@@ -1973,7 +1973,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await docker.images.delete(request.image, force=request.force, noprune=request.noprune)
             return PurgeImageResp.success(image=request.image)
         except Exception as e:
-            log.error(f'Failed to purge image "{request.image}": {e}')
+            log.error('Failed to purge image "{}": {}', request.image, e)
             return PurgeImageResp.failure(image=request.image, error=str(e))
 
     @override

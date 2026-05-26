@@ -266,7 +266,7 @@ async def project_fair_shares(
 async def admin_upsert_project_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: UpsertProjectFairShareWeightInput,
-) -> UpsertProjectFairShareWeightPayload:
+) -> UpsertProjectFairShareWeightPayload | None:
     """Upsert project fair share weight (admin only)."""
     check_admin_only()
 
@@ -285,7 +285,7 @@ async def admin_upsert_project_fair_share_weight(
 async def admin_bulk_upsert_project_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: BulkUpsertProjectFairShareWeightInput,
-) -> BulkUpsertProjectFairShareWeightPayload:
+) -> BulkUpsertProjectFairShareWeightPayload | None:
     """Bulk upsert project fair share weights (admin only)."""
     check_admin_only()
 
@@ -306,7 +306,7 @@ async def admin_bulk_upsert_project_fair_share_weight(
 async def upsert_project_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: UpsertProjectFairShareWeightInput,
-) -> UpsertProjectFairShareWeightPayload:
+) -> UpsertProjectFairShareWeightPayload | None:
     """Upsert project fair share weight."""
     me = current_user()
     if me is None or not me.is_superadmin:
@@ -328,7 +328,7 @@ async def upsert_project_fair_share_weight(
 async def bulk_upsert_project_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: BulkUpsertProjectFairShareWeightInput,
-) -> BulkUpsertProjectFairShareWeightPayload:
+) -> BulkUpsertProjectFairShareWeightPayload | None:
     """Bulk upsert project fair share weights."""
     me = current_user()
     if me is None or not me.is_superadmin:

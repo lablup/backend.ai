@@ -33,13 +33,14 @@ from ai.backend.common.dto.manager.v2.session_options import (
     DefaultSessionOptionsInfo,
     DefaultSessionOptionsInput,
     FailurePolicyEnum,
-    HandlerTimeoutEntryInfo,
+    HandlerOptionsEntryInfo,
+    HandlerOptionsInfo,
     KernelExecutionSpecInfo,
     KernelExecutionSpecInput,
     ResourceOptsInfo,
     ResourceOptsInput,
-    SessionTimeoutsInfo,
-    SessionTimeoutsInput,
+    SessionHandlerOptionsInfo,
+    SessionHandlerOptionsInput,
 )
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.image import ImageID
@@ -56,9 +57,10 @@ from ai.backend.manager.data.session.options import (
     AgentSelectionPolicy,
     DefaultSessionOptions,
     FailurePolicy,
+    HandlerOptions,
     KernelExecutionSpec,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 
 __all__ = (
@@ -98,37 +100,56 @@ def _cluster_mode_to_info(value: ClusterMode) -> ClusterModeEnum:
 
 
 # ---------------------------------------------------------------------------
-# Timeouts
+# Handler options (timeout + max_retry_count)
 # ---------------------------------------------------------------------------
 
 
-def _timeouts_from_input(
-    timeouts: SessionTimeoutsInput,
+def _handler_options_from_input(
+    options: SessionHandlerOptionsInput,
     valid_handler_names: frozenset[str],
-) -> SessionTimeouts:
-    by_handler: dict[str, int | None] = {}
-    for entry in timeouts.by_handler:
+) -> SessionHandlerOptions:
+    by_handler: dict[str, HandlerOptions] = {}
+    for entry in options.by_handler:
         if entry.handler_name in by_handler:
             raise InvalidAPIParameters(
-                f"Duplicate handler_name in timeouts.by_handler: {entry.handler_name!r}"
+                f"Duplicate handler_name in handler_options.by_handler: {entry.handler_name!r}"
             )
         if entry.handler_name not in valid_handler_names:
             raise InvalidAPIParameters(
                 f"Unknown handler_name {entry.handler_name!r};"
                 f" valid names: {sorted(valid_handler_names)}"
             )
-        by_handler[entry.handler_name] = entry.timeout_sec
-    return SessionTimeouts(default=timeouts.default, by_handler=by_handler)
+        by_handler[entry.handler_name] = HandlerOptions(
+            timeout=entry.timeout_sec,
+            max_retry_count=entry.max_retry_count,
+        )
+    return SessionHandlerOptions(
+        default=HandlerOptions(
+            timeout=options.default.timeout_sec,
+            max_retry_count=options.default.max_retry_count,
+        ),
+        by_handler=by_handler,
+    )
 
 
-def _timeouts_to_info(timeouts: SessionTimeouts) -> SessionTimeoutsInfo:
+def _handler_options_to_info(options: SessionHandlerOptions) -> SessionHandlerOptionsInfo:
     entries = [
-        HandlerTimeoutEntryInfo(handler_name=name, timeout_sec=seconds)
-        for name, seconds in timeouts.by_handler.items()
+        HandlerOptionsEntryInfo(
+            handler_name=name,
+            timeout_sec=opts.timeout,
+            max_retry_count=opts.max_retry_count,
+        )
+        for name, opts in options.by_handler.items()
     ]
     # Keep the output order deterministic so clients see a stable view.
     entries.sort(key=lambda e: e.handler_name)
-    return SessionTimeoutsInfo(default=timeouts.default, by_handler=entries)
+    return SessionHandlerOptionsInfo(
+        default=HandlerOptionsInfo(
+            timeout_sec=options.default.timeout,
+            max_retry_count=options.default.max_retry_count,
+        ),
+        by_handler=entries,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +200,7 @@ def _mount_items_to_entries(items: Sequence[MountItemInput]) -> list[MountInfoEn
                 vfolder_id=VFolderUUID(item.vfolder_id),
                 mount_destination=item.mount_path,
                 mount_perm=perm or MountPermission.READ_WRITE,
+                subpath=item.subpath,
             )
         )
     return result
@@ -249,13 +271,13 @@ def default_session_options_from_input(
 
     ``valid_handler_names`` is the runtime set of handler ``name()``
     results registered on the session scheduler coordinator; any
-    ``timeouts.by_handler`` key outside this set is rejected as
+    ``handler_options.by_handler`` key outside this set is rejected as
     :class:`InvalidAPIParameters`.
 
     Every field on the input is optional — missing fields fall back to
     the Python ``DefaultSessionOptions`` field defaults. The admin
-    surface therefore accepts partial payloads (e.g. only ``timeouts``)
-    while still yielding a complete stored object.
+    surface therefore accepts partial payloads (e.g. only
+    ``handler_options``) while still yielding a complete stored object.
     """
     baseline = DefaultSessionOptions()
     resolved_kernel_execution_spec: KernelExecutionSpec | None
@@ -266,11 +288,13 @@ def default_session_options_from_input(
     else:
         resolved_kernel_execution_spec = baseline.default_kernel_execution_spec
 
-    resolved_timeouts: SessionTimeouts
-    if options.timeouts is not None:
-        resolved_timeouts = _timeouts_from_input(options.timeouts, valid_handler_names)
+    resolved_handler_options: SessionHandlerOptions
+    if options.handler_options is not None:
+        resolved_handler_options = _handler_options_from_input(
+            options.handler_options, valid_handler_names
+        )
     else:
-        resolved_timeouts = baseline.timeouts
+        resolved_handler_options = baseline.handler_options
 
     return DefaultSessionOptions(
         priority=options.priority if options.priority is not None else baseline.priority,
@@ -290,7 +314,7 @@ def default_session_options_from_input(
             else baseline.default_failure_policy
         ),
         default_kernel_execution_spec=resolved_kernel_execution_spec,
-        timeouts=resolved_timeouts,
+        handler_options=resolved_handler_options,
         agent_selection_policy=(
             _agent_selection_policy_from_input(options.agent_selection_policy)
             if options.agent_selection_policy is not None
@@ -311,6 +335,6 @@ def default_session_options_to_info(options: DefaultSessionOptions) -> DefaultSe
             if options.default_kernel_execution_spec is not None
             else None
         ),
-        timeouts=_timeouts_to_info(options.timeouts),
+        handler_options=_handler_options_to_info(options.handler_options),
         agent_selection_policy=_agent_selection_policy_to_info(options.agent_selection_policy),
     )

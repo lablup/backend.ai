@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.error_log.request import (
     ListErrorLogsInput,
     MarkClearedInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestAppendErrorLogInput:
@@ -79,7 +80,7 @@ class TestAppendErrorLogInput:
         assert inp.context_env == {}
 
     def test_context_env_invalid_json_string_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AppendErrorLogInput.model_validate({
                 "severity": "error",
                 "source": "manager",
@@ -89,7 +90,7 @@ class TestAppendErrorLogInput:
             })
 
     def test_context_env_json_non_object_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AppendErrorLogInput.model_validate({
                 "severity": "error",
                 "source": "manager",
@@ -99,7 +100,7 @@ class TestAppendErrorLogInput:
             })
 
     def test_missing_required_field_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AppendErrorLogInput.model_validate({
                 "severity": "error",
                 "source": "manager",
@@ -142,19 +143,19 @@ class TestListErrorLogsInput:
         assert inp.page_size == 100
 
     def test_page_size_exceeds_max_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_size=200)
 
     def test_page_size_exceeds_max_boundary_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_size=101)
 
     def test_page_size_below_min_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_size=0)
 
     def test_page_size_negative_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_size=-1)
 
     def test_page_no_min_boundary(self) -> None:
@@ -162,11 +163,11 @@ class TestListErrorLogsInput:
         assert inp.page_no == 1
 
     def test_page_no_below_min_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_no=0)
 
     def test_page_no_negative_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_no=-5)
 
     def test_mark_read_true(self) -> None:
@@ -192,7 +193,7 @@ class TestMarkClearedInput:
         assert inp.log_id == "550e8400-e29b-41d4-a716-446655440000"
 
     def test_missing_log_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             MarkClearedInput.model_validate({})
 
     def test_creation_from_dict(self) -> None:

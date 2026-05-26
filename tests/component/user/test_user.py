@@ -41,6 +41,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.user import users
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import UserFactory
 
@@ -65,7 +66,7 @@ class TestUserCreate:
     async def test_regular_user_cannot_create_user(
         self,
         user_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         resource_policy_fixture: str,
     ) -> None:
         unique = secrets.token_hex(4)
@@ -73,7 +74,7 @@ class TestUserCreate:
             email=f"denied-{unique}@test.local",
             username=f"denied-{unique}",
             password="test-password-1234",
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
             resource_policy=resource_policy_fixture,
         )
         with pytest.raises(PermissionDeniedError):
@@ -360,7 +361,7 @@ class TestUserDelete:
 @pytest.fixture()
 async def user_with_rbac_rows(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[tuple[uuid.UUID, str]]:
     """Insert a user along with the RBAC rows that the create flow would
@@ -390,7 +391,7 @@ async def user_with_rbac_rows(
                 description="Test user for RBAC purge cleanup",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
             )
@@ -416,7 +417,7 @@ async def user_with_rbac_rows(
         await conn.execute(
             sa.insert(AssociationScopesEntitiesRow.__table__).values(
                 scope_type=ScopeType.DOMAIN,
-                scope_id=domain_fixture,
+                scope_id=domain_fixture.domain_name,
                 entity_type=EntityType.USER,
                 entity_id=scope_id,
                 relation_type=RelationType.AUTO,

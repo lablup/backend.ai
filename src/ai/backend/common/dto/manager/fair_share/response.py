@@ -6,10 +6,11 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     # Common
@@ -52,20 +53,20 @@ __all__ = (
 )
 
 
-class ResourceSlotEntryDTO(BaseModel):
+class ResourceSlotEntryDTO(BackendAISchema):
     """A single resource slot entry with resource type and quantity."""
 
     resource_type: str = Field(description="Resource type identifier (e.g., cpu, mem, cuda.shares)")
     quantity: str = Field(description="Quantity as a decimal string to preserve precision")
 
 
-class ResourceSlotDTO(BaseModel):
+class ResourceSlotDTO(BackendAISchema):
     """Collection of compute resource allocations."""
 
     entries: list[ResourceSlotEntryDTO] = Field(description="List of resource allocations")
 
 
-class FairShareSpecDTO(BaseModel):
+class FairShareSpecDTO(BackendAISchema):
     """Fair share specification parameters."""
 
     weight: Decimal | None = Field(
@@ -78,7 +79,7 @@ class FairShareSpecDTO(BaseModel):
     resource_weights: ResourceSlotDTO = Field(description="Weights for each resource type")
 
 
-class FairShareCalculationSnapshotDTO(BaseModel):
+class FairShareCalculationSnapshotDTO(BackendAISchema):
     """Snapshot of the most recent fair share calculation."""
 
     fair_share_factor: Decimal = Field(description="Computed fair share factor (0-1 range)")
@@ -207,7 +208,7 @@ class SearchUserFairSharesResponse(BaseResponseModel):
 # Usage Bucket Common
 
 
-class UsageBucketMetadataDTO(BaseModel):
+class UsageBucketMetadataDTO(BackendAISchema):
     """Common metadata for usage bucket records."""
 
     period_start: date = Field(description="Start date of the usage measurement period (inclusive)")
@@ -370,7 +371,7 @@ class BulkUpsertUserFairShareWeightResponse(BaseResponseModel):
 # Resource Group Fair Share Spec
 
 
-class ResourceGroupFairShareSpecDTO(BaseModel):
+class ResourceGroupFairShareSpecDTO(BackendAISchema):
     """Fair share specification for a resource group."""
 
     half_life_days: int = Field(description="Half-life for exponential decay in days")
@@ -396,7 +397,7 @@ class GetResourceGroupFairShareSpecResponse(BaseResponseModel):
     fair_share_spec: ResourceGroupFairShareSpecDTO = Field(description="Fair share specification")
 
 
-class ResourceGroupFairShareSpecItemDTO(BaseModel):
+class ResourceGroupFairShareSpecItemDTO(BackendAISchema):
     """Resource group with its fair share specification."""
 
     resource_group: str = Field(description="Name of the resource group")

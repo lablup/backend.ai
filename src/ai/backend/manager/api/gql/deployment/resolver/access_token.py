@@ -24,7 +24,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 @gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Create access token."))
 async def create_access_token(
     input: CreateAccessTokenInput, info: Info[StrawberryGQLContext]
-) -> CreateAccessTokenPayload:
+) -> CreateAccessTokenPayload | None:
     """Create a new access token for a deployment."""
     payload = await info.context.adapters.deployment.create_access_token(input.to_pydantic())
     return CreateAccessTokenPayload(access_token=AccessToken.from_pydantic(payload.access_token))
@@ -35,7 +35,7 @@ async def create_access_token(
 )
 async def delete_access_token(
     input: DeleteAccessTokenInput, info: Info[StrawberryGQLContext]
-) -> DeleteAccessTokenPayload:
+) -> DeleteAccessTokenPayload | None:
     """Delete an access token."""
     payload = await info.context.adapters.deployment.delete_access_token(input.to_pydantic())
     return DeleteAccessTokenPayload(id=payload.id)

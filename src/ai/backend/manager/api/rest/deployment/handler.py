@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.deployment import (
 )
 from ai.backend.common.dto.manager.deployment.response import DeploymentDTO, RevisionDTO
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
@@ -223,7 +224,7 @@ class DeploymentAPIHandler:
         """Get a specific deployment."""
         # Call service action - raises EndpointNotFound if not found
         action_result = await self._deployment.get_deployment_by_id.wait_for_complete(
-            GetDeploymentByIdAction(deployment_id=path.parsed.deployment_id)
+            GetDeploymentByIdAction(deployment_id=DeploymentID(path.parsed.deployment_id))
         )
 
         # Build response
@@ -302,7 +303,7 @@ class DeploymentAPIHandler:
         # Call service action
         action_result = await self._deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(
-                model_deployment_id=path.parsed.deployment_id,
+                model_deployment_id=DeploymentID(path.parsed.deployment_id),
                 adder=revision_creator,
                 auto_activate=body.parsed.options.auto_activate,
             )
@@ -349,7 +350,7 @@ class DeploymentAPIHandler:
         """Get a specific revision."""
         # Call service action - raises DeploymentRevisionNotFound if not found
         action_result = await self._deployment.get_revision_by_id.wait_for_complete(
-            GetRevisionByIdAction(revision_id=path.parsed.revision_id)
+            GetRevisionByIdAction(revision_id=DeploymentRevisionID(path.parsed.revision_id))
         )
 
         # Build response
@@ -364,8 +365,8 @@ class DeploymentAPIHandler:
         # Call service action
         await self._deployment.activate_revision.wait_for_complete(
             ActivateRevisionAction(
-                deployment_id=path.parsed.deployment_id,
-                revision_id=path.parsed.revision_id,
+                deployment_id=DeploymentID(path.parsed.deployment_id),
+                revision_id=DeploymentRevisionID(path.parsed.revision_id),
             )
         )
 

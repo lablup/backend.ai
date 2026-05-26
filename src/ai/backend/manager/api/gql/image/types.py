@@ -302,7 +302,7 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         after: str | None = None,
         first: int | None = None,
         last: int | None = None,
-    ) -> ImageV2AliasConnectionGQL:
+    ) -> ImageV2AliasConnectionGQL | None:
         """Get the aliases for this image with pagination, filtering, and ordering."""
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None

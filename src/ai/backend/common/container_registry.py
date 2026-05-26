@@ -2,7 +2,9 @@ import enum
 import uuid
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 from .api_handlers import BaseFieldModel, BaseRequestModel, BaseResponseModel
 
@@ -24,7 +26,7 @@ class AllowedGroupsModel(BaseFieldModel):
     remove: list[str] = []
 
 
-class ContainerRegistryModel(BaseModel):
+class ContainerRegistryModel(BackendAISchema):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID | None = None

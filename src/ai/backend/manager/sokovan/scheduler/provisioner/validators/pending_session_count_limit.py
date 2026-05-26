@@ -40,5 +40,5 @@ class PendingSessionCountLimitValidator(ValidatorRule):
         # Check if creating this session would exceed the limit
         if current_pending_count >= pending_count_limit:
             raise PendingSessionCountLimitExceeded(
-                f"You cannot create more than {pending_count_limit} pending session(s)."
+                max_pending_session_count=pending_count_limit,
             )

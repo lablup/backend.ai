@@ -113,7 +113,7 @@ async def runtime_variant(
 async def admin_create_runtime_variant(
     info: Info[StrawberryGQLContext],
     input: CreateRuntimeVariantInputGQL,
-) -> CreateRuntimeVariantPayloadGQL:
+) -> CreateRuntimeVariantPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.runtime_variant.create(dto)
@@ -129,7 +129,7 @@ async def admin_create_runtime_variant(
 async def admin_update_runtime_variant(
     info: Info[StrawberryGQLContext],
     input: UpdateRuntimeVariantInputGQL,
-) -> UpdateRuntimeVariantPayloadGQL:
+) -> UpdateRuntimeVariantPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.runtime_variant.update(dto)
@@ -145,7 +145,7 @@ async def admin_update_runtime_variant(
 async def admin_delete_runtime_variant(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteRuntimeVariantPayloadGQL:
+) -> DeleteRuntimeVariantPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.runtime_variant.delete(id)
     return DeleteRuntimeVariantPayloadGQL.from_pydantic(payload)
@@ -160,7 +160,7 @@ async def admin_delete_runtime_variant(
 async def admin_delete_runtime_variants(
     info: Info[StrawberryGQLContext],
     input: DeleteRuntimeVariantsInputGQL,
-) -> DeleteRuntimeVariantsPayloadGQL:
+) -> DeleteRuntimeVariantsPayloadGQL | None:
     """Delete multiple runtime variants.
 
     Args:

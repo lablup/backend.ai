@@ -6,6 +6,7 @@ import grp
 import importlib
 import importlib.resources
 import ipaddress
+import json
 import logging
 import os
 import pwd
@@ -80,7 +81,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
@@ -197,8 +198,13 @@ async def exception_middleware(
     root_ctx: RootContext = request.app["_root.context"]
     try:
         resp = await handler(request)
-    except ValidationError as ex:
-        log.exception("Failed to create response model: {}", ex.json(indent=2))
+    except (BackendAISchemaValidationFailed, ValidationError) as ex:
+        # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+        # skip the ``BackendAISchema`` auto-conversion override.
+        log.exception(
+            "Failed to create response model: {}",
+            json.dumps(ex.errors(), indent=2, default=str),
+        )
         raise InternalServerError() from ex
     except BackendAIError as ex:
         if ex.status_code == 500:
@@ -806,9 +812,11 @@ async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
     root_ctx.health_probe = probe
 
-    # Register health checkers using already-initialized resources
-    await probe.register(DatabaseHealthChecker(db=root_ctx.db))
-    await probe.register(
+    # Database: readiness only — no connection-stuck restart pattern needed.
+    await probe.register_readiness(DatabaseHealthChecker(db=root_ctx.db))
+
+    # Valkey: liveness — also surfaced in readiness.
+    await probe.register_liveness(
         ValkeyHealthChecker(
             clients={
                 ComponentId("live"): root_ctx.valkey_live,

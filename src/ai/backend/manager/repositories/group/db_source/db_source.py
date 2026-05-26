@@ -998,7 +998,7 @@ class GroupDBSource:
         """
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(GroupRow)
-            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.GroupRow.to_data() for row in result.rows]
 
@@ -1040,7 +1040,7 @@ class GroupDBSource:
                     ),
                 )
             )
-            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.GroupRow.to_data() for row in result.rows]
 

@@ -8,7 +8,6 @@ from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpe
 # fmt: off
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-    from ai.backend.common.clients.prometheus.client import PrometheusClient
     from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
         ValkeyArtifactDownloadTrackingClient,
     )
@@ -32,6 +31,7 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.agent_cache import AgentRPCCache
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+    from ai.backend.manager.clients.prometheus.client import PrometheusClient
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.storage import StorageSessionManager

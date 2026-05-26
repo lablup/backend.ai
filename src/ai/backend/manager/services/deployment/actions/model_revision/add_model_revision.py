@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
@@ -13,7 +13,7 @@ from ai.backend.manager.services.deployment.actions.model_revision.base import (
 
 @dataclass
 class AddModelRevisionAction(ModelRevisionBaseAction):
-    model_deployment_id: UUID
+    model_deployment_id: DeploymentID
     adder: ModelRevisionCreator
     auto_activate: bool
 

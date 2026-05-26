@@ -249,7 +249,7 @@ async def user_app_config(
 )  # type: ignore[misc]
 async def merged_app_config(
     info: Info[StrawberryGQLContext],
-) -> AppConfig:
+) -> AppConfig | None:
     """Get merged app configuration for the current user."""
     me = current_user()
     if me is None:
@@ -269,7 +269,7 @@ async def merged_app_config(
 async def admin_upsert_domain_app_config(
     input: UpsertDomainConfigInput,
     info: Info[StrawberryGQLContext],
-) -> UpsertDomainConfigPayload:
+) -> UpsertDomainConfigPayload | None:
     """Create or update domain-level app configuration (admin only)."""
     check_admin_only()
     result = await info.context.adapters.app_config.upsert_domain_config(
@@ -289,7 +289,7 @@ async def admin_upsert_domain_app_config(
 async def upsert_domain_app_config(
     input: UpsertDomainConfigInput,
     info: Info[StrawberryGQLContext],
-) -> UpsertDomainConfigPayload:
+) -> UpsertDomainConfigPayload | None:
     """Create or update domain-level app configuration."""
     me = current_user()
     if me is None or not (me.is_admin or me.is_superadmin):
@@ -311,7 +311,7 @@ async def upsert_domain_app_config(
 async def upsert_user_app_config(
     input: UpsertUserConfigInput,
     info: Info[StrawberryGQLContext],
-) -> UpsertUserConfigPayload:
+) -> UpsertUserConfigPayload | None:
     """Create or update user-level app configuration."""
     me = current_user()
     if me is None:
@@ -339,7 +339,7 @@ async def upsert_user_app_config(
 async def admin_delete_domain_app_config(
     input: DeleteDomainConfigInput,
     info: Info[StrawberryGQLContext],
-) -> DeleteDomainConfigPayload:
+) -> DeleteDomainConfigPayload | None:
     """Delete domain-level app configuration (admin only)."""
     check_admin_only()
     result = await info.context.adapters.app_config.delete_domain_config(input.domain_name)
@@ -357,7 +357,7 @@ async def admin_delete_domain_app_config(
 async def delete_domain_app_config(
     input: DeleteDomainConfigInput,
     info: Info[StrawberryGQLContext],
-) -> DeleteDomainConfigPayload:
+) -> DeleteDomainConfigPayload | None:
     """Delete domain-level app configuration."""
     me = current_user()
     if me is None or not (me.is_admin or me.is_superadmin):
@@ -377,7 +377,7 @@ async def delete_domain_app_config(
 async def delete_user_app_config(
     input: DeleteUserConfigInput,
     info: Info[StrawberryGQLContext],
-) -> DeleteUserConfigPayload:
+) -> DeleteUserConfigPayload | None:
     """Delete user-level app configuration."""
     me = current_user()
     if me is None:

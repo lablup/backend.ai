@@ -21,23 +21,19 @@ class DependencyBuilderStack(DependencyStack):
     """
     DependencyStack that collects health checkers from providers.
 
-    Uses AsyncExitStack internally for lifecycle management while automatically
-    collecting health checkers from providers that implement gen_health_checkers() method.
-
-    Health checkers are registered by their ServiceGroup (e.g., REDIS, DATABASE, ETCD).
-    Each ServiceGroup can have only one health checker, which checks multiple components
-    within that service group.
-
-    Health checkers can be retrieved after dependency initialization
-    to register them with a HealthProbe for health monitoring.
+    Uses AsyncExitStack internally for lifecycle management while collecting
+    liveness/readiness health checkers from each provider. Each ServiceGroup
+    can have only one checker per kind.
     """
 
     _stack: AsyncExitStack
-    _health_checkers: dict[ServiceGroup, ServiceHealthChecker]
+    _liveness_checkers: dict[ServiceGroup, ServiceHealthChecker]
+    _readiness_checkers: dict[ServiceGroup, ServiceHealthChecker]
 
     def __init__(self) -> None:
         self._stack = AsyncExitStack()
-        self._health_checkers = {}
+        self._liveness_checkers = {}
+        self._readiness_checkers = {}
 
     async def enter_dependency(
         self,
@@ -45,17 +41,17 @@ class DependencyBuilderStack(DependencyStack):
         setup_input: SetupInputT,
     ) -> ResourceT:
         """
-        Execute a dependency provider and collect health checker.
-
-        If the provider returns a health checker, it will be registered using
-        checker.target_service_group as the key.
+        Execute a dependency provider and collect its liveness/readiness checkers.
         """
         resource = await self._stack.enter_async_context(provider.provide(setup_input))
 
-        # Collect health checker from provider
-        checker = provider.gen_health_checkers(resource)
-        if checker is not None:
-            self._health_checkers[checker.target_service_group] = checker
+        liveness = provider.gen_liveness_checker(resource)
+        if liveness is not None:
+            self._liveness_checkers[liveness.target_service_group] = liveness
+
+        readiness = provider.gen_readiness_checker(resource)
+        if readiness is not None:
+            self._readiness_checkers[readiness.target_service_group] = readiness
 
         return resource
 
@@ -65,47 +61,35 @@ class DependencyBuilderStack(DependencyStack):
         setup_input: SetupInputT,
     ) -> ResourcesT:
         """
-        Execute a dependency composer and collect health checkers from nested dependencies.
-
-        Creates a nested DependencyBuilderStack to track dependencies
-        within the composer, then merges collected health checkers.
+        Execute a dependency composer and merge collected checkers from nested deps.
         """
-        # Create nested builder stack
         nested_stack = DependencyBuilderStack()
         await self._stack.enter_async_context(nested_stack)
 
-        # Compose and get resources
         resources = await nested_stack._stack.enter_async_context(
             composer.compose(nested_stack, setup_input)
         )
 
-        # Collect health checkers from nested stack
-        for service_group, checker in nested_stack._health_checkers.items():
-            self._health_checkers[service_group] = checker
+        for service_group, checker in nested_stack._liveness_checkers.items():
+            self._liveness_checkers[service_group] = checker
+        for service_group, checker in nested_stack._readiness_checkers.items():
+            self._readiness_checkers[service_group] = checker
 
         return resources
 
-    def get_health_checkers(self) -> dict[ServiceGroup, ServiceHealthChecker]:
-        """
-        Return collected health checkers.
+    def get_liveness_checkers(self) -> dict[ServiceGroup, ServiceHealthChecker]:
+        """Return collected liveness checkers."""
+        return self._liveness_checkers.copy()
 
-        Returns:
-            Dictionary mapping ServiceGroup to ServiceHealthChecker instances
-            collected from all initialized dependencies.
-        """
-        return self._health_checkers.copy()
+    def get_readiness_checkers(self) -> dict[ServiceGroup, ServiceHealthChecker]:
+        """Return collected readiness checkers."""
+        return self._readiness_checkers.copy()
 
     async def __aenter__(self) -> DependencyBuilderStack:
-        """
-        Enter the async context.
-        """
         await self._stack.__aenter__()
         return self
 
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
     ) -> bool | None:
-        """
-        Exit the async context and cleanup resources in LIFO order.
-        """
         return await self._stack.__aexit__(exc_type, exc_val, exc_tb)

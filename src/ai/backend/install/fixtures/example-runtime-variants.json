@@ -3,6 +3,7 @@
     {
       "name": "vllm",
       "description": "vLLM",
+      "reads_vfolder_config_files": false,
       "default_model_definition": {
         "models": [
           {
@@ -24,6 +25,7 @@
     {
       "name": "nim",
       "description": "NVIDIA NIM",
+      "reads_vfolder_config_files": false,
       "default_model_definition": {
         "models": [
           {
@@ -44,6 +46,7 @@
     {
       "name": "cmd",
       "description": "Predefined Image Command",
+      "reads_vfolder_config_files": false,
       "default_model_definition": {
         "models": [
           {
@@ -58,6 +61,7 @@
     {
       "name": "huggingface-tgi",
       "description": "Huggingface TGI",
+      "reads_vfolder_config_files": false,
       "default_model_definition": {
         "models": [
           {
@@ -79,6 +83,7 @@
     {
       "name": "sglang",
       "description": "SGLang",
+      "reads_vfolder_config_files": false,
       "default_model_definition": {
         "models": [
           {
@@ -106,6 +111,7 @@
     {
       "name": "modular-max",
       "description": "Modular MAX",
+      "reads_vfolder_config_files": false,
       "default_model_definition": {
         "models": [
           {
@@ -127,6 +133,7 @@
     {
       "name": "custom",
       "description": "Custom (Default)",
+      "reads_vfolder_config_files": true,
       "default_model_definition": {
         "models": null
       }

@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchDeploymentsInput,
     ReplaceDeploymentOptionsInput,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
@@ -196,7 +197,7 @@ async def my_deployments(
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> ModelDeployment | None:
     """Get a specific deployment by ID."""
     _, deployment_id = resolve_global_id(id)
-    node = await info.context.adapters.deployment.get(UUID(deployment_id))
+    node = await info.context.adapters.deployment.get(DeploymentID(UUID(deployment_id)))
     return ModelDeployment.from_pydantic(node)
 
 
@@ -206,7 +207,7 @@ async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> ModelDeploymen
 @gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Create model deployment."))
 async def create_model_deployment(
     input: CreateDeploymentInput, info: Info[StrawberryGQLContext]
-) -> CreateDeploymentPayload:
+) -> CreateDeploymentPayload | None:
     """Create a new model deployment."""
     user_data = current_user()
     if user_data is None:
@@ -218,16 +219,18 @@ async def create_model_deployment(
 @gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Update model deployment."))
 async def update_model_deployment(
     input: UpdateDeploymentInput, info: Info[StrawberryGQLContext]
-) -> UpdateDeploymentPayload:
+) -> UpdateDeploymentPayload | None:
     """Update an existing model deployment."""
-    payload = await info.context.adapters.deployment.update(input.to_pydantic(), UUID(input.id))
+    payload = await info.context.adapters.deployment.update(
+        input.to_pydantic(), DeploymentID(UUID(input.id))
+    )
     return UpdateDeploymentPayload(deployment=ModelDeployment.from_pydantic(payload.deployment))
 
 
 @gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Delete model deployment."))
 async def delete_model_deployment(
     input: DeleteDeploymentInput, info: Info[StrawberryGQLContext]
-) -> DeleteDeploymentPayload:
+) -> DeleteDeploymentPayload | None:
     """Delete a model deployment."""
     await info.context.adapters.deployment.delete(input.to_pydantic())
     return DeleteDeploymentPayload(id=input.id)
@@ -244,7 +247,7 @@ async def delete_model_deployment(
 )
 async def replace_deployment_options(
     input: ReplaceDeploymentOptionsInputGQL, info: Info[StrawberryGQLContext]
-) -> ReplaceDeploymentOptionsPayload:
+) -> ReplaceDeploymentOptionsPayload | None:
     """Replace the options surface of a deployment.
 
     GQL input carries the target ``deployment_id`` and the full ``options``
@@ -270,7 +273,7 @@ async def replace_deployment_options(
 )
 async def sync_replicas(
     input: SyncReplicaInput, info: Info[StrawberryGQLContext]
-) -> SyncReplicaPayload:
+) -> SyncReplicaPayload | None:
     payload = await info.context.adapters.deployment.sync_replicas(input.to_pydantic())
     return SyncReplicaPayload(success=payload.success)
 
@@ -287,7 +290,7 @@ async def sync_replicas(
 )
 async def admin_refresh_deployment_revisions(
     info: Info[StrawberryGQLContext],
-) -> AdminRefreshDeploymentRevisionsPayload:
+) -> AdminRefreshDeploymentRevisionsPayload | None:
     check_admin_only()
     payload = await info.context.adapters.deployment.admin_refresh_deployment_revisions()
     return AdminRefreshDeploymentRevisionsPayload(

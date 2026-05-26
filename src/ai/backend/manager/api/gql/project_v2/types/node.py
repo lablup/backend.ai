@@ -109,7 +109,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         self,
         info: Info,
         scope: ProjectFairShareScopeGQL,
-    ) -> ProjectFairShareGQL:
+    ) -> ProjectFairShareGQL | None:
         from ai.backend.common.dto.manager.v2.fair_share.request import GetProjectFairShareInput
 
         payload = await info.context.adapters.fair_share.get_project(
@@ -130,7 +130,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     async def active_resource_overview(
         self,
         info: Info,
-    ) -> ActiveResourceOverviewGQL:
+    ) -> ActiveResourceOverviewGQL | None:
         dto = await info.context.adapters.resource_slot.get_project_resource_overview(
             UUID(str(self.id))
         )
@@ -151,7 +151,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ProjectUsageBucketConnection:
+    ) -> ProjectUsageBucketConnection | None:
         from strawberry.relay import PageInfo
 
         from ai.backend.manager.api.gql.base import encode_cursor
@@ -198,10 +198,13 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     async def domain(
         self,
         info: Info,
-    ) -> Annotated[
-        DomainV2GQL,
-        strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
-    ]:
+    ) -> (
+        Annotated[
+            DomainV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+        ]
+        | None
+    ):
         from ai.backend.manager.errors.resource import DomainNotFound
 
         domain: DomainV2GQL | None = await info.context.data_loaders.domain_loader.load(
@@ -232,10 +235,13 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        UserV2Connection,
-        strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
-    ]:
+    ) -> (
+        Annotated[
+            UserV2Connection,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
         from strawberry.relay import PageInfo
 
         from ai.backend.common.dto.manager.v2.user.request import AdminSearchUsersInput

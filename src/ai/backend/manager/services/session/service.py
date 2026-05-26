@@ -65,9 +65,10 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -218,10 +219,6 @@ from ai.backend.manager.services.session.actions.start_service import (
 from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
     TerminateSessionsActionResult,
-)
-from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
-    TerminateSessionsInProjectAction,
-    TerminateSessionsInProjectActionResult,
 )
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
@@ -831,37 +828,10 @@ class SessionService:
             action.session_ids, reason=reason.value, forced=action.forced
         )
         return TerminateSessionsActionResult(
-            cancelled=[uuid.UUID(str(s)) for s in mark_result.cancelled_sessions],
-            terminating=[uuid.UUID(str(s)) for s in mark_result.terminating_sessions],
-            force_terminated=[uuid.UUID(str(s)) for s in mark_result.force_terminated_sessions],
-            skipped=[uuid.UUID(str(s)) for s in mark_result.skipped_sessions],
-        )
-
-    async def terminate_sessions_in_project(
-        self, action: TerminateSessionsInProjectAction
-    ) -> TerminateSessionsInProjectActionResult:
-        """Terminate multiple sessions within a project scope.
-
-        Sessions not belonging to the project are filtered out and
-        included in the ``skipped`` list of the result.
-        """
-        valid_ids = await self._session_repository.filter_sessions_in_project(
-            action.session_ids, action.project_id
-        )
-        valid_set = set(valid_ids)
-        not_in_project = [uuid.UUID(str(sid)) for sid in action.session_ids if sid not in valid_set]
-        if valid_ids:
-            result = await self.terminate_sessions(
-                TerminateSessionsAction(session_ids=valid_ids, forced=action.forced)
-            )
-            return TerminateSessionsInProjectActionResult(
-                cancelled=result.cancelled,
-                terminating=result.terminating,
-                force_terminated=result.force_terminated,
-                skipped=result.skipped + not_in_project,
-            )
-        return TerminateSessionsInProjectActionResult(
-            skipped=not_in_project,
+            cancelled=mark_result.cancelled_sessions,
+            terminating=mark_result.terminating_sessions,
+            force_terminated=mark_result.force_terminated_sessions,
+            skipped=mark_result.skipped_sessions,
         )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
@@ -1599,6 +1569,21 @@ class SessionService:
                 domain_name=domain_name,
                 project_id=ProjectID(action.group_id),
             )
+        kernel_groups = await self._resolve_kernel_groups(
+            cluster_size=action.resource.cluster_size,
+            preopen_ports=preopen_ports,
+            execution_spec=KernelExecutionSpecDraft(
+                image_id=ImageID(action.image_id),
+                resources=resource_entries,
+                resource_opts=resource_opts,
+                environ=environ,
+                mounts=mount_entries,
+                startup_command=startup_command,
+                bootstrap_script=bootstrap_script,
+                starts_at=starts_at,
+                batch_timeout_sec=batch_timeout_sec,
+            ),
+        )
 
         draft = SessionSpecDraft(
             identity=SessionIdentityDraft(
@@ -1636,25 +1621,8 @@ class SessionService:
                         AgentId(a) for a in (action.scheduling.agent_list or ())
                     ),
                 ),
-                kernel_groups=(
-                    KernelGroupDraft(
-                        role="main",
-                        replica_count=action.resource.cluster_size,
-                        preopen_ports=preopen_ports,
-                        execution_spec=KernelExecutionSpecDraft(
-                            image_id=ImageID(action.image_id),
-                            resources=resource_entries,
-                            resource_opts=resource_opts,
-                            environ=environ,
-                            mounts=mount_entries,
-                            startup_command=startup_command,
-                            bootstrap_script=bootstrap_script,
-                            starts_at=starts_at,
-                            batch_timeout_sec=batch_timeout_sec,
-                        ),
-                    ),
-                ),
-                timeouts=SessionTimeouts(),
+                kernel_groups=kernel_groups,
+                handler_options=SessionHandlerOptions(),
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=False,
@@ -1666,3 +1634,29 @@ class SessionService:
         session_data = await self._session_repository.get_session_data_by_id(session_id)
 
         return EnqueueSessionActionResult(session_data=session_data)
+
+    async def _resolve_kernel_groups(
+        self,
+        cluster_size: int,
+        preopen_ports: tuple[int, ...],
+        execution_spec: KernelExecutionSpecDraft,
+    ) -> tuple[KernelGroupDraft, ...]:
+        # 1 main + (cluster_size - 1) sub, matching legacy registry Shape (a).
+        groups: tuple[KernelGroupDraft, ...] = (
+            KernelGroupDraft(
+                role=DEFAULT_ROLE,
+                replica_count=1,
+                preopen_ports=preopen_ports,
+                execution_spec=execution_spec,
+            ),
+        )
+        if cluster_size > 1:
+            groups += (
+                KernelGroupDraft(
+                    role="sub",
+                    replica_count=cluster_size - 1,
+                    preopen_ports=preopen_ports,
+                    execution_spec=execution_spec,
+                ),
+            )
+        return groups

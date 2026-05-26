@@ -40,7 +40,7 @@ class LeaderCron(LeaderTask):
         self._task_runners = []
         self._stopped = False
 
-        log.info(f"Initialized LeaderCron with {len(tasks)} tasks")
+        log.info("Initialized LeaderCron with {} tasks", len(tasks))
 
     async def _run_task(self, task: PeriodicTask) -> None:
         """
@@ -55,13 +55,13 @@ class LeaderCron(LeaderTask):
                     try:
                         await task.run()
                     except Exception:
-                        log.exception(f"Error running task {task.name}")
+                        log.exception("Error running task {}", task.name)
                 await asyncio.sleep(task.interval)
         except asyncio.CancelledError:
-            log.debug(f"Task {task.name} cancelled")
+            log.debug("Task {} cancelled", task.name)
             raise
         except Exception:
-            log.exception(f"Unexpected error in task {task.name}")
+            log.exception("Unexpected error in task {}", task.name)
             raise
 
     async def start(self, leadership_checker: LeadershipChecker) -> None:
@@ -82,7 +82,7 @@ class LeaderCron(LeaderTask):
             runner.set_name(f"leader-cron-task-{task.name}")
             self._task_runners.append(runner)
 
-        log.info(f"Leader cron started with {len(self._tasks)} tasks")
+        log.info("Leader cron started with {} tasks", len(self._tasks))
 
     async def stop(self) -> None:
         """

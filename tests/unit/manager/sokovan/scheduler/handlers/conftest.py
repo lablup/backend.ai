@@ -40,6 +40,7 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.kernel.types import (
     Metrics as KernelMetrics,
 )
+from ai.backend.manager.data.session.options import SessionHandlerOptions
 from ai.backend.manager.data.session.types import (
     ImageSpec,
     MountSpec,
@@ -145,6 +146,7 @@ def _create_session(
         ),
         metrics=SessionMetrics(num_queries=0, last_stat=None),
         network=SessionNetwork(network_type=None, network_id=None),
+        handler_options=SessionHandlerOptions(),
     )
 
     kernel_infos = []

@@ -120,10 +120,10 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
+from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -184,7 +184,6 @@ from .models.utils import (
 from .models.vfolder import (
     verify_vfolder_name,
 )
-from .scheduler.types import KernelAgentBinding
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
@@ -250,12 +249,15 @@ class AgentRegistry:
                     perm = MountPermission(raw_perm)
                 except ValueError:
                     perm = None
+            raw_subpath = opts.get("subpath")
+            subpath_value = str(raw_subpath) if raw_subpath is not None else None
             dst_path = mount_id_map.get(vfolder_uuid) or mount_id_map.get(raw_id)
             entries.append(
                 MountInfoEntry(
                     vfolder_id=VFolderUUID(vfolder_uuid),
                     mount_destination=dst_path,
                     mount_perm=perm,
+                    subpath=subpath_value,
                 )
             )
         return tuple(entries)
@@ -1155,7 +1157,7 @@ class AgentRegistry:
                     designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
                 ),
                 kernel_groups=tuple(groups_by_role.values()),
-                timeouts=SessionTimeouts(),
+                handler_options=SessionHandlerOptions(),
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=sudo_session_enabled,
@@ -1380,47 +1382,6 @@ class AgentRegistry:
         async with self._agent_client_pool.acquire(verified_agent_id) as client:
             await client.update_scaling_group(scaling_group)
 
-    async def settle_agent_alloc(
-        self,
-        kernel_agent_bindings: Sequence[KernelAgentBinding],
-    ) -> None:
-        """
-        Tries to settle down agent row's occupied_slots with real value. This must be called
-        after kernel creation is completed, to prevent fraction of resource dropped by agent scheduler
-        during kernel creation still being reported as used.
-        """
-
-        keyfunc = lambda item: item.agent_alloc_ctx.agent_id
-        for agent_id, group_iterator in itertools.groupby(
-            sorted(kernel_agent_bindings, key=keyfunc),
-            key=keyfunc,
-        ):
-            actual_allocated_slots = ResourceSlot()
-            requested_slots = ResourceSlot()
-
-            for kernel_agent_binding in group_iterator:
-                # this value must be set while running _post_create_kernel
-                actual_allocated_slot = self._kernel_actual_allocated_resources.get(
-                    kernel_agent_binding.kernel.id
-                )
-                requested_slots += kernel_agent_binding.kernel.requested_slots
-                if actual_allocated_slot is not None:
-                    actual_allocated_slots += ResourceSlot.from_json(actual_allocated_slot)
-                    del self._kernel_actual_allocated_resources[kernel_agent_binding.kernel.id]
-                else:  # something's wrong; just fall back to requested slot value
-                    actual_allocated_slots += kernel_agent_binding.kernel.requested_slots
-
-            # Phase 3 (BA-4308): Legacy JSONB write to agents.occupied_slots removed.
-            # Agent occupied slots are now solely managed by the normalized
-            # agent_resources table.  The agents.occupied_slots JSONB column is
-            # retained for historical audit but no longer written to.
-            if actual_allocated_slots != requested_slots:
-                log.debug(
-                    "agent {} has slot calibration diff (requested != actual); "
-                    "agent_resources table is the source of truth",
-                    agent_id,
-                )
-
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
             access_key_to_concurrency_used: dict[AccessKey, ConcurrencyUsed] = {}
@@ -1570,7 +1531,7 @@ class AgentRegistry:
                                 await client.destroy_local_network(network_ref_name)
                         except Exception:
                             log.exception(
-                                f"Failed to destroy the agent-local network {network_ref_name}"
+                                "Failed to destroy the agent-local network {}", network_ref_name
                             )
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
@@ -1584,7 +1545,7 @@ class AgentRegistry:
                 try:
                     await network_plugin.destroy_network(network_ref_name)
                 except Exception:
-                    log.exception(f"Failed to destroy the overlay network {network_ref_name}")
+                    log.exception("Failed to destroy the overlay network {}", network_ref_name)
             else:
                 pass
 
@@ -1765,38 +1726,6 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
-    async def sync_kernel_stats(
-        self,
-        kernel_ids: Sequence[KernelId],
-    ) -> None:
-        per_kernel_updates = {}
-        log.debug("sync_kernel_stats(k:{!r})", kernel_ids)
-        for kernel_id in kernel_ids:
-            raw_kernel_id = str(kernel_id)
-            kern_stat = await self.valkey_stat.get_kernel_statistics(raw_kernel_id)
-            if kern_stat is None:
-                log.warning("sync_kernel_stats(k:{}): no statistics updates", kernel_id)
-                continue
-            per_kernel_updates[kernel_id] = kern_stat
-
-        async def _update() -> None:
-            async with self.db.begin() as conn:
-                update_query = (
-                    sa.update(kernels)
-                    .where(kernels.c.id == sa.bindparam("kernel_id"))
-                    .values({kernels.c.last_stat: sa.bindparam("last_stat")})
-                )
-                params = []
-                for kernel_id, updates in per_kernel_updates.items():
-                    params.append({
-                        "kernel_id": kernel_id,
-                        "last_stat": updates,
-                    })
-                await conn.execute(update_query, params)
-
-        if per_kernel_updates:
-            await execute_with_retry(_update)
-
     async def sync_agent_kernel_registry(self, agent_id: AgentId) -> None:
         """
         Fetch agent data and status of related kernel data from DB.
@@ -1826,38 +1755,6 @@ class AgentRegistry:
                     (kernel.id, kernel.session_id) for kernel in grouped_kernels
                 ])
             return
-
-    async def _free_kernel_resources(
-        self,
-        kernel_id: uuid.UUID,
-        agent_id: str,
-    ) -> int:
-        """Free normalized resource allocations and decrement agent_resources.used."""
-        ar = AgentResourceRow.__table__
-        async with self.db.begin_session() as db_sess:
-            released = (
-                await db_sess.execute(
-                    sa.update(ResourceAllocationRow)
-                    .where(
-                        ResourceAllocationRow.kernel_id == kernel_id,
-                        ResourceAllocationRow.free_at.is_(None),
-                    )
-                    .values(free_at=sa.func.now())
-                    .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
-                )
-            ).all()
-            if not released:
-                return 0
-            for r in released:
-                if r.used is None:
-                    continue
-                new_used = sa.func.greatest(ar.c.used - r.used, 0)
-                await db_sess.execute(
-                    sa.update(ar)
-                    .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
-                    .values(used=new_used)
-                )
-            return len(released)
 
     async def _get_user_email(
         self,

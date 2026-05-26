@@ -24,12 +24,13 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture()
 async def project_with_rbac_rows(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[tuple[uuid.UUID, str]]:
     """Insert a project along with the RBAC rows that the create flow would
@@ -50,7 +51,7 @@ async def project_with_rbac_rows(
                 name=f"rbac-purge-{unique}",
                 description="Test project for RBAC purge cleanup",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -88,7 +89,7 @@ async def project_with_rbac_rows(
                 # Project registered as an entity in the domain scope.
                 {
                     "scope_type": ScopeType.DOMAIN,
-                    "scope_id": domain_fixture,
+                    "scope_id": domain_fixture.domain_name,
                     "entity_type": EntityType.PROJECT,
                     "entity_id": scope_id,
                     "relation_type": RelationType.AUTO,

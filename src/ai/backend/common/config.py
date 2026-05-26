@@ -4,29 +4,28 @@ import os
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import humps
 import tomli
 import trafaret as t
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
+    model_validator,
 )
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
-from .exception import ConfigurationError
-from .types import RedisHelperConfig
+from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
+from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
 __all__ = (
     "ConfigurationError",
     "check",
     "etcd_config_iv",
     "merge",
-    "model_definition_iv",
     "override_key",
     "override_with_env",
     "read_from_etcd",
@@ -38,7 +37,7 @@ __all__ = (
 )
 
 
-class BaseConfigSchema(BaseModel):
+class BaseConfigSchema(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -51,7 +50,7 @@ class BaseConfigSchema(BaseModel):
     )
 
 
-class BaseConfigModel(BaseModel):
+class BaseConfigModel(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -143,56 +142,19 @@ agent_selector_globalconfig_iv = t.Dict({}).allow_extra("*")
 agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
 
 
-model_definition_iv = t.Dict({
-    t.Key("models"): t.List(
-        t.Dict({
-            t.Key("name"): t.String,
-            t.Key("model_path"): t.String,
-            t.Key("service", default=None): t.Null
-            | t.Dict({
-                # ai.backend.kernel.service.ServiceParser.start_service()
-                # ai.backend.kernel.service_actions
-                t.Key("pre_start_actions", default=[]): t.Null
-                | t.List(
-                    t.Dict({
-                        t.Key("action"): t.String,
-                        t.Key("args"): t.Dict().allow_extra("*"),
-                    })
-                ),
-                t.Key("start_command", default=None): t.Null | t.List(t.String),
-                t.Key("shell", default="/bin/bash"): t.String,
-                t.Key("port"): t.ToInt[1:],
-                t.Key("health_check", default=None): t.Null
-                | t.Dict({
-                    t.Key("interval", default=10): t.Null | t.ToFloat[0:],
-                    t.Key("path"): t.String,
-                    t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
-                    t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
-                    t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
-                    t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
-                }),
-            }),
-            t.Key("metadata", default=None): t.Null
-            | t.Dict({
-                t.Key("author", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("title", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("version", default=None): t.Null | t.Int | t.String,
-                tx.AliasedKey(["created", "created_at"], default=None): t.Null
-                | t.String(allow_blank=True),
-                tx.AliasedKey(["last_modified", "modified_at"], default=None): t.Null
-                | t.String(allow_blank=True),
-                t.Key("description", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("task", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("category", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("architecture", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("framework", default=None): t.Null | t.List(t.String),
-                t.Key("label", default=None): t.Null | t.List(t.String),
-                t.Key("license", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("min_resource", default=None): t.Null | t.Dict().allow_extra("*"),
-            }).allow_extra("*"),
-        })
-    )
-})
+DEFAULT_SHELL = "/bin/bash"
+
+
+def _wrap_str_start_command_into_argv(service: Any) -> Any:
+    if not isinstance(service, dict):
+        return service
+    sc = service.get("start_command")
+    if not isinstance(sc, str):
+        return service
+    shell = service.get("shell")
+    if shell:
+        return {**service, "start_command": [shell, "-c", sc]}
+    return {**service, "start_command": [sc]}
 
 
 class PreStartAction(BaseConfigModel):
@@ -256,9 +218,9 @@ class ModelServiceConfig(BaseConfigModel):
         examples=[["python", "service.py"], ["vllm", "serve", "{model_path}"]],
     )
     shell: str = Field(
-        default="/bin/bash",
+        default=DEFAULT_SHELL,
         description="Shell configured for the model service.",
-        examples=["/bin/bash"],
+        examples=[DEFAULT_SHELL],
     )
     port: int = Field(
         description="Port number for the model service. Must be greater than 1.",
@@ -269,6 +231,11 @@ class ModelServiceConfig(BaseConfigModel):
         default=None,
         description="Health check configuration for the model service.",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_str_start_command(cls, data: Any) -> Any:
+        return _wrap_str_start_command_into_argv(data)
 
 
 class ModelMetadata(BaseConfigModel):
@@ -460,6 +427,14 @@ class ModelDefinition(BaseConfigModel):
         description="List of models in the model definition.",
     )
 
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return ModelDefinitionValidationError(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
     def merge(self, override: ModelDefinition) -> ModelDefinition:
         """Merge the given override into this definition, returning a new instance."""
         return _merge_definition(self, override)
@@ -514,18 +489,11 @@ class ModelHealthCheckDraft(BaseConfigModel):
     initial_delay: float | None = None
 
     def to_resolved(self) -> ModelHealthCheck:
-        if self.path is None:
-            raise ValueError("ModelHealthCheck.path is required")
-        return ModelHealthCheck(
-            interval=self.interval if self.interval is not None else 10.0,
-            path=self.path,
-            max_retries=self.max_retries if self.max_retries is not None else 10,
-            max_wait_time=self.max_wait_time if self.max_wait_time is not None else 15.0,
-            expected_status_code=(
-                self.expected_status_code if self.expected_status_code is not None else 200
-            ),
-            initial_delay=self.initial_delay if self.initial_delay is not None else 60.0,
-        )
+        # Drop unset (None) fields so the strict type's ``Field(default=...)``
+        # declarations remain the single source of truth for default values.
+        # Missing required fields (e.g. ``path``) surface as the strict
+        # type's ``BackendAISchemaValidationFailed`` via ``model_validate``.
+        return ModelHealthCheck.model_validate(self.model_dump(exclude_none=True))
 
 
 class ModelServiceConfigDraft(BaseConfigModel):
@@ -535,16 +503,21 @@ class ModelServiceConfigDraft(BaseConfigModel):
     port: int | None = None
     health_check: ModelHealthCheckDraft | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_str_start_command(cls, data: Any) -> Any:
+        return _wrap_str_start_command_into_argv(data)
+
     def to_resolved(self) -> ModelServiceConfig:
-        if self.port is None:
-            raise ValueError("ModelServiceConfig.port is required")
-        return ModelServiceConfig(
-            pre_start_actions=self.pre_start_actions or [],
-            start_command=self.start_command,
-            shell=self.shell if self.shell is not None else "/bin/bash",
-            port=self.port,
-            health_check=(self.health_check.to_resolved() if self.health_check else None),
-        )
+        # Drop unset (None) scalars so the strict type's ``Field(default=...)``
+        # declarations remain the single source of truth for default values;
+        # resolve the nested ``health_check`` draft explicitly so its own
+        # required-field check (``path``) fires through its own
+        # ``model_validate``. Missing required fields (e.g. ``port``)
+        # surface as ``BackendAISchemaValidationFailed``.
+        payload = self.model_dump(exclude_none=True, exclude={"health_check"})
+        payload["health_check"] = self.health_check.to_resolved() if self.health_check else None
+        return ModelServiceConfig.model_validate(payload)
 
 
 class ModelConfigDraft(BaseConfigModel):
@@ -554,12 +527,8 @@ class ModelConfigDraft(BaseConfigModel):
     metadata: ModelMetadata | None = None  # ModelMetadata is already all-Optional.
 
     def to_resolved(self) -> ModelConfig:
-        if self.name is None:
-            raise ValueError("ModelConfig.name is required")
-        if self.model_path is None:
-            raise ValueError("ModelConfig.model_path is required")
         service = self.service.to_resolved() if self.service else None
-        if service is not None and service.start_command:
+        if service is not None and service.start_command and self.model_path is not None:
             # ``{model_path}`` placeholders in the variant baseline's
             # ``start_command`` are resolved here, at the same moment the
             # draft becomes a strict ``ModelConfig`` and ``model_path`` is
@@ -567,12 +536,9 @@ class ModelConfigDraft(BaseConfigModel):
             service.start_command = [
                 token.replace("{model_path}", self.model_path) for token in service.start_command
             ]
-        return ModelConfig(
-            name=self.name,
-            model_path=self.model_path,
-            service=service,
-            metadata=self.metadata,
-        )
+        payload = self.model_dump(exclude_none=True, exclude={"service"})
+        payload["service"] = service
+        return ModelConfig.model_validate(payload)
 
 
 def _merge_health_check_draft(
@@ -648,6 +614,14 @@ class ModelDefinitionDraft(BaseConfigModel):
 
     models: list[ModelConfigDraft] | None = None
 
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return ModelDefinitionValidationError(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
     def merge(self, override: ModelDefinitionDraft) -> ModelDefinitionDraft:
         """Merge ``override`` over ``self`` and return a new draft.
 
@@ -672,13 +646,9 @@ class ModelDefinitionDraft(BaseConfigModel):
         return ModelDefinitionDraft.model_construct(models=merged)
 
     def to_resolved(self) -> ModelDefinition:
-        """Build the strict ``ModelDefinition`` from this draft.
-
-        Each child draft is converted via its own ``to_resolved`` and the
-        strict type's constructor performs Pydantic validation; missing
-        required fields propagate as ``pydantic.ValidationError``.
-        """
-        return ModelDefinition(models=[m.to_resolved() for m in (self.models or [])])
+        return ModelDefinition.model_validate({
+            "models": [m.to_resolved() for m in (self.models or [])],
+        })
 
 
 def find_config_file(daemon_name: str) -> Path:

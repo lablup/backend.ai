@@ -17,26 +17,34 @@ truth for both "what must be set" and "how it nests".
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
 import yarl
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.types import AccessKey, SessionTypes, VFolderMount
+from ai.backend.common.types import (
+    AccessKey,
+    BackendAISchema,
+    SchemaValidationFailureInfo,
+    SessionTypes,
+    VFolderMount,
+)
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     KernelExecutionSpec,
     SessionOptions,
 )
+from ai.backend.manager.errors.kernel import IncompleteSessionSpec
 from ai.backend.manager.models.network import NetworkType
 
 
-class _SpecBaseModel(BaseModel):
+class _SpecBaseModel(BackendAISchema):
     """Base for resolved session-spec sub-models.
 
     ``arbitrary_types_allowed`` lets us use ``ResourceSlot`` and other
@@ -138,3 +146,22 @@ class SessionSpec(_SpecBaseModel):
     options: SessionOptions
     kernel_specs: tuple[KernelSpec, ...]
     internal_data_extras: InternalDataExtras = Field(default_factory=InternalDataExtras)
+
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        missing_paths = [cls._format_loc(tuple(err["loc"])) for err in info.errors]
+        return IncompleteSessionSpec(
+            extra_msg="SessionSpec fields not resolved: " + ", ".join(missing_paths),
+            extra_data={"missing": missing_paths},
+        )
+
+    @staticmethod
+    def _format_loc(loc: tuple[object, ...]) -> str:
+        parts: list[str] = []
+        for item in loc:
+            if isinstance(item, int):
+                parts.append(f"[{item}]")
+            else:
+                parts.append(f".{item}" if parts else str(item))
+        return "".join(parts)

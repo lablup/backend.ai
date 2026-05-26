@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     PreemptionMode,
@@ -115,6 +116,7 @@ class ScalingGroupSchedulerConfig:
 
 @dataclass
 class ScalingGroupData:
+    id: ResourceGroupID
     name: str
     status: ScalingGroupStatus
     metadata: ScalingGroupMetadata

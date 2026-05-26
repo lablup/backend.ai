@@ -73,7 +73,9 @@ class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
                 "cluster_mode": (
                     opts.cluster_mode if opts.cluster_mode is not None else rg.cluster_mode
                 ),
-                "timeouts": opts.timeouts if opts.timeouts is not None else rg.timeouts,
+                "handler_options": (
+                    opts.handler_options if opts.handler_options is not None else rg.handler_options
+                ),
                 "scheduling_target": new_sched,
             }
         )

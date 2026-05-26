@@ -108,9 +108,9 @@ class ImportStep[InputType](abc.ABC):
 
         try:
             await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed files: {model_prefix}")
+            log.info("[cleanup] Removed files: {}", model_prefix)
         except Exception as e:
-            log.warning(f"[cleanup] Failed to cleanup: {model_prefix}: {e!s}")
+            log.warning("[cleanup] Failed to cleanup: {}: {!s}", model_prefix, e)
 
 
 class ImportPipeline:
@@ -143,7 +143,7 @@ class ImportPipeline:
                     try:
                         await step.cleanup_stage(context)
                     except Exception:
-                        log.error(f"Failed to cleanup step {step.step_type}")
+                        log.error("Failed to cleanup step {}", step.step_type)
                         pass
 
         except Exception:
@@ -153,6 +153,6 @@ class ImportPipeline:
                     await step.cleanup_stage(context)
                 except Exception:
                     # Log cleanup failures but continue with other cleanups
-                    log.error(f"Failed to cleanup step {step.step_type}")
+                    log.error("Failed to cleanup step {}", step.step_type)
                     pass
             raise

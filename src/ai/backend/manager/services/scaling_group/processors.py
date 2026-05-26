@@ -80,6 +80,10 @@ from ai.backend.manager.services.scaling_group.actions.replace_default_session_o
     ReplaceDefaultSessionOptionsAction,
     ReplaceDefaultSessionOptionsActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
+    ResolveResourceGroupIDByNameAction,
+    ResolveResourceGroupIDByNameActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
     UpdateAllowedDomainsForResourceGroupActionResult,
@@ -177,6 +181,10 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         GetAllowedProjectsForResourceGroupAction,
         GetAllowedProjectsForResourceGroupActionResult,
     ]
+    resolve_resource_group_id_by_name: ActionProcessor[
+        ResolveResourceGroupIDByNameAction,
+        ResolveResourceGroupIDByNameActionResult,
+    ]
 
     def __init__(
         self,
@@ -242,6 +250,9 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         self.get_allowed_projects_for_rg = ActionProcessor(
             service.get_allowed_projects_for_resource_group, action_monitors
         )
+        self.resolve_resource_group_id_by_name = ActionProcessor(
+            service.resolve_resource_group_id_by_name, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -270,4 +281,5 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
             GetAllowedResourceGroupsForProjectAction.spec(),
             GetAllowedDomainsForResourceGroupAction.spec(),
             GetAllowedProjectsForResourceGroupAction.spec(),
+            ResolveResourceGroupIDByNameAction.spec(),
         ]

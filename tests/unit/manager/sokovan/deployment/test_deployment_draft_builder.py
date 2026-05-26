@@ -10,7 +10,9 @@ from ai.backend.common.config import (
     ModelDefinition,
     ModelServiceConfig,
 )
-from ai.backend.manager.data.deployment.types import ModelRevisionSpec
+from ai.backend.manager.data.deployment.types import ModelRevisionData
+from ai.backend.manager.data.session.draft import KernelExecutionSpecDraft
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     DeploymentContext,
     ResolvedPresetValues,
@@ -20,10 +22,10 @@ from ai.backend.manager.sokovan.deployment.deployment_draft_builder import (
 )
 
 
-def _revision_spec(model_definition: ModelDefinition | None) -> ModelRevisionSpec:
-    revision = MagicMock(spec=ModelRevisionSpec)
+def _revision_data(model_definition: ModelDefinition | None) -> ModelRevisionData:
+    revision = MagicMock(spec=ModelRevisionData)
     revision.model_definition = model_definition
-    return cast(ModelRevisionSpec, revision)
+    return cast(ModelRevisionData, revision)
 
 
 def _context(args: list[str] | None) -> DeploymentContext:
@@ -46,8 +48,8 @@ class TestModelDefinitionPayload:
     """
 
     @pytest.fixture
-    def vllm_revision(self) -> ModelRevisionSpec:
-        return _revision_spec(
+    def vllm_revision(self) -> ModelRevisionData:
+        return _revision_data(
             ModelDefinition(
                 models=[
                     ModelConfig(
@@ -64,7 +66,7 @@ class TestModelDefinitionPayload:
 
     async def test_returns_none_when_revision_has_no_definition(self) -> None:
         payload = DeploymentSessionDraftBuilder._model_definition_payload(
-            _revision_spec(None),
+            _revision_data(None),
             _context(None),
         )
 
@@ -84,7 +86,7 @@ class TestModelDefinitionPayload:
     )
     async def test_reads_args_from_context_into_dict_payload(
         self,
-        vllm_revision: ModelRevisionSpec,
+        vllm_revision: ModelRevisionData,
         args: list[str] | None,
         expected_start_command: list[str],
     ) -> None:
@@ -101,7 +103,7 @@ class TestModelDefinitionPayload:
 
     async def test_args_tokenized_per_token_not_concatenated(
         self,
-        vllm_revision: ModelRevisionSpec,
+        vllm_revision: ModelRevisionData,
     ) -> None:
         # Regression guard for BA-5891 at the highest layer where the bug
         # surfaced: tokens must arrive split, so each value lands as its
@@ -118,3 +120,54 @@ class TestModelDefinitionPayload:
         cmd = payload["models"][0]["service"]["start_command"]
         assert cmd == ["vllm", "serve", "/models", *tokens]
         assert all(" " not in token for token in cmd)
+
+
+class TestKernelGroups:
+    """Multi-node deployment lays out 1 main + (cluster_size - 1) sub."""
+
+    @pytest.fixture
+    def execution_spec(self) -> KernelExecutionSpecDraft:
+        return KernelExecutionSpecDraft()
+
+    @pytest.fixture
+    def kernel_draft_builder(self) -> DeploymentSessionDraftBuilder:
+        return DeploymentSessionDraftBuilder()
+
+    def test_single_node_yields_one_main_group(
+        self,
+        execution_spec: KernelExecutionSpecDraft,
+        kernel_draft_builder: DeploymentSessionDraftBuilder,
+    ) -> None:
+        groups = kernel_draft_builder._resolve_kernel_groups(
+            cluster_size=1, execution_spec=execution_spec
+        )
+
+        assert len(groups) == 1
+        assert groups[0].role == DEFAULT_ROLE
+        assert groups[0].replica_count == 1
+
+    @pytest.mark.parametrize(
+        ("cluster_size", "expected_sub_replicas"),
+        [
+            pytest.param(2, 1, id="size-2"),
+            pytest.param(3, 2, id="size-3"),
+            pytest.param(5, 4, id="size-5"),
+        ],
+    )
+    def test_multi_node_splits_main_and_sub(
+        self,
+        execution_spec: KernelExecutionSpecDraft,
+        cluster_size: int,
+        expected_sub_replicas: int,
+        kernel_draft_builder: DeploymentSessionDraftBuilder,
+    ) -> None:
+        groups = kernel_draft_builder._resolve_kernel_groups(
+            cluster_size=cluster_size, execution_spec=execution_spec
+        )
+
+        assert len(groups) == 2
+        main, sub = groups
+        assert main.role == DEFAULT_ROLE
+        assert main.replica_count == 1
+        assert sub.role == "sub"
+        assert sub.replica_count == expected_sub_replicas

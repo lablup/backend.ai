@@ -10,7 +10,6 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
 )
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
@@ -36,10 +35,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClient
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    ModelRevisionData,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
@@ -47,7 +48,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.errors.deployment import ReplicaCountMismatch
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound, ReplicaCountMismatch
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -66,6 +67,7 @@ from ai.backend.manager.repositories.prometheus_query_preset.repository import (
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.types import OptionalState
 
 from .types import (
     DeploymentExecutionError,
@@ -303,7 +305,7 @@ class DeploymentExecutor:
             # the handler to attempt scaling would permanently wedge the
             # deployment in SCALING because scale_deployment() would then
             # refuse to act on a None revision id.
-            if deployment.deployment_info.current_revision_id is None:
+            if deployment.deployment_info.current_revision is None:
                 skipped.append(deployment)
                 continue
             try:
@@ -350,12 +352,12 @@ class DeploymentExecutor:
         # Phase 2: Evaluate scaling (per-deployment)
         for deployment in deployments:
             info = deployment.deployment_info
-            if info.current_revision_id is None:
+            if info.current_revision is None:
                 skipped.append(deployment)
                 continue
             try:
                 out_creators, in_route_ids = self._evaluate_deployment_scaling(
-                    info, route_map, info.current_revision_id
+                    info, route_map, info.current_revision.id
                 )
                 if out_creators or in_route_ids:
                     scale_out_creators.extend(out_creators)
@@ -380,9 +382,8 @@ class DeploymentExecutor:
         if scale_in_route_ids:
             scale_in_updater = BatchUpdater(
                 spec=RouteBatchUpdaterSpec(
-                    status=RouteStatus.TERMINATING,
-                    traffic_ratio=0.0,
-                    traffic_status=RouteTrafficStatus.INACTIVE,
+                    status=OptionalState.update(RouteStatus.TERMINATING),
+                    traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
                 ),
                 conditions=[RouteConditions.by_ids(scale_in_route_ids)],
             )
@@ -442,7 +443,7 @@ class DeploymentExecutor:
         # the two stay in lock-step.
         deployments_to_calculate: list[DeploymentWithHistory] = []
         for deployment in deployments:
-            if deployment.deployment_info.current_revision_id is None:
+            if deployment.deployment_info.current_revision is None:
                 skipped.append(deployment)
                 continue
             deployments_to_calculate.append(deployment)
@@ -615,7 +616,20 @@ class DeploymentExecutor:
         Resolves the runtime variant id to a name at this boundary since
         the AppProxy wire API still keys on the variant name string.
         """
-        target_revision = deployment.resolve_revision_spec(revision_id)
+        if (
+            deployment.current_revision is not None
+            and deployment.current_revision.id == revision_id
+        ):
+            target_revision = deployment.current_revision
+        elif (
+            deployment.deploying_revision is not None
+            and deployment.deploying_revision.id == revision_id
+        ):
+            target_revision = deployment.deploying_revision
+        else:
+            raise DeploymentRevisionNotFound(
+                f"Revision {revision_id} not found in deployment {deployment.id}"
+            )
 
         health_check_config = None
         if target_revision.model_definition:
@@ -627,7 +641,7 @@ class DeploymentExecutor:
             )
 
         variant = await self._runtime_variant_repo.get_by_id(
-            target_revision.execution.runtime_variant_id
+            target_revision.model_runtime_config.runtime_variant_id
         )
 
         return CreateEndpointItem(
@@ -661,9 +675,9 @@ class DeploymentExecutor:
         with recorder.phase("verify_replicas"):
             with recorder.step("compare_route_count"):
                 routes = route_map[deployment.id]
-                if len(routes) != deployment.replica_spec.target_replica_count:
+                if len(routes) != deployment.replica.target_replica_count:
                     raise ReplicaCountMismatch(
-                        expected=deployment.replica_spec.target_replica_count,
+                        expected=deployment.replica.target_replica_count,
                         actual=len(routes),
                     )
 
@@ -682,11 +696,24 @@ class DeploymentExecutor:
 
         with recorder.phase("evaluate_scaling"):
             with recorder.step("calculate_scale_action"):
-                target_count = deployment.replica_spec.target_replica_count
+                target_count = deployment.replica.target_replica_count
                 routes = route_map[deployment.id]
                 if len(routes) < target_count:
                     # Build creators for scale out
                     new_replica_count = target_count - len(routes)
+                    revision_data: ModelRevisionData | None
+                    if (
+                        deployment.current_revision is not None
+                        and deployment.current_revision.id == revision_id
+                    ):
+                        revision_data = deployment.current_revision
+                    else:
+                        revision_data = deployment.deploying_revision
+                    health_check = (
+                        revision_data.model_definition.health_check_config()
+                        if revision_data is not None and revision_data.model_definition
+                        else None
+                    )
                     for _ in range(new_replica_count):
                         creator_spec = RouteCreatorSpec(
                             deployment_id=deployment.id,
@@ -694,6 +721,7 @@ class DeploymentExecutor:
                             domain=deployment.metadata.domain,
                             project_id=deployment.metadata.project,
                             revision_id=revision_id,
+                            health_check=health_check,
                         )
                         scale_out_creators.append(
                             RBACEntityCreator(
@@ -845,8 +873,8 @@ class DeploymentExecutor:
             if not auto_scaling_rule:
                 with recorder.step("apply_manual_scaling"):
                     routes = metrics_data.routes_by_deployment.get(deployment.id, [])
-                    if deployment.replica_spec.replica_count != len(routes):
-                        return deployment.replica_spec.replica_count
+                    if deployment.replica.replica_count != len(routes):
+                        return deployment.replica.replica_count
                     return None
 
             with recorder.step("evaluate_autoscaling_rules"):

@@ -13,6 +13,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.deployment_chat import DeploymentChatClient
 from ai.backend.client.v2.exceptions import DeploymentAuthError
 from ai.backend.common.dto.clients.openai_compat import ChatCompletionResponse
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 BASE_URL = "http://infer.test.local"
 CHAT_URL = f"{BASE_URL}/v1/chat/completions"
@@ -221,7 +222,7 @@ class TestChatCompletionResponseModel:
         # ``delta`` is the streaming-chunk shape; the SDK never sets
         # stream=true, so its arrival means the server misbehaved.
         # Failing loudly is preferable to silently dropping the round.
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ChatCompletionResponse.model_validate({
                 "choices": [
                     {"delta": {"role": "assistant", "content": "partial"}},

@@ -70,6 +70,70 @@ Multi-tenant access control for queries.
 - `repositories/base/` - Base utility source code
 - `repositories/fair_share/repository.py` - Usage examples
 
+## DB Ops Wrapper (`ops/`) — Preferred for new code
+
+`ops/provider.py` wraps `ExtendedAsyncSAEngine` and exposes a spec-only operations
+surface. **Migration direction:** db_sources are moving to this wrapper. New or modified
+db_sources SHOULD use `DBOpsProvider` rather than holding the engine and calling
+`session.execute` directly. Existing db_sources are migrated gradually when touched.
+
+### Entry points
+
+```python
+class FooDBSource:
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+        self._ops = DBOpsProvider(db)
+
+    async def foo(self, foo_id: FooID) -> FooData:
+        async with self._ops.read_ops() as r:
+            result = await r.query(Querier(row_class=FooRow, pk_value=foo_id))
+            if result is None:
+                raise FooNotFound()
+            return result.row.to_data()
+
+    async def create(self, spec: FooCreatorSpec) -> FooData:
+        async with self._ops.write_ops() as w:
+            result = await w.create(Creator(spec=spec))
+            return result.row.to_data()
+```
+
+- `read_ops()` / `write_ops()` both open a READ COMMITTED session; the raw engine/
+  session is never exposed.
+- ops methods accept only spec types — never raw `Select/Insert/Update/Delete`.
+
+### Reads with scope (RBAC)
+
+```python
+async with self._ops.read_ops() as r:
+    # default — scoped query:
+    result = await r.batch_query_with_scopes(sa.select(FooRow), querier, scopes)
+    # superadmin / internal only — bypasses scope filtering:
+    result = await r.batch_query_in_global(sa.select(FooRow), querier)
+```
+
+Use `batch_query_in_global` only for superadmin-only endpoints or internal system
+operations; it bypasses RBAC scope filtering. Empty `scopes` for the scoped variant
+raises `EmptySearchScopeError` (400).
+
+### Single-table specs + multi-table coordination
+
+Each spec owns exactly one table — never build child-table rows inside a creator/
+updater spec. For a parent + dependent children, the repository coordinates the
+sequence procedurally (no tree object):
+
+```python
+async with self._ops.write_ops() as w:
+    parent = (await w.create(Creator(spec=parent_spec))).row
+    dep = ChildDependency(parent_id=parent.id)          # build dependency from the result
+    children = (await w.bulk_create_dependent(child_specs, dep)).rows
+```
+
+- `DependentCreatorSpec[TDependency, TRow].build_row(dependency)` builds one row from a
+  dependency resolved at execution time (e.g. the parent's generated id).
+- `create_dependent` (single) / `bulk_create_dependent` (multiple) execute them.
+- An update that must replace child rows = update parent + purge old children +
+  `bulk_create_dependent` new children, all inside one `write_ops()` block.
+
 ## Implementation Pattern
 
 **Pattern:**

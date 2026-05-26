@@ -75,20 +75,17 @@ class DeploymentHistoryNode(BaseResponseModel):
 
 
 class RouteHistoryNode(BaseResponseModel):
-    """Node model representing a route scheduling history record.
-
-    from_status/to_status values depend on category:
-    - category=lifecycle: lifecycle status values (provisioning, running, etc.)
-    - category=health: health status values (healthy, unhealthy, etc.)
-    """
+    """Node model representing a route scheduling history record."""
 
     id: UUID = Field(description="History record ID")
     route_id: UUID = Field(description="Route ID this history belongs to")
     deployment_id: UUID = Field(description="Deployment ID the route belongs to")
     category: str = Field(description="Handler category: 'lifecycle' or 'health'")
     phase: str = Field(description="Scheduling phase")
-    from_status: str | None = Field(default=None, description="Status before transition")
-    to_status: str | None = Field(default=None, description="Status after transition")
+    from_status: str | None = Field(default=None, description="Lifecycle status before transition")
+    to_status: str | None = Field(default=None, description="Lifecycle status after transition")
+    from_sub_status: str | None = Field(default=None, description="Sub-status before transition")
+    to_sub_status: str | None = Field(default=None, description="Sub-status after transition")
     result: str = Field(description="Result of the scheduling attempt")
     error_code: str | None = Field(default=None, description="Error code if scheduling failed")
     message: str | None = Field(default=None, description="Human-readable message or error detail")

@@ -56,12 +56,14 @@ from .deployment import (
     UpdateDeploymentPayload,
 )
 from .deployment_options import (
+    DeploymentHandlerOptionsInfoGQL,
+    DeploymentHandlerOptionsInputGQL,
     DeploymentOptionsInfoGQL,
     DeploymentOptionsInputGQL,
-    DeploymentTimeoutsInfoGQL,
-    DeploymentTimeoutsInputGQL,
-    HandlerTimeoutEntryInfoGQL,
-    HandlerTimeoutEntryInputGQL,
+    HandlerOptionsEntryInfoGQL,
+    HandlerOptionsEntryInputGQL,
+    HandlerOptionsInfoGQL,
+    HandlerOptionsInputGQL,
 )
 from .policy import (
     BlueGreenConfigInputGQL,
@@ -117,7 +119,6 @@ from .revision import (
     MountPermission,
     ResourceConfig,
     ResourceConfigInput,
-    ResourceGroupInput,
 )
 from .revision_preset import (
     CreateDeploymentRevisionPresetInputGQL,
@@ -202,12 +203,14 @@ __all__ = [
     "UpdateDeploymentInput",
     "UpdateDeploymentPayload",
     # Deployment Options
+    "DeploymentHandlerOptionsInfoGQL",
+    "DeploymentHandlerOptionsInputGQL",
     "DeploymentOptionsInfoGQL",
     "DeploymentOptionsInputGQL",
-    "DeploymentTimeoutsInfoGQL",
-    "DeploymentTimeoutsInputGQL",
-    "HandlerTimeoutEntryInfoGQL",
-    "HandlerTimeoutEntryInputGQL",
+    "HandlerOptionsEntryInfoGQL",
+    "HandlerOptionsEntryInputGQL",
+    "HandlerOptionsInfoGQL",
+    "HandlerOptionsInputGQL",
     # Policy
     "BlueGreenConfigInputGQL",
     "BlueGreenStrategySpecGQL",
@@ -254,7 +257,6 @@ __all__ = [
     "MountPermission",
     "ResourceConfig",
     "ResourceConfigInput",
-    "ResourceGroupInput",
     # Allocated Resource Slot
     "AllocatedResourceSlotFilterGQL",
     "AllocatedResourceSlotGQL",

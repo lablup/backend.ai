@@ -199,7 +199,10 @@ class BaseRunner(metaclass=ABCMeta):
         process_owner = os.getuid()
         if work_dir_owner != process_owner:
             log.warning(
-                f"{work_dir} (uid: {work_dir_owner}) is not owned by the current user {process_owner}!",
+                "{} (uid: {}) is not owned by the current user {}!",
+                work_dir,
+                work_dir_owner,
+                process_owner,
             )
 
         path_env = self.child_env["PATH"]
@@ -255,10 +258,10 @@ class BaseRunner(metaclass=ABCMeta):
         outsock_port = self.intrinsic_host_ports_mapping.get("replout", "2001")
         self.insock = self.zctx.socket(zmq.PULL)
         self.insock.bind(f"tcp://*:{insock_port}")
-        log.debug(f"binding the kernel-runner inbound socket to tcp://*:{insock_port}")
+        log.debug("binding the kernel-runner inbound socket to tcp://*:{}", insock_port)
         self.outsock = self.zctx.socket(zmq.PUSH)
         self.outsock.bind(f"tcp://*:{outsock_port}")
-        log.debug(f"binding the kernel-runner outbound socket to tcp://*:{outsock_port}")
+        log.debug("binding the kernel-runner outbound socket to tcp://*:{}", outsock_port)
 
         self.log_queue = janus.Queue()
         self.task_queue = asyncio.Queue()
@@ -1001,7 +1004,10 @@ class BaseRunner(metaclass=ABCMeta):
     ) -> None:
         exitcode = await proc.wait()
         log.info(
-            f"Service {service_name} (pid: {proc.pid}) has terminated with exit code: {exitcode}"
+            "Service {} (pid: {}) has terminated with exit code: {}",
+            service_name,
+            proc.pid,
+            exitcode,
         )
         self.services_running.pop(service_name, None)
 

@@ -53,7 +53,7 @@ async def prometheus_query_preset_categories(
     before: str | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> list[CategoryGQL]:
+) -> list[CategoryGQL] | None:
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
 

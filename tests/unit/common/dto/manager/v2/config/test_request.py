@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.config.request import (
     UpdateDotfileInput,
 )
 from ai.backend.common.dto.manager.v2.config.types import MAXIMUM_DOTFILE_SIZE, DotfileScope
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateDotfileInput:
@@ -61,7 +62,7 @@ class TestCreateDotfileInput:
         assert req.path == "/home/.bashrc"
 
     def test_blank_path_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateDotfileInput(
                 scope=DotfileScope.USER,
                 path="   ",
@@ -70,7 +71,7 @@ class TestCreateDotfileInput:
             )
 
     def test_empty_path_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateDotfileInput(
                 scope=DotfileScope.USER,
                 path="",
@@ -79,7 +80,7 @@ class TestCreateDotfileInput:
             )
 
     def test_data_exceeding_max_length_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateDotfileInput(
                 scope=DotfileScope.USER,
                 path="/home/.bashrc",
@@ -97,7 +98,7 @@ class TestCreateDotfileInput:
         assert len(req.data) == MAXIMUM_DOTFILE_SIZE
 
     def test_invalid_permission_999_rejects(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateDotfileInput(
                 scope=DotfileScope.USER,
                 path="/home/.bashrc",
@@ -106,7 +107,7 @@ class TestCreateDotfileInput:
             )
 
     def test_invalid_permission_alpha_rejects(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateDotfileInput(
                 scope=DotfileScope.USER,
                 path="/home/.bashrc",
@@ -218,15 +219,15 @@ class TestUpdateDotfileInput:
         assert req.path == "/home/.bashrc"
 
     def test_blank_path_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateDotfileInput(path="   ")
 
     def test_empty_path_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateDotfileInput(path="")
 
     def test_invalid_permission_rejects(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateDotfileInput(path="/home/.bashrc", permission="999")
 
     def test_partial_update_data_only(self) -> None:
@@ -272,15 +273,15 @@ class TestDeleteDotfileInput:
         assert req.path == "/home/.bashrc"
 
     def test_blank_path_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteDotfileInput(path="   ")
 
     def test_empty_path_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteDotfileInput(path="")
 
     def test_missing_path_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteDotfileInput.model_validate({})
 
     def test_round_trip(self) -> None:
@@ -302,7 +303,7 @@ class TestUpdateBootstrapScriptInput:
         assert req.script == ""
 
     def test_script_exceeding_max_length_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateBootstrapScriptInput(script="x" * (MAXIMUM_DOTFILE_SIZE + 1))
 
     def test_script_at_max_length_is_valid(self) -> None:

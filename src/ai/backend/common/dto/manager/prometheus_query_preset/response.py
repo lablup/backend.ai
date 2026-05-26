@@ -8,10 +8,11 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "CreateQueryDefinitionResponse",
@@ -30,14 +31,14 @@ __all__ = (
 )
 
 
-class QueryDefinitionOptionsDTO(BaseModel):
+class QueryDefinitionOptionsDTO(BackendAISchema):
     """Options DTO for a prometheus query definition."""
 
     filter_labels: list[str] = Field(description="Allowed filter label keys")
     group_labels: list[str] = Field(description="Allowed group-by label keys")
 
 
-class QueryDefinitionDTO(BaseModel):
+class QueryDefinitionDTO(BackendAISchema):
     """DTO for prometheus query definition data."""
 
     id: UUID = Field(description="Query definition ID")
@@ -81,28 +82,28 @@ class DeleteQueryDefinitionResponse(BaseResponseModel):
     id: UUID = Field(description="Deleted query definition ID")
 
 
-class MetricLabelEntryDTO(BaseModel):
+class MetricLabelEntryDTO(BackendAISchema):
     """A key-value label entry in the execute response."""
 
     key: str
     value: str
 
 
-class MetricValueDTO(BaseModel):
+class MetricValueDTO(BackendAISchema):
     """A single (timestamp, value) data point from Prometheus."""
 
     timestamp: float
     value: str
 
 
-class QueryDefinitionMetricResult(BaseModel):
+class QueryDefinitionMetricResult(BackendAISchema):
     """A single metric result from query definition execution."""
 
     metric: list[MetricLabelEntryDTO]
     values: list[MetricValueDTO]
 
 
-class QueryDefinitionExecuteData(BaseModel):
+class QueryDefinitionExecuteData(BackendAISchema):
     """Data field of the execute response."""
 
     result_type: str

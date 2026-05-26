@@ -34,8 +34,13 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -49,13 +54,15 @@ def _route_with_replica(
     session_id: SessionId | None = None,
 ) -> RouteData:
     return RouteData(
-        route_id=uuid4(),
+        route_id=ReplicaID(uuid4()),
         deployment_id=endpoint_id,
         session_id=session_id if session_id is not None else SessionId(uuid4()),
         status=RouteStatus.RUNNING,
         health_status=RouteHealthStatus.HEALTHY,
         traffic_ratio=1.0,
         revision_id=DeploymentRevisionID(uuid4()),
+        traffic_status=RouteTrafficStatus.ACTIVE,
+        health_check=None,
         replica_host=replica_host,
         replica_port=replica_port,
         created_at=datetime.now(tzutc()),

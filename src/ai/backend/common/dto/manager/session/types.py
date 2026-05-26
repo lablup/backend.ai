@@ -145,12 +145,29 @@ class ResourceOpts(BaseFieldModel):
 
 
 class MountOption(BaseFieldModel):
-    """Per-mount option used inside ``mount_options`` mapping."""
+    """Per-mount option used inside ``mount_options`` mapping.
 
+    Single source of truth for per-vfolder mount overrides — used by both
+    session creation (``CreationConfigV*.mount_options``) and inference
+    service creation (``ServiceConfigModel.extra_mounts``).
+    """
+
+    mount_destination: str | None = Field(
+        default=None,
+        description="Mount destination inside the container. Defaults to ``/home/work/{folder_name}``.",
+    )
     type: MountTypes = MountTypes.BIND
     permission: MountPermission | None = Field(
         default=None,
         validation_alias=AliasChoices("permission", "perm"),
+    )
+    subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the vfolder to mount. ``null`` (default) mounts the vfolder root."
+            " Empty string is rejected; omit the field to mount the root."
+        ),
     )
     model_config = ConfigDict(extra="allow")
 

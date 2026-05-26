@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateDomainInput:
@@ -43,7 +44,7 @@ class TestCreateDomainInput:
         assert req.integration_name == "ext-123"
 
     def test_name_max_length_64_enforced(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateDomainInput(name="a" * 65)
 
     def test_name_at_max_length_valid(self) -> None:
@@ -55,7 +56,7 @@ class TestCreateDomainInput:
         assert req.name == "d"
 
     def test_missing_name_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateDomainInput.model_validate({})
 
     def test_is_active_default_true(self) -> None:
@@ -109,7 +110,7 @@ class TestUpdateDomainInput:
         assert req.name == "new-name"
 
     def test_name_max_length_enforced(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateDomainInput(name="a" * 65)
 
     def test_is_active_update(self) -> None:
@@ -155,7 +156,7 @@ class TestDeleteDomainInput:
         assert req.name == "test-domain"
 
     def test_missing_name_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteDomainInput.model_validate({})
 
     def test_round_trip(self) -> None:
@@ -173,7 +174,7 @@ class TestPurgeDomainInput:
         assert req.name == "test-domain"
 
     def test_missing_name_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeDomainInput.model_validate({})
 
     def test_round_trip(self) -> None:
@@ -239,11 +240,11 @@ class TestSearchDomainsRequest:
         assert req.limit >= 1
 
     def test_limit_zero_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchDomainsRequest(limit=0)
 
     def test_negative_offset_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchDomainsRequest(offset=-1)
 
     def test_with_filter_and_order(self) -> None:

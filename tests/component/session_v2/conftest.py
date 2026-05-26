@@ -30,6 +30,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
@@ -56,6 +57,7 @@ from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -88,11 +90,20 @@ def session_repository(
 
 
 @pytest.fixture()
+def scheduling_controller_mock() -> AsyncMock:
+    """Mock scheduling controller. Tests can override `mark_sessions_for_termination`
+    to return a custom `MarkTerminatingResult`.
+    """
+    return AsyncMock()
+
+
+@pytest.fixture()
 async def session_processors(
     session_repository: SessionRepository,
     background_task_manager: BackgroundTaskManager,
     error_monitor: ErrorPluginContext,
     rbac_permission_repo: PermissionControllerRepository,
+    scheduling_controller_mock: AsyncMock,
 ) -> SessionProcessors:
     """SessionProcessors with real SingleEntityActionRBACValidator.
 
@@ -107,7 +118,7 @@ async def session_processors(
         idle_checker_host=AsyncMock(),
         session_repository=session_repository,
         scheduler_repository=AsyncMock(),
-        scheduling_controller=AsyncMock(),
+        scheduling_controller=scheduling_controller_mock,
         appproxy_client_pool=AsyncMock(),
         user_repository=AsyncMock(),
     )
@@ -115,6 +126,7 @@ async def session_processors(
     real_single_entity_validator = SingleEntityActionRBACValidator(
         rbac_permission_repo, MagicMock()
     )
+    real_bulk_validator = BulkActionRBACValidator(rbac_permission_repo, MagicMock())
     return SessionProcessors(
         service=service,
         action_monitors=[],
@@ -122,6 +134,7 @@ async def session_processors(
             rbac=RBACValidators(
                 scope=AsyncMock(),
                 single_entity=real_single_entity_validator,
+                bulk=real_bulk_validator,
             )
         ),
     )
@@ -396,7 +409,7 @@ async def _cleanup_session(db_engine: SAEngine, session_id: SessionId) -> None:
 @pytest.fixture()
 async def admin_session_seed(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -404,7 +417,7 @@ async def admin_session_seed(
     """Seed a RUNNING session owned by the admin user."""
     seed = await _seed_session(
         db_engine,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
@@ -417,7 +430,7 @@ async def admin_session_seed(
 @pytest.fixture()
 async def user_session_seed(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     regular_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -429,7 +442,7 @@ async def user_session_seed(
     """
     seed = await _seed_session(
         db_engine,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         group_id=group_fixture,
         user_uuid=regular_user_fixture.user_uuid,
         access_key=regular_user_fixture.keypair.access_key,

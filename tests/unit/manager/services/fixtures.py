@@ -3,6 +3,7 @@ import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
@@ -46,7 +47,7 @@ IMAGE_ROW_FIXTURE = ImageRow(
     resources=RESOURCE_LIMITS,
     status=ImageStatus.ALIVE,
 )
-IMAGE_ROW_FIXTURE.id = uuid.uuid4()
+IMAGE_ROW_FIXTURE.id = ImageID(uuid.uuid4())
 IMAGE_ROW_FIXTURE.created_at = datetime(2023, 9, 30, 15, 0, 0, tzinfo=UTC)
 
 IMAGE_FIXTURE_DATA = IMAGE_ROW_FIXTURE.to_dataclass()

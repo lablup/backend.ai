@@ -104,7 +104,7 @@ class VFSDirectoryDownloadServerStreamReader(StreamReader):
             # Clean up temp file
             if self._temp_file and self._temp_file.exists():
                 await aiofiles.os.remove(self._temp_file)
-                log.debug(f"Cleaned up temp file: {self._temp_file}")
+                log.debug("Cleaned up temp file: {}", self._temp_file)
 
     @override
     def content_type(self) -> str | None:
@@ -113,12 +113,12 @@ class VFSDirectoryDownloadServerStreamReader(StreamReader):
     def _create_tar_archive(self, source_dir: str, tar_path: str) -> None:
         """Create tar archive of directory contents."""
         try:
-            log.debug(f"Creating tar archive: {source_dir} -> {tar_path}")
+            log.debug("Creating tar archive: {} -> {}", source_dir, tar_path)
             with tarfile.open(tar_path, "w") as tar:
                 tar.add(source_dir, arcname=".", recursive=True)
-            log.debug(f"Tar archive created successfully: {tar_path}")
+            log.debug("Tar archive created successfully: {}", tar_path)
         except Exception as e:
-            log.error(f"Failed to create tar archive: {e}")
+            log.error("Failed to create tar archive: {}", e)
             raise
 
 
@@ -160,7 +160,7 @@ class VFSStorage(AbstractStorage):
         if not self._base_path.exists():
             return
 
-        log.info(f"Cleaning up temporary storage: {self._base_path}")
+        log.info("Cleaning up temporary storage: {}", self._base_path)
         try:
             # Remove all contents but keep the directory itself
             for item in self._base_path.iterdir():
@@ -168,9 +168,9 @@ class VFSStorage(AbstractStorage):
                     shutil.rmtree(item)
                 else:
                     item.unlink()
-            log.info(f"Temporary storage cleaned: {self._base_path}")
+            log.info("Temporary storage cleaned: {}", self._base_path)
         except Exception as e:
-            log.warning(f"Failed to clean temporary storage {self._base_path}: {e}")
+            log.warning("Failed to clean temporary storage {}: {}", self._base_path, e)
 
     @property
     def name(self) -> str:

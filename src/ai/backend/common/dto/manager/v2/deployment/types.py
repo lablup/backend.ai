@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -23,7 +23,9 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import (
+    BackendAISchema,
     ClusterMode,
     MountPermission,
     RuntimeVariant,
@@ -75,7 +77,7 @@ __all__ = (
 )
 
 
-class ProjectDeploymentScope(BaseModel):
+class ProjectDeploymentScope(BackendAISchema):
     """Scope for project-level deployment operations."""
 
     project_id: UUID = Field(description="Project UUID to scope the deployment operation.")
@@ -111,7 +113,7 @@ class RouteOrderField(StrEnum):
     TRAFFIC_RATIO = "traffic_ratio"
 
 
-class IntOrPercent(BaseModel):
+class IntOrPercent(BackendAISchema):
     """A rolling-update budget value: either an absolute count or a percentage.
 
     Exactly one of ``count`` or ``percent`` must be provided (oneOf semantics).
@@ -396,6 +398,13 @@ class ModelMountConfigInfoDTO(BaseResponseModel):
     vfolder_id: str
     mount_destination: str
     definition_path: str
+    subpath: str | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. "
+            "Subpath within the model vfolder. ``None`` means the vfolder root."
+        ),
+    )
 
 
 class ExtraVFolderMountGQLDTO(BaseResponseModel):
@@ -418,6 +427,13 @@ class ExtraVFolderMountGQLDTO(BaseResponseModel):
             "permission at session-creation time (task #83)."
         ),
     )
+    subpath: str | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. "
+            "Subpath within the vfolder. ``None`` means the vfolder root."
+        ),
+    )
 
 
 class DeploymentMetadataInfoDTO(BaseResponseModel):
@@ -433,6 +449,7 @@ class DeploymentMetadataInfoDTO(BaseResponseModel):
     name: str
     status: ModelDeploymentStatus
     tags: list[str]
+    resource_group_name: str
     created_at: datetime
     updated_at: datetime
 

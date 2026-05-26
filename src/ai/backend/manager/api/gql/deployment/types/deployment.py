@@ -167,6 +167,7 @@ from ai.backend.manager.data.deployment.types import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
@@ -231,12 +232,35 @@ class ModelDeploymentMetadata:
     tags: list[str]
     created_at: datetime
     updated_at: datetime
+    resource_group_name: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Name of the resource group (scaling group) this deployment runs in.",
+        )
+    )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The resource group this deployment runs in, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def resource_group(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ResourceGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
     @gql_field(
         description="The project of this entity.",
         deprecation_reason="Use project_v2 instead.",
     )  # type: ignore[misc]
-    async def project(self, info: Info[StrawberryGQLContext]) -> Project:
+    async def project(self, info: Info[StrawberryGQLContext]) -> Project | None:
         project_global_id = to_global_id(
             GroupNode, UUID(str(self.project_id)), is_target_graphene_object=True
         )
@@ -263,7 +287,7 @@ class ModelDeploymentMetadata:
         description="The domain of this entity.",
         deprecation_reason="Use domain_v2 instead.",
     )  # type: ignore[misc]
-    async def domain(self, info: Info[StrawberryGQLContext]) -> Domain:
+    async def domain(self, info: Info[StrawberryGQLContext]) -> Domain | None:
         domain_global_id = to_global_id(
             DomainNode, self.domain_name, is_target_graphene_object=True
         )
@@ -397,7 +421,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ModelRevisionConnection:
+    ) -> ModelRevisionConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_revisions(
@@ -438,7 +462,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ModelReplicaConnection:
+    ) -> ModelReplicaConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_replicas(
@@ -479,7 +503,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> AutoScalingRuleConnection:
+    ) -> AutoScalingRuleConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_rules(
@@ -522,7 +546,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> AccessTokenConnection:
+    ) -> AccessTokenConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_access_tokens(
@@ -698,6 +722,7 @@ class DeploymentStatusChangedPayload:
 class ModelDeploymentMetadataInput(PydanticInputMixin[ModelDeploymentMetadataInputDTO]):
     project_id: ID
     domain_name: str
+    resource_group_name: str
     name: str | None = None
     tags: list[str] | None = None
 

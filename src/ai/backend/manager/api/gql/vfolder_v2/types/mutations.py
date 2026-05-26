@@ -471,7 +471,7 @@ class PurgeVFolderOptionsInputGQL(PydanticInputMixin[PurgeVFolderOptionsDTO]):
 )
 class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
     ids: list[UUID] = gql_field(description="List of VFolder UUIDs to purge.")
-    options: PurgeVFolderOptionsInputGQL = gql_added_field(
+    options: PurgeVFolderOptionsInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(

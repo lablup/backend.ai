@@ -1,12 +1,14 @@
 from abc import ABC
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, ValidationInfo
+from pydantic import ConfigDict, ValidationInfo
+
+from ai.backend.common.types import BackendAISchema
 
 from .types import LogLevel
 
 
-class BaseConfigValidationContext(BaseModel, ABC):
+class BaseConfigValidationContext(BackendAISchema, ABC):
     debug: bool
     log_level: LogLevel
 

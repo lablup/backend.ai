@@ -3,14 +3,15 @@ from dataclasses import asdict, dataclass
 from enum import StrEnum
 from typing import Any, Self, TypeVar, override
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from ai.backend.common.dto.internal.health import ConnectivityCheckResponse, HealthStatus
+from ai.backend.common.types import BackendAISchema
 
 T = TypeVar("T")
 
 
-class BaseAgentResponseModel(BaseModel):
+class BaseAgentResponseModel(BackendAISchema):
     """Base class for pydantic response payloads on agent RPC v3 methods.
 
     Counterpart to ``BaseAgentRequestModel`` on the response side.
@@ -59,7 +60,7 @@ class DeviceHwStatus(StrEnum):
     UNAVAILABLE = "unavailable"
 
 
-class DeviceHardwareInfo(BaseModel):
+class DeviceHardwareInfo(BackendAISchema):
     """Per-device hardware info entry for ``GatherHwinfoResp``.
 
     The ``metadata`` field is a plugin-defined free-form string map — the

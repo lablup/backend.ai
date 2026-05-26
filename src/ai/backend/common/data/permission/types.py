@@ -149,7 +149,6 @@ class EntityType(enum.StrEnum):
     APP_CONFIG_DOMAIN = "app_config:domain"
     APP_CONFIG_USER = "app_config:user"
     # Session sub
-    SESSION_KERNEL = "session:kernel"
     SESSION_FILE = "session:file"
     SESSION_DIRECTORY = "session:directory"
     SESSION_APP_SERVICE = "session:app_service"
@@ -193,6 +192,7 @@ class EntityType(enum.StrEnum):
     VFOLDER_FILE = "vfolder:file"
     VFOLDER_DIRECTORY = "vfolder:directory"
     VFOLDER_INVITATION = "vfolder:invitation"
+    VFOLDER_DATA = "vfolder:data"
     # Resource group sub
     RESOURCE_GROUP_DOMAIN = "resource_group:domain"
     RESOURCE_GROUP_KEYPAIR = "resource_group:keypair"
@@ -227,6 +227,7 @@ class EntityType(enum.StrEnum):
     GROUP_USAGE = "group:usage"
     # User sub
     USER_STATS = "user:stats"
+    USER_EMAIL = "user:email"
     # Agent sub
     AGENT_WATCHER = "agent:watcher"
     AGENT_REGISTRY = "agent:registry"
@@ -417,6 +418,14 @@ class RBACElementType(enum.StrEnum):
     IMAGE_ALIAS = "image:alias"
     ROLE_ASSIGNMENT = "role:assignment"
 
+    # === Sub-entity permissions split from parent metadata access ===
+    # These split permission control of a parent entity into sub-aspects so that
+    # access to listings/detail (parent) and access to internal data or
+    # sub-operations (child) can be granted independently.
+    VFOLDER_DATA = "vfolder:data"
+    SESSION_APP_SERVICE = "session:app_service"
+    USER_EMAIL = "user:email"
+
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"
 
@@ -478,8 +487,25 @@ _DEFAULT_ADMIN_OPS: frozenset[OperationType] = _STANDARD_OPS
 _DEFAULT_OWNER_OPS: frozenset[OperationType] = _STANDARD_OPS
 _DEFAULT_MEMBER_OPS: frozenset[OperationType] = _READ_ONLY_OPS
 
-_ADMIN_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {}
-_OWNER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {}
+# vfolder:data CRUD on internal files/directories — soft-delete is intentionally
+# omitted because there is no two-stage delete for vfolder data.
+_VFOLDER_DATA_OWNER_OPS: frozenset[OperationType] = frozenset({
+    OperationType.CREATE,
+    OperationType.READ,
+    OperationType.UPDATE,
+    OperationType.HARD_DELETE,
+})
+
+_ADMIN_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    # vfolder:data and session:app_service are owner-only — admins of the parent scope
+    # have access to listings/metadata but not to internal data or app endpoints.
+    RBACElementType.VFOLDER_DATA: frozenset(),
+    RBACElementType.SESSION_APP_SERVICE: frozenset(),
+}
+_OWNER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    RBACElementType.VFOLDER_DATA: _VFOLDER_DATA_OWNER_OPS,
+    RBACElementType.SESSION_APP_SERVICE: _READ_ONLY_OPS,
+}
 _MEMBER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
     # Members of a project may create their own sessions, vfolders,
     # and model deployments (a.k.a. model services).
@@ -489,6 +515,9 @@ _MEMBER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
         OperationType.READ,
         OperationType.CREATE,
     }),
+    # Owner-only sub-entities — members of the parent scope have no access.
+    RBACElementType.VFOLDER_DATA: frozenset(),
+    RBACElementType.SESSION_APP_SERVICE: frozenset(),
 }
 
 

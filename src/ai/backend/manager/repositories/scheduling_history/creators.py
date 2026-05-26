@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     RouteHandlerCategory,
-    RouteHealthStatus,
     RouteStatus,
+    RouteSubStatus,
 )
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import (
@@ -127,7 +127,7 @@ class DeploymentHistoryCreatorSpec(CreatorSpec[DeploymentHistoryRow]):
 class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
     """CreatorSpec for route history."""
 
-    route_id: UUID
+    route_id: ReplicaID
     deployment_id: DeploymentID
     category: RouteHandlerCategory
     phase: str  # RouteLifecycleType value
@@ -135,8 +135,8 @@ class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
     message: str
     from_status: RouteStatus | None = None
     to_status: RouteStatus | None = None
-    from_health_status: RouteHealthStatus | None = None
-    to_health_status: RouteHealthStatus | None = None
+    from_sub_status: RouteSubStatus | None = None
+    to_sub_status: RouteSubStatus | None = None
     error_code: str | None = None
     sub_steps: list[SubStepResult] = field(default_factory=list)
 
@@ -145,14 +145,12 @@ class RouteHistoryCreatorSpec(CreatorSpec[RouteHistoryRow]):
         return RouteHistoryRow(
             route_id=self.route_id,
             deployment_id=self.deployment_id,
-            category=self.category.value,
+            category=self.category,
             phase=self.phase,
-            from_status=str(self.from_status.value) if self.from_status else None,
-            to_status=str(self.to_status.value) if self.to_status else None,
-            from_health_status=str(self.from_health_status.value)
-            if self.from_health_status
-            else None,
-            to_health_status=str(self.to_health_status.value) if self.to_health_status else None,
+            from_status=self.from_status.value if self.from_status else None,
+            to_status=self.to_status.value if self.to_status else None,
+            from_sub_status=self.from_sub_status.value if self.from_sub_status else None,
+            to_sub_status=self.to_sub_status.value if self.to_sub_status else None,
             result=str(self.result),
             error_code=self.error_code,
             message=self.message,

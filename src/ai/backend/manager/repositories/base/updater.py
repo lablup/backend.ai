@@ -11,6 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 
 from .integrity import match_integrity_error, parse_integrity_error
@@ -172,8 +173,8 @@ async def execute_updater[TRow: Base](
         updater: Updater containing spec and pk_value
 
     Returns:
-        UpdaterResult containing the updated row, or None if no row matched
-        or if there are no values to update
+        UpdaterResult containing the updated row (or the current row when there are no
+        values to update), or None only if no row matched the primary key.
 
     Example:
         class SessionStatusUpdaterSpec(UpdaterSpec[SessionRow]):
@@ -198,14 +199,20 @@ async def execute_updater[TRow: Base](
     row_class = updater.spec.row_class
     table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            "Updater only supports single-column primary keys",
+        )
     values = updater.spec.build_values()
 
-    # Return None if there are no values to update
     if not values:
-        return None
-
-    if len(pk_columns) != 1:
-        raise ValueError("Updater only supports single-column primary keys")
+        # No columns to update: return the current row if it exists so callers can tell
+        # "nothing to change" apart from "row not found". None means not found only.
+        existing = await db_sess.execute(
+            sa.select(row_class).where(pk_columns[0] == updater.pk_value)
+        )
+        current_row = existing.scalar_one_or_none()
+        return UpdaterResult(row=current_row) if current_row is not None else None
 
     update_stmt = (
         sa.update(table)

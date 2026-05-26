@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     ProjectResourceAllocationPayload,
     ResourceGroupResourceAllocationPayload,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestKeypairUsage:
@@ -70,11 +71,11 @@ class TestDomainUsage:
     async def test_admin_domain_usage_returns_data(
         self,
         admin_v2_registry: V2ClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Admin can query domain usage with valid domain name."""
         result = await admin_v2_registry.resource_allocation.admin_domain_usage(
-            domain_fixture,
+            domain_fixture.domain_name,
         )
         assert isinstance(result, DomainResourceAllocationPayload)
         assert result.domain is not None
@@ -85,12 +86,12 @@ class TestDomainUsage:
     async def test_regular_user_domain_usage_returns_403(
         self,
         user_v2_registry: V2ClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Non-admin user gets 403 when querying domain usage (superadmin_required)."""
         with pytest.raises(BackendAPIError) as exc_info:
             await user_v2_registry.resource_allocation.admin_domain_usage(
-                domain_fixture,
+                domain_fixture.domain_name,
             )
         assert exc_info.value.status == 403
 

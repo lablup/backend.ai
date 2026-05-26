@@ -20,10 +20,21 @@ from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteSubStatus,
+)
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
+    QueryCondition,
+    combine_conditions_and,
+    combine_conditions_or,
+)
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -34,16 +45,19 @@ from ai.backend.manager.sokovan.deployment.route.handlers import (
     AppProxySyncRouteHandler,
     HealthCheckRouteHandler,
     ProvisioningRouteHandler,
+    ReplicaProbeTargetSyncHandler,
     RouteEvictionHandler,
     RouteHandler,
+    RunningRouteHandler,
     ServiceDiscoverySyncHandler,
+    StartingRouteHandler,
     TerminatingRouteHandler,
+    WarmingUpRouteHandler,
 )
 from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
     RouteHealthObserver,
     RouteObserver,
 )
-from ai.backend.manager.sokovan.deployment.route.handlers.running import RunningRouteHandler
 from ai.backend.manager.sokovan.deployment.route.recorder import RouteRecorderContext
 from ai.backend.manager.sokovan.deployment.route.types import (
     RouteExecutionResult,
@@ -54,7 +68,7 @@ from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_enti
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
-from ai.backend.manager.types import DistributedLockFactory
+from ai.backend.manager.types import DistributedLockFactory, OptionalState, TriState
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -146,6 +160,14 @@ class RouteCoordinator:
                 route_executor=executor,
                 event_producer=self._event_producer,
             ),
+            RouteLifecycleType.CHECK_STARTING: StartingRouteHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.CHECK_WARMING_UP: WarmingUpRouteHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
             RouteLifecycleType.RUNNING: RunningRouteHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
@@ -169,6 +191,9 @@ class RouteCoordinator:
             RouteLifecycleType.APPPROXY_SYNC: AppProxySyncRouteHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.PROBE_TARGET_SYNC: ReplicaProbeTargetSyncHandler(
+                route_executor=executor,
             ),
         }
 
@@ -197,11 +222,20 @@ class RouteCoordinator:
                 lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
                 await stack.enter_async_context(self._lock_factory(handler.lock_id, lock_lifetime))
 
-            # Get routes by target lifecycle + health statuses
+            # Build filter conditions from handler target statuses
             target = handler.target_statuses()
-            routes = await self._deployment_repository.get_routes_by_statuses(
-                target.lifecycle,
-                target.health,
+            conditions: list[QueryCondition] = []
+            if target.lifecycle is not None:
+                conditions.append(RouteConditions.by_lifecycle_statuses(target.lifecycle))
+            if target.health is not None:
+                conditions.append(RouteConditions.by_health_statuses(target.health))
+            if target.traffic is not None:
+                conditions.append(RouteConditions.by_traffic_statuses(target.traffic))
+            if target.sub_status is not None:
+                conditions.append(RouteConditions.by_sub_statuses(target.sub_status))
+            routes = await self._deployment_repository.search_route_datas_with_last_history(
+                querier=BatchQuerier(pagination=NoPagination(), conditions=conditions),
+                category=handler.category(),
             )
             if not routes:
                 log.trace("No routes to process for handler: {}", handler.name())
@@ -228,11 +262,31 @@ class RouteCoordinator:
 
         Observers collect data (e.g., health check results) without
         changing route status in DB.
+
+        Observed scope:
+        - RUNNING routes (any health status) — ongoing health monitoring.
+        - PROVISIONING + WARMING_UP routes — initial health probe so the
+          warming-up handler has data to transition into RUNNING.
+          Without this, warming-up routes have no one writing to Valkey
+          and time out after `initial_delay`.
         """
         try:
-            routes = await self._deployment_repository.get_routes_by_statuses(
-                [RouteStatus.RUNNING],
-                list(RouteHealthStatus),
+            routes = await self._deployment_repository.search_route_datas(
+                querier=BatchQuerier(
+                    pagination=NoPagination(),
+                    conditions=[
+                        combine_conditions_or([
+                            combine_conditions_and([
+                                RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
+                                RouteConditions.by_health_statuses(list(RouteHealthStatus)),
+                            ]),
+                            combine_conditions_and([
+                                RouteConditions.by_lifecycle_statuses([RouteStatus.PROVISIONING]),
+                                RouteConditions.by_sub_statuses([RouteSubStatus.WARMING_UP]),
+                            ]),
+                        ]),
+                    ],
+                ),
             )
             if not routes:
                 return
@@ -286,22 +340,22 @@ class RouteCoordinator:
                     message=f"{handler_name} completed successfully",
                     from_status=from_status,
                     to_status=to_status,
-                    to_health_status=transitions.success.health_status,
+                    from_sub_status=r.sub_status,
+                    to_sub_status=transitions.success.sub_status,
                     sub_steps=extract_sub_steps_for_entity(r.route_id, records),
                 )
                 for r in result.successes
             ]
             updater_spec = RouteBatchUpdaterSpec(
-                status=transitions.success.status,
-                health_status=transitions.success.health_status,
+                status=OptionalState.from_nullable(transitions.success.status),
+                health_status=OptionalState.from_nullable(transitions.success.health_status),
+                sub_status=TriState.from_nullable(transitions.success.sub_status),
+                traffic_status=OptionalState.from_nullable(transitions.success.traffic_status),
             )
             batch_updaters.append(
                 BatchUpdater(
                     spec=updater_spec,
-                    conditions=[
-                        RouteConditions.by_ids(route_ids),
-                        RouteConditions.by_lifecycle_statuses(target.lifecycle),
-                    ],
+                    conditions=[RouteConditions.by_ids(route_ids)],
                 )
             )
             all_history_specs.extend(success_history_specs)
@@ -320,7 +374,8 @@ class RouteCoordinator:
                     message=e.reason,
                     from_status=from_status,
                     to_status=to_status,
-                    to_health_status=transitions.failure.health_status,
+                    from_sub_status=e.route_info.sub_status,
+                    to_sub_status=transitions.failure.sub_status,
                     error_code=e.error_code,
                     sub_steps=extract_sub_steps_for_entity(e.route_info.route_id, records),
                 )
@@ -329,13 +384,16 @@ class RouteCoordinator:
             batch_updaters.append(
                 BatchUpdater(
                     spec=RouteBatchUpdaterSpec(
-                        status=transitions.failure.status,
-                        health_status=transitions.failure.health_status,
+                        status=OptionalState.from_nullable(transitions.failure.status),
+                        health_status=OptionalState.from_nullable(
+                            transitions.failure.health_status
+                        ),
+                        sub_status=TriState.from_nullable(transitions.failure.sub_status),
+                        traffic_status=OptionalState.from_nullable(
+                            transitions.failure.traffic_status
+                        ),
                     ),
-                    conditions=[
-                        RouteConditions.by_ids(route_ids),
-                        RouteConditions.by_lifecycle_statuses(target.lifecycle),
-                    ],
+                    conditions=[RouteConditions.by_ids(route_ids)],
                 )
             )
             all_history_specs.extend(failure_history_specs)
@@ -354,7 +412,8 @@ class RouteCoordinator:
                     message=f"{handler_name} marked route as stale",
                     from_status=from_status,
                     to_status=to_status,
-                    to_health_status=transitions.stale.health_status,
+                    from_sub_status=r.sub_status,
+                    to_sub_status=transitions.stale.sub_status,
                     sub_steps=extract_sub_steps_for_entity(r.route_id, records),
                 )
                 for r in result.stale
@@ -362,13 +421,14 @@ class RouteCoordinator:
             batch_updaters.append(
                 BatchUpdater(
                     spec=RouteBatchUpdaterSpec(
-                        status=transitions.stale.status,
-                        health_status=transitions.stale.health_status,
+                        status=OptionalState.from_nullable(transitions.stale.status),
+                        health_status=OptionalState.from_nullable(transitions.stale.health_status),
+                        sub_status=TriState.from_nullable(transitions.stale.sub_status),
+                        traffic_status=OptionalState.from_nullable(
+                            transitions.stale.traffic_status
+                        ),
                     ),
-                    conditions=[
-                        RouteConditions.by_ids(route_ids),
-                        RouteConditions.by_lifecycle_statuses(target.lifecycle),
-                    ],
+                    conditions=[RouteConditions.by_ids(route_ids)],
                 )
             )
             all_history_specs.extend(stale_history_specs)
@@ -378,15 +438,6 @@ class RouteCoordinator:
             await self._deployment_repository.update_route_status_bulk_with_history(
                 batch_updaters, BulkCreator(specs=all_history_specs)
             )
-
-        # Record running_at in Valkey for routes that just transitioned to RUNNING
-        if (
-            transitions.success is not None
-            and transitions.success.status == RouteStatus.RUNNING
-            and result.successes
-        ):
-            for route in result.successes:
-                await self._valkey_schedule.mark_route_running_at(str(route.route_id))
 
     async def process_if_needed(self, lifecycle_type: RouteLifecycleType) -> None:
         """
@@ -414,7 +465,21 @@ class RouteCoordinator:
                 long_interval=60.0,
                 initial_delay=10.0,
             ),
-            # Check running routes frequently with both short and long cycles
+            # Check STARTING routes: wait for replica host/port
+            RouteTaskSpec(
+                RouteLifecycleType.CHECK_STARTING,
+                short_interval=5.0,
+                long_interval=60.0,
+                initial_delay=10.0,
+            ),
+            # Check WARMING_UP routes: initial health probe
+            RouteTaskSpec(
+                RouteLifecycleType.CHECK_WARMING_UP,
+                short_interval=5.0,
+                long_interval=60.0,
+                initial_delay=15.0,
+            ),
+            # Check RUNNING routes session liveness
             RouteTaskSpec(
                 RouteLifecycleType.RUNNING,
                 short_interval=10.0,
@@ -465,6 +530,13 @@ class RouteCoordinator:
                 short_interval=None,
                 long_interval=30.0,
                 initial_delay=15.0,
+            ),
+            # Probe target sync - refresh ReplicaProbeTarget TTL and recover lost Valkey entries
+            RouteTaskSpec(
+                RouteLifecycleType.PROBE_TARGET_SYNC,
+                short_interval=None,
+                long_interval=60.0,
+                initial_delay=30.0,
             ),
         ]
 

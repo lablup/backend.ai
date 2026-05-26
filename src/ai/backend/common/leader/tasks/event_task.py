@@ -51,9 +51,9 @@ class EventProducerTask(PeriodicTask):
         try:
             event = self._spec.event_factory()
             await self._event_producer.anycast_event(event)
-            log.debug(f"Event task {self._spec.name} produced event")
+            log.debug("Event task {} produced event", self._spec.name)
         except Exception:
-            log.exception(f"Failed to produce event for task {self._spec.name}")
+            log.exception("Failed to produce event for task {}", self._spec.name)
 
     @property
     def name(self) -> str:

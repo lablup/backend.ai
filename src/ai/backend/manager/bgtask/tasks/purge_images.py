@@ -3,14 +3,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, override
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,
     BaseBackgroundTaskResult,
 )
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageAction
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class PurgedImageData(BaseModel):
+class PurgedImageData(BackendAISchema):
     """Data about a purged image."""
 
     agent_id: str = Field(description="Agent ID where the image was purged")
@@ -41,7 +41,7 @@ class PurgeImagesTaskResult(BaseBackgroundTaskResult):
     errors: list[str] = Field(description="List of errors encountered during the purge operation")
 
 
-class PurgeImageSpec(BaseModel):
+class PurgeImageSpec(BackendAISchema):
     """Specification of a container image to purge."""
 
     name: str = Field(description="Image name")
@@ -49,7 +49,7 @@ class PurgeImageSpec(BaseModel):
     architecture: str = Field(description="Image architecture (e.g., x86_64, aarch64)")
 
 
-class PurgeAgentSpec(BaseModel):
+class PurgeAgentSpec(BackendAISchema):
     """Specification for purging images on a specific agent."""
 
     agent_id: AgentId = Field(description="Agent ID where images will be purged")

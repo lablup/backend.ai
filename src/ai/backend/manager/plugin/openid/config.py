@@ -1,10 +1,12 @@
 from collections.abc import Mapping
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from ai.backend.common.types import BackendAISchema
 
 
-class OpenIDProviderConfig(BaseModel):
+class OpenIDProviderConfig(BackendAISchema):
     well_known: str | None = Field(
         default=None,
         description=(
@@ -41,7 +43,7 @@ class OpenIDProviderConfig(BaseModel):
     )
 
 
-class OIDCHookConfig(BaseModel):
+class OIDCHookConfig(BackendAISchema):
     secret: str = Field(
         description="Secret key used for signing and verifying JWT tokens.",
     )
@@ -49,7 +51,7 @@ class OIDCHookConfig(BaseModel):
     model_config = {"extra": "ignore"}
 
 
-class OIDCWebAppConfig(BaseModel):
+class OIDCWebAppConfig(BackendAISchema):
     openid: OpenIDProviderConfig = Field(
         description="OpenID Connect provider configuration.",
     )

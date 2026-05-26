@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.compute_session.types import (
     ComputeSessionOrderField,
     OrderDirection,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestComputeSessionPathParam:
@@ -25,7 +26,7 @@ class TestComputeSessionPathParam:
         assert param.session_id == "session-abc-123"
 
     def test_missing_session_id_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ComputeSessionPathParam.model_validate({})
 
     def test_round_trip(self) -> None:
@@ -80,11 +81,11 @@ class TestSearchComputeSessionsInput:
         assert inp.offset == 10
 
     def test_invalid_limit_zero_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchComputeSessionsInput(limit=0)
 
     def test_invalid_offset_negative_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchComputeSessionsInput(offset=-1)
 
     def test_round_trip(self) -> None:

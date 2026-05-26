@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 
-class _OpenAICompatModel(BaseModel):
+class _OpenAICompatModel(BackendAISchema):
     """Base for OpenAI-compat response DTOs.
 
     Runtimes (vLLM, SGLang, NIM, TGI) ship runtime-specific extras

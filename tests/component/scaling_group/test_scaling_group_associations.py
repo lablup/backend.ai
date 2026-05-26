@@ -28,12 +28,13 @@ from ai.backend.manager.models.scaling_group import (
     scaling_groups,
     sgroups_for_domains,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture()
 async def private_sgroup_for_visibility(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
 ) -> AsyncIterator[str]:
     """Insert a private (is_public=False) scaling group with domain association; yield name."""
     name = f"private-vis-{secrets.token_hex(8)}"
@@ -53,7 +54,7 @@ async def private_sgroup_for_visibility(
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
                 scaling_group=name,
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
             )
         )
     yield name

@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.notification.types import (
@@ -20,6 +20,7 @@ from ai.backend.common.data.notification.types import (
     SMTPConnection,
 )
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "CreateNotificationChannelResponse",
@@ -57,7 +58,7 @@ class EmailSpecResponse(BaseResponseModel):
     auth: SMTPAuth | None = Field(default=None, description="SMTP authentication credentials")
 
 
-class NotificationChannelDTO(BaseModel):
+class NotificationChannelDTO(BackendAISchema):
     """DTO for notification channel data."""
 
     id: UUID = Field(description="Channel ID")
@@ -71,7 +72,7 @@ class NotificationChannelDTO(BaseModel):
     updated_at: datetime = Field(description="Last update timestamp")
 
 
-class NotificationRuleDTO(BaseModel):
+class NotificationRuleDTO(BackendAISchema):
     """DTO for notification rule data."""
 
     id: UUID = Field(description="Rule ID")

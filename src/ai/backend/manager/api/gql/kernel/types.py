@@ -442,10 +442,13 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         before: str | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        ResourceAllocationConnectionGQL,
-        strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
-    ]:
+    ) -> (
+        Annotated[
+            ResourceAllocationConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+        ]
+        | None
+    ):
         """Fetch per-slot resource allocation for this kernel."""
         import uuid as _uuid
         from decimal import Decimal

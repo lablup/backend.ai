@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Annotated
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.configs.generator import (
     BinarySizeFormatter,
@@ -27,6 +27,7 @@ from ai.backend.common.meta import (
     ConfigEnvironment,
     ConfigExample,
 )
+from ai.backend.common.types import BackendAISchema
 
 
 class TestFieldVisibility:
@@ -243,7 +244,7 @@ class TestTOMLGenerator:
         assert generator.env == ConfigEnvironment.PROD
 
     def test_generate_simple_config(self) -> None:
-        class SimpleConfig(BaseModel):
+        class SimpleConfig(BackendAISchema):
             name: Annotated[
                 str,
                 Field(default="default-name"),
@@ -265,7 +266,7 @@ class TestTOMLGenerator:
     def test_generate_uses_prod_example(self) -> None:
         """PROD environment uses prod example value."""
 
-        class EnvConfig(BaseModel):
+        class EnvConfig(BackendAISchema):
             endpoint: Annotated[
                 str,
                 Field(default="default-endpoint"),
@@ -285,7 +286,7 @@ class TestTOMLGenerator:
     def test_generate_uses_local_example(self) -> None:
         """LOCAL environment uses local example value."""
 
-        class EnvConfig(BaseModel):
+        class EnvConfig(BackendAISchema):
             endpoint: Annotated[
                 str,
                 Field(default="default-endpoint"),
@@ -303,7 +304,7 @@ class TestTOMLGenerator:
         assert "localhost:8080" in result
 
     def test_optional_field_commented(self) -> None:
-        class OptionalConfig(BaseModel):
+        class OptionalConfig(BackendAISchema):
             optional_field: Annotated[
                 str | None,
                 Field(default=None),
@@ -322,7 +323,7 @@ class TestTOMLGenerator:
         assert "optional_field" in result
 
     def test_secret_field_masked(self) -> None:
-        class SecretConfig(BaseModel):
+        class SecretConfig(BackendAISchema):
             password: Annotated[
                 str,
                 Field(default="secret123"),
@@ -342,7 +343,7 @@ class TestTOMLGenerator:
         assert "dev-pass" not in result
 
     def test_secret_field_unmasked(self) -> None:
-        class SecretConfig(BaseModel):
+        class SecretConfig(BackendAISchema):
             password: Annotated[
                 str,
                 Field(default="secret123"),
@@ -363,7 +364,7 @@ class TestTOMLGenerator:
         assert "***SECRET***" not in result
 
     def test_nested_config_section(self) -> None:
-        class InnerConfig(BaseModel):
+        class InnerConfig(BackendAISchema):
             value: Annotated[
                 int,
                 Field(default=10),
@@ -374,7 +375,7 @@ class TestTOMLGenerator:
                 ),
             ]
 
-        class OuterConfig(BaseModel):
+        class OuterConfig(BackendAISchema):
             inner: Annotated[
                 InnerConfig,
                 Field(default_factory=InnerConfig),
@@ -392,7 +393,7 @@ class TestTOMLGenerator:
         assert "value" in result
 
     def test_runtime_field_hidden(self) -> None:
-        class RuntimeConfig(BaseModel):
+        class RuntimeConfig(BackendAISchema):
             runtime_field: Annotated[
                 str,
                 Field(default="runtime"),
@@ -421,7 +422,7 @@ class TestTOMLGenerator:
         assert "normal_field" in result
 
     def test_skips_fields_without_meta(self) -> None:
-        class MixedConfig(BaseModel):
+        class MixedConfig(BackendAISchema):
             with_meta: Annotated[
                 str,
                 Field(default="has-meta"),
@@ -442,7 +443,7 @@ class TestTOMLGenerator:
 
 class TestConvenienceFunctions:
     def test_generate_sample_toml(self) -> None:
-        class SampleConfig(BaseModel):
+        class SampleConfig(BackendAISchema):
             field: Annotated[
                 str,
                 Field(default="default"),
@@ -458,7 +459,7 @@ class TestConvenienceFunctions:
         assert "local" in result
 
     def test_generate_halfstack_toml(self) -> None:
-        class HalfstackConfig(BaseModel):
+        class HalfstackConfig(BackendAISchema):
             field: Annotated[
                 str,
                 Field(default="default"),

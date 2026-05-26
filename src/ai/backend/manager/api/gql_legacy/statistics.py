@@ -29,15 +29,6 @@ class KernelStatistics:
         return await valkey_stat_client.get_session_statistics_batch(session_ids_str)
 
     @classmethod
-    async def batch_load_by_kernel(
-        cls,
-        ctx: GraphQueryContext,
-        session_ids: Sequence[SessionId],
-    ) -> Sequence[Mapping[str, Any] | None]:
-        """wrapper of `KernelStatistics.batch_load_by_kernel_impl()` for aiodataloader"""
-        return await cls.batch_load_by_kernel_impl(ctx.valkey_stat, session_ids)
-
-    @classmethod
     async def batch_load_inference_metrics_by_kernel(
         cls,
         ctx: GraphQueryContext,

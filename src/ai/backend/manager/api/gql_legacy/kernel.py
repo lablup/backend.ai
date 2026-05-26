@@ -24,6 +24,7 @@ from ai.backend.common.types import (
     KernelId,
     SessionId,
 )
+from ai.backend.manager.api.gql_legacy.stat_converter import LegacyLiveStatConverter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.group import groups
@@ -42,6 +43,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
     QueryFilterParser,
 )
 from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.services.metric.actions.live_stat import ContainerLiveStatAction
 
 from .base import (
     BigInt,
@@ -65,6 +67,19 @@ __all__ = (
     "LegacyComputeSession",
     "LegacyComputeSessionList",
 )
+
+
+async def _batch_load_kernel_live_stat(
+    ctx: GraphQueryContext,
+    kernel_ids: Sequence[KernelId],
+) -> list[dict[str, Any] | None]:
+    if not kernel_ids:
+        return []
+    action_result = await ctx.processors.metric.query_container_live_stat.wait_for_complete(
+        ContainerLiveStatAction(kernel_ids=list(kernel_ids))
+    )
+    converted = LegacyLiveStatConverter.convert(kernel_ids, action_result.stats)
+    return [converted.get(kid) for kid in kernel_ids]
 
 
 class KernelNode(graphene.ObjectType):  # type: ignore[misc]
@@ -190,16 +205,9 @@ class KernelNode(graphene.ObjectType):  # type: ignore[misc]
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> dict[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
-            graph_ctx, self.batch_load_live_stat
+            graph_ctx, _batch_load_kernel_live_stat
         )
         return cast(dict[str, Any] | None, await loader.load(self.row_id))
-
-    @classmethod
-    async def batch_load_live_stat(
-        cls, ctx: GraphQueryContext, kernel_ids: Sequence[KernelId]
-    ) -> list[dict[str, Any] | None]:
-        kernel_ids_str = [str(kid) for kid in kernel_ids]
-        return await ctx.valkey_stat.get_session_statistics_batch(kernel_ids_str)
 
 
 class KernelConnection(Connection):
@@ -313,7 +321,9 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
     # we can leave last_stat value for legacy support, as an alias to last_stat
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, _batch_load_kernel_live_stat
+        )
         return cast(Mapping[str, Any] | None, await loader.load(self.id))
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
@@ -606,7 +616,9 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
     # we can leave last_stat value for legacy support, as an alias to last_stat
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, _batch_load_kernel_live_stat
+        )
         return cast(Mapping[str, Any] | None, await loader.load(self.id))
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
@@ -632,7 +644,9 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             if value is None:
                 return convert_type(0)
             return convert_type(value)
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "KernelStatistics.by_kernel")
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, _batch_load_kernel_live_stat
+        )
         kstat = await loader.load(self.id)
         if kstat is None:
             return convert_type(0)

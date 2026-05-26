@@ -39,12 +39,4 @@ class DomainResourceLimitValidator(ValidatorRule):
         # Check if adding this workload would exceed the limit
         total_after = domain_occupied + workload.requested_slots
         if not (total_after <= domain_limit):
-            # Format the limit for human-readable output
-            if domain_limit and any(v for v in domain_limit.values()):
-                limit_str = " ".join(f"{k}={v}" for k, v in domain_limit.items() if v)
-                exceeded_msg = f"limit: {limit_str}, current: {domain_occupied}, requested: {workload.requested_slots}"
-            else:
-                exceeded_msg = f"No resource limits defined. current: {domain_occupied}, requested: {workload.requested_slots}"
-            raise DomainResourceQuotaExceeded(
-                f"Your domain resource quota is exceeded. ({exceeded_msg})"
-            )
+            raise DomainResourceQuotaExceeded(quota_slots=domain_limit)

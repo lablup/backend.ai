@@ -3,10 +3,12 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from ai.backend.common.types import BackendAISchema
 
 
-class VerifierResult(BaseModel):
+class VerifierResult(BackendAISchema):
     """Result from a single verifier"""
 
     success: bool
@@ -18,7 +20,7 @@ class VerifierResult(BaseModel):
     error: str | None = None  # For when verifier fails with exception
 
 
-class VerificationStepResult(BaseModel):
+class VerificationStepResult(BackendAISchema):
     """Verification result containing results from all verifiers"""
 
     verifiers: dict[str, VerifierResult]
@@ -29,7 +31,7 @@ class ArtifactRegistryType(enum.StrEnum):
     RESERVOIR = "reservoir"
 
 
-class ArtifactDownloadTrackingData(BaseModel):
+class ArtifactDownloadTrackingData(BackendAISchema):
     """
     Artifact-level download tracking data stored in Redis.
     """
@@ -60,7 +62,7 @@ class ArtifactDownloadTrackingData(BaseModel):
     )
 
 
-class FileDownloadProgressData(BaseModel):
+class FileDownloadProgressData(BackendAISchema):
     """
     File-level download progress data stored in Redis.
     """
@@ -91,7 +93,7 @@ class FileDownloadProgressData(BaseModel):
     )
 
 
-class DownloadProgressData(BaseModel):
+class DownloadProgressData(BackendAISchema):
     """
     Download progress data including artifact-level and all file-level information.
     """
@@ -104,7 +106,7 @@ class DownloadProgressData(BaseModel):
     )
 
 
-class ArtifactRevisionDownloadProgress(BaseModel):
+class ArtifactRevisionDownloadProgress(BackendAISchema):
     """
     Download progress with artifact revision status.
     Used for both local and remote download progress.
@@ -130,7 +132,7 @@ class ArtifactRevisionDownloadProgress(BaseModel):
     )
 
 
-class CombinedDownloadProgress(BaseModel):
+class CombinedDownloadProgress(BackendAISchema):
     """
     Combined local and remote download progress.
     """

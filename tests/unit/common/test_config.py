@@ -227,21 +227,6 @@ class TestModelConfigs:
         assert service.start_command is None
         assert service.port == 8000
 
-    def test_model_service_config_draft_rejects_string_start_command(self) -> None:
-        with pytest.raises(ValueError):
-            ModelDefinitionDraft.model_validate({
-                "models": [
-                    {
-                        "name": "demo",
-                        "model_path": "/models/demo",
-                        "service": {
-                            "start_command": "python serve.py",
-                            "port": 8000,
-                        },
-                    }
-                ]
-            })
-
     def test_to_resolved_substitutes_model_path_placeholder(self) -> None:
         # The variant baseline keeps ``{model_path}`` so a single fixture
         # entry covers any mount destination; the placeholder is resolved

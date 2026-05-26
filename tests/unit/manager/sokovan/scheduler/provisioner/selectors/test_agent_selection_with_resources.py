@@ -198,8 +198,13 @@ class TestAgentSelectionWithResources:
             )
 
         # Should raise error because designated agent lacks resources
-        assert "Designated agent '['designated']' is not compatible" in str(exc_info.value)
-        assert "insufficient resources" in str(exc_info.value)
+        message = str(exc_info.value)
+        assert "no designated agent is compatible" in message
+        assert "designated agent 'designated'" in message
+        assert "insufficient resources" in message
+        # Aggregated detail lines must be split with newlines, not "; ".
+        assert "; " not in message
+        assert "\n" in message
 
     async def test_container_limit_with_resource_requirements(
         self,

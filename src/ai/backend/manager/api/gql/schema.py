@@ -48,7 +48,7 @@ from .artifact import (
     update_artifact,
 )
 from .artifact_registry import default_artifact_registry
-from .audit_log import admin_audit_logs_v2
+from .audit_log import admin_audit_logs_v2, scoped_audit_logs_v2
 from .background_task import background_task_events
 from .container_registry import (
     admin_container_registries_v2,
@@ -399,7 +399,7 @@ from .session.resolver import (
     enqueue_session,
     project_sessions_v2,
     session_v2,
-    terminate_project_sessions_v2,
+    terminate_sessions_v2,
 )
 from .storage_host import my_storage_host_permissions
 from .storage_namespace import (
@@ -514,6 +514,7 @@ class Query:
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
+    scoped_audit_logs_v2 = scoped_audit_logs_v2
     admin_container_registries_v2 = admin_container_registries_v2
     admin_login_sessions_v2 = admin_login_sessions_v2
     admin_login_history_v2 = admin_login_history_v2
@@ -894,7 +895,7 @@ class Mutation:
     vfolder_create_download_session_v2 = vfolder_create_download_session_v2
     # Session V2 mutations
     enqueue_session = enqueue_session
-    terminate_project_sessions_v2 = terminate_project_sessions_v2
+    terminate_sessions_v2 = terminate_sessions_v2
 
 
 @strawberry.type

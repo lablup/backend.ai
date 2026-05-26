@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -28,6 +27,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
@@ -38,7 +38,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentTargetStatuses,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
@@ -151,9 +150,14 @@ class FailureClassificationResult:
 
     Classification priority (first match wins), resolved against
     ``DeploymentWithHistory.last_history`` narrowed to the current
-    handler phase:
-    1. give_up: attempts in current phase >= SERVICE_MAX_RETRIES
-    2. expired: current phase's ``started_at`` elapsed > lifecycle timeout
+    handler phase. Both retry and timeout limits come from the
+    deployment's frozen ``DeploymentHandlerOptions`` —
+    ``resolve(handler_name)`` per-handler with field-level fallback to
+    ``default``. ``None`` on either dimension means "no limit"; the
+    matching classification simply does not fire on that dimension:
+    1. give_up: ``max_retry_count`` set AND attempts in current phase
+       reached it
+    2. expired: ``timeout`` set AND elapsed exceeded it
     3. need_retry: default (can be retried)
     """
 
@@ -292,7 +296,7 @@ class DeploymentCoordinator:
         """Return the live set of handler instances registered on this coordinator.
 
         The coordinator owns the authoritative registry; callers that need
-        handler names (e.g. for validating ``DeploymentOptions.timeouts.by_handler``)
+        handler names (e.g. for validating ``DeploymentOptions.handler_options.by_handler``)
         or handler metadata (e.g. for ``/v2/scheduling-handlers``) should
         consult this method rather than maintaining a parallel static list.
         """
@@ -507,9 +511,8 @@ class DeploymentCoordinator:
                 started_at = (
                     last.started_at if last is not None and last.phase == handler_name else None
                 )
-                if deployment.deployment_info.is_transition_timed_out(
-                    started_at, handler_name, current_dbtime
-                ):
+                policy = deployment.deployment_info.options.handler_options.resolve(handler_name)
+                if policy.is_timed_out(started_at, current_dbtime):
                     timed_out.append(deployment)
             if timed_out:
                 log.warning(
@@ -740,9 +743,13 @@ class DeploymentCoordinator:
         coming right after a phase change (same category, different phase)
         is treated as a fresh attempt.
 
+        Per-deployment ``DeploymentHandlerOptions`` resolves both limits
+        per handler. ``None`` on either field means "no limit" — the
+        matching classification skips that dimension entirely.
+
         Classification priority (first match wins):
-        1. give_up: attempts in the current phase >= SERVICE_MAX_RETRIES
-        2. expired: timeout exceeded for the current lifecycle
+        1. give_up: per-handler max_retry_count set AND attempts reached it
+        2. expired: per-handler timeout set AND elapsed exceeded it
         3. need_retry: default
         """
         give_up_errors: list[DeploymentExecutionError] = []
@@ -756,15 +763,15 @@ class DeploymentCoordinator:
             attempts = last.attempts if in_current_phase and last is not None else 0
             started_at = last.started_at if in_current_phase and last is not None else None
 
+            policy = deployment.deployment_info.options.handler_options.resolve(handler_name)
+
             # 1. Check max retries exceeded → give_up
-            if attempts >= SERVICE_MAX_RETRIES:
+            if policy.is_retry_exhausted(attempts):
                 give_up_errors.append(error)
                 continue
 
             # 2. Check timeout exceeded → expired
-            if deployment.deployment_info.is_transition_timed_out(
-                started_at, handler_name, current_dbtime
-            ):
+            if policy.is_timed_out(started_at, current_dbtime):
                 expired_errors.append(error)
                 continue
 

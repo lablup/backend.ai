@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 from datetime import datetime
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -23,13 +24,14 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
-    ReplicaSpec,
+    ModelRevisionData,
+    ReplicaData,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.sokovan.deployment.handlers.deploying import (
+from ai.backend.manager.sokovan.deployment.handlers.deploying_provisioning import (
     DeployingProvisioningHandler,
 )
 from ai.backend.manager.sokovan.deployment.strategy.applier import StrategyApplyResult
@@ -103,7 +105,7 @@ class TestDeployingProvisioningHandler:
         """
         deploying_rev_id = DeploymentRevisionID(uuid4())
         revision = MagicMock()
-        revision.revision_id = deploying_rev_id
+        revision.id = deploying_rev_id
 
         return DeploymentWithHistory(
             deployment_info=DeploymentInfo(
@@ -123,17 +125,18 @@ class TestDeployingProvisioningHandler:
                     scaling_state=ScalingState.STABLE,
                     retry_count=0,
                 ),
-                replica_spec=ReplicaSpec(
+                replica=ReplicaData(
                     replica_count=1,
                     desired_replica_count=1,
                 ),
-                network=DeploymentNetworkSpec(
+                network=DeploymentNetworkData(
                     open_to_public=False,
+                    access_token_ids=None,
                     url=None,
+                    preferred_domain_name=None,
                 ),
-                model_revisions=[revision],
-                current_revision_id=None,
-                deploying_revision_id=deploying_rev_id,
+                current_revision=None,
+                deploying_revision=cast(ModelRevisionData, revision),
                 sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
                 options=DeploymentOptions(),
             ),
@@ -156,7 +159,7 @@ class TestDeployingProvisioningHandler:
         dep, revision_id = call_args[0]
         info = deployment_created_without_revision.deployment_info
         assert dep is deployment_created_without_revision
-        assert revision_id == info.deploying_revision_id
+        assert revision_id == info.deploying_revision.id  # type: ignore[union-attr]
 
     async def test_deployment_already_with_url_is_not_reregistered(
         self,
@@ -184,7 +187,7 @@ class TestDeployingProvisioningHandler:
     ) -> None:
         """Deployments with no deploying_revision_id must be filtered out."""
         info = deployment_created_without_revision.deployment_info
-        info_no_rev = dataclasses.replace(info, deploying_revision_id=None)
+        info_no_rev = dataclasses.replace(info, deploying_revision=None)
         deployment = DeploymentWithHistory(deployment_info=info_no_rev, last_history=None)
 
         await handler.execute([deployment])
@@ -215,3 +218,11 @@ class TestDeployingProvisioningHandler:
 
         evaluated_infos = mock_evaluator.evaluate.await_args.args[0]
         assert all(info.id != dep_id for info in evaluated_infos)
+
+    def test_give_up_transition_targets_rolling_back(self) -> None:
+        """Retry-exhausted deployments must transition to ROLLING_BACK."""
+        transitions = DeployingProvisioningHandler.status_transitions()
+
+        assert transitions.give_up is not None
+        assert transitions.give_up.lifecycle == EndpointLifecycle.DEPLOYING
+        assert transitions.give_up.sub_step == DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK

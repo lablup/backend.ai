@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
-    AddRevisionGQLInputDTO,
+    AddRevisionInput,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
     BulkDeleteAccessTokensInput,
@@ -169,7 +169,7 @@ class V2DeploymentClient(BaseDomainClient):
     async def add_revision(
         self,
         deployment_id: UUID,
-        body: AddRevisionGQLInputDTO,
+        body: AddRevisionInput,
     ) -> AddRevisionPayload:
         """Add a new model revision to a deployment."""
         return await self._client.typed_request(

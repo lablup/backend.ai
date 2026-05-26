@@ -8,7 +8,6 @@ import itertools
 import math
 import numbers
 import textwrap
-import uuid
 from abc import ABC, ABCMeta, abstractmethod
 from collections import UserDict, UserString, defaultdict, namedtuple
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
@@ -27,7 +26,6 @@ from typing import (
     NewType,
     NotRequired,
     Self,
-    TypeAlias,
     TypedDict,
     TypeVar,
     cast,
@@ -49,11 +47,16 @@ from pydantic import (
     Field,
     PlainValidator,
     TypeAdapter,
+    ValidationError,
+    field_validator,
 )
+from pydantic_core import ErrorDetails
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
 from .exception import (
+    BackendAIError,
+    BackendAISchemaValidationFailed,
     GenericNotImplementedError,
     InvalidIpAddressValue,
     InvalidResourceSlotQuantity,
@@ -81,6 +84,7 @@ __all__ = (
     "AutoPullBehavior",
     "AutoScalingMetricComparator",
     "AutoScalingMetricSource",
+    "BackendAISchema",
     "BinarySize",
     "CIStrEnum",
     "CIStrEnumTrafaret",
@@ -113,6 +117,7 @@ __all__ = (
     "MetricValue",
     "ModelServiceProfile",
     "ModelServiceStatus",
+    "SchemaValidationFailureInfo",
     "MountExpression",
     "MountInfoEntry",
     "MountPermission",
@@ -176,6 +181,77 @@ if TYPE_CHECKING:
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
 )
+
+
+@dataclass(frozen=True)
+class SchemaValidationFailureInfo:
+    """Pydantic-decoupled view of a failed ``model_validate*`` call,
+    passed to :meth:`BackendAISchema.build_validation_error`.
+
+    ``summary`` is ``str(pydantic.ValidationError)``; ``errors`` is
+    ``exc.errors()`` as-is.
+    """
+
+    summary: str
+    errors: list[ErrorDetails]
+
+
+class BackendAISchema(BaseModel):
+    """Pydantic base whose ``model_validate`` / ``model_validate_json``
+    auto-map ``ValidationError`` to a :class:`BackendAIError` (HTTP 4xx)
+    via :meth:`build_validation_error`. Subclasses override the
+    classmethod to inject a domain-specific 400::
+
+        class MyConfig(BackendAISchema):
+            @override
+            @classmethod
+            def build_validation_error(
+                cls, info: SchemaValidationFailureInfo
+            ) -> BackendAIError:
+                return MyConfigParseError(
+                    extra_msg=info.summary,
+                    extra_data={"errors": info.errors},
+                )
+    """
+
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        """Default override raising the generic
+        :class:`BackendAISchemaValidationFailed`."""
+        return BackendAISchemaValidationFailed(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
+    @classmethod
+    def _validation_failure_info(cls, exc: ValidationError) -> SchemaValidationFailureInfo:
+        # Strip ``input`` and ``ctx`` per-entry. ``ctx`` may carry
+        # non-JSON-serializable objects (e.g. a raised ``ValueError``
+        # from a ``model_validator``), and ``BackendAIError.__init__``
+        # eagerly serializes the response body via orjson, so those
+        # values would crash exception construction itself.
+        sanitized = [
+            cast(
+                ErrorDetails,
+                {k: v for k, v in err.items() if k not in ("input", "ctx")},
+            )
+            for err in exc.errors()
+        ]
+        return SchemaValidationFailureInfo(summary=str(exc), errors=sanitized)
+
+    @classmethod
+    def model_validate(cls, *args: Any, **kwargs: Any) -> Self:
+        try:
+            return super().model_validate(*args, **kwargs)
+        except ValidationError as e:
+            raise cls.build_validation_error(cls._validation_failure_info(e)) from e
+
+    @classmethod
+    def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
+        try:
+            return super().model_validate_json(*args, **kwargs)
+        except ValidationError as e:
+            raise cls.build_validation_error(cls._validation_failure_info(e)) from e
 
 
 class aobject:
@@ -397,6 +473,7 @@ ImageCanonical = NewType("ImageCanonical", str)
 
 
 class ContainerStatus(enum.StrEnum):
+    CREATED = "created"
     RUNNING = "running"
     RESTARTING = "restarting"
     PAUSED = "paused"
@@ -652,13 +729,12 @@ _MOUNT_PERMISSION_ORDER: dict[MountPermission, int] = {
 MountPermissionLiteral = Literal["ro", "rw", "wd"]
 
 
-class MountInfoEntry(BaseModel):
+class MountInfoEntry(BackendAISchema):
     """Revision-stored form of a user-supplied extra mount.
 
-    The row column persists only these three fields; everything else
-    (``name``, ``vfsubpath``, ``host_path``, ``usage_mode``) that
-    ``VFolderMount`` carries is re-derived at session creation via
-    ``prepare_vfolder_mounts``, so storing it would just be dead weight.
+    The row column persists these fields; the remaining ``VFolderMount``
+    fields (``name``, ``host_path``, ``usage_mode``) are re-derived at
+    session creation via ``prepare_vfolder_mounts``.
 
     ``mount_destination`` is ``None`` when the caller did not provide one —
     ``prepare_vfolder_mounts`` then defaults it to ``/home/work/{vfolder_name}``
@@ -673,14 +749,31 @@ class MountInfoEntry(BaseModel):
     and is frozen onto deployment revision rows so later vfolder
     permission changes cannot retroactively alter already-spawned
     sessions.
+
+    ``subpath`` is the path within the vfolder to mount. ``None`` (or the
+    string ``"."``) means mount the vfolder root.
     """
 
-    vfolder_id: VFolderUUID
+    vfolder_id: VFolderUUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfid"),
+    )
     mount_destination: str | None = Field(
         validation_alias=AliasChoices("mount_destination", "kernel_path"),
         default=None,
     )
     mount_perm: MountPermission | None = Field(default=None)
+    subpath: str | None = Field(
+        validation_alias=AliasChoices("subpath", "vfsubpath"),
+        default=None,
+    )
+
+    @field_validator("vfolder_id", mode="before")
+    @classmethod
+    def _strip_quota_scope_prefix(cls, value: Any) -> Any:
+        # Legacy `vfid` is `str(VFolderID)`; reuse the canonical parser.
+        if isinstance(value, str):
+            return VFolderID.from_str(value).folder_id
+        return value
 
 
 class MountTypes(enum.StrEnum):
@@ -697,18 +790,19 @@ class VFolderMountOptions:
     """Typed mount options for a single vfolder mount request."""
 
     permission: MountPermission | None = None
+    subpath: str | None = None
 
 
 @attrs.define(slots=True)
 class VFolderMountRequest:
     """A single vfolder mount request combining reference, destination path, and options."""
 
-    ref: str | uuid.UUID  # vfolder name (with optional /subpath) or UUID
+    ref: str | UUID  # vfolder name (with optional /subpath) or UUID
     dst_path: str | None = None  # custom mount destination path
     options: VFolderMountOptions = attrs.Factory(VFolderMountOptions)
 
 
-class MountPoint(BaseModel):
+class MountPoint(BackendAISchema):
     model_config = ConfigDict(
         validate_by_name=True,
         protected_namespaces=(),
@@ -1256,7 +1350,7 @@ class SlotQuantity:
     quantity: Decimal
 
 
-class ResourceSlotEntry(BaseModel):
+class ResourceSlotEntry(BackendAISchema):
     """List-friendly shared form of a single resource slot allocation.
 
     The preferred replacement for the ``ResourceSlot`` ``UserDict`` in new
@@ -1317,7 +1411,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-VolumeID: TypeAlias = uuid.UUID
+VolumeID = NewType("VolumeID", UUID)
 
 
 @attrs.define(slots=True, frozen=True)

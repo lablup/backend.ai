@@ -436,12 +436,15 @@ def default_options_replace(
     from pathlib import Path
 
     from ai.backend.common.dto.manager.v2.deployment_options import (
+        DeploymentHandlerOptionsInput,
         DeploymentOptionsInput,
-        DeploymentTimeoutsInput,
-        HandlerTimeoutEntryInput,
     )
     from ai.backend.common.dto.manager.v2.resource_group.request import (
         ReplaceResourceGroupDefaultDeploymentOptionsInput,
+    )
+    from ai.backend.common.dto.manager.v2.session_options import (
+        HandlerOptionsEntryInput,
+        HandlerOptionsInput,
     )
 
     if config_path is not None:
@@ -456,7 +459,7 @@ def default_options_replace(
                 options=DeploymentOptionsInput.model_validate(raw),
             )
     else:
-        entries: list[HandlerTimeoutEntryInput] = []
+        entries: list[HandlerOptionsEntryInput] = []
         for spec in handlers:
             if "=" not in spec:
                 raise click.BadParameter(
@@ -464,7 +467,7 @@ def default_options_replace(
                 )
             handler_name, _, value_str = spec.partition("=")
             entries.append(
-                HandlerTimeoutEntryInput(
+                HandlerOptionsEntryInput(
                     handler_name=handler_name.strip(),
                     timeout_sec=_parse_timeout_value(value_str),
                 )
@@ -474,8 +477,8 @@ def default_options_replace(
         )
         body = ReplaceResourceGroupDefaultDeploymentOptionsInput(
             options=DeploymentOptionsInput(
-                timeouts=DeploymentTimeoutsInput(
-                    default=default_value,
+                handler_options=DeploymentHandlerOptionsInput(
+                    default=HandlerOptionsInput(timeout_sec=default_value),
                     by_handler=entries,
                 ),
             ),
@@ -545,8 +548,8 @@ def default_session_options_replace(
 ) -> None:
     """Fully replace a resource group's ``default_session_options`` (superadmin only).
 
-    ``DefaultSessionOptions`` is a non-trivial nested structure (timeouts,
-    default kernel spec, scheduling policy, ...). The CLI therefore
+    ``DefaultSessionOptions`` is a non-trivial nested structure
+    (handler_options, default kernel spec, scheduling policy, ...). The CLI therefore
     accepts the full payload as a JSON file rather than per-field
     flags; use the ``get`` command to read the current shape as a
     starting template.

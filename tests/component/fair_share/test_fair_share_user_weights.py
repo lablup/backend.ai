@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.fair_share import (
     UpsertUserFairShareWeightResponse,
     UserWeightEntryInput,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestUserFairShareWeights:
@@ -57,7 +58,7 @@ class TestUserFairShareWeights:
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         admin_user_fixture: Any,
     ) -> None:
         """Upsert user fair share → weight created/updated."""
@@ -67,7 +68,7 @@ class TestUserFairShareWeights:
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
             request=UpsertUserFairShareWeightRequest(
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 weight=weight,
             ),
         )
@@ -94,7 +95,7 @@ class TestBulkUpsertUserWeights:
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         admin_user_fixture: Any,
     ) -> None:
         """Bulk upsert success → all weights updated."""
@@ -105,7 +106,7 @@ class TestBulkUpsertUserWeights:
                     UserWeightEntryInput(
                         user_uuid=admin_user_fixture.user_uuid,
                         project_id=group_fixture,
-                        domain_name=domain_fixture,
+                        domain_name=domain_fixture.domain_name,
                         weight=Decimal("7.0"),
                     ),
                 ],
@@ -134,7 +135,7 @@ class TestBulkUpsertUserWeights:
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         admin_user_fixture: Any,
     ) -> None:
         """Bulk upsert overwrites existing weight."""
@@ -143,7 +144,7 @@ class TestBulkUpsertUserWeights:
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
             request=UpsertUserFairShareWeightRequest(
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 weight=Decimal("10.0"),
             ),
         )
@@ -156,7 +157,7 @@ class TestBulkUpsertUserWeights:
                     UserWeightEntryInput(
                         user_uuid=admin_user_fixture.user_uuid,
                         project_id=group_fixture,
-                        domain_name=domain_fixture,
+                        domain_name=domain_fixture.domain_name,
                         weight=new_weight,
                     ),
                 ],
@@ -201,14 +202,14 @@ class TestUserScopeAccessControl:
         self,
         user_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_fixture: uuid.UUID,
         admin_user_fixture: Any,
     ) -> None:
         """RG-scoped user access as regular user → 200 (allowed)."""
         get_result = await user_registry.fair_share.rg_get_user_fair_share(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
         )
@@ -216,7 +217,7 @@ class TestUserScopeAccessControl:
 
         search_result = await user_registry.fair_share.rg_search_user_fair_shares(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
             project_id=group_fixture,
             request=SearchUserFairSharesRequest(),
         )

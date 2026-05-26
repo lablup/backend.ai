@@ -12,19 +12,23 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
+    RouteSubStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    PydanticColumn,
     StrEnumType,
 )
 
@@ -52,7 +56,7 @@ class RoutingRow(Base):  # type: ignore[misc]
         sa.UniqueConstraint("endpoint", "session", name="uq_routings_endpoint_session"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
+    id: Mapped[ReplicaID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     endpoint: Mapped[DeploymentID] = mapped_column(
@@ -108,14 +112,33 @@ class RoutingRow(Base):  # type: ignore[misc]
     )
     replica_port: Mapped[int | None] = mapped_column("replica_port", sa.Integer, nullable=True)
 
+    # Health check config (copied from revision at creation; None = no health check)
+    health_check: Mapped[ModelHealthCheck | None] = mapped_column(
+        "health_check", PydanticColumn(ModelHealthCheck), nullable=True, default=None
+    )
+
     # Revision reference without FK (relationship only)
     revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
     traffic_status: Mapped[RouteTrafficStatus] = mapped_column(
         "traffic_status",
         StrEnumType(RouteTrafficStatus, use_name=False),
         nullable=False,
-        server_default=sa.text("'active'"),
-        default=RouteTrafficStatus.ACTIVE,
+        server_default=sa.text("'inactive'"),
+        default=RouteTrafficStatus.INACTIVE,
+    )
+    sub_status: Mapped[RouteSubStatus | None] = mapped_column(
+        "sub_status",
+        StrEnumType(RouteSubStatus, use_name=False),
+        nullable=True,
+        default=None,
+        server_default=sa.text("'pending'"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.text("now()"),
+        onupdate=sa.func.now(),
     )
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
@@ -222,30 +245,6 @@ class RoutingRow(Base):  # type: ignore[misc]
             raise NoResultFound
         return row
 
-    def __init__(
-        self,
-        id: uuid.UUID,
-        endpoint: DeploymentID,
-        session: uuid.UUID | None,
-        session_owner: uuid.UUID,
-        domain: str,
-        project: uuid.UUID,
-        revision: uuid.UUID,
-        status: RouteStatus = RouteStatus.PROVISIONING,
-        traffic_ratio: float = 1.0,
-        traffic_status: RouteTrafficStatus = RouteTrafficStatus.ACTIVE,
-    ) -> None:
-        self.id = id
-        self.endpoint = endpoint
-        self.session = session
-        self.session_owner = session_owner
-        self.domain = domain
-        self.project = project
-        self.status = status
-        self.traffic_ratio = traffic_ratio
-        self.revision = revision
-        self.traffic_status = traffic_status
-
     def delegate_ownership(self, user_uuid: uuid.UUID) -> None:
         self.session_owner = user_uuid
 
@@ -272,5 +271,6 @@ class RoutingRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             revision_id=self.revision,
             traffic_status=self.traffic_status,
+            health_check=self.health_check,
             error_data=self.error_data or {},
         )

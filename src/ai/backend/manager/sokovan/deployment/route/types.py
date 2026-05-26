@@ -10,6 +10,8 @@ class RouteLifecycleType(StrEnum):
     """Types of route lifecycle operations."""
 
     PROVISIONING = "provisioning"
+    CHECK_STARTING = "check_starting"
+    CHECK_WARMING_UP = "check_warming_up"
     RUNNING = "running"
     HEALTH_CHECK = "health_check"
     ROUTE_EVICTION = "route_eviction"
@@ -17,6 +19,7 @@ class RouteLifecycleType(StrEnum):
     SERVICE_DISCOVERY_SYNC = "service_discovery_sync"
     APPPROXY_SYNC = "appproxy_sync"
     OBSERVE_HEALTH = "observe_health"
+    PROBE_TARGET_SYNC = "probe_target_sync"
 
 
 @dataclass

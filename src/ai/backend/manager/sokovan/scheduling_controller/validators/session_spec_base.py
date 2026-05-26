@@ -57,6 +57,7 @@ class SessionSpecValidationContext:
     keypair_resource_policy: KeyPairResourcePolicyData | None = None
     image_infos: Mapping[ImageID, ImageInfo] = field(default_factory=dict)
     known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
+    required_slot_names: frozenset[SlotName] = field(default_factory=frozenset)
     dotfile_data: DotfileBundle = field(default_factory=DotfileBundle)
     active_session_count: int = 0
 
@@ -98,5 +99,5 @@ class SessionSpecValidator:
         context: SessionSpecValidationContext,
     ) -> None:
         for rule in self._rules:
-            log.debug(f"Applying SessionSpec validation rule: {rule.name()}")
+            log.debug("Applying SessionSpec validation rule: {}", rule.name())
             rule.validate(spec, context)

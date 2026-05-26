@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.auth.request import (
     VerifyAuthInput,
 )
 from ai.backend.common.dto.manager.v2.auth.types import AuthTokenType
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestAuthorizeInput:
@@ -97,7 +98,7 @@ class TestAuthorizeInput:
         assert req.stoken is None
 
     def test_missing_type_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AuthorizeInput.model_validate({
                 "domain": "default",
                 "username": "user@example.com",
@@ -105,7 +106,7 @@ class TestAuthorizeInput:
             })
 
     def test_missing_domain_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AuthorizeInput.model_validate({
                 "type": "keypair",
                 "username": "user@example.com",
@@ -113,7 +114,7 @@ class TestAuthorizeInput:
             })
 
     def test_empty_domain_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AuthorizeInput(
                 type=AuthTokenType.KEYPAIR,
                 domain="",
@@ -122,7 +123,7 @@ class TestAuthorizeInput:
             )
 
     def test_empty_username_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AuthorizeInput(
                 type=AuthTokenType.KEYPAIR,
                 domain="default",
@@ -131,7 +132,7 @@ class TestAuthorizeInput:
             )
 
     def test_empty_password_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AuthorizeInput(
                 type=AuthTokenType.KEYPAIR,
                 domain="default",
@@ -140,7 +141,7 @@ class TestAuthorizeInput:
             )
 
     def test_invalid_type_string_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AuthorizeInput.model_validate({
                 "type": "invalid_type",
                 "domain": "default",
@@ -255,26 +256,26 @@ class TestSignupInput:
         assert req.full_name is None
 
     def test_empty_email_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SignupInput(domain="default", email="", password="secret")
 
     def test_whitespace_only_email_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SignupInput(domain="default", email="   ", password="secret")
 
     def test_missing_email_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SignupInput.model_validate({"domain": "default", "password": "secret"})
 
     def test_missing_password_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SignupInput.model_validate({
                 "domain": "default",
                 "email": "user@example.com",
             })
 
     def test_empty_password_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SignupInput(domain="default", email="user@example.com", password="")
 
 
@@ -335,19 +336,19 @@ class TestSignoutInput:
         assert req.email == "user@example.com"
 
     def test_empty_email_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SignoutInput(email="", password="secret")
 
     def test_whitespace_only_email_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SignoutInput(email="   ", password="secret")
 
     def test_empty_password_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SignoutInput(email="user@example.com", password="")
 
     def test_missing_email_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SignoutInput.model_validate({"password": "secret"})
 
 
@@ -374,11 +375,11 @@ class TestVerifyAuthInput:
         assert req.echo == "test_echo"
 
     def test_empty_echo_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             VerifyAuthInput(echo="")
 
     def test_missing_echo_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             VerifyAuthInput.model_validate({})
 
     def test_echo_at_max_length_is_valid(self) -> None:
@@ -386,7 +387,7 @@ class TestVerifyAuthInput:
         assert len(req.echo) == 256
 
     def test_echo_exceeding_max_length_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             VerifyAuthInput(echo="a" * 257)
 
 
@@ -422,7 +423,7 @@ class TestGetRoleInput:
         assert req.group == group_id
 
     def test_invalid_uuid_string_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetRoleInput.model_validate({"group": "not-a-uuid"})
 
     def test_group_is_uuid_instance(self) -> None:
@@ -465,27 +466,27 @@ class TestUpdateFullNameInput:
         assert req.full_name == "John Doe"
 
     def test_empty_email_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateFullNameInput(email="", full_name="John Doe")
 
     def test_whitespace_only_email_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateFullNameInput(email="   ", full_name="John Doe")
 
     def test_empty_full_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateFullNameInput(email="user@example.com", full_name="")
 
     def test_whitespace_only_full_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateFullNameInput(email="user@example.com", full_name="   ")
 
     def test_missing_email_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateFullNameInput.model_validate({"full_name": "John Doe"})
 
     def test_missing_full_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateFullNameInput.model_validate({"email": "user@example.com"})
 
 
@@ -514,7 +515,7 @@ class TestUpdatePasswordInput:
         assert req.new_password_confirm == "newpass"
 
     def test_empty_old_password_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordInput(
                 old_password="",
                 new_password="newpass",
@@ -522,7 +523,7 @@ class TestUpdatePasswordInput:
             )
 
     def test_empty_new_password_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordInput(
                 old_password="oldpass",
                 new_password="",
@@ -530,7 +531,7 @@ class TestUpdatePasswordInput:
             )
 
     def test_empty_new_password_confirm_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordInput(
                 old_password="oldpass",
                 new_password="newpass",
@@ -538,21 +539,21 @@ class TestUpdatePasswordInput:
             )
 
     def test_missing_old_password_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordInput.model_validate({
                 "new_password": "newpass",
                 "new_password_confirm": "newpass",
             })
 
     def test_missing_new_password_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordInput.model_validate({
                 "old_password": "oldpass",
                 "new_password_confirm": "newpass",
             })
 
     def test_missing_new_password_confirm_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordInput.model_validate({
                 "old_password": "oldpass",
                 "new_password": "newpass",
@@ -591,7 +592,7 @@ class TestUpdatePasswordNoAuthInput:
         assert req.new_password == "newpass"
 
     def test_empty_domain_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordNoAuthInput(
                 domain="",
                 username="user@example.com",
@@ -600,7 +601,7 @@ class TestUpdatePasswordNoAuthInput:
             )
 
     def test_empty_username_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordNoAuthInput(
                 domain="default",
                 username="",
@@ -609,7 +610,7 @@ class TestUpdatePasswordNoAuthInput:
             )
 
     def test_empty_current_password_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordNoAuthInput(
                 domain="default",
                 username="user@example.com",
@@ -618,7 +619,7 @@ class TestUpdatePasswordNoAuthInput:
             )
 
     def test_empty_new_password_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordNoAuthInput(
                 domain="default",
                 username="user@example.com",
@@ -627,7 +628,7 @@ class TestUpdatePasswordNoAuthInput:
             )
 
     def test_missing_any_field_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdatePasswordNoAuthInput.model_validate({
                 "domain": "default",
                 "username": "user@example.com",
@@ -679,41 +680,41 @@ class TestUploadSSHKeypairInput:
         assert req.privkey == "-----BEGIN RSA PRIVATE KEY-----"
 
     def test_empty_pubkey_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UploadSSHKeypairInput(
                 pubkey="",
                 privkey="-----BEGIN RSA PRIVATE KEY-----",
             )
 
     def test_whitespace_only_pubkey_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UploadSSHKeypairInput(
                 pubkey="   ",
                 privkey="-----BEGIN RSA PRIVATE KEY-----",
             )
 
     def test_empty_privkey_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UploadSSHKeypairInput(
                 pubkey="ssh-rsa AAAA...",
                 privkey="",
             )
 
     def test_whitespace_only_privkey_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UploadSSHKeypairInput(
                 pubkey="ssh-rsa AAAA...",
                 privkey="   ",
             )
 
     def test_missing_pubkey_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UploadSSHKeypairInput.model_validate({
                 "privkey": "-----BEGIN RSA PRIVATE KEY-----",
             })
 
     def test_missing_privkey_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UploadSSHKeypairInput.model_validate({
                 "pubkey": "ssh-rsa AAAA...",
             })

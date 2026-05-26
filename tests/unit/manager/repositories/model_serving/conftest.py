@@ -10,6 +10,7 @@ import yarl
 from pytest_mock import MockerFixture
 
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
@@ -141,7 +142,7 @@ def sample_image() -> ImageRow:
     image = ImageRow(
         name="test-model-image", project=None, architecture="x86_64", registry_id=uuid.uuid4()
     )
-    image.id = uuid.uuid4()
+    image.id = ImageID(uuid.uuid4())
     image.registry = "docker.io"
     image.image = "test/model:latest"
     image.tag = "latest"

@@ -76,7 +76,10 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_card.creators import ModelCardCreatorSpec
-from ai.backend.manager.repositories.model_card.types import ProjectModelCardSearchScope
+from ai.backend.manager.repositories.model_card.types import (
+    ProjectModelCardSearchScope,
+    VFolderModelCardSearchScope,
+)
 from ai.backend.manager.repositories.model_card.updaters import ModelCardUpdaterSpec
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.model_card.actions.available_presets import (
@@ -210,6 +213,42 @@ class ModelCardAdapter(BaseAdapter):
         )
         result = await self._processors.model_card.search_in_project.wait_for_complete(
             SearchModelCardsInProjectAction(scope=scope, querier=querier)
+        )
+        return SearchModelCardsPayload(
+            items=[self._data_to_node(d) for d in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_by_vfolder(
+        self,
+        scope: VFolderModelCardSearchScope,
+        input: SearchModelCardsInput,
+    ) -> SearchModelCardsPayload:
+        """Search model cards backed by a specific VFolder.
+
+        Used by the ``VFolderGQL.model_cards`` nested resolver. Access is
+        delegated to the parent VFolder resolver — the caller must already
+        have permission to resolve the VFolder.
+        """
+        conditions = [scope.to_condition()]
+        if input.filter:
+            conditions.extend(self._convert_filter(input.filter))
+        orders = self._convert_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_model_card_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._processors.model_card.search.wait_for_complete(
+            SearchModelCardsAction(querier=querier)
         )
         return SearchModelCardsPayload(
             items=[self._data_to_node(d) for d in result.items],

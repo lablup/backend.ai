@@ -1,10 +1,11 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
+from ai.backend.common.types import BackendAISchema
 from ai.backend.test.testcases.spec_manager import TestTag
 from ai.backend.test.tester.dependency import TestContextInjectionModel
 
 
-class BaseConfigModel(BaseModel):
+class BaseConfigModel(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")

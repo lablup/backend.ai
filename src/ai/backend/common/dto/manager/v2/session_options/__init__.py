@@ -1,4 +1,4 @@
-"""Shared DTOs for session options (timeouts, kernel spec, ...).
+"""Shared DTOs for session options (handler options, kernel spec, ...).
 
 These sub-models are used by both the per-session ``sessions.options``
 surface (via ``EnqueueSessionInput.options``) and the per-resource-group
@@ -10,22 +10,24 @@ circular imports.
 
 from ai.backend.common.dto.manager.v2.session_options.request import (
     DefaultSessionOptionsInput,
-    HandlerTimeoutEntryInput,
+    HandlerOptionsEntryInput,
+    HandlerOptionsInput,
     KernelExecutionSpecInput,
     KernelGroupInput,
     ResourceOptsInput,
     SchedulingTargetInput,
+    SessionHandlerOptionsInput,
     SessionOptionsInput,
-    SessionTimeoutsInput,
 )
 from ai.backend.common.dto.manager.v2.session_options.response import (
     DefaultSessionOptionsInfo,
-    HandlerTimeoutEntryInfo,
+    HandlerOptionsEntryInfo,
+    HandlerOptionsInfo,
     KernelExecutionSpecInfo,
     KernelGroupInfo,
     ResourceOptsInfo,
     SchedulingTargetInfo,
-    SessionTimeoutsInfo,
+    SessionHandlerOptionsInfo,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,
@@ -37,8 +39,10 @@ __all__ = (
     "DefaultSessionOptionsInfo",
     "DefaultSessionOptionsInput",
     "FailurePolicyEnum",
-    "HandlerTimeoutEntryInfo",
-    "HandlerTimeoutEntryInput",
+    "HandlerOptionsEntryInfo",
+    "HandlerOptionsEntryInput",
+    "HandlerOptionsInfo",
+    "HandlerOptionsInput",
     "KernelExecutionSpecInfo",
     "KernelExecutionSpecInput",
     "KernelGroupInfo",
@@ -47,7 +51,7 @@ __all__ = (
     "ResourceOptsInput",
     "SchedulingTargetInfo",
     "SchedulingTargetInput",
+    "SessionHandlerOptionsInfo",
+    "SessionHandlerOptionsInput",
     "SessionOptionsInput",
-    "SessionTimeoutsInfo",
-    "SessionTimeoutsInput",
 )

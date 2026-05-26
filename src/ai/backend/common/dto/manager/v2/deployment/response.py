@@ -94,13 +94,30 @@ class ExtraVFolderMountNode(BaseResponseModel):
             "later vfolder permission changes do not retroactively affect it."
         ),
     )
+    subpath: str | None = Field(
+        default=None,
+        description=("Subpath within the vfolder. ``None`` means the vfolder root."),
+    )
 
 
 class RevisionNode(BaseResponseModel):
     """Node model representing a deployment revision."""
 
     id: UUID = Field(description="Revision ID")
-    name: str = Field(description="Revision name")
+    deployment_id: UUID = Field(
+        description=(
+            "ID of the parent deployment that owns this revision. "
+            "Exposed alongside the resolved deployment node so clients can "
+            "navigate without re-fetching."
+        ),
+    )
+    revision_number: int = Field(
+        description=(
+            "Per-deployment sequential revision number assigned at insert "
+            "time (UNIQUE per deployment). Stable across the lifetime of the "
+            "row and suitable for surfacing 'Revision #N' labels."
+        ),
+    )
     # ``image_id`` is null when the referenced image row has been deleted
     # (``deployment_revisions.image`` SET NULL FK); the revision is kept for
     # history but cannot be redeployed in that state.
@@ -427,6 +444,9 @@ class ReplicaNode(BaseResponseModel):
     readiness_status: ReadinessStatus = Field(description="Readiness status")
     liveness_status: LivenessStatus = Field(description="Liveness status")
     activeness_status: ActivenessStatus = Field(description="Activeness status")
+    status: RouteStatus = Field(description="Provisioning status of the replica")
+    traffic_status: RouteTrafficStatus = Field(description="Traffic status of the replica")
+    health_status: RouteHealthStatus = Field(description="Health check status of the replica")
     created_at: datetime = Field(description="Creation timestamp")
 
 

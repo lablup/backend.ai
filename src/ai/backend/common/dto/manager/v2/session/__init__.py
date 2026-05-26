@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.session.request import (
     SessionPathParam,
     ShutdownServiceInput,
     StartServiceInput,
-    TerminateSessionsInProjectInput,
     UploadFilesInput,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
@@ -73,7 +72,6 @@ __all__ = (
     "SessionPathParam",
     "ShutdownServiceInput",
     "StartServiceInput",
-    "TerminateSessionsInProjectInput",
     "UploadFilesInput",
     # Node and Payload models (response)
     "AdminSearchSessionsPayload",

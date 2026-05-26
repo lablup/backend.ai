@@ -8,7 +8,7 @@ from uuid import UUID
 import aiohttp_cors
 import sqlalchemy as sa
 from aiohttp import web
-from pydantic import BaseModel, Field, validator
+from pydantic import Field, validator
 from sqlalchemy.orm import selectinload
 
 from ai.backend.appproxy.common.types import (
@@ -22,6 +22,7 @@ from ai.backend.appproxy.common.utils import pydantic_api_handler, pydantic_api_
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.types import RootContext
+from ai.backend.common.types import BackendAISchema
 
 from .types import StubResponseModel
 from .utils import auth_required
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 
-class BulkRemoveCircuitsRequestModel(BaseModel):
+class BulkRemoveCircuitsRequestModel(BackendAISchema):
     circuit_ids: Annotated[list[UUID], Field(description="Comma separated list of Circuit UUIDs.")]
 
     @validator("circuit_ids", pre=True)

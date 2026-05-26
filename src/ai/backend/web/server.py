@@ -23,6 +23,7 @@ from collections.abc import (
 from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import UTC, datetime
 from functools import partial
+from http import HTTPStatus
 from pathlib import Path
 from pprint import pprint
 from typing import Any, cast
@@ -48,7 +49,11 @@ from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
-from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+from ai.backend.common.dto.internal.health import (
+    ConnectivityCheckResponse,
+    HealthResponse,
+    HealthStatus,
+)
 from ai.backend.common.dto.manager.auth.request import UpdatePasswordNoAuthRequest
 from ai.backend.common.dto.manager.auth.types import (
     AuthSuccessResponse,
@@ -70,6 +75,19 @@ from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.web.clients.apollo_router_pool import (
+    ApolloRouterEndpointsHealthChecker,
+    ApolloRouterPoolGateHealthChecker,
+)
+from ai.backend.web.clients.endpoint_pool import (
+    EndpointPoolSpec,
+    HealthyEndpointPool,
+    build_endpoint_selection_strategy,
+)
+from ai.backend.web.clients.manager_pool import (
+    ManagerEndpointsHealthChecker,
+    ManagerPoolGateHealthChecker,
+)
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
@@ -82,6 +100,9 @@ from .proxy import (
     web_handler_with_jwt,
     web_plugin_handler,
     websocket_handler,
+)
+from .proxy import (
+    pipeline_handler as pipeline_request_handler,
 )
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
@@ -547,20 +568,55 @@ async def extend_login_session(request: web.Request) -> web.Response:
     return web.json_response(result)
 
 
-async def check_health(request: web.Request) -> web.Response:
-    """Health check endpoint with dependency connectivity status"""
-    request["do_not_print_access_log"] = True
-
-    health_probe: HealthProbe = request.app["health_probe"]
-    connectivity = await health_probe.get_connectivity_status()
+def _build_web_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """Detail /health — always 200; informational tier failures reported as
+    DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
-
     return web.json_response(response.model_dump(mode="json"))
+
+
+def _build_web_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
+    is_healthy = connectivity.overall_healthy
+    response = HealthResponse(
+        status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
+        version=__version__,
+        component="webserver",
+        connectivity=connectivity,
+    )
+    return web.json_response(
+        response.model_dump(mode="json"),
+        status=HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
+    )
+
+
+async def check_health(request: web.Request) -> web.Response:
+    """Aggregated health (union of liveness and readiness)."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_connectivity_status()
+    return _build_web_health_response(connectivity)
+
+
+async def check_livez(request: web.Request) -> web.Response:
+    """Liveness probe — only liveness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_liveness_status()
+    return _build_web_probe_response(connectivity)
+
+
+async def check_readyz(request: web.Request) -> web.Response:
+    """Readiness probe — only readiness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_readiness_status()
+    return _build_web_probe_response(connectivity)
 
 
 async def webserver_healthcheck(request: web.Request) -> web.Response:
@@ -796,6 +852,87 @@ async def client_ctx(
 
 
 @asynccontextmanager
+async def manager_pool_ctx(
+    config: WebServerUnifiedConfig,
+    app: web.Application,
+) -> AsyncGenerator[HealthyEndpointPool]:
+    def _probe_session_factory(endpoint: str) -> aiohttp.ClientSession:
+        # Used only by the pool's background readiness probe. Per-user client
+        # sessions (cookies, access keys) come from app["client_pool"] and
+        # stay separate so user state never leaks across requests.
+        return aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(
+                ssl=config.api.ssl_verify,
+                limit=config.api.connection_limit,
+            ),
+            base_url=endpoint,
+            auto_decompress=False,
+        )
+
+    pool = HealthyEndpointPool(
+        endpoints=[str(endpoint) for endpoint in config.api.endpoint],
+        spec=EndpointPoolSpec(
+            probe_path=config.api.health_check_probe_path,
+            health_check_interval=config.api.health_check_interval,
+            failure_threshold=config.api.health_check_failure_threshold,
+            recovery_timeout=config.api.health_check_recovery_timeout,
+            probe_timeout=config.api.health_check_probe_timeout,
+        ),
+        strategy=build_endpoint_selection_strategy(config.api.endpoint_selection_policy),
+        probe_session_factory=_probe_session_factory,
+    )
+
+    async def _shutdown(_app: web.Application) -> None:
+        await pool.close()
+
+    # NOTE: on_shutdown handlers are invoked before other cleanups.
+    app.on_shutdown.append(_shutdown)
+    yield pool
+
+
+@asynccontextmanager
+async def apollo_router_pool_ctx(
+    config: WebServerUnifiedConfig,
+    app: web.Application,
+) -> AsyncGenerator[HealthyEndpointPool]:
+    """Healthy-endpoint pool for the Apollo Router (a.k.a. Hive Router) upstream.
+
+    Mirrors :func:`manager_pool_ctx` but targets ``config.apollo_router``. Only
+    constructed when ``config.apollo_router.enabled`` is true; callers should
+    guard registration accordingly.
+    """
+
+    def _probe_session_factory(endpoint: str) -> aiohttp.ClientSession:
+        return aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(
+                ssl=config.api.ssl_verify,
+                limit=config.api.connection_limit,
+            ),
+            base_url=endpoint,
+            auto_decompress=False,
+        )
+
+    pool = HealthyEndpointPool(
+        endpoints=list(config.apollo_router.endpoints),
+        spec=EndpointPoolSpec(
+            probe_path=config.apollo_router.health_check_probe_path,
+            health_check_interval=config.apollo_router.health_check_interval,
+            failure_threshold=config.apollo_router.health_check_failure_threshold,
+            recovery_timeout=config.apollo_router.health_check_recovery_timeout,
+            probe_timeout=config.apollo_router.health_check_probe_timeout,
+        ),
+        strategy=build_endpoint_selection_strategy(config.apollo_router.endpoint_selection_policy),
+        probe_session_factory=_probe_session_factory,
+    )
+
+    async def _shutdown(_app: web.Application) -> None:
+        await pool.close()
+
+    app.on_shutdown.append(_shutdown)
+    yield pool
+
+
+@asynccontextmanager
 async def no_auth_client_registry_ctx(
     config: WebServerUnifiedConfig,
 ) -> AsyncGenerator[BackendAIClientRegistry]:
@@ -841,24 +978,33 @@ async def webapp_ctx(
     j2env.filters["toml_scalar"] = toml_scalar
     app["j2env"] = j2env
 
-    anon_web_handler = partial(web_handler, is_anonymous=True)
-    anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
+    manager_pool = cast(HealthyEndpointPool, app["manager_pool"])
 
+    manager_web_handler = partial(web_handler, endpoint_pool=manager_pool)
+    manager_websocket_handler = partial(websocket_handler, endpoint_pool=manager_pool)
+    manager_web_plugin_handler = partial(web_plugin_handler, endpoint_pool=manager_pool)
+
+    anon_web_handler = partial(manager_web_handler, is_anonymous=True)
+    anon_web_plugin_handler = partial(manager_web_plugin_handler, is_anonymous=True)
+
+    # Pipeline is a separate upstream — no health-aware pool here. A follow-up
+    # will introduce one alongside ApolloRouterClientPool.
     pipeline_api_endpoint = str(config.pipeline.endpoint)
-    pipeline_api_ws_endpoint = pipeline_api_endpoint.replace("http", "ws", 1)
     pipeline_handler = partial(
-        web_handler, is_anonymous=True, api_endpoint=str(pipeline_api_endpoint)
+        pipeline_request_handler,
+        is_anonymous=True,
+        pipeline_endpoint=pipeline_api_endpoint,
     )
     pipeline_login_handler = partial(
-        web_handler,
+        pipeline_request_handler,
         is_anonymous=False,
-        api_endpoint=str(pipeline_api_endpoint),
+        pipeline_endpoint=pipeline_api_endpoint,
         http_headers_to_forward_extra={"X-BackendAI-SessionID"},
     )
     pipeline_websocket_handler = partial(
         websocket_handler,
         is_anonymous=True,
-        api_endpoint=pipeline_api_ws_endpoint,
+        static_endpoint=pipeline_api_endpoint,
     )
 
     cors_options = {
@@ -882,6 +1028,8 @@ async def webapp_ctx(
     cors.add(app.router.add_route("POST", "/server/extend-login-session", extend_login_session))
     cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/health", check_health))
+    cors.add(app.router.add_route("GET", "/livez", check_livez))
+    cors.add(app.router.add_route("GET", "/readyz", check_readyz))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
@@ -894,27 +1042,32 @@ async def webapp_ctx(
         app.router.add_route("POST", "/func/{path:totp/anon(?:/.*)?$}", anon_web_plugin_handler)
     )
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
-    cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", web_handler))
-    cors.add(app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", web_handler))
-    cors.add(app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", web_handler))
-    cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", websocket_handler))
+    cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", manager_web_handler))
+    cors.add(
+        app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", manager_web_handler)
+    )
+    cors.add(
+        app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", manager_web_handler)
+    )
+    cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", manager_websocket_handler))
     cors.add(app.router.add_route("GET", "/func/", anon_web_handler))
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
         # Use JWT authentication for Apollo Router if enabled, otherwise use HMAC
         supergraph_handler = partial(
-            web_handler_with_jwt, api_endpoints=list(config.apollo_router.endpoints)
+            web_handler_with_jwt,
+            endpoint_pool=cast(HealthyEndpointPool, app["apollo_router_pool"]),
         )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
 
-    cors.add(app.router.add_route("HEAD", "/func/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("GET", "/func/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("PUT", "/func/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("POST", "/func/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", web_handler))
+    cors.add(app.router.add_route("HEAD", "/func/{path:.*$}", manager_web_handler))
+    cors.add(app.router.add_route("GET", "/func/{path:.*$}", manager_web_handler))
+    cors.add(app.router.add_route("PUT", "/func/{path:.*$}", manager_web_handler))
+    cors.add(app.router.add_route("POST", "/func/{path:.*$}", manager_web_handler))
+    cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", manager_web_handler))
+    cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", manager_web_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", pipeline_websocket_handler))
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*login/$}", pipeline_login_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
@@ -993,6 +1146,13 @@ async def server_main(
         app["config"] = config
         app["stats"] = WebStats()
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
+        app["manager_pool"] = await web_init_stack.enter_async_context(
+            manager_pool_ctx(config, app)
+        )
+        if config.apollo_router.enabled:
+            app["apollo_router_pool"] = await web_init_stack.enter_async_context(
+                apollo_router_pool_ctx(config, app)
+            )
         app["no_auth_client_registry"] = await web_init_stack.enter_async_context(
             no_auth_client_registry_ctx(config)
         )
@@ -1000,13 +1160,32 @@ async def server_main(
 
         # Initialize health probe
         health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
-        await health_probe.register(
+        # Valkey: liveness — also surfaced in readiness.
+        await health_probe.register_liveness(
             ValkeyHealthChecker(
                 clients={
                     ComponentId("session"): app["redis"],
                 }
             )
         )
+        # Manager pool: any-healthy gate readers consult on /health/ready,
+        # plus per-endpoint informational status surfaced on /health.
+        await health_probe.register_readiness(
+            ManagerPoolGateHealthChecker(app["manager_pool"]),
+        )
+        await health_probe.register_informational(
+            ManagerEndpointsHealthChecker(app["manager_pool"]),
+        )
+        if config.apollo_router.enabled:
+            # Apollo Router (Hive Gateway) is required for GraphQL federation:
+            # /readyz should turn red when no upstream is alive even if
+            # manager traffic is otherwise fine.
+            await health_probe.register_readiness(
+                ApolloRouterPoolGateHealthChecker(app["apollo_router_pool"]),
+            )
+            await health_probe.register_informational(
+                ApolloRouterEndpointsHealthChecker(app["apollo_router_pool"]),
+            )
         await health_probe.start()
         web_init_stack.push_async_callback(health_probe.stop)
         app["health_probe"] = health_probe

@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -80,6 +81,7 @@ class TestSessionUniqueNamePerUser:
                 GroupRow,
                 AgentRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 ResourcePresetRow,
                 EndpointRow,

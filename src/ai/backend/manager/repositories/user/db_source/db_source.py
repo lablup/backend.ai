@@ -1307,7 +1307,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(UserRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
@@ -1347,7 +1347,7 @@ class UserDBSource:
                     ),
                 )
             )
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
@@ -1375,7 +1375,7 @@ class UserDBSource:
                     UserRow.uuid == UserRoleRow.user_id,
                 )
             )
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
@@ -1536,7 +1536,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
             items = [row.KeyPairRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,

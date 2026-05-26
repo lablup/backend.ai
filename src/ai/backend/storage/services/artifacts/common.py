@@ -127,7 +127,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
             dst_path = dst_storage.resolve_path(model_prefix)
             verifier_start_time = datetime.now(UTC)
             log.info(
-                f"Starting artifact verification using '{verifier_name}', dst_path: {dst_path}"
+                "Starting artifact verification using '{}', dst_path: {}", verifier_name, dst_path
             )
             try:
                 result = await verifier.verify(dst_path, context)
@@ -147,11 +147,13 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
                 if result.infected_count > 0:
                     verification_success = False
                     log.warning(
-                        f"Artifact verification using '{verifier_name}' found {result.infected_count} infected files"
+                        "Artifact verification using '{}' found {} infected files",
+                        verifier_name,
+                        result.infected_count,
                     )
                 else:
                     log.info(
-                        f"Artifact verification using '{verifier_name}' completed successfully"
+                        "Artifact verification using '{}' completed successfully", verifier_name
                     )
 
             except Exception as e:
@@ -167,7 +169,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
                     metadata={},
                     error=str(e),
                 )
-                log.error(f"Artifact verification using '{verifier_name}' failed: {e}")
+                log.error("Artifact verification using '{}' failed: {}", verifier_name, e)
 
         # Create complete verification result
         verification_result = VerificationStepResult(

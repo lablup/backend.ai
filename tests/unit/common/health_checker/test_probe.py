@@ -14,7 +14,6 @@ from ai.backend.common.health_checker import (
     ComponentHealthStatus,
     ComponentId,
     HealthCheckerAlreadyRegistered,
-    HealthCheckerNotFound,
     HealthProbe,
     ServiceGroup,
     ServiceHealth,
@@ -22,310 +21,170 @@ from ai.backend.common.health_checker import (
 )
 
 
-async def test_probe_register_checker(
-    health_probe: HealthProbe,
-    sample_service_group: ServiceGroup,
-    mock_healthy_checker: ServiceHealthChecker,
-) -> None:
-    """Test registering a health checker."""
-    await health_probe.register(mock_healthy_checker)
-
-    # Verify registration by getting all registered checkers
-    registered = await health_probe._get_all_registered()
-    assert sample_service_group in registered
-    assert registered[sample_service_group].checker == mock_healthy_checker
-    assert registered[sample_service_group].result is None  # Not checked yet
-
-
-async def test_probe_register_duplicate_checker_raises_error(
-    health_probe: HealthProbe,
-    sample_service_group: ServiceGroup,
-    mock_healthy_checker: ServiceHealthChecker,
-) -> None:
-    """Test that registering a duplicate checker raises HealthCheckerAlreadyRegistered."""
-    await health_probe.register(mock_healthy_checker)
-
-    # Try to register again with the same key
-    with pytest.raises(HealthCheckerAlreadyRegistered) as exc_info:
-        await health_probe.register(mock_healthy_checker)
-
-    # Verify the exception contains service_group
-    assert str(sample_service_group) in str(exc_info.value)
-
-
-async def test_probe_unregister_checker(
-    health_probe: HealthProbe,
-    sample_service_group: ServiceGroup,
-    mock_healthy_checker: ServiceHealthChecker,
-) -> None:
-    """Test unregistering a health checker."""
-    await health_probe.register(mock_healthy_checker)
-    await health_probe.unregister(sample_service_group)
-
-    # Verify unregistration
-    registered = await health_probe._get_all_registered()
-    assert sample_service_group not in registered
-
-
-async def test_probe_unregister_nonexistent_checker_raises_error(
-    health_probe: HealthProbe,
-    sample_service_group: ServiceGroup,
-) -> None:
-    """Test that unregistering a non-existent checker raises HealthCheckerNotFound."""
-    with pytest.raises(HealthCheckerNotFound) as exc_info:
-        await health_probe.unregister(sample_service_group)
-
-    # Verify the exception contains service_group
-    assert str(sample_service_group) in str(exc_info.value)
-
-
-async def test_probe_register_multiple_checkers(
-    health_probe: HealthProbe,
-    mock_healthy_checker: ServiceHealthChecker,
-) -> None:
-    """Test registering multiple health checkers."""
-    # Create separate mock checkers with different service groups
+def _make_checker(
+    service_group: ServiceGroup,
+    *,
+    is_healthy: bool = True,
+    error_message: str | None = None,
+    component_id: str = "test-component",
+    timeout: float = 1.0,
+) -> ServiceHealthChecker:
     check_time = datetime.now(UTC)
-    healthy_result = ServiceHealth(
+    result = ServiceHealth(
         results={
-            ComponentId("test-component"): ComponentHealthStatus(
-                is_healthy=True,
+            ComponentId(component_id): ComponentHealthStatus(
+                is_healthy=is_healthy,
                 last_checked_at=check_time,
-                error_message=None,
+                error_message=error_message,
             )
         }
     )
-
-    manager_checker = AsyncMock(spec=ServiceHealthChecker)
-    manager_checker.check_service = AsyncMock(return_value=healthy_result)
-    manager_checker.timeout = 1.0
-    manager_checker.target_service_group = MANAGER
-
-    database_checker = AsyncMock(spec=ServiceHealthChecker)
-    database_checker.check_service = AsyncMock(return_value=healthy_result)
-    database_checker.timeout = 1.0
-    database_checker.target_service_group = DATABASE
-
-    agent_checker = AsyncMock(spec=ServiceHealthChecker)
-    agent_checker.check_service = AsyncMock(return_value=healthy_result)
-    agent_checker.timeout = 1.0
-    agent_checker.target_service_group = AGENT
-
-    await health_probe.register(manager_checker)
-    await health_probe.register(database_checker)
-    await health_probe.register(agent_checker)
-
-    registered = await health_probe._get_all_registered()
-    assert len(registered) == 3
-    assert MANAGER in registered
-    assert DATABASE in registered
-    assert AGENT in registered
+    checker = AsyncMock(spec=ServiceHealthChecker)
+    checker.check_service = AsyncMock(return_value=result)
+    checker.timeout = timeout
+    checker.target_service_group = service_group
+    return checker
 
 
-async def test_probe_check_healthy_checker(
+async def test_register_readiness_appears_in_readyz(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
     mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
-    """Test checking a healthy checker returns success result."""
-    await health_probe.register(mock_healthy_checker)
+    await health_probe.register_readiness(mock_healthy_checker)
+    await health_probe.check_all()
+
+    readiness = await health_probe.get_readiness_status()
+    liveness = await health_probe.get_liveness_status()
+
+    assert {c.service_group for c in readiness.connectivity_checks} == {sample_service_group}
+    assert liveness.connectivity_checks == []
+
+
+async def test_register_liveness_appears_in_both_livez_and_readyz(
+    health_probe: HealthProbe,
+    sample_service_group: ServiceGroup,
+    mock_healthy_checker: ServiceHealthChecker,
+) -> None:
+    await health_probe.register_liveness(mock_healthy_checker)
+    await health_probe.check_all()
+
+    liveness = await health_probe.get_liveness_status()
+    readiness = await health_probe.get_readiness_status()
+
+    assert {c.service_group for c in liveness.connectivity_checks} == {sample_service_group}
+    assert {c.service_group for c in readiness.connectivity_checks} == {sample_service_group}
+
+
+async def test_register_same_checker_to_both_runs_check_once(
+    health_probe: HealthProbe,
+    mock_healthy_checker: ServiceHealthChecker,
+) -> None:
+    await health_probe.register_readiness(mock_healthy_checker)
+    await health_probe.register_liveness(mock_healthy_checker)
+
+    await health_probe.check_all()
+
+    mock = mock_healthy_checker.check_service
+    assert isinstance(mock, AsyncMock)
+    assert mock.call_count == 1
+
+
+async def test_register_duplicate_in_same_kind_raises(
+    health_probe: HealthProbe,
+    sample_service_group: ServiceGroup,
+    mock_healthy_checker: ServiceHealthChecker,
+) -> None:
+    await health_probe.register_readiness(mock_healthy_checker)
+
+    with pytest.raises(HealthCheckerAlreadyRegistered) as exc_info:
+        await health_probe.register_readiness(mock_healthy_checker)
+
+    assert str(sample_service_group) in str(exc_info.value)
+
+
+async def test_register_different_instance_for_same_group_raises(
+    health_probe: HealthProbe,
+    sample_service_group: ServiceGroup,
+    mock_healthy_checker: ServiceHealthChecker,
+) -> None:
+    await health_probe.register_readiness(mock_healthy_checker)
+
+    other = _make_checker(sample_service_group)
+
+    with pytest.raises(HealthCheckerAlreadyRegistered):
+        await health_probe.register_liveness(other)
+
+
+async def test_check_all_with_healthy_checker(
+    health_probe: HealthProbe,
+    sample_service_group: ServiceGroup,
+    mock_healthy_checker: ServiceHealthChecker,
+) -> None:
+    await health_probe.register_readiness(mock_healthy_checker)
 
     all_results = await health_probe.check_all()
 
     assert isinstance(all_results, AllServicesHealth)
     assert sample_service_group in all_results.results
-    result = all_results.results[sample_service_group]
-    # Result contains component statuses
-    assert len(result.results) > 0
-    for component_status in result.results.values():
-        assert component_status.is_healthy is True
-        assert component_status.error_message is None
-        assert isinstance(component_status.last_checked_at, datetime)
+    for status in all_results.results[sample_service_group].results.values():
+        assert status.is_healthy is True
+        assert status.error_message is None
 
 
-async def test_probe_check_unhealthy_checker(
+async def test_check_all_with_unhealthy_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
     mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
-    """Test checking an unhealthy checker returns failure result."""
-    await health_probe.register(mock_unhealthy_checker)
+    await health_probe.register_readiness(mock_unhealthy_checker)
 
     all_results = await health_probe.check_all()
 
-    assert isinstance(all_results, AllServicesHealth)
-    assert sample_service_group in all_results.results
-    result = all_results.results[sample_service_group]
-    assert len(result.results) > 0
-    for component_status in result.results.values():
-        assert component_status.is_healthy is False
-        assert "Service unavailable" in component_status.error_message  # type: ignore
-        assert isinstance(component_status.last_checked_at, datetime)
+    for status in all_results.results[sample_service_group].results.values():
+        assert status.is_healthy is False
+        assert status.error_message is not None
+        assert "Service unavailable" in status.error_message
 
 
-async def test_probe_check_timeout_checker(
+async def test_check_all_timeout_returns_empty(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
     mock_timeout_checker: ServiceHealthChecker,
 ) -> None:
-    """Test checking a timeout checker returns empty result."""
-    await health_probe.register(mock_timeout_checker)
+    await health_probe.register_readiness(mock_timeout_checker)
 
     all_results = await health_probe.check_all()
 
-    assert isinstance(all_results, AllServicesHealth)
-    assert sample_service_group in all_results.results
-    result = all_results.results[sample_service_group]
-    # Timeout returns empty results
-    assert len(result.results) == 0
+    assert all_results.results[sample_service_group].results == {}
 
 
-async def test_probe_check_all_updates_internal_status(
+async def test_check_all_mixed_kinds(
     health_probe: HealthProbe,
-    sample_service_group: ServiceGroup,
-    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
-    """Test that check_all() updates the internal result registry."""
-    await health_probe.register(mock_healthy_checker)
+    manager_checker = _make_checker(MANAGER, is_healthy=True)
+    database_checker = _make_checker(DATABASE, is_healthy=False, error_message="db down")
+    agent_checker = _make_checker(AGENT, is_healthy=True)
 
-    # Initially, result should be None
-    registered = await health_probe._get_all_registered()
-    assert registered[sample_service_group].result is None
-
-    # After check_all(), result should be updated
-    await health_probe.check_all()
-
-    registered = await health_probe._get_all_registered()
-    assert registered[sample_service_group].result is not None
-
-
-async def test_probe_check_all_mixed_results(
-    health_probe: HealthProbe,
-    mock_healthy_checker: ServiceHealthChecker,
-    mock_unhealthy_checker: ServiceHealthChecker,
-) -> None:
-    """Test check_all() with a mix of healthy and unhealthy checkers."""
-    # Create separate checkers with different service groups
-    check_time = datetime.now(UTC)
-
-    # Healthy checker for MANAGER
-    healthy_result = ServiceHealth(
-        results={
-            ComponentId("test-component"): ComponentHealthStatus(
-                is_healthy=True,
-                last_checked_at=check_time,
-                error_message=None,
-            )
-        }
-    )
-    manager_checker = AsyncMock(spec=ServiceHealthChecker)
-    manager_checker.check_service = AsyncMock(return_value=healthy_result)
-    manager_checker.timeout = 1.0
-    manager_checker.target_service_group = MANAGER
-
-    # Unhealthy checker for DATABASE
-    unhealthy_result = ServiceHealth(
-        results={
-            ComponentId("test-component"): ComponentHealthStatus(
-                is_healthy=False,
-                last_checked_at=check_time,
-                error_message="Service unavailable",
-            )
-        }
-    )
-    database_checker = AsyncMock(spec=ServiceHealthChecker)
-    database_checker.check_service = AsyncMock(return_value=unhealthy_result)
-    database_checker.timeout = 1.0
-    database_checker.target_service_group = DATABASE
-
-    await health_probe.register(manager_checker)
-    await health_probe.register(database_checker)
+    await health_probe.register_liveness(manager_checker)
+    await health_probe.register_readiness(database_checker)
+    await health_probe.register_readiness(agent_checker)
 
     all_results = await health_probe.check_all()
 
-    assert isinstance(all_results, AllServicesHealth)
-    assert len(all_results.results) == 2
-    # Check healthy result
-    manager_result = all_results.results[MANAGER]
-    assert all(s.is_healthy for s in manager_result.results.values())
-    # Check unhealthy result
-    database_result = all_results.results[DATABASE]
-    assert all(not s.is_healthy for s in database_result.results.values())
+    assert set(all_results.results.keys()) == {MANAGER, DATABASE, AGENT}
 
 
-async def test_probe_check_all_continues_on_exception(
-    health_probe: HealthProbe,
-    mock_healthy_checker: ServiceHealthChecker,
-    mock_unhealthy_checker: ServiceHealthChecker,
-) -> None:
-    """Test that check_all() continues checking even if some checkers fail."""
-    # Create separate checkers with different service groups
-    check_time = datetime.now(UTC)
-
-    # Healthy result
-    healthy_result = ServiceHealth(
-        results={
-            ComponentId("test-component"): ComponentHealthStatus(
-                is_healthy=True,
-                last_checked_at=check_time,
-                error_message=None,
-            )
-        }
-    )
-
-    # Unhealthy result
-    unhealthy_result = ServiceHealth(
-        results={
-            ComponentId("test-component"): ComponentHealthStatus(
-                is_healthy=False,
-                last_checked_at=check_time,
-                error_message="Service unavailable",
-            )
-        }
-    )
-
-    manager_checker = AsyncMock(spec=ServiceHealthChecker)
-    manager_checker.check_service = AsyncMock(return_value=healthy_result)
-    manager_checker.timeout = 1.0
-    manager_checker.target_service_group = MANAGER
-
-    database_checker = AsyncMock(spec=ServiceHealthChecker)
-    database_checker.check_service = AsyncMock(return_value=unhealthy_result)
-    database_checker.timeout = 1.0
-    database_checker.target_service_group = DATABASE
-
-    agent_checker = AsyncMock(spec=ServiceHealthChecker)
-    agent_checker.check_service = AsyncMock(return_value=healthy_result)
-    agent_checker.timeout = 1.0
-    agent_checker.target_service_group = AGENT
-
-    await health_probe.register(manager_checker)
-    await health_probe.register(database_checker)
-    await health_probe.register(agent_checker)
-
-    all_results = await health_probe.check_all()
-
-    # All three should be checked
-    assert isinstance(all_results, AllServicesHealth)
-    assert len(all_results.results) == 3
-    assert MANAGER in all_results.results
-    assert DATABASE in all_results.results
-    assert AGENT in all_results.results
-
-
-async def test_probe_check_all_empty_registry(
+async def test_check_all_empty_returns_empty(
     health_probe: HealthProbe,
 ) -> None:
-    """Test check_all() with no registered checkers returns empty results."""
     all_results = await health_probe.check_all()
-    assert isinstance(all_results, AllServicesHealth)
     assert all_results.results == {}
 
 
-async def test_probe_start_and_stop(
+async def test_start_and_stop(
     health_probe: HealthProbe,
 ) -> None:
-    """Test starting and stopping the health probe loop."""
     assert health_probe._running is False
     assert health_probe._loop_task is None
 
@@ -338,245 +197,128 @@ async def test_probe_start_and_stop(
     assert health_probe._loop_task is None
 
 
-async def test_probe_start_already_running(
-    health_probe: HealthProbe,
-) -> None:
-    """Test that starting an already running probe logs a warning."""
-    await health_probe.start()
-
-    # Start again - should log warning but not crash
-    await health_probe.start()
-
-    # Should still be running
-    assert health_probe._running is True
-
-    await health_probe.stop()
-
-
-async def test_probe_stop_not_running(
-    health_probe: HealthProbe,
-) -> None:
-    """Test that stopping a non-running probe logs a warning."""
-    assert health_probe._running is False
-
-    # Stop without starting - should log warning but not crash
-    await health_probe.stop()
-
-    # Should still be not running
-    assert health_probe._running is False
-
-
-async def test_probe_periodic_check(
+async def test_periodic_check_invokes_checker(
     health_probe: HealthProbe,
     mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
-    """Test that the probe periodically checks registered checkers."""
-    await health_probe.register(mock_healthy_checker)
-
+    await health_probe.register_readiness(mock_healthy_checker)
     await health_probe.start()
-
-    # Wait for at least 2-3 check intervals
     await asyncio.sleep(0.35)
-
     await health_probe.stop()
 
-    # Verify that check_service was called multiple times
     mock = mock_healthy_checker.check_service
     assert isinstance(mock, AsyncMock)
     assert mock.call_count >= 2
 
 
-async def test_probe_dynamic_registration_during_loop(
+async def test_dynamic_registration_during_loop(
     health_probe: HealthProbe,
-    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
-    """Test that checkers can be registered/unregistered while the loop is running."""
-    # Create separate checkers with different service groups
-    check_time = datetime.now(UTC)
-    healthy_result = ServiceHealth(
-        results={
-            ComponentId("test-component"): ComponentHealthStatus(
-                is_healthy=True,
-                last_checked_at=check_time,
-                error_message=None,
-            )
-        }
-    )
+    manager_checker = _make_checker(MANAGER)
+    database_checker = _make_checker(DATABASE)
 
-    manager_checker = AsyncMock(spec=ServiceHealthChecker)
-    manager_checker.check_service = AsyncMock(return_value=healthy_result)
-    manager_checker.timeout = 1.0
-    manager_checker.target_service_group = MANAGER
-
-    database_checker = AsyncMock(spec=ServiceHealthChecker)
-    database_checker.check_service = AsyncMock(return_value=healthy_result)
-    database_checker.timeout = 1.0
-    database_checker.target_service_group = DATABASE
-
-    # Start with one checker
-    await health_probe.register(manager_checker)
+    await health_probe.register_readiness(manager_checker)
     await health_probe.start()
-
-    # Wait for first check
     await asyncio.sleep(0.15)
 
-    # Add another checker while running
-    await health_probe.register(database_checker)
-
-    # Wait for next check
-    await asyncio.sleep(0.15)
-
-    # Unregister first checker
-    await health_probe.unregister(MANAGER)
-
-    # Wait for final check
-    await asyncio.sleep(0.15)
+    await health_probe.register_readiness(database_checker)
+    await asyncio.sleep(0.25)
 
     await health_probe.stop()
 
-    # Verify final state
-    registered = await health_probe._get_all_registered()
-    assert MANAGER not in registered
-    assert DATABASE in registered
+    readiness = await health_probe.get_readiness_status()
+    assert {c.service_group for c in readiness.connectivity_checks} == {MANAGER, DATABASE}
 
 
-async def test_probe_get_connectivity_status_all_healthy(
+async def test_readiness_includes_liveness_registered(
     health_probe: HealthProbe,
-    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
-    """Test get_connectivity_status() when all components are healthy."""
-    # Create separate checkers with different service groups
-    check_time = datetime.now(UTC)
-    healthy_result = ServiceHealth(
-        results={
-            ComponentId("test-component"): ComponentHealthStatus(
-                is_healthy=True,
-                last_checked_at=check_time,
-                error_message=None,
-            )
-        }
-    )
+    """Readiness response is a superset of liveness — if not alive, not ready."""
+    readiness_checker = _make_checker(DATABASE)
+    liveness_checker = _make_checker(MANAGER)
 
-    manager_checker = AsyncMock(spec=ServiceHealthChecker)
-    manager_checker.check_service = AsyncMock(return_value=healthy_result)
-    manager_checker.timeout = 1.0
-    manager_checker.target_service_group = MANAGER
-
-    database_checker = AsyncMock(spec=ServiceHealthChecker)
-    database_checker.check_service = AsyncMock(return_value=healthy_result)
-    database_checker.timeout = 1.0
-    database_checker.target_service_group = DATABASE
-
-    await health_probe.register(manager_checker)
-    await health_probe.register(database_checker)
-
-    # Run checks first
+    await health_probe.register_readiness(readiness_checker)
+    await health_probe.register_liveness(liveness_checker)
     await health_probe.check_all()
 
-    response = await health_probe.get_connectivity_status()
+    readiness = await health_probe.get_readiness_status()
+    liveness = await health_probe.get_liveness_status()
 
-    assert response.overall_healthy is True
-    # Should have 2 components (one from each service group's checker)
-    assert len(response.connectivity_checks) == 2
-    assert isinstance(response.timestamp, datetime)
+    assert {c.service_group for c in readiness.connectivity_checks} == {DATABASE, MANAGER}
+    assert {c.service_group for c in liveness.connectivity_checks} == {MANAGER}
 
 
-async def test_probe_get_connectivity_status_some_unhealthy(
+async def test_get_readiness_status_reflects_unhealthy(
     health_probe: HealthProbe,
-    mock_healthy_checker: ServiceHealthChecker,
-    mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
-    """Test get_connectivity_status() when some components are unhealthy."""
-    # Create separate checkers with different service groups
-    check_time = datetime.now(UTC)
+    healthy = _make_checker(MANAGER, is_healthy=True)
+    unhealthy = _make_checker(DATABASE, is_healthy=False, error_message="db down")
 
-    # Healthy result
-    healthy_result = ServiceHealth(
-        results={
-            ComponentId("test-component"): ComponentHealthStatus(
-                is_healthy=True,
-                last_checked_at=check_time,
-                error_message=None,
-            )
-        }
-    )
-
-    # Unhealthy result
-    unhealthy_result = ServiceHealth(
-        results={
-            ComponentId("test-component"): ComponentHealthStatus(
-                is_healthy=False,
-                last_checked_at=check_time,
-                error_message="Service unavailable",
-            )
-        }
-    )
-
-    manager_checker = AsyncMock(spec=ServiceHealthChecker)
-    manager_checker.check_service = AsyncMock(return_value=healthy_result)
-    manager_checker.timeout = 1.0
-    manager_checker.target_service_group = MANAGER
-
-    database_checker = AsyncMock(spec=ServiceHealthChecker)
-    database_checker.check_service = AsyncMock(return_value=unhealthy_result)
-    database_checker.timeout = 1.0
-    database_checker.target_service_group = DATABASE
-
-    await health_probe.register(manager_checker)
-    await health_probe.register(database_checker)
-
-    # Run checks first
+    await health_probe.register_readiness(healthy)
+    await health_probe.register_readiness(unhealthy)
     await health_probe.check_all()
 
-    response = await health_probe.get_connectivity_status()
-
+    response = await health_probe.get_readiness_status()
     assert response.overall_healthy is False
     assert len(response.connectivity_checks) == 2
 
 
-async def test_probe_get_connectivity_status_empty_registry(
-    health_probe: HealthProbe,
-) -> None:
-    """Test get_connectivity_status() with no registered checkers."""
-    response = await health_probe.get_connectivity_status()
-
-    assert response.overall_healthy is True  # Default to True when empty
-    assert len(response.connectivity_checks) == 0
-    assert isinstance(response.timestamp, datetime)
-
-
-async def test_probe_get_connectivity_status_excludes_unchecked(
+async def test_liveness_excludes_readiness_only(
     health_probe: HealthProbe,
     mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
-    """Test that get_connectivity_status() excludes checkers that haven't been checked yet."""
-    await health_probe.register(mock_healthy_checker)
+    """A readiness-only checker must NOT appear in liveness."""
+    await health_probe.register_readiness(mock_healthy_checker)
+    await health_probe.check_all()
 
-    # Don't run check_all() - result should be None
+    liveness = await health_probe.get_liveness_status()
+
+    assert liveness.overall_healthy is True
+    assert liveness.connectivity_checks == []
+
+
+async def test_get_connectivity_status_returns_union(
+    health_probe: HealthProbe,
+) -> None:
+    readiness_checker = _make_checker(DATABASE)
+    liveness_checker = _make_checker(MANAGER)
+
+    await health_probe.register_readiness(readiness_checker)
+    await health_probe.register_liveness(liveness_checker)
+    await health_probe.check_all()
 
     response = await health_probe.get_connectivity_status()
 
-    # Should not include the unchecked component
-    assert len(response.connectivity_checks) == 0
-    assert response.overall_healthy is True  # Default when no checked components
+    assert {c.service_group for c in response.connectivity_checks} == {DATABASE, MANAGER}
+    assert response.overall_healthy is True
 
 
-async def test_probe_get_connectivity_status_component_fields(
+async def test_get_connectivity_status_excludes_unchecked(
+    health_probe: HealthProbe,
+    mock_healthy_checker: ServiceHealthChecker,
+) -> None:
+    await health_probe.register_readiness(mock_healthy_checker)
+
+    response = await health_probe.get_connectivity_status()
+
+    assert response.connectivity_checks == []
+    assert response.overall_healthy is True
+
+
+async def test_get_connectivity_status_component_fields(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
     mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
-    """Test that ComponentConnectivityStatus in response has correct fields."""
-    await health_probe.register(mock_unhealthy_checker)
-
+    await health_probe.register_readiness(mock_unhealthy_checker)
     await health_probe.check_all()
+
     response = await health_probe.get_connectivity_status()
 
     assert len(response.connectivity_checks) == 1
     component = response.connectivity_checks[0]
-
-    assert component.service_group == "test"  # From mock fixture (TEST_SERVICE_GROUP)
-    assert component.component_id == "test-component"  # From mock fixture
+    assert component.service_group == "test"
+    assert component.component_id == "test-component"
     assert component.is_healthy is False
     assert component.error_message is not None
     assert "Service unavailable" in component.error_message

@@ -8,9 +8,11 @@ from .node import (
     AuditLogV2GQL,
 )
 from .order import AuditLogOrderByGQL, AuditLogOrderFieldGQL
+from .scope import AuditLogScopeGQL
 
 __all__ = [
     "AuditLogFilterGQL",
+    "AuditLogScopeGQL",
     "AuditLogStatusFilterGQL",
     "AuditLogOrderByGQL",
     "AuditLogOrderFieldGQL",

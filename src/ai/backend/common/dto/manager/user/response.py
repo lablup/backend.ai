@@ -8,10 +8,11 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 from .types import UserRole, UserStatus
 
@@ -27,7 +28,7 @@ __all__ = (
 )
 
 
-class UserDTO(BaseModel):
+class UserDTO(BackendAISchema):
     """DTO for user data in REST API responses."""
 
     id: UUID = Field(description="User UUID")

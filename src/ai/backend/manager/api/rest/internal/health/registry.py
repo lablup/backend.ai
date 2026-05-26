@@ -12,5 +12,7 @@ def register_internal_health_routes(handler: InternalHealthHandler) -> RouteRegi
 
     # Internal endpoint — no CORS required
     reg.add("GET", "", handler.hello)
+    reg.add("GET", "/livez", handler.livez)
+    reg.add("GET", "/readyz", handler.readyz)
 
     return reg

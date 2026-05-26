@@ -6,76 +6,12 @@ For row creation, use EndpointCreatorSpec from repositories/model_serving/creato
 
 from __future__ import annotations
 
-import dataclasses
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-from pydantic import AnyUrl
-
-from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
-    ClusterMode,
 )
-from ai.backend.manager.data.model_serving.types import (
-    ModelServicePrepareCtx,
-    ServiceConfig,
-)
-
-if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.types import ModelRevisionSpec
-
-
-@dataclass
-class ModelServiceCreator:
-    """Data container for model service creation parameters.
-
-    This is not a CreatorSpec - it's used to collect and pass service creation
-    parameters in the service layer before creating an EndpointCreatorSpec.
-    """
-
-    service_name: str
-    replicas: int
-    image: str | None
-    runtime_variant_id: RuntimeVariantID
-    architecture: str | None
-    group_name: str
-    domain_name: str
-    cluster_size: int
-    cluster_mode: ClusterMode
-    open_to_public: bool
-    config: ServiceConfig
-    sudo_session_enabled: bool
-    model_service_prepare_ctx: ModelServicePrepareCtx
-    tag: str | None = None
-    startup_command: str | None = None
-    bootstrap_script: str | None = None
-    callback_url: AnyUrl | None = None
-
-    def with_revision(
-        self,
-        revision: ModelRevisionSpec,
-        image: str,
-        architecture: str,
-    ) -> ModelServiceCreator:
-        """Return a new creator with revision results applied.
-
-        ``image`` / ``architecture`` are resolved by the caller from the
-        revision's ``image_id`` — the spec no longer carries the canonical
-        strings itself.
-        """
-        overrided_service_config = dataclasses.replace(
-            self.config,
-            resources=dict(revision.resource_spec.resource_slots),
-            environ=revision.execution.environ,
-        )
-        return dataclasses.replace(
-            self,
-            image=image,
-            architecture=architecture,
-            config=overrided_service_config,
-        )
 
 
 @dataclass

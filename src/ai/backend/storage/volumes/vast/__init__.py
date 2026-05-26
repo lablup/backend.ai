@@ -79,7 +79,7 @@ class VASTQuotaModel(BaseQuotaModel):
         try:
             await aiofiles.os.remove(qs_path / VAST_QUOTA_ID_FILE_NAME)
         except FileNotFoundError:
-            log.warning(f"vast quota id file not found (qid: {quota_scope_id}). skip")
+            log.warning("vast quota id file not found (qid: {}). skip", quota_scope_id)
 
     async def _modify_quota_scope(
         self,
@@ -125,8 +125,9 @@ class VASTQuotaModel(BaseQuotaModel):
                         break
                 else:
                     log.error(
-                        "Got invalid parameter error but no quota exists with given quota name"
-                        f" ({quota_name}). Raise error (orig:{e!s})"
+                        "Got invalid parameter error but no quota exists with given quota name ({}). Raise error (orig:{!s})",
+                        quota_name,
+                        e,
                     )
                     raise InvalidQuotaConfig(
                         f"No existing quota found with name {quota_name}"

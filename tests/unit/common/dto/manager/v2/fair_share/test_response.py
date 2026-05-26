@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceWeightEntryInfo,
     UsageBucketMetadataInfo,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 _UUID1 = UUID("550e8400-e29b-41d4-a716-446655440000")
 _UUID2 = UUID("660e8400-e29b-41d4-a716-446655440001")
@@ -156,7 +157,7 @@ class TestDomainFairShareNode:
         assert node.calculation_snapshot.fair_share_factor == Decimal("0.25")
 
     def test_missing_required_field_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DomainFairShareNode.model_validate({
                 "id": str(_UUID1),
                 "resource_group": "default",
@@ -405,7 +406,7 @@ class TestSearchDomainFairSharesPayload:
         assert payload.total_count == 1
 
     def test_missing_total_count_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchDomainFairSharesPayload.model_validate({"items": []})
 
     def test_round_trip_serialization(self) -> None:
@@ -500,7 +501,7 @@ class TestBulkUpsertDomainFairShareWeightPayload:
         assert payload.upserted_count == 3
 
     def test_missing_upserted_count_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BulkUpsertDomainFairShareWeightPayload.model_validate({})
 
     def test_round_trip_serialization(self) -> None:

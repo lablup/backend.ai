@@ -5,7 +5,7 @@ from typing import Annotated
 
 import aiohttp_cors
 from aiohttp import web
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.appproxy.common.types import (
     CORSOptions,
@@ -17,6 +17,7 @@ from ai.backend.appproxy.common.utils import (
 )
 from ai.backend.appproxy.coordinator.models import Worker
 from ai.backend.appproxy.coordinator.types import RootContext
+from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
 
 from .utils import auth_required
@@ -24,7 +25,7 @@ from .utils import auth_required
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class WorkerResponseModel(BaseModel):
+class WorkerResponseModel(BackendAISchema):
     authority: Annotated[str, Field(description="authority name of worker.")]
     endpoint: Annotated[str, Field(description="API Endpoint of the worker.")]
 

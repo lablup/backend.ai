@@ -8,7 +8,6 @@ from collections.abc import (
 )
 from datetime import datetime
 from decimal import Decimal
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -18,10 +17,7 @@ from typing import (
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
-import trafaret as t
 import yarl
-from ruamel.yaml import YAML
-from ruamel.yaml.error import YAMLError
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import (
@@ -33,7 +29,6 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from ai.backend.common.config import model_definition_iv
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.project import ProjectID
@@ -67,13 +62,14 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
+    DeploymentPolicyData,
     DeploymentState,
     DeploymentSummaryData,
     ModelDeploymentAutoScalingRuleData,
-    ModelRevisionSpec,
-    ReplicaSpec,
+    ModelRevisionData,
+    ReplicaData,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -84,7 +80,6 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound, ServiceUnavailable
-from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -132,6 +127,18 @@ def _get_endpoint_revisions_join_condition() -> Any:
     return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
 
 
+def _get_current_revision_row_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return EndpointRow.current_revision == DeploymentRevisionRow.id
+
+
+def _get_deploying_revision_row_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return EndpointRow.deploying_revision == DeploymentRevisionRow.id
+
+
 def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
     from ai.backend.manager.models.deployment_auto_scaling_policy import (
         DeploymentAutoScalingPolicyRow,
@@ -166,17 +173,6 @@ class EndpointRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoints"
 
     __table_args__ = (
-        sa.Index(
-            "ix_endpoints_unique_name_when_active",
-            "name",
-            "domain",
-            "project",
-            unique=True,
-            postgresql_where=sa.column("lifecycle_stage").notin_([
-                EndpointLifecycle.DESTROYING.value,
-                EndpointLifecycle.DESTROYED.value,
-            ]),
-        ),
         sa.Index(
             "ix_endpoints_lifecycle_sub_step",
             "lifecycle_stage",
@@ -302,6 +298,21 @@ class EndpointRow(Base):  # type: ignore[misc]
         "DeploymentRevisionRow",
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_revisions_join_condition,
+        order_by="DeploymentRevisionRow.revision_number.desc()",
+    )
+    current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        primaryjoin=_get_current_revision_row_join_condition,
+        foreign_keys="EndpointRow.current_revision",
+        viewonly=True,
+        uselist=False,
+    )
+    deploying_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        primaryjoin=_get_deploying_revision_row_join_condition,
+        foreign_keys="EndpointRow.deploying_revision",
+        viewonly=True,
+        uselist=False,
     )
 
     auto_scaling_policy: Mapped[DeploymentAutoScalingPolicyRow | None] = relationship(
@@ -739,24 +750,23 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     def to_deployment_info(self) -> DeploymentInfo:
         """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
-        policy_data = None
-        if self.deployment_policy is not None:
-            policy_data = self.deployment_policy.to_data()
+        return self._build_deployment_info(
+            current_revision=(
+                self.current_revision_row.to_data() if self.current_revision_row else None
+            ),
+            deploying_revision=(
+                self.deploying_revision_row.to_data() if self.deploying_revision_row else None
+            ),
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+        )
 
-        model_revisions: list[ModelRevisionSpec] = []
-        for rev_row in self.revisions:
-            if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
-                model_revisions.append(rev_row.to_model_revision_spec())
-
-        info = self._to_deployment_info_with_revisions(model_revisions)
-        info.policy = policy_data
-        return info
-
-    def _to_deployment_info_with_revisions(
+    def _build_deployment_info(
         self,
-        model_revisions: list[ModelRevisionSpec],
+        current_revision: ModelRevisionData | None,
+        deploying_revision: ModelRevisionData | None,
+        policy: DeploymentPolicyData | None = None,
     ) -> DeploymentInfo:
-        """Build DeploymentInfo with pre-built model_revisions dict."""
+        """Build DeploymentInfo with current and deploying revision data."""
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(
@@ -775,20 +785,21 @@ class EndpointRow(Base):  # type: ignore[misc]
                 scaling_state=self.scaling_state,
                 retry_count=self.retries,
             ),
-            replica_spec=ReplicaSpec(
+            replica=ReplicaData(
                 replica_count=self.replicas,
                 desired_replica_count=self.desired_replicas,
             ),
-            network=DeploymentNetworkSpec(
+            network=DeploymentNetworkData(
                 open_to_public=self.open_to_public if self.open_to_public is not None else False,
+                access_token_ids=None,
                 url=self.url,
+                preferred_domain_name=None,
             ),
-            model_revisions=list(model_revisions),
             options=self.options,
-            current_revision_id=self.current_revision,
-            deploying_revision_id=self.deploying_revision,
+            current_revision=current_revision,
+            deploying_revision=deploying_revision,
             sub_step=self.sub_step,
-            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+            policy=policy,
         )
 
 
@@ -1188,6 +1199,7 @@ class ModelServiceHelper:
                 dst_path=options.mount_destination,
                 options=VFolderMountOptions(
                     permission=options.permission,
+                    subpath=options.subpath,
                 ),
             )
             for folder_id, options in extra_mounts.items()
@@ -1229,96 +1241,3 @@ class ModelServiceHelper:
             relpath,
         )
         return cast(dict[str, Any], result)
-
-    @staticmethod
-    async def validate_model_definition_file_exists(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        suggested_path: str | None,
-    ) -> str:
-        """
-        Checks if model definition file exists in target model VFolder. Returns path to resolved model definition filename.
-        Since model service counts both `model-definition.yml` and `model-definition.yaml` as valid definition file name, this function ensures
-        at least one model definition file exists under the target VFolder and returns the matched filename.
-        """
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
-
-        if suggested_path:
-            path = Path(suggested_path)
-            storage_reply = await ModelServiceHelper._listdir(
-                storage_manager, proxy_name, volume_name, vfid, path.parent.as_posix()
-            )
-            for item in storage_reply["items"]:
-                if item["name"] == path.name:
-                    return suggested_path
-            else:
-                raise InvalidAPIParameters(
-                    f"Model definition YAML file {suggested_path} not found inside the model storage"
-                )
-        else:
-            storage_reply = await ModelServiceHelper._listdir(
-                storage_manager, proxy_name, volume_name, vfid, "."
-            )
-            model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
-            for item in storage_reply["items"]:
-                if item["name"] in model_definition_candidates:
-                    result: str = item["name"]
-                    return result
-            else:
-                raise InvalidAPIParameters(
-                    'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
-                )
-
-    @staticmethod
-    async def _read_model_definition(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        model_definition_filename: str,
-    ) -> dict[str, Any]:
-        """
-        Reads specified model definition file from target VFolder and returns
-        """
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
-        manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
-        chunks = await manager_facing_client.fetch_file_content(
-            volume_name,
-            str(vfid),
-            f"./{model_definition_filename}",
-        )
-        model_definition_yaml = chunks.decode("utf-8")
-        yaml = YAML()
-        result: dict[str, Any] = yaml.load(model_definition_yaml)
-        return result
-
-    @staticmethod
-    async def validate_model_definition(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        model_definition_path: str,
-    ) -> dict[str, Any]:
-        """
-        Checks if model definition YAML exists and is syntactically perfect.
-        Returns validated model definition configuration.
-        """
-        raw_model_definition = await ModelServiceHelper._read_model_definition(
-            storage_manager,
-            folder_host,
-            vfid,
-            model_definition_path,
-        )
-
-        try:
-            model_definition = model_definition_iv.check(raw_model_definition)
-            if model_definition is None:
-                raise DataTransformationFailed("Model definition validation returned None")
-            result: dict[str, Any] = model_definition
-            return result
-        except t.DataError as e:
-            raise InvalidAPIParameters(
-                f"Failed to validate model definition from VFolder (ID {vfid.folder_id}): {e}",
-            ) from e
-        except YAMLError as e:
-            raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e

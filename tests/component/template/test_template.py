@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.template import (
     UpdateSessionTemplateRequest,
     UpdateSessionTemplateResponse,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 def _session_template_payload(name: str = "test-template") -> str:
@@ -72,12 +73,12 @@ class TestCreateSessionTemplate:
     async def test_admin_creates_session_template(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("admin-tpl"),
             ),
@@ -91,12 +92,12 @@ class TestCreateSessionTemplate:
     async def test_user_creates_session_template(
         self,
         user_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         result = await user_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("user-tpl"),
             ),
@@ -111,12 +112,12 @@ class TestGetSessionTemplate:
     async def test_admin_gets_session_template(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         create_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("get-test"),
             ),
@@ -131,12 +132,12 @@ class TestGetSessionTemplate:
     async def test_user_gets_session_template(
         self,
         user_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         create_result = await user_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("user-get-test"),
             ),
@@ -150,12 +151,12 @@ class TestGetSessionTemplate:
     async def test_get_with_format_param(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         create_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("fmt-test"),
             ),
@@ -173,12 +174,12 @@ class TestListSessionTemplates:
     async def test_list_session_templates(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("list-test"),
             ),
@@ -194,12 +195,12 @@ class TestUpdateSessionTemplate:
     async def test_admin_updates_session_template(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         create_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("update-before"),
             ),
@@ -209,7 +210,7 @@ class TestUpdateSessionTemplate:
         result = await admin_registry.template.update_session_template(
             template_id,
             UpdateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("update-after"),
             ),
@@ -225,12 +226,12 @@ class TestDeleteSessionTemplate:
     async def test_admin_deletes_session_template(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         create_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("delete-test"),
             ),
@@ -244,12 +245,12 @@ class TestDeleteSessionTemplate:
     async def test_get_deleted_template_returns_empty(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         create_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("del-verify"),
             ),
@@ -272,13 +273,13 @@ class TestCreateClusterTemplate:
     async def test_admin_creates_cluster_template(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         # First, create a session template to reference.
         st_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("cluster-dep"),
             ),
@@ -287,7 +288,7 @@ class TestCreateClusterTemplate:
 
         result = await admin_registry.template.create_cluster_template(
             CreateClusterTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_cluster_template_payload("test-cluster", session_tpl_id),
             ),
@@ -301,12 +302,12 @@ class TestGetClusterTemplate:
     async def test_admin_gets_cluster_template(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         st_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("ct-get-dep"),
             ),
@@ -315,7 +316,7 @@ class TestGetClusterTemplate:
 
         ct_result = await admin_registry.template.create_cluster_template(
             CreateClusterTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_cluster_template_payload("ct-get-test", session_tpl_id),
             ),
@@ -332,12 +333,12 @@ class TestGetClusterTemplate:
     async def test_get_with_format_param(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         st_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("ct-fmt-dep"),
             ),
@@ -346,7 +347,7 @@ class TestGetClusterTemplate:
 
         ct_result = await admin_registry.template.create_cluster_template(
             CreateClusterTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_cluster_template_payload("ct-fmt-test", session_tpl_id),
             ),
@@ -364,12 +365,12 @@ class TestListClusterTemplates:
     async def test_list_cluster_templates(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         st_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("ct-list-dep"),
             ),
@@ -378,7 +379,7 @@ class TestListClusterTemplates:
 
         await admin_registry.template.create_cluster_template(
             CreateClusterTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_cluster_template_payload("ct-list-test", session_tpl_id),
             ),
@@ -394,12 +395,12 @@ class TestUpdateClusterTemplate:
     async def test_admin_updates_cluster_template(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         st_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("ct-upd-dep"),
             ),
@@ -408,7 +409,7 @@ class TestUpdateClusterTemplate:
 
         ct_result = await admin_registry.template.create_cluster_template(
             CreateClusterTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_cluster_template_payload("ct-upd-before", session_tpl_id),
             ),
@@ -429,12 +430,12 @@ class TestDeleteClusterTemplate:
     async def test_admin_deletes_cluster_template(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_name_fixture: str,
     ) -> None:
         st_result = await admin_registry.template.create_session_template(
             CreateSessionTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_session_template_payload("ct-del-dep"),
             ),
@@ -443,7 +444,7 @@ class TestDeleteClusterTemplate:
 
         ct_result = await admin_registry.template.create_cluster_template(
             CreateClusterTemplateRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 group=group_name_fixture,
                 payload=_cluster_template_payload("ct-del-test", session_tpl_id),
             ),

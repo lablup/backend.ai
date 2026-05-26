@@ -12,16 +12,18 @@ from dateutil.tz import tzutc
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
-    ReplicaSpec,
+    ReplicaData,
     RouteHealthStatus,
     RouteStatus,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -70,7 +72,8 @@ def mock_valkey_schedule() -> AsyncMock:
     """Mock ValkeyScheduleClient."""
     client = AsyncMock()
     client.get_route_health_records_batch = AsyncMock(return_value={})
-    client.get_redis_time = AsyncMock(return_value=1000)
+    client.get_route_health_statuses_batch = AsyncMock(return_value={})
+    client.get_route_probe_targets_batch = AsyncMock(return_value={})
     return client
 
 
@@ -161,17 +164,17 @@ def _create_deployment_info(
             scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
-        replica_spec=ReplicaSpec(
+        replica=ReplicaData(
             replica_count=1,
             desired_replica_count=1,
         ),
-        network=DeploymentNetworkSpec(
+        network=DeploymentNetworkData(
             open_to_public=False,
+            access_token_ids=None,
             url="http://test.endpoint",
+            preferred_domain_name=None,
         ),
-        model_revisions=[],
         options=DeploymentOptions(),
-        current_revision_id=DeploymentRevisionID(uuid4()),
     )
 
 
@@ -190,7 +193,7 @@ def _create_route_data(
 ) -> RouteData:
     """Create RouteData for tests."""
     return RouteData(
-        route_id=route_id or uuid4(),
+        route_id=ReplicaID(route_id) if route_id is not None else ReplicaID(uuid4()),
         deployment_id=deployment_id or DeploymentID(uuid4()),
         session_id=session_id,
         status=status,
@@ -198,6 +201,8 @@ def _create_route_data(
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
         revision_id=revision_id or DeploymentRevisionID(uuid4()),
+        traffic_status=RouteTrafficStatus.INACTIVE,
+        health_check=None,
     )
 
 

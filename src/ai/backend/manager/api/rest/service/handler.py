@@ -56,8 +56,6 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     MountInfoEntry,
-    MountPermission,
-    MountTypes,
     RuntimeVariant,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -68,6 +66,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     ExecutionSpec,
     ImageIdentifierDraft,
+    ModelRevisionData,
     ModelRevisionSpecDraft,
     MountMetadata,
     ReplicaSpec,
@@ -167,6 +166,11 @@ def _serve_info_from_dto(dto: ServiceInfo, runtime_variant_name: RuntimeVariant)
     )
 
 
+def _resolve_target_revision_data(info: DeploymentInfo) -> ModelRevisionData | None:
+    """Resolve the target revision data (current first, then deploying)."""
+    return info.current_revision or info.deploying_revision
+
+
 def _serve_info_from_deployment_info(
     deployment_info: DeploymentInfo,
     runtime_variant_name: RuntimeVariant,
@@ -177,22 +181,22 @@ def _serve_info_from_deployment_info(
     active revision's ``runtime_variant_id`` (internal data types are
     id-only; the legacy REST response still exposes the name string).
     """
-    model_revision = deployment_info.model_revisions[0] if deployment_info.model_revisions else None
+    model_revision = _resolve_target_revision_data(deployment_info)
 
     return ServeInfoModel(
         endpoint_id=deployment_info.id,
         # ``None`` here covers two cases: no revision exists, or the revision's
         # model vfolder has been deleted (SET NULL FK).
-        model_id=model_revision.mounts.model_vfolder_id if model_revision else None,
-        extra_mounts=[m.vfolder_id for m in model_revision.mounts.extra_mounts]
+        model_id=model_revision.model_mount_config.vfolder_id if model_revision else None,
+        extra_mounts=[m.vfolder_id for m in model_revision.model_mount_config.extra_mounts]
         if model_revision
         else [],
         name=deployment_info.metadata.name,
-        model_definition_path=model_revision.mounts.model_definition_path
+        model_definition_path=model_revision.model_mount_config.definition_path
         if model_revision
         else None,
-        replicas=deployment_info.replica_spec.replica_count,
-        desired_session_count=deployment_info.replica_spec.replica_count,
+        replicas=deployment_info.replica.replica_count,
+        desired_session_count=deployment_info.replica.replica_count,
         active_routes=[],
         service_endpoint=HttpUrl(deployment_info.network.url)
         if deployment_info.network.url
@@ -378,13 +382,11 @@ class ServiceHandler:
             await self._deployment.create_legacy_deployment.wait_for_complete(deployment_action)
         )
         deployment_info = deployment_result.data
-        model_revision = (
-            deployment_info.model_revisions[0] if deployment_info.model_revisions else None
-        )
+        model_revision = _resolve_target_revision_data(deployment_info)
         if model_revision is None:
             raise RuntimeVariantNotFound()
         runtime_variant_name = await self._resolve_runtime_variant_name(
-            model_revision.execution.runtime_variant_id
+            model_revision.model_runtime_config.runtime_variant_id
         )
         resp = _serve_info_from_deployment_info(deployment_info, runtime_variant_name)
         return APIResponse.build(HTTPStatus.CREATED, resp)
@@ -668,15 +670,9 @@ class ServiceHandler:
                 model_definition_path=params.config.model_definition_path,
                 model_version=params.config.model_version,
                 model_mount_destination=params.config.model_mount_destination,
+                vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts={
-                    k: MountOption(
-                        mount_destination=v.get("mount_destination"),
-                        type=MountTypes(v["type"]) if v.get("type") else MountTypes.BIND,
-                        permission=MountPermission(v["permission"])
-                        if v.get("permission")
-                        else None,
-                    )
-                    for k, v in params.config.extra_mounts.items()
+                    k: MountOption.from_dto(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
                 scaling_group=params.config.scaling_group,
@@ -718,11 +714,13 @@ class ServiceHandler:
                 model_vfolder_id=validation_result.model_vfolder_id,
                 model_definition_path=validation_result.model_definition_path,
                 model_mount_destination=params.config.model_mount_destination,
+                vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts=[
                     MountInfoEntry(
                         vfolder_id=VFolderUUID(m.vfid.folder_id),
                         mount_destination=m.kernel_path.as_posix(),
                         mount_perm=m.mount_perm,
+                        subpath=str(m.vfsubpath),
                     )
                     for m in validation_result.extra_mounts
                 ],
@@ -774,15 +772,9 @@ class ServiceHandler:
                 model_definition_path=params.config.model_definition_path,
                 model_version=params.config.model_version,
                 model_mount_destination=params.config.model_mount_destination,
+                vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts={
-                    k: MountOption(
-                        mount_destination=v.get("mount_destination"),
-                        type=MountTypes(v["type"]) if v.get("type") else MountTypes.BIND,
-                        permission=MountPermission(v["permission"])
-                        if v.get("permission")
-                        else None,
-                    )
-                    for k, v in params.config.extra_mounts.items()
+                    k: MountOption.from_dto(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
                 scaling_group=params.config.scaling_group,

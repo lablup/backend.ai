@@ -89,6 +89,17 @@ class IntPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowInt]):
         return values
 
 
+class IntPKNoValuesUpdaterSpec(UpdaterSpec[UpdaterTestRowInt]):
+    """Updater spec that produces no column changes (empty build_values)."""
+
+    @property
+    def row_class(self) -> type[UpdaterTestRowInt]:
+        return UpdaterTestRowInt
+
+    def build_values(self) -> dict[str, Any]:
+        return {}
+
+
 class UUIDPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowUUID]):
     """Updater spec for updating status on UUID PK table."""
 
@@ -220,6 +231,42 @@ class TestUpdaterIntPK:
         async with database_connection.begin_session() as db_sess:
             updater: Updater[UpdaterTestRowInt] = Updater(
                 spec=IntPKStatusUpdaterSpec(new_status="active"),
+                pk_value=99999,
+            )
+
+            result = await execute_updater(db_sess, updater)
+
+            assert result is None
+
+    async def test_update_no_values_returns_current_row(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        int_row_class: type[UpdaterTestRowInt],
+        sample_data: list[int],
+    ) -> None:
+        """Empty build_values returns the current row, not None (None means not-found only)."""
+        async with database_connection.begin_session() as db_sess:
+            target_id = sample_data[0]
+            updater: Updater[UpdaterTestRowInt] = Updater(
+                spec=IntPKNoValuesUpdaterSpec(),
+                pk_value=target_id,
+            )
+
+            result = await execute_updater(db_sess, updater)
+
+            assert result is not None
+            assert result.row.id == target_id
+
+    async def test_update_no_values_missing_row_returns_none(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        int_row_class: type[UpdaterTestRowInt],
+        sample_data: list[int],
+    ) -> None:
+        """Empty build_values with a missing PK still returns None."""
+        async with database_connection.begin_session() as db_sess:
+            updater: Updater[UpdaterTestRowInt] = Updater(
+                spec=IntPKNoValuesUpdaterSpec(),
                 pk_value=99999,
             )
 

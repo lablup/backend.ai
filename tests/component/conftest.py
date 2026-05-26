@@ -57,6 +57,7 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -77,6 +78,7 @@ from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
 from ai.backend.manager.agent_cache import AgentRPCCache
@@ -149,6 +151,7 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     postgres_container,
     redis_container,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger("tests.component.conftest")
@@ -541,20 +544,23 @@ async def database_engine(
 @pytest.fixture()
 async def domain_fixture(
     db_engine: SAEngine,
-) -> AsyncIterator[str]:
-    """Insert a test domain and yield its name."""
+) -> AsyncIterator[DomainFixtureData]:
+    """Insert a test domain and yield its identifiers."""
     domain_name = f"domain-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(domains).values(
+        result = await conn.execute(
+            sa.insert(domains)
+            .values(
                 name=domain_name,
                 description=f"Test domain {domain_name}",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
+            .returning(domains.c.id, domains.c.name)
         )
-    yield domain_name
+        row = result.one()
+    yield DomainFixtureData(domain_name=row.name, domain_id=row.id)
     async with db_engine.begin() as conn:
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
 
@@ -668,10 +674,10 @@ async def resource_policy_fixture(
 @pytest.fixture()
 async def scaling_group_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
-) -> AsyncIterator[str]:
+    domain_fixture: DomainFixtureData,
+) -> AsyncIterator[ResourceGroupName]:
     """Insert a scaling group and its domain association; yield the name."""
-    sgroup_name = f"sgroup-{secrets.token_hex(6)}"
+    sgroup_name = ResourceGroupName(f"sgroup-{secrets.token_hex(6)}")
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(scaling_groups).values(
@@ -687,7 +693,7 @@ async def scaling_group_fixture(
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
                 scaling_group=sgroup_name,
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
             )
         )
     yield sgroup_name
@@ -701,7 +707,7 @@ async def scaling_group_fixture(
 @pytest.fixture()
 async def group_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a test group (project) and yield its UUID."""
@@ -714,7 +720,7 @@ async def group_fixture(
                 name=group_name,
                 description=f"Test group {group_name}",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -727,7 +733,7 @@ async def group_fixture(
 async def admin_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert admin user, keypair, and group membership; yield identifiers."""
@@ -758,7 +764,7 @@ async def admin_user_fixture(
                 description=f"Test admin account {unique_id}",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.SUPERADMIN,
             )
@@ -828,7 +834,7 @@ async def admin_user_fixture(
 async def regular_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert regular user, keypair, and group membership; yield identifiers."""
@@ -859,7 +865,7 @@ async def regular_user_fixture(
                 description=f"Test user account {unique_id}",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
             )
@@ -1273,6 +1279,7 @@ def auth_processors(
             rbac=RBACValidators(
                 scope=MagicMock(spec=ScopeActionRBACValidator),
                 single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                bulk=MagicMock(spec=BulkActionRBACValidator),
             ),
         ),
     )

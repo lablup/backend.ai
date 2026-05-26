@@ -91,9 +91,9 @@ class DeploymentStrategyEvaluator:
         # to count accumulated failures for rollback detection, but old
         # terminated routes are irrelevant and would bloat the result set.
         deploying_revision_ids = {
-            deployment.deploying_revision_id
+            deployment.deploying_revision.id
             for deployment in deployments
-            if deployment.deploying_revision_id is not None
+            if deployment.deploying_revision is not None
         }
         route_conditions: list[QueryCondition] = [
             RouteConditions.by_endpoint_ids(endpoint_ids),

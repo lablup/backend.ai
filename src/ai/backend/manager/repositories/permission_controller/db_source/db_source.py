@@ -737,7 +737,7 @@ class PermissionDBSource:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             items = [row.RoleRow.to_data() for row in result.rows]
@@ -762,7 +762,7 @@ class PermissionDBSource:
                 db_sess,
                 query,
                 querier,
-                scope,
+                scopes=[scope] if scope is not None else (),
             )
 
             items = [row.PermissionRow.to_data() for row in result.rows]
@@ -1355,7 +1355,7 @@ class PermissionDBSource:
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)
-            result = await execute_batch_querier(session, query, querier, scope=scope)
+            result = await execute_batch_querier(session, query, querier, scopes=[scope])
             items = [row.RoleInvitationRow.to_data() for row in result.rows]
             return RoleInvitationSearchResult(
                 items=items,
@@ -1371,7 +1371,7 @@ class PermissionDBSource:
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)
-            result = await execute_batch_querier(session, query, querier, scope=scope)
+            result = await execute_batch_querier(session, query, querier, scopes=[scope])
             items = [row.RoleInvitationRow.to_data() for row in result.rows]
             return RoleInvitationSearchResult(
                 items=items,
@@ -1387,7 +1387,7 @@ class PermissionDBSource:
     ) -> RoleInvitationSearchResult:
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(RoleInvitationRow)
-            result = await execute_batch_querier(session, query, querier, scope=scope)
+            result = await execute_batch_querier(session, query, querier, scopes=[scope])
             items = [row.RoleInvitationRow.to_data() for row in result.rows]
             return RoleInvitationSearchResult(
                 items=items,

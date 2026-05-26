@@ -34,7 +34,7 @@ async def admin_service_catalogs(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> list[ServiceCatalogGQL]:
+) -> list[ServiceCatalogGQL] | None:
     check_admin_only()
     ctx = info.context
 

@@ -6,6 +6,7 @@ import logging
 from collections import defaultdict
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
@@ -187,6 +188,21 @@ def _create_resource_slot_from_policy(
     return ResourceSlot.from_policy(resource_policy_map, cast(Mapping[str, Any], known_slot_types))
 
 
+@dataclass(frozen=True)
+class _ScalingGroupWithSlotInventory:
+    """Scaling group bundled with the slot inventory served by its agents.
+
+    ``active_slot_types`` maps each slot name served by a non-terminated
+    agent in this scaling group to its registered :class:`SlotTypes`
+    unit. The validator chain consults this map both for membership
+    (reject requests for slots the RG does not provide) and for unit
+    metadata (humanize values during error formatting).
+    """
+
+    sg_row: ScalingGroupRow
+    active_slot_types: Mapping[SlotName, SlotTypes]
+
+
 class ScheduleDBSource:
     """
     Database source for schedule-related operations.
@@ -288,6 +304,53 @@ class ScheduleDBSource:
                 snapshot_data=snapshot_data,
                 spec=spec,
             )
+
+    async def _fetch_scaling_group_with_slot_inventory(
+        self,
+        db_sess: SASession,
+        name: str,
+    ) -> _ScalingGroupWithSlotInventory:
+        """Load a scaling group together with its per-RG slot inventory.
+
+        Eager-loads ``agents`` -> ``agent_resource_rows`` -> ``slot_type_row``
+        via ``selectinload``, filters out TERMINATED agents, and projects
+        the remaining rows into ``{slot_name: SlotTypes}``. The ``AgentRow``
+        instances themselves are not exposed — callers only see the SG row
+        and the derived inventory.
+
+        Raises:
+            ScalingGroupNotFound: when the scaling group does not exist.
+        """
+        sg_row = (
+            await db_sess.scalars(
+                sa.select(ScalingGroupRow)
+                .options(
+                    selectinload(ScalingGroupRow.agents)
+                    .selectinload(AgentRow.agent_resource_rows)
+                    .selectinload(AgentResourceRow.slot_type_row)
+                )
+                .where(ScalingGroupRow.name == name)
+            )
+        ).one_or_none()
+        if sg_row is None:
+            raise ScalingGroupNotFound(f"Resource group {name} not found")
+        active_slot_types: dict[SlotName, SlotTypes] = {
+            SlotName(ar.slot_name): SlotTypes(ar.slot_type_row.slot_type)
+            for agent in sg_row.agents
+            if agent.status != AgentStatus.TERMINATED
+            for ar in agent.agent_resource_rows
+        }
+        return _ScalingGroupWithSlotInventory(
+            sg_row=sg_row,
+            active_slot_types=active_slot_types,
+        )
+
+    async def _fetch_required_slot_names(self, db_sess: SASession) -> frozenset[SlotName]:
+        stmt = sa.select(ResourceSlotTypeRow.slot_name).where(
+            ResourceSlotTypeRow.required.is_(True)
+        )
+        rows = (await db_sess.execute(stmt)).scalars().all()
+        return frozenset(SlotName(slot_name) for slot_name in rows)
 
     async def _fetch_scaling_group(
         self, db_sess: SASession, scaling_group: str
@@ -1463,16 +1526,14 @@ class ScheduleDBSource:
             network_info: ScalingGroupNetworkInfo | None = None
             rg_defaults = None
             resource_group_allow_fractional = False
+            known_slot_types: Mapping[SlotName, SlotTypes] = {}
+            required_slot_names = await self._fetch_required_slot_names(db_sess)
             if resource_group_name:
-                sg_row = (
-                    await db_sess.scalars(
-                        sa.select(ScalingGroupRow).where(
-                            ScalingGroupRow.name == resource_group_name
-                        )
-                    )
-                ).one_or_none()
-                if sg_row is None:
-                    raise ScalingGroupNotFound(f"Resource group {resource_group_name} not found")
+                rg_bundle = await self._fetch_scaling_group_with_slot_inventory(
+                    db_sess, resource_group_name
+                )
+                sg_row = rg_bundle.sg_row
+                known_slot_types = rg_bundle.active_slot_types
                 # Every production caller of ``enqueue_session_from_draft`` populates
                 # access_key/domain_name/project_id alongside resource_group_name; this
                 # branch flags the contract violation rather than letting the RG
@@ -1575,11 +1636,16 @@ class ScheduleDBSource:
                             VFolderMountRequest(
                                 ref=UUID(str(entry.vfolder_id)),
                                 dst_path=entry.mount_destination,
-                                options=VFolderMountOptions(permission=entry.mount_perm),
+                                options=VFolderMountOptions(
+                                    permission=entry.mount_perm,
+                                    subpath=entry.subpath,
+                                ),
                             )
                         )
-                    if not per_group_requests:
-                        continue
+                    # Always resolve mounts even when the request list is
+                    # empty: ``prepare_vfolder_mounts`` injects dot-prefixed
+                    # auto-mount vfolders regardless of explicit requests, so
+                    # skipping here would silently drop them.
                     vfolder_mounts_by_role[group.role] = tuple(
                         await self._fetch_vfolder_mounts(
                             db_sess,
@@ -1632,6 +1698,8 @@ class ScheduleDBSource:
             dotfile_data=dotfile_bundle,
             active_session_count=active_session_count,
             keypair_resource_policy=keypair_policy,
+            known_slot_types=known_slot_types,
+            required_slot_names=required_slot_names,
         )
 
     async def pick_default_resource_group(
@@ -2958,7 +3026,7 @@ class ScheduleDBSource:
                 # Use the image UUID as key for reliable matching
                 image_configs[image_row.id] = image_config
             except Exception as e:
-                log.error(f"Failed to process image {image_row.name}: {e}")
+                log.error("Failed to process image {}: {}", image_row.name, e)
                 continue
 
         return image_configs
@@ -3261,6 +3329,8 @@ class ScheduleDBSource:
                 SessionRow.environ,
                 SessionRow.cluster_mode,
                 SessionRow.user_uuid,
+                SessionRow.network_type,
+                SessionRow.network_id,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
                 KernelRow.agent_addr,
@@ -3314,6 +3384,8 @@ class ScheduleDBSource:
                     "environ": row.environ,
                     "cluster_mode": row.cluster_mode,
                     "user_uuid": row.user_uuid,
+                    "network_type": row.network_type,
+                    "network_id": row.network_id,
                 }
                 if row.user_uuid:
                     user_uuids.add(row.user_uuid)
@@ -3364,7 +3436,7 @@ class ScheduleDBSource:
             # Get user info
             user_info = user_map.get(session_info["user_uuid"])
             if not user_info:
-                log.warning(f"User info not found for session {session_id}")
+                log.warning("User info not found for session {}", session_id)
                 continue
 
             # Convert kernels
@@ -3410,6 +3482,8 @@ class ScheduleDBSource:
                     user_uuid=session_info["user_uuid"],
                     user_email=user_info.email,
                     user_name=user_info.username,
+                    network_type=session_info["network_type"],
+                    network_id=session_info["network_id"],
                 )
             )
 
@@ -4270,6 +4344,8 @@ class ScheduleDBSource:
                 SessionRow.environ,
                 SessionRow.cluster_mode,
                 SessionRow.user_uuid,
+                SessionRow.network_type,
+                SessionRow.network_id,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.agent,
                 KernelRow.agent_addr,
@@ -4318,6 +4394,8 @@ class ScheduleDBSource:
                     "environ": row.environ,
                     "cluster_mode": row.cluster_mode,
                     "user_uuid": row.user_uuid,
+                    "network_type": row.network_type,
+                    "network_id": row.network_id,
                 }
                 if row.user_uuid:
                     user_uuids.add(row.user_uuid)
@@ -4368,7 +4446,7 @@ class ScheduleDBSource:
             # Get user info
             user_info = user_map.get(session_info["user_uuid"])
             if not user_info:
-                log.warning(f"User info not found for session {session_id}")
+                log.warning("User info not found for session {}", session_id)
                 continue
 
             # Convert kernels
@@ -4414,6 +4492,8 @@ class ScheduleDBSource:
                     user_uuid=session_info["user_uuid"],
                     user_email=user_info.email,
                     user_name=user_info.username,
+                    network_type=session_info["network_type"],
+                    network_id=session_info["network_id"],
                 )
             )
 
@@ -4610,6 +4690,8 @@ class ScheduleDBSource:
                 SessionRow.environ,
                 SessionRow.cluster_mode,
                 SessionRow.user_uuid,
+                SessionRow.network_type,
+                SessionRow.network_id,
             )
             session_result = await execute_batch_querier(db_sess, session_query, querier)
 
@@ -4638,6 +4720,8 @@ class ScheduleDBSource:
                     "environ": row.environ,
                     "cluster_mode": row.cluster_mode,
                     "user_uuid": row.user_uuid,
+                    "network_type": row.network_type,
+                    "network_id": row.network_id,
                     "kernels": [],
                 }
                 if row.user_uuid:
@@ -4734,7 +4818,7 @@ class ScheduleDBSource:
                 session_info = session_info_map[session_id]
                 user_info = user_map.get(session_info["user_uuid"])
                 if not user_info:
-                    log.warning(f"User info not found for session {session_id}")
+                    log.warning("User info not found for session {}", session_id)
                     continue
 
                 sessions_for_start.append(
@@ -4750,6 +4834,8 @@ class ScheduleDBSource:
                         user_uuid=session_info["user_uuid"],
                         user_email=user_info.email,
                         user_name=user_info.username,
+                        network_type=session_info["network_type"],
+                        network_id=session_info["network_id"],
                     )
                 )
 

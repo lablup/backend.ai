@@ -33,6 +33,8 @@ from ai.backend.manager.data.session.draft import (
     SessionSpecDraft,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
@@ -110,7 +112,13 @@ class TestOwnerOnlyResourceGroupForDelegation:
         short-circuit on ``ScalingGroupNotFound`` and never exercise the
         invariant under test.
         """
-        async with with_tables(database_connection, [ScalingGroupRow]):
+        # Include the agent tables so the SG fetch's
+        # ``selectinload(agents).selectinload(agent_resource_rows)`` chain
+        # has tables to query, even though we seed no rows below.
+        async with with_tables(
+            database_connection,
+            [ScalingGroupRow, ResourceSlotTypeRow, AgentRow, AgentResourceRow],
+        ):
             async with database_connection.begin_session() as db_sess:
                 db_sess.add(
                     ScalingGroupRow(

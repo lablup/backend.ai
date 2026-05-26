@@ -5,9 +5,10 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.types import BackendAISchema
 
 from .types import (
     DomainFairShareFilter,
@@ -351,7 +352,7 @@ class UpsertUserFairShareWeightRequest(BaseRequestModel):
 # Update Resource Group Fair Share Spec
 
 
-class ResourceWeightEntryInput(BaseModel):
+class ResourceWeightEntryInput(BackendAISchema):
     """A single resource weight entry for fair share calculation.
 
     Set weight to null to remove the resource type weight (revert to default).

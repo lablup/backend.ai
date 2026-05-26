@@ -631,6 +631,8 @@ class VfolderRepository:
                 vfolder_row.status = VFolderOperationStatus.DELETE_PENDING
 
             await session.flush()
+            for row in vfolder_rows:
+                await session.refresh(row, attribute_names=["updated_at"])
 
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
 
@@ -648,6 +650,8 @@ class VfolderRepository:
                     vfolder_rows.append(vfolder_row)
 
             await session.flush()
+            for row in vfolder_rows:
+                await session.refresh(row, attribute_names=["updated_at"])
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
 
     async def _fetch_vfolders_with_linked_model_cards(
@@ -740,12 +744,21 @@ class VfolderRepository:
                         .values(status=VFolderOperationStatus.DELETE_ONGOING)
                     )
                     await db_session.execute(delete_stmt)
+                    # ``onupdate=now()`` on ``updated_at`` expires the
+                    # column on the in-memory rows after the UPDATE;
+                    # explicitly refresh so the subsequent conversion
+                    # does not need a lazy SELECT (which would fail
+                    # outside the greenlet bridge).
+                    for row in succeeded_rows:
+                        await db_session.refresh(row, attribute_names=["updated_at"])
+
+                succeeded_data = [self._vfolder_row_to_data(row) for row in succeeded_rows]
 
             if succeeded_ids:
                 # Delete relation rows for succeeded vfolders only.
                 await delete_vfolder_relation_rows(db_conn, self._db.begin_session, succeeded_ids)
 
-            result.succeeded = [self._vfolder_row_to_data(row) for row in succeeded_rows]
+            result.succeeded = succeeded_data
             return result
 
     @vfolder_repository_resilience.apply()
@@ -1182,6 +1195,7 @@ class VfolderRepository:
             cur_size=row.cur_size or 0,
             created_at=row.created_at or datetime.now(UTC),
             last_used=row.last_used,
+            updated_at=row.updated_at,
             creator=row.creator,
             creator_id=row.creator_id,
             unmanaged_path=row.unmanaged_path,
@@ -1589,6 +1603,7 @@ class VfolderRepository:
             cur_size=vfolder_dict["cur_size"],
             created_at=vfolder_dict["created_at"],
             last_used=vfolder_dict["last_used"],
+            updated_at=vfolder_dict["updated_at"],
             creator=vfolder_dict["creator"],
             creator_id=vfolder_dict.get("creator_id"),
             unmanaged_path=vfolder_dict["unmanaged_path"],
@@ -2298,7 +2313,7 @@ class VfolderRepository:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             items = [row.VFolderRow.to_data() for row in result.rows]
@@ -2332,7 +2347,7 @@ class VfolderRepository:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             items = [row.VFolderRow.to_data() for row in result.rows]

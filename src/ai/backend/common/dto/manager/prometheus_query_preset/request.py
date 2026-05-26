@@ -10,11 +10,13 @@ import re
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.clients.prometheus.preset import validate_query_template
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.validators import (
+    validate_query_template,
+)
 
 from .types import QueryDefinitionOrder
 

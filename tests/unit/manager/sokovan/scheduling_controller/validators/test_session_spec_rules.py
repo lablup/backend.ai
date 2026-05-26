@@ -36,8 +36,8 @@ from ai.backend.manager.data.session.options import (
     KernelExecutionSpec,
     ResourceOpts,
     SchedulingTarget,
+    SessionHandlerOptions,
     SessionOptions,
-    SessionTimeouts,
 )
 from ai.backend.manager.data.session.spec import (
     KernelSpec,
@@ -58,11 +58,20 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.container_limit
 from ai.backend.manager.sokovan.scheduling_controller.validators.dotfile_vfolder_conflict_rule import (
     DotfileVFolderConflictRule,
 )
+from ai.backend.manager.sokovan.scheduling_controller.validators.image_slot_type_rule import (
+    ImageSlotTypeRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.validators.inference_model_folder_rule import (
     InferenceModelFolderRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.mount_name_validation_rule import (
     MountNameValidationRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.requested_slot_type_rule import (
+    RequestedSlotTypeRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.required_resource_slot_rule import (
+    RequiredResourceSlotRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_rule import (
     ResourceLimitRule,
@@ -150,7 +159,7 @@ def _spec(
             cluster_size=len(kernel_specs),
             scheduling_target=SchedulingTarget(),
             kernel_groups=[],
-            timeouts=SessionTimeouts(),
+            handler_options=SessionHandlerOptions(),
         ),
         kernel_specs=decorated_kernel_specs,
     )
@@ -161,12 +170,14 @@ def _ctx(
     keypair_policy: KeyPairResourcePolicyData | None = None,
     image_infos: dict[ImageID, ImageInfo] | None = None,
     known_slot_types: dict[SlotName, SlotTypes] | None = None,
+    required_slot_names: frozenset[SlotName] | None = None,
     dotfile_data: DotfileBundle | None = None,
 ) -> SessionSpecValidationContext:
     return SessionSpecValidationContext(
         keypair_resource_policy=keypair_policy,
         image_infos=image_infos or {},
         known_slot_types=known_slot_types or {},
+        required_slot_names=required_slot_names or frozenset(),
         dotfile_data=dotfile_data or DotfileBundle(),
     )
 
@@ -397,3 +408,176 @@ class TestDotfileVFolderConflictRule:
             )
         )
         DotfileVFolderConflictRule().validate(spec, ctx)
+
+
+def _image_info_with_slots(
+    image_id: ImageID,
+    *,
+    slot_keys: tuple[str, ...],
+) -> ImageInfo:
+    return ImageInfo(
+        id=uuid.UUID(str(image_id)),
+        canonical="repo/img:tag",
+        architecture="x86_64",
+        registry="repo",
+        labels={},
+        resource_spec={k: {"min": "1", "max": None} for k in slot_keys},
+    )
+
+
+def _kernel_with_resources(
+    image_id: ImageID,
+    *,
+    resources: tuple[tuple[str, str], ...],
+) -> KernelSpec:
+    return KernelSpec(
+        cluster_role="main",
+        cluster_idx=1,
+        cluster_hostname="main1",
+        local_rank=0,
+        execution_spec=KernelExecutionSpec(
+            image_id=image_id,
+            resources=[ResourceSlotEntry(resource_type=k, quantity=q) for k, q in resources],
+            resource_opts=ResourceOpts(),
+        ),
+    )
+
+
+_RG_BASE: dict[SlotName, SlotTypes] = {
+    SlotName("cpu"): SlotTypes.COUNT,
+    SlotName("mem"): SlotTypes.BYTES,
+}
+
+
+class TestImageSlotTypeRule:
+    def test_passes_when_image_slots_served_by_rg(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(
+            image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem"))},
+            known_slot_types=dict(_RG_BASE),
+        )
+        ImageSlotTypeRule().validate(spec, ctx)
+
+    def test_rejects_image_slot_not_served_by_rg(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(
+            image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem", "cuda.device"))},
+            known_slot_types={**_RG_BASE, SlotName("cuda.shares"): SlotTypes.COUNT},
+        )
+        with pytest.raises(InvalidAPIParameters):
+            ImageSlotTypeRule().validate(spec, ctx)
+
+    def test_rejects_when_rg_has_no_active_agents(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(
+            image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem"))},
+        )
+        with pytest.raises(InvalidAPIParameters):
+            ImageSlotTypeRule().validate(spec, ctx)
+
+    def test_noop_without_image_info(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(known_slot_types=dict(_RG_BASE))
+        ImageSlotTypeRule().validate(spec, ctx)
+
+    def test_skips_image_slot_when_min_is_zero(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        image_info = ImageInfo(
+            id=uuid.UUID(str(img)),
+            canonical="repo/img:tag",
+            architecture="x86_64",
+            registry="repo",
+            labels={},
+            resource_spec={
+                "cpu": {"min": "1", "max": None},
+                "mem": {"min": "1", "max": None},
+                "cuda.device": {"min": "0", "max": None},
+            },
+        )
+        ctx = _ctx(
+            image_infos={img: image_info},
+            known_slot_types=dict(_RG_BASE),
+        )
+        ImageSlotTypeRule().validate(spec, ctx)
+
+
+class TestRequestedSlotTypeRule:
+    def test_passes_when_requested_slots_served_by_rg(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((
+            _kernel_with_resources(img, resources=(("cpu", "1"), ("mem", "1073741824"))),
+        ))
+        ctx = _ctx(known_slot_types=dict(_RG_BASE))
+        RequestedSlotTypeRule().validate(spec, ctx)
+
+    def test_rejects_requested_slot_not_served_by_rg(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((
+            _kernel_with_resources(
+                img,
+                resources=(("cpu", "1"), ("mem", "1073741824"), ("cuda.device", "1")),
+            ),
+        ))
+        ctx = _ctx(known_slot_types={**_RG_BASE, SlotName("cuda.shares"): SlotTypes.COUNT})
+        with pytest.raises(InvalidAPIParameters):
+            RequestedSlotTypeRule().validate(spec, ctx)
+
+    def test_rejects_when_rg_has_no_active_agents(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel_with_resources(img, resources=(("cpu", "1"),)),))
+        with pytest.raises(InvalidAPIParameters):
+            RequestedSlotTypeRule().validate(spec, _ctx())
+
+    def test_skips_requested_slot_when_quantity_is_zero(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((
+            _kernel_with_resources(
+                img,
+                resources=(("cpu", "1"), ("mem", "1073741824"), ("cuda.device", "0")),
+            ),
+        ))
+        ctx = _ctx(known_slot_types=dict(_RG_BASE))
+        RequestedSlotTypeRule().validate(spec, ctx)
+
+
+class TestRequiredResourceSlotRule:
+    @pytest.fixture
+    def image_id(self) -> ImageID:
+        return ImageID(uuid.uuid4())
+
+    @pytest.fixture
+    def required_slot_ctx(self) -> SessionSpecValidationContext:
+        return _ctx(required_slot_names=frozenset({SlotName("cpu"), SlotName("mem")}))
+
+    def test_passes_when_required_slots_present(
+        self,
+        image_id: ImageID,
+        required_slot_ctx: SessionSpecValidationContext,
+    ) -> None:
+        spec = _spec((
+            _kernel_with_resources(image_id, resources=(("cpu", "1"), ("mem", "1073741824"))),
+        ))
+        RequiredResourceSlotRule().validate(spec, required_slot_ctx)
+
+    @pytest.mark.parametrize(
+        ("resources", "expected_missing_slot"),
+        [
+            (((("cpu", "1"),)), "mem"),
+            (((("cpu", "0"), ("mem", "1073741824"))), "cpu"),
+        ],
+    )
+    def test_rejects_missing_or_zero_required_slot(
+        self,
+        image_id: ImageID,
+        required_slot_ctx: SessionSpecValidationContext,
+        resources: tuple[tuple[str, str], ...],
+        expected_missing_slot: str,
+    ) -> None:
+        spec = _spec((_kernel_with_resources(image_id, resources=resources),))
+        with pytest.raises(InvalidAPIParameters, match=expected_missing_slot):
+            RequiredResourceSlotRule().validate(spec, required_slot_ctx)

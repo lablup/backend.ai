@@ -30,6 +30,7 @@ from ai.backend.manager.repositories.container_registry_quota.repository import 
 )
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
 @dataclass
@@ -97,21 +98,20 @@ class TestPerProjectRegistryQuotaRepository:
         return PerProjectRegistryQuotaRepository(db_with_cleanup)
 
     @pytest.fixture
-    async def sample_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
-        """Pre-created domain for group tests. Returns domain name."""
-        domain_name = "test-domain-" + str(uuid.uuid4())[:8]
-        async with db_with_cleanup.begin_session() as session:
-            domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
-            session.add(domain)
-            await session.commit()
-        return domain_name
+    async def sample_domain(
+        self,
+        domain_factory: DomainFactory,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        """Pre-created domain for group tests."""
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def sample_resource_policy(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: str
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_domain: DomainFixtureData
     ) -> str:
         """Pre-created resource policy. Returns policy name."""
-        policy_name = f"test-policy-{sample_domain}"
+        policy_name = f"test-policy-{sample_domain.domain_name}"
         async with db_with_cleanup.begin_session() as session:
             project_policy = ProjectResourcePolicyRow(
                 name=policy_name,
@@ -127,7 +127,7 @@ class TestPerProjectRegistryQuotaRepository:
     async def project_with_registry(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         sample_resource_policy: str,
     ) -> _ProjectWithRegistry:
         """Pre-created project with valid container_registry config linked to a ContainerRegistryRow."""
@@ -157,7 +157,7 @@ class TestPerProjectRegistryQuotaRepository:
 
             group = GroupRow(
                 name=f"test-group-{str(uuid.uuid4())[:8]}",
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
                 container_registry={
@@ -189,14 +189,14 @@ class TestPerProjectRegistryQuotaRepository:
     async def project_without_registry(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         sample_resource_policy: str,
     ) -> _ProjectWithoutRegistry:
         """Pre-created project with no container_registry configured."""
         async with db_with_cleanup.begin_session() as session:
             group = GroupRow(
                 name=f"test-group-no-reg-{str(uuid.uuid4())[:8]}",
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
                 container_registry=None,
@@ -212,14 +212,14 @@ class TestPerProjectRegistryQuotaRepository:
     async def project_with_invalid_registry(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         sample_resource_policy: str,
     ) -> _ProjectWithInvalidRegistry:
         """Pre-created project with empty container_registry dict (missing required keys)."""
         async with db_with_cleanup.begin_session() as session:
             group = GroupRow(
                 name=f"test-group-invalid-{str(uuid.uuid4())[:8]}",
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
                 container_registry={},
@@ -235,14 +235,14 @@ class TestPerProjectRegistryQuotaRepository:
     async def project_with_orphaned_registry(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         sample_resource_policy: str,
     ) -> _ProjectWithOrphanedRegistry:
         """Pre-created project whose container_registry config points to a non-existent registry."""
         async with db_with_cleanup.begin_session() as session:
             group = GroupRow(
                 name=f"test-group-orphan-{str(uuid.uuid4())[:8]}",
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
                 container_registry={
@@ -261,7 +261,7 @@ class TestPerProjectRegistryQuotaRepository:
     async def project_with_minimal_registry(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         sample_resource_policy: str,
     ) -> _ProjectWithRegistry:
         """Pre-created project with a registry that has only required fields (no username/password/extra)."""
@@ -281,7 +281,7 @@ class TestPerProjectRegistryQuotaRepository:
 
             group = GroupRow(
                 name=f"test-group-minimal-{str(uuid.uuid4())[:8]}",
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 resource_policy=sample_resource_policy,
                 container_registry={

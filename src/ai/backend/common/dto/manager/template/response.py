@@ -8,9 +8,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     # Shared DTOs
@@ -36,7 +37,7 @@ __all__ = (
 # --- Shared DTOs ---
 
 
-class SessionTemplateItemDTO(BaseModel):
+class SessionTemplateItemDTO(BackendAISchema):
     """Base DTO for a template item in list responses."""
 
     name: str = Field(description="Template name")
@@ -63,7 +64,7 @@ class ClusterTemplateListItemDTO(SessionTemplateItemDTO):
     type: Literal["user", "group"] = Field(description='Template type ("user" or "group")')
 
 
-class CreateSessionTemplateItemDTO(BaseModel):
+class CreateSessionTemplateItemDTO(BackendAISchema):
     """DTO for a single created session template entry."""
 
     id: str = Field(description="Created template ID")

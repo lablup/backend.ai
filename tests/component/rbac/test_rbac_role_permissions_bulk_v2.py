@@ -50,6 +50,7 @@ from ai.backend.manager.api.rest.v2.rbac.registry import register_v2_rbac_routes
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -141,13 +142,13 @@ class TestBulkAddRolePermissionsV2:
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         result = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture, "image", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
                 ],
             ),
         )
@@ -161,13 +162,13 @@ class TestBulkAddRolePermissionsV2:
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         # Seed one entry first
         first = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "vfolder", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "vfolder", "read"),
                 ],
             ),
         )
@@ -177,8 +178,8 @@ class TestBulkAddRolePermissionsV2:
         result = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "vfolder", "read"),
-                    _entry(target_role.role.id, domain_fixture, "agent", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "vfolder", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "agent", "read"),
                 ],
             ),
         )
@@ -203,13 +204,13 @@ class TestBulkAddRolePermissionsV2:
         self,
         user_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.rbac.bulk_add_role_permissions(
                 BulkAddRolePermissionsInput(
                     permissions=[
-                        _entry(target_role.role.id, domain_fixture, "session", "read"),
+                        _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
                     ],
                 ),
             )
@@ -222,13 +223,13 @@ class TestBulkRemoveRolePermissionsV2:
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         added = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture, "image", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
                 ],
             ),
         )
@@ -256,12 +257,12 @@ class TestBulkRemoveRolePermissionsV2:
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         added = await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
                 ],
             ),
         )
@@ -300,14 +301,14 @@ class TestReplaceRolePermissionsV2:
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         # Seed prior set
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture, "image", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
                 ],
             ),
         )
@@ -317,8 +318,8 @@ class TestReplaceRolePermissionsV2:
             ReplaceRolePermissionsInput(
                 role_id=target_role.role.id,
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "vfolder", "read"),
-                    _entry(target_role.role.id, domain_fixture, "agent", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "vfolder", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "agent", "read"),
                 ],
             ),
         )
@@ -333,12 +334,12 @@ class TestReplaceRolePermissionsV2:
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
                 ],
             ),
         )
@@ -352,7 +353,7 @@ class TestReplaceRolePermissionsV2:
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         wrong_role_id = uuid.uuid4()
         with pytest.raises(InvalidRequestError):
@@ -360,7 +361,7 @@ class TestReplaceRolePermissionsV2:
                 ReplaceRolePermissionsInput(
                     role_id=target_role.role.id,
                     permissions=[
-                        _entry(wrong_role_id, domain_fixture, "session", "read"),
+                        _entry(wrong_role_id, domain_fixture.domain_name, "session", "read"),
                     ],
                 ),
             )
@@ -390,15 +391,15 @@ class TestPermissionFilterScopeIdNarrowing:
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         # Seed two permissions in the same scope and an unrelated one in another scope.
-        scope_b = f"{domain_fixture}-other"
+        scope_b = f"{domain_fixture.domain_name}-other"
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture, "image", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
                     CreatePermissionInput(
                         role_id=target_role.role.id,
                         scope_type="domain",
@@ -414,24 +415,24 @@ class TestPermissionFilterScopeIdNarrowing:
             AdminSearchPermissionsGQLInput(
                 filter=PermissionFilter(
                     role_id=UUIDFilter(equals=target_role.role.id),
-                    scope_id=StringFilter(equals=domain_fixture),
+                    scope_id=StringFilter(equals=domain_fixture.domain_name),
                 ),
                 limit=100,
             ),
         )
-        assert {item.scope_id for item in result.items} == {domain_fixture}
+        assert {item.scope_id for item in result.items} == {domain_fixture.domain_name}
         assert len(result.items) == 2
 
     async def test_role_id_in_filter_returns_matching_rows(
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
                 ],
             ),
         )
@@ -448,7 +449,7 @@ class TestPermissionFilterScopeIdNarrowing:
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """``PermissionRow.entity_type`` is a ``StrEnumType``-wrapped column.
 
@@ -459,8 +460,8 @@ class TestPermissionFilterScopeIdNarrowing:
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture, "image", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
                 ],
             ),
         )
@@ -479,15 +480,15 @@ class TestPermissionFilterScopeIdNarrowing:
         self,
         admin_v2_registry: V2ClientRegistry,
         target_role: CreateRoleResponse,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """``RBACElementTypeFilter.in_`` returns rows whose entity_type is in the list."""
         await admin_v2_registry.rbac.bulk_add_role_permissions(
             BulkAddRolePermissionsInput(
                 permissions=[
-                    _entry(target_role.role.id, domain_fixture, "session", "read"),
-                    _entry(target_role.role.id, domain_fixture, "image", "read"),
-                    _entry(target_role.role.id, domain_fixture, "vfolder", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "session", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "image", "read"),
+                    _entry(target_role.role.id, domain_fixture.domain_name, "vfolder", "read"),
                 ],
             ),
         )

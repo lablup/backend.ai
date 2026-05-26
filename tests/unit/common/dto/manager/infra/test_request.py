@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.infra.request import (
     UsagePerPeriodRequest,
     WatcherAgentRequest,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 # --- etcd requests ---
 
@@ -53,7 +54,7 @@ class TestGetConfigRequest:
         assert req.prefix is True
 
     def test_missing_key_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetConfigRequest()  # type: ignore[call-arg]
 
     def test_serialization_roundtrip(self) -> None:
@@ -74,7 +75,7 @@ class TestSetConfigRequest:
         assert req.value == {"nested": "data"}
 
     def test_missing_key_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SetConfigRequest(value="val")  # type: ignore[call-arg]
 
 
@@ -111,7 +112,7 @@ class TestListScalingGroupsRequest:
         assert req.group == "alias-test2"
 
     def test_missing_group_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListScalingGroupsRequest()  # type: ignore[call-arg]
 
 
@@ -153,7 +154,7 @@ class TestCheckPresetsRequest:
         assert req.scaling_group == "sg1"
 
     def test_missing_group_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CheckPresetsRequest()  # type: ignore[call-arg]
 
 
@@ -168,15 +169,15 @@ class TestUsagePerMonthRequest:
         assert req.group_ids == ["g1", "g2"]
 
     def test_missing_group_ids_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerMonthRequest(month="202006")  # type: ignore[call-arg]
 
     def test_invalid_month_pattern(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerMonthRequest(group_ids=None, month="abc")
 
     def test_month_rejects_extra_chars(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerMonthRequest(group_ids=None, month="202006extra")
 
     def test_serialization_roundtrip(self) -> None:
@@ -207,11 +208,11 @@ class TestUsagePerPeriodRequest:
         assert req.project_id == "g1"
 
     def test_invalid_start_date_pattern(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerPeriodRequest(start_date="2020-06-01", end_date="20200630")
 
     def test_invalid_end_date_pattern(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UsagePerPeriodRequest(start_date="20200601", end_date="short")
 
 
@@ -225,7 +226,7 @@ class TestWatcherAgentRequest:
         assert req.agent_id == "i-agent002"
 
     def test_missing_agent_id_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             WatcherAgentRequest()  # type: ignore[call-arg]
 
     def test_serialization_roundtrip(self) -> None:

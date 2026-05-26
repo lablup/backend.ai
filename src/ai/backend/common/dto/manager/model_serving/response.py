@@ -9,11 +9,11 @@ import uuid
 from collections.abc import Sequence
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, NonNegativeFloat, NonNegativeInt
+from pydantic import ConfigDict, Field, HttpUrl, NonNegativeFloat, NonNegativeInt
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.common.types import RuntimeVariant
+from ai.backend.common.types import BackendAISchema, RuntimeVariant
 
 __all__ = (
     # Response models
@@ -64,7 +64,7 @@ class CompactServeInfoModel(BaseResponseModel):
     )
 
 
-class RouteInfoModel(BaseModel):
+class RouteInfoModel(BackendAISchema):
     route_id: uuid.UUID = Field(
         description=(
             "Unique ID referencing endpoint route. Each endpoint route has a one-to-one"
@@ -157,7 +157,7 @@ class TokenResponseModel(BaseResponseModel):
     token: str
 
 
-class ErrorInfoModel(BaseModel):
+class ErrorInfoModel(BackendAISchema):
     session_id: uuid.UUID | None
     error: dict[str, Any]
 
@@ -167,7 +167,7 @@ class ErrorListResponseModel(BaseResponseModel):
     retries: int
 
 
-class RuntimeInfo(BaseModel):
+class RuntimeInfo(BackendAISchema):
     name: str = Field(description="Identifier to be passed later inside request body")
     human_readable_name: str = Field(description="Use this value as displayed label to user")
 

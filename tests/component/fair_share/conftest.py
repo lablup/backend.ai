@@ -28,6 +28,7 @@ from ai.backend.manager.services.resource_usage.processors import ResourceUsageP
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture()
@@ -80,7 +81,7 @@ def server_module_registries(
 @pytest.fixture()
 async def group_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
     scaling_group_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
@@ -94,7 +95,7 @@ async def group_fixture(
                 name=group_name,
                 description=f"Test group {group_name}",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )

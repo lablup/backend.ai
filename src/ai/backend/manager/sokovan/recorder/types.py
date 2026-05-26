@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel
+from ai.backend.common.types import BackendAISchema
 
 # Generic type variable for entity IDs
 # Bound to UUID to ensure all entity IDs are UUID-based
@@ -19,7 +19,7 @@ class StepStatus(StrEnum):
     FAILED = "failed"
 
 
-class StepRecord(BaseModel):
+class StepRecord(BackendAISchema):
     """Represents a recorded execution step (completed)."""
 
     name: str  # e.g., "check_quota", "pull_image"
@@ -30,7 +30,7 @@ class StepRecord(BaseModel):
     error_code: str | None = None
 
 
-class PhaseRecord(BaseModel):
+class PhaseRecord(BackendAISchema):
     """Represents a recorded phase containing multiple steps.
 
     Depth is limited to Phase → Step (no nested phases).
@@ -44,7 +44,7 @@ class PhaseRecord(BaseModel):
     steps: list[StepRecord]
 
 
-class ExecutionRecord(BaseModel):
+class ExecutionRecord(BackendAISchema):
     """Top-level execution record for an entity.
 
     Contains phases, each with their steps.
@@ -55,7 +55,7 @@ class ExecutionRecord(BaseModel):
     phases: list[PhaseRecord]
 
 
-class RecordBuildData(BaseModel):
+class RecordBuildData(BackendAISchema):
     """Data required for building execution records.
 
     Contains shared phases that apply to the entity.

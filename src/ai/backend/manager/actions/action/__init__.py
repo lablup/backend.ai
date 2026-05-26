@@ -72,6 +72,10 @@ from .rbac_vfolder import (
     VFolderSoftDeleteRBACAction,
     VFolderUpdateRBACAction,
 )
+from .types import (
+    ActionTarget,
+    SearchableActionTarget,
+)
 
 RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     ModelDeploymentCreateRBACAction,
@@ -125,6 +129,8 @@ __all__ = (
     "BaseActionTriggerMeta",
     "BaseBulkAction",
     "BaseBulkActionResult",
+    "ActionTarget",
+    "SearchableActionTarget",
     "BaseRBACAction",
     "RBACActionName",
     "RBACRequiredPermission",

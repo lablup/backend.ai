@@ -461,6 +461,38 @@
   # high-traffic deployments.
   # Added in 25.12.0
   connection-limit = 200
+  # HTTP path that the manager pool's background probe targets on each Manager
+  # endpoint. Must return 2xx for the endpoint to be considered ready to accept
+  # traffic. Default '/health/readyz' matches the Backend.AI public readiness
+  # route — it requires the Manager's gating dependencies (DB, etcd, Redis) to
+  # be up, so the webserver does not forward requests to a half-broken Manager.
+  # Use '/health/livez' if you only want a liveness signal.
+  # Added in UNRELEASED
+  health-check-probe-path = "/health/readyz"
+  # Seconds between background liveness probes per Manager endpoint. Smaller
+  # values detect upstream failures faster at the cost of probe traffic.
+  # Added in UNRELEASED
+  health-check-interval = 10.0
+  # Consecutive probe (or caller-reported) failures required before an endpoint
+  # flips from healthy to unhealthy.
+  # Added in UNRELEASED
+  health-check-failure-threshold = 3
+  # Seconds the unhealthy_since timestamp is retained after an endpoint is
+  # marked unhealthy. Reserved for future eviction policies; the endpoint itself
+  # flips back to healthy on the next successful probe.
+  # Added in UNRELEASED
+  health-check-recovery-timeout = 60.0
+  # Per-endpoint HTTP probe timeout in seconds. Independent of health-check-
+  # interval: the probe must finish within this window or it counts as a
+  # failure.
+  # Added in UNRELEASED
+  health-check-probe-timeout = 2.0
+  # Selection policy ManagerClientPool uses to pick an endpoint per request.
+  # 'round_robin' rotates across the healthy set; 'random' picks uniformly;
+  # 'least_connections' favors the endpoint with the fewest in-flight
+  # acquisitions.
+  # Added in UNRELEASED
+  endpoint-selection-policy = "least_connections"
 
 # JWT authentication configuration shared between Manager and Web Server for
 # stateless token-based authentication.
@@ -768,6 +800,33 @@
   # enabled.
   # Added in 25.12.0
   endpoints = "http://apollo-router:4000"
+  # HTTP path that the Apollo Router pool's background probe targets on each
+  # upstream. Must return 2xx for the endpoint to be considered ready to accept
+  # traffic. Default '/readiness' matches the GraphQL Hive Gateway readiness
+  # route — it requires the federated supergraph to be loaded, so the webserver
+  # does not forward GraphQL traffic to a gateway that is still starting up.
+  # Apollo Router (Rust) deployments typically expose '/health/readiness'
+  # instead; switch via this option.
+  # Added in UNRELEASED
+  health-check-probe-path = "/readiness"
+  # Seconds between background liveness probes per Apollo Router endpoint.
+  # Added in UNRELEASED
+  health-check-interval = 10.0
+  # Consecutive probe (or caller-reported) failures required before an Apollo
+  # Router endpoint flips from healthy to unhealthy.
+  # Added in UNRELEASED
+  health-check-failure-threshold = 3
+  # Seconds the unhealthy_since timestamp is retained after an Apollo Router
+  # endpoint is marked unhealthy.
+  # Added in UNRELEASED
+  health-check-recovery-timeout = 60.0
+  # Per-endpoint HTTP probe timeout in seconds for Apollo Router.
+  # Added in UNRELEASED
+  health-check-probe-timeout = 2.0
+  # Selection policy ApolloRouterClientPool uses to pick an Apollo Router
+  # endpoint per request.
+  # Added in UNRELEASED
+  endpoint-selection-policy = "least_connections"
 
 # Logging configuration for log levels, formats, and destinations.
 # Added in 25.12.0

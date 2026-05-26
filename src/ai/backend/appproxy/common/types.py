@@ -16,7 +16,7 @@ import aiohttp_cors
 from aiohttp import web
 from pydantic import AliasChoices, AnyUrl, BaseModel, ConfigDict, Field
 
-from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
+from ai.backend.common.types import BackendAISchema, ModelServiceStatus, RuntimeVariant
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
 
@@ -84,7 +84,7 @@ type AppCreator = Callable[
 ]
 
 
-class RouteInfo(BaseModel):
+class RouteInfo(BackendAISchema):
     """Information about a route within a circuit.
 
     Routes describe a kernel endpoint (``kernel_host`` + ``kernel_port``)
@@ -157,7 +157,7 @@ class RouteInfo(BaseModel):
         return self.kernel_host or "localhost"
 
 
-class SerializableCircuit(BaseModel):
+class SerializableCircuit(BackendAISchema):
     """
     Serializable representation of `ai.backend.appproxy.coordinator.models.Circuit`
     """
@@ -241,7 +241,7 @@ class SerializableCircuit(BaseModel):
         return f"bai_router_{self.id}@etcd"
 
 
-class SerializableToken(BaseModel):
+class SerializableToken(BackendAISchema):
     login_session_token: str | None
     kernel_host: str
     kernel_port: int
@@ -252,7 +252,7 @@ class SerializableToken(BaseModel):
     domain_name: str
 
 
-class SessionConfig(BaseModel):
+class SessionConfig(BackendAISchema):
     model_config = ConfigDict(populate_by_name=True)
 
     id: Annotated[UUID | None, Field(default=None)]
@@ -265,13 +265,13 @@ class SessionConfig(BaseModel):
     domain_name: str
 
 
-class EndpointConfig(BaseModel):
+class EndpointConfig(BackendAISchema):
     id: UUID
     runtime_variant: Annotated[RuntimeVariant | None, Field(default=None)]
     existing_url: AnyUrl | None
 
 
-class HealthCheckState(BaseModel):
+class HealthCheckState(BackendAISchema):
     """
     Runtime health check state
     """

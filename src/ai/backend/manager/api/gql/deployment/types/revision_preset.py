@@ -310,7 +310,7 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         info: Info[StrawberryGQLContext],
         filter: AllocatedResourceSlotFilterGQL | None = None,
         order_by: list[AllocatedResourceSlotOrderByGQL] | None = None,
-    ) -> list[AllocatedResourceSlotGQL]:
+    ) -> list[AllocatedResourceSlotGQL] | None:
         from ai.backend.common.dto.manager.v2.resource_slot.request import (
             SearchAllocatedResourceSlotsInput,
         )

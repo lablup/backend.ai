@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.configs.inspector import (
     ConfigInspector,
@@ -17,6 +17,7 @@ from ai.backend.common.meta import (
     ConfigEnvironment,
     ConfigExample,
 )
+from ai.backend.common.types import BackendAISchema
 
 
 class TestFieldTypeInfo:
@@ -155,7 +156,7 @@ class TestFieldSchema:
 
 class TestConfigInspector:
     def test_extract_simple_field(self) -> None:
-        class SimpleConfig(BaseModel):
+        class SimpleConfig(BackendAISchema):
             name: Annotated[
                 str,
                 Field(default="default-name"),
@@ -181,7 +182,7 @@ class TestConfigInspector:
         assert field.doc.added_version == "25.1.0"
 
     def test_extract_uses_serialization_alias(self) -> None:
-        class AliasedConfig(BaseModel):
+        class AliasedConfig(BackendAISchema):
             my_field: Annotated[
                 str,
                 Field(default="value", serialization_alias="my-field"),
@@ -200,7 +201,7 @@ class TestConfigInspector:
         assert "my_field" not in schema
 
     def test_extract_required_field(self) -> None:
-        class RequiredConfig(BaseModel):
+        class RequiredConfig(BackendAISchema):
             required_field: Annotated[
                 str,
                 Field(),
@@ -217,7 +218,7 @@ class TestConfigInspector:
         assert schema["required_field"].type_info.required is True
 
     def test_extract_secret_field(self) -> None:
-        class SecretConfig(BaseModel):
+        class SecretConfig(BackendAISchema):
             password: Annotated[
                 str,
                 Field(default="secret123"),
@@ -235,7 +236,7 @@ class TestConfigInspector:
         assert schema["password"].type_info.secret is True
 
     def test_extract_composite_field(self) -> None:
-        class InnerConfig(BaseModel):
+        class InnerConfig(BackendAISchema):
             value: Annotated[
                 int,
                 Field(default=10),
@@ -246,7 +247,7 @@ class TestConfigInspector:
                 ),
             ]
 
-        class OuterConfig(BaseModel):
+        class OuterConfig(BackendAISchema):
             inner: Annotated[
                 InnerConfig,
                 Field(default_factory=InnerConfig),
@@ -266,7 +267,7 @@ class TestConfigInspector:
         assert schema["inner"].children["value"].type_info.type_name == "int"
 
     def test_skips_fields_without_meta(self) -> None:
-        class MixedConfig(BaseModel):
+        class MixedConfig(BackendAISchema):
             with_meta: Annotated[
                 str,
                 Field(default="has-meta"),
@@ -285,7 +286,7 @@ class TestConfigInspector:
         assert "without_meta" not in schema
 
     def test_get_example_value_local(self) -> None:
-        class ExampleConfig(BaseModel):
+        class ExampleConfig(BackendAISchema):
             endpoint: Annotated[
                 str,
                 Field(default="localhost"),
@@ -303,7 +304,7 @@ class TestConfigInspector:
         assert example == "localhost:8080"
 
     def test_get_example_value_prod(self) -> None:
-        class ExampleConfig(BaseModel):
+        class ExampleConfig(BackendAISchema):
             endpoint: Annotated[
                 str,
                 Field(default="localhost"),
@@ -321,7 +322,7 @@ class TestConfigInspector:
         assert example == "api.example.com"
 
     def test_get_fields_by_version(self) -> None:
-        class VersionedConfig(BaseModel):
+        class VersionedConfig(BackendAISchema):
             old_field: Annotated[
                 str,
                 Field(default="old"),
@@ -364,7 +365,7 @@ class TestConfigInspector:
         assert versions == ["24.0.0", "24.6.0", "25.1.0"]
 
     def test_get_deprecated_fields(self) -> None:
-        class DeprecatedConfig(BaseModel):
+        class DeprecatedConfig(BackendAISchema):
             current_field: Annotated[
                 str,
                 Field(default="current"),
@@ -395,7 +396,7 @@ class TestConfigInspector:
         assert deprecated[0][1].doc.deprecation_hint == "Use current_field instead"
 
     def test_get_secret_fields(self) -> None:
-        class SecretsConfig(BaseModel):
+        class SecretsConfig(BackendAISchema):
             public_field: Annotated[
                 str,
                 Field(default="public"),
@@ -424,7 +425,7 @@ class TestConfigInspector:
         assert secrets[0][0] == "secret_field"
 
     def test_type_name_simple_types(self) -> None:
-        class TypesConfig(BaseModel):
+        class TypesConfig(BackendAISchema):
             str_field: Annotated[
                 str,
                 Field(default=""),
@@ -461,7 +462,7 @@ class TestConfigInspector:
         assert schema["bool_field"].type_info.type_name == "bool"
 
     def test_type_name_optional(self) -> None:
-        class OptionalConfig(BaseModel):
+        class OptionalConfig(BackendAISchema):
             optional_field: Annotated[
                 str | None,
                 Field(default=None),

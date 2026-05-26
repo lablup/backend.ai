@@ -11,7 +11,9 @@ from __future__ import annotations
 import enum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from ai.backend.common.types import BackendAISchema
 
 
 class GQLWSMessageType(enum.StrEnum):
@@ -30,34 +32,34 @@ class GQLWSMessageType(enum.StrEnum):
 # --- Client → Server ---
 
 
-class ConnectionInitMessage(BaseModel, frozen=True):
+class ConnectionInitMessage(BackendAISchema, frozen=True):
     type: Literal[GQLWSMessageType.CONNECTION_INIT]
     payload: dict[str, Any] | None = None
 
 
-class SubscribePayload(BaseModel, frozen=True):
+class SubscribePayload(BackendAISchema, frozen=True):
     query: str
     variables: dict[str, Any] | None = None
     operationName: str | None = None
 
 
-class SubscribeMessage(BaseModel, frozen=True):
+class SubscribeMessage(BackendAISchema, frozen=True):
     type: Literal[GQLWSMessageType.SUBSCRIBE]
     id: str
     payload: SubscribePayload
 
 
-class ClientCompleteMessage(BaseModel, frozen=True):
+class ClientCompleteMessage(BackendAISchema, frozen=True):
     type: Literal[GQLWSMessageType.COMPLETE]
     id: str
 
 
-class PingMessage(BaseModel, frozen=True):
+class PingMessage(BackendAISchema, frozen=True):
     type: Literal[GQLWSMessageType.PING] = GQLWSMessageType.PING
     payload: dict[str, Any] | None = None
 
 
-class PongMessage(BaseModel, frozen=True):
+class PongMessage(BackendAISchema, frozen=True):
     type: Literal[GQLWSMessageType.PONG] = GQLWSMessageType.PONG
     payload: dict[str, Any] | None = None
 
@@ -65,29 +67,29 @@ class PongMessage(BaseModel, frozen=True):
 # --- Server → Client ---
 
 
-class ConnectionAckMessage(BaseModel, frozen=True):
+class ConnectionAckMessage(BackendAISchema, frozen=True):
     type: Literal[GQLWSMessageType.CONNECTION_ACK] = GQLWSMessageType.CONNECTION_ACK
     payload: dict[str, Any] | None = None
 
 
-class NextPayload(BaseModel, frozen=True):
+class NextPayload(BackendAISchema, frozen=True):
     data: dict[str, Any] | None = None
     errors: list[dict[str, Any]] | None = None
 
 
-class NextMessage(BaseModel, frozen=True):
+class NextMessage(BackendAISchema, frozen=True):
     type: Literal[GQLWSMessageType.NEXT] = GQLWSMessageType.NEXT
     id: str
     payload: NextPayload
 
 
-class ErrorMessage(BaseModel, frozen=True):
+class ErrorMessage(BackendAISchema, frozen=True):
     type: Literal[GQLWSMessageType.ERROR] = GQLWSMessageType.ERROR
     id: str
     payload: list[dict[str, Any]]
 
 
-class ServerCompleteMessage(BaseModel, frozen=True):
+class ServerCompleteMessage(BackendAISchema, frozen=True):
     type: Literal[GQLWSMessageType.COMPLETE] = GQLWSMessageType.COMPLETE
     id: str
 
