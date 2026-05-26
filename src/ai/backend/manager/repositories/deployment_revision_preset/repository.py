@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from decimal import Decimal
 from uuid import UUID
 
@@ -11,6 +12,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.deployment_revision_preset.creators import (
+    PresetResourceSlotDependentCreatorSpec,
+)
 from ai.backend.manager.repositories.deployment_revision_preset.db_source.db_source import (
     DeploymentRevisionPresetDBSource,
 )
@@ -28,17 +32,21 @@ class DeploymentRevisionPresetRepository:
         return await self._db_source.get_next_rank(variant_id)
 
     async def create(
-        self, creator: Creator[DeploymentRevisionPresetRow]
+        self,
+        creator: Creator[DeploymentRevisionPresetRow],
+        slot_specs: Sequence[PresetResourceSlotDependentCreatorSpec],
     ) -> DeploymentRevisionPresetData:
-        return await self._db_source.create(creator)
+        return await self._db_source.create(creator, slot_specs)
 
     async def get_by_id(self, preset_id: UUID) -> DeploymentRevisionPresetData:
         return await self._db_source.get_by_id(preset_id)
 
     async def update(
-        self, updater: Updater[DeploymentRevisionPresetRow]
+        self,
+        updater: Updater[DeploymentRevisionPresetRow],
+        slot_specs: Sequence[PresetResourceSlotDependentCreatorSpec] | None,
     ) -> DeploymentRevisionPresetData:
-        return await self._db_source.update(updater)
+        return await self._db_source.update(updater, slot_specs)
 
     async def delete(self, preset_id: UUID) -> DeploymentRevisionPresetData:
         return await self._db_source.delete(preset_id)

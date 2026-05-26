@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from decimal import Decimal
 from uuid import UUID
 
@@ -14,9 +15,21 @@ from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.base import (
+    BatchPurger,
+    BatchQuerier,
+    execute_batch_querier,
+)
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.deployment_revision_preset.creators import (
+    PresetResourceSlotDependentCreatorSpec,
+    PresetSlotDependency,
+)
+from ai.backend.manager.repositories.deployment_revision_preset.purgers import (
+    PresetResourceSlotBatchPurgerSpec,
+)
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -25,9 +38,11 @@ RANK_GAP = 100
 
 class DeploymentRevisionPresetDBSource:
     _db: ExtendedAsyncSAEngine
+    _ops: DBOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._ops = DBOpsProvider(db)
 
     async def get_next_rank(self, variant_id: UUID) -> int:
         async with self._db.begin_readonly_session_read_committed() as session:
@@ -38,11 +53,15 @@ class DeploymentRevisionPresetDBSource:
             return (max_rank + RANK_GAP) if max_rank is not None else RANK_GAP
 
     async def create(
-        self, creator: Creator[DeploymentRevisionPresetRow]
+        self,
+        creator: Creator[DeploymentRevisionPresetRow],
+        slot_specs: Sequence[PresetResourceSlotDependentCreatorSpec],
     ) -> DeploymentRevisionPresetData:
-        async with self._db.begin_session() as session:
-            result = await execute_creator(session, creator)
-            return result.row.to_data()
+        async with self._ops.write_ops() as w:
+            created = await w.create(creator)
+            preset = created.row
+            await w.bulk_create_dependent(slot_specs, PresetSlotDependency(preset_id=preset.id))
+            return preset.to_data()
 
     async def get_by_id(self, preset_id: UUID) -> DeploymentRevisionPresetData:
         async with self._db.begin_readonly_session_read_committed() as session:
@@ -55,15 +74,23 @@ class DeploymentRevisionPresetDBSource:
             return row.to_data()
 
     async def update(
-        self, updater: Updater[DeploymentRevisionPresetRow]
+        self,
+        updater: Updater[DeploymentRevisionPresetRow],
+        slot_specs: Sequence[PresetResourceSlotDependentCreatorSpec] | None,
     ) -> DeploymentRevisionPresetData:
-        async with self._db.begin_session() as session:
-            result = await execute_updater(session, updater)
+        async with self._ops.write_ops() as w:
+            result = await w.update(updater)
             if result is None:
                 raise DeploymentRevisionPresetNotFound(
                     f"Deployment revision preset with ID {updater.pk_value} not found."
                 )
-            return result.row.to_data()
+            preset = result.row
+            if slot_specs is not None:
+                await w.batch_purge(
+                    BatchPurger(spec=PresetResourceSlotBatchPurgerSpec(preset_id=preset.id))
+                )
+                await w.bulk_create_dependent(slot_specs, PresetSlotDependency(preset_id=preset.id))
+            return preset.to_data()
 
     async def delete(self, preset_id: UUID) -> DeploymentRevisionPresetData:
         async with self._db.begin_session() as session:

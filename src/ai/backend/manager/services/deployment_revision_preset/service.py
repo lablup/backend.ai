@@ -45,14 +45,14 @@ class DeploymentRevisionPresetService:
         next_rank = await self._repository.get_next_rank(spec.runtime_variant_id)
         spec.rank = next_rank
 
-        data = await self._repository.create(action.creator)
+        data = await self._repository.create(action.creator, action.resource_slot_specs)
         return CreateDeploymentRevisionPresetActionResult(preset=data)
 
     async def update(
         self, action: UpdateDeploymentRevisionPresetAction
     ) -> UpdateDeploymentRevisionPresetActionResult:
         action.updater.pk_value = action.id
-        data = await self._repository.update(action.updater)
+        data = await self._repository.update(action.updater, action.resource_slot_specs)
         return UpdateDeploymentRevisionPresetActionResult(preset=data)
 
     async def delete(
