@@ -76,10 +76,29 @@ version = ".".join(release.split(".")[:2])
 
 # Expose the current Backend.AI client API version as the |api_version|
 # substitution so docs do not hard-code the string. Source of truth:
-# `src/ai/backend/client/config.py` (`API_VERSION`).
-from ai.backend.client.config import API_VERSION as _api_version
+# `src/ai/backend/client/config.py` (`API_VERSION`). We parse the literal
+# out of the file directly instead of importing the package, so the docs
+# build does not need aiohttp / the full client runtime installed.
+import ast
 
-api_version = f"v{_api_version[0]}.{_api_version[1]}"
+
+def _read_api_version() -> str:
+    source = (root_path / "src/ai/backend/client/config.py").read_text()
+    for node in ast.parse(source).body:
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "API_VERSION"
+            and isinstance(node.value, ast.Tuple)
+            and len(node.value.elts) == 2
+        ):
+            major, rev = (ast.literal_eval(e) for e in node.value.elts)
+            return f"v{major}.{rev}"
+    raise RuntimeError("API_VERSION not found in src/ai/backend/client/config.py")
+
+
+api_version = _read_api_version()
 rst_prolog = f"""
 .. |api_version| replace:: {api_version}
 """
