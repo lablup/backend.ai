@@ -99,23 +99,12 @@ class ModelCardDBSource:
     async def update(self, updater: Updater[ModelCardRow]) -> ModelCardData:
         async with self._db.begin_session() as session:
             result = await execute_updater(session, updater)
-            # execute_updater returns None either because the row is missing
-            # OR because build_values() produced an empty dict (e.g., the
-            # caller only wants to sync normalized child rows like
-            # model_card_resource_requirements, which are not plain columns
-            # on the model_cards table). Disambiguate by re-reading the row:
-            # if it exists, this was a child-only update and we continue on
-            # to the child sync step below.
+            # execute_updater returns the current row even when build_values() is empty
+            # (e.g. a child-only update that syncs model_card_resource_requirements), and
+            # None only when the row is missing.
             if result is None:
-                row = (
-                    await session.execute(
-                        sa.select(ModelCardRow).where(ModelCardRow.id == updater.pk_value)
-                    )
-                ).scalar_one_or_none()
-                if row is None:
-                    raise ModelCardNotFound(f"Model card with ID {updater.pk_value} not found.")
-            else:
-                row = result.row
+                raise ModelCardNotFound(f"Model card with ID {updater.pk_value} not found.")
+            row = result.row
 
             # Sync the normalized model_card_resource_requirements table when
             # the updater spec requests a change. Plain column UPDATE cannot
