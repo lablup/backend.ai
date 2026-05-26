@@ -8,16 +8,16 @@ from uuid import UUID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
+    DeploymentRevisionPresetCreatorSpec,
     PresetResourceSlotDependentCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment_revision_preset.db_source.db_source import (
     DeploymentRevisionPresetDBSource,
 )
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -25,18 +25,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class DeploymentRevisionPresetRepository:
     _db_source: DeploymentRevisionPresetDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = DeploymentRevisionPresetDBSource(db)
-
-    async def get_next_rank(self, variant_id: UUID) -> int:
-        return await self._db_source.get_next_rank(variant_id)
+    def __init__(self, ops_provider: DBOpsProvider) -> None:
+        self._db_source = DeploymentRevisionPresetDBSource(ops_provider)
 
     async def create(
         self,
-        creator: Creator[DeploymentRevisionPresetRow],
+        spec: DeploymentRevisionPresetCreatorSpec,
         slot_specs: Sequence[PresetResourceSlotDependentCreatorSpec],
     ) -> DeploymentRevisionPresetData:
-        return await self._db_source.create(creator, slot_specs)
+        return await self._db_source.create(spec, slot_specs)
 
     async def get_by_id(self, preset_id: UUID) -> DeploymentRevisionPresetData:
         return await self._db_source.get_by_id(preset_id)

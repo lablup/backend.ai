@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 
@@ -63,6 +64,7 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
         repositories = Repositories.create(
             args=RepositoryArgs(
                 db=setup_input.db,
+                ops_provider=DBOpsProvider(setup_input.db),
                 storage_manager=setup_input.storage_manager,
                 config_provider=setup_input.config_provider,
                 valkey_stat_client=setup_input.valkey_stat,

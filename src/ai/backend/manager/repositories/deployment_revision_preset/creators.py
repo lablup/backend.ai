@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
-from ai.backend.manager.repositories.base.creator import CreatorSpec, DependentCreatorSpec
+from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
@@ -30,11 +30,15 @@ def _parse_quantity(value: str) -> Decimal:
 
 
 @dataclass
-class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRow]):
+class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRevisionPresetRow]):
+    """Preset creator whose rank is assigned by the ops layer (next-value) at execution.
+
+    ``build_row`` receives the computed next rank as its dependency.
+    """
+
     runtime_variant_id: RuntimeVariantID
     name: str
     description: str | None
-    rank: int
     image_id: ImageID
     model_definition: ModelDefinition | None
     resource_opts: list[ResourceOptsEntry]
@@ -63,12 +67,12 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
         )
 
     @override
-    def build_row(self) -> DeploymentRevisionPresetRow:
+    def build_row(self, next_rank: int) -> DeploymentRevisionPresetRow:
         return DeploymentRevisionPresetRow(
             runtime_variant=self.runtime_variant_id,
             name=self.name,
             description=self.description,
-            rank=self.rank,
+            rank=next_rank,
             image_id=self.image_id,
             model_definition=self.model_definition,
             resource_opts=self.resource_opts,

@@ -14,5 +14,5 @@ class DeploymentRevisionPresetRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
-            repository=DeploymentRevisionPresetRepository(args.db),
+            repository=DeploymentRevisionPresetRepository(args.ops_provider),
         )

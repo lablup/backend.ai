@@ -83,7 +83,6 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
     combine_conditions_or,
 )
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
     DeploymentRevisionPresetCreatorSpec,
@@ -255,30 +254,27 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         model_def = input.model_definition
         strategy, strategy_spec = self._convert_required_strategy_input(input.deployment_strategy)
 
-        creator = Creator(
-            spec=DeploymentRevisionPresetCreatorSpec(
-                runtime_variant_id=input.runtime_variant_id,
-                name=input.name,
-                description=input.description,
-                rank=0,
-                image_id=input.image_id,
-                model_definition=model_def,
-                resource_opts=resource_opts,
-                cluster_mode=input.cluster_mode,
-                cluster_size=input.cluster_size,
-                startup_command=input.startup_command,
-                bootstrap_script=input.bootstrap_script,
-                environ=environ,
-                preset_values=preset_values,
-                open_to_public=input.open_to_public,
-                replica_count=input.replica_count,
-                revision_history_limit=input.revision_history_limit,
-                deployment_strategy=strategy,
-                deployment_strategy_spec=strategy_spec,
-            )
+        spec = DeploymentRevisionPresetCreatorSpec(
+            runtime_variant_id=input.runtime_variant_id,
+            name=input.name,
+            description=input.description,
+            image_id=input.image_id,
+            model_definition=model_def,
+            resource_opts=resource_opts,
+            cluster_mode=input.cluster_mode,
+            cluster_size=input.cluster_size,
+            startup_command=input.startup_command,
+            bootstrap_script=input.bootstrap_script,
+            environ=environ,
+            preset_values=preset_values,
+            open_to_public=input.open_to_public,
+            replica_count=input.replica_count,
+            revision_history_limit=input.revision_history_limit,
+            deployment_strategy=strategy,
+            deployment_strategy_spec=strategy_spec,
         )
         result = await self._processors.deployment_revision_preset.create.wait_for_complete(
-            CreateDeploymentRevisionPresetAction(creator=creator, resource_slot_specs=slot_specs)
+            CreateDeploymentRevisionPresetAction(creator_spec=spec, resource_slot_specs=slot_specs)
         )
         return CreateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.preset))
 

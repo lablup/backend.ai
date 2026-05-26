@@ -11,6 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 
 from .integrity import match_integrity_error, parse_integrity_error
@@ -199,7 +200,9 @@ async def execute_updater[TRow: Base](
     table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
     if len(pk_columns) != 1:
-        raise ValueError("Updater only supports single-column primary keys")
+        raise UnsupportedCompositePrimaryKeyError(
+            "Updater only supports single-column primary keys",
+        )
     values = updater.spec.build_values()
 
     if not values:
