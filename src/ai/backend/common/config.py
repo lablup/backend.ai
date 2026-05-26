@@ -158,8 +158,6 @@ def _wrap_str_start_command_into_argv(service: Any) -> Any:
 
 
 class PreStartAction(BaseConfigModel):
-    model_config = ConfigDict(extra="forbid")
-
     action: str = Field(
         description="The name of the pre-start action to execute.",
         examples=["action_name"],
@@ -172,8 +170,6 @@ class PreStartAction(BaseConfigModel):
 
 
 class ModelHealthCheck(BaseConfigModel):
-    model_config = ConfigDict(extra="forbid")
-
     interval: float = Field(
         default=10.0,
         description="Interval in seconds between health checks.",
@@ -208,8 +204,6 @@ class ModelHealthCheck(BaseConfigModel):
 
 
 class ModelServiceConfig(BaseConfigModel):
-    model_config = ConfigDict(extra="forbid")
-
     pre_start_actions: list[PreStartAction] = Field(
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
@@ -293,8 +287,6 @@ class ModelMetadata(BaseConfigModel):
 
 
 class ModelConfig(BaseConfigModel):
-    model_config = ConfigDict(extra="forbid")
-
     name: str = Field(
         description="Name of the model.",
         examples=["my_model"],
@@ -430,8 +422,6 @@ def _merge_definition(base: ModelDefinition, override: ModelDefinition) -> Model
 
 
 class ModelDefinition(BaseConfigModel):
-    model_config = ConfigDict(extra="forbid")
-
     models: list[ModelConfig] = Field(
         default_factory=list,
         description="List of models in the model definition.",
