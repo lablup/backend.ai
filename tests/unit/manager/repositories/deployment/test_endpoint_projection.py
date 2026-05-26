@@ -26,8 +26,11 @@ def endpoint_factory() -> EndpointFactory:
 
     The projection is pure and reads only the endpoint row's own columns —
     no relationship access — so a ``MagicMock`` carrying the columns the
-    method touches is sufficient. ``EndpointRow.to_model_deployment_data``
-    is invoked unbound so the stub drives every attribute read.
+    method touches is sufficient. The mock is bound to ``spec=EndpointRow``
+    so a column the projection reads that no longer exists on the row
+    (e.g. renamed/removed) raises ``AttributeError`` instead of silently
+    fabricating a value. ``EndpointRow.to_model_deployment_data`` is invoked
+    unbound so the stub drives every attribute read.
     """
 
     def _build(
@@ -36,7 +39,7 @@ def endpoint_factory() -> EndpointFactory:
         deploying_revision: DeploymentRevisionID | None = None,
         lifecycle_stage: EndpointLifecycle = EndpointLifecycle.DEPLOYING,
     ) -> Any:
-        stub = MagicMock()
+        stub = MagicMock(spec=EndpointRow)
         stub.id = DeploymentID(uuid.uuid4())
         stub.name = "test-deployment"
         stub.lifecycle_stage = lifecycle_stage
