@@ -1,8 +1,11 @@
 """Regression test for auto-mount (dot-prefixed) vfolder resolution.
 
-Reproduces the 26.4.4rc6 regression where
-``ScheduleDBSource.fetch_session_spec_contexts`` short-circuited a kernel
-group with no explicit mount requests::
+Exercised through ``SchedulerRepository.fetch_session_spec_contexts`` (the
+repository-layer entry point the scheduling controller calls) against a real
+test database.
+
+Reproduces the 26.4.4rc6 regression where the underlying db_source
+short-circuited a kernel group with no explicit mount requests::
 
     if not per_group_requests:
         continue
@@ -28,9 +31,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.session.draft import (
     KernelGroupDraft,
@@ -66,7 +71,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
-from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -281,9 +286,24 @@ class TestAutoMountVFolderResolution:
         sm.get_manager_facing_client = MagicMock(return_value=client)
         return sm
 
-    async def test_automount_resolved_without_explicit_mount_requests(
+    @pytest.fixture
+    def scheduler_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> SchedulerRepository:
+        """A real repository over the test DB. The cache client and config
+        provider are unused by ``fetch_session_spec_contexts`` (DB-only path),
+        so they are mocked.
+        """
+        return SchedulerRepository(
+            db_with_cleanup,
+            AsyncMock(spec=ValkeyStatClient),
+            MagicMock(spec=ManagerConfigProvider),
+        )
+
+    async def test_automount_resolved_without_explicit_mount_requests(
+        self,
+        scheduler_repository: SchedulerRepository,
         test_domain_name: str,
         test_user: UUID,
         test_group: UUID,
@@ -308,8 +328,7 @@ class TestAutoMountVFolderResolution:
             ),
         )
 
-        db_source = ScheduleDBSource(db_with_cleanup)
-        result = await db_source.fetch_session_spec_contexts(
+        result = await scheduler_repository.fetch_session_spec_contexts(
             draft,
             storage_manager=mock_storage_manager,
             allowed_vfolder_types=["user"],
