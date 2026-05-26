@@ -8,8 +8,16 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 
 
-@dataclass
-class SearchDeploymentsAction(DeploymentBaseAction):
+@dataclass(frozen=True)
+class AdminSearchDeploymentsAction(DeploymentBaseAction):
+    """Search every deployment with no scope (superadmin path).
+
+    The ``admin_`` prefix makes the unscoped intent explicit; scope-restricted
+    variants (``search_user_deployments`` / ``search_project_deployments``)
+    live alongside this on the same ``DeploymentService`` /
+    ``DeploymentRepository`` / ``DeploymentProcessors``.
+    """
+
     querier: BatchQuerier
 
     @override
@@ -22,7 +30,7 @@ class SearchDeploymentsAction(DeploymentBaseAction):
         return ActionOperationType.SEARCH
 
 
-@dataclass
+@dataclass(frozen=True)
 class SearchDeploymentsActionResult(BaseActionResult):
     data: list[ModelDeploymentData]
     total_count: int

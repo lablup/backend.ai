@@ -50,10 +50,10 @@ def project_search(
 
     from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.deployment.request import (
-        AdminSearchDeploymentsInput,
         DeploymentFilter,
         DeploymentOrder,
         DeploymentStatusFilter,
+        SearchDeploymentsInput,
     )
     from ai.backend.common.dto.manager.v2.deployment.types import DeploymentOrderField
 
@@ -79,7 +79,7 @@ def project_search(
             )
         orders = parsed
 
-    body = AdminSearchDeploymentsInput(
+    body = SearchDeploymentsInput(
         filter=filter_dto,
         order=orders,
         limit=limit,

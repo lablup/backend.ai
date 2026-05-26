@@ -13,6 +13,7 @@ from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
 from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.data.model_deployment.types import (
+    DeploymentLifecycleSubStep,
     ModelDeploymentStatus,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -195,6 +196,19 @@ ScalingStateGQL: type[ScalingState] = gql_enum(
 )
 
 
+DeploymentLifecycleSubStepGQL: type[DeploymentLifecycleSubStep] = gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Sub-step within a deployment's current lifecycle phase."
+            " ``None`` when the deployment is not in a sub-step-bearing phase."
+        ),
+    ),
+    DeploymentLifecycleSubStep,
+    name="DeploymentLifecycleSubStep",
+)
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
@@ -350,6 +364,16 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
                 " ``STABLE`` once holding at the desired count."
             ),
         )
+    )
+    sub_step: DeploymentLifecycleSubStepGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Sub-step within the current lifecycle phase."
+                " ``None`` when the deployment is not in a sub-step-bearing phase."
+            ),
+        ),
+        default=None,
     )
 
     @gql_added_field(

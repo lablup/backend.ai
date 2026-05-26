@@ -16,6 +16,7 @@ from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft, Mode
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
+    DeploymentLifecycleSubStep,
     DeploymentStrategy,
     LivenessStatus,
     ModelDeploymentStatus,
@@ -173,30 +174,6 @@ class RouteSubStatus(enum.StrEnum):
     PENDING = "pending"
     STARTING = "starting"
     WARMING_UP = "warming_up"
-
-
-# ========== Status Transition Types (BEP-1030) ==========
-
-
-class DeploymentLifecycleSubStep(enum.StrEnum):
-    """Sub-steps within deployment lifecycle phases.
-
-    Member names are prefixed with the lifecycle phase they belong to
-    (e.g. ``DEPLOYING_``).  String values are stored in the database as-is.
-    """
-
-    # -- DEPLOYING phase --
-    DEPLOYING_PROVISIONING = "deploying_provisioning"
-    """New revision routes are being provisioned and old routes are being drained."""
-    DEPLOYING_ROLLING_BACK = "deploying_rolling_back"
-    """Clearing deploying_revision and transitioning to READY."""
-    DEPLOYING_COMPLETED = "deploying_completed"
-    """All strategy conditions satisfied; triggers revision swap."""
-
-    @classmethod
-    def deploying_handler_sub_steps(cls) -> tuple[DeploymentLifecycleSubStep, ...]:
-        """Sub-steps that have their own deploying handler (excludes COMPLETED, which is an evaluator outcome)."""
-        return (cls.DEPLOYING_PROVISIONING, cls.DEPLOYING_ROLLING_BACK)
 
 
 @dataclass(frozen=True)
@@ -1078,14 +1055,21 @@ class ReplicaStateData:
 
 @dataclass
 class ModelDeploymentData:
+    """API-shaped projection of an ``EndpointRow``.
+
+    Carries only the row's own columns (plus the metadata composite). Joined
+    children — current/deploying revision spec, deployment policy, replica
+    list, auto-scaling rules, access tokens — are NOT included; the v2 GQL
+    layer fetches each via its own DataLoader/resolver and v1 REST clients
+    follow up with the dedicated nested endpoints. The projection therefore
+    stays scope-id-only and requires no eager loads beyond the row itself.
+    """
+
     id: DeploymentID
     metadata: ModelDeploymentMetadataInfo
     network_access: DeploymentNetworkData
-    revision: ModelRevisionData | None
     current_revision_id: DeploymentRevisionID | None
     deploying_revision_id: DeploymentRevisionID | None
-    revision_history_ids: list[DeploymentRevisionID]
-    scaling_rule_ids: list[UUID]
     replica_state: ReplicaStateData
     default_deployment_strategy: DeploymentStrategy
     created_user_id: UUID
@@ -1094,8 +1078,6 @@ class ModelDeploymentData:
     # whether the endpoint is currently reconciling its replica count
     # (``SCALING``) or holding at the desired count (``STABLE``).
     scaling_state: ScalingState
-    policy: DeploymentPolicyData | None = None
-    access_token_ids: list[UUID] | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
 
 
@@ -1261,10 +1243,14 @@ class DeploymentSearchResult:
 
 
 @dataclass
-class DeploymentInfoSearchResult:
-    """Search result with pagination for deployment info."""
+class ModelDeploymentDataSearchResult:
+    """Search result with pagination for the API-shaped ``ModelDeploymentData``.
 
-    items: list[DeploymentInfo]
+    Returned by repository methods that project ``EndpointRow`` straight to
+    ``ModelDeploymentData`` without going through ``DeploymentInfo``.
+    """
+
+    items: list[ModelDeploymentData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

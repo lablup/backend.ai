@@ -3498,6 +3498,15 @@ enum DeploymentHistoryOrderField {
   UPDATED_AT
 }
 
+"""
+Added in UNRELEASED. Sub-step within a deployment's current lifecycle phase. ``None`` when the deployment is not in a sub-step-bearing phase.
+"""
+enum DeploymentLifecycleSubStep {
+  DEPLOYING_PROVISIONING
+  DEPLOYING_ROLLING_BACK
+  DEPLOYING_COMPLETED
+}
+
 """Added in UNRELEASED. Deployment options payload response."""
 type DeploymentOptionsInfoGQL {
   """Handler-keyed scheduler policy (timeout + retry)."""
@@ -6131,6 +6140,11 @@ type ModelDeployment implements Node {
   Added in UNRELEASED. Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle). ``SCALING`` while the replica reconciler is adjusting replica count; ``STABLE`` once holding at the desired count.
   """
   scalingState: ScalingState!
+
+  """
+  Added in UNRELEASED. Sub-step within the current lifecycle phase. ``None`` when the deployment is not in a sub-step-bearing phase.
+  """
+  subStep: DeploymentLifecycleSubStep
 
   """
   Added in 26.4.3. The current active revision of this deployment, resolved via DataLoader.

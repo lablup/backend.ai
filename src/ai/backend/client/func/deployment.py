@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.deployment import (
     ListDeploymentsResponse,
     ListRevisionsResponse,
     ListRoutesResponse,
-    SearchDeploymentsRequest,
+    SearchLegacyDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
     UpdateDeploymentRequest,
@@ -58,9 +58,9 @@ class Deployment(BaseFunction):
     @classmethod
     async def search(
         cls,
-        request: SearchDeploymentsRequest,
+        request: SearchLegacyDeploymentsRequest,
     ) -> ListDeploymentsResponse:
-        """Search deployments with filters."""
+        """Search deployments within a project."""
         rqst = Request("POST", "/deployments/search")
         rqst.set_json(request.model_dump(mode="json"))
         async with rqst.fetch() as resp:

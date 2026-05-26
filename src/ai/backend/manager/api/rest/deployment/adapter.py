@@ -35,7 +35,7 @@ from ai.backend.common.dto.manager.deployment import (
     RouteDTO,
     RouteFilter,
     RouteOrder,
-    SearchDeploymentsRequest,
+    SearchLegacyDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
     UpsertDeploymentPolicyRequest,
@@ -106,45 +106,16 @@ __all__ = (
 class DeploymentAdapter(BaseFilterAdapter):
     """Adapter for converting deployment requests to repository queries."""
 
-    def __init__(
-        self,
-        *,
-        revision_adapter: RevisionAdapter,
-        policy_adapter: DeploymentPolicyAdapter,
-    ) -> None:
-        """Inject the sub-adapters this converter delegates to.
+    def convert_to_dto(self, data: ModelDeploymentData) -> DeploymentDTO:
+        """Convert ModelDeploymentData to the v1 response DTO.
 
-        ``RevisionAdapter`` / ``DeploymentPolicyAdapter`` are the single
-        place that knows how to render a revision or policy surface into
-        a DTO — recomputing them per call would duplicate that knowledge
-        and lose the ability to swap implementations (e.g. testing).
+        Surfaces ``current_revision_id`` and ``deploying_revision_id`` as
+        scope IDs only — mirrors the v2 GQL ``ModelDeployment`` node, which
+        likewise exposes only the IDs and defers the revision / policy
+        specs to dedicated DataLoader resolvers. Clients fetch the revision
+        spec through ``GET /deployments/{deployment_id}/revisions/{id}`` and
+        the policy through ``GET /deployments/{deployment_id}/policy``.
         """
-        self._revision_adapter = revision_adapter
-        self._policy_adapter = policy_adapter
-
-    def convert_to_dto(
-        self,
-        data: ModelDeploymentData,
-        runtime_variant_name: RuntimeVariant,
-    ) -> DeploymentDTO:
-        """Convert ModelDeploymentData to DTO.
-
-        ``runtime_variant_name`` is resolved by the caller (REST handler)
-        from ``data.revision.model_runtime_config.runtime_variant_id``
-        via the RuntimeVariant resolver path — the legacy REST response
-        preserves the historical name-based field so old clients keep
-        seeing the same shape.
-        """
-        current_revision = None
-        if data.revision:
-            current_revision = self._revision_adapter.convert_to_dto(
-                data.revision, runtime_variant_name
-            )
-
-        deployment_policy = None
-        if data.policy:
-            deployment_policy = self._policy_adapter.convert_to_dto(data.policy)
-
         return DeploymentDTO(
             id=data.id,
             name=data.metadata.name,
@@ -165,12 +136,12 @@ class DeploymentAdapter(BaseFilterAdapter):
                 replica_ids=data.replica_state.replica_ids,
             ),
             default_deployment_strategy=data.default_deployment_strategy,
-            current_revision=current_revision,
-            deployment_policy=deployment_policy,
+            current_revision_id=data.current_revision_id,
+            deploying_revision_id=data.deploying_revision_id,
             sub_step=data.sub_step,
         )
 
-    def build_querier(self, request: SearchDeploymentsRequest) -> BatchQuerier:
+    def build_querier(self, request: SearchLegacyDeploymentsRequest) -> BatchQuerier:
         """
         Build a BatchQuerier for deployments from search request.
 

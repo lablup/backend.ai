@@ -7,8 +7,8 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.model_deployment.types import DeploymentLifecycleSubStep
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
 from ai.backend.manager.sokovan.deployment.strategy.applier import (
     StrategyApplyResult,
     StrategyResultApplier,

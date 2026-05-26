@@ -32,7 +32,7 @@ from ai.backend.common.dto.manager.deployment import (
     RevisionPathParam,
     RouteFilter,
     RoutePathParam,
-    SearchDeploymentsRequest,
+    SearchLegacyDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
     UpdateDeploymentRequest,
@@ -53,6 +53,9 @@ from ai.backend.manager.data.deployment.types import RouteTrafficStatus as Manag
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.deployment.types import (
+    ProjectDeploymentSearchScope,
+)
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
     DeploymentUpdaterSpec,
@@ -89,8 +92,8 @@ from ai.backend.manager.services.deployment.actions.route import (
     SearchRoutesAction,
     UpdateRouteTrafficStatusAction,
 )
-from ai.backend.manager.services.deployment.actions.search_deployments import (
-    SearchDeploymentsAction,
+from ai.backend.manager.services.deployment.actions.search_project_deployments import (
+    SearchProjectDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentAction,
@@ -125,10 +128,7 @@ class DeploymentAPIHandler:
         self._runtime_variant_adapter = runtime_variant_adapter
         self._revision_adapter = RevisionAdapter()
         self._policy_adapter = DeploymentPolicyAdapter()
-        self._deployment_adapter = DeploymentAdapter(
-            revision_adapter=self._revision_adapter,
-            policy_adapter=self._policy_adapter,
-        )
+        self._deployment_adapter = DeploymentAdapter()
         self._route_adapter = RouteAdapter()
         self._create_deployment_adapter = CreateDeploymentAdapter()
         self._add_revision_adapter = AddRevisionAdapter()
@@ -142,29 +142,21 @@ class DeploymentAPIHandler:
         resolving the runtime-variant id back to its name so the legacy
         shape stays stable.
         """
-        variant_name = await self._resolve_revision_variant_name(data)
-        return self._revision_adapter.convert_to_dto(data, variant_name)
-
-    async def _resolve_revision_variant_name(self, data: ModelRevisionData) -> RuntimeVariant:
-        """Resolve the runtime-variant name from a revision's variant id."""
         variant_node = await self._runtime_variant_adapter.get(
             data.model_runtime_config.runtime_variant_id
         )
-        return RuntimeVariant(variant_node.name)
+        return self._revision_adapter.convert_to_dto(data, RuntimeVariant(variant_node.name))
 
-    async def _deployment_dto(self, data: ModelDeploymentData) -> DeploymentDTO:
-        """Render a deployment DTO with runtime-variant name pre-resolved.
+    def _deployment_dto(self, data: ModelDeploymentData) -> DeploymentDTO:
+        """Render a deployment DTO.
 
-        ``DeploymentAdapter.convert_to_dto`` expects the caller to provide
-        the runtime-variant name; when no current revision exists the
-        value is an empty ``RuntimeVariant`` sentinel since the adapter
-        drops ``current_revision`` anyway.
+        Synchronous now — the v1 response surface mirrors the v2 GQL node
+        and only carries ``current_revision_id`` / ``deploying_revision_id``,
+        so there is no nested revision to resolve here. Clients fetch the
+        revision spec through ``GET /deployments/{deployment_id}/revisions/{id}``
+        and the policy through ``GET /deployments/{deployment_id}/policy``.
         """
-        if data.revision is None:
-            variant_name = RuntimeVariant("")
-        else:
-            variant_name = await self._resolve_revision_variant_name(data.revision)
-        return self._deployment_adapter.convert_to_dto(data, variant_name)
+        return self._deployment_adapter.convert_to_dto(data)
 
     # Deployment Endpoints
 
@@ -189,24 +181,29 @@ class DeploymentAPIHandler:
         )
 
         # Build response
-        resp = CreateDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
+        resp = CreateDeploymentResponse(deployment=self._deployment_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     async def search_deployments(
         self,
-        body: BodyParam[SearchDeploymentsRequest],
+        body: BodyParam[SearchLegacyDeploymentsRequest],
     ) -> APIResponse:
-        """Search deployments with filters, orders, and pagination."""
-        # Build querier using adapter
-        querier = self._deployment_adapter.build_querier(body.parsed)
+        """Search deployments with filters, orders, and pagination.
 
-        # Call service action
-        action_result = await self._deployment.search_deployments.wait_for_complete(
-            SearchDeploymentsAction(querier=querier)
+        Legacy v1 contract — the project scope is carried inline on the body
+        rather than as a path segment so existing clients keep their request
+        shape. The handler resolves it to ``ProjectDeploymentSearchScope``
+        and routes through the v2-shared ``search_project_deployments``
+        processor.
+        """
+        querier = self._deployment_adapter.build_querier(body.parsed)
+        scope = ProjectDeploymentSearchScope(project_id=body.parsed.project_id)
+
+        action_result = await self._deployment.search_project_deployments.wait_for_complete(
+            SearchProjectDeploymentsAction(scope=scope, querier=querier)
         )
 
-        # Build response
-        deployment_dtos = [await self._deployment_dto(dep) for dep in action_result.data]
+        deployment_dtos = [self._deployment_dto(dep) for dep in action_result.data]
         resp = ListDeploymentsResponse(
             deployments=deployment_dtos,
             pagination=PaginationInfo(
@@ -228,7 +225,7 @@ class DeploymentAPIHandler:
         )
 
         # Build response
-        resp = GetDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
+        resp = GetDeploymentResponse(deployment=self._deployment_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def update_deployment(
@@ -265,7 +262,7 @@ class DeploymentAPIHandler:
         )
 
         # Build response
-        resp = UpdateDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
+        resp = UpdateDeploymentResponse(deployment=self._deployment_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def destroy_deployment(

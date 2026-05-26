@@ -29,19 +29,15 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateDeploymentPayload,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
-    BlueGreenConfigInfo,
     ClusterConfigInfoDTO,
     DeploymentMetadataInfoDTO,
     DeploymentNetworkAccessInfoDTO,
-    DeploymentPolicyInfo,
     DeploymentStrategyInfoDTO,
     ExtraVFolderMountGQLDTO,
-    IntOrPercent,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
     ReplicaStateInfo,
     ResourceConfigInfoDTO,
-    RollingUpdateConfigInfo,
 )
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
     DeploymentHandlerOptionsInfo,
@@ -169,7 +165,6 @@ def _make_deployment_node(**kwargs: object) -> DeploymentNode:
         "options": _make_deployment_options(),
         "scaling_state": ScalingState.STABLE,
         "current_revision_id": None,
-        "policy": None,
     }
     defaults.update(kwargs)
     return DeploymentNode(**defaults)
@@ -316,47 +311,16 @@ class TestDeploymentNode:
         )
         assert node.id == deployment_id
         assert node.current_revision_id is None
-        assert node.policy is None
 
     def test_current_revision_id_defaults_to_none(self) -> None:
         node = _make_deployment_node()
         assert node.current_revision_id is None
-
-    def test_policy_defaults_to_none(self) -> None:
-        node = _make_deployment_node()
-        assert node.policy is None
 
     def test_with_current_revision_id(self) -> None:
         revision_id = uuid.uuid4()
         node = _make_deployment_node(current_revision_id=revision_id)
         assert node.current_revision_id is not None
         assert node.current_revision_id == revision_id
-
-    def test_with_rolling_policy(self) -> None:
-        rolling = RollingUpdateConfigInfo(
-            max_surge=IntOrPercent(count=1),
-            max_unavailable=IntOrPercent(count=0),
-        )
-        policy = DeploymentPolicyInfo(
-            strategy=DeploymentStrategy.ROLLING,
-            rolling_update=rolling,
-            blue_green=None,
-        )
-        node = _make_deployment_node(policy=policy)
-        assert node.policy is not None
-        assert node.policy.strategy == DeploymentStrategy.ROLLING
-        assert node.policy.rolling_update is not None
-
-    def test_with_blue_green_policy(self) -> None:
-        bg = BlueGreenConfigInfo(auto_promote=False, promote_delay_seconds=0)
-        policy = DeploymentPolicyInfo(
-            strategy=DeploymentStrategy.BLUE_GREEN,
-            rolling_update=None,
-            blue_green=bg,
-        )
-        node = _make_deployment_node(policy=policy)
-        assert node.policy is not None
-        assert node.policy.strategy == DeploymentStrategy.BLUE_GREEN
 
     def test_metadata_accessible(self) -> None:
         project_id = str(uuid.uuid4())

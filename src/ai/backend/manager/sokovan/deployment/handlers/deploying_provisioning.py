@@ -5,12 +5,12 @@ from collections.abc import Sequence
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.model_deployment.types import DeploymentLifecycleSubStep
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentLifecycleStatus,
-    DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
 )

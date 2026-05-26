@@ -30,6 +30,10 @@ from ai.backend.manager.services.deployment.actions.access_token.search_access_t
     SearchAccessTokensAction,
     SearchAccessTokensActionResult,
 )
+from ai.backend.manager.services.deployment.actions.admin_search_deployments import (
+    AdminSearchDeploymentsAction,
+    SearchDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
     BulkDeleteAutoScalingRulesAction,
     BulkDeleteAutoScalingRulesActionResult,
@@ -116,17 +120,21 @@ from ai.backend.manager.services.deployment.actions.route import (
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
 )
-from ai.backend.manager.services.deployment.actions.search_deployments import (
-    SearchDeploymentsAction,
-    SearchDeploymentsActionResult,
+from ai.backend.manager.services.deployment.actions.search_project_deployment_summary import (
+    SearchProjectDeploymentSummaryAction,
+    SearchProjectDeploymentSummaryActionResult,
 )
-from ai.backend.manager.services.deployment.actions.search_deployments_in_project import (
-    SearchDeploymentsInProjectAction,
-    SearchDeploymentsInProjectActionResult,
+from ai.backend.manager.services.deployment.actions.search_project_deployments import (
+    SearchProjectDeploymentsAction,
+    SearchProjectDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
     SearchReplicasActionResult,
+)
+from ai.backend.manager.services.deployment.actions.search_user_deployments import (
+    SearchUserDeploymentsAction,
+    SearchUserDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.sync_replicas import (
     SyncReplicaAction,
@@ -158,9 +166,17 @@ class DeploymentProcessors(AbstractProcessorPackage):
     destroy_deployment: SingleEntityActionProcessor[
         DestroyDeploymentAction, DestroyDeploymentActionResult
     ]
-    search_deployments: ActionProcessor[SearchDeploymentsAction, SearchDeploymentsActionResult]
-    search_deployments_in_project: ActionProcessor[
-        SearchDeploymentsInProjectAction, SearchDeploymentsInProjectActionResult
+    admin_search_deployments: ActionProcessor[
+        AdminSearchDeploymentsAction, SearchDeploymentsActionResult
+    ]
+    search_user_deployments: ActionProcessor[
+        SearchUserDeploymentsAction, SearchUserDeploymentsActionResult
+    ]
+    search_project_deployments: ActionProcessor[
+        SearchProjectDeploymentsAction, SearchProjectDeploymentsActionResult
+    ]
+    search_project_deployment_summary: ActionProcessor[
+        SearchProjectDeploymentSummaryAction, SearchProjectDeploymentSummaryActionResult
     ]
     get_deployment_by_id: SingleEntityActionProcessor[
         GetDeploymentByIdAction, GetDeploymentByIdActionResult
@@ -248,9 +264,21 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.destroy_deployment = SingleEntityActionProcessor(
             service.destroy_deployment, action_monitors, validators=rbac_single_entity_validators
         )
-        self.search_deployments = ActionProcessor(service.search_deployments, action_monitors)
-        self.search_deployments_in_project = ActionProcessor(
-            service.search_deployments_in_project,
+        self.admin_search_deployments = ActionProcessor(
+            service.admin_search_deployments, action_monitors
+        )
+        self.search_user_deployments = ActionProcessor(
+            service.search_user_deployments,
+            action_monitors,
+            validators=[cast(ActionValidator, validators.rbac.scope)],
+        )
+        self.search_project_deployments = ActionProcessor(
+            service.search_project_deployments,
+            action_monitors,
+            validators=[cast(ActionValidator, validators.rbac.scope)],
+        )
+        self.search_project_deployment_summary = ActionProcessor(
+            service.search_project_deployment_summary,
             action_monitors,
             validators=[cast(ActionValidator, validators.rbac.scope)],
         )
@@ -324,8 +352,10 @@ class DeploymentProcessors(AbstractProcessorPackage):
             UpdateDeploymentAction.spec(),
             ReplaceDeploymentOptionsAction.spec(),
             DestroyDeploymentAction.spec(),
-            SearchDeploymentsAction.spec(),
-            SearchDeploymentsInProjectAction.spec(),
+            AdminSearchDeploymentsAction.spec(),
+            SearchUserDeploymentsAction.spec(),
+            SearchProjectDeploymentsAction.spec(),
+            SearchProjectDeploymentSummaryAction.spec(),
             GetDeploymentByIdAction.spec(),
             GetDeploymentPolicyAction.spec(),
             SearchDeploymentPoliciesAction.spec(),

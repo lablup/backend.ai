@@ -62,10 +62,10 @@ def search(
     """Search all deployments (admin)."""
     from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.deployment.request import (
-        AdminSearchDeploymentsInput,
         DeploymentFilter,
         DeploymentOrder,
         DeploymentStatusFilter,
+        SearchDeploymentsInput,
     )
     from ai.backend.common.dto.manager.v2.deployment.types import DeploymentOrderField
 
@@ -99,7 +99,7 @@ def search(
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.deployment.admin_search(
-                AdminSearchDeploymentsInput(
+                SearchDeploymentsInput(
                     filter=filter_dto,
                     order=orders,
                     limit=limit,

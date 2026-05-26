@@ -12,11 +12,11 @@ from dataclasses import dataclass, field
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.model_deployment.types import DeploymentLifecycleSubStep
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    DeploymentLifecycleSubStep,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,

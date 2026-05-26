@@ -14,8 +14,8 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
+from ai.backend.common.data.model_deployment.types import DeploymentLifecycleSubStep
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,

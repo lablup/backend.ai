@@ -15,6 +15,7 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
+    DeploymentLifecycleSubStep,
     LivenessStatus,
     ReadinessStatus,
     RouteHealthStatus,
@@ -26,7 +27,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ClusterConfigInfoDTO,
     DeploymentMetadataInfoDTO,
     DeploymentNetworkAccessInfoDTO,
-    DeploymentPolicyInfo,
     DeploymentStrategyInfoDTO,
     ExtraVFolderMountGQLDTO,
     ModelDefinitionInfoDTO,
@@ -48,7 +48,6 @@ __all__ = (
     "ActivateRevisionPayload",
     "AddRevisionPayload",
     "AdminRefreshDeploymentRevisionsPayload",
-    "AdminSearchDeploymentsPayload",
     "AdminSearchRevisionsPayload",
     "AutoScalingRuleNode",
     "CreateAccessTokenPayload",
@@ -71,6 +70,7 @@ __all__ = (
     "SearchAccessTokensPayload",
     "SearchAutoScalingRulesPayload",
     "SearchDeploymentPoliciesPayload",
+    "SearchDeploymentsPayload",
     "SearchReplicasPayload",
     "SearchRoutesPayload",
     "RevisionRefreshResultInfo",
@@ -176,8 +176,12 @@ class DeploymentNode(BaseResponseModel):
         default=None,
         description="ID of the revision currently being deployed (in progress, not yet active)",
     )
-    policy: DeploymentPolicyInfo | None = Field(
-        default=None, description="Deployment update policy"
+    sub_step: DeploymentLifecycleSubStep | None = Field(
+        default=None,
+        description=(
+            "Sub-step within the current lifecycle phase. ``None`` when the"
+            " deployment is not in a sub-step-bearing phase."
+        ),
     )
 
 
@@ -312,8 +316,12 @@ class DeploymentPolicyNode(BaseResponseModel):
 # ---------------------------------------------------------------------------
 
 
-class AdminSearchDeploymentsPayload(BaseResponseModel):
-    """Payload for admin deployment search result."""
+class SearchDeploymentsPayload(BaseResponseModel):
+    """Payload for deployment search result.
+
+    Shared across the admin, project-scoped, and self-service search paths
+    — the result shape is identical for all three.
+    """
 
     items: list[DeploymentNode] = Field(description="Deployment list")
     total_count: int = Field(description="Total count")

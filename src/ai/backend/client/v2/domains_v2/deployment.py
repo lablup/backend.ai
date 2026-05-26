@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
     AddRevisionInput,
-    AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
     BulkDeleteAccessTokensInput,
     CreateAccessTokenInput,
@@ -25,6 +24,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
+    SearchDeploymentsInput,
     SearchReplicasInput,
     SearchRoutesInput,
     SyncReplicaInput,
@@ -36,7 +36,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     ActivateRevisionPayload,
     AddRevisionPayload,
     AdminRefreshDeploymentRevisionsPayload,
-    AdminSearchDeploymentsPayload,
     AdminSearchRevisionsPayload,
     BulkDeleteAccessTokensPayload,
     BulkDeleteAutoScalingRulesPayload,
@@ -56,6 +55,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     SearchAccessTokensPayload,
     SearchAutoScalingRulesPayload,
     SearchDeploymentPoliciesPayload,
+    SearchDeploymentsPayload,
     SearchReplicasPayload,
     SearchRoutesPayload,
     SyncReplicaPayload,
@@ -91,39 +91,39 @@ class V2DeploymentClient(BaseDomainClient):
 
     async def admin_search(
         self,
-        body: AdminSearchDeploymentsInput,
-    ) -> AdminSearchDeploymentsPayload:
+        body: SearchDeploymentsInput,
+    ) -> SearchDeploymentsPayload:
         """Search deployments with admin scope (superadmin only)."""
         return await self._client.typed_request(
             "POST",
             _PATH + "/search",
             request=body,
-            response_model=AdminSearchDeploymentsPayload,
+            response_model=SearchDeploymentsPayload,
         )
 
     async def my_search(
         self,
-        body: AdminSearchDeploymentsInput,
-    ) -> AdminSearchDeploymentsPayload:
+        body: SearchDeploymentsInput,
+    ) -> SearchDeploymentsPayload:
         """Search deployments owned by the current user."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/my/search",
             request=body,
-            response_model=AdminSearchDeploymentsPayload,
+            response_model=SearchDeploymentsPayload,
         )
 
     async def project_search(
         self,
         project_id: UUID,
-        body: AdminSearchDeploymentsInput,
-    ) -> AdminSearchDeploymentsPayload:
+        body: SearchDeploymentsInput,
+    ) -> SearchDeploymentsPayload:
         """Search deployments within a specific project."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/projects/{project_id}/search",
             request=body,
-            response_model=AdminSearchDeploymentsPayload,
+            response_model=SearchDeploymentsPayload,
         )
 
     async def get(

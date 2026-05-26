@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.deployment import (
     ListRevisionsResponse,
     ListRoutesResponse,
     SearchDeploymentPoliciesRequest,
-    SearchDeploymentsRequest,
+    SearchLegacyDeploymentsRequest,
     SearchRevisionsRequest,
     SearchRoutesRequest,
     UpdateDeploymentRequest,
@@ -51,7 +51,7 @@ class DeploymentClient(BaseDomainClient):
 
     async def search_deployments(
         self,
-        request: SearchDeploymentsRequest,
+        request: SearchLegacyDeploymentsRequest,
     ) -> ListDeploymentsResponse:
         return await self._client.typed_request(
             "POST",

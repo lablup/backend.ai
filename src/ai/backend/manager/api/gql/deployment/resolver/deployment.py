@@ -10,8 +10,8 @@ from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    AdminSearchDeploymentsInput,
     ReplaceDeploymentOptionsInput,
+    SearchDeploymentsInput,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
@@ -72,7 +72,7 @@ async def admin_deployments(
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.admin_search(
-        AdminSearchDeploymentsInput(
+        SearchDeploymentsInput(
             filter=pydantic_filter,
             order=pydantic_order,
             first=first,
@@ -120,7 +120,7 @@ async def project_deployments(
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.project_search(
         scope.project_id,
-        AdminSearchDeploymentsInput(
+        SearchDeploymentsInput(
             filter=pydantic_filter,
             order=pydantic_order,
             first=first,
@@ -166,7 +166,7 @@ async def my_deployments(
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.my_search(
-        AdminSearchDeploymentsInput(
+        SearchDeploymentsInput(
             filter=pydantic_filter,
             order=pydantic_order,
             first=first,

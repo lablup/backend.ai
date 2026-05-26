@@ -33,6 +33,8 @@ from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -44,6 +46,9 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -156,6 +161,48 @@ def deployment_processors(
             ),
         ),
     )
+
+
+@pytest.fixture()
+async def regular_user_project_model_deployment_read_permission(
+    db_engine: SAEngine,
+    regular_user_fixture: Any,
+    group_fixture: uuid.UUID,
+) -> AsyncIterator[None]:
+    """Grant PROJECT-scoped MODEL_DEPLOYMENT:READ permission to the regular user."""
+    role_id = uuid.uuid4()
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(RoleRow.__table__).values(
+                id=role_id,
+                name=f"test-deployment-reader-{secrets.token_hex(4)}",
+                status=RoleStatus.ACTIVE,
+            )
+        )
+        await conn.execute(
+            sa.insert(UserRoleRow.__table__).values(
+                user_id=regular_user_fixture.user_uuid,
+                role_id=role_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(PermissionRow.__table__).values(
+                role_id=role_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(group_fixture),
+                entity_type=EntityType.MODEL_DEPLOYMENT,
+                operation=OperationType.READ,
+            )
+        )
+    yield
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(
+            UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
 
 
 @pytest.fixture()

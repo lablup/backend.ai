@@ -20,7 +20,9 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
-from ai.backend.manager.services.deployment.processors import DeploymentProcessors
+from ai.backend.manager.services.deployment.processors import (
+    DeploymentProcessors,
+)
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentRevisionPresetProcessors,

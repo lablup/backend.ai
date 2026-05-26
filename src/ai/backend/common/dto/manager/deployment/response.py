@@ -135,11 +135,19 @@ class DeploymentDTO(BackendAISchema):
     default_deployment_strategy: DeploymentStrategy = Field(
         description="Default deployment strategy"
     )
-    current_revision: RevisionDTO | None = Field(
-        default=None, description="Current active revision"
+    current_revision_id: UUID | None = Field(
+        default=None,
+        description=(
+            "ID of the current active revision. Fetch the revision spec via"
+            " ``GET /deployments/{deployment_id}/revisions/{revision_id}``."
+        ),
     )
-    deployment_policy: DeploymentPolicyDTO | None = Field(
-        default=None, description="Deployment rollout policy"
+    deploying_revision_id: UUID | None = Field(
+        default=None,
+        description=(
+            "ID of the revision currently being deployed (in progress, not yet"
+            " active). Fetch the spec via the nested revision endpoint."
+        ),
     )
     sub_step: str | None = Field(
         default=None, description="Current deployment sub-step (e.g. provisioning, rolling_back)"

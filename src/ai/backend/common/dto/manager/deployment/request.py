@@ -33,7 +33,7 @@ __all__ = (
     "RevisionFilter",
     "RouteFilter",
     # Search/List requests
-    "SearchDeploymentsRequest",
+    "SearchLegacyDeploymentsRequest",
     "SearchRevisionsRequest",
     "SearchRoutesRequest",
     # Create requests
@@ -83,9 +83,19 @@ class RevisionFilter(BaseRequestModel):
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
 
 
-class SearchDeploymentsRequest(BaseRequestModel):
-    """Request body for searching deployments with filters, orders, and pagination."""
+class SearchLegacyDeploymentsRequest(BaseRequestModel):
+    """Legacy v1 search request body carrying its project scope inline.
 
+    Standalone request type so the v1 ``POST /deployments/search`` contract
+    stays independent of any shared base — every legacy-only field is
+    visible on this class. ``project_id`` is taken from the body rather
+    than the URL so existing clients keep their request shape; the handler
+    resolves it to the project scope on the v2-shared
+    ``SearchProjectDeploymentsAction`` path. New callers should use the v2
+    scoped endpoints instead.
+    """
+
+    project_id: UUID = Field(description="Project ID to scope the search to.")
     filter: DeploymentFilter | None = Field(default=None, description="Filter conditions")
     order: DeploymentOrder | None = Field(default=None, description="Order specification")
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
