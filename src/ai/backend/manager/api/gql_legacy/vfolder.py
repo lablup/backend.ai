@@ -575,7 +575,7 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         readme_filetype: str | None = None,
     ) -> Self:
         first_model = model_def.models[0] if model_def is not None and model_def.models else None
-        # If first model not exist, fallback to metadata with all fields filled with none values
+        # If the first model does not exist, fallback to metadata with all fields filled with none values
         metadata = (first_model.metadata if first_model is not None else None) or ModelMetadata()
         name = first_model.name if first_model is not None else vfolder_row.name
         return cls(
