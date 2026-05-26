@@ -20,7 +20,9 @@ from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
     NextValuePolicy,
-    execute_batch_querier,
+    NoPagination,
+    Purger,
+    Querier,
 )
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
@@ -39,11 +41,9 @@ RANK_GAP = 100
 
 
 class DeploymentRevisionPresetDBSource:
-    _db: ExtendedAsyncSAEngine
     _ops: DBOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db = db
         self._ops = DBOpsProvider(db)
 
     async def create(
@@ -67,14 +67,13 @@ class DeploymentRevisionPresetDBSource:
             return preset.to_data()
 
     async def get_by_id(self, preset_id: UUID) -> DeploymentRevisionPresetData:
-        async with self._db.begin_readonly_session_read_committed() as session:
-            stmt = sa.select(DeploymentRevisionPresetRow).where(
-                DeploymentRevisionPresetRow.id == preset_id
+        async with self._ops.read_ops() as r:
+            result = await r.query(
+                Querier(row_class=DeploymentRevisionPresetRow, pk_value=preset_id)
             )
-            row = (await session.execute(stmt)).scalar_one_or_none()
-            if row is None:
+            if result is None:
                 raise DeploymentRevisionPresetNotFound()
-            return row.to_data()
+            return result.row.to_data()
 
     async def update(
         self,
@@ -96,24 +95,20 @@ class DeploymentRevisionPresetDBSource:
             return preset.to_data()
 
     async def delete(self, preset_id: UUID) -> DeploymentRevisionPresetData:
-        async with self._db.begin_session() as session:
-            stmt = sa.select(DeploymentRevisionPresetRow).where(
-                DeploymentRevisionPresetRow.id == preset_id
+        async with self._ops.write_ops() as w:
+            result = await w.purge(
+                Purger(row_class=DeploymentRevisionPresetRow, pk_value=preset_id)
             )
-            row = (await session.execute(stmt)).scalar_one_or_none()
-            if row is None:
+            if result is None:
                 raise DeploymentRevisionPresetNotFound()
-            data = row.to_data()
-            await session.delete(row)
-        return data
+            return result.row.to_data()
 
     async def search(
         self,
         querier: BatchQuerier,
     ) -> tuple[list[DeploymentRevisionPresetData], int, bool, bool]:
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DeploymentRevisionPresetRow)
-            result = await execute_batch_querier(db_sess, query, querier)
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(sa.select(DeploymentRevisionPresetRow), querier)
             items = [row.DeploymentRevisionPresetRow.to_data() for row in result.rows]
             return items, result.total_count, result.has_next_page, result.has_previous_page
 
@@ -122,12 +117,17 @@ class DeploymentRevisionPresetDBSource:
         preset_id: UUID,
     ) -> list[tuple[str, Decimal]]:
         """Get all resource slots for a preset (no pagination)."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = sa.select(PresetResourceSlotRow).where(
-                PresetResourceSlotRow.preset_id == preset_id
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(
+                sa.select(PresetResourceSlotRow).where(
+                    PresetResourceSlotRow.preset_id == preset_id
+                ),
+                BatchQuerier(pagination=NoPagination()),
             )
-            rows = (await db_sess.execute(stmt)).scalars().all()
-            return [(r.slot_name, r.quantity) for r in rows]
+            return [
+                (row.PresetResourceSlotRow.slot_name, row.PresetResourceSlotRow.quantity)
+                for row in result.rows
+            ]
 
     async def search_resource_slots(
         self,
@@ -139,7 +139,7 @@ class DeploymentRevisionPresetDBSource:
         Returns (items, total_count, has_next_page, has_previous_page).
         Each item is a (slot_name, quantity) tuple.
         """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
+        async with self._ops.read_ops() as r:
             query = (
                 sa.select(PresetResourceSlotRow, ResourceSlotTypeRow.rank)
                 .join(
@@ -148,7 +148,7 @@ class DeploymentRevisionPresetDBSource:
                 )
                 .where(PresetResourceSlotRow.preset_id == preset_id)
             )
-            result = await execute_batch_querier(db_sess, query, querier)
+            result = await r.batch_query_in_global(query, querier)
             items: list[tuple[str, Decimal]] = [
                 (row.PresetResourceSlotRow.slot_name, row.PresetResourceSlotRow.quantity)
                 for row in result.rows
