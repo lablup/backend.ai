@@ -13,9 +13,9 @@
 | k8s 클러스터 | 1 노드 이상. 본 가이드는 `ser8` (192.168.0.156) 를 swarm-manager 노드로 가정 |
 | helm 3.x | `helm version` 으로 확인 |
 | Docker Swarm | swarm-manager 가 k8s 클러스터의 한 노드에 있어야 함. swarm 가입은 §4 에서 |
-| Harbor / 사설 docker registry | 본 가이드는 `192.168.0.156:5000` 가정 |
+| 사설 docker registry | 본 가이드는 `192.168.0.156:5000` 가정 (HTTP, insecure). 사내 Harbor 등도 가능 — chart values 에서 image.repository 만 갈아끼우면 됨 |
 | NFS 서버 | `/vfroot` 공유. 본 가이드는 `192.168.0.156:/` 가정 |
-| backend.ai-agent image | `192.168.0.156:5000/backend.ai-agent:dev` 가 registry 에 push 돼 있어야 함 |
+| 컴포넌트 이미지들 | 사설 registry 에 5 개 image (`backend.ai-manager / agent / storage-proxy / appproxy / webserver`, 모두 `:dev` 태그) push 돼 있어야 함. **없다면 §0.1 참조** |
 
 ### 노드 라벨 / taint (한 번만)
 
@@ -27,6 +27,44 @@ kubectl taint  node ser8 backendai.io/dedicated=swarm-manager:NoSchedule --overw
 # 확인
 kubectl describe node ser8 | grep -E "Taints|backendai.io"
 ```
+
+## 0.1. 컴포넌트 이미지 빌드 + 푸시 (registry 에 없으면 1 회)
+
+`dood3` 의 helm chart 는 사설 registry 에 backend.ai image 5 종 (`manager / agent / storage-proxy / appproxy / webserver`, 모두 `:dev` 태그) 이 있다고 가정합니다. main 에 머지되기 전이라 공개 image 가 없고 — 이 repo 의 `docker/` 아래 Dockerfile 들로 직접 빌드해야 합니다.
+
+**전체 빌드 절차는 별도 문서로 분리됨 → [`docs/build-images.md`](./build-images.md)**.
+
+핵심만 요약:
+
+```bash
+# 1) LFS 자산 동기화 (agent 빌드의 silent failure 방지)
+git lfs install && git lfs pull
+
+# 2) 신형 (manager / agent / storage-proxy)
+docker build -f docker/manager/Dockerfile        -t backend.ai-manager:dev        .
+docker build -f docker/agent/Dockerfile          -t backend.ai-agent:dev          .
+docker build -f docker/storage-proxy/Dockerfile  -t backend.ai-storage-proxy:dev  .
+
+# 3) 구형 (appproxy / webserver) — pants 로 wheel 먼저 빌드 후 docker build
+./scripts/build-wheels.sh
+PKGVER=$(./py -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
+docker build -f docker/backend.ai-appproxy-coordinator.dockerfile \
+  --build-arg PYTHON_VERSION=3.13-slim --build-arg PKGVER=$PKGVER \
+  -t backend.ai-appproxy:dev .
+docker build -f docker/backend.ai-webserver.dockerfile \
+  --build-arg PYTHON_VERSION=3.13-slim --build-arg PKGVER=$PKGVER \
+  -t backend.ai-webserver:dev .
+
+# 4) 사설 registry (예: 192.168.0.156:5000) 로 tag + push
+REG=192.168.0.156:5000
+for img in backend.ai-{manager,agent,storage-proxy,appproxy,webserver}; do
+  docker tag $img:dev $REG/$img:dev && docker push $REG/$img:dev
+done
+```
+
+> appproxy 는 coordinator/worker 양쪽이 같은 image 를 씁니다 (entrypoint 인자만 다름).
+>
+> air-gapped 환경, kernel image mirror, troubleshooting, Dockerfile 스타일 차이 (신형 vs 구형) 등 상세는 [`build-images.md`](./build-images.md) 참조.
 
 ## 1. k8s control plane 설치 (umbrella helm chart)
 
