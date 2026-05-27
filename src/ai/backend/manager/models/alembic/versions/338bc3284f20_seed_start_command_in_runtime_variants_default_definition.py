@@ -8,7 +8,7 @@ operator-set value. ``custom`` / ``nim`` / ``cmd`` are intentionally
 left as-is (no ``start_command`` in the fixture either).
 
 Revision ID: 338bc3284f20
-Revises: b8a85c96607c
+Revises: 4ce7119188af
 Create Date: 2026-05-27
 
 """
@@ -22,7 +22,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "338bc3284f20"
-down_revision = "b8a85c96607c"
+down_revision = "4ce7119188af"
 branch_labels = None
 depends_on = None
 
