@@ -55,7 +55,6 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
 from ai.backend.manager.repositories.scheduler.types.session import (
     TerminatingKernelData,
     TerminatingSessionData,
@@ -344,7 +343,7 @@ def mock_provisioner() -> AsyncMock:
     """Mock SessionProvisioner for ScheduleSessionsLifecycleHandler tests."""
     provisioner = AsyncMock()
     provisioner.schedule_scaling_group = AsyncMock(
-        return_value=ScheduleResult(scheduled_sessions=[])
+        return_value=ScheduleResult(scheduled_session_ids=[])
     )
     return provisioner
 
@@ -545,16 +544,7 @@ def schedule_result_success_factory() -> Callable[..., ScheduleResult]:
     """Factory for creating successful ScheduleResult from sessions."""
 
     def _create(sessions: list[SessionWithKernels]) -> ScheduleResult:
-        scheduled_sessions = [
-            ScheduledSessionData(
-                session_id=s.session_info.identity.id,
-                creation_id=s.session_info.identity.creation_id,
-                access_key=AccessKey(s.session_info.metadata.access_key),
-                reason="scheduled-successfully",
-            )
-            for s in sessions
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_sessions)
+        return ScheduleResult(scheduled_session_ids=[s.session_info.identity.id for s in sessions])
 
     return _create
 

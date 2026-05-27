@@ -71,6 +71,7 @@ class ResourceSlotService:
                 agent_id=row.agent_id,
                 slot_name=row.slot_name,
                 capacity=row.capacity,
+                reserved=row.reserved,
                 used=row.used,
             )
         )
@@ -82,6 +83,7 @@ class ResourceSlotService:
                 agent_id=row.agent_id,
                 slot_name=row.slot_name,
                 capacity=row.capacity,
+                reserved=row.reserved,
                 used=row.used,
             )
             for row in rows

@@ -115,6 +115,9 @@ class AgentResourceRow(Base):  # type: ignore[misc]
     capacity: Mapped[Decimal] = mapped_column(
         "capacity", sa.Numeric(precision=24, scale=6), nullable=False
     )
+    reserved: Mapped[Decimal] = mapped_column(
+        "reserved", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
+    )
     used: Mapped[Decimal] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
     )
@@ -154,6 +157,7 @@ class AgentResourceRow(Base):  # type: ignore[misc]
             "agent_id",
             "slot_name",
             "capacity",
+            "reserved",
             "used",
         ),
     )

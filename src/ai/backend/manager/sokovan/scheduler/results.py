@@ -17,7 +17,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
-from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
 
 __all__ = ["ScheduleResult"]
 
@@ -26,12 +25,12 @@ __all__ = ["ScheduleResult"]
 class ScheduleResult:
     """Result of a scheduling operation."""
 
-    # List of scheduled session data
-    scheduled_sessions: list[ScheduledSessionData] = field(default_factory=list)
+    # Ids of the sessions that were actually allocated this pass.
+    scheduled_session_ids: list[SessionId] = field(default_factory=list)
 
     def success_count(self) -> int:
         """Get the count of successfully scheduled sessions."""
-        return len(self.scheduled_sessions)
+        return len(self.scheduled_session_ids)
 
 
 # ============================================================================

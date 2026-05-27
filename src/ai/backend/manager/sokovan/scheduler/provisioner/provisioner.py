@@ -292,12 +292,12 @@ class SessionProvisioner:
             failures=scheduling_failures,
         )
         with self._phase_metrics.measure_phase("scheduler", scaling_group, "allocation"):
-            scheduled_sessions = await self._allocator.allocate(batch)
+            scheduled_session_ids = await self._allocator.allocate(batch)
 
         failure_ids = [f.session_id for f in scheduling_failures]
         await self._valkey_schedule.set_pending_queue(scaling_group, failure_ids)
         return ScheduleResult(
-            scheduled_sessions=scheduled_sessions,
+            scheduled_session_ids=scheduled_session_ids,
         )
 
     async def _schedule_workload(
