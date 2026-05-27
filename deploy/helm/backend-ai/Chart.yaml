@@ -1,0 +1,42 @@
+apiVersion: v2
+name: backend-ai
+description: Umbrella chart that bundles all Backend.AI control plane components (manager + bundled etcd/redis/postgres, storage-proxy, webserver, app-proxy coordinator/worker, apollo router, swarm-network-daemon). Each sub-chart is also installable standalone from its own directory; this umbrella only adds a single-shot install/upgrade path.
+type: application
+version: 0.1.0
+appVersion: "26.4.0"
+
+dependencies:
+  - name: backend-ai-manager
+    version: "0.2.0"
+    repository: "file://../backend-ai-manager"
+    condition: backend-ai-manager.enabled
+
+  - name: backend-ai-storage-proxy
+    version: "0.1.0"
+    repository: "file://../backend-ai-storage-proxy"
+    condition: backend-ai-storage-proxy.enabled
+
+  - name: backend-ai-webserver
+    version: "0.1.0"
+    repository: "file://../backend-ai-webserver"
+    condition: backend-ai-webserver.enabled
+
+  - name: backend-ai-appproxy-coordinator
+    version: "0.1.0"
+    repository: "file://../backend-ai-appproxy-coordinator"
+    condition: backend-ai-appproxy-coordinator.enabled
+
+  - name: backend-ai-appproxy-worker
+    version: "0.1.0"
+    repository: "file://../backend-ai-appproxy-worker"
+    condition: backend-ai-appproxy-worker.enabled
+
+  - name: backend-ai-apollo-router
+    version: "0.1.0"
+    repository: "file://../backend-ai-apollo-router"
+    condition: backend-ai-apollo-router.enabled
+
+  - name: backend-ai-swarm-network-daemon
+    version: "0.1.0"
+    repository: "file://../backend-ai-swarm-network-daemon"
+    condition: backend-ai-swarm-network-daemon.enabled

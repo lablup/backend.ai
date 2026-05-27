@@ -1,0 +1,173 @@
+{
+  "prometheus_query_presets": [
+    {
+      "name": "container_gauge",
+      "description": "Current container utilization as a raw gauge value",
+      "rank": 100,
+      "category_name": "container",
+      "metric_name": "backendai_container_utilization",
+      "query_template": "sum by ({group_by})(backendai_container_utilization{{{labels}}})",
+      "time_window": null,
+      "options": {
+        "filter_labels": [
+          "container_metric_name",
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ],
+        "group_labels": [
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ]
+      }
+    },
+    {
+      "name": "container_rate",
+      "description": "Container utilization rate of change normalized over 5 minutes",
+      "rank": 200,
+      "category_name": "container",
+      "metric_name": "backendai_container_utilization",
+      "query_template": "sum by ({group_by})(rate(backendai_container_utilization{{{labels}}}[{window}])) / 5.0",
+      "time_window": "5m",
+      "options": {
+        "filter_labels": [
+          "container_metric_name",
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ],
+        "group_labels": [
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ]
+      }
+    },
+    {
+      "name": "container_diff",
+      "description": "Container utilization rate of change over 5 minutes (unnormalized)",
+      "rank": 300,
+      "category_name": "container",
+      "metric_name": "backendai_container_utilization",
+      "query_template": "sum by ({group_by})(rate(backendai_container_utilization{{{labels}}}[{window}]))",
+      "time_window": "5m",
+      "options": {
+        "filter_labels": [
+          "container_metric_name",
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ],
+        "group_labels": [
+          "kernel_id",
+          "session_id",
+          "agent_id",
+          "user_id",
+          "project_id",
+          "value_type"
+        ]
+      }
+    },
+    {
+      "name": "vllm_requests_running",
+      "description": "Number of requests currently being processed by vLLM",
+      "rank": 400,
+      "category_name": "vllm-inference",
+      "metric_name": "vllm:num_requests_running",
+      "query_template": "sum by ({group_by})(vllm:num_requests_running{{{labels}}})",
+      "time_window": null,
+      "options": {
+        "filter_labels": [
+          "deployment_id"
+        ],
+        "group_labels": [
+          "deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "vllm_requests_waiting",
+      "description": "Number of requests waiting in the vLLM queue",
+      "rank": 500,
+      "category_name": "vllm-inference",
+      "metric_name": "vllm:num_requests_waiting",
+      "query_template": "sum by ({group_by})(vllm:num_requests_waiting{{{labels}}})",
+      "time_window": null,
+      "options": {
+        "filter_labels": [
+          "deployment_id"
+        ],
+        "group_labels": [
+          "deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "vllm_gpu_cache_usage",
+      "description": "Average GPU KV cache usage percentage across vLLM replicas",
+      "rank": 600,
+      "category_name": "vllm-inference",
+      "metric_name": "vllm:gpu_cache_usage_perc",
+      "query_template": "avg by ({group_by})(vllm:gpu_cache_usage_perc{{{labels}}})",
+      "time_window": null,
+      "options": {
+        "filter_labels": [
+          "deployment_id"
+        ],
+        "group_labels": [
+          "deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "vllm_request_throughput",
+      "description": "Request success rate per second over 5 minutes",
+      "rank": 700,
+      "category_name": "vllm-inference",
+      "metric_name": "vllm:request_success_total",
+      "query_template": "sum by ({group_by})(rate(vllm:request_success_total{{{labels}}}[{window}]))",
+      "time_window": "5m",
+      "options": {
+        "filter_labels": [
+          "deployment_id"
+        ],
+        "group_labels": [
+          "deployment_id"
+        ]
+      }
+    },
+    {
+      "name": "vllm_avg_latency",
+      "description": "Average end-to-end request latency over 5 minutes",
+      "rank": 800,
+      "category_name": "vllm-inference",
+      "metric_name": "vllm:e2e_request_latency_seconds",
+      "query_template": "avg by ({group_by})(rate(vllm:e2e_request_latency_seconds_sum{{{labels}}}[{window}]) / rate(vllm:e2e_request_latency_seconds_count{{{labels}}}[{window}]))",
+      "time_window": "5m",
+      "options": {
+        "filter_labels": [
+          "deployment_id"
+        ],
+        "group_labels": [
+          "deployment_id"
+        ]
+      }
+    }
+  ]
+}

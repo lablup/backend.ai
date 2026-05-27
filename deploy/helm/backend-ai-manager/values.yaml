@@ -94,6 +94,14 @@ storageProxy:
   # MUST match `storageProxy.managerSecret` in values-storage-proxy-local.yaml.
   managerSecret: "CHANGE-ME-STORAGE-MANAGER-SECRET"
   sslVerify: false
+  # Ownership types (`user` / `group`) permitted when a vfolder is created.
+  # Written into etcd at `/sorna/<ns>/volumes/_types/<type>` — manager reads
+  # this prefix on vfolder operations and rejects ownership types not listed
+  # here with "user-owned vfolder is not allowed in this cluster" (or the
+  # analogous message for group). Empty list → no vfolder creation allowed.
+  allowedVfolderTypes:
+    - user
+    - group
   # Volumes exposed on the default_host. Order matters — the first volume's
   # `proxyName:name` string is used as `volumes.default_host`.
   volumes:
@@ -106,4 +114,34 @@ schemaMigrate:
   enabled: true
 
 fixture:
+  enabled: true
+
+## Container registries — single source of truth for both the
+## `container_registries` DB rows AND the post-install `mgr image rescan`.
+##
+## The fixture ConfigMap renders `11-container-registries.json` from this list
+## at chart-template time (one DB row per (registryName, project) combo, with
+## a deterministic SHA-256 derived id). The image-rescan Job iterates over
+## the unique `registryName` values and runs `mgr image rescan <name>` for
+## each, populating the `images` table so the Web UI's session-create dialog
+## can list runtime versions.
+##
+## To swap to a private registry, edit ONLY this list — no other files.
+## Empty list disables both the fixture and the rescan.
+containerRegistries:
+  - registryName: cr.backend.ai
+    url: https://cr.backend.ai
+    type: harbor2
+    projects:
+      - stable
+      - community
+      - multiarch
+    # username / password optional — set for private registries that need auth.
+    # username: ""
+    # password: ""
+
+## Image rescan toggle. Set false in air-gapped clusters with no outbound
+## HTTPS to the registries listed above; you'll need to populate the `images`
+## table by other means (e.g., agent-reported local images).
+imageRescan:
   enabled: true

@@ -1,13 +1,37 @@
-{{- if .Values.fixture.enabled }}
+{{- if and .Values.imageRescan.enabled .Values.fixture.enabled .Values.containerRegistries }}
+{{- /*
+  Post-install Job that runs `mgr image rescan <registry>` for each unique
+  registryName found in .Values.containerRegistries. Must run AFTER:
+    - schema-migrate (weight 0) — `images` table exists
+    - fixture-populate (weight 2) — `container_registries` rows are present
+  Weight 4 keeps it after the coordinator db-init Job (weight 3) for clean
+  log ordering — they don't actually depend on each other.
+
+  Requires the cluster pod to have outbound HTTPS access to the registries
+  listed. Skip by setting `imageRescan.enabled: false` in air-gapped envs.
+*/}}
+{{- /*
+  Build a deduplicated list of registryName strings. Multiple
+  containerRegistries entries can share a registryName (different projects),
+  and we only need to rescan each registry once — the rescan walks all
+  projects belonging to that registry.
+*/}}
+{{- $regNames := list }}
+{{- range $reg := .Values.containerRegistries }}
+  {{- if not (has $reg.registryName $regNames) }}
+    {{- $regNames = append $regNames $reg.registryName }}
+  {{- end }}
+{{- end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "bai-manager.fullname" . }}-fixture-populate
+  name: {{ include "bai-manager.fullname" . }}-image-rescan
   labels:
     {{- include "bai-manager.labels" . | nindent 4 }}
+    app.kubernetes.io/component: image-rescan
   annotations:
-    "helm.sh/hook": post-install
-    "helm.sh/hook-weight": "2"
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "4"
     "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   backoffLimit: 3
@@ -15,7 +39,7 @@ spec:
     metadata:
       labels:
         {{- include "bai-manager.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: fixture-populate
+        app.kubernetes.io/component: image-rescan
     spec:
       restartPolicy: OnFailure
       {{- with .Values.imagePullSecrets }}
@@ -45,36 +69,21 @@ spec:
             - { name: config-template, mountPath: /config-in }
             - { name: config-rendered, mountPath: /config-out }
       containers:
-        - name: populate
+        - name: rescan
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/bin/sh", "-c"]
           args:
             - |
               set -e
-              # Each fixture is sed-rendered into a writable scratch dir before
-              # being applied — the ConfigMap mount is read-only and we need to
-              # substitute `__DEFAULT_VFOLDER_HOST__` (used in 03-keypairs.json
-              # under keypair_resource_policies[*].allowed_vfolder_hosts) with
-              # the actual `<proxyName>:<firstVolume>` string this chart
-              # provisions, so the seeded keypair_resource_policies match the
-              # storage-proxy registration.
-              mkdir -p /rendered
-              for f in /fixture/*.json; do
-                rendered="/rendered/$(basename "$f")"
-                sed "s|__DEFAULT_VFOLDER_HOST__|${DEFAULT_VFOLDER_HOST}|g" "$f" > "$rendered"
-                echo "populating $rendered"
-                backend.ai mgr --config /etc/backend.ai/manager.toml fixture populate "$rendered"
-              done
-          env:
-            - name: DEFAULT_VFOLDER_HOST
-              value: {{ printf "%s:%s" .Values.storageProxy.proxyName (index .Values.storageProxy.volumes 0).name | quote }}
+              {{- range $regNames }}
+              echo "===rescan {{ . }}==="
+              backend.ai mgr --config /etc/backend.ai/manager.toml image rescan {{ . | quote }}
+              {{- end }}
+              echo "image rescan complete"
           volumeMounts:
             - name: config-rendered
               mountPath: /etc/backend.ai
-              readOnly: true
-            - name: fixture
-              mountPath: /fixture
               readOnly: true
       volumes:
         - name: config-template
@@ -82,7 +91,4 @@ spec:
             name: {{ include "bai-manager.fullname" . }}-config
         - name: config-rendered
           emptyDir: {}
-        - name: fixture
-          configMap:
-            name: {{ include "bai-manager.fullname" . }}-fixture
 {{- end }}

@@ -1,4 +1,27 @@
 {{- if .Values.fixture.enabled }}
+{{- /*
+  Fixtures applied by the fixture-populate Job in alphabetical order. The Job
+  runs `for f in /fixture/*.json` so the file name is the sort key.
+
+  Static fixtures live in files/ and are loaded by .Files.Glob below.
+  Filenames are numerically prefixed (00-bootstrap.json → 10-prometheus-query-
+  presets.json) so the shell glob runs them in dependency order:
+    00 bootstrap (domains, groups, users, scaling_groups, resource_policies)
+    01 roles (roles, user_roles, permissions, role-related assoc_scopes)
+    02 users-scopes (user→project association_scopes_entities)
+    03 keypair_resource_policies + keypairs
+    04 set users.main_access_key (update mode, links user → keypair)
+    05 resource-slot-types
+    06 resource-presets (depends on slot types)
+    07 runtime-variants
+    08 runtime-variant-presets
+    09 prometheus-query-preset-categories
+    10 prometheus-query-presets
+
+  `11-container-registries.json` is *generated* below from
+  .Values.containerRegistries — see comments there for why this isn't a
+  static file.
+*/}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,8 +29,30 @@ metadata:
   labels:
     {{- include "bai-manager.labels" . | nindent 4 }}
 data:
-  bootstrap.json: |
-{{ .Files.Get "files/bootstrap-fixture.json" | indent 4 }}
-  resource-slot-types.json: |
-{{ .Files.Get "files/resource-slot-types.json" | indent 4 }}
+{{- range $path, $_ := .Files.Glob "files/*.json" }}
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+{{- if .Values.containerRegistries }}
+{{- /*
+  Container registries — one DB row per (registryName, project) tuple.
+  Each row needs a stable `id` (UUID-shaped) because the fixture loader
+  inserts with the literal id; we derive it deterministically from
+  sha256(registryName|project) so re-renders produce the same UUIDs and
+  re-applying the fixture is idempotent.
+*/}}
+{{- $rows := list }}
+{{- range $reg := .Values.containerRegistries }}
+  {{- range $proj := $reg.projects }}
+    {{- $hash := printf "%s|%s" $reg.registryName $proj | sha256sum }}
+    {{- $id := printf "%s-%s-%s-%s-%s" (substr 0 8 $hash) (substr 8 12 $hash) (substr 12 16 $hash) (substr 16 20 $hash) (substr 20 32 $hash) }}
+    {{- $row := dict "id" $id "registry_name" $reg.registryName "url" $reg.url "type" $reg.type "project" $proj }}
+    {{- if $reg.username }}{{- $_ := set $row "username" $reg.username }}{{- end }}
+    {{- if $reg.password }}{{- $_ := set $row "password" $reg.password }}{{- end }}
+    {{- $rows = append $rows $row }}
+  {{- end }}
+{{- end }}
+  11-container-registries.json: |-
+{{ dict "container_registries" $rows | toJson | indent 4 }}
+{{- end }}
 {{- end }}

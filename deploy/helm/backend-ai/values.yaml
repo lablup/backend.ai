@@ -1,0 +1,48 @@
+## Umbrella chart defaults.
+##
+## Each sub-chart's own values are nested under its chart name. To override
+## a sub-chart value, use the sub-chart name as the top-level key, e.g.:
+##
+##   backend-ai-webserver:
+##     webserver:
+##       sessionSecret: "..."
+##
+## For a ready-made lab profile see values-local.yaml.
+##
+## IMPORTANT: install with `helm install bai deploy/helm/backend-ai ...`.
+## The release name MUST be `bai` so that the in-cluster service names
+## (`bai-etcd`, `bai-redis`, `bai-postgres`, `bai-backend-ai-manager`, …)
+## match the cross-chart references baked into webserver / appproxy /
+## storage-proxy default values.
+
+## ---------------- Sub-chart toggles ----------------
+backend-ai-manager:
+  enabled: true
+
+backend-ai-storage-proxy:
+  enabled: true
+
+backend-ai-webserver:
+  enabled: true
+  ## Umbrella release `bai` produces apollo-router service
+  ## `bai-backend-ai-apollo-router` (not `bai-router-…`), so override the
+  ## endpoint that the webserver configmap embeds.
+  webserver:
+    apolloRouterEndpoint: "http://bai-backend-ai-apollo-router.backend-ai.svc.cluster.local:4000"
+
+backend-ai-appproxy-coordinator:
+  enabled: true
+
+backend-ai-appproxy-worker:
+  enabled: true
+  ## Same reason — coordinator service is `bai-backend-ai-appproxy-coordinator`.
+  worker:
+    coordinatorEndpoint: "http://bai-backend-ai-appproxy-coordinator.backend-ai.svc.cluster.local:10200"
+
+backend-ai-apollo-router:
+  enabled: true
+
+## swarm-network-daemon is only needed when the agent uses Docker Swarm
+## overlay networking for multi-node sessions. Opt-in.
+backend-ai-swarm-network-daemon:
+  enabled: false

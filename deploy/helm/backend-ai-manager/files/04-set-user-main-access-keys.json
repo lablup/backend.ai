@@ -1,0 +1,25 @@
+{
+  "__mode": "update",
+  "users": [
+    {
+      "uuid": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+      "main_access_key": "AKIAIOSFODNN7EXAMPLE"
+    },
+    {
+      "uuid": "4f13d193-f646-425a-a340-270c4d2b9860",
+      "main_access_key": "AKIAHUKCHDEZGEXAMPLE"
+    },
+    {
+      "uuid": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+      "main_access_key": "AKIANABBDUSEREXAMPLE"
+    },
+    {
+      "uuid": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+      "main_access_key": "AKIANATWOUSEREXAMPLE"
+    },
+    {
+      "uuid": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+      "main_access_key": "AKIANAMONITOREXAMPLE"
+    }
+  ]
+}

@@ -1,0 +1,197 @@
+{{- if .Values.coordinator.dbInit.enabled }}
+{{- /*
+  One-shot DB bootstrap for the app-proxy coordinator. Mirrors the
+  install_appproxy_db() routine in src/ai/backend/install/context.py:898.
+
+  Order in the umbrella install:
+    weight 0 → manager schema-migrate (creates `backendai` DB schema)
+    weight 1 → manager etcd-seed       (writes global config to etcd)
+    weight 2 → manager fixture-populate (inserts `default` scaling_groups row)
+    weight 3 → THIS Job                 (creates `appproxy` DB + schema + UPDATEs scaling_groups)
+
+  Coordinator Deployment has a wait-for-appproxy-schema initContainer so its
+  pod blocks (without CrashLooping the user-visible state) until this Job
+  finishes.
+
+  wsproxyAddr resolution:
+    - If .Values.coordinator.dbInit.wsproxyAddr is set, use it verbatim.
+    - Otherwise build from this chart's in-cluster Service DNS so the manager
+      pod can call coordinator. The agent / browser never reads this URL.
+*/}}
+{{- $wsproxyAddr := .Values.coordinator.dbInit.wsproxyAddr }}
+{{- if not $wsproxyAddr }}
+  {{- $wsproxyAddr = printf "http://%s.%s.svc.cluster.local:%v" (include "bai-appproxy-coordinator.fullname" .) .Release.Namespace .Values.coordinator.bindPort }}
+{{- end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "bai-appproxy-coordinator.fullname" . }}-db-init
+  labels:
+    {{- include "bai-appproxy-coordinator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: db-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        {{- include "bai-appproxy-coordinator.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: db-init
+    spec:
+      restartPolicy: OnFailure
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: render-alembic-ini
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              DB_URL="postgresql+asyncpg://{{ .Values.coordinator.db.user }}:$POSTGRES_PASSWORD@{{ .Values.coordinator.db.host }}:{{ .Values.coordinator.db.port }}/{{ .Values.coordinator.db.name }}"
+              sed "s|__DB_URL__|$DB_URL|g" /alembic-in/alembic-appproxy.ini > /alembic-out/alembic-appproxy.ini
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-coordinator.fullname" . }}-secrets, key: postgres-password } }
+          volumeMounts:
+            - { name: alembic-in,  mountPath: /alembic-in }
+            - { name: alembic-out, mountPath: /alembic-out }
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ .Values.coordinator.coreDb.host }} {{ .Values.coordinator.coreDb.port }}; do
+                echo "waiting for postgres..."; sleep 3;
+              done
+      containers:
+        - name: db-init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-coordinator.fullname" . }}-secrets, key: postgres-password } }
+            - name: API_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-coordinator.fullname" . }}-secrets, key: api-token } }
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+
+              # Step 1 — Wait until the manager's fixture-populate Job has
+              # inserted the `default` scaling_groups row. We poll instead of
+              # using helm hook chaining because cross-chart hook ordering is
+              # weight-based but the actual DB row availability is a runtime
+              # property.
+              python <<'PY'
+              import asyncio, asyncpg, os, sys, time
+              async def wait():
+                  deadline = time.time() + 300
+                  while time.time() < deadline:
+                      try:
+                          conn = await asyncpg.connect(
+                              host="{{ .Values.coordinator.coreDb.host }}",
+                              port={{ .Values.coordinator.coreDb.port }},
+                              user="{{ .Values.coordinator.coreDb.user }}",
+                              password=os.environ["POSTGRES_PASSWORD"],
+                              database="{{ .Values.coordinator.coreDb.name }}",
+                          )
+                          row = await conn.fetchrow(
+                              "SELECT 1 FROM scaling_groups WHERE name=$1",
+                              "{{ .Values.coordinator.dbInit.scalingGroup }}",
+                          )
+                          await conn.close()
+                          if row:
+                              print("scaling_groups row present", flush=True)
+                              return
+                      except Exception as e:
+                          print(f"waiting for scaling_groups: {e}", flush=True)
+                      time.sleep(3)
+                  print("timeout waiting for scaling_groups", file=sys.stderr)
+                  sys.exit(1)
+              asyncio.run(wait())
+              PY
+
+              # Step 2 — CREATE DATABASE appproxy (idempotent). Owner is the
+              # same role coordinator uses at runtime (`coordinator.db.user`),
+              # which already exists as the manager's postgres user. We do not
+              # create a separate `appproxy` role — the lab postgres has a
+              # single superuser and a separate role would just complicate
+              # password management.
+              python <<'PY'
+              import asyncio, asyncpg, os
+              async def ensure_db():
+                  conn = await asyncpg.connect(
+                      host="{{ .Values.coordinator.coreDb.host }}",
+                      port={{ .Values.coordinator.coreDb.port }},
+                      user="{{ .Values.coordinator.coreDb.user }}",
+                      password=os.environ["POSTGRES_PASSWORD"],
+                      database="{{ .Values.coordinator.coreDb.name }}",
+                  )
+                  try:
+                      exists = await conn.fetchval(
+                          "SELECT 1 FROM pg_database WHERE datname=$1",
+                          "{{ .Values.coordinator.db.name }}",
+                      )
+                      if not exists:
+                          print("creating database {{ .Values.coordinator.db.name }}", flush=True)
+                          await conn.execute(
+                              'CREATE DATABASE "{{ .Values.coordinator.db.name }}" '
+                              'OWNER "{{ .Values.coordinator.db.user }}"'
+                          )
+                      else:
+                          print("database {{ .Values.coordinator.db.name }} already exists", flush=True)
+                  finally:
+                      await conn.close()
+              asyncio.run(ensure_db())
+              PY
+
+              # Step 3 — Run alembic migrations against the appproxy DB.
+              # alembic-appproxy.ini was rendered by the initContainer above
+              # with the substituted sqlalchemy.url.
+              cd /alembic
+              python -m alembic -c alembic-appproxy.ini upgrade head
+
+              # Step 4 — Stamp the coordinator endpoint into scaling_groups
+              # for the configured scaling group so the manager knows where
+              # to call this coordinator for session app provisioning.
+              python <<'PY'
+              import asyncio, asyncpg, os
+              async def update_sg():
+                  conn = await asyncpg.connect(
+                      host="{{ .Values.coordinator.coreDb.host }}",
+                      port={{ .Values.coordinator.coreDb.port }},
+                      user="{{ .Values.coordinator.coreDb.user }}",
+                      password=os.environ["POSTGRES_PASSWORD"],
+                      database="{{ .Values.coordinator.coreDb.name }}",
+                  )
+                  try:
+                      result = await conn.execute(
+                          "UPDATE scaling_groups "
+                          "SET wsproxy_api_token=$1, wsproxy_addr=$2 "
+                          "WHERE name=$3",
+                          os.environ["API_TOKEN"],
+                          "{{ $wsproxyAddr }}",
+                          "{{ .Values.coordinator.dbInit.scalingGroup }}",
+                      )
+                      print(f"scaling_groups UPDATE: {result}", flush=True)
+                  finally:
+                      await conn.close()
+              asyncio.run(update_sg())
+              PY
+
+              echo "db-init complete"
+          volumeMounts:
+            - { name: alembic-out, mountPath: /alembic }
+      volumes:
+        - name: alembic-in
+          configMap:
+            name: {{ include "bai-appproxy-coordinator.fullname" . }}-alembic
+        - name: alembic-out
+          emptyDir: {}
+{{- end }}

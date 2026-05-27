@@ -14,15 +14,34 @@ coordinator:
     nodePort: 30200
   bindPort: 10200
   advertisedHost: "192.168.0.156"
-  advertisedPort: 30201
+  # MUST equal `service.nodePort` — this is the port the browser hits when
+  # following the wsproxy URL emitted by manager. If they diverge, the
+  # browser sees TCP "Connection refused" on the advertised port and the
+  # Web UI surfaces "AppLaunchError: Failed to fetch".
+  advertisedPort: 30200
 
   # Reuse manager's PG/Redis. Coordinator writes its own tables (alembic-managed).
+  # `db` is what the coordinator server itself uses at runtime — connects to
+  # the `appproxy` database. The db-init Job (templates/job-db-init.yaml)
+  # creates this DB on first install using `coreDb` below as the maintenance
+  # connection.
   db:
     host: bai-postgres
     port: 5432
     user: backendai
     name: appproxy
     # postgres password supplied via secret (same as manager's)
+
+  # Maintenance connection used by the db-init Job to CREATE DATABASE
+  # appproxy (one-time) and to UPDATE scaling_groups.wsproxy_* on the core DB.
+  # Must be a superuser. Defaults assume the bundled manager chart's postgres.
+  coreDb:
+    host: bai-postgres
+    port: 5432
+    user: backendai
+    name: backendai
+    # password reuses .Values.coordinator.dbPassword (same secret key).
+
   redis:
     host: bai-redis
     port: 6379
@@ -32,6 +51,17 @@ coordinator:
     host: bai-etcd
     port: 2379
     namespace: local
+
+  # appproxy DB owner is `coordinator.db.user` (default backendai). The db-init
+  # Job runs `CREATE DATABASE {db.name} OWNER {db.user}` if the DB is missing.
+  dbInit:
+    enabled: true
+    # scaling_groups row to update with this coordinator's endpoint after
+    # the core DB has been seeded by the manager's fixture-populate Job.
+    scalingGroup: "default"
+    # wsproxyAddr published to manager so it can call coordinator.
+    # Empty → built from this chart's Service DNS at render time.
+    wsproxyAddr: ""
 
   jwtSecret: "CHANGE-ME-APPPROXY-COORDINATOR-JWT"
   apiToken: "CHANGE-ME-COORDINATOR-API-TOKEN"

@@ -21,6 +21,43 @@ spec:
       imagePullSecrets: {{- toYaml . | nindent 8 }}
       {{- end }}
       initContainers:
+        {{- if .Values.coordinator.dbInit.enabled }}
+        - name: wait-for-appproxy-schema
+          # Block until the db-init Job has created the appproxy DB and
+          # stamped alembic_version. Without this, the coordinator pod would
+          # CrashLoop until the post-install Job (weight=3) finishes.
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "bai-appproxy-coordinator.fullname" . }}-secrets, key: postgres-password } }
+          command:
+            - sh
+            - -c
+            - |
+              python - <<'PY'
+              import os, time, asyncio, asyncpg
+              async def check():
+                  conn = await asyncpg.connect(
+                      host="{{ .Values.coordinator.db.host }}",
+                      port={{ .Values.coordinator.db.port }},
+                      database="{{ .Values.coordinator.db.name }}",
+                      user="{{ .Values.coordinator.db.user }}",
+                      password=os.environ["POSTGRES_PASSWORD"])
+                  try:
+                      row = await conn.fetchrow("SELECT to_regclass('public.alembic_version') AS t")
+                      return row["t"] is not None
+                  finally:
+                      await conn.close()
+              while True:
+                  try:
+                      if asyncio.run(check()):
+                          print("appproxy schema ready"); break
+                  except Exception as e:
+                      print(f"waiting for appproxy schema: {e}")
+                  time.sleep(3)
+              PY
+        {{- end }}
         - name: render-config
           image: busybox:1.36
           command: ["/bin/sh", "-c"]

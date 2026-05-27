@@ -35,7 +35,7 @@ data:
 
     [apollo_router]
     enabled = true
-    endpoint = "http://bai-router-backend-ai-apollo-router.backend-ai.svc.cluster.local:4000"
+    endpoint = "{{ .Values.webserver.apolloRouterEndpoint }}"
     health_check_probe_path = "/health"
 
     [session]
@@ -49,7 +49,7 @@ data:
     max_count_for_preopen_ports = 10
 
     [session.redis]
-    addr = "bai-redis:6379"
+    addr = "{{ .Values.webserver.sessionRedisAddr }}"
     password = "__REDIS_PASSWORD__"
     db = 5
 

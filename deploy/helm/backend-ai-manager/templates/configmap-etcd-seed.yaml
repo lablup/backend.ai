@@ -28,8 +28,18 @@ data:
   causes `StorageProxyNotFound` at folder-op time.
 */}}
 {{- $firstVolume := index .Values.storageProxy.volumes 0 }}
+{{/*
+  Build the _types map so manager allows the listed ownership kinds when
+  vfolders are created. Each enabled type is stored as an empty etcd key
+  under `volumes/_types/<type>` — the keys' *presence* is what enables them.
+*/}}
+{{- $vfolderTypes := dict }}
+{{- range .Values.storageProxy.allowedVfolderTypes }}
+  {{- $_ := set $vfolderTypes . "" }}
+{{- end }}
 {{- $volumesSeed := dict
     "default_host" (printf "%s:%s" .Values.storageProxy.proxyName $firstVolume.name)
+    "_types" $vfolderTypes
     "proxies" (dict
         .Values.storageProxy.proxyName (dict
             "client_api" (printf "http://%s:%v" .Values.storageProxy.clientApiHost .Values.storageProxy.clientApiPort)

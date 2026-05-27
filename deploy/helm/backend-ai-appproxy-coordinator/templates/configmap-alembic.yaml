@@ -1,0 +1,11 @@
+{{- if .Values.coordinator.dbInit.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bai-appproxy-coordinator.fullname" . }}-alembic
+  labels:
+    {{- include "bai-appproxy-coordinator.labels" . | nindent 4 }}
+data:
+  alembic-appproxy.ini: |-
+{{ .Files.Get "files/alembic-appproxy.ini" | indent 4 }}
+{{- end }}

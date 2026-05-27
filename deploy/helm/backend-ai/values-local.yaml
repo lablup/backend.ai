@@ -1,0 +1,124 @@
+## Umbrella chart local-cluster overrides (dood3 scenario).
+##
+## Usage:
+##   helm dependency update deploy/helm/backend-ai
+##   helm install bai deploy/helm/backend-ai \
+##     -n backend-ai --create-namespace \
+##     -f deploy/helm/backend-ai/values-local.yaml
+##
+## Mirrors deploy/helm/values-local.yaml + values-storage-proxy-local.yaml
+## under a single release. Release name MUST be `bai` (see values.yaml).
+
+## ---------------- Manager + bundled deps (etcd, postgres, redis) ----------------
+backend-ai-manager:
+  enabled: true
+
+  image:
+    repository: 192.168.0.156:5000/backend.ai-manager
+    tag: dev
+    pullPolicy: Always
+
+  manager:
+    dockerGid: 984
+    # Pin to the swarm-manager node (only ser8 carries the label today).
+    nodeSelector:
+      backendai.io/dedicated: swarm-manager
+    tolerations:
+      - key: backendai.io/dedicated
+        operator: Equal
+        value: swarm-manager
+        effect: NoSchedule
+    secret: "local-dev-manager-secret"
+
+    # Expose manager API + deps on NodePort so a host-side agent (dood3)
+    # can reach them without going through cluster DNS.
+    service:
+      type: NodePort
+      port: 8081
+      nodePort: 32081
+    exposeDepsAsNodePort: true
+    etcdNodePort: 32379
+    redisNodePort: 32679
+
+  postgres:
+    password: "local-dev-postgres"
+
+  redis:
+    password: "local-dev-redis"
+
+  storageProxy:
+    enabled: true
+    proxyName: proxy1
+    clientApiHost: "192.168.0.156"
+    clientApiPort: 6021
+    managerApiHost: "192.168.0.156"
+    managerApiPort: 6022
+    managerSecret: "local-dev-storage-manager-secret"
+    sslVerify: false
+    volumes:
+      - name: volume1
+        backend: vfs
+
+## ---------------- Storage proxy ----------------
+backend-ai-storage-proxy:
+  enabled: true
+
+  image:
+    repository: 192.168.0.156:5000/backend.ai-storage-proxy
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  storageProxy:
+    proxyName: proxy1
+    nodeId: storage-proxy-1
+    # MUST match storageProxy.managerSecret in manager block above.
+    managerSecret: "local-dev-storage-manager-secret"
+    jwtSecret: "local-dev-storage-jwt"
+    etcd:
+      host: bai-etcd.backend-ai.svc.cluster.local
+      port: 2379
+      namespace: local
+    nodeSelector:
+      kubernetes.io/hostname: ser8
+    tolerations:
+      - key: backendai.io/dedicated
+        operator: Equal
+        value: swarm-manager
+        effect: NoSchedule
+    volumes:
+      volume1:
+        backend: vfs
+        subpath: volume1
+
+## ---------------- Webserver ----------------
+backend-ai-webserver:
+  enabled: true
+  webserver:
+    sessionSecret: "local-dev-webserver-session"
+    apolloRouterEndpoint: "http://bai-backend-ai-apollo-router.backend-ai.svc.cluster.local:4000"
+    sessionRedisAddr: "bai-redis:6379"
+
+## ---------------- App Proxy ----------------
+backend-ai-appproxy-coordinator:
+  enabled: true
+  coordinator:
+    jwtSecret: "local-dev-appproxy-jwt"
+    apiToken: "local-dev-appproxy-token"
+
+backend-ai-appproxy-worker:
+  enabled: true
+  worker:
+    coordinatorEndpoint: "http://bai-backend-ai-appproxy-coordinator.backend-ai.svc.cluster.local:10200"
+    jwtSecret: "local-dev-appproxy-jwt"
+    apiToken: "local-dev-appproxy-token"
+
+## ---------------- Apollo Router ----------------
+backend-ai-apollo-router:
+  enabled: true
+
+## ---------------- Swarm overlay daemon ----------------
+## dood3 + multi-node session 사용 시에만 true.
+backend-ai-swarm-network-daemon:
+  enabled: false
+  daemon:
+    authToken: "local-dev-swarm-network-token"
