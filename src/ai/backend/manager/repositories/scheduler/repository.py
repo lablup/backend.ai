@@ -28,7 +28,6 @@ from ai.backend.common.types import (
     AgentId,
     SessionId,
     SlotName,
-    SlotQuantity,
     SlotTypes,
     VFolderMount,
     VFolderMountRequest,
@@ -57,7 +56,6 @@ from ai.backend.manager.types import UserScope
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
 from .types.base import SchedulingSpec
-from .types.results import ScheduledSessionData
 from .types.scheduling import SchedulingData
 from .types.search import (
     SessionWithKernelsAndUserSearchResult,
@@ -130,15 +128,12 @@ class SchedulerRepository:
         return scheduling_data
 
     @scheduler_repository_resilience.apply()
-    async def allocate_sessions(
-        self, allocation_batch: AllocationBatch
-    ) -> list[ScheduledSessionData]:
+    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> list[SessionId]:
         """
-        Allocate sessions by updating DB.
-        Agent occupied slots are synced directly in the DB.
+        Allocate sessions by reserving and assigning their kernels to agents.
 
         Returns:
-            List of ScheduledSessionData for allocated sessions
+            The ids of the sessions that were actually allocated.
         """
         return await self._db_source.allocate_sessions(allocation_batch)
 
@@ -310,54 +305,6 @@ class SchedulerRepository:
         Update sessions from CREATING to RUNNING state with occupying_slots.
         """
         await self._db_source.update_sessions_to_running(sessions_data)
-
-    @scheduler_repository_resilience.apply()
-    async def allocate_kernel_resources(
-        self,
-        kernel_id: UUID,
-        agent_id: str,
-        slots: Sequence[SlotQuantity],
-    ) -> int:
-        """Set used values on allocations and increment agent_resources.used.
-
-        Idempotent: re-calling with the same kernel_id will not double-increment.
-        """
-        return await self._db_source.allocate_kernel_resources(kernel_id, agent_id, slots)
-
-    @scheduler_repository_resilience.apply()
-    async def allocate_session_kernel_resources(
-        self,
-        allocations: Sequence[tuple[UUID, str, Sequence[SlotQuantity]]],
-    ) -> int:
-        """Allocate resources for multiple kernels in a single transaction.
-
-        All-or-nothing: if any kernel fails, all allocations are rolled back.
-        Idempotent per kernel (used_at IS NULL guard).
-        """
-        return await self._db_source.allocate_session_kernel_resources(allocations)
-
-    @scheduler_repository_resilience.apply()
-    async def update_running_and_allocate_resources(
-        self,
-        sessions_data: list[SessionRunningData],
-        allocations: Sequence[tuple[UUID, str, Sequence[SlotQuantity]]],
-    ) -> int:
-        """Atomically update session occupying_slots and allocate kernel resources.
-
-        Single transaction: if allocation fails, session update is also rolled back.
-        """
-        return await self._db_source.update_running_and_allocate_resources(
-            sessions_data, allocations
-        )
-
-    @scheduler_repository_resilience.apply()
-    async def free_kernel_resources(
-        self,
-        kernel_id: UUID,
-        agent_id: str,
-    ) -> int:
-        """Set free_at on allocations and decrement agent_resources.used."""
-        return await self._db_source.free_kernel_resources(kernel_id, agent_id)
 
     @scheduler_repository_resilience.apply()
     async def update_kernels_to_pulling_for_image(

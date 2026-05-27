@@ -110,7 +110,7 @@ class TestTerminateSessions:
 
         # Verify
         assert isinstance(result, ScheduleResult)
-        assert len(result.scheduled_sessions) == 0
+        assert len(result.scheduled_session_ids) == 0
 
     async def test_terminate_sessions_single_success(
         self,
@@ -156,7 +156,7 @@ class TestTerminateSessions:
         # Verify
         # Returns empty result (status updates handled by events/sweep)
         assert isinstance(result, ScheduleResult)
-        assert len(result.scheduled_sessions) == 0
+        assert len(result.scheduled_session_ids) == 0
 
         # Verify agent destroy_kernel was called with correct parameters
         # Note: AgentClient.destroy_kernel accepts SessionId type and converts to str internally
@@ -206,7 +206,7 @@ class TestTerminateSessions:
         # Verify
         # Returns empty result (status updates handled by events/sweep)
         assert isinstance(result, ScheduleResult)
-        assert len(result.scheduled_sessions) == 0
+        assert len(result.scheduled_session_ids) == 0
 
         # Verify all kernels had RPC calls made
         # Note: AgentClient.destroy_kernel accepts SessionId type and converts to str internally
@@ -273,7 +273,7 @@ class TestTerminateSessions:
 
         # Verify
         # Session should not be counted as terminated due to partial failure
-        assert len(result.scheduled_sessions) == 0
+        assert len(result.scheduled_session_ids) == 0
 
     async def test_terminate_sessions_concurrent_execution(
         self,
@@ -342,7 +342,7 @@ class TestTerminateSessions:
         # Verify
         # Returns empty result (status updates handled by events/sweep)
         assert isinstance(result, ScheduleResult)
-        assert len(result.scheduled_sessions) == 0
+        assert len(result.scheduled_session_ids) == 0
 
         # Verify all RPC calls were made
         for i, agent_id in enumerate(all_agent_ids):
@@ -378,4 +378,4 @@ class TestTerminateSessions:
 
         # Verify
         # Session without kernels cannot be terminated
-        assert len(result.scheduled_sessions) == 0
+        assert len(result.scheduled_session_ids) == 0
