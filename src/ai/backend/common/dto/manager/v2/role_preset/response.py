@@ -32,6 +32,12 @@ class RolePresetNode(BaseResponseModel):
     name: str = Field(description="Role preset name.")
     scope_type: RBACElementTypeDTO = Field(description="Scope type this preset targets.")
     auto_apply: bool = Field(description="If true, this preset is auto-applied at scope creation.")
+    auto_assign: bool = Field(
+        description=(
+            "Default value for the `auto_assign` flag copied onto roles instantiated "
+            "from this preset."
+        ),
+    )
     created_at: datetime = Field(description="Creation timestamp.")
     updated_at: datetime = Field(description="Last modification timestamp.")
 

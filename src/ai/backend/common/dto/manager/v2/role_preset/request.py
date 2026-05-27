@@ -38,6 +38,13 @@ class CreateRolePresetInput(BaseRequestModel):
             "Multiple auto-apply presets per scope type are allowed."
         ),
     )
+    auto_assign: bool = Field(
+        default=False,
+        description=(
+            "Default value for the `auto_assign` flag copied onto roles instantiated "
+            "from this preset."
+        ),
+    )
     permissions: list[RolePermissionPresetEntry] = Field(
         default_factory=list,
         description="Permission entries carried by the preset.",
@@ -54,6 +61,10 @@ class UpdateRolePresetInput(BaseRequestModel):
     auto_apply: bool | None = Field(
         default=None,
         description="Updated auto-apply flag.",
+    )
+    auto_assign: bool | None = Field(
+        default=None,
+        description="Updated default value for the `auto_assign` flag of instantiated roles.",
     )
 
 
@@ -82,6 +93,7 @@ class RolePresetFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     scope_type: RBACElementTypeDTO | None = Field(default=None, description="Filter by scope type.")
     auto_apply: bool | None = Field(default=None, description="Filter by auto-apply flag.")
+    auto_assign: bool | None = Field(default=None, description="Filter by auto-assign flag.")
     AND: list[RolePresetFilter] | None = Field(default=None, description="AND conjunction.")
     OR: list[RolePresetFilter] | None = Field(default=None, description="OR conjunction.")
     NOT: list[RolePresetFilter] | None = Field(default=None, description="NOT negation.")
