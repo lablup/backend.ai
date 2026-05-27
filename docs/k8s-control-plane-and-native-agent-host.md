@@ -1,10 +1,10 @@
-# Backend.AI agent on host (dood3)
+# Backend.AI agent on host (k8s-control-plane-and-native-agent)
 
-`dood3` 시나리오: backend.ai 의 다른 컴포넌트 (manager, storage-proxy, webserver, apollo-router, appproxy, swarm-network-daemon) 는 k8s 위에 그대로 돌리되, **agent 만 호스트의 일반 process 로** 띄움.
+`k8s-control-plane-and-native-agent` 시나리오: backend.ai 의 다른 컴포넌트 (manager, storage-proxy, webserver, apollo-router, appproxy, swarm-network-daemon) 는 k8s 위에 그대로 돌리되, **agent 만 호스트의 일반 process 로** 띄움.
 
 차이 — `dood2` 와 비교:
 
-| 항목 | dood2 | dood3 |
+| 항목 | dood2 | k8s-control-plane-and-native-agent |
 |---|---|---|
 | agent | k8s DaemonSet pod | host systemd/process |
 | `/var/run/docker.sock` | pod hostPath mount | agent 가 직접 사용 |
@@ -24,7 +24,7 @@
 
 ## etcd / redis NodePort 활성화
 
-manager helm chart 의 values 에 (이미 `dood3` 의 values-local.yaml 에 적용됨):
+manager helm chart 의 values 에 (이미 `k8s-control-plane-and-native-agent` 의 values-local.yaml 에 적용됨):
 ```yaml
 manager:
   service:
@@ -64,7 +64,7 @@ python3.13 -m venv /opt/backend.ai/venv
 
 ### 2. agent.toml
 
-template: `configs/agent/dood3.toml`. 핵심:
+template: `configs/agent/k8s-control-plane-and-native-agent.toml`. 핵심:
 - `[etcd] addr = { host = "192.168.0.156", port = 32379 }`
 - `[agent] rpc-listen-addr = { host = "0.0.0.0", port = 6001 }`
 - `[agent] public-host = "<this-host-ip>"`

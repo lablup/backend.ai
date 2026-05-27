@@ -1,4 +1,4 @@
-# Backend.AI agent.toml for the dood3 scenario:
+# Backend.AI agent.toml for the k8s-control-plane-and-native-agent scenario:
 # - agent runs as a host process (systemd or direct), NOT a k8s pod
 # - manager / etcd / redis live in k8s, exposed via NodePort
 # - kernels run on the host's docker daemon (DooD)

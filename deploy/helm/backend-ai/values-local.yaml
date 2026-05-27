@@ -1,4 +1,4 @@
-## Umbrella chart local-cluster overrides (dood3 scenario).
+## Umbrella chart local-cluster overrides (k8s-control-plane-and-native-agent scenario).
 ##
 ## Usage:
 ##   helm dependency update deploy/helm/backend-ai
@@ -30,7 +30,7 @@ backend-ai-manager:
         effect: NoSchedule
     secret: "local-dev-manager-secret"
 
-    # Expose manager API + deps on NodePort so a host-side agent (dood3)
+    # Expose manager API + deps on NodePort so a host-side agent (k8s-control-plane-and-native-agent)
     # can reach them without going through cluster DNS.
     service:
       type: NodePort
@@ -117,7 +117,7 @@ backend-ai-apollo-router:
   enabled: true
 
 ## ---------------- Swarm overlay daemon ----------------
-## dood3 + multi-node session 사용 시에만 true.
+## k8s-control-plane-and-native-agent + multi-node session 사용 시에만 true.
 backend-ai-swarm-network-daemon:
   enabled: false
   daemon:

@@ -1,10 +1,10 @@
-# dood3 — agent on host (diff from dood2)
+# k8s-control-plane-and-native-agent — agent on host (diff from dood2)
 
-`dood3` 시나리오: backend.ai 의 다른 컴포넌트는 모두 k8s 위에서 그대로, **agent 만 호스트의 docker container** 로 (k8s 외) 띄움. dood2 의 agent DaemonSet 가정을 풀고, 노드 추가 시 helm 작업 없이 호스트 작업만으로 agent 를 늘릴 수 있게.
+`k8s-control-plane-and-native-agent` 시나리오: backend.ai 의 다른 컴포넌트는 모두 k8s 위에서 그대로, **agent 만 호스트의 docker container** 로 (k8s 외) 띄움. dood2 의 agent DaemonSet 가정을 풀고, 노드 추가 시 helm 작업 없이 호스트 작업만으로 agent 를 늘릴 수 있게.
 
 ## dood2 와 차이 요약
 
-| 항목 | dood2 | dood3 |
+| 항목 | dood2 | k8s-control-plane-and-native-agent |
 |---|---|---|
 | agent | k8s DaemonSet pod | 호스트 docker container (`--net=host --pid=host`) |
 | agent 가 보는 docker daemon | hostPath `/var/run/docker.sock` | 동일 (네트워크 모드만 host) |
@@ -12,7 +12,7 @@
 | manager API | ClusterIP | NodePort (`192.168.0.156:32081`) |
 | etcd 의 `config/redis/addr` | `bai-redis:6379` (cluster DNS) | `192.168.0.156:32679` (NodePort) |
 | 노드 추가 절차 | helm chart + label/affinity | 호스트 docker + NFS mount + agent container 실행 |
-| agent.toml | helm template 으로 자동 생성 | `configs/agent/dood3.toml` template 으로 직접 배치 |
+| agent.toml | helm template 으로 자동 생성 | `configs/agent/k8s-control-plane-and-native-agent.toml` template 으로 직접 배치 |
 | agent advertised_rpc_addr | pod IP (자동) | `192.168.0.156:6001` (호스트 IP, 명시 필요) |
 
 ## 변경 / 추가된 파일
@@ -23,9 +23,9 @@
 - `deploy/helm/values-agent-gpu.yaml`
 
 ### 신규
-- `configs/agent/dood3.toml` — 호스트 agent 의 reference toml
-- `docs/dood_agent_host.md` — 호스트 setup 가이드
-- `docs/dood3-diff.md` — 이 문서
+- `configs/agent/k8s-control-plane-and-native-agent.toml` — 호스트 agent 의 reference toml
+- `docs/k8s-control-plane-and-native-agent-host.md` — 호스트 setup 가이드
+- `docs/k8s-control-plane-and-native-agent-diff.md` — 이 문서
 - `deploy/helm/backend-ai-manager/templates/services-external.yaml` — etcd / redis NodePort service (옵션, `manager.exposeDepsAsNodePort` 로 게이트)
 
 ### 수정
@@ -34,7 +34,7 @@
   - `manager.service` 를 `NodePort` 로 (nodePort=32081)
   - `exposeDepsAsNodePort: true`, `etcdNodePort: 32379`, `redisNodePort: 32679`
 
-## 발생한 이슈 (dood3 작업 중)
+## 발생한 이슈 (k8s-control-plane-and-native-agent 작업 중)
 
 ### I-1. agent RPC addr 가 0.0.0.0 로 publish
 
@@ -114,9 +114,9 @@ $ ./bai admin agent search
 i-charsyam-nvidia tcp://192.168.0.104:6001
 i-ser8 tcp://192.168.0.156:6001
 
-$ ./bai session enqueue @dood3-session.json  # agent_list=[i-ser8]
+$ ./bai session enqueue @k8s-control-plane-and-native-agent-session.json  # agent_list=[i-ser8]
 $ ./bai admin session search
-4af422a2-... dood3-test-5 PREPARED → RUNNING
+4af422a2-... k8s-control-plane-and-native-agent-test-5 PREPARED → RUNNING
 
 $ docker ps | grep kernel
 kernel.python.74a3d1c5-...  Up 46 seconds
@@ -156,8 +156,8 @@ sudo docker create --name temp-agent 192.168.0.156:5000/backend.ai-agent:dev
 sudo docker cp temp-agent:/opt/backend.ai /opt/
 sudo docker rm temp-agent
 
-# 7. agent.toml (configs/agent/dood3.toml 기반, public-host / advertised-rpc-addr 만 노드 IP 로 갱신)
-sudo install -m 0644 dood3.toml /etc/backend.ai/agent.toml
+# 7. agent.toml (configs/agent/k8s-control-plane-and-native-agent.toml 기반, public-host / advertised-rpc-addr 만 노드 IP 로 갱신)
+sudo install -m 0644 k8s-control-plane-and-native-agent.toml /etc/backend.ai/agent.toml
 
 # 8. agent container
 sudo docker run -d --name backend-ai-agent \
@@ -179,4 +179,4 @@ k8s 작업 0. helm chart 변경 0. agent 의 lifecycle 은 호스트 docker (res
 - agent OS-level lifecycle (rolling restart, log aggregation, healthcheck alerting) 가 k8s 가 아닌 호스트 docker restart policy 의 책임.
 - 노드별로 host 작업이 많음 — ansible / cloud-init 으로 자동화 권장.
 - swarm overlay 의존 (multi-node session 사용 시) 은 dood2 의 `swarm-network-daemon` 분리 그대로 적용 가능. agent 가 host docker container 형태라도 같은 docker engine 이라 overlay attach 정상 동작.
-- 진짜 host process (docker container 아닌 systemd) 로 띄우려면 호스트에 venv 직접 setup. 현재 가이드는 host docker container 까지만 — k8s 외 라는 dood3 의도 충족하면서 작업량 최소.
+- 진짜 host process (docker container 아닌 systemd) 로 띄우려면 호스트에 venv 직접 setup. 현재 가이드는 host docker container 까지만 — k8s 외 라는 k8s-control-plane-and-native-agent 의도 충족하면서 작업량 최소.

@@ -1,12 +1,12 @@
 # Backend.AI 컴포넌트 image 빌드 가이드
 
-dood3 (또는 일반 k8s) 배포에 필요한 backend.ai 5 개 컴포넌트 image 를 repo 의 `docker/` 아래 Dockerfile 들로 빌드한 뒤 사설 registry 에 push 하는 절차. 외부에서 pull 만 받으면 되는 보조 image 들도 함께 정리합니다.
+k8s-control-plane-and-native-agent (또는 일반 k8s) 배포에 필요한 backend.ai 5 개 컴포넌트 image 를 repo 의 `docker/` 아래 Dockerfile 들로 빌드한 뒤 사설 registry 에 push 하는 절차. 외부에서 pull 만 받으면 되는 보조 image 들도 함께 정리합니다.
 
-> 본 가이드는 `docs/dood3-install.md` 의 §0.1 에서 참조됩니다. 표준 helm install 흐름의 사전 단계.
+> 본 가이드는 `docs/k8s-control-plane-and-native-agent-install.md` 의 §0.1 에서 참조됩니다. 표준 helm install 흐름의 사전 단계.
 
 ## 개요
 
-dood3 helm chart 가 가정하는 image 들:
+k8s-control-plane-and-native-agent helm chart 가 가정하는 image 들:
 
 | 컴포넌트 | image (사설 registry 기준) | 빌드 방식 | 빌드 필요? |
 |---|---|---|---|
@@ -91,7 +91,7 @@ docker build -f docker/agent/Dockerfile -t backend.ai-agent:dev .
 - runtime stage: docker-ce-cli 추가 설치 (DooD pattern — host docker.sock 호출용), iproute2/util-linux/procps 등 진단 도구 포함
 - 컨테이너는 root 로 동작 (host docker.sock 권한 + /proc / cgroups 접근)
 - entrypoint default: `ag start-server --config /etc/backend.ai/agent.toml`
-- dood3 시나리오에선 이 image 를 호스트에 직접 `docker run --net=host` 로 띄움 (`docs/dood3-install.md §4` 참조)
+- k8s-control-plane-and-native-agent 시나리오에선 이 image 를 호스트에 직접 `docker run --net=host` 로 띄움 (`docs/k8s-control-plane-and-native-agent-install.md §4` 참조)
 
 ### Storage Proxy
 
@@ -242,7 +242,7 @@ done
 docker pull 192.168.0.156:5000/backend.ai-manager:dev
 ```
 
-성공하면 `docs/dood3-install.md §1` 의 helm install 진행.
+성공하면 `docs/k8s-control-plane-and-native-agent-install.md §1` 의 helm install 진행.
 
 ## Troubleshooting
 

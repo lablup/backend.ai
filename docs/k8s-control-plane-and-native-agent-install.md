@@ -1,10 +1,10 @@
-# Backend.AI dood3 설치 매뉴얼
+# Backend.AI k8s-control-plane-and-native-agent 설치 매뉴얼
 
-`dood3` 시나리오: control plane (manager / storage-proxy / webserver / appproxy / apollo-router / 부수 etcd·redis·postgres) 는 모두 **k8s** 위에 helm umbrella chart 로 설치하고, **agent 만 호스트의 docker container** 로 띄움.
+`k8s-control-plane-and-native-agent` 시나리오: control plane (manager / storage-proxy / webserver / appproxy / apollo-router / 부수 etcd·redis·postgres) 는 모두 **k8s** 위에 helm umbrella chart 로 설치하고, **agent 만 호스트의 docker container** 로 띄움.
 
 관련 문서:
-- `docs/dood3-diff.md` — dood2 대비 변경 / 알려진 이슈 I-1~I-5
-- `docs/dood_agent_host.md` — agent 호스트 셋업 디테일 (이 문서의 §4 와 중복)
+- `docs/k8s-control-plane-and-native-agent-diff.md` — dood2 대비 변경 / 알려진 이슈 I-1~I-5
+- `docs/k8s-control-plane-and-native-agent-host.md` — agent 호스트 셋업 디테일 (이 문서의 §4 와 중복)
 
 ## 0. 사전 조건
 
@@ -30,7 +30,7 @@ kubectl describe node ser8 | grep -E "Taints|backendai.io"
 
 ## 0.1. 컴포넌트 이미지 빌드 + 푸시 (registry 에 없으면 1 회)
 
-`dood3` 의 helm chart 는 사설 registry 에 backend.ai image 5 종 (`manager / agent / storage-proxy / appproxy / webserver`, 모두 `:dev` 태그) 이 있다고 가정합니다. main 에 머지되기 전이라 공개 image 가 없고 — 이 repo 의 `docker/` 아래 Dockerfile 들로 직접 빌드해야 합니다.
+`k8s-control-plane-and-native-agent` 의 helm chart 는 사설 registry 에 backend.ai image 5 종 (`manager / agent / storage-proxy / appproxy / webserver`, 모두 `:dev` 태그) 이 있다고 가정합니다. main 에 머지되기 전이라 공개 image 가 없고 — 이 repo 의 `docker/` 아래 Dockerfile 들로 직접 빌드해야 합니다.
 
 **전체 빌드 절차는 별도 문서로 분리됨 → [`docs/build-images.md`](./build-images.md)**.
 
@@ -123,7 +123,7 @@ curl -sf http://192.168.0.156:32081/ && echo OK
 # 브라우저로 http://192.168.0.156:30890
 ```
 
-## 2. etcd 의 redis addr 를 NodePort 로 덮어쓰기 (dood3 고정 후처리)
+## 2. etcd 의 redis addr 를 NodePort 로 덮어쓰기 (k8s-control-plane-and-native-agent 고정 후처리)
 
 etcd-seed Job 은 redis addr 를 cluster DNS (`bai-redis:6379`) 로 기록 — k8s 안 컴포넌트는 OK 지만 호스트 agent 는 resolve 불가. NodePort 로 덮어씀:
 
@@ -154,7 +154,7 @@ agent 가 어떤 registry 의 image 를 pull 할지 manager 가 알려주는 메
 
 ## 4. agent 설치 (호스트별 반복)
 
-각 worker 호스트에서 아래 4-1 ~ 4-5 를 수행. dood3 의 핵심: **agent 만 호스트, k8s 밖**.
+각 worker 호스트에서 아래 4-1 ~ 4-5 를 수행. k8s-control-plane-and-native-agent 의 핵심: **agent 만 호스트, k8s 밖**.
 
 ### 4-1. 호스트 사전 준비
 
@@ -216,7 +216,7 @@ sudo docker rm temp-agent
 
 ### 4-4. agent.toml 배치
 
-`configs/agent/dood3.toml` 을 베이스로, **host IP 3 군데만** 갈아끼움:
+`configs/agent/k8s-control-plane-and-native-agent.toml` 을 베이스로, **host IP 3 군데만** 갈아끼움:
 
 | 필드 | 값 | 비고 |
 |---|---|---|
@@ -231,7 +231,7 @@ sudo docker rm temp-agent
 sed -e 's|host = "192.168.0.156", port = 6001|host = "192.168.0.104", port = 6001|' \
     -e 's|public-host = "192.168.0.156"|public-host = "192.168.0.104"|' \
     -e 's|advertised-host = "192.168.0.156"|advertised-host = "192.168.0.104"|' \
-    configs/agent/dood3.toml | sudo tee /etc/backend.ai/agent.toml >/dev/null
+    configs/agent/k8s-control-plane-and-native-agent.toml | sudo tee /etc/backend.ai/agent.toml >/dev/null
 ```
 
 (`[etcd]` 의 `192.168.0.156:32379` 는 그대로 — 모든 호스트가 같은 control plane 을 봄.)
@@ -288,7 +288,7 @@ ansible / cloud-init 으로 자동화 권장.
 
 ## 7. Troubleshooting
 
-자주 만나는 이슈는 `docs/dood3-diff.md` §발생한 이슈 (I-1 ~ I-5) 참조:
+자주 만나는 이슈는 `docs/k8s-control-plane-and-native-agent-diff.md` §발생한 이슈 (I-1 ~ I-5) 참조:
 
 - **I-1**: agent RPC addr 가 0.0.0.0 으로 publish → `advertised-rpc-addr` 명시 누락
 - **I-2**: agent 가 redis 연결 실패 → §2 의 etcd redis addr 덮어쓰기 누락

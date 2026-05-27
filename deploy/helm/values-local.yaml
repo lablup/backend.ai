@@ -24,7 +24,7 @@ manager:
   secret: "local-dev-manager-secret"
 
   # Expose manager API + deps (etcd/redis) on NodePort so a host-side agent
-  # process (dood3 scenario) can reach them without going through k8s DNS.
+  # process (k8s-control-plane-and-native-agent scenario) can reach them without going through k8s DNS.
   service:
     type: NodePort
     port: 8081
