@@ -27,6 +27,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvitationNotFound,
     VFolderNotFound,
 )
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderInvitationState
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -798,7 +799,7 @@ class TestUpdateInvitationAction:
             mount_permission=VFolderMountPermission.READ_WRITE,
         )
 
-        with pytest.raises(VFolderNotFound):
+        with pytest.raises(UserNotFound):
             await invite_service.update_invitation(action)
 
 

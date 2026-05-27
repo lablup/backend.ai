@@ -190,8 +190,6 @@ class VfolderRepository:
             if not vfolder_row:
                 raise VFolderNotFound()
 
-            # Owner can always act on their own vfolder regardless of domain.
-            # Required for SSO-created accounts whose domain_name may be NULL or empty.
             if vfolder_row.user == user_id:
                 return self._vfolder_row_to_data(vfolder_row)
 
@@ -208,7 +206,7 @@ class VfolderRepository:
                 user_id,
                 allow_privileged_access=True,
                 user_role=user_row.role,
-                domain_name=domain_name or "",
+                domain_name=domain_name,
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=(VFolderRow.id == vfolder_id),
             )

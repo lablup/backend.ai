@@ -10,6 +10,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvitationNotFound,
     VFolderNotFound,
 )
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
     VFolderInvitationState,
@@ -76,7 +77,7 @@ class VFolderInviteService:
         # Get inviter email
         inviter_email = await self._vfolder_repository.get_user_email_by_id(action.user_uuid)
         if inviter_email is None:
-            raise VFolderNotFound()
+            raise UserNotFound()
 
         # Resolve invitee emails to user info
         invitee_users = await self._vfolder_repository.get_users_by_emails(action.invitee_emails)
@@ -173,7 +174,7 @@ class VFolderInviteService:
                 action.requester_user_uuid
             )
             if requester_email is None:
-                raise VFolderNotFound
+                raise UserNotFound
 
             # Determine new state based on who is rejecting
             if requester_email == invitation_data.inviter:
@@ -202,7 +203,7 @@ class VFolderInviteService:
             action.requester_user_uuid
         )
         if requester_email is None:
-            raise VFolderNotFound()
+            raise UserNotFound()
 
         # Update invitation permission (only by inviter)
         await self._vfolder_repository.update_invitation_permission(
@@ -217,7 +218,7 @@ class VFolderInviteService:
             action.requester_user_uuid
         )
         if requester_email is None:
-            raise VFolderNotFound()
+            raise UserNotFound()
 
         # Get pending invitations with vfolder info
         invitation_vfolder_pairs = await self._vfolder_repository.get_pending_invitations_for_user(
@@ -303,7 +304,7 @@ class VFolderInviteService:
             action.requester_user_uuid
         )
         if requester_email is None:
-            raise VFolderNotFound()
+            raise UserNotFound()
 
         invitation_pairs = await self._vfolder_repository.get_sent_invitations_for_user(
             requester_email
