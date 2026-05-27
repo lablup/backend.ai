@@ -119,7 +119,7 @@ class VFolderInvitationDTO(BackendAISchema):
     """DTO for vfolder invitation data."""
 
     id: str = Field(description="Invitation ID")
-    inviter: str = Field(description="Inviter email")
+    inviter: str = Field(description="Inviter email, or username if email is empty")
     invitee: str = Field(description="Invitee email")
     perm: VFolderPermissionField = Field(description="Permission level")
     state: str = Field(description="Invitation state")
