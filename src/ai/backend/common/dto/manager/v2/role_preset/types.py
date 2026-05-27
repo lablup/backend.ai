@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import (
     EntityType,
     OperationTypeDTO,
@@ -25,13 +26,6 @@ __all__ = (
     "RolePermissionPresetInfo",
     "RolePresetOrderField",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for role preset search results."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class RolePresetOrderField(StrEnum):
