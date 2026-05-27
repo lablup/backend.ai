@@ -21,9 +21,8 @@ class RolePresetRow(Base):  # type: ignore[misc]
     __tablename__ = "role_presets"
     __table_args__ = (
         sa.Index(
-            "uq_role_presets_scope_type_auto_apply",
+            "ix_role_presets_scope_type_auto_apply",
             "scope_type",
-            unique=True,
             postgresql_where=sa.text("auto_apply IS TRUE"),
         ),
     )

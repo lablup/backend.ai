@@ -3,8 +3,7 @@
 Adds two new tables that support admin-managed role templates:
 
 - ``role_presets`` — one row per template, identified by ``scope_type``
-  with an optional ``auto_apply`` flag. A partial unique index ensures
-  at most one auto-apply preset per scope type.
+  with an optional ``auto_apply`` flag.
 - ``role_permission_presets`` — child rows that capture the
   ``(entity_type, operation)`` pairs that the preset grants. Deleting
   a preset cascades to its permission rows.
@@ -58,10 +57,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_role_presets")),
     )
     op.create_index(
-        "uq_role_presets_scope_type_auto_apply",
+        "ix_role_presets_scope_type_auto_apply",
         "role_presets",
         ["scope_type"],
-        unique=True,
         postgresql_where=sa.text("auto_apply IS TRUE"),
     )
     op.create_table(
@@ -100,7 +98,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("role_permission_presets")
     op.drop_index(
-        "uq_role_presets_scope_type_auto_apply",
+        "ix_role_presets_scope_type_auto_apply",
         table_name="role_presets",
         postgresql_where=sa.text("auto_apply IS TRUE"),
     )
