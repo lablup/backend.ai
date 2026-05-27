@@ -6,8 +6,8 @@ import asyncio
 import logging
 from typing import Final
 
+from ai.backend.common.cron.base import PeriodicTask
 from ai.backend.common.leader.base import LeadershipChecker, LeaderTask
-from ai.backend.common.leader.tasks.base import PeriodicTask
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
