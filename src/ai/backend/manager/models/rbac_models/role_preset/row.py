@@ -38,6 +38,10 @@ class RolePresetRow(Base):  # type: ignore[misc]
     auto_apply: Mapped[bool] = mapped_column(
         "auto_apply", sa.Boolean, nullable=False, server_default=sa.false()
     )
+    # Default for the ``auto_assign`` flag copied onto roles instantiated from this preset.
+    auto_assign: Mapped[bool] = mapped_column(
+        "auto_assign", sa.Boolean, nullable=False, server_default=sa.false()
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )

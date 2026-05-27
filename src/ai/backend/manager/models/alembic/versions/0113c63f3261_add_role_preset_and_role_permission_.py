@@ -43,6 +43,12 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column(
+            "auto_assign",
+            sa.Boolean(),
+            server_default=sa.text("false"),
+            nullable=False,
+        ),
+        sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
