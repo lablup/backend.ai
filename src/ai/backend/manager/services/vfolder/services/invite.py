@@ -64,8 +64,6 @@ class VFolderInviteService:
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
         # Get VFolder data
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        if not user.domain_name:
-            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, action.user_uuid, user.domain_name
         )
@@ -77,7 +75,7 @@ class VFolderInviteService:
 
         # Get inviter email
         inviter_email = await self._vfolder_repository.get_user_email_by_id(action.user_uuid)
-        if not inviter_email:
+        if inviter_email is None:
             raise VFolderNotFound()
 
         # Resolve invitee emails to user info
@@ -174,7 +172,7 @@ class VFolderInviteService:
             requester_email = await self._vfolder_repository.get_user_email_by_id(
                 action.requester_user_uuid
             )
-            if not requester_email:
+            if requester_email is None:
                 raise VFolderNotFound
 
             # Determine new state based on who is rejecting
@@ -203,7 +201,7 @@ class VFolderInviteService:
         requester_email = await self._vfolder_repository.get_user_email_by_id(
             action.requester_user_uuid
         )
-        if not requester_email:
+        if requester_email is None:
             raise VFolderNotFound()
 
         # Update invitation permission (only by inviter)
@@ -218,7 +216,7 @@ class VFolderInviteService:
         requester_email = await self._vfolder_repository.get_user_email_by_id(
             action.requester_user_uuid
         )
-        if not requester_email:
+        if requester_email is None:
             raise VFolderNotFound()
 
         # Get pending invitations with vfolder info
@@ -250,8 +248,6 @@ class VFolderInviteService:
     ) -> LeaveInvitedVFolderActionResult:
         # Get vfolder info
         user = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
-        if not user.domain_name:
-            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -306,7 +302,7 @@ class VFolderInviteService:
         requester_email = await self._vfolder_repository.get_user_email_by_id(
             action.requester_user_uuid
         )
-        if not requester_email:
+        if requester_email is None:
             raise VFolderNotFound()
 
         invitation_pairs = await self._vfolder_repository.get_sent_invitations_for_user(

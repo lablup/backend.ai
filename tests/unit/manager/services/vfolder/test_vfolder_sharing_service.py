@@ -36,6 +36,7 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     InviteVFolderAction,
     LeaveInvitedVFolderAction,
     ListInvitationAction,
+    ListSentInvitationsAction,
     RejectInvitationAction,
     RevokeInvitedVFolderAction,
     UpdateInvitationAction,
@@ -1042,3 +1043,272 @@ class TestUpdateInvitedVFolderMountPermissionAction:
         mock_vfolder_repo.update_invited_vfolder_mount_permission.assert_called_once_with(
             vfolder_uuid, user_id, VFolderMountPermission.RW_DELETE
         )
+
+
+# ============================================================
+# Empty-email / null-domain account scenarios
+# ============================================================
+
+
+class TestEmptyEmailAccountInvitationScenarios:
+    """Verify that invitation flows work when User.email is an empty string and
+    User.domain_name may be NULL."""
+
+    @pytest.fixture
+    def empty_email_user(self, user_uuid: uuid.UUID) -> MagicMock:
+        return _make_user_data(user_uuid, domain_name=None, email="")
+
+    @pytest.fixture
+    def expected_invitation_id(self) -> str:
+        return str(uuid.uuid4())
+
+    @pytest.fixture
+    def invitee_uuid(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def invitation_uuid(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def empty_invitee_invitation(self, vfolder_uuid: uuid.UUID) -> MagicMock:
+        invitation_data = MagicMock(spec=VFolderInvitationData)
+        invitation_data.vfolder = vfolder_uuid
+        invitation_data.invitee = ""
+        invitation_data.permission = VFolderMountPermission.READ_ONLY.value
+        return invitation_data
+
+    @pytest.fixture
+    def invitation_with_empty_invitee_and_normal_inviter(self) -> MagicMock:
+        invitation_data = MagicMock(spec=VFolderInvitationData)
+        invitation_data.inviter = "inviter@test.com"
+        invitation_data.invitee = ""
+        return invitation_data
+
+    # --- invite ---
+
+    @pytest.fixture
+    def invite_action_with_empty_email_inviter(
+        self,
+        mock_user_repo: MagicMock,
+        mock_vfolder_repo: MagicMock,
+        empty_email_user: MagicMock,
+        user_uuid: uuid.UUID,
+        vfolder_uuid: uuid.UUID,
+        expected_invitation_id: str,
+    ) -> InviteVFolderAction:
+        mock_user_repo.get_user_by_uuid = AsyncMock(return_value=empty_email_user)
+        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+            return_value=_make_vfolder_data(vfolder_uuid, name="folder")
+        )
+        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
+        mock_vfolder_repo.get_users_by_emails = AsyncMock(
+            return_value=[(uuid.uuid4(), "invitee@test.com")]
+        )
+        mock_vfolder_repo.check_user_has_vfolder_permission = AsyncMock(return_value=False)
+        mock_vfolder_repo.check_pending_invitation_exists = AsyncMock(return_value=False)
+        mock_vfolder_repo.create_vfolder_invitation = AsyncMock(return_value=expected_invitation_id)
+        return InviteVFolderAction(
+            keypair_resource_policy={},
+            user_uuid=user_uuid,
+            vfolder_uuid=vfolder_uuid,
+            mount_permission=VFolderMountPermission.READ_ONLY,
+            invitee_emails=["invitee@test.com"],
+        )
+
+    async def test_inviter_with_empty_email_can_send_invitation(
+        self,
+        invite_service: VFolderInviteService,
+        mock_vfolder_repo: MagicMock,
+        vfolder_uuid: uuid.UUID,
+        invite_action_with_empty_email_inviter: InviteVFolderAction,
+        expected_invitation_id: str,
+    ) -> None:
+        result = await invite_service.invite(invite_action_with_empty_email_inviter)
+
+        assert result.vfolder_uuid == vfolder_uuid
+        assert expected_invitation_id in result.invitation_ids
+        assert mock_vfolder_repo.create_vfolder_invitation.call_args.args[1] == ""
+
+    # --- accept ---
+
+    @pytest.fixture
+    def accept_action_with_empty_email_invitee(
+        self,
+        mock_vfolder_repo: MagicMock,
+        empty_invitee_invitation: MagicMock,
+        invitee_uuid: uuid.UUID,
+        vfolder_uuid: uuid.UUID,
+        invitation_uuid: uuid.UUID,
+    ) -> AcceptInvitationAction:
+        mock_vfolder_repo.get_invitation_by_id = AsyncMock(return_value=empty_invitee_invitation)
+        mock_vfolder_repo.get_user_by_email = AsyncMock(return_value=(invitee_uuid, None))
+        mock_vfolder_repo.get_by_id = AsyncMock(
+            return_value=_make_vfolder_data(vfolder_uuid, name="shared-folder")
+        )
+        mock_vfolder_repo.count_vfolder_with_name_for_user = AsyncMock(return_value=0)
+        mock_vfolder_repo.create_vfolder_permission = AsyncMock()
+        mock_vfolder_repo.update_invitation_state = AsyncMock()
+        return AcceptInvitationAction(invitation_id=invitation_uuid)
+
+    async def test_invitee_with_empty_email_can_accept_invitation(
+        self,
+        invite_service: VFolderInviteService,
+        mock_vfolder_repo: MagicMock,
+        invitation_uuid: uuid.UUID,
+        accept_action_with_empty_email_invitee: AcceptInvitationAction,
+    ) -> None:
+        result = await invite_service.accept_invitation(accept_action_with_empty_email_invitee)
+
+        assert result.invitation_id == invitation_uuid
+        mock_vfolder_repo.update_invitation_state.assert_called_once_with(
+            invitation_uuid, VFolderInvitationState.ACCEPTED
+        )
+
+    # --- reject ---
+
+    @pytest.fixture
+    def reject_action_with_empty_email_invitee(
+        self,
+        mock_vfolder_repo: MagicMock,
+        invitation_with_empty_invitee_and_normal_inviter: MagicMock,
+        invitee_uuid: uuid.UUID,
+        invitation_uuid: uuid.UUID,
+    ) -> RejectInvitationAction:
+        mock_vfolder_repo.get_invitation_by_id = AsyncMock(
+            return_value=invitation_with_empty_invitee_and_normal_inviter
+        )
+        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
+        mock_vfolder_repo.update_invitation_state = AsyncMock()
+        return RejectInvitationAction(
+            invitation_id=invitation_uuid,
+            requester_user_uuid=invitee_uuid,
+        )
+
+    async def test_invitee_with_empty_email_can_reject_invitation(
+        self,
+        invite_service: VFolderInviteService,
+        mock_vfolder_repo: MagicMock,
+        invitation_uuid: uuid.UUID,
+        reject_action_with_empty_email_invitee: RejectInvitationAction,
+    ) -> None:
+        result = await invite_service.reject_invitation(reject_action_with_empty_email_invitee)
+
+        assert result.invitation_id == invitation_uuid
+        mock_vfolder_repo.update_invitation_state.assert_called_once_with(
+            invitation_uuid, VFolderInvitationState.REJECTED
+        )
+
+    # --- update ---
+
+    @pytest.fixture
+    def update_action_with_empty_email_inviter(
+        self,
+        mock_vfolder_repo: MagicMock,
+        invitation_uuid: uuid.UUID,
+    ) -> UpdateInvitationAction:
+        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
+        mock_vfolder_repo.update_invitation_permission = AsyncMock()
+        return UpdateInvitationAction(
+            invitation_id=invitation_uuid,
+            requester_user_uuid=uuid.uuid4(),
+            mount_permission=VFolderMountPermission.READ_WRITE,
+        )
+
+    async def test_inviter_with_empty_email_can_update_invitation_permission(
+        self,
+        invite_service: VFolderInviteService,
+        mock_vfolder_repo: MagicMock,
+        invitation_uuid: uuid.UUID,
+        update_action_with_empty_email_inviter: UpdateInvitationAction,
+    ) -> None:
+        result = await invite_service.update_invitation(update_action_with_empty_email_inviter)
+
+        assert result.invitation_id == invitation_uuid
+        mock_vfolder_repo.update_invitation_permission.assert_called_once_with(
+            invitation_uuid, "", VFolderMountPermission.READ_WRITE
+        )
+
+    # --- list received ---
+
+    @pytest.fixture
+    def list_invitation_action_with_empty_email_requester(
+        self,
+        mock_vfolder_repo: MagicMock,
+    ) -> ListInvitationAction:
+        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
+        mock_vfolder_repo.get_pending_invitations_for_user = AsyncMock(return_value=[])
+        return ListInvitationAction(requester_user_uuid=uuid.uuid4())
+
+    async def test_user_with_empty_email_can_list_received_invitations(
+        self,
+        invite_service: VFolderInviteService,
+        mock_vfolder_repo: MagicMock,
+        list_invitation_action_with_empty_email_requester: ListInvitationAction,
+    ) -> None:
+        result = await invite_service.list_invitation(
+            list_invitation_action_with_empty_email_requester
+        )
+
+        assert result.info == []
+        mock_vfolder_repo.get_pending_invitations_for_user.assert_called_once_with("")
+
+    # --- list sent ---
+
+    @pytest.fixture
+    def list_sent_invitations_action_with_empty_email_requester(
+        self,
+        mock_vfolder_repo: MagicMock,
+    ) -> ListSentInvitationsAction:
+        mock_vfolder_repo.get_user_email_by_id = AsyncMock(return_value="")
+        mock_vfolder_repo.get_sent_invitations_for_user = AsyncMock(return_value=[])
+        return ListSentInvitationsAction(requester_user_uuid=uuid.uuid4())
+
+    async def test_user_with_empty_email_can_list_sent_invitations(
+        self,
+        invite_service: VFolderInviteService,
+        mock_vfolder_repo: MagicMock,
+        list_sent_invitations_action_with_empty_email_requester: ListSentInvitationsAction,
+    ) -> None:
+        result = await invite_service.list_sent_invitations(
+            list_sent_invitations_action_with_empty_email_requester
+        )
+
+        assert result.invitations == []
+        mock_vfolder_repo.get_sent_invitations_for_user.assert_called_once_with("")
+
+    # --- leave invited vfolder ---
+
+    @pytest.fixture
+    def leave_action_with_empty_email_user(
+        self,
+        mock_user_repo: MagicMock,
+        mock_vfolder_repo: MagicMock,
+        empty_email_user: MagicMock,
+        user_uuid: uuid.UUID,
+        vfolder_uuid: uuid.UUID,
+    ) -> LeaveInvitedVFolderAction:
+        mock_user_repo.get_user_by_uuid = AsyncMock(return_value=empty_email_user)
+        mock_vfolder_repo.get_by_id_validated = AsyncMock(
+            return_value=_make_vfolder_data(vfolder_uuid, ownership_type=VFolderOwnershipType.USER)
+        )
+        mock_vfolder_repo.get_user_info = AsyncMock(return_value=(UserRole.USER, None))
+        mock_vfolder_repo.delete_vfolder_permission = AsyncMock()
+        return LeaveInvitedVFolderAction(
+            requester_user_uuid=user_uuid,
+            vfolder_uuid=vfolder_uuid,
+            shared_user_uuid=None,
+        )
+
+    async def test_user_with_empty_email_can_leave_invited_vfolder(
+        self,
+        invite_service: VFolderInviteService,
+        mock_vfolder_repo: MagicMock,
+        user_uuid: uuid.UUID,
+        vfolder_uuid: uuid.UUID,
+        leave_action_with_empty_email_user: LeaveInvitedVFolderAction,
+    ) -> None:
+        result = await invite_service.leave_invited_vfolder(leave_action_with_empty_email_user)
+
+        assert result.vfolder_uuid == vfolder_uuid
+        mock_vfolder_repo.delete_vfolder_permission.assert_called_once_with(vfolder_uuid, user_uuid)
