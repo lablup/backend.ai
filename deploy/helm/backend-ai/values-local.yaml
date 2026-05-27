@@ -40,6 +40,11 @@ backend-ai-manager:
     etcdNodePort: 32379
     redisNodePort: 32679
 
+    # Seeded into etcd at config/redis/addr — host agent uses this to reach
+    # redis (cannot resolve cluster DNS from outside k8s). Match the redis
+    # NodePort above and the lab's swarm-manager node IP (ser8).
+    redisExternalAddr: "192.168.0.156:32679"
+
   postgres:
     password: "local-dev-postgres"
 

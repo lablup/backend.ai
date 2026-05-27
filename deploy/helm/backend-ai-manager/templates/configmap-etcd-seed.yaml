@@ -10,12 +10,21 @@ data:
 {{- $seed := .Values.etcdSeed.config | deepCopy }}
 {{/*
   The agent reads this block from etcd and only supports the `addr` form.
+  Default is the in-cluster Service DNS (bai-redis:6379) — fine for k8s-only
+  consumers (manager, storage-proxy, appproxy). For the
+  k8s-control-plane-and-native-agent scenario the host agent cannot resolve
+  cluster DNS, so override `.Values.manager.redisExternalAddr` to the
+  externally reachable host:port (e.g. NodePort or LoadBalancer). The seed
+  re-applies on every helm upgrade, so this stays consistent — no manual
+  `etcdctl put` step.
+
   Bitnami redis in sentinel mode exposes a Service whose endpoints track the
   current master (sentinel sidecar relabels pods on failover), so pointing
   there by Service DNS gives failover semantics with a simple standalone URL.
 */}}
+{{- $redisAddr := default (printf "%s:6379" (include "bai-manager.redisHost" .)) .Values.manager.redisExternalAddr }}
 {{- $_ := set $seed "redis" (dict
-    "addr" (printf "%s:6379" (include "bai-manager.redisHost" .))
+    "addr" $redisAddr
     "password" .Values.redis.password) }}
     {{- toJson $seed | nindent 4 }}
 {{- if .Values.storageProxy.enabled }}

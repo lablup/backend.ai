@@ -38,6 +38,17 @@ manager:
   tolerations: []
   affinity: {}
 
+  # When set, seeded into etcd at `config/redis/addr` instead of the cluster
+  # DNS default (`bai-redis:6379`). Required for the
+  # k8s-control-plane-and-native-agent scenario: the host agent lives outside
+  # the cluster and cannot resolve k8s service DNS, so it needs a routable
+  # host:port (typically the redis NodePort, e.g. `<node-ip>:32679` — match
+  # `manager.redisNodePort` and the actual IP that's reachable from the agent
+  # hosts). The etcd-seed Job re-applies this value on every helm upgrade,
+  # keeping the etcd entry in lockstep with what's declared here — no manual
+  # `etcdctl put` step.
+  redisExternalAddr: ""
+
 ## ---------------- Embedded deps (single replica, no HA) ----------------
 postgres:
   image: postgres:16

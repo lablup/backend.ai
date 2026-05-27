@@ -123,20 +123,29 @@ curl -sf http://192.168.0.156:32081/ && echo OK
 # 브라우저로 http://192.168.0.156:30890
 ```
 
-## 2. etcd 의 redis addr 를 NodePort 로 덮어쓰기 (k8s-control-plane-and-native-agent 고정 후처리)
+## 2. agent 가 보는 redis 주소 (values 로 선언)
 
-etcd-seed Job 은 redis addr 를 cluster DNS (`bai-redis:6379`) 로 기록 — k8s 안 컴포넌트는 OK 지만 호스트 agent 는 resolve 불가. NodePort 로 덮어씀:
+host 의 agent 는 cluster DNS 를 resolve 못 하므로 `bai-redis:6379` 가 아닌 외부 도달 가능한 주소 (NodePort / LB) 가 필요합니다. **`deploy/helm/backend-ai/values-local.yaml` 의 `manager.redisExternalAddr` 한 줄** 로 처리:
 
-```bash
-kubectl exec -n backend-ai bai-etcd-0 -- etcdctl \
-  put /sorna/local/config/redis/addr "192.168.0.156:32679"
-
-# 확인
-kubectl exec -n backend-ai bai-etcd-0 -- etcdctl \
-  get /sorna/local/config/redis/addr
+```yaml
+backend-ai-manager:
+  manager:
+    redisExternalAddr: "192.168.0.156:32679"   # redis NodePort 와 일치
 ```
 
-이 작업은 **클러스터 1회**. etcd 가 persistent 라 노드 재기동 후에도 유지됨.
+etcd-seed Job 이 매 install/upgrade 마다 이 값을 `config/redis/addr` 로 박아주므로:
+- 사람이 `etcdctl put` 할 필요 없음
+- helm upgrade 시 reset 되는 drift 없음
+- IP 바뀌면 values 만 수정 후 `helm upgrade` — 끝
+
+```bash
+# 확인
+kubectl exec -n backend-ai bai-etcd-0 -- etcdctl get /sorna/local/config/redis/addr
+# /sorna/local/config/redis/addr
+# 192.168.0.156:32679
+```
+
+값이 비어 있으면 (`redisExternalAddr: ""`) cluster DNS (`bai-redis:6379`) 가 seed 됨 — 순수 k8s-안-만 시나리오 와 backward compatible.
 
 ## 3. (옵션) 사설 image registry 등록
 
