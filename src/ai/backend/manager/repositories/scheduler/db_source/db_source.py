@@ -52,6 +52,7 @@ from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, S
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.resource.types import SlotTypePolicy
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -346,6 +347,11 @@ class ScheduleDBSource:
         stmt = sa.select(ResourceSlotTypeRow.slot_name).where(
             ResourceSlotTypeRow.required.is_(True)
         )
+        rows = (await db_sess.execute(stmt)).scalars().all()
+        return frozenset(SlotName(slot_name) for slot_name in rows)
+
+    async def _fetch_enabled_slot_names(self, db_sess: SASession) -> frozenset[SlotName]:
+        stmt = sa.select(ResourceSlotTypeRow.slot_name).where(ResourceSlotTypeRow.enabled.is_(True))
         rows = (await db_sess.execute(stmt)).scalars().all()
         return frozenset(SlotName(slot_name) for slot_name in rows)
 
@@ -1503,7 +1509,10 @@ class ScheduleDBSource:
             rg_defaults = None
             resource_group_allow_fractional = False
             known_slot_types: Mapping[SlotName, SlotTypes] = {}
-            required_slot_names = await self._fetch_required_slot_names(db_sess)
+            slot_type_policy = SlotTypePolicy(
+                enabled=await self._fetch_enabled_slot_names(db_sess),
+                required=await self._fetch_required_slot_names(db_sess),
+            )
             if resource_group_name:
                 rg_bundle = await self._fetch_scaling_group_with_slot_inventory(
                     db_sess, resource_group_name
@@ -1675,7 +1684,7 @@ class ScheduleDBSource:
             active_session_count=active_session_count,
             keypair_resource_policy=keypair_policy,
             known_slot_types=known_slot_types,
-            required_slot_names=required_slot_names,
+            slot_type_policy=slot_type_policy,
         )
 
     async def pick_default_resource_group(

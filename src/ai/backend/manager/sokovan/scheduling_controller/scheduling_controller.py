@@ -190,7 +190,7 @@ class SchedulingController:
             keypair_resource_policy=fetched.keypair_resource_policy,
             image_infos=fetched.image_infos,
             known_slot_types=fetched.known_slot_types,
-            required_slot_names=fetched.required_slot_names,
+            slot_type_policy=fetched.slot_type_policy,
             dotfile_data=fetched.dotfile_data,
             active_session_count=fetched.active_session_count,
         )

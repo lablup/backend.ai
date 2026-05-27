@@ -53,7 +53,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
-from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, SlotTypePolicy
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -212,6 +212,9 @@ def _fetch_bundle(image_id: ImageID) -> SessionSpecContextFetch:
             SlotName("cpu"): SlotTypes.COUNT,
             SlotName("mem"): SlotTypes.BYTES,
         },
+        slot_type_policy=SlotTypePolicy(
+            enabled=frozenset({SlotName("cpu"), SlotName("mem")}),
+        ),
     )
 
 

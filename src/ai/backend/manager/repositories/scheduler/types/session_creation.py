@@ -16,6 +16,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
+from ai.backend.manager.data.resource.types import SlotTypePolicy
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 
 
@@ -147,5 +148,5 @@ class SessionSpecContextFetch:
     dotfile_data: DotfileBundle
     keypair_resource_policy: Any | None  # KeyPairResourcePolicyData
     known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
-    required_slot_names: frozenset[SlotName] = field(default_factory=frozenset)
+    slot_type_policy: SlotTypePolicy = field(default_factory=SlotTypePolicy)
     active_session_count: int = 0

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ai.backend.common.types import SlotName
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import image_min_slots
@@ -36,8 +37,9 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecValidationContext,
     ) -> None:
-        rg_slot_types = context.known_slot_types
-        if not rg_slot_types:
+        known_slot_types = context.known_slot_types
+        enabled = context.slot_type_policy.enabled
+        if not known_slot_types:
             raise InvalidAPIParameters(
                 extra_msg=(
                     f"resource group '{spec.scope.resource_group_name}' has no "
@@ -53,7 +55,8 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
             unknown = sorted(
                 slot_name
                 for slot_name in image_info.resource_spec
-                if slot_name not in rg_slot_types
+                if SlotName(slot_name) in enabled
+                and SlotName(slot_name) not in known_slot_types
                 and min_slots.get(slot_name, Decimal(0)) > Decimal(0)
             )
             if unknown:
