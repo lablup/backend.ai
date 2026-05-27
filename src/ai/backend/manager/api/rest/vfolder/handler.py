@@ -1088,7 +1088,7 @@ class VFolderHandler:
             invs_info.append(
                 VFolderInvitationDTO(
                     id=str(inv.id),
-                    inviter=inv.inviter_user_email,
+                    inviter=inv.inviter_user_email or inv.inviter_username or "",
                     invitee=inv.invitee_user_email,
                     perm=VFolderPermissionField(inv.mount_permission.value),
                     state=inv.status.value,
@@ -1189,7 +1189,7 @@ class VFolderHandler:
             invs.append(
                 VFolderInvitationDTO(
                     id=inv_json.get("id", ""),
-                    inviter=inv_json.get("inviter", ""),
+                    inviter=info.inviter_user_email or info.inviter_username or "",
                     invitee=inv_json.get("invitee", ""),
                     perm=VFolderPermissionField(info.mount_permission.value),
                     state=inv_json.get("state", ""),

@@ -214,6 +214,7 @@ class VFolderInvitationData:
     id: uuid.UUID
     vfolder: uuid.UUID
     inviter: str  # email
+    inviter_username: str | None
     invitee: str  # email
     permission: VFolderMountPermission
     created_at: datetime
