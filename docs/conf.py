@@ -81,8 +81,9 @@ version = ".".join(release.split(".")[:2])
 # out of the file directly instead of importing the package, so the docs
 # build does not need aiohttp / the full client runtime installed.
 def _read_api_version() -> str:
-    source = (root_path / "src/ai/backend/client/config.py").read_text()
-    for node in ast.parse(source).body:
+    config_path = root_path / "src/ai/backend/client/config.py"
+    source = config_path.read_text(encoding="utf-8")
+    for node in ast.parse(source, filename=str(config_path)).body:
         if (
             isinstance(node, ast.Assign)
             and len(node.targets) == 1
