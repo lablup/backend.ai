@@ -32,6 +32,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentMetadataInfo,
     ModelReplicaData,
     ModelRevisionData,
+    MountInfo,
     ReplicaStateData,
     ResourceSpec,
     RevisionRefreshResult,
@@ -322,13 +323,11 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
 
 
 def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionCreator:
-    """Rebuild a ``ModelRevisionCreator`` from an existing revision's persisted data.
+    """Rebuild a ``ModelRevisionCreator`` from a persisted revision.
 
-    ``model_definition`` is reset to ``None`` so ``DeploymentController.add_revision``
-    re-resolves it from the vfolder. ``revision_preset_id`` and ``preset_values`` are
-    carried over so the new revision keeps the same preset attribution. ``extra_mounts``
-    is left empty because ``add_revision`` does not propagate this field to the new
-    revision spec.
+    ``model_definition`` is cleared so ``add_revision`` re-resolves it via
+    the merge chain. Mount identity (``extra_mounts``, ``vfolder_subpath``)
+    is copied verbatim — refreshing must not silently drop them.
     """
     if data.model_mount_config.vfolder_id is None:
         raise InvalidAPIParameters(
@@ -346,7 +345,16 @@ def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionC
             model_vfolder_id=data.model_mount_config.vfolder_id,
             model_definition_path=data.model_mount_config.definition_path or None,
             model_mount_destination=data.model_mount_config.mount_destination or "/models",
-            extra_mounts=[],
+            extra_mounts=[
+                MountInfo(
+                    vfolder_id=m.vfolder_id,
+                    mount_destination=m.mount_destination,
+                    mount_perm=m.mount_perm,
+                    subpath=m.subpath,
+                )
+                for m in data.model_mount_config.extra_mounts
+            ],
+            vfolder_subpath=data.model_mount_config.subpath,
         ),
         execution=ExecutionSpec(
             startup_command=data.execution.startup_command,
