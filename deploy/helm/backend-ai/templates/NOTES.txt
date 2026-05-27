@@ -1,0 +1,50 @@
+{{- /*
+  Surface the three external addresses operators need when wiring up a
+  host agent (k8s-control-plane-and-native-agent scenario) or pointing a
+  `./bai` CLI at the new cluster. Printed by `helm install` / `helm upgrade`.
+
+  Sub-chart values are accessed via index notation because the dep name
+  ("backend-ai-manager") contains hyphens — `.Values.foo-bar` is not valid
+  Go template syntax.
+*/}}
+{{- $mgr := index .Values "backend-ai-manager" "manager" | default dict }}
+{{- $unset := "(unset — cluster DNS only)" }}
+{{- $redis   := default $unset (index $mgr "redisExternalAddr") }}
+{{- $etcd    := default $unset (index $mgr "etcdExternalAddr") }}
+{{- $manager := default $unset (index $mgr "managerExternalAddr") }}
+Backend.AI control plane installed (release: {{ .Release.Name }}).
+
+────────────────────────────────────────────────────────────────────────
+External addresses (for agent.toml / ./bai CLI / external HTTP clients)
+────────────────────────────────────────────────────────────────────────
+
+  redis    : {{ $redis }}
+  etcd     : {{ $etcd }}
+  manager  : {{ $manager }}
+
+{{- if and (eq $redis $unset) (eq $etcd $unset) }}
+
+⚠  None of the external addresses are set. Host agents (running outside k8s)
+   cannot resolve cluster DNS and will fail to reach the control plane.
+   For the k8s-control-plane-and-native-agent scenario, set
+   `backend-ai-manager.manager.redisExternalAddr` / `etcdExternalAddr` /
+   `managerExternalAddr` in your values file — see
+   docs/k8s-control-plane-and-native-agent-install.md §2.
+{{- end }}
+
+────────────────────────────────────────────────────────────────────────
+Where each value goes
+────────────────────────────────────────────────────────────────────────
+  redisExternalAddr    → seeded into etcd at config/redis/addr (automatic;
+                         re-applied on every helm upgrade)
+  etcdExternalAddr     → write into agent.toml [etcd] addr on each agent host
+                         (see docs/k8s-control-plane-and-native-agent-host.md)
+  managerExternalAddr  → write into ~/.config/backend.ai/config.toml endpoint
+                         for ./bai CLI, or expose via webserver/ingress for users
+
+Quick verify:
+  $ kubectl exec -n {{ .Release.Namespace }} {{ .Release.Name }}-etcd-0 -- \
+      etcdctl get /sorna/local/config/redis/addr
+{{- if ne $manager $unset }}
+  $ curl -sf http://{{ $manager }}/ && echo "manager API OK"
+{{- end }}

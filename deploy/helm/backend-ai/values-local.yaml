@@ -40,10 +40,13 @@ backend-ai-manager:
     etcdNodePort: 32379
     redisNodePort: 32679
 
-    # Seeded into etcd at config/redis/addr — host agent uses this to reach
-    # redis (cannot resolve cluster DNS from outside k8s). Match the redis
-    # NodePort above and the lab's swarm-manager node IP (ser8).
-    redisExternalAddr: "192.168.0.156:32679"
+    # External addresses host agent / ./bai CLI use to reach the in-cluster
+    # control plane. Lab values point at the swarm-manager node's NodePorts;
+    # for prod swap to a LB IP/FQDN. After helm install, `NOTES.txt` echoes
+    # these so the agent host setup (docs §4) can paste them into agent.toml.
+    redisExternalAddr: "192.168.0.156:32679"   # seeded into etcd config/redis/addr
+    etcdExternalAddr: "192.168.0.156:32379"    # agent.toml [etcd] addr
+    managerExternalAddr: "192.168.0.156:32081" # ./bai CLI api_endpoint
 
   postgres:
     password: "local-dev-postgres"

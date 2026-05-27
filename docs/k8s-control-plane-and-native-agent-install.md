@@ -123,29 +123,41 @@ curl -sf http://192.168.0.156:32081/ && echo OK
 # 브라우저로 http://192.168.0.156:30890
 ```
 
-## 2. agent 가 보는 redis 주소 (values 로 선언)
+## 2. agent / ./bai CLI 가 보는 외부 주소 (values 로 선언)
 
-host 의 agent 는 cluster DNS 를 resolve 못 하므로 `bai-redis:6379` 가 아닌 외부 도달 가능한 주소 (NodePort / LB) 가 필요합니다. **`deploy/helm/backend-ai/values-local.yaml` 의 `manager.redisExternalAddr` 한 줄** 로 처리:
+호스트 agent 와 외부 클라이언트 (`./bai` CLI 등) 는 cluster DNS 를 resolve 못 하므로 외부 도달 가능한 주소 (NodePort / LB) 가 필요합니다. **`deploy/helm/backend-ai/values-local.yaml` 의 3 개 knob** 으로 처리:
 
 ```yaml
 backend-ai-manager:
   manager:
-    redisExternalAddr: "192.168.0.156:32679"   # redis NodePort 와 일치
+    redisExternalAddr: "192.168.0.156:32679"   # config/redis/addr — etcd-seed 가 자동 박음
+    etcdExternalAddr: "192.168.0.156:32379"    # agent.toml [etcd] addr
+    managerExternalAddr: "192.168.0.156:32081" # ./bai CLI api_endpoint
 ```
 
-etcd-seed Job 이 매 install/upgrade 마다 이 값을 `config/redis/addr` 로 박아주므로:
-- 사람이 `etcdctl put` 할 필요 없음
-- helm upgrade 시 reset 되는 drift 없음
-- IP 바뀌면 values 만 수정 후 `helm upgrade` — 끝
+각 값의 역할:
 
-```bash
-# 확인
-kubectl exec -n backend-ai bai-etcd-0 -- etcdctl get /sorna/local/config/redis/addr
-# /sorna/local/config/redis/addr
-# 192.168.0.156:32679
+| 값 | 누가 읽음 | 어디에 |
+|---|---|---|
+| `redisExternalAddr` | host agent | etcd 의 `config/redis/addr` — **etcd-seed Job 이 매 install/upgrade 마다 자동 seed**. drift 0 |
+| `etcdExternalAddr` | host agent | 각 agent host 의 `/etc/backend.ai/agent.toml` 의 `[etcd] addr` — §4 의 agent 호스트 셋업이 참조 |
+| `managerExternalAddr` | `./bai` CLI, 외부 HTTP client | `~/.config/backend.ai/config.toml` 의 `endpoint` — 운영자가 클라이언트 설정 시 참조 |
+
+helm install 직후 NOTES 가 위 3 개 주소를 그대로 echo 합니다 — agent host 설정 시 그 출력을 그대로 복사하면 됨:
+
+```
+$ helm install bai deploy/helm/backend-ai ...
+...
+NOTES:
+External addresses (for agent.toml / ./bai CLI / external HTTP clients)
+  redis    : 192.168.0.156:32679
+  etcd     : 192.168.0.156:32379
+  manager  : 192.168.0.156:32081
 ```
 
-값이 비어 있으면 (`redisExternalAddr: ""`) cluster DNS (`bai-redis:6379`) 가 seed 됨 — 순수 k8s-안-만 시나리오 와 backward compatible.
+prod 에서 IP 바뀌면 values 만 수정 후 `helm upgrade` — etcd 측은 자동 reseed, host 측은 ansible 등으로 agent.toml 일괄 갱신.
+
+값이 비어 있으면 (`""`) cluster DNS (`bai-redis:6379` 등) 가 사용됨 — 순수 k8s-안-만 시나리오와 backward compatible.
 
 ## 3. (옵션) 사설 image registry 등록
 

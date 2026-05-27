@@ -36,11 +36,7 @@ manager:
   redisNodePort: 32679
 ```
 
-추가로 **etcd 안의 redis URL** 도 NodePort 로 갱신해야 (default 는 `bai-redis:6379` 라 호스트에서 resolve 불가):
-```bash
-kubectl exec -n backend-ai bai-etcd-0 -- etcdctl \
-  put /sorna/local/config/redis/addr "192.168.0.156:32679"
-```
+추가로 **etcd 안의 redis URL** 도 외부 도달 가능 주소여야 (default 는 `bai-redis:6379` 라 호스트에서 resolve 불가). 이건 chart 의 `manager.redisExternalAddr` values 로 자동 seed — manual `etcdctl put` 불필요. 자세한 건 `k8s-control-plane-and-native-agent-install.md §2` 참조.
 
 ## agent 설치 (호스트)
 
