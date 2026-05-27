@@ -57,6 +57,7 @@ class TestAgentResources:
         row.agent_id = "agent-1"
         row.slot_name = "cpu"
         row.capacity = Decimal("8")
+        row.reserved = Decimal("1")
         row.used = Decimal("2")
         mock_repository.get_agent_resources = AsyncMock(return_value=[row])
 
@@ -65,7 +66,11 @@ class TestAgentResources:
         assert isinstance(result, GetAgentResourcesResult)
         assert result.items == [
             AgentResourceData(
-                agent_id="agent-1", slot_name="cpu", capacity=Decimal("8"), used=Decimal("2")
+                agent_id="agent-1",
+                slot_name="cpu",
+                capacity=Decimal("8"),
+                reserved=Decimal("1"),
+                used=Decimal("2"),
             )
         ]
         mock_repository.get_agent_resources.assert_called_once_with("agent-1")
@@ -105,7 +110,11 @@ class TestAgentResources:
         querier: BatchQuerier,
     ) -> None:
         item = AgentResourceData(
-            agent_id="agent-1", slot_name="cpu", capacity=Decimal("8"), used=Decimal("2")
+            agent_id="agent-1",
+            slot_name="cpu",
+            capacity=Decimal("8"),
+            reserved=Decimal("1"),
+            used=Decimal("2"),
         )
         mock_repository.search_agent_resources = AsyncMock(
             return_value=AgentResourceSearchResult(
@@ -150,6 +159,7 @@ class TestAgentResources:
                         agent_id=f"agent-{i}",
                         slot_name="cpu",
                         capacity=Decimal("8"),
+                        reserved=Decimal("0"),
                         used=Decimal("0"),
                     )
                     for i in range(5)
