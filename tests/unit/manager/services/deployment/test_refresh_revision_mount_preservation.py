@@ -1,5 +1,5 @@
 """
-Mock-based unit tests for ``_build_creator_from_revision_data``.
+Unit tests for ``_build_creator_from_revision_data``.
 
 Tests verify that the rebuilder used by
 ``DeploymentService.admin_refresh_deployment_revisions`` preserves mount
