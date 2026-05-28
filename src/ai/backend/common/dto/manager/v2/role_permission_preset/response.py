@@ -7,7 +7,7 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.dto.manager.v2.rbac.types import EntityType, OperationTypeDTO
+from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO, RBACElementTypeDTO
 from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.identifier.role_preset import RolePresetID
 
@@ -24,7 +24,9 @@ class RolePermissionPresetNode(BaseResponseModel):
 
     id: RolePermissionPresetID = Field(description="Permission entry UUID.")
     role_preset_id: RolePresetID = Field(description="UUID of the parent role preset.")
-    entity_type: EntityType = Field(description="Entity type the permission applies to.")
+    entity_type: RBACElementTypeDTO = Field(
+        description="Entity type the permission applies to.",
+    )
     operation: OperationTypeDTO = Field(description="Operation granted by the permission.")
     created_at: datetime = Field(description="Creation timestamp.")
 
