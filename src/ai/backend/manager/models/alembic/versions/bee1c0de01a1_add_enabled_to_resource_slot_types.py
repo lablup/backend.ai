@@ -1,7 +1,7 @@
 """add enabled flag to resource slot types
 
 Revision ID: bee1c0de01a1
-Revises: 4ce7119188af
+Revises: 338bc3284f20
 Create Date: 2026-05-27
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "bee1c0de01a1"
-down_revision = "4ce7119188af"
+down_revision = "338bc3284f20"
 branch_labels = None
 depends_on = None
 
