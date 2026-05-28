@@ -1322,8 +1322,8 @@ class ResourceSlot(UserDict[str, Decimal]):
     def to_humanized(self, slot_types: Mapping[str, Any]) -> Mapping[str, str]:
         result: dict[str, str] = {}
         for k, v in self.data.items():
-            slot_type = slot_types.get(k, type(self)._guess_slot_type(k))
-            result[k] = type(self)._humanize_value(Decimal(v), slot_type)
+            slot_type = slot_types.get(k, self._guess_slot_type(k))
+            result[k] = self._humanize_value(Decimal(v), slot_type)
         return result
 
     @classmethod

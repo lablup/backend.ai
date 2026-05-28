@@ -348,6 +348,11 @@ class ScheduleDBSource:
             ResourceSlotTypeRow.slot_name,
             ResourceSlotTypeRow.enabled,
             ResourceSlotTypeRow.required,
+        ).where(
+            sa.or_(
+                ResourceSlotTypeRow.enabled.is_(True),
+                ResourceSlotTypeRow.required.is_(True),
+            )
         )
         rows = (await db_sess.execute(stmt)).all()
         return SlotTypePolicy(
