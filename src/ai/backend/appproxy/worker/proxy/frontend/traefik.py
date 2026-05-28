@@ -5,9 +5,8 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
-import aiotools
 from aiohttp import web
 
 from ai.backend.appproxy.common.config import get_default_redis_key_ttl
@@ -22,6 +21,7 @@ from ai.backend.appproxy.worker.types import (
     RootContext,
     SubdomainFrontendInfo,
 )
+from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseFrontend
@@ -33,12 +33,63 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
 
 
+_LAST_USED_TIME_MARKER_WRITER_INTERVAL: Final[float] = 10.0
+_ACTIVE_CIRCUIT_WRITER_INTERVAL: Final[float] = 5.0
+
+
+class _LastUsedTimeMarkerWriterTask(PeriodicTask):
+    """Periodically flush accumulated last-used-time markers to Valkey."""
+
+    _frontend: Final[AbstractTraefikFrontend[Any]]
+
+    def __init__(self, frontend: AbstractTraefikFrontend[Any]) -> None:
+        self._frontend = frontend
+
+    @property
+    def name(self) -> str:
+        return "last_used_time_marker_writer"
+
+    @property
+    def interval(self) -> float:
+        return _LAST_USED_TIME_MARKER_WRITER_INTERVAL
+
+    @property
+    def initial_delay(self) -> float:
+        return 0.0
+
+    async def run(self) -> None:
+        await self._frontend.last_used_time_marker_writer()
+
+
+class _ActiveCircuitWriterTask(PeriodicTask):
+    """Periodically refresh last-access timestamps for active circuits."""
+
+    _frontend: Final[AbstractTraefikFrontend[Any]]
+
+    def __init__(self, frontend: AbstractTraefikFrontend[Any]) -> None:
+        self._frontend = frontend
+
+    @property
+    def name(self) -> str:
+        return "active_circuit_writer"
+
+    @property
+    def interval(self) -> float:
+        return _ACTIVE_CIRCUIT_WRITER_INTERVAL
+
+    @property
+    def initial_delay(self) -> float:
+        return 0.0
+
+    async def run(self) -> None:
+        await self._frontend.active_circuit_writer()
+
+
 class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
     BaseFrontend[TraefikBackend, TCircuitKeyType]
 ):
     runner: web.AppRunner
-    last_used_time_marker_writer_task: asyncio.Task[Any]
-    active_circuit_writer_task: asyncio.Task[Any]
+    _local_cron: LocalCron
     redis_keys: dict[str, float]
     redis_keys_lock: asyncio.Lock
     active_circuits: set[uuid.UUID]
@@ -73,41 +124,31 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
         site = web.UnixSite(self.runner, path)
         await site.start()
 
-        self.last_used_time_marker_writer_task = aiotools.create_timer(
-            self._last_used_time_marker_writer,
-            10.0,
-        )
-        self.active_circuit_writer_task = aiotools.create_timer(
-            self._active_circuit_writer,
-            5.0,
-        )
+        self._local_cron = LocalCron([
+            _LastUsedTimeMarkerWriterTask(self),
+            _ActiveCircuitWriterTask(self),
+        ])
+        await self._local_cron.start()
 
     async def stop(self) -> None:
         if not self.root_context.local_config.proxy_worker.traefik:
             raise MissingTraefikConfigError("Traefik configuration is required")
 
         await self.runner.cleanup()
+        await self._local_cron.stop()
 
-        self.last_used_time_marker_writer_task.cancel()
-        self.active_circuit_writer_task.cancel()
-        await self.last_used_time_marker_writer_task
-        await self.active_circuit_writer_task
+    async def last_used_time_marker_writer(self) -> None:
+        async with self.redis_keys_lock:
+            if len(self.redis_keys) == 0:
+                return
+            keys = self.redis_keys
+            self.redis_keys = {}
 
-    async def _last_used_time_marker_writer(self, _interval: float) -> None:
-        try:
-            async with self.redis_keys_lock:
-                if len(self.redis_keys) == 0:
-                    return
-                keys = self.redis_keys
-                self.redis_keys = {}
+        data = {key: str(value) for key, value in keys.items()}
+        ttl = get_default_redis_key_ttl()
+        await self.root_context.valkey_live.store_multiple_live_data(data, ex=ttl)
 
-            data = {key: str(value) for key, value in keys.items()}
-            ttl = get_default_redis_key_ttl()
-            await self.root_context.valkey_live.store_multiple_live_data(data, ex=ttl)
-
-            log.debug("Wrote {} keys", len(keys))
-        except Exception:
-            log.exception("_last_used_time_marker_writer():")
+        log.debug("Wrote {} keys", len(keys))
 
     async def mark_last_used_time(self, request: web.Request) -> web.StreamResponse:
         key = request.match_info["key"]
@@ -130,17 +171,14 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
 
         return web.StreamResponse(status=204)
 
-    async def _active_circuit_writer(self, _interval: float) -> None:
-        try:
-            if len(self.active_circuits) > 0:
-                now = time.time()
-                keys: dict[str, float] = {}
-                for c in self.active_circuits:
-                    keys[f"circuit.{c}.last_access"] = now
-                async with self.redis_keys_lock:
-                    self.redis_keys.update(keys)
-        except Exception:
-            log.exception("_active_circuit_writer():")
+    async def active_circuit_writer(self) -> None:
+        if len(self.active_circuits) > 0:
+            now = time.time()
+            keys: dict[str, float] = {}
+            for c in self.active_circuits:
+                keys[f"circuit.{c}.last_access"] = now
+            async with self.redis_keys_lock:
+                self.redis_keys.update(keys)
 
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TraefikBackend:
         return TraefikBackend(self.root_context, circuit, routes)

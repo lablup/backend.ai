@@ -77,6 +77,7 @@ from ai.backend.common.clients.http_client.client_pool import (
 )
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.cron import LocalCron
 from ai.backend.common.defs import (
     REDIS_LIVE_DB,
     REDIS_STATISTICS_DB,
@@ -121,7 +122,6 @@ from .config import load as load_config
 from .coordinator_client import (
     deregister_worker,
     list_worker_circuits,
-    ping_worker,
     register_worker,
 )
 from .errors import (
@@ -131,7 +131,6 @@ from .errors import (
     MissingProfilingConfigError,
     MissingTraefikConfigError,
 )
-from .metrics import collect_inference_metric
 from .proxy.frontend import (
     H2PortFrontend,
     H2SubdomainFrontend,
@@ -142,6 +141,7 @@ from .proxy.frontend import (
     TraefikSubdomainFrontend,
     TraefikTCPFrontend,
 )
+from .tasks import WorkerHeartbeatTask
 from .types import Circuit, CleanupContext, RootContext, WorkerMetricRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -461,42 +461,13 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
 
-    async def _heartbeat(_interval: float) -> None:
-        try:
-            async for attempt in AsyncRetrying(
-                wait=wait_exponential(multiplier=1, min=4, max=10),
-                retry=retry_if_exception_type(TryAgain),
-            ):
-                with attempt:
-                    try:
-                        await ping_worker(root_ctx, str(uuid.uuid4()))
-                    except CoordinatorConnectionError:
-                        log.warning(
-                            "Failed to ping coordinator {}, retrying...",
-                            root_ctx.local_config.proxy_worker.coordinator_endpoint,
-                        )
-
-        except Exception as e:
-            log.warning("Failed to ping coordinator: {}", str(e))
-
-    timer = aiotools.create_timer(_heartbeat, root_ctx.local_config.proxy_worker.heartbeat_period)
+    cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
+    await cron.start()
     try:
         yield
     finally:
-        await aiotools.cancel_and_wait(timer)
+        await cron.stop()
         await deregister_worker(root_ctx, str(uuid.uuid4()))
-
-
-@asynccontextmanager
-async def inference_metric_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    timer = aiotools.create_timer(
-        functools.partial(collect_inference_metric, root_ctx),
-        root_ctx.local_config.proxy_worker.inference_metric_collection_interval,
-    )
-    try:
-        yield
-    finally:
-        await aiotools.cancel_and_wait(timer)
 
 
 @asynccontextmanager
@@ -806,7 +777,6 @@ def build_root_app(
                 health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
-                inference_metric_collection_ctx,
             ]
         else:
             cleanup_contexts = [
@@ -818,7 +788,6 @@ def build_root_app(
                 health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
-                inference_metric_collection_ctx,
             ]
     shutdown_context_instances = []
 

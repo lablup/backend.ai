@@ -22,7 +22,6 @@ from collections.abc import (
     Iterable,
     Mapping,
     MutableMapping,
-    MutableSequence,
     Sequence,
 )
 from contextlib import contextmanager
@@ -67,12 +66,21 @@ from ai.backend.agent.errors import (
     KernelNotFoundError,
 )
 from ai.backend.agent.etcd import AgentEtcdClientView
+from ai.backend.agent.health.heartbeat import HeartbeatTask
 from ai.backend.agent.metrics.metric import (
     StatScope,
     StatTaskObserver,
     SyncContainerLifecycleObserver,
 )
 from ai.backend.agent.port_pool import PortPool
+from ai.backend.agent.tasks import (
+    CleanupReportedKernelsTask,
+    CollectContainerStatTask,
+    CollectProcessStatTask,
+    ReportKernelCommitStatusTask,
+    ScanImagesTask,
+    SyncContainerLifecyclesTask,
+)
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks, current_loop
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -85,6 +93,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import ModelConfig, ModelDefinition
+from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
 from ai.backend.common.data.image.types import InstalledImageInfo, ScannedImage
 from ai.backend.common.defs import (
@@ -175,7 +184,6 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
@@ -815,7 +823,7 @@ class AbstractAgent[
     port_pool: PortPool
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
-    timer_tasks: MutableSequence[asyncio.Task[Any]]
+    _local_cron: LocalCron | None
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
     agent_public_key: PublicKey | None
@@ -905,7 +913,7 @@ class AbstractAgent[
             if local_config.container.stats_type
             else None,
         )
-        self.timer_tasks = []
+        self._local_cron = None
         self.port_pool = PortPool(
             local_config.container.port_range,
             cooldown_sec=local_config.container.port_reuse_cooldown_sec,
@@ -1004,40 +1012,24 @@ class AbstractAgent[
         )
         self.affinity_map = AffinityMap.build(all_devices)
 
+        periodic_tasks: list[PeriodicTask] = []
+
         if not self._skip_initial_scan:
             scan_images_result = await self.scan_images()
             self.images = scan_images_result.scanned_images
-            self.timer_tasks.append(aiotools.create_timer(self._scan_images_wrapper, 20.0))
+            periodic_tasks.append(ScanImagesTask(self))
             await self.scan_running_kernels()
 
         # Prepare stat collector tasks.
-        self.timer_tasks.append(
-            aiotools.create_timer(
-                self.collect_container_stat,
-                UTILIZATION_METRIC_INTERVAL,
-                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
-            )
-        )
-        self.timer_tasks.append(
-            aiotools.create_timer(
-                self.collect_process_stat,
-                UTILIZATION_METRIC_INTERVAL,
-                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
-            )
-        )
+        periodic_tasks.append(CollectContainerStatTask(self))
+        periodic_tasks.append(CollectProcessStatTask(self))
 
         # Prepare heartbeats.
-        heartbeat_interval = self.local_config.debug.heartbeat_interval
-        self.timer_tasks.append(aiotools.create_timer(self.heartbeat, heartbeat_interval))
+        periodic_tasks.append(HeartbeatTask(self))
 
         # Prepare auto-cleaning of idle kernels.
-        sync_container_lifecycles_config = self.local_config.agent.sync_container_lifecycles
-        if sync_container_lifecycles_config.enabled:
-            self.timer_tasks.append(
-                aiotools.create_timer(
-                    self.sync_container_lifecycles, sync_container_lifecycles_config.interval
-                )
-            )
+        if self.local_config.agent.sync_container_lifecycles.enabled:
+            periodic_tasks.append(SyncContainerLifecyclesTask(self))
 
         self._agent_runner = Runner(resources=[])
         host_port_observer = HostPortObserver(self)
@@ -1053,12 +1045,13 @@ class AbstractAgent[
                 "Monitoring abnormal kernel activities reported by Watcher at {}", abuse_report_path
             )
             abuse_report_path.mkdir(exist_ok=True, parents=True)
-            self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 30.0))
+            periodic_tasks.append(CleanupReportedKernelsTask(self))
 
         # Report commit status
-        self.timer_tasks.append(
-            aiotools.create_timer(self._report_all_kernel_commit_status_map, 7.0)
-        )
+        periodic_tasks.append(ReportKernelCommitStatusTask(self))
+
+        self._local_cron = LocalCron(periodic_tasks)
+        await self._local_cron.start()
 
         loop = current_loop()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
@@ -1114,7 +1107,8 @@ class AbstractAgent[
             await self.save_last_registry(force=True)
 
         # Stop timers.
-        await aiotools.cancel_and_wait(self.timer_tasks)
+        if self._local_cron is not None:
+            await self._local_cron.stop()
         await self._agent_runner.close()
         self._clean_kernel_registry_task.cancel()
 
@@ -1197,7 +1191,7 @@ class AbstractAgent[
         await self._pre_anycast_event(anycast_event)
         await self.event_producer.anycast_and_broadcast_event(anycast_event, broadcast_event)
 
-    async def _report_all_kernel_commit_status_map(self, interval: float) -> None:
+    async def report_all_kernel_commit_status_map(self) -> None:
         """
         Commit statuses are managed by `lock` file.
         +- base_commit_path
@@ -1242,7 +1236,7 @@ class AbstractAgent[
             log.exception("unexpected error in commit status reporting")
             return
 
-    async def heartbeat(self, interval: float) -> None:
+    async def heartbeat(self) -> None:
         """
         Send my status information and available kernel images to the manager(s).
         """
@@ -1352,7 +1346,7 @@ class AbstractAgent[
             await self.stat_ctx.collect_node_stat(resource_scaling_factors)
 
     @_observe_stat_task(stat_scope=StatScope.CONTAINER)
-    async def collect_container_stat(self, interval: float) -> None:
+    async def collect_container_stat(self) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting container statistics")
         container_ids: set[ContainerId] = set()
@@ -1364,7 +1358,7 @@ class AbstractAgent[
             await self.stat_ctx.collect_container_stat(list(container_ids))
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
-    async def collect_process_stat(self, interval: float) -> None:
+    async def collect_process_stat(self) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting process statistics in container")
         container_ids: set[ContainerId] = set()
@@ -1759,7 +1753,7 @@ class AbstractAgent[
                             kernel_id,
                         )
 
-    async def sync_container_lifecycles(self, interval: float) -> None:
+    async def sync_container_lifecycles(self) -> None:
         """
         Periodically synchronize the alive/known container sets,
         for cases when we miss the container lifecycle events from the underlying implementation APIs
@@ -1958,7 +1952,7 @@ class AbstractAgent[
                     hwinfo[device_name] = result
         return hwinfo
 
-    async def _cleanup_reported_kernels(self, interval: float) -> None:
+    async def cleanup_reported_kernels(self) -> None:
         # dest_path == abuse_report_path
         dest_path = self.local_config.agent.abuse_report_path
         if dest_path is None:
@@ -2021,7 +2015,7 @@ class AbstractAgent[
         manual image addition and deletions by admins.
         """
 
-    async def _scan_images_wrapper(self, interval: float) -> None:
+    async def scan_images_periodically(self) -> None:
         result = await self.scan_images()
         self.images = result.scanned_images
         if result.removed_images:
