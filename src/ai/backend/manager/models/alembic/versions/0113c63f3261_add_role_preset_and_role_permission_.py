@@ -2,8 +2,9 @@
 
 Adds two new tables that support admin-managed role templates:
 
-- ``role_presets`` — one row per template, identified by ``scope_type``
-  with an optional ``auto_apply`` flag.
+- ``role_presets`` — one row per template, identified by ``scope_type``.
+  A partial unique index enforces at most one active (``deleted = false``)
+  preset per ``scope_type``.
 - ``role_permission_presets`` — child rows that capture the
   ``(entity_type, operation)`` pairs that the preset grants. Deleting
   a preset cascades to its permission rows.
@@ -37,13 +38,13 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=64), nullable=False),
         sa.Column("scope_type", sa.String(length=32), nullable=False),
         sa.Column(
-            "auto_apply",
+            "auto_assign",
             sa.Boolean(),
             server_default=sa.text("false"),
             nullable=False,
         ),
         sa.Column(
-            "auto_assign",
+            "deleted",
             sa.Boolean(),
             server_default=sa.text("false"),
             nullable=False,
@@ -63,10 +64,11 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_role_presets")),
     )
     op.create_index(
-        "ix_role_presets_scope_type_auto_apply",
+        "uq_role_presets_scope_type_active",
         "role_presets",
         ["scope_type"],
-        postgresql_where=sa.text("auto_apply IS TRUE"),
+        unique=True,
+        postgresql_where=sa.text("deleted IS FALSE"),
     )
     op.create_table(
         "role_permission_presets",
@@ -104,8 +106,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("role_permission_presets")
     op.drop_index(
-        "ix_role_presets_scope_type_auto_apply",
+        "uq_role_presets_scope_type_active",
         table_name="role_presets",
-        postgresql_where=sa.text("auto_apply IS TRUE"),
+        postgresql_where=sa.text("deleted IS FALSE"),
     )
     op.drop_table("role_presets")

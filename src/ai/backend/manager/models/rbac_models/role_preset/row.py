@@ -21,9 +21,10 @@ class RolePresetRow(Base):  # type: ignore[misc]
     __tablename__ = "role_presets"
     __table_args__ = (
         sa.Index(
-            "ix_role_presets_scope_type_auto_apply",
+            "uq_role_presets_scope_type_active",
             "scope_type",
-            postgresql_where=sa.text("auto_apply IS TRUE"),
+            unique=True,
+            postgresql_where=sa.text("deleted IS FALSE"),
         ),
     )
 
@@ -34,13 +35,14 @@ class RolePresetRow(Base):  # type: ignore[misc]
     scope_type: Mapped[ScopeType] = mapped_column(
         "scope_type", StrEnumType(ScopeType, length=32), nullable=False
     )
-    # If true, this preset is auto-applied when a scope of `scope_type` is created.
-    auto_apply: Mapped[bool] = mapped_column(
-        "auto_apply", sa.Boolean, nullable=False, server_default=sa.false()
-    )
     # Default for the ``auto_assign`` flag copied onto roles instantiated from this preset.
     auto_assign: Mapped[bool] = mapped_column(
         "auto_assign", sa.Boolean, nullable=False, server_default=sa.false()
+    )
+    # Soft-delete flag. The partial unique index above keeps at most one row
+    # with ``deleted = false`` per ``scope_type``; deleted rows are archived.
+    deleted: Mapped[bool] = mapped_column(
+        "deleted", sa.Boolean, nullable=False, server_default=sa.false()
     )
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
