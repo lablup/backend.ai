@@ -51,8 +51,9 @@ class ScalingGroupProxyTarget:
 class SlotTypePolicy:
     """Global slot-type admin policy from `resource_slot_types`.
 
-    - enabled: slot names with enabled=true. Sessions cannot request slots
-      not in this set (via image declarations or explicit requests).
+    - enabled: slot names with enabled=true. Image-side validators
+      (`ImageSlotTypeRule`, `ResourceLimitRule`) only enforce slots in this
+      set, so image-declared slots outside it are skipped instead of rejected.
     - required: slot names with required=true. Sessions must request nonzero
       amounts for these slots.
     """

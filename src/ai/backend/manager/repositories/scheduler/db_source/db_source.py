@@ -343,17 +343,17 @@ class ScheduleDBSource:
             active_slot_types=active_slot_types,
         )
 
-    async def _fetch_required_slot_names(self, db_sess: SASession) -> frozenset[SlotName]:
-        stmt = sa.select(ResourceSlotTypeRow.slot_name).where(
-            ResourceSlotTypeRow.required.is_(True)
+    async def _fetch_slot_type_policy(self, db_sess: SASession) -> SlotTypePolicy:
+        stmt = sa.select(
+            ResourceSlotTypeRow.slot_name,
+            ResourceSlotTypeRow.enabled,
+            ResourceSlotTypeRow.required,
         )
-        rows = (await db_sess.execute(stmt)).scalars().all()
-        return frozenset(SlotName(slot_name) for slot_name in rows)
-
-    async def _fetch_enabled_slot_names(self, db_sess: SASession) -> frozenset[SlotName]:
-        stmt = sa.select(ResourceSlotTypeRow.slot_name).where(ResourceSlotTypeRow.enabled.is_(True))
-        rows = (await db_sess.execute(stmt)).scalars().all()
-        return frozenset(SlotName(slot_name) for slot_name in rows)
+        rows = (await db_sess.execute(stmt)).all()
+        return SlotTypePolicy(
+            enabled=frozenset(SlotName(row.slot_name) for row in rows if row.enabled),
+            required=frozenset(SlotName(row.slot_name) for row in rows if row.required),
+        )
 
     async def _fetch_scaling_group(
         self, db_sess: SASession, scaling_group: str
@@ -1509,10 +1509,7 @@ class ScheduleDBSource:
             rg_defaults = None
             resource_group_allow_fractional = False
             known_slot_types: Mapping[SlotName, SlotTypes] = {}
-            slot_type_policy = SlotTypePolicy(
-                enabled=await self._fetch_enabled_slot_names(db_sess),
-                required=await self._fetch_required_slot_names(db_sess),
-            )
+            slot_type_policy = await self._fetch_slot_type_policy(db_sess)
             if resource_group_name:
                 rg_bundle = await self._fetch_scaling_group_with_slot_inventory(
                     db_sess, resource_group_name
