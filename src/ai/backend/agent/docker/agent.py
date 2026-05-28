@@ -271,14 +271,14 @@ async def _clean_scratch(
 def _DockerError_reduce(self: DockerError) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
-        (self.status, {"message": self.message}, *self.args),
+        (self.status, self.message, *self.args),
     )
 
 
 def _DockerContainerError_reduce(self: DockerContainerError) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
-        (self.status, {"message": self.message}, self.container_id, *self.args),
+        (self.status, self.message, self.container_id, *self.args),
     )
 
 
@@ -1295,7 +1295,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         container_id="",
                         message="Docker API returned None when creating container",
                     )
-                cid = cast(str, container._id)
+                cid = container._id
                 async with AsyncFileWriter(
                     target_filename=self.config_dir / "resource.txt",
                     access_mode="a",
