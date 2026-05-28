@@ -21,10 +21,9 @@ class RolePresetRow(Base):  # type: ignore[misc]
     __tablename__ = "role_presets"
     __table_args__ = (
         sa.Index(
-            "uq_role_presets_scope_type_active",
+            "ix_role_presets_scope_type_deleted",
             "scope_type",
-            unique=True,
-            postgresql_where=sa.text("deleted IS FALSE"),
+            "deleted",
         ),
     )
 
@@ -39,8 +38,8 @@ class RolePresetRow(Base):  # type: ignore[misc]
     auto_assign: Mapped[bool] = mapped_column(
         "auto_assign", sa.Boolean, nullable=False, server_default=sa.false()
     )
-    # Soft-delete flag. The partial unique index above keeps at most one row
-    # with ``deleted = false`` per ``scope_type``; deleted rows are archived.
+    # Soft-delete flag. Toggled by the Delete / Restore service operations;
+    # the Update API never mutates this column directly.
     deleted: Mapped[bool] = mapped_column(
         "deleted", sa.Boolean, nullable=False, server_default=sa.false()
     )
