@@ -178,7 +178,7 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def get_by_id_validated(
-        self, vfolder_id: uuid.UUID, user_id: uuid.UUID, domain_name: str
+        self, vfolder_id: uuid.UUID, user_id: uuid.UUID, domain_name: str | None
     ) -> VFolderData:
         """
         Get a VFolder by ID with ownership/permission validation.
@@ -189,6 +189,9 @@ class VfolderRepository:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
             if not vfolder_row:
                 raise VFolderNotFound()
+
+            if vfolder_row.user == user_id:
+                return self._vfolder_row_to_data(vfolder_row)
 
             # Check access permissions
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
@@ -1239,16 +1242,15 @@ class VfolderRepository:
             return (count or 0) > 0
 
     @vfolder_repository_resilience.apply()
-    async def get_user_by_email(self, email: str) -> tuple[uuid.UUID, str] | None:
+    async def get_user_by_email(self, email: str) -> tuple[uuid.UUID, str | None] | None:
         """
         Get user info by email.
         Returns (user_id, domain_name) or None if user not found.
+        domain_name may be None.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
             if not user_row:
-                return None
-            if user_row.domain_name is None:
                 return None
             return user_row.uuid, user_row.domain_name
 
