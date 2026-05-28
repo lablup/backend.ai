@@ -1,5 +1,5 @@
 """
-Tests for _report_all_kernel_commit_status_map.
+Tests for report_all_kernel_commit_status_map.
 
 Mock-based unit tests to verify commit status scanning handles
 filesystem errors gracefully and prevents FD leaks.
@@ -28,7 +28,7 @@ class CommitScanScenario:
 
 
 class TestReportAllKernelCommitStatusMap:
-    """Tests for _report_all_kernel_commit_status_map timer callback."""
+    """Tests for report_all_kernel_commit_status_map timer callback."""
 
     @pytest.fixture
     def mock_agent(self, tmp_path: Path) -> AsyncMock:
@@ -80,7 +80,7 @@ class TestReportAllKernelCommitStatusMap:
                 (lock_dir / kernel).touch()
 
         # When: Call the method under test
-        await AbstractAgent._report_all_kernel_commit_status_map(mock_agent, 7.0)
+        await AbstractAgent.report_all_kernel_commit_status_map(mock_agent)
 
         # Then: Verify update_kernel_commit_statuses called with expected kernel IDs and expire time
         mock_agent.valkey_stat_client.update_kernel_commit_statuses.assert_called_once()
@@ -98,7 +98,7 @@ class TestReportAllKernelCommitStatusMap:
         mock_agent.local_config.agent.image_commit_path = Path("/nonexistent/path")
 
         # When: Call the method under test
-        await AbstractAgent._report_all_kernel_commit_status_map(mock_agent, 7.0)
+        await AbstractAgent.report_all_kernel_commit_status_map(mock_agent)
 
         # Then: Verify update_kernel_commit_statuses called with empty list
         call_args = mock_agent.valkey_stat_client.update_kernel_commit_statuses.call_args
@@ -117,7 +117,7 @@ class TestReportAllKernelCommitStatusMap:
         mock_agent.local_config.agent.image_commit_path = file_path
 
         # When: Call the method under test
-        await AbstractAgent._report_all_kernel_commit_status_map(mock_agent, 7.0)
+        await AbstractAgent.report_all_kernel_commit_status_map(mock_agent)
 
         # Then: Verify exception was logged and valkey update was skipped
         mock_log.exception.assert_called_once()
@@ -135,7 +135,7 @@ class TestReportAllKernelCommitStatusMap:
         mock_agent.local_config.agent.image_commit_path = mock_path
 
         # When: Call the method under test
-        await AbstractAgent._report_all_kernel_commit_status_map(mock_agent, 7.0)
+        await AbstractAgent.report_all_kernel_commit_status_map(mock_agent)
 
         # Then: Verify warning was logged (not exception) and valkey update was skipped
         mock_log.warning.assert_called_once()
@@ -154,7 +154,7 @@ class TestReportAllKernelCommitStatusMap:
         mock_agent.local_config.agent.image_commit_path = mock_path
 
         # When: Call the method under test
-        await AbstractAgent._report_all_kernel_commit_status_map(mock_agent, 7.0)
+        await AbstractAgent.report_all_kernel_commit_status_map(mock_agent)
 
         # Then: Verify exception was logged with correct message and valkey update was skipped
         mock_log.exception.assert_called_once()
