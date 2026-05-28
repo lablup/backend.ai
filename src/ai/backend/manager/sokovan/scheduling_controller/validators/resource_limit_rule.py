@@ -19,6 +19,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.manager.data.resource.types import SlotTypePolicy
 from ai.backend.manager.data.session.spec import KernelSpec, SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
@@ -47,7 +48,13 @@ class ResourceLimitRule(SessionSpecValidatorRule):
             image_info = context.image_infos.get(kernel.execution_spec.image_id)
             if image_info is None:
                 continue
-            self._validate_kernel(idx, kernel, image_info, context.known_slot_types)
+            self._validate_kernel(
+                idx,
+                kernel,
+                image_info,
+                context.known_slot_types,
+                context.slot_type_policy,
+            )
 
     @classmethod
     def _validate_kernel(
@@ -56,6 +63,7 @@ class ResourceLimitRule(SessionSpecValidatorRule):
         kernel: KernelSpec,
         image_info: ImageInfo,
         known_slot_types: Mapping[SlotName, SlotTypes],
+        policy: SlotTypePolicy,
     ) -> None:
         min_slots = image_min_slots(image_info)
         shmem = kernel.execution_spec.resource_opts.shmem
@@ -68,6 +76,8 @@ class ResourceLimitRule(SessionSpecValidatorRule):
         }
         for slot_name, min_value in min_slots.items():
             if Decimal(min_value) <= Decimal(0):
+                continue
+            if SlotName(slot_name) not in policy.enabled:
                 continue
             requested_value = requested.get(slot_name)
             if requested_value is None or requested_value < Decimal(min_value):
@@ -83,8 +93,8 @@ class ResourceLimitRule(SessionSpecValidatorRule):
             if Decimal(int(shmem)) >= mem_value:
                 raise InvalidAPIParameters(
                     extra_msg=(
-                        f"kernel_specs[{idx}] shared-memory ({shmem}) must be "
-                        f"smaller than requested memory ({BinarySize(mem_value)})."
+                        f"kernel_specs[{idx}] shared-memory ({shmem!s}) must be "
+                        f"smaller than requested memory ({BinarySize(mem_value)!s})."
                     ),
                 )
 

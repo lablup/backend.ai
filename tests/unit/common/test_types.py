@@ -10,6 +10,7 @@ from typeguard import TypeCheckError
 from ai.backend.common.exception import (
     BackendAISchemaValidationFailed,
     InvalidResourceSlotQuantity,
+    UnknownResourceSlotType,
 )
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -201,7 +202,7 @@ def test_resource_slot_serialization() -> None:
     r1 = ResourceSlot.from_user_input({"a": "1", "b": "2g"}, st_user_input)
     r2 = ResourceSlot.from_user_input({"a": "2", "b": "1g"}, st_user_input)
     r3 = ResourceSlot.from_user_input({"a": "1"}, st_user_input)
-    with pytest.raises(ValueError):
+    with pytest.raises(UnknownResourceSlotType):
         ResourceSlot.from_user_input({"x": "1"}, st_user_input)
 
     assert r1["a"] == Decimal(1)
@@ -314,7 +315,7 @@ def test_resource_slot_parsing_typeless_user_input_serialize_again() -> None:
 
 
 def test_resource_slot_parsing_typeless_user_input_serialize_again_2() -> None:
-    with pytest.raises(ValueError, match="Unknown slot type"):
+    with pytest.raises(UnknownResourceSlotType, match="Unknown slot type"):
         ResourceSlot.from_user_input(
             {"a": "1", "shmem": "2g"},
             {

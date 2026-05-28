@@ -49,6 +49,13 @@ class ResourceSlotTypeRow(Base):  # type: ignore[misc]
         default=False,
         server_default=sa.false(),
     )
+    enabled: Mapped[bool] = mapped_column(
+        "enabled",
+        sa.Boolean,
+        nullable=False,
+        default=True,
+        server_default=sa.true(),
+    )
     display_name: Mapped[str] = mapped_column(
         "display_name",
         sa.String(length=128),
