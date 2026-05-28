@@ -16,12 +16,12 @@ from ai.backend.common.identifier.role_permission_preset import RolePermissionPr
 from ai.backend.common.identifier.role_preset import RolePresetID
 
 __all__ = (
-    "BulkAddRolePresetPermissionsInput",
-    "BulkRemoveRolePresetPermissionsInput",
+    "BulkAddRolePermissionPresetsInput",
+    "BulkDeleteRolePresetsInput",
+    "BulkPurgeRolePresetsInput",
+    "BulkRemoveRolePermissionPresetsInput",
+    "BulkRestoreRolePresetsInput",
     "CreateRolePresetInput",
-    "DeleteRolePresetInput",
-    "PurgeRolePresetInput",
-    "RestoreRolePresetInput",
     "RolePresetFilter",
     "RolePresetOrder",
     "SearchRolePresetsInput",
@@ -65,25 +65,31 @@ class UpdateRolePresetInput(BaseRequestModel):
     )
 
 
-class DeleteRolePresetInput(BaseRequestModel):
-    """Input for soft-deleting a role preset (sets ``deleted = true``)."""
+class BulkDeleteRolePresetsInput(BaseRequestModel):
+    """Input for bulk-soft-deleting role presets (sets ``deleted = true``)."""
 
-    id: RolePresetID = Field(description="Role preset UUID to soft-delete.")
-
-
-class RestoreRolePresetInput(BaseRequestModel):
-    """Input for restoring a soft-deleted role preset (sets ``deleted = false``)."""
-
-    id: RolePresetID = Field(description="Role preset UUID to restore.")
+    role_preset_ids: list[RolePresetID] = Field(
+        description="Role preset UUIDs to soft-delete.",
+    )
 
 
-class PurgeRolePresetInput(BaseRequestModel):
-    """Input for hard-deleting a role preset. Cascades to its permission entries."""
+class BulkRestoreRolePresetsInput(BaseRequestModel):
+    """Input for bulk-restoring soft-deleted role presets (sets ``deleted = false``)."""
 
-    id: RolePresetID = Field(description="Role preset UUID to purge.")
+    role_preset_ids: list[RolePresetID] = Field(
+        description="Role preset UUIDs to restore.",
+    )
 
 
-class BulkAddRolePresetPermissionsInput(BaseRequestModel):
+class BulkPurgeRolePresetsInput(BaseRequestModel):
+    """Input for bulk-hard-deleting role presets. Cascades to their permission entries."""
+
+    role_preset_ids: list[RolePresetID] = Field(
+        description="Role preset UUIDs to purge.",
+    )
+
+
+class BulkAddRolePermissionPresetsInput(BaseRequestModel):
     """Input for bulk-adding permission entries to an existing role preset."""
 
     permissions: list[RolePermissionPresetEntry] = Field(
@@ -91,11 +97,11 @@ class BulkAddRolePresetPermissionsInput(BaseRequestModel):
     )
 
 
-class BulkRemoveRolePresetPermissionsInput(BaseRequestModel):
-    """Input for bulk-deleting permission entries by primary key."""
+class BulkRemoveRolePermissionPresetsInput(BaseRequestModel):
+    """Input for bulk-deleting role_permission_presets rows by primary key."""
 
-    permission_ids: list[RolePermissionPresetID] = Field(
-        description="Permission entry IDs to delete.",
+    permission_preset_ids: list[RolePermissionPresetID] = Field(
+        description="role_permission_presets row IDs to delete.",
     )
 
 

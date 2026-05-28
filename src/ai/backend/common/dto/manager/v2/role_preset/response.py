@@ -16,13 +16,14 @@ from ai.backend.common.identifier.role_permission_preset import RolePermissionPr
 from ai.backend.common.identifier.role_preset import RolePresetID
 
 __all__ = (
-    "BulkAddRolePresetPermissionsPayload",
-    "BulkRemoveRolePresetPermissionFailureInfo",
-    "BulkRemoveRolePresetPermissionsPayload",
+    "BulkAddRolePermissionPresetsPayload",
+    "BulkDeleteRolePresetsPayload",
+    "BulkPurgeRolePresetsPayload",
+    "BulkRemoveRolePermissionPresetsPayload",
+    "BulkRestoreRolePresetsPayload",
+    "BulkRolePermissionPresetFailureInfo",
+    "BulkRolePresetFailureInfo",
     "CreateRolePresetPayload",
-    "DeleteRolePresetPayload",
-    "PurgeRolePresetPayload",
-    "RestoreRolePresetPayload",
     "RolePermissionPresetNode",
     "RolePresetNode",
     "SearchRolePresetsPayload",
@@ -78,25 +79,64 @@ class UpdateRolePresetPayload(BaseResponseModel):
     role_preset: RolePresetNode = Field(description="Updated role preset.")
 
 
-class DeleteRolePresetPayload(BaseResponseModel):
-    """Payload for soft-deleting a role preset."""
+class BulkRolePresetFailureInfo(BaseResponseModel):
+    """Failure detail for a single role preset ID in a bulk role-preset operation."""
 
-    role_preset: RolePresetNode = Field(description="The role preset after soft delete.")
-
-
-class RestoreRolePresetPayload(BaseResponseModel):
-    """Payload for restoring a soft-deleted role preset."""
-
-    role_preset: RolePresetNode = Field(description="The role preset after restore.")
+    role_preset_id: RolePresetID = Field(
+        description="Role preset ID that the operation failed on.",
+    )
+    message: str = Field(description="Error message describing the failure.")
 
 
-class PurgeRolePresetPayload(BaseResponseModel):
-    """Payload for hard-deleting a role preset."""
+class BulkRolePermissionPresetFailureInfo(BaseResponseModel):
+    """Failure detail for a single role-permission-preset row in a bulk operation."""
 
-    id: RolePresetID = Field(description="UUID of the purged role preset.")
+    permission_preset_id: RolePermissionPresetID = Field(
+        description="role_permission_presets row ID that the operation failed on.",
+    )
+    message: str = Field(description="Error message describing the failure.")
 
 
-class BulkAddRolePresetPermissionsPayload(BaseResponseModel):
+class BulkDeleteRolePresetsPayload(BaseResponseModel):
+    """Payload for bulk-soft-deleting role presets."""
+
+    items: list[RolePresetNode] = Field(
+        default_factory=list,
+        description="Role presets that were soft-deleted.",
+    )
+    failed: list[BulkRolePresetFailureInfo] = Field(
+        default_factory=list,
+        description="Role preset IDs that failed to soft-delete.",
+    )
+
+
+class BulkRestoreRolePresetsPayload(BaseResponseModel):
+    """Payload for bulk-restoring soft-deleted role presets."""
+
+    items: list[RolePresetNode] = Field(
+        default_factory=list,
+        description="Role presets that were restored.",
+    )
+    failed: list[BulkRolePresetFailureInfo] = Field(
+        default_factory=list,
+        description="Role preset IDs that failed to restore.",
+    )
+
+
+class BulkPurgeRolePresetsPayload(BaseResponseModel):
+    """Payload for bulk-hard-deleting role presets."""
+
+    items: list[RolePresetNode] = Field(
+        default_factory=list,
+        description="Snapshot of role presets that were purged.",
+    )
+    failed: list[BulkRolePresetFailureInfo] = Field(
+        default_factory=list,
+        description="Role preset IDs that failed to purge.",
+    )
+
+
+class BulkAddRolePermissionPresetsPayload(BaseResponseModel):
     """Payload for bulk-adding permission entries to a role preset."""
 
     permissions: list[RolePermissionPresetNode] = Field(
@@ -104,23 +144,14 @@ class BulkAddRolePresetPermissionsPayload(BaseResponseModel):
     )
 
 
-class BulkRemoveRolePresetPermissionFailureInfo(BaseResponseModel):
-    """Failure detail for a single permission ID in bulk role-preset-permission deletion."""
-
-    permission_id: RolePermissionPresetID = Field(
-        description="Permission entry ID that failed to delete.",
-    )
-    message: str = Field(description="Error message describing the failure.")
-
-
-class BulkRemoveRolePresetPermissionsPayload(BaseResponseModel):
+class BulkRemoveRolePermissionPresetsPayload(BaseResponseModel):
     """Payload for bulk-removing permission entries from a role preset."""
 
     items: list[RolePermissionPresetNode] = Field(
         default_factory=list,
         description="Permission entries that were removed.",
     )
-    failed: list[BulkRemoveRolePresetPermissionFailureInfo] = Field(
+    failed: list[BulkRolePermissionPresetFailureInfo] = Field(
         default_factory=list,
         description="Permission entry IDs that failed to delete.",
     )
