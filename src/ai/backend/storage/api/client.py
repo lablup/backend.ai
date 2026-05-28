@@ -348,6 +348,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
                     session_dir=session_dir,
                     session_id=token_data["session"],
                     total_size=int(token_data["size"]),
+                    valkey_client=ctx.valkey_tus_client,
                 )
             )
             state = await session.read_state()
@@ -426,6 +427,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     session_dir=session_dir,
                     session_id=token_data["session"],
                     total_size=total_size,
+                    valkey_client=ctx.valkey_tus_client,
                 )
             )
             await session.ensure_initialized()
