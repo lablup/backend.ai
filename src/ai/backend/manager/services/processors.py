@@ -232,6 +232,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.resource_usage.service import (
         ResourceUsageService,
     )
+    from ai.backend.manager.services.role_preset.processors import (
+        RolePresetProcessors,
+    )
+    from ai.backend.manager.services.role_preset.service import (
+        RolePresetService,
+    )
     from ai.backend.manager.services.runtime_variant.processors import (
         RuntimeVariantProcessors,
     )
@@ -386,6 +392,7 @@ class Services:
     prometheus_query_preset_category: PrometheusQueryPresetCategoryService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
+    role_preset: RolePresetService
     runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentRevisionPresetService
@@ -451,6 +458,7 @@ class Processors(AbstractProcessorPackage):
     prometheus_query_preset_category: PrometheusQueryPresetCategoryProcessors
     resource_preset: ResourcePresetProcessors
     resource_slot: ResourceSlotProcessors
+    role_preset: RolePresetProcessors
     runtime_variant: RuntimeVariantProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors
     deployment_revision_preset: DeploymentRevisionPresetProcessors
@@ -509,6 +517,7 @@ class Processors(AbstractProcessorPackage):
             *self.prometheus_query_preset_category.supported_actions(),
             *self.resource_preset.supported_actions(),
             *self.resource_slot.supported_actions(),
+            *self.role_preset.supported_actions(),
             *self.runtime_variant.supported_actions(),
             *self.runtime_variant_preset.supported_actions(),
             *self.deployment_revision_preset.supported_actions(),
