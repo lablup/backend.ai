@@ -3,19 +3,21 @@ Role Preset DTO v2 models for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.role_preset.request import (
-    AddRolePresetPermissionsInput,
+    BulkAddRolePresetPermissionsInput,
+    BulkRemoveRolePresetPermissionsInput,
     CreateRolePresetInput,
-    RemoveRolePresetPermissionsInput,
     RolePresetFilter,
     RolePresetOrder,
     SearchRolePresetsInput,
     UpdateRolePresetInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import (
-    AddRolePresetPermissionsPayload,
+    BulkAddRolePresetPermissionsPayload,
+    BulkRemoveRolePresetPermissionFailureInfo,
+    BulkRemoveRolePresetPermissionsPayload,
     CreateRolePresetPayload,
     DeleteRolePresetPayload,
-    RemoveRolePresetPermissionsPayload,
+    RolePermissionPresetNode,
     RolePresetNode,
     SearchRolePresetsPayload,
     UpdateRolePresetPayload,
@@ -26,7 +28,6 @@ from ai.backend.common.dto.manager.v2.role_preset.types import (
     OrderDirection,
     RBACElementTypeDTO,
     RolePermissionPresetEntry,
-    RolePermissionPresetInfo,
     RolePresetOrderField,
 )
 
@@ -37,21 +38,22 @@ __all__ = (
     "OrderDirection",
     "RBACElementTypeDTO",
     "RolePermissionPresetEntry",
-    "RolePermissionPresetInfo",
     "RolePresetOrderField",
     # Request DTOs
-    "AddRolePresetPermissionsInput",
+    "BulkAddRolePresetPermissionsInput",
+    "BulkRemoveRolePresetPermissionsInput",
     "CreateRolePresetInput",
-    "RemoveRolePresetPermissionsInput",
     "RolePresetFilter",
     "RolePresetOrder",
     "SearchRolePresetsInput",
     "UpdateRolePresetInput",
     # Response DTOs
-    "AddRolePresetPermissionsPayload",
+    "BulkAddRolePresetPermissionsPayload",
+    "BulkRemoveRolePresetPermissionFailureInfo",
+    "BulkRemoveRolePresetPermissionsPayload",
     "CreateRolePresetPayload",
     "DeleteRolePresetPayload",
-    "RemoveRolePresetPermissionsPayload",
+    "RolePermissionPresetNode",
     "RolePresetNode",
     "SearchRolePresetsPayload",
     "UpdateRolePresetPayload",

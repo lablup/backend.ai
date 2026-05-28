@@ -12,11 +12,12 @@ from ai.backend.common.dto.manager.v2.role_preset.types import (
     RolePermissionPresetEntry,
     RolePresetOrderField,
 )
+from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
 
 __all__ = (
-    "AddRolePresetPermissionsInput",
+    "BulkAddRolePresetPermissionsInput",
+    "BulkRemoveRolePresetPermissionsInput",
     "CreateRolePresetInput",
-    "RemoveRolePresetPermissionsInput",
     "RolePresetFilter",
     "RolePresetOrder",
     "SearchRolePresetsInput",
@@ -34,15 +35,17 @@ class CreateRolePresetInput(BaseRequestModel):
     auto_apply: bool = Field(
         default=False,
         description=(
-            "If true, this preset is auto-applied when a scope of `scope_type` is created. "
-            "Multiple auto-apply presets per scope type are allowed."
+            "If true, a role is instantiated from this preset and bound to every new "
+            "scope of `scope_type` at creation time. Multiple auto-apply presets per "
+            "scope type are allowed."
         ),
     )
     auto_assign: bool = Field(
         default=False,
         description=(
-            "Default value for the `auto_assign` flag copied onto roles instantiated "
-            "from this preset."
+            "Default value for the `auto_assign` flag on roles instantiated from this "
+            "preset. When true, the role is automatically granted to a user upon "
+            "joining the scope."
         ),
     )
     permissions: list[RolePermissionPresetEntry] = Field(
@@ -68,22 +71,19 @@ class UpdateRolePresetInput(BaseRequestModel):
     )
 
 
-class AddRolePresetPermissionsInput(BaseRequestModel):
-    """Input for adding permission entries to an existing role preset."""
+class BulkAddRolePresetPermissionsInput(BaseRequestModel):
+    """Input for bulk-adding permission entries to an existing role preset."""
 
     permissions: list[RolePermissionPresetEntry] = Field(
-        description="Permission entries to add to the preset.",
+        description="Permission entries to insert. Duplicates are surfaced as failures.",
     )
 
 
-class RemoveRolePresetPermissionsInput(BaseRequestModel):
-    """Input for removing permission entries from an existing role preset.
+class BulkRemoveRolePresetPermissionsInput(BaseRequestModel):
+    """Input for bulk-deleting permission entries by primary key."""
 
-    Entries are matched by ``(entity_type, operation)``. Unknown entries are silently ignored.
-    """
-
-    permissions: list[RolePermissionPresetEntry] = Field(
-        description="Permission entries to remove from the preset.",
+    permission_ids: list[RolePermissionPresetID] = Field(
+        description="Permission entry IDs to delete.",
     )
 
 

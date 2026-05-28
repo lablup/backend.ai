@@ -7,18 +7,35 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.dto.manager.v2.role_preset.types import RBACElementTypeDTO
+from ai.backend.common.dto.manager.v2.role_preset.types import (
+    EntityType,
+    OperationTypeDTO,
+    RBACElementTypeDTO,
+)
+from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.identifier.role_preset import RolePresetID
 
 __all__ = (
-    "AddRolePresetPermissionsPayload",
+    "BulkAddRolePresetPermissionsPayload",
+    "BulkRemoveRolePresetPermissionFailureInfo",
+    "BulkRemoveRolePresetPermissionsPayload",
     "CreateRolePresetPayload",
     "DeleteRolePresetPayload",
-    "RemoveRolePresetPermissionsPayload",
+    "RolePermissionPresetNode",
     "RolePresetNode",
     "SearchRolePresetsPayload",
     "UpdateRolePresetPayload",
 )
+
+
+class RolePermissionPresetNode(BaseResponseModel):
+    """Node model for a stored permission entry under a role preset."""
+
+    id: RolePermissionPresetID = Field(description="Permission entry UUID.")
+    role_preset_id: RolePresetID = Field(description="UUID of the parent role preset.")
+    entity_type: EntityType = Field(description="Entity type the permission applies to.")
+    operation: OperationTypeDTO = Field(description="Operation granted by the permission.")
+    created_at: datetime = Field(description="Creation timestamp.")
 
 
 class RolePresetNode(BaseResponseModel):
@@ -60,16 +77,34 @@ class DeleteRolePresetPayload(BaseResponseModel):
     id: RolePresetID = Field(description="UUID of the deleted role preset.")
 
 
-class AddRolePresetPermissionsPayload(BaseResponseModel):
-    """Payload for adding permission entries to a role preset."""
+class BulkAddRolePresetPermissionsPayload(BaseResponseModel):
+    """Payload for bulk-adding permission entries to a role preset."""
 
-    role_preset: RolePresetNode = Field(description="Role preset metadata.")
+    permissions: list[RolePermissionPresetNode] = Field(
+        description="Permission entries that were added.",
+    )
 
 
-class RemoveRolePresetPermissionsPayload(BaseResponseModel):
-    """Payload for removing permission entries from a role preset."""
+class BulkRemoveRolePresetPermissionFailureInfo(BaseResponseModel):
+    """Failure detail for a single permission ID in bulk role-preset-permission deletion."""
 
-    role_preset: RolePresetNode = Field(description="Role preset metadata.")
+    permission_id: RolePermissionPresetID = Field(
+        description="Permission entry ID that failed to delete.",
+    )
+    message: str = Field(description="Error message describing the failure.")
+
+
+class BulkRemoveRolePresetPermissionsPayload(BaseResponseModel):
+    """Payload for bulk-removing permission entries from a role preset."""
+
+    items: list[RolePermissionPresetNode] = Field(
+        default_factory=list,
+        description="Permission entries that were removed.",
+    )
+    failed: list[BulkRemoveRolePresetPermissionFailureInfo] = Field(
+        default_factory=list,
+        description="Permission entry IDs that failed to delete.",
+    )
 
 
 class SearchRolePresetsPayload(BaseResponseModel):

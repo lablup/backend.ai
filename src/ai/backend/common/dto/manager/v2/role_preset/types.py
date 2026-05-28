@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from enum import StrEnum
-from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import (
     EntityType,
     OperationTypeDTO,
     RBACElementTypeDTO,
 )
-from ai.backend.common.identifier.role_preset import RolePresetID
 
 __all__ = (
     "EntityType",
@@ -23,7 +20,6 @@ __all__ = (
     "OrderDirection",
     "RBACElementTypeDTO",
     "RolePermissionPresetEntry",
-    "RolePermissionPresetInfo",
     "RolePresetOrderField",
 )
 
@@ -42,13 +38,3 @@ class RolePermissionPresetEntry(BaseRequestModel):
 
     entity_type: EntityType = Field(description="Entity type the permission applies to.")
     operation: OperationTypeDTO = Field(description="Operation granted by the permission.")
-
-
-class RolePermissionPresetInfo(BaseResponseModel):
-    """Response representation of one stored permission entry under a role preset."""
-
-    id: UUID = Field(description="UUID of the permission entry row.")
-    role_preset_id: RolePresetID = Field(description="UUID of the parent role preset.")
-    entity_type: EntityType = Field(description="Entity type the permission applies to.")
-    operation: OperationTypeDTO = Field(description="Operation granted by the permission.")
-    created_at: datetime = Field(description="Creation timestamp.")
