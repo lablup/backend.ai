@@ -21,6 +21,8 @@ __all__ = (
     "BulkRemoveRolePresetPermissionsPayload",
     "CreateRolePresetPayload",
     "DeleteRolePresetPayload",
+    "PurgeRolePresetPayload",
+    "RestoreRolePresetPayload",
     "RolePermissionPresetNode",
     "RolePresetNode",
     "SearchRolePresetsPayload",
@@ -48,11 +50,16 @@ class RolePresetNode(BaseResponseModel):
     id: RolePresetID = Field(description="Role preset UUID.")
     name: str = Field(description="Role preset name.")
     scope_type: RBACElementTypeDTO = Field(description="Scope type this preset targets.")
-    auto_apply: bool = Field(description="If true, this preset is auto-applied at scope creation.")
     auto_assign: bool = Field(
         description=(
             "Default value for the `auto_assign` flag copied onto roles instantiated "
             "from this preset."
+        ),
+    )
+    deleted: bool = Field(
+        description=(
+            "Soft-delete flag. Set by the Delete mutation and cleared by the Restore "
+            "mutation; archived rows are excluded from default searches."
         ),
     )
     created_at: datetime = Field(description="Creation timestamp.")
@@ -72,9 +79,21 @@ class UpdateRolePresetPayload(BaseResponseModel):
 
 
 class DeleteRolePresetPayload(BaseResponseModel):
-    """Payload for role preset deletion."""
+    """Payload for soft-deleting a role preset."""
 
-    id: RolePresetID = Field(description="UUID of the deleted role preset.")
+    role_preset: RolePresetNode = Field(description="The role preset after soft delete.")
+
+
+class RestoreRolePresetPayload(BaseResponseModel):
+    """Payload for restoring a soft-deleted role preset."""
+
+    role_preset: RolePresetNode = Field(description="The role preset after restore.")
+
+
+class PurgeRolePresetPayload(BaseResponseModel):
+    """Payload for hard-deleting a role preset."""
+
+    id: RolePresetID = Field(description="UUID of the purged role preset.")
 
 
 class BulkAddRolePresetPermissionsPayload(BaseResponseModel):
