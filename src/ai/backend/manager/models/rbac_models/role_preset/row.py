@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -9,6 +8,7 @@ from sqlalchemy.orm import (
     mapped_column,
 )
 
+from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.models.base import (
     GUID,
@@ -27,7 +27,7 @@ class RolePresetRow(Base):  # type: ignore[misc]
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
+    id: Mapped[RolePresetID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(64), nullable=False)

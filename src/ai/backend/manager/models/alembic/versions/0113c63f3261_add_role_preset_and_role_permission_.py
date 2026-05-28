@@ -19,7 +19,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "0113c63f3261"
-down_revision = "338bc3284f20"
+down_revision = "bee1c0de01a1"
 # Part of: 26.6.0
 branch_labels = None
 depends_on = None

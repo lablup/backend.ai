@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
@@ -28,10 +29,10 @@ class RolePermissionPresetRow(Base):  # type: ignore[misc]
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
+    id: Mapped[RolePermissionPresetID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    role_preset_id: Mapped[uuid.UUID] = mapped_column(
+    role_preset_id: Mapped[RolePresetID] = mapped_column(
         "role_preset_id",
         GUID,
         sa.ForeignKey("role_presets.id", ondelete="CASCADE"),
