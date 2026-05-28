@@ -822,6 +822,7 @@ class TestListInvitationAction:
         invitation_data.vfolder = vfolder_uuid
         invitation_data.invitee = "user@test.com"
         invitation_data.inviter = "inviter@test.com"
+        invitation_data.inviter_username = "inviter-user"
         invitation_data.permission = VFolderMountPermission.READ_ONLY
         invitation_data.created_at = now
         invitation_data.modified_at = None

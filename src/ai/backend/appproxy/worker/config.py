@@ -758,20 +758,6 @@ class ProxyWorkerConfig(BaseSchema):
         ),
     ]
 
-    inference_metric_collection_interval: Annotated[
-        float,
-        Field(default=5.0),
-        BackendAIConfigMeta(
-            description=(
-                "The interval in seconds between collecting metrics from inference model endpoints. "
-                "Metrics include request counts, latencies, and throughput. Lower values provide "
-                "more granular data but increase overhead on model services."
-            ),
-            added_version="25.9.0",
-            example=ConfigExample(local="5.0", prod="5.0"),
-        ),
-    ]
-
     client_pool_cleanup_interval: Annotated[
         float,
         Field(default=60.0),

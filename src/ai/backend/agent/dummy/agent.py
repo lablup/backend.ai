@@ -283,7 +283,7 @@ class DummyAgent(
         return []
 
     @override
-    async def sync_container_lifecycles(self, interval: float) -> None:
+    async def sync_container_lifecycles(self) -> None:
         return
 
     @override
