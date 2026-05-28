@@ -30,11 +30,14 @@ class RolePermissionPresetRow(Base):  # type: ignore[misc]
     )
 
     id: Mapped[RolePermissionPresetID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id",
+        GUID(RolePermissionPresetID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     role_preset_id: Mapped[RolePresetID] = mapped_column(
         "role_preset_id",
-        GUID,
+        GUID(RolePresetID),
         sa.ForeignKey("role_presets.id", ondelete="CASCADE"),
         nullable=False,
     )

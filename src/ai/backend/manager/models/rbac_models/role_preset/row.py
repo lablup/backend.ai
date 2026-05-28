@@ -28,7 +28,7 @@ class RolePresetRow(Base):  # type: ignore[misc]
     )
 
     id: Mapped[RolePresetID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        "id", GUID(RolePresetID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(64), nullable=False)
     scope_type: Mapped[ScopeType] = mapped_column(
