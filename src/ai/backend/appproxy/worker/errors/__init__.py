@@ -3,7 +3,6 @@ App Proxy Worker error classes.
 """
 
 from .circuit import (
-    InvalidAppInfoTypeError,
     InvalidCircuitDataError,
     InvalidFrontendTypeError,
 )
@@ -16,13 +15,11 @@ from .config import (
     MissingTraefikConfigError,
 )
 from .process import (
-    InvalidMatrixSizeError,
     SubprocessPipeError,
 )
 
 __all__ = [
     # circuit
-    "InvalidAppInfoTypeError",
     "InvalidCircuitDataError",
     "InvalidFrontendTypeError",
     # config
@@ -33,6 +30,5 @@ __all__ = [
     "MissingProfilingConfigError",
     "MissingTraefikConfigError",
     # process
-    "InvalidMatrixSizeError",
     "SubprocessPipeError",
 ]
