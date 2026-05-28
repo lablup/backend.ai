@@ -19,11 +19,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiohttp import web
+from redis.asyncio import Redis
 
+from ai.backend.common import config
 from ai.backend.common.clients.valkey_client.valkey_tus import ValkeyTusClient
-from ai.backend.common.defs import REDIS_TUS_DB
+from ai.backend.common.defs import REDIS_STREAM_LOCK, REDIS_TUS_DB
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import RedisConnectionInfo, ValkeyTarget
 from ai.backend.storage.api.client import tus_upload_part
 from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
 from ai.backend.testutils.bootstrap import redis_container  # noqa: F401
@@ -34,10 +36,18 @@ async def valkey_tus_client(
     redis_container: tuple[str, HostPortPairModel],  # noqa: F811
 ) -> AsyncIterator[ValkeyTusClient]:
     hostport_pair = redis_container[1]
+    lock_redis = RedisConnectionInfo(
+        Redis.from_url(f"redis://{hostport_pair.address}/{REDIS_STREAM_LOCK}"),
+        sentinel=None,
+        name="test.tus.api.lock",
+        service_name=None,
+        redis_helper_config=config.redis_helper_default_config,
+    )
     client = await ValkeyTusClient.create(
         ValkeyTarget(addr=hostport_pair.address),
         db_id=REDIS_TUS_DB,
         human_readable_name="test.tus.api",
+        lock_redis=lock_redis,
     )
     try:
         yield client
