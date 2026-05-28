@@ -6,20 +6,17 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.role_preset.types import (
-    OrderDirection,
-    RBACElementTypeDTO,
+from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import RBACElementTypeDTO
+from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
-    RolePresetOrderField,
 )
-from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField
 from ai.backend.common.identifier.role_preset import RolePresetID
 
 __all__ = (
-    "BulkAddRolePermissionPresetsInput",
     "BulkDeleteRolePresetsInput",
     "BulkPurgeRolePresetsInput",
-    "BulkRemoveRolePermissionPresetsInput",
     "BulkRestoreRolePresetsInput",
     "CreateRolePresetInput",
     "RolePresetFilter",
@@ -86,22 +83,6 @@ class BulkPurgeRolePresetsInput(BaseRequestModel):
 
     role_preset_ids: list[RolePresetID] = Field(
         description="Role preset UUIDs to purge.",
-    )
-
-
-class BulkAddRolePermissionPresetsInput(BaseRequestModel):
-    """Input for bulk-adding permission entries to an existing role preset."""
-
-    permissions: list[RolePermissionPresetEntry] = Field(
-        description="Permission entries to insert. Duplicates are surfaced as failures.",
-    )
-
-
-class BulkRemoveRolePermissionPresetsInput(BaseRequestModel):
-    """Input for bulk-deleting role_permission_presets rows by primary key."""
-
-    permission_preset_ids: list[RolePermissionPresetID] = Field(
-        description="role_permission_presets row IDs to delete.",
     )
 
 
