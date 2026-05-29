@@ -72,25 +72,21 @@ jobs:
       run: |
         echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
         exit 1
-    - name: Calculate the fetch depth
+    - name: Detect fork PR
       run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
-            echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
-            # Fork PRs need full history to find the merge base
-            echo "GIT_FETCH_DEPTH=0" >> "${GITHUB_ENV}"
-          else
-            echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-            echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-          fi
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ] \
+          && [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
+          echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
         else
           echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
       uses: actions/checkout@v6
       with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        fetch-depth: 2
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
@@ -174,25 +170,21 @@ jobs:
       run: |
         echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
         exit 1
-    - name: Calculate the fetch depth
+    - name: Detect fork PR
       run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
-            echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
-            # Fork PRs need full history to find the merge base
-            echo "GIT_FETCH_DEPTH=0" >> "${GITHUB_ENV}"
-          else
-            echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-            echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-          fi
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ] \
+          && [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
+          echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
         else
           echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
       uses: actions/checkout@v6
       with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        fetch-depth: 2
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
@@ -359,17 +351,13 @@ jobs:
       run: |
         echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
         exit 1
-    - name: Calculate the fetch depth
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-        else
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
-        fi
     - name: Check out the revision with minimal required history
       uses: actions/checkout@v6
       with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        fetch-depth: 2
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
@@ -442,25 +430,13 @@ jobs:
       run: |
         echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
         exit 1
-    - name: Calculate the fetch depth
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
-            echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
-            # Fork PRs need full history to find the merge base
-            echo "GIT_FETCH_DEPTH=0" >> "${GITHUB_ENV}"
-          else
-            echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-            echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-          fi
-        else
-          echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
-        fi
     - name: Check out the revision with minimal required history
       uses: actions/checkout@v6
       with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        fetch-depth: 2
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
@@ -537,17 +513,13 @@ jobs:
       run: |
         echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
         exit 1
-    - name: Calculate the fetch depth
-      run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-        else
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
-        fi
     - name: Check out the revision with minimal required history
       uses: actions/checkout@v6
       with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        fetch-depth: 2
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
