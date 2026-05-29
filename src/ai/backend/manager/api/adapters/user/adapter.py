@@ -9,7 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
@@ -855,6 +855,45 @@ class UserAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
+        )
+        action_result = await self._processors.user.admin_search_keypairs.wait_for_complete(
+            AdminSearchKeypairsAction(querier=querier)
+        )
+        return SearchResult(
+            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
+            total_count=action_result.result.total_count,
+            has_next_page=action_result.result.has_next_page,
+            has_previous_page=action_result.result.has_previous_page,
+        )
+
+    async def gql_search_keypairs_by_resource_policy(
+        self,
+        resource_policy_name: str,
+        input: AdminSearchKeypairsInput,
+    ) -> SearchResult[KeypairNode]:
+        """Search keypairs assigned to a given keypair resource policy (GQL connection).
+
+        Used by the ``keypairs`` connection field on the keypair resource policy node.
+        The resource policy name is applied as a base scope condition before any
+        user-supplied filters.
+        """
+        conditions = self._convert_keypair_filter(input.filter) if input.filter else []
+        orders = self._convert_keypair_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KEYPAIR_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[
+                KeypairConditions.by_resource_policy_equals(
+                    StringMatchSpec(resource_policy_name, case_insensitive=False, negated=False)
+                )
+            ],
         )
         action_result = await self._processors.user.admin_search_keypairs.wait_for_complete(
             AdminSearchKeypairsAction(querier=querier)

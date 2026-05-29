@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
@@ -12,6 +14,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     ProjectResourcePolicyNode,
     UserResourcePolicyNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     ResourceLimitEntryGQL,
@@ -25,6 +28,14 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.keypair.types.filters import (
+        KeypairFilterGQL,
+        KeypairOrderByGQL,
+    )
+    from ai.backend.manager.api.gql.keypair.types.node import KeyPairConnection
 
 # ── Keypair Resource Policy ──
 
@@ -64,6 +75,81 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     allowed_vfolder_hosts: list[VFolderHostPermissionEntryGQL] = gql_field(
         description="Allowed vfolder host permissions."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Keypairs assigned to this resource policy.",
+        )
+    )  # type: ignore[misc]
+    async def keypairs(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            KeypairFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.keypair.types.filters"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                KeypairOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.keypair.types.filters"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            KeyPairConnection,
+            strawberry.lazy("ai.backend.manager.api.gql.keypair.types.node"),
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.keypair.request import AdminSearchKeypairsInput
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.keypair.types.node import (
+            KeyPairConnection,
+            KeyPairEdge,
+            KeyPairGQL,
+        )
+        from ai.backend.manager.api.gql.utils import check_admin_only
+
+        # This node is reachable from non-admin entry points (e.g. myKeypairResourcePolicyV2),
+        # but the keypair listing spans all users sharing the policy — restrict to superadmins.
+        check_admin_only()
+
+        result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
+            resource_policy_name=self.name,
+            input=AdminSearchKeypairsInput(
+                filter=filter.to_pydantic() if filter is not None else None,
+                order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [KeyPairGQL.from_pydantic(item) for item in result.items]
+        edges = [KeyPairEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return KeyPairConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=result.total_count,
+        )
 
 
 KeypairResourcePolicyV2Edge = Edge[KeypairResourcePolicyV2GQL]
