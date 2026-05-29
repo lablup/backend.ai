@@ -5461,6 +5461,15 @@ type KeypairResourceAllocationV2 {
 }
 
 """
+Added in UNRELEASED. Nested filter for keypairs assigned to a keypair resource policy. Filters policies linked to at least one keypair matching all specified conditions.
+"""
+input KeypairResourcePolicyKeypairNestedFilter {
+  userId: UUIDFilter = null
+  accessKey: StringFilter = null
+  isActive: Boolean = null
+}
+
+"""
 Added in 26.4.2. Keypair resource policy defining session and storage limits for API keypairs.
 """
 type KeypairResourcePolicyV2 implements Node {
@@ -5537,6 +5546,11 @@ input KeypairResourcePolicyV2Filter {
   idleTimeout: IntFilter = null
   maxConcurrentSftpSessions: IntFilter = null
   maxPendingSessionCount: IntFilter = null
+
+  """
+  Added in UNRELEASED. Filter policies by their assigned keypairs (e.g., policies linked to keypairs owned by a specific user).
+  """
+  keypair: KeypairResourcePolicyKeypairNestedFilter = null
 }
 
 """Added in 26.4.2. Ordering specification for keypair resource policies."""
