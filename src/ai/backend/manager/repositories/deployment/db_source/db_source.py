@@ -92,6 +92,7 @@ from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import (
     DeploymentHasNoTargetRevision,
     DeploymentRevisionNotFound,
+    NoActiveKeypairForDeployment,
     UserNotFoundInDeployment,
 )
 from ai.backend.manager.errors.resource import (
@@ -2105,7 +2106,7 @@ class DeploymentDBSource:
         ).scalar_one_or_none()
         if user_row is None:
             raise UserNotFoundInDeployment(f"{user_uuid} not found")
-        raise UserNotFoundInDeployment(f"{user_uuid} has no active keypair")
+        raise NoActiveKeypairForDeployment(f"{user_uuid} has no active keypair")
 
     async def fetch_deployment_context(
         self,
@@ -2144,7 +2145,7 @@ class DeploymentDBSource:
                 created.user.uuid,
                 created.access_key,
                 created.user.role or UserRole.USER,
-                deployment_info.metadata.domain,
+                created.user.domain_name or deployment_info.metadata.domain,
                 None,  # No keypair_resource_policy
                 deployment_info.metadata.domain,
                 deployment_info.metadata.project,
