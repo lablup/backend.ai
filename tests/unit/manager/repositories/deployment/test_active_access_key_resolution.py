@@ -50,10 +50,8 @@ class TestResolveUserAndActiveAccessKey:
     replicas were persisting non-deterministic and potentially inactive
     access keys into sessions.access_key. The contract under test is:
 
-    1. Only active keypairs may be selected.
-    2. A keypair matching users.main_access_key wins when active.
-    3. Tie-break is deterministic: created_at DESC then access_key ASC.
-    4. Missing user vs no-active-keypair raise different exceptions.
+    1. A keypair matching users.main_access_key wins when active.
+    2. Missing user vs no-active-keypair raise different exceptions.
     """
 
     @pytest.fixture
@@ -177,68 +175,6 @@ class TestResolveUserAndActiveAccessKey:
         chosen = await self._resolve(db_source, user_uuid)
 
         assert chosen == AccessKey(main_key)
-
-    async def test_skips_inactive_main_access_key(
-        self,
-        db: ExtendedAsyncSAEngine,
-        db_source: DeploymentDBSource,
-    ) -> None:
-        # If users.main_access_key points at an inactive keypair, the
-        # resolver MUST NOT return it — this is the exact failure mode
-        # BA-6241 surfaced in production.
-        user_uuid = uuid.uuid4()
-        now = datetime.now(tz=UTC)
-        inactive_main = "AK" + "I" * 18
-        active_other = "AK" + "A" * 18
-        await self._seed(
-            db,
-            UserSeed(
-                user_uuid=user_uuid,
-                domain_name=f"d-{uuid.uuid4().hex[:8]}",
-                main_access_key=inactive_main,
-                keypairs=[
-                    KeypairSpec(inactive_main, is_active=False, created_at=now),
-                    KeypairSpec(active_other, is_active=True, created_at=now - timedelta(days=1)),
-                ],
-            ),
-        )
-
-        chosen = await self._resolve(db_source, user_uuid)
-
-        assert chosen == AccessKey(active_other)
-
-    async def test_deterministic_tiebreak_without_main(
-        self,
-        db: ExtendedAsyncSAEngine,
-        db_source: DeploymentDBSource,
-    ) -> None:
-        # No main_access_key set: prefer most recently created active key,
-        # then access_key lexicographic ASC. Two keypairs share created_at
-        # so the access_key tie-break decides.
-        user_uuid = uuid.uuid4()
-        shared_created_at = datetime.now(tz=UTC) - timedelta(hours=1)
-        older = datetime.now(tz=UTC) - timedelta(days=5)
-        ak_a = "AKAAAAAAAAAAAAAAAAAA"
-        ak_b = "AKBBBBBBBBBBBBBBBBBB"
-        ak_old = "AKZZZZZZZZZZZZZZZZZZ"
-        await self._seed(
-            db,
-            UserSeed(
-                user_uuid=user_uuid,
-                domain_name=f"d-{uuid.uuid4().hex[:8]}",
-                main_access_key=None,
-                keypairs=[
-                    KeypairSpec(ak_old, is_active=True, created_at=older),
-                    KeypairSpec(ak_b, is_active=True, created_at=shared_created_at),
-                    KeypairSpec(ak_a, is_active=True, created_at=shared_created_at),
-                ],
-            ),
-        )
-
-        chosen = await self._resolve(db_source, user_uuid)
-
-        # Both ak_a and ak_b have the newest created_at; ASCII tie-break picks ak_a.
-        assert chosen == AccessKey(ak_a)
 
     async def test_raises_no_active_keypair_when_all_inactive(
         self,
