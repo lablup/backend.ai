@@ -31,7 +31,6 @@ from ai.backend.manager.repositories.base import (
     BatchUpdater,
     BulkCreator,
     Creator,
-    NoPagination,
     Purger,
     Querier,
 )
@@ -96,28 +95,18 @@ class RolePresetDBSource:
     async def bulk_delete(
         self,
         batch_updater: BatchUpdater[RolePresetRow],
-    ) -> list[RolePresetData]:
-        return await self._batch_update_and_refetch(batch_updater)
+    ) -> int:
+        async with self._ops.write_ops() as w:
+            result = await w.batch_update(batch_updater)
+            return result.updated_count
 
     async def bulk_restore(
         self,
         batch_updater: BatchUpdater[RolePresetRow],
-    ) -> list[RolePresetData]:
-        return await self._batch_update_and_refetch(batch_updater)
-
-    async def _batch_update_and_refetch(
-        self,
-        batch_updater: BatchUpdater[RolePresetRow],
-    ) -> list[RolePresetData]:
+    ) -> int:
         async with self._ops.write_ops() as w:
-            await w.batch_update(batch_updater)
-            refetch_query = sa.select(RolePresetRow)
-            for condition in batch_updater.conditions:
-                refetch_query = refetch_query.where(condition())
-            result = await w.batch_query_in_global(
-                refetch_query, BatchQuerier(pagination=NoPagination())
-            )
-            return [row.RolePresetRow.to_data() for row in result.rows]
+            result = await w.batch_update(batch_updater)
+            return result.updated_count
 
     async def purge(self, preset_id: RolePresetID) -> bool:
         async with self._ops.write_ops() as w:
@@ -156,12 +145,7 @@ class RolePresetDBSource:
     async def bulk_remove_permissions(
         self,
         batch_purger: BatchPurger[RolePermissionPresetRow],
-    ) -> list[RolePermissionPresetData]:
+    ) -> int:
         async with self._ops.write_ops() as w:
-            snapshot_query = batch_purger.spec.build_subquery()
-            snapshot_result = await w.batch_query_in_global(
-                snapshot_query, BatchQuerier(pagination=NoPagination())
-            )
-            snapshots = [row.RolePermissionPresetRow.to_data() for row in snapshot_result.rows]
-            await w.batch_purge(batch_purger)
-            return snapshots
+            result = await w.batch_purge(batch_purger)
+            return result.deleted_count

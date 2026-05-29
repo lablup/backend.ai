@@ -3,7 +3,6 @@ from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
@@ -27,7 +26,7 @@ class BulkRemoveRolePermissionPresetsAction(RolePresetAction):
 
 @dataclass
 class BulkRemoveRolePermissionPresetsActionResult(BaseActionResult):
-    permissions: list[RolePermissionPresetData]
+    removed_count: int
 
     @override
     def entity_id(self) -> str | None:

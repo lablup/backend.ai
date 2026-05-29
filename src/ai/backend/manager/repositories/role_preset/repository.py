@@ -62,13 +62,13 @@ class RolePresetRepository:
     async def bulk_delete(
         self,
         batch_updater: BatchUpdater[RolePresetRow],
-    ) -> list[RolePresetData]:
+    ) -> int:
         return await self._db_source.bulk_delete(batch_updater)
 
     async def bulk_restore(
         self,
         batch_updater: BatchUpdater[RolePresetRow],
-    ) -> list[RolePresetData]:
+    ) -> int:
         return await self._db_source.bulk_restore(batch_updater)
 
     async def purge(self, preset_id: RolePresetID) -> bool:
@@ -89,5 +89,5 @@ class RolePresetRepository:
     async def bulk_remove_permissions(
         self,
         batch_purger: BatchPurger[RolePermissionPresetRow],
-    ) -> list[RolePermissionPresetData]:
+    ) -> int:
         return await self._db_source.bulk_remove_permissions(batch_purger)
