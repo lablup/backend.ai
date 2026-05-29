@@ -54,6 +54,17 @@ class UserNotFoundInDeployment(ObjectNotFound):
         )
 
 
+class NoActiveKeypairForDeployment(ObjectNotFound):
+    object_name = "active keypair for deployment user"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class DeploymentHasNoTargetRevision(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/deployment-has-no-target-revision"
     error_title = "Deployment has no target revision."
