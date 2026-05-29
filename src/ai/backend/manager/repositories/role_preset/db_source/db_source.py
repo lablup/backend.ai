@@ -11,10 +11,14 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
+    RolePresetBulkPurgeResult,
     RolePresetData,
+    RolePresetPurgeFailure,
+    RolePresetSearchResult,
 )
 from ai.backend.manager.errors.role_preset import RolePresetNotFound
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
@@ -28,6 +32,7 @@ from ai.backend.manager.repositories.base import (
     BulkCreator,
     Creator,
     NoPagination,
+    Purger,
     Querier,
 )
 from ai.backend.manager.repositories.base.updater import Updater
@@ -49,38 +54,33 @@ class RolePresetDBSource:
         self,
         creator: Creator[RolePresetRow],
         permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec],
-    ) -> tuple[RolePresetData, list[RolePermissionPresetData]]:
+    ) -> RolePresetData:
         async with self._ops.write_ops() as w:
             created = await w.create(creator)
             preset_row = created.row
-            permission_rows: list[RolePermissionPresetRow] = []
             if permission_creator_specs:
-                bulk_result = await w.bulk_create_dependent(permission_creator_specs, preset_row.id)
-                permission_rows = list(bulk_result.rows)
-            return (
-                preset_row.to_data(),
-                [row.to_data() for row in permission_rows],
-            )
+                await w.bulk_create_dependent(permission_creator_specs, preset_row.id)
+            return preset_row.to_data()
 
-    async def get(self, querier: Querier[RolePresetRow]) -> RolePresetData:
+    async def get(self, preset_id: RolePresetID) -> RolePresetData:
         async with self._ops.read_ops() as r:
-            result = await r.query(querier)
+            result = await r.query(Querier(row_class=RolePresetRow, pk_value=preset_id))
             if result is None:
-                raise RolePresetNotFound()
+                raise RolePresetNotFound(f"Role preset with ID {preset_id} not found.")
             return result.row.to_data()
 
     async def search(
         self,
         querier: BatchQuerier,
-    ) -> tuple[list[RolePresetData], int, bool, bool]:
+    ) -> RolePresetSearchResult:
         async with self._ops.read_ops() as r:
             result = await r.batch_query_in_global(sa.select(RolePresetRow), querier)
             items = [row.RolePresetRow.to_data() for row in result.rows]
-            return (
-                items,
-                result.total_count,
-                result.has_next_page,
-                result.has_previous_page,
+            return RolePresetSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
             )
 
     async def update(
@@ -119,18 +119,29 @@ class RolePresetDBSource:
             )
             return [row.RolePresetRow.to_data() for row in result.rows]
 
+    async def purge(self, preset_id: RolePresetID) -> bool:
+        async with self._ops.write_ops() as w:
+            result = await w.purge(Purger(row_class=RolePresetRow, pk_value=preset_id))
+            return result is not None
+
     async def bulk_purge(
         self,
-        batch_purger: BatchPurger[RolePresetRow],
-    ) -> list[RolePresetData]:
+        ids: Sequence[RolePresetID],
+    ) -> RolePresetBulkPurgeResult:
+        purgers = [Purger(row_class=RolePresetRow, pk_value=preset_id) for preset_id in ids]
         async with self._ops.write_ops() as w:
-            snapshot_query = batch_purger.spec.build_subquery()
-            snapshot_result = await w.batch_query_in_global(
-                snapshot_query, BatchQuerier(pagination=NoPagination())
+            result = await w.bulk_purge_partial(purgers)
+        failures = [
+            RolePresetPurgeFailure(
+                id=ids[error.index],
+                message=str(error.exception),
             )
-            snapshots = [row.RolePresetRow.to_data() for row in snapshot_result.rows]
-            await w.batch_purge(batch_purger)
-            return snapshots
+            for error in result.errors
+        ]
+        return RolePresetBulkPurgeResult(
+            success_count=result.success_count(),
+            failures=failures,
+        )
 
     async def bulk_add_permissions(
         self,

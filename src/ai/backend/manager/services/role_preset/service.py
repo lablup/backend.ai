@@ -6,6 +6,10 @@ from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import
     BulkAddRolePermissionPresetsAction,
     BulkAddRolePermissionPresetsActionResult,
 )
+from ai.backend.manager.services.role_preset.actions.bulk_purge import (
+    BulkPurgeRolePresetsAction,
+    BulkPurgeRolePresetsActionResult,
+)
 from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
     BulkRemoveRolePermissionPresetsAction,
     BulkRemoveRolePermissionPresetsActionResult,
@@ -23,8 +27,8 @@ from ai.backend.manager.services.role_preset.actions.get import (
     GetRolePresetActionResult,
 )
 from ai.backend.manager.services.role_preset.actions.purge import (
-    BulkPurgeRolePresetsAction,
-    BulkPurgeRolePresetsActionResult,
+    PurgeRolePresetAction,
+    PurgeRolePresetActionResult,
 )
 from ai.backend.manager.services.role_preset.actions.restore import (
     BulkRestoreRolePresetsAction,
@@ -49,24 +53,20 @@ class RolePresetService:
         self._repository = repository
 
     async def create(self, action: CreateRolePresetAction) -> CreateRolePresetActionResult:
-        preset, permissions = await self._repository.create(
-            action.creator, action.permission_creator_specs
-        )
-        return CreateRolePresetActionResult(preset=preset, permissions=permissions)
+        preset = await self._repository.create(action.creator, action.permission_creator_specs)
+        return CreateRolePresetActionResult(preset=preset)
 
     async def get(self, action: GetRolePresetAction) -> GetRolePresetActionResult:
-        preset = await self._repository.role_preset(action.querier)
+        preset = await self._repository.role_preset(action.preset_id)
         return GetRolePresetActionResult(preset=preset)
 
     async def search(self, action: SearchRolePresetsAction) -> SearchRolePresetsActionResult:
-        items, total_count, has_next_page, has_previous_page = await self._repository.search(
-            action.querier
-        )
+        result = await self._repository.search(action.querier)
         return SearchRolePresetsActionResult(
-            items=items,
-            total_count=total_count,
-            has_next_page=has_next_page,
-            has_previous_page=has_previous_page,
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def update(self, action: UpdateRolePresetAction) -> UpdateRolePresetActionResult:
@@ -85,11 +85,18 @@ class RolePresetService:
         presets = await self._repository.bulk_restore(action.batch_updater)
         return BulkRestoreRolePresetsActionResult(presets=presets)
 
+    async def purge(self, action: PurgeRolePresetAction) -> PurgeRolePresetActionResult:
+        success = await self._repository.purge(action.preset_id)
+        return PurgeRolePresetActionResult(success=success)
+
     async def bulk_purge(
         self, action: BulkPurgeRolePresetsAction
     ) -> BulkPurgeRolePresetsActionResult:
-        presets = await self._repository.bulk_purge(action.batch_purger)
-        return BulkPurgeRolePresetsActionResult(presets=presets)
+        result = await self._repository.bulk_purge(action.ids)
+        return BulkPurgeRolePresetsActionResult(
+            success_count=result.success_count,
+            failures=result.failures,
+        )
 
     async def bulk_add_permissions(
         self, action: BulkAddRolePermissionPresetsAction

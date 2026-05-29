@@ -3,10 +3,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 
+from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
+    RolePresetBulkPurgeResult,
     RolePresetData,
+    RolePresetSearchResult,
 )
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
@@ -18,7 +21,6 @@ from ai.backend.manager.repositories.base import (
     BatchUpdater,
     BulkCreator,
     Creator,
-    Querier,
 )
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
@@ -42,16 +44,16 @@ class RolePresetRepository:
         self,
         creator: Creator[RolePresetRow],
         permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec],
-    ) -> tuple[RolePresetData, list[RolePermissionPresetData]]:
+    ) -> RolePresetData:
         return await self._db_source.create(creator, permission_creator_specs)
 
-    async def role_preset(self, querier: Querier[RolePresetRow]) -> RolePresetData:
-        return await self._db_source.get(querier)
+    async def role_preset(self, preset_id: RolePresetID) -> RolePresetData:
+        return await self._db_source.get(preset_id)
 
     async def search(
         self,
         querier: BatchQuerier,
-    ) -> tuple[list[RolePresetData], int, bool, bool]:
+    ) -> RolePresetSearchResult:
         return await self._db_source.search(querier)
 
     async def update(self, updater: Updater[RolePresetRow]) -> RolePresetData:
@@ -69,11 +71,14 @@ class RolePresetRepository:
     ) -> list[RolePresetData]:
         return await self._db_source.bulk_restore(batch_updater)
 
+    async def purge(self, preset_id: RolePresetID) -> bool:
+        return await self._db_source.purge(preset_id)
+
     async def bulk_purge(
         self,
-        batch_purger: BatchPurger[RolePresetRow],
-    ) -> list[RolePresetData]:
-        return await self._db_source.bulk_purge(batch_purger)
+        ids: Sequence[RolePresetID],
+    ) -> RolePresetBulkPurgeResult:
+        return await self._db_source.bulk_purge(ids)
 
     async def bulk_add_permissions(
         self,

@@ -11,19 +11,7 @@ from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
-
-
-@dataclass
-class RolePresetByIDsBatchPurgerSpec(BatchPurgerSpec[RolePresetRow]):
-    """Selects role preset rows by id."""
-
-    ids: Sequence[RolePresetID]
-
-    @override
-    def build_subquery(self) -> sa.sql.Select[tuple[RolePresetRow]]:
-        return sa.select(RolePresetRow).where(RolePresetRow.id.in_(self.ids))
 
 
 @dataclass

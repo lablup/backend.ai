@@ -4,10 +4,7 @@ from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.role_preset.types import (
-    RolePermissionPresetData,
-    RolePresetData,
-)
+from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.role_preset.creators import (
@@ -34,7 +31,6 @@ class CreateRolePresetAction(RolePresetAction):
 @dataclass
 class CreateRolePresetActionResult(BaseActionResult):
     preset: RolePresetData
-    permissions: list[RolePermissionPresetData]
 
     @override
     def entity_id(self) -> str | None:

@@ -1,21 +1,20 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.role_preset.types import RolePresetData
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.services.role_preset.actions.base import RolePresetAction
 
 
 @dataclass
 class GetRolePresetAction(RolePresetAction):
-    querier: Querier[RolePresetRow]
+    preset_id: RolePresetID
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.querier.pk_value)
+        return str(self.preset_id)
 
     @override
     @classmethod
