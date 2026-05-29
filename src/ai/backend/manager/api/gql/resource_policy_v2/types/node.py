@@ -125,7 +125,7 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
         # but the keypair listing spans all users sharing the policy — restrict to superadmins.
         check_admin_only()
 
-        result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
+        result = await info.context.adapters.user.gql_admin_search_keypairs_by_resource_policy(
             resource_policy_name=self.name,
             input=AdminSearchKeypairsInput(
                 filter=filter.to_pydantic() if filter is not None else None,

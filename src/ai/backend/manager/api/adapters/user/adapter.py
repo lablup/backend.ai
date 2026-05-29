@@ -866,7 +866,7 @@ class UserAdapter(BaseAdapter):
             has_previous_page=action_result.result.has_previous_page,
         )
 
-    async def gql_search_keypairs_by_resource_policy(
+    async def gql_admin_search_keypairs_by_resource_policy(
         self,
         resource_policy_name: str,
         input: AdminSearchKeypairsInput,
