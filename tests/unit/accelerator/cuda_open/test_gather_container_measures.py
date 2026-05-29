@@ -140,7 +140,7 @@ class TestGatherContainerMeasures:
     ) -> None:
         """DockerError on a vanished container should be skipped, not crash the loop."""
         mock_docker.containers.get.side_effect = [
-            DockerError(status=404, data={"message": "No such container"}),
+            DockerError(status=404, message="No such container"),
             single_gpu_container,
         ]
 
