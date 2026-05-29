@@ -16,7 +16,7 @@ from .common import ObjectNotFound
 
 
 class RolePresetNotFound(ObjectNotFound):
-    object_name = "role preset"
+    object_name = "role_preset"
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
