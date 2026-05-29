@@ -13,6 +13,7 @@ backend_packages = [
     "setupgen",
     "platform_resources",
     "accelerator_wheels",
+    "visibility_checker",
 ]
 pants_ignore = [
     ".*/",
@@ -104,6 +105,13 @@ setuptools = "tools/setuptools.lock"
 bin = [
     "ruff",
 ]
+
+[visibility]
+# The Rust visibility-checker replaces Pants' experimental visibility linter for this PR.
+# Keep the backend loaded so existing BUILD-file rule macros still parse, but avoid running
+# Pants' own visibility checks during lint/dependency resolution.
+skip = true
+enforce = false
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"

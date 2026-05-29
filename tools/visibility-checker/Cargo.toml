@@ -1,0 +1,14 @@
+[package]
+name = "visibility-checker"
+version = "0.1.0"
+edition = "2024"
+license = "LGPL-3.0-or-later"
+publish = false
+
+[dependencies]
+rustpython-ruff_python_ast = "0.15.8"
+rustpython-ruff_python_parser = "0.15.8"
+
+[profile.release]
+strip = "debuginfo"
+lto = "thin"
