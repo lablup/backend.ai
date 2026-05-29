@@ -5504,6 +5504,9 @@ type KeypairResourcePolicyV2 implements Node {
 
   """Allowed vfolder host permissions."""
   allowedVfolderHosts: [VFolderHostPermissionEntry!]!
+
+  """Added in UNRELEASED. Keypairs assigned to this resource policy."""
+  keypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection
 }
 
 """Added in 26.4.2. Paginated connection for keypair resource policies."""
