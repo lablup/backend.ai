@@ -42,18 +42,20 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.typed_validators import PydanticJWTValidator
-from ai.backend.common.types import BinarySize, VFolderID
+from ai.backend.common.types import BinarySize, TusSessionId, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage import __version__
 from ai.backend.storage.dto.context import StorageRootCtx
-from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
+from ai.backend.storage.errors import (
+    InvalidAPIParameters,
+    UploadChunkExceedsTotalSizeError,
+    UploadOffsetMismatchError,
+)
 from ai.backend.storage.services.file_stream.zip import (
     ZipArchiveStreamReader,
 )
-from ai.backend.storage.services.upload.tus_session import (
-    TusUploadSession,
-    TusUploadSessionArgs,
-)
+from ai.backend.storage.services.upload.tus_session import TusUploadSession
+from ai.backend.storage.services.upload.types import TusUploadSessionArgs
 from ai.backend.storage.types import SENTINEL, TusChunkUploadStreamReader
 from ai.backend.storage.utils import (
     CheckParamSource,
@@ -63,7 +65,6 @@ from ai.backend.storage.utils import (
 
 if TYPE_CHECKING:
     from ai.backend.storage.context import RootContext
-    from ai.backend.storage.volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -99,7 +100,7 @@ class UploadTokenData(TypedDict):
     volume: str
     vfid: VFolderID
     relpath: str
-    session: str
+    session: TusSessionId
     size: int
 
 
@@ -332,7 +333,9 @@ async def tus_check_session(request: web.Request) -> web.Response:
     ) as params:
         token_data = params["token"]
         async with ctx.get_volume(token_data["volume"]) as volume:
-            session_dir = _resolve_tus_upload_session_dir(volume, token_data)
+            session_dir = (
+                volume.mangle_vfpath(token_data["vfid"]) / ".upload" / token_data["session"]
+            )
             if not session_dir.exists():
                 raise web.HTTPNotFound(
                     body=dump_json_str(
@@ -349,10 +352,11 @@ async def tus_check_session(request: web.Request) -> web.Response:
                     session_id=token_data["session"],
                     total_size=int(token_data["size"]),
                     valkey_client=ctx.valkey_tus_client,
+                    lock_factory=ctx.tus_lock_factory,
                 )
             )
             state = await session.read_state()
-            headers = _tus_response_headers(
+            headers = _prepare_tus_session_headers(
                 upload_offset=state.committed_offset,
                 upload_length=int(token_data["size"]),
             )
@@ -411,7 +415,9 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             )
 
         async with ctx.get_volume(token_data["volume"]) as volume:
-            session_dir = _resolve_tus_upload_session_dir(volume, token_data)
+            session_dir = (
+                volume.mangle_vfpath(token_data["vfid"]) / ".upload" / token_data["session"]
+            )
             if not session_dir.exists():
                 raise web.HTTPNotFound(
                     body=dump_json_str(
@@ -428,6 +434,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     session_id=token_data["session"],
                     total_size=total_size,
                     valkey_client=ctx.valkey_tus_client,
+                    lock_factory=ctx.tus_lock_factory,
                 )
             )
             await session.ensure_initialized()
@@ -435,28 +442,26 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             upload_stream = TusChunkUploadStreamReader(
                 request.content, request.content_type, DEFAULT_CHUNK_SIZE
             )
-            temp_chunk, length, sha256 = await session.write_temp_chunk(
-                client_offset, upload_stream
-            )
+            written = await session.write_temp_chunk(client_offset, upload_stream)
             try:
-                if client_offset + length > total_size:
-                    raise UploadOffsetMismatchError(
-                        f"Chunk at offset {client_offset} with length {length} "
+                if client_offset + written.length > total_size:
+                    raise UploadChunkExceedsTotalSizeError(
+                        f"Chunk at offset {client_offset} with length {written.length} "
                         f"exceeds declared size {total_size}"
                     )
                 acceptance = await session.commit_chunk(
                     offset=client_offset,
-                    chunk_path=temp_chunk.path,
-                    length=length,
-                    sha256=sha256,
+                    chunk_path=written.path,
+                    length=written.length,
+                    sha256=written.sha256,
                 )
             except BaseException:
-                if temp_chunk.path.exists():
-                    await asyncio.to_thread(temp_chunk.path.unlink)
+                if written.path.exists():
+                    await asyncio.to_thread(written.path.unlink)
                 raise
 
             state = acceptance.state
-            if acceptance.completed_now:
+            if acceptance.is_final_commit:
                 parent_dir = volume.mangle_vfpath(token_data["vfid"])
                 if (dst_dir := params["dst_dir"]) is not None:
                     parent_dir = parent_dir / dst_dir
@@ -464,21 +469,17 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 await session.assemble(target_path)
                 await session.cleanup()
 
-            headers = _tus_response_headers(
+            headers = _prepare_tus_session_headers(
                 upload_offset=state.committed_offset,
                 upload_length=total_size,
             )
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
-def _resolve_tus_upload_session_dir(volume: AbstractVolume, token_data: UploadTokenData) -> Path:
-    return volume.mangle_vfpath(token_data["vfid"]) / ".upload" / token_data["session"]
-
-
 _TUS_HEADER_LIST = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
 
 
-def _tus_response_headers(*, upload_offset: int, upload_length: int) -> dict[str, str]:
+def _prepare_tus_session_headers(*, upload_offset: int, upload_length: int) -> dict[str, str]:
     return {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": _TUS_HEADER_LIST,

@@ -64,6 +64,7 @@ from .quota import (
 )
 from .upload import (
     ChunkConflictError,
+    UploadChunkExceedsTotalSizeError,
     UploadSessionCorruptedError,
 )
 from .vfolder import (
@@ -96,6 +97,7 @@ __all__ = [
     "UploadOffsetMismatchError",
     # upload
     "ChunkConflictError",
+    "UploadChunkExceedsTotalSizeError",
     "UploadSessionCorruptedError",
     # vfolder
     "VFolderNotFoundError",

@@ -24,10 +24,16 @@ from redis.asyncio import Redis
 from ai.backend.common import config
 from ai.backend.common.clients.valkey_client.valkey_tus import ValkeyTusClient
 from ai.backend.common.defs import REDIS_STREAM_LOCK, REDIS_TUS_DB
+from ai.backend.common.lock import DistributedLockFactory
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import RedisConnectionInfo, ValkeyTarget
 from ai.backend.storage.api.client import tus_upload_part
-from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
+from ai.backend.storage.errors import (
+    InvalidAPIParameters,
+    UploadChunkExceedsTotalSizeError,
+    UploadOffsetMismatchError,
+)
+from ai.backend.storage.services.upload.lock import create_tus_lock_factory
 from ai.backend.testutils.bootstrap import redis_container  # noqa: F401
 
 
@@ -36,6 +42,22 @@ async def valkey_tus_client(
     redis_container: tuple[str, HostPortPairModel],  # noqa: F811
 ) -> AsyncIterator[ValkeyTusClient]:
     hostport_pair = redis_container[1]
+    client = await ValkeyTusClient.create(
+        ValkeyTarget(addr=hostport_pair.address),
+        db_id=REDIS_TUS_DB,
+        human_readable_name="test.tus.api",
+    )
+    try:
+        yield client
+    finally:
+        await client.close()
+
+
+@pytest.fixture
+async def tus_lock_factory(
+    redis_container: tuple[str, HostPortPairModel],  # noqa: F811
+) -> AsyncIterator[DistributedLockFactory]:
+    hostport_pair = redis_container[1]
     lock_redis = RedisConnectionInfo(
         Redis.from_url(f"redis://{hostport_pair.address}/{REDIS_STREAM_LOCK}"),
         sentinel=None,
@@ -43,16 +65,10 @@ async def valkey_tus_client(
         service_name=None,
         redis_helper_config=config.redis_helper_default_config,
     )
-    client = await ValkeyTusClient.create(
-        ValkeyTarget(addr=hostport_pair.address),
-        db_id=REDIS_TUS_DB,
-        human_readable_name="test.tus.api",
-        lock_redis=lock_redis,
-    )
     try:
-        yield client
+        yield create_tus_lock_factory(lock_redis)
     finally:
-        await client.close()
+        await lock_redis.close()
 
 
 @dataclasses.dataclass(slots=True)
@@ -70,6 +86,7 @@ def _build_request(
     body: bytes | None,
     offset_header: str | None,
     valkey_client: ValkeyTusClient,
+    lock_factory: DistributedLockFactory,
 ) -> MagicMock:
     volume = MagicMock()
     volume.mangle_vfpath.return_value = vfpath
@@ -79,6 +96,7 @@ def _build_request(
     ctx.get_volume.return_value.__aenter__ = AsyncMock(return_value=volume)
     ctx.get_volume.return_value.__aexit__ = AsyncMock(return_value=None)
     ctx.valkey_tus_client = valkey_client
+    ctx.tus_lock_factory = lock_factory
 
     request = MagicMock(spec=web.Request)
     request.app = {"ctx": ctx}
@@ -144,7 +162,10 @@ def _patch_handler_params(token_data: dict[str, Any]) -> Any:
 
 class TestUploadOffsetHeaderValidation:
     async def test_missing_offset_header_raises(
-        self, patch_env: _PatchEnv, valkey_tus_client: ValkeyTusClient
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
     ) -> None:
         request = _build_request(
             vfpath=patch_env.vfpath,
@@ -153,6 +174,7 @@ class TestUploadOffsetHeaderValidation:
             body=None,
             offset_header=None,
             valkey_client=valkey_tus_client,
+            lock_factory=tus_lock_factory,
         )
         token_data = _token_data(session_id=patch_env.session_id, total_size=1024, relpath="f.bin")
         cp = _patch_handler_params(token_data)
@@ -163,7 +185,10 @@ class TestUploadOffsetHeaderValidation:
             cp.stop()
 
     async def test_non_integer_offset_header_raises(
-        self, patch_env: _PatchEnv, valkey_tus_client: ValkeyTusClient
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
     ) -> None:
         request = _build_request(
             vfpath=patch_env.vfpath,
@@ -172,6 +197,7 @@ class TestUploadOffsetHeaderValidation:
             body=None,
             offset_header="not-a-number",
             valkey_client=valkey_tus_client,
+            lock_factory=tus_lock_factory,
         )
         token_data = _token_data(session_id=patch_env.session_id, total_size=1024, relpath="f.bin")
         cp = _patch_handler_params(token_data)
@@ -182,7 +208,10 @@ class TestUploadOffsetHeaderValidation:
             cp.stop()
 
     async def test_negative_offset_raises_conflict(
-        self, patch_env: _PatchEnv, valkey_tus_client: ValkeyTusClient
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
     ) -> None:
         request = _build_request(
             vfpath=patch_env.vfpath,
@@ -191,6 +220,7 @@ class TestUploadOffsetHeaderValidation:
             body=None,
             offset_header="-1",
             valkey_client=valkey_tus_client,
+            lock_factory=tus_lock_factory,
         )
         token_data = _token_data(session_id=patch_env.session_id, total_size=1024, relpath="f.bin")
         cp = _patch_handler_params(token_data)
@@ -201,7 +231,10 @@ class TestUploadOffsetHeaderValidation:
             cp.stop()
 
     async def test_offset_above_total_size_raises_conflict(
-        self, patch_env: _PatchEnv, valkey_tus_client: ValkeyTusClient
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
     ) -> None:
         request = _build_request(
             vfpath=patch_env.vfpath,
@@ -210,6 +243,7 @@ class TestUploadOffsetHeaderValidation:
             body=None,
             offset_header="2048",
             valkey_client=valkey_tus_client,
+            lock_factory=tus_lock_factory,
         )
         token_data = _token_data(session_id=patch_env.session_id, total_size=1024, relpath="f.bin")
         cp = _patch_handler_params(token_data)
@@ -222,7 +256,10 @@ class TestUploadOffsetHeaderValidation:
 
 class TestSessionNotFound:
     async def test_missing_session_dir_raises_not_found(
-        self, tmp_path: Path, valkey_tus_client: ValkeyTusClient
+        self,
+        tmp_path: Path,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
     ) -> None:
         vfpath = tmp_path / "vfpath"
         vfpath.mkdir()
@@ -235,6 +272,7 @@ class TestSessionNotFound:
             body=b"",
             offset_header="0",
             valkey_client=valkey_tus_client,
+            lock_factory=tus_lock_factory,
         )
         token_data = _token_data(session_id="missing-session", total_size=1024, relpath="f.bin")
         cp = _patch_handler_params(token_data)
@@ -247,7 +285,10 @@ class TestSessionNotFound:
 
 class TestHappyPath:
     async def test_single_chunk_upload_completes_and_assembles(
-        self, patch_env: _PatchEnv, valkey_tus_client: ValkeyTusClient
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
     ) -> None:
         payload = b"hello world" * 100
         request = _build_request(
@@ -257,6 +298,7 @@ class TestHappyPath:
             body=payload,
             offset_header="0",
             valkey_client=valkey_tus_client,
+            lock_factory=tus_lock_factory,
         )
         token_data = _token_data(
             session_id=patch_env.session_id,
@@ -277,7 +319,10 @@ class TestHappyPath:
         assert list((patch_env.session_dir / "chunks").glob("*.dat")) == []
 
     async def test_two_chunks_assemble_in_order(
-        self, patch_env: _PatchEnv, valkey_tus_client: ValkeyTusClient
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
     ) -> None:
         token_data = _token_data(
             session_id=patch_env.session_id, total_size=2048, relpath="result.bin"
@@ -292,6 +337,7 @@ class TestHappyPath:
                 body=b"A" * 1024,
                 offset_header="0",
                 valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
             )
             await tus_upload_part(first)
 
@@ -302,6 +348,7 @@ class TestHappyPath:
                 body=b"B" * 1024,
                 offset_header="1024",
                 valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
             )
             response = await tus_upload_part(second)
         finally:
@@ -312,7 +359,10 @@ class TestHappyPath:
         assert final_path.read_bytes() == b"A" * 1024 + b"B" * 1024
 
     async def test_duplicate_chunk_replay_is_idempotent(
-        self, patch_env: _PatchEnv, valkey_tus_client: ValkeyTusClient
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
     ) -> None:
         token_data = _token_data(
             session_id=patch_env.session_id, total_size=2048, relpath="result.bin"
@@ -327,6 +377,7 @@ class TestHappyPath:
                 body=payload,
                 offset_header="0",
                 valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
             )
             await tus_upload_part(first)
 
@@ -338,6 +389,7 @@ class TestHappyPath:
                 body=payload,
                 offset_header="0",
                 valkey_client=valkey_tus_client,
+                lock_factory=tus_lock_factory,
             )
             response = await tus_upload_part(replay)
         finally:
@@ -346,7 +398,10 @@ class TestHappyPath:
         assert response.headers["Upload-Offset"] == "1024"
 
     async def test_chunk_exceeding_declared_size_raises(
-        self, patch_env: _PatchEnv, valkey_tus_client: ValkeyTusClient
+        self,
+        patch_env: _PatchEnv,
+        valkey_tus_client: ValkeyTusClient,
+        tus_lock_factory: DistributedLockFactory,
     ) -> None:
         token_data = _token_data(
             session_id=patch_env.session_id, total_size=10, relpath="result.bin"
@@ -358,10 +413,11 @@ class TestHappyPath:
             body=b"too-much-data",  # 13 bytes > 10
             offset_header="0",
             valkey_client=valkey_tus_client,
+            lock_factory=tus_lock_factory,
         )
         cp = _patch_handler_params(token_data)
         try:
-            with pytest.raises(UploadOffsetMismatchError):
+            with pytest.raises(UploadChunkExceedsTotalSizeError):
                 await tus_upload_part(request)
         finally:
             cp.stop()

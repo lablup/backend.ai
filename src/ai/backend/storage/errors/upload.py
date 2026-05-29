@@ -32,6 +32,24 @@ class ChunkConflictError(BackendAIError, web.HTTPConflict):
         )
 
 
+class UploadChunkExceedsTotalSizeError(BackendAIError, web.HTTPConflict):
+    """
+    Raised when a PATCH chunk's offset+length would write past the declared
+    ``Upload-Length`` (409 Conflict). The Upload-Offset header itself is in
+    range; the chunk's body simply overruns the remaining slot.
+    """
+
+    error_type = "https://api.backend.ai/probs/storage/upload-chunk-exceeds-total-size"
+    error_title = "Upload Chunk Exceeds Total Size"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class UploadSessionCorruptedError(BackendAIError, web.HTTPInternalServerError):
     """
     Raised when the upload session metadata stored in Valkey cannot be parsed,
