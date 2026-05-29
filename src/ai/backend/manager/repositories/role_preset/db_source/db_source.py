@@ -38,6 +38,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetDependentCreatorSpec,
+    RolePresetCreatorSpec,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -51,11 +52,11 @@ class RolePresetDBSource:
 
     async def create(
         self,
-        creator: Creator[RolePresetRow],
+        creator_spec: RolePresetCreatorSpec,
         permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec],
     ) -> RolePresetData:
         async with self._ops.write_ops() as w:
-            created = await w.create(creator)
+            created = await w.create(Creator(spec=creator_spec))
             preset_row = created.row
             if permission_creator_specs:
                 await w.bulk_create_dependent(permission_creator_specs, preset_row.id)

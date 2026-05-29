@@ -20,12 +20,12 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BatchUpdater,
     BulkCreator,
-    Creator,
 )
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetDependentCreatorSpec,
+    RolePresetCreatorSpec,
 )
 from ai.backend.manager.repositories.role_preset.db_source.db_source import (
     RolePresetDBSource,
@@ -42,10 +42,10 @@ class RolePresetRepository:
 
     async def create(
         self,
-        creator: Creator[RolePresetRow],
+        creator_spec: RolePresetCreatorSpec,
         permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec],
     ) -> RolePresetData:
-        return await self._db_source.create(creator, permission_creator_specs)
+        return await self._db_source.create(creator_spec, permission_creator_specs)
 
     async def role_preset(self, preset_id: RolePresetID) -> RolePresetData:
         return await self._db_source.get(preset_id)

@@ -5,17 +5,16 @@ from typing import override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.role_preset.types import RolePresetData
-from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetDependentCreatorSpec,
+    RolePresetCreatorSpec,
 )
 from ai.backend.manager.services.role_preset.actions.base import RolePresetAction
 
 
 @dataclass
 class CreateRolePresetAction(RolePresetAction):
-    creator: Creator[RolePresetRow]
+    creator_spec: RolePresetCreatorSpec
     permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec]
 
     @override

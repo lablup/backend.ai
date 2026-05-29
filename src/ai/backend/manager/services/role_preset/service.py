@@ -53,7 +53,7 @@ class RolePresetService:
         self._repository = repository
 
     async def create(self, action: CreateRolePresetAction) -> CreateRolePresetActionResult:
-        preset = await self._repository.create(action.creator, action.permission_creator_specs)
+        preset = await self._repository.create(action.creator_spec, action.permission_creator_specs)
         return CreateRolePresetActionResult(preset=preset)
 
     async def get(self, action: GetRolePresetAction) -> GetRolePresetActionResult:
