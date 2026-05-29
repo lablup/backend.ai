@@ -5,7 +5,9 @@ from typing import Any, override
 
 from ai.backend.common.data.notification import WebhookSpec
 from ai.backend.common.data.notification.types import EmailSpec
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -37,6 +39,18 @@ class NotificationChannelUpdaterSpec(UpdaterSpec[NotificationChannelRow]):
         self.enabled.update_dict(to_update, "enabled")
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class NotificationRuleUpdaterSpec(UpdaterSpec[NotificationRuleRow]):
@@ -60,3 +74,15 @@ class NotificationRuleUpdaterSpec(UpdaterSpec[NotificationRuleRow]):
         self.message_template.update_dict(to_update, "message_template")
         self.enabled.update_dict(to_update, "enabled")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

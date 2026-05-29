@@ -9,13 +9,14 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.errors.repository import EmptySearchScopeError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -76,6 +77,18 @@ class ParentUpdaterSpec(UpdaterSpec[OpsTestParentRow]):
 
     def build_values(self) -> dict[str, Any]:
         return {"name": self.new_name}
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
 
 
 @dataclass(frozen=True)

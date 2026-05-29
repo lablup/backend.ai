@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -55,3 +57,15 @@ class KeyPairResourcePolicyUpdaterSpec(UpdaterSpec["KeyPairResourcePolicyRow"]):
         self.max_session_lifetime.update_dict(to_update, "max_session_lifetime")
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

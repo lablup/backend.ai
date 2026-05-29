@@ -17,6 +17,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base import CreatorSpec
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -83,3 +84,7 @@ class RouteBatchUpdaterSpec(BatchUpdaterSpec[RoutingRow]):
         self.traffic_status.update_dict(values, "traffic_status")
         self.sub_status.update_dict(values, "sub_status")
         return values
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None

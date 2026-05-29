@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -33,3 +35,15 @@ class ResourcePresetUpdaterSpec(UpdaterSpec[ResourcePresetRow]):
         self.shared_memory.update_dict(to_update, "shared_memory")
         self.scaling_group_name.update_dict(to_update, "scaling_group_name")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

@@ -5,8 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -82,3 +84,15 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
     def group_ids_value(self) -> list[str] | None:
         """Helper property for group_ids access."""
         return self.group_ids.optional_value()
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

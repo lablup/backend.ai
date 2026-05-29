@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.data.model_card.types import ResourceRequirementEntry
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -50,3 +52,15 @@ class ModelCardUpdaterSpec(UpdaterSpec[ModelCardRow]):
         self.readme.update_dict(to_update, "readme")
         self.access_level.update_dict(to_update, "access_level")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

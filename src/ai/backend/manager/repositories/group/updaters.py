@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -48,3 +50,15 @@ class GroupUpdaterSpec(UpdaterSpec[GroupRow]):
         self.resource_policy.update_dict(to_update, "resource_policy")
         self.container_registry.update_dict(to_update, "container_registry")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

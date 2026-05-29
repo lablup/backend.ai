@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -36,3 +38,15 @@ class UserResourcePolicyUpdaterSpec(UpdaterSpec[UserResourcePolicyRow]):
         self.max_customized_image_count.update_dict(to_update, "max_customized_image_count")
         self.max_concurrent_logins.update_dict(to_update, "max_concurrent_logins")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

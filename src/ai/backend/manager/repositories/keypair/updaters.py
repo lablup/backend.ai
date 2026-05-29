@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -33,6 +35,18 @@ class KeyPairUpdaterSpec(UpdaterSpec[KeyPairRow]):
         self.rate_limit.update_dict(to_update, "rate_limit")
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class KeyPairSSHUpdaterSpec(UpdaterSpec[KeyPairRow]):
@@ -56,3 +70,15 @@ class KeyPairSSHUpdaterSpec(UpdaterSpec[KeyPairRow]):
         self.ssh_public_key.update_dict(to_update, "ssh_public_key")
         self.ssh_private_key.update_dict(to_update, "ssh_private_key")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

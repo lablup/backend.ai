@@ -6,10 +6,12 @@ from dataclasses import dataclass, field
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.models.prometheus_query_preset.row import (
     PresetOptions,
     PrometheusQueryPresetRow,
 )
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -54,3 +56,15 @@ class PrometheusQueryPresetUpdaterSpec(UpdaterSpec[PrometheusQueryPresetRow]):
                 group_labels=group_value if group_value is not None else [],
             )
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

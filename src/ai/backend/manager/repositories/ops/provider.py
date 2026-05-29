@@ -27,6 +27,8 @@ from ai.backend.manager.repositories.base import (
     BulkCreator,
     BulkCreatorResult,
     BulkCreatorResultWithFailures,
+    BulkUpdater,
+    BulkUpdaterPartialResult,
     Creator,
     CreatorResult,
     DependentCreatorSpec,
@@ -46,6 +48,7 @@ from ai.backend.manager.repositories.base import (
     execute_bulk_creator,
     execute_bulk_creator_partial,
     execute_bulk_dependent_creator,
+    execute_bulk_updater_partial,
     execute_creator,
     execute_dependent_creator,
     execute_next_value_creator,
@@ -190,6 +193,13 @@ class WriteOps(ReadOps):
     async def batch_purge[TRow: Base](self, purger: BatchPurger[TRow]) -> BatchPurgerResult:
         """Delete rows in batches matching the purger subquery."""
         return await execute_batch_purger(self._sess, purger)
+
+    async def bulk_update_partial[TRow: Base](
+        self,
+        bulk: BulkUpdater[TRow],
+    ) -> BulkUpdaterPartialResult[TRow]:
+        """Update multiple rows, isolating each via a savepoint for partial success."""
+        return await execute_bulk_updater_partial(self._sess, bulk)
 
     @asynccontextmanager
     async def savepoint(self) -> AsyncIterator[WriteOps]:

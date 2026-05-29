@@ -12,9 +12,11 @@ from sqlalchemy import cast, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import array as pg_array
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.data.scaling_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -41,6 +43,18 @@ class ScalingGroupStatusUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
         self.is_public.update_dict(to_update, "is_public")
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class ScalingGroupMetadataUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
@@ -62,6 +76,18 @@ class ScalingGroupMetadataUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
         to_update: dict[str, Any] = {}
         self.description.update_dict(to_update, "description")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
 
 
 @dataclass
@@ -88,6 +114,18 @@ class ScalingGroupNetworkConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
         self.use_host_network.update_dict(to_update, "use_host_network")
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class ScalingGroupDriverConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
@@ -113,6 +151,18 @@ class ScalingGroupDriverConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
         if (driver_opts := self.driver_opts.optional_value()) is not None:
             to_update["driver_opts"] = dict(driver_opts)
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
 
 
 @dataclass
@@ -154,6 +204,18 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
             )
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class ResourceGroupFairShareUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
@@ -176,6 +238,18 @@ class ResourceGroupFairShareUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
         to_update: dict[str, Any] = {}
         self.fair_share_spec.update_dict(to_update, "fair_share_spec")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
 
 
 @dataclass
@@ -214,3 +288,15 @@ class ScalingGroupUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
         if self.fair_share:
             to_update.update(self.fair_share.build_values())
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

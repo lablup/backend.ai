@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator, Callable, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
 import pytest
@@ -32,6 +32,8 @@ from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.common.exception import BackendAIError
+from ai.backend.manager.repositories.base.types import QueryCondition
 
 
 class UpdaterTestRowInt(Base):  # type: ignore[misc]
@@ -88,6 +90,18 @@ class IntPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowInt]):
             values["value"] = self._new_value
         return values
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 class IntPKNoValuesUpdaterSpec(UpdaterSpec[UpdaterTestRowInt]):
     """Updater spec that produces no column changes (empty build_values)."""
@@ -98,6 +112,18 @@ class IntPKNoValuesUpdaterSpec(UpdaterSpec[UpdaterTestRowInt]):
 
     def build_values(self) -> dict[str, Any]:
         return {}
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
 
 
 class UUIDPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowUUID]):
@@ -113,6 +139,18 @@ class UUIDPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowUUID]):
     def build_values(self) -> dict[str, Any]:
         return {"status": self._new_status}
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 class StrPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowStr]):
     """Updater spec for updating status on string PK table."""
@@ -126,6 +164,18 @@ class StrPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowStr]):
 
     def build_values(self) -> dict[str, Any]:
         return {"status": self._new_status}
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
 
 
 # Batch Updater Specs
@@ -143,6 +193,10 @@ class IntPKBatchUpdaterSpec(BatchUpdaterSpec[UpdaterTestRowInt]):
 
     def build_values(self) -> dict[str, Any]:
         return {"status": self._new_status}
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
 
 
 class TestUpdaterIntPK:
@@ -720,6 +774,18 @@ class UniqueNameUpdaterSpec(UpdaterSpec[UpdaterTestRowWithUnique]):
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return self._checks
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 class UniqueNameBatchUpdaterSpec(BatchUpdaterSpec[UpdaterTestRowWithUnique]):
     """Batch updater spec that triggers unique constraint violation."""
@@ -742,6 +808,10 @@ class UniqueNameBatchUpdaterSpec(BatchUpdaterSpec[UpdaterTestRowWithUnique]):
     @property
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return self._checks
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
 
 
 class TestUpdaterIntegrityError:

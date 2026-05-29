@@ -8,6 +8,7 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
@@ -20,6 +21,7 @@ from ai.backend.manager.models.deployment_policy import (
 )
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -49,6 +51,18 @@ class DeploymentMetadataUpdaterSpec(UpdaterSpec[EndpointRow]):
         self.tag.update_dict(to_update, "tag")
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class ReplicaSpecUpdaterSpec(UpdaterSpec[EndpointRow]):
@@ -67,6 +81,18 @@ class ReplicaSpecUpdaterSpec(UpdaterSpec[EndpointRow]):
         # Use the actual database column names
         self.replica_count.update_dict(to_update, "replicas")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
 
 
 @dataclass
@@ -88,6 +114,18 @@ class DeploymentNetworkSpecUpdaterSpec(UpdaterSpec[EndpointRow]):
         self.url.update_dict(to_update, "url")
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class MountUpdaterSpec(UpdaterSpec[EndpointRow]):
@@ -105,6 +143,18 @@ class MountUpdaterSpec(UpdaterSpec[EndpointRow]):
         to_update: dict[str, Any] = {}
         self.model_vfolder_id.update_dict(to_update, "model_vfolder_id")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
 
 
 @dataclass
@@ -136,6 +186,18 @@ class DeploymentUpdaterSpec(UpdaterSpec[EndpointRow]):
         if self.mount:
             to_update.update(self.mount.build_values())
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
 
 
 @dataclass
@@ -181,6 +243,18 @@ class DeploymentAutoScalingPolicyUpdaterSpec(UpdaterSpec[DeploymentAutoScalingPo
         self.cooldown_seconds.update_dict(to_update, "cooldown_seconds")
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class DeploymentPolicyUpdaterSpec(UpdaterSpec[DeploymentPolicyRow]):
@@ -212,6 +286,18 @@ class DeploymentPolicyUpdaterSpec(UpdaterSpec[DeploymentPolicyRow]):
             to_update["strategy_spec"] = spec_value.model_dump()
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class RouteStatusUpdaterSpec(UpdaterSpec[RoutingRow]):
@@ -237,6 +323,18 @@ class RouteStatusUpdaterSpec(UpdaterSpec[RoutingRow]):
         self.traffic_status.update_dict(to_update, "traffic_status")
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class RouteSessionUpdaterSpec(UpdaterSpec[RoutingRow]):
@@ -258,6 +356,18 @@ class RouteSessionUpdaterSpec(UpdaterSpec[RoutingRow]):
             "session": self.session,
             "status": RouteStatus.PROVISIONING,
         }
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
 
 
 @dataclass
@@ -294,3 +404,15 @@ class RouteUpdaterSpec(UpdaterSpec[RoutingRow]):
         self.revision.update_dict(to_update, "revision")
         self.error_data.update_dict(to_update, "error_data")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None

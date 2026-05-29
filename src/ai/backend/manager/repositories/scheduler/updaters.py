@@ -8,6 +8,7 @@ from typing import Any, override
 
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.utils import sql_json_merge
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
 
 
@@ -47,3 +48,7 @@ class SessionStatusBatchUpdaterSpec(BatchUpdaterSpec[SessionRow]):
             values["terminated_at"] = self.status_changed_at
 
         return values
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None

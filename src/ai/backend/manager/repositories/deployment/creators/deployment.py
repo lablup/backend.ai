@@ -23,6 +23,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.repositories.base import CreatorSpec
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec
 
 # ========== Field groups for DeploymentCreatorSpec ==========
@@ -196,3 +197,7 @@ class EndpointLifecycleBatchUpdaterSpec(BatchUpdaterSpec[EndpointRow]):
         if self.scaling_state is not None:
             values["scaling_state"] = self.scaling_state
         return values
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None

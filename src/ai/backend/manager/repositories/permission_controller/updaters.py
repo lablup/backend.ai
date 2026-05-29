@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     OperationType,
@@ -11,6 +12,7 @@ from ai.backend.manager.data.permission.types import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -38,6 +40,18 @@ class RoleUpdaterSpec(UpdaterSpec[RoleRow]):
         self.description.update_dict(to_update, "description")
         return to_update
 
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
+
 
 @dataclass
 class PermissionUpdaterSpec(UpdaterSpec[PermissionRow]):
@@ -61,3 +75,15 @@ class PermissionUpdaterSpec(UpdaterSpec[PermissionRow]):
         self.entity_type.map(lambda v: v.to_entity_type()).update_dict(to_update, "entity_type")
         self.operation.update_dict(to_update, "operation")
         return to_update
+
+    @override
+    def guard_condition(self) -> QueryCondition | None:
+        return None
+
+    @override
+    def not_found_error(self) -> BackendAIError | None:
+        return None
+
+    @override
+    def on_guard_failure(self) -> BackendAIError | None:
+        return None
