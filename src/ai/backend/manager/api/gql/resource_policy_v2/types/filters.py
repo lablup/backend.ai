@@ -55,7 +55,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
     ),
     name="KeypairResourcePolicyKeypairNestedFilter",
 )
-class KeypairResourcePolicyKeypairNestedFilter(
+class KeypairResourcePolicyKeypairNestedFilterGQL(
     PydanticInputMixin[KeypairResourcePolicyKeypairNestedFilterDTO]
 ):
     user_id: UUIDFilter | None = None
@@ -77,7 +77,7 @@ class KeypairResourcePolicyV2Filter(PydanticInputMixin[KeypairResourcePolicyFilt
     idle_timeout: IntFilter | None = None
     max_concurrent_sftp_sessions: IntFilter | None = None
     max_pending_session_count: IntFilter | None = None
-    keypair: KeypairResourcePolicyKeypairNestedFilter | None = gql_added_field(
+    keypair: KeypairResourcePolicyKeypairNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
