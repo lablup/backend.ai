@@ -8393,8 +8393,6 @@ input KeypairResourcePolicyKeypairNestedFilter
   @join__type(graph: STRAWBERRY)
 {
   userId: UUIDFilter = null
-  accessKey: StringFilter = null
-  isActive: Boolean = null
 }
 
 """

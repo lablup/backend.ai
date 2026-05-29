@@ -5465,8 +5465,6 @@ Added in UNRELEASED. Nested filter for keypairs assigned to a keypair resource p
 """
 input KeypairResourcePolicyKeypairNestedFilter {
   userId: UUIDFilter = null
-  accessKey: StringFilter = null
-  isActive: Boolean = null
 }
 
 """
