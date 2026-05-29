@@ -88,13 +88,14 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
     )
 
     # Relative weight of this group when distributing traffic across the
-    # deployment's replica groups.
+    # deployment's replica groups. Defaults to 100 so a lone group receives
+    # the full share and percentage-style splits are intuitive.
     traffic_weight: Mapped[int] = mapped_column(
         "traffic_weight",
         sa.Integer,
         nullable=False,
-        default=0,
-        server_default=sa.text("0"),
+        default=100,
+        server_default=sa.text("100"),
     )
 
     created_at: Mapped[datetime] = mapped_column(
