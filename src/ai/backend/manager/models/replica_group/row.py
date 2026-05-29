@@ -15,6 +15,7 @@ from ai.backend.manager.models.base import GUID, Base
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow
+    from ai.backend.manager.models.routing import RoutingRow
 
 __all__ = ("ReplicaGroupRow",)
 
@@ -25,6 +26,12 @@ def _get_deployment_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return foreign(ReplicaGroupRow.deployment_id) == EndpointRow.id
+
+
+def _get_replicas_join_condition() -> sa.sql.elements.ColumnElement[Any]:
+    from ai.backend.manager.models.routing import RoutingRow
+
+    return ReplicaGroupRow.id == foreign(RoutingRow.replica_group_id)
 
 
 class ReplicaGroupRow(Base):  # type: ignore[misc]
@@ -107,5 +114,10 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
     endpoint_row: Mapped[EndpointRow] = relationship(
         "EndpointRow",
         primaryjoin=_get_deployment_join_condition,
+        viewonly=True,
+    )
+    replicas: Mapped[list[RoutingRow]] = relationship(
+        "RoutingRow",
+        primaryjoin=_get_replicas_join_condition,
         viewonly=True,
     )

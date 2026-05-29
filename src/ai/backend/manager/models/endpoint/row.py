@@ -32,6 +32,7 @@ from sqlalchemy.orm import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
     AccessKey,
@@ -250,6 +251,18 @@ class EndpointRow(Base):  # type: ignore[misc]
     )
     deploying_revision: Mapped[DeploymentRevisionID | None] = mapped_column(
         "deploying_revision", GUID(DeploymentRevisionID), nullable=True
+    )
+
+    # Replica group references (no FK; mirrors ``RoutingRow.revision`` and
+    # avoids a circular FK with ``replica_groups.deployment_id``).
+    # ``primary_replica_group_id`` is the group serving traffic;
+    # ``target_replica_group_id`` is the group being rolled out (``NULL``
+    # in the steady state).
+    primary_replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
+        "primary_replica_group_id", GUID(ReplicaGroupID), nullable=True
+    )
+    target_replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
+        "target_replica_group_id", GUID(ReplicaGroupID), nullable=True
     )
     sub_step: Mapped[DeploymentLifecycleSubStep | None] = mapped_column(
         "sub_step",
