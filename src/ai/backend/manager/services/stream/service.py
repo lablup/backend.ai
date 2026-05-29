@@ -8,7 +8,7 @@ from typing import Final
 from ai.backend.common import validators as tx
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.types import AccessKey, KernelId, SessionId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.idle import AppStreamingStatus, IdleCheckerHost
@@ -75,7 +75,7 @@ class StreamService:
         self, action: GetStreamingSessionAction
     ) -> GetStreamingSessionActionResult:
         session = await self._repository.get_streaming_session(
-            action.session_name, AccessKey(action.access_key)
+            action.session_name, action.user_uuid
         )
         kernel = session.main_kernel
         return GetStreamingSessionActionResult(
@@ -90,7 +90,7 @@ class StreamService:
 
     async def execute_in_stream(self, action: ExecuteInStreamAction) -> ExecuteInStreamActionResult:
         session = await self._repository.get_streaming_session(
-            action.session_name, AccessKey(action.access_key)
+            action.session_name, action.user_uuid
         )
         result = await self._registry.execute(
             session,
@@ -115,7 +115,7 @@ class StreamService:
         self, action: InterruptInStreamAction
     ) -> InterruptInStreamActionResult:
         session = await self._repository.get_streaming_session(
-            action.session_name, AccessKey(action.access_key)
+            action.session_name, action.user_uuid
         )
         result = await self._registry.interrupt_session(session)
         return InterruptInStreamActionResult(result=dict(result))
@@ -124,7 +124,7 @@ class StreamService:
         self, action: StartServiceInStreamAction
     ) -> StartServiceInStreamActionResult:
         session = await self._repository.get_streaming_session(
-            action.session_name, AccessKey(action.access_key)
+            action.session_name, action.user_uuid
         )
         result = await self._registry.start_service(session, action.service, action.opts)
         return StartServiceInStreamActionResult(result=dict(result))
