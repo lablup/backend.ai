@@ -1,0 +1,1 @@
+Derive the `--changed-since` base ref from the PR merge commit's first parent (`HEAD^1`) in `ci.yml`, so pants can always locate a merge base without extra fetches — including for stale (un-rebased) PRs and PRs that have merged `main` back into the topic branch.
