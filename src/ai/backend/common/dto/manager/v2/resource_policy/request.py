@@ -291,12 +291,6 @@ class KeypairResourcePolicyKeypairNestedFilter(BaseRequestModel):
     user_id: UUIDFilter | None = Field(
         default=None, description="Filter by the UUID of the keypair owner."
     )
-    access_key: StringFilter | None = Field(
-        default=None, description="Filter by the keypair access key."
-    )
-    is_active: bool | None = Field(
-        default=None, description="Filter by whether the keypair is active."
-    )
 
 
 class KeypairResourcePolicyFilter(BaseRequestModel):

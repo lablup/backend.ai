@@ -743,31 +743,16 @@ class ResourcePolicyAdapter(BaseAdapter):
         Builds keypair-level conditions and wraps them in an EXISTS subquery
         correlating keypairs back to their resource policy.
         """
-        keypair_conditions: list[QueryCondition] = []
-        if filter.user_id is not None:
-            cond = self.convert_uuid_filter(
-                filter.user_id,
-                equals_factory=KeypairConditions.by_user_id_equals,
-                in_factory=KeypairConditions.by_user_id_in,
-            )
-            if cond is not None:
-                keypair_conditions.append(cond)
-        if filter.access_key is not None:
-            cond = self.convert_string_filter(
-                filter.access_key,
-                contains_factory=KeypairConditions.by_access_key_contains,
-                equals_factory=KeypairConditions.by_access_key_equals,
-                starts_with_factory=KeypairConditions.by_access_key_starts_with,
-                ends_with_factory=KeypairConditions.by_access_key_ends_with,
-                in_factory=KeypairConditions.by_access_key_in,
-            )
-            if cond is not None:
-                keypair_conditions.append(cond)
-        if filter.is_active is not None:
-            keypair_conditions.append(KeypairConditions.by_is_active(filter.is_active))
-        if not keypair_conditions:
+        if filter.user_id is None:
             return None
-        return KeypairResourcePolicyConditions.exists_keypair_combined(keypair_conditions)
+        cond = self.convert_uuid_filter(
+            filter.user_id,
+            equals_factory=KeypairConditions.by_user_id_equals,
+            in_factory=KeypairConditions.by_user_id_in,
+        )
+        if cond is None:
+            return None
+        return KeypairResourcePolicyConditions.exists_keypair_combined([cond])
 
     def _convert_user_filter(self, filter: UserResourcePolicyFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

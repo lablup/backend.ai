@@ -59,8 +59,6 @@ class KeypairResourcePolicyKeypairNestedFilter(
     PydanticInputMixin[KeypairResourcePolicyKeypairNestedFilterDTO]
 ):
     user_id: UUIDFilter | None = None
-    access_key: StringFilter | None = None
-    is_active: bool | None = None
 
 
 @gql_pydantic_input(
