@@ -1,7 +1,7 @@
 """expand_prometheus_query_presets
 
 Revision ID: 7af18070fdef
-Revises: bee1c0de01a1
+Revises: 0113c63f3261
 Create Date: 2026-05-27 00:00:00.000000
 
 # Part of: 26.3.0 (main)
@@ -16,67 +16,46 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "7af18070fdef"
-down_revision = "bee1c0de01a1"
+down_revision = "0113c63f3261"
 branch_labels = None
 depends_on = None
 
-CONTAINER_CATEGORY_ID = uuid.UUID("4f1e6c43-8a52-4d6e-9b7c-1c8a2f3d9b40")
-CONTAINER_CATEGORY_NAME = "container"
-CONTAINER_CATEGORY_DESCRIPTION = (
-    "Container-level utilization metrics collected by Backend.AI agents"
-)
-
-VLLM_CATEGORY_ID = uuid.UUID("6a2d8f19-7b34-4e0c-9f15-3e8b4d2a7c81")
-VLLM_CATEGORY_NAME = "vllm-inference"
-VLLM_CATEGORY_DESCRIPTION = "vLLM inference runtime metrics scraped from model serving endpoints"
-
-CONTAINER_FILTER_LABELS = [
-    "container_metric_name",
-    "kernel_id",
-    "session_id",
-    "agent_id",
-    "user_id",
-    "project_id",
-    "value_type",
-]
-CONTAINER_GROUP_LABELS = [
-    "kernel_id",
-    "session_id",
-    "agent_id",
-    "user_id",
-    "project_id",
-    "value_type",
-]
-CONTAINER_OPTIONS = json.dumps({
-    "filter_labels": CONTAINER_FILTER_LABELS,
-    "group_labels": CONTAINER_GROUP_LABELS,
-})
-
-VLLM_OPTIONS = json.dumps({
-    "filter_labels": ["deployment_id"],
-    "group_labels": ["deployment_id"],
-})
-
-# (old_name, new_name, new_description, new_rank)
 # Matched by name because the previous seed migration generated UUIDs at insert
-# time (server_default uuid_generate_v4), so the row id differs per environment.
-CONTAINER_RENAMES: list[tuple[str, str, str, int]] = [
-    (
-        "container_gauge",
-        "Per-Kernel Resource Metric — Instant Value (sum)",
-        "Instant value of the per-kernel resource utilization gauge, summed across the selected grouping",
-        100,
-    ),
-    (
-        "container_diff",
-        "Per-Kernel Resource Metric — 5-Minute Rate (sum)",
-        "Per-second rate of the per-kernel resource utilization gauge over a 5-minute window, summed across the selected grouping",
-        200,
-    ),
+# time (uuid_generate_v4), so the row id differs per environment.
+CONTAINER_RENAMES: list[dict[str, Any]] = [
+    {
+        "old_name": "container_gauge",
+        "new_name": "Per-Kernel Resource Metric — Instant Value (sum)",
+        "description": "Instant value of the per-kernel resource utilization gauge, summed across the selected grouping",
+        "rank": 100,
+    },
+    {
+        "old_name": "container_diff",
+        "new_name": "Per-Kernel Resource Metric — 5-Minute Rate (sum)",
+        "description": "Per-second rate of the per-kernel resource utilization gauge over a 5-minute window, summed across the selected grouping",
+        "rank": 200,
+    },
 ]
 
-# old_name — only deleted if the row is still in its original seeded state.
-CONTAINER_DELETIONS: list[str] = ["container_rate"]
+CONTAINER_OPTIONS = json.dumps({
+    "filter_labels": [
+        "container_metric_name",
+        "kernel_id",
+        "session_id",
+        "agent_id",
+        "user_id",
+        "project_id",
+        "value_type",
+    ],
+    "group_labels": [
+        "kernel_id",
+        "session_id",
+        "agent_id",
+        "user_id",
+        "project_id",
+        "value_type",
+    ],
+})
 
 CONTAINER_INSERTIONS: list[dict[str, Any]] = [
     {
@@ -135,8 +114,9 @@ CONTAINER_INSERTIONS: list[dict[str, Any]] = [
     },
 ]
 
-# vLLM presets were never seeded into production DBs by a previous migration.
-# All 14 rows are inserted here (idempotent by id NOT EXISTS).
+# vLLM presets were never seeded into production DBs by a previous migration,
+# but the example fixture seeds 5 of these ids under legacy names. All 14 rows
+# are upserted by id, so both production and fixture-seeded DBs converge.
 VLLM_INSERTIONS: list[dict[str, Any]] = [
     {
         "id": "2f0634e3-a976-4eeb-ba01-1e1829965453",
@@ -266,15 +246,21 @@ VLLM_INSERTIONS: list[dict[str, Any]] = [
     },
 ]
 
+VLLM_OPTIONS = json.dumps({
+    "filter_labels": ["deployment_id"],
+    "group_labels": ["deployment_id"],
+})
 
-def _seed_category(
-    conn: sa.Connection, category_id: uuid.UUID, name: str, description: str
-) -> uuid.UUID:
+
+def _seed_category(conn: sa.Connection, name: str, description: str) -> uuid.UUID:
+    # Insert only if the category is missing (name is unique), letting the DB
+    # generate the id, then return whichever id is now in place — the existing
+    # one if it was already seeded, otherwise the freshly generated one.
     conn.execute(
         sa.text(
             textwrap.dedent("""\
-                INSERT INTO prometheus_query_preset_categories (id, name, description)
-                SELECT CAST(:id AS uuid), :name, :description
+                INSERT INTO prometheus_query_preset_categories (name, description)
+                SELECT :name, :description
                 WHERE NOT EXISTS (
                     SELECT 1 FROM prometheus_query_preset_categories
                     WHERE name = CAST(:name AS varchar)
@@ -282,7 +268,6 @@ def _seed_category(
             """)
         ),
         parameters={
-            "id": str(category_id),
             "name": name,
             "description": description,
         },
@@ -296,12 +281,16 @@ def _seed_category(
     )
 
 
-def _insert_presets(
+def _upsert_presets(
     conn: sa.Connection,
     presets: list[dict[str, Any]],
     category_id: uuid.UUID,
     options: str,
 ) -> None:
+    # Upsert by id (the table's only unique key): environments seeded from the
+    # example fixture already hold these ids under their old names, so a plain
+    # insert would hit the primary key. ON CONFLICT converges those rows to the
+    # new definitions, while fresh production DBs simply insert.
     for preset in presets:
         conn.execute(
             sa.text(
@@ -309,14 +298,19 @@ def _insert_presets(
                     INSERT INTO prometheus_query_presets
                         (id, name, description, rank, category_id,
                          metric_name, query_template, time_window, options)
-                    SELECT CAST(:id AS uuid), :name, :description, :rank,
-                           CAST(:category_id AS uuid),
-                           :metric_name, :query_template, :time_window,
-                           CAST(:options AS jsonb)
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM prometheus_query_presets
-                        WHERE name = CAST(:name AS varchar)
-                    )
+                    VALUES (CAST(:id AS uuid), :name, :description, :rank,
+                            CAST(:category_id AS uuid),
+                            :metric_name, :query_template, :time_window,
+                            CAST(:options AS jsonb))
+                    ON CONFLICT (id) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        description = EXCLUDED.description,
+                        rank = EXCLUDED.rank,
+                        category_id = EXCLUDED.category_id,
+                        metric_name = EXCLUDED.metric_name,
+                        query_template = EXCLUDED.query_template,
+                        time_window = EXCLUDED.time_window,
+                        options = EXCLUDED.options
                 """)
             ),
             parameters={
@@ -327,58 +321,70 @@ def _insert_presets(
         )
 
 
-def upgrade() -> None:
-    conn = op.get_bind()
-
-    container_category_id = _seed_category(
-        conn,
-        CONTAINER_CATEGORY_ID,
-        CONTAINER_CATEGORY_NAME,
-        CONTAINER_CATEGORY_DESCRIPTION,
-    )
-    vllm_category_id = _seed_category(
-        conn,
-        VLLM_CATEGORY_ID,
-        VLLM_CATEGORY_NAME,
-        VLLM_CATEGORY_DESCRIPTION,
-    )
-
+def _rename_presets(
+    conn: sa.Connection, renames: list[dict[str, Any]], category_id: uuid.UUID
+) -> None:
     # Rename existing seeded presets only if the row is still in its original
     # state (name unchanged), preserving any user customization.
-    for old_name, new_name, new_description, new_rank in CONTAINER_RENAMES:
+    for rename in renames:
         conn.execute(
             sa.text(
                 textwrap.dedent("""\
                     UPDATE prometheus_query_presets
                     SET name = :new_name,
-                        description = :new_description,
-                        rank = :new_rank,
+                        description = :description,
+                        rank = :rank,
                         category_id = CAST(:category_id AS uuid)
                     WHERE name = CAST(:old_name AS varchar)
                 """)
             ),
             parameters={
-                "old_name": old_name,
-                "new_name": new_name,
-                "new_description": new_description,
-                "new_rank": new_rank,
-                "category_id": str(container_category_id),
+                **rename,
+                "category_id": str(category_id),
             },
         )
 
-    for old_name in CONTAINER_DELETIONS:
+
+def _delete_presets(conn: sa.Connection, names: list[str]) -> None:
+    for name in names:
         conn.execute(
-            sa.text(
-                textwrap.dedent("""\
-                    DELETE FROM prometheus_query_presets
-                    WHERE name = CAST(:old_name AS varchar)
-                """)
-            ),
-            parameters={"old_name": old_name},
+            sa.text("DELETE FROM prometheus_query_presets WHERE name = CAST(:name AS varchar)"),
+            parameters={"name": name},
         )
 
-    _insert_presets(conn, CONTAINER_INSERTIONS, container_category_id, CONTAINER_OPTIONS)
-    _insert_presets(conn, VLLM_INSERTIONS, vllm_category_id, VLLM_OPTIONS)
+
+def upgrade() -> None:
+    conn = op.get_bind()
+
+    container_category_id = _seed_category(
+        conn,
+        name="container",
+        description="Container-level utilization metrics collected by Backend.AI agents",
+    )
+    vllm_category_id = _seed_category(
+        conn,
+        name="vllm-inference",
+        description="vLLM inference runtime metrics scraped from model serving endpoints",
+    )
+
+    _rename_presets(conn, renames=CONTAINER_RENAMES, category_id=container_category_id)
+
+    # Drop container_rate: its sum(rate)/5.0 normalization doesn't compose with
+    # the new avg/min/max variants.
+    _delete_presets(conn, names=["container_rate"])
+
+    _upsert_presets(
+        conn,
+        presets=CONTAINER_INSERTIONS,
+        category_id=container_category_id,
+        options=CONTAINER_OPTIONS,
+    )
+    _upsert_presets(
+        conn,
+        presets=VLLM_INSERTIONS,
+        category_id=vllm_category_id,
+        options=VLLM_OPTIONS,
+    )
 
 
 def downgrade() -> None:
