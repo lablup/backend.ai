@@ -117,7 +117,7 @@ class StreamHandler:
         access_key = AccessKey(user_ctx.access_key)
         api_version = request["api_version"]
         result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
+            GetStreamingSessionAction(session_name=session_name, user_uuid=user_ctx.user_uuid),
         )
         log.info("STREAM_PTY(ak:{0}, s:{1})", access_key, session_name)
         stream_key = KernelId(uuid.UUID(result.kernel_id))
@@ -194,7 +194,7 @@ class StreamHandler:
                                 await self._stream.execute_in_stream.wait_for_complete(
                                     ExecuteInStreamAction(
                                         session_name=session_name,
-                                        access_key=access_key,
+                                        user_uuid=user_ctx.user_uuid,
                                         api_version=api_version,
                                         run_id=run_id,
                                         mode="query",
@@ -207,7 +207,7 @@ class StreamHandler:
                                 await self._stream.execute_in_stream.wait_for_complete(
                                     ExecuteInStreamAction(
                                         session_name=session_name,
-                                        access_key=access_key,
+                                        user_uuid=user_ctx.user_uuid,
                                         api_version=api_version,
                                         run_id=run_id,
                                         mode="query",
@@ -222,7 +222,7 @@ class StreamHandler:
                                     await self._stream.restart_in_stream.wait_for_complete(
                                         RestartInStreamAction(
                                             session_name=session_name,
-                                            access_key=access_key,
+                                            user_uuid=user_ctx.user_uuid,
                                         ),
                                     )
                                     socks[0].close()
@@ -314,7 +314,7 @@ class StreamHandler:
         api_version = request["api_version"]
         log.info("STREAM_EXECUTE(ak:{0}, s:{1})", access_key, session_name)
         session_result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
+            GetStreamingSessionAction(session_name=session_name, user_uuid=user_ctx.user_uuid),
         )
         stream_key = KernelId(uuid.UUID(session_result.kernel_id))
 
@@ -345,7 +345,7 @@ class StreamHandler:
                 exec_result = await self._stream.execute_in_stream.wait_for_complete(
                     ExecuteInStreamAction(
                         session_name=session_name,
-                        access_key=access_key,
+                        user_uuid=user_ctx.user_uuid,
                         api_version=api_version,
                         run_id=run_id,
                         mode=mode,
@@ -360,7 +360,7 @@ class StreamHandler:
                     await self._stream.interrupt_in_stream.wait_for_complete(
                         InterruptInStreamAction(
                             session_name=session_name,
-                            access_key=access_key,
+                            user_uuid=user_ctx.user_uuid,
                         ),
                     )
                     break
@@ -431,7 +431,7 @@ class StreamHandler:
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
         session_result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
+            GetStreamingSessionAction(session_name=session_name, user_uuid=user_ctx.user_uuid),
         )
         kernel_id = KernelId(uuid.UUID(session_result.kernel_id))
         session_id = SessionId(uuid.UUID(session_result.session_id))
@@ -548,7 +548,7 @@ class StreamHandler:
             start_result = await self._stream.start_service_in_stream.wait_for_complete(
                 StartServiceInStreamAction(
                     session_name=session_name,
-                    access_key=access_key,
+                    user_uuid=user_ctx.user_uuid,
                     service=service,
                     opts=opts,
                 ),
@@ -591,9 +591,8 @@ class StreamHandler:
         user_ctx: UserContext,
     ) -> web.StreamResponse:
         session_name = path.parsed.session_name
-        access_key = AccessKey(user_ctx.access_key)
         result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
+            GetStreamingSessionAction(session_name=session_name, user_uuid=user_ctx.user_uuid),
         )
         service_ports: list[dict[str, Any]] = result.service_ports
         if not service_ports:
