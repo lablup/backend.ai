@@ -8,6 +8,9 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
     KeypairResourcePolicyFilter as KeypairResourcePolicyFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
+    KeypairResourcePolicyKeypairNestedFilter as KeypairResourcePolicyKeypairNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_policy.request import (
     KeypairResourcePolicyOrder as KeypairResourcePolicyOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
@@ -22,14 +25,17 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UserResourcePolicyOrder as UserResourcePolicyOrderDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntFilter,
     OrderDirection,
     StringFilter,
+    UUIDFilter,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_pydantic_input,
@@ -37,6 +43,24 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 # ── Keypair Resource Policy ──
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Nested filter for keypairs assigned to a keypair resource policy. "
+            "Filters policies linked to at least one keypair matching all specified conditions."
+        ),
+    ),
+    name="KeypairResourcePolicyKeypairNestedFilter",
+)
+class KeypairResourcePolicyKeypairNestedFilter(
+    PydanticInputMixin[KeypairResourcePolicyKeypairNestedFilterDTO]
+):
+    user_id: UUIDFilter | None = None
+    access_key: StringFilter | None = None
+    is_active: bool | None = None
 
 
 @gql_pydantic_input(
@@ -55,6 +79,16 @@ class KeypairResourcePolicyV2Filter(PydanticInputMixin[KeypairResourcePolicyFilt
     idle_timeout: IntFilter | None = None
     max_concurrent_sftp_sessions: IntFilter | None = None
     max_pending_session_count: IntFilter | None = None
+    keypair: KeypairResourcePolicyKeypairNestedFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter policies by their assigned keypairs "
+                "(e.g., policies linked to keypairs owned by a specific user)."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_enum(

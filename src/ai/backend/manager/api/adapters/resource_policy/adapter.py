@@ -30,6 +30,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
     DeleteProjectResourcePolicyInput,
     DeleteUserResourcePolicyInput,
     KeypairResourcePolicyFilter,
+    KeypairResourcePolicyKeypairNestedFilter,
     KeypairResourcePolicyOrder,
     ProjectResourcePolicyFilter,
     ProjectResourcePolicyOrder,
@@ -71,6 +72,7 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
+from ai.backend.manager.models.keypair.conditions import KeypairConditions
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -727,7 +729,45 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.keypair is not None:
+            cond = self._convert_keypair_nested_filter(filter.keypair)
+            if cond is not None:
+                conditions.append(cond)
         return conditions
+
+    def _convert_keypair_nested_filter(
+        self, filter: KeypairResourcePolicyKeypairNestedFilter
+    ) -> QueryCondition | None:
+        """Convert a keypair nested filter into a single EXISTS condition.
+
+        Builds keypair-level conditions and wraps them in an EXISTS subquery
+        correlating keypairs back to their resource policy.
+        """
+        keypair_conditions: list[QueryCondition] = []
+        if filter.user_id is not None:
+            cond = self.convert_uuid_filter(
+                filter.user_id,
+                equals_factory=KeypairConditions.by_user_id_equals,
+                in_factory=KeypairConditions.by_user_id_in,
+            )
+            if cond is not None:
+                keypair_conditions.append(cond)
+        if filter.access_key is not None:
+            cond = self.convert_string_filter(
+                filter.access_key,
+                contains_factory=KeypairConditions.by_access_key_contains,
+                equals_factory=KeypairConditions.by_access_key_equals,
+                starts_with_factory=KeypairConditions.by_access_key_starts_with,
+                ends_with_factory=KeypairConditions.by_access_key_ends_with,
+                in_factory=KeypairConditions.by_access_key_in,
+            )
+            if cond is not None:
+                keypair_conditions.append(cond)
+        if filter.is_active is not None:
+            keypair_conditions.append(KeypairConditions.by_is_active(filter.is_active))
+        if not keypair_conditions:
+            return None
+        return KeypairResourcePolicyConditions.exists_keypair_combined(keypair_conditions)
 
     def _convert_user_filter(self, filter: UserResourcePolicyFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
