@@ -6,3 +6,8 @@ files(
         "src/**/*.rs",
     ],
 )
+
+files(
+    name="prebuilt",
+    sources=["bin/visibility-checker-*"],
+)
