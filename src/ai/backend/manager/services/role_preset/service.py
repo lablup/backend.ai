@@ -2,6 +2,10 @@ import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
+from ai.backend.manager.services.role_preset.actions.batch_remove_permissions import (
+    BatchRemoveRolePermissionPresetsAction,
+    BatchRemoveRolePermissionPresetsActionResult,
+)
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
     BulkAddRolePermissionPresetsActionResult,
@@ -9,10 +13,6 @@ from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import
 from ai.backend.manager.services.role_preset.actions.bulk_purge import (
     BulkPurgeRolePresetsAction,
     BulkPurgeRolePresetsActionResult,
-)
-from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
-    BulkRemoveRolePermissionPresetsAction,
-    BulkRemoveRolePermissionPresetsActionResult,
 )
 from ai.backend.manager.services.role_preset.actions.create import (
     CreateRolePresetAction,
@@ -76,14 +76,20 @@ class RolePresetService:
     async def bulk_delete(
         self, action: BulkDeleteRolePresetsAction
     ) -> BulkDeleteRolePresetsActionResult:
-        deleted_count = await self._repository.bulk_delete(action.batch_updater)
-        return BulkDeleteRolePresetsActionResult(deleted_count=deleted_count)
+        result = await self._repository.bulk_delete(action.ids)
+        return BulkDeleteRolePresetsActionResult(
+            successes=result.successes,
+            failures=result.failures,
+        )
 
     async def bulk_restore(
         self, action: BulkRestoreRolePresetsAction
     ) -> BulkRestoreRolePresetsActionResult:
-        restored_count = await self._repository.bulk_restore(action.batch_updater)
-        return BulkRestoreRolePresetsActionResult(restored_count=restored_count)
+        result = await self._repository.bulk_restore(action.ids)
+        return BulkRestoreRolePresetsActionResult(
+            successes=result.successes,
+            failures=result.failures,
+        )
 
     async def purge(self, action: PurgeRolePresetAction) -> PurgeRolePresetActionResult:
         success = await self._repository.purge(action.preset_id)
@@ -104,8 +110,8 @@ class RolePresetService:
         permissions = await self._repository.bulk_add_permissions(action.bulk_creator)
         return BulkAddRolePermissionPresetsActionResult(permissions=permissions)
 
-    async def bulk_remove_permissions(
-        self, action: BulkRemoveRolePermissionPresetsAction
-    ) -> BulkRemoveRolePermissionPresetsActionResult:
-        removed_count = await self._repository.bulk_remove_permissions(action.batch_purger)
-        return BulkRemoveRolePermissionPresetsActionResult(removed_count=removed_count)
+    async def batch_remove_permissions(
+        self, action: BatchRemoveRolePermissionPresetsAction
+    ) -> BatchRemoveRolePermissionPresetsActionResult:
+        removed_count = await self._repository.batch_remove_permissions(action.batch_purger)
+        return BatchRemoveRolePermissionPresetsActionResult(removed_count=removed_count)

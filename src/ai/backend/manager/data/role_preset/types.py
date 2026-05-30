@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from ai.backend.common.data.permission.types import (
     EntityType,
@@ -10,6 +11,10 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.manager.repositories.base.updater import BulkUpdaterError
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 
 
 @dataclass(frozen=True)
@@ -50,3 +55,9 @@ class RolePresetPurgeFailure:
 class RolePresetBulkPurgeResult:
     success_count: int
     failures: list[RolePresetPurgeFailure]
+
+
+@dataclass(frozen=True)
+class RolePresetBulkUpdateResult:
+    successes: list[RolePresetData] = field(default_factory=list)
+    failures: list[BulkUpdaterError[RolePresetRow]] = field(default_factory=list)

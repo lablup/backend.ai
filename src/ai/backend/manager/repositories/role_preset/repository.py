@@ -8,6 +8,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
     RolePresetBulkPurgeResult,
+    RolePresetBulkUpdateResult,
     RolePresetData,
     RolePresetSearchResult,
 )
@@ -18,7 +19,6 @@ from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
-    BatchUpdater,
     BulkCreator,
 )
 from ai.backend.manager.repositories.base.updater import Updater
@@ -61,15 +61,15 @@ class RolePresetRepository:
 
     async def bulk_delete(
         self,
-        batch_updater: BatchUpdater[RolePresetRow],
-    ) -> int:
-        return await self._db_source.bulk_delete(batch_updater)
+        ids: Sequence[RolePresetID],
+    ) -> RolePresetBulkUpdateResult:
+        return await self._db_source.bulk_delete(ids)
 
     async def bulk_restore(
         self,
-        batch_updater: BatchUpdater[RolePresetRow],
-    ) -> int:
-        return await self._db_source.bulk_restore(batch_updater)
+        ids: Sequence[RolePresetID],
+    ) -> RolePresetBulkUpdateResult:
+        return await self._db_source.bulk_restore(ids)
 
     async def purge(self, preset_id: RolePresetID) -> bool:
         return await self._db_source.purge(preset_id)
@@ -86,8 +86,8 @@ class RolePresetRepository:
     ) -> list[RolePermissionPresetData]:
         return await self._db_source.bulk_add_permissions(bulk_creator)
 
-    async def bulk_remove_permissions(
+    async def batch_remove_permissions(
         self,
         batch_purger: BatchPurger[RolePermissionPresetRow],
     ) -> int:
-        return await self._db_source.bulk_remove_permissions(batch_purger)
+        return await self._db_source.batch_remove_permissions(batch_purger)

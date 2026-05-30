@@ -16,6 +16,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
     RolePresetBulkPurgeResult,
+    RolePresetBulkUpdateResult,
     RolePresetData,
     RolePresetPurgeFailure,
     RolePresetSearchResult,
@@ -28,7 +29,6 @@ from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
-    BatchUpdater,
     BulkCreator,
     Creator,
     Purger,
@@ -39,6 +39,9 @@ from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetDependentCreatorSpec,
     RolePresetCreatorSpec,
+)
+from ai.backend.manager.repositories.role_preset.updaters import (
+    RolePresetDeletedFlagUpdaterSpec,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -95,19 +98,28 @@ class RolePresetDBSource:
 
     async def bulk_delete(
         self,
-        batch_updater: BatchUpdater[RolePresetRow],
-    ) -> int:
-        async with self._ops.write_ops() as w:
-            result = await w.batch_update(batch_updater)
-            return result.updated_count
+        ids: Sequence[RolePresetID],
+    ) -> RolePresetBulkUpdateResult:
+        return await self._bulk_set_deleted_flag(ids, deleted=True)
 
     async def bulk_restore(
         self,
-        batch_updater: BatchUpdater[RolePresetRow],
-    ) -> int:
+        ids: Sequence[RolePresetID],
+    ) -> RolePresetBulkUpdateResult:
+        return await self._bulk_set_deleted_flag(ids, deleted=False)
+
+    async def _bulk_set_deleted_flag(
+        self,
+        ids: Sequence[RolePresetID],
+        *,
+        deleted: bool,
+    ) -> RolePresetBulkUpdateResult:
+        spec = RolePresetDeletedFlagUpdaterSpec(deleted=deleted)
+        updaters = [Updater(spec=spec, pk_value=preset_id) for preset_id in ids]
         async with self._ops.write_ops() as w:
-            result = await w.batch_update(batch_updater)
-            return result.updated_count
+            result = await w.bulk_update_partial(updaters)
+        successes = [row.to_data() for row in result.successes]
+        return RolePresetBulkUpdateResult(successes=successes, failures=result.errors)
 
     async def purge(self, preset_id: RolePresetID) -> bool:
         async with self._ops.write_ops() as w:
@@ -143,7 +155,7 @@ class RolePresetDBSource:
             result = await w.bulk_create(bulk_creator)
             return [row.to_data() for row in result.rows]
 
-    async def bulk_remove_permissions(
+    async def batch_remove_permissions(
         self,
         batch_purger: BatchPurger[RolePermissionPresetRow],
     ) -> int:

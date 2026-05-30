@@ -378,3 +378,39 @@ async def execute_batch_updater[TRow: Base](
         parsed = parse_integrity_error(e)
         match_integrity_error(parsed, updater.spec.integrity_error_checks)
     return BatchUpdaterResult(updated_count=cast(CursorResult[Any], result).rowcount)
+
+
+async def execute_bulk_updater_partial[TRow: Base](
+    db_sess: SASession,
+    updaters: list[Updater[TRow]],
+) -> BulkUpdaterResult[TRow]:
+    """Execute bulk UPDATE with partial failure support.
+
+    Unlike execute_batch_updater which uses condition-based UPDATE and fails
+    atomically, this function processes each updater individually within a
+    savepoint and collects both successes and failures.
+
+    Mirrors execute_bulk_purger_partial: each updater runs inside its own
+    savepoint, exceptions on a single row only roll back that savepoint, and
+    an updater that matches no row is silently skipped (not surfaced in
+    successes or errors).
+    """
+    if not updaters:
+        return BulkUpdaterResult(successes=[], errors=[])
+
+    successes: list[TRow] = []
+    errors: list[BulkUpdaterError[TRow]] = []
+
+    for index, updater in enumerate(updaters):
+        try:
+            async with db_sess.begin_nested():
+                result = await execute_updater(db_sess, updater)
+                if result is not None:
+                    successes.append(result.row)
+        except sa.exc.IntegrityError as e:
+            parsed = parse_integrity_error(e)
+            errors.append(BulkUpdaterError(spec=updater.spec, exception=parsed, index=index))
+        except Exception as e:
+            errors.append(BulkUpdaterError(spec=updater.spec, exception=e, index=index))
+
+    return BulkUpdaterResult(successes=successes, errors=errors)

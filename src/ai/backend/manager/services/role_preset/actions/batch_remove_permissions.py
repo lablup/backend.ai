@@ -11,7 +11,7 @@ from ai.backend.manager.services.role_preset.actions.base import RolePresetActio
 
 
 @dataclass
-class BulkRemoveRolePermissionPresetsAction(RolePresetAction):
+class BatchRemoveRolePermissionPresetsAction(RolePresetAction):
     batch_purger: BatchPurger[RolePermissionPresetRow]
 
     @override
@@ -25,7 +25,7 @@ class BulkRemoveRolePermissionPresetsAction(RolePresetAction):
 
 
 @dataclass
-class BulkRemoveRolePermissionPresetsActionResult(BaseActionResult):
+class BatchRemoveRolePermissionPresetsActionResult(BaseActionResult):
     removed_count: int
 
     @override

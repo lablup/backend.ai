@@ -4,6 +4,10 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.services.role_preset.actions.batch_remove_permissions import (
+    BatchRemoveRolePermissionPresetsAction,
+    BatchRemoveRolePermissionPresetsActionResult,
+)
 from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
     BulkAddRolePermissionPresetsAction,
     BulkAddRolePermissionPresetsActionResult,
@@ -11,10 +15,6 @@ from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import
 from ai.backend.manager.services.role_preset.actions.bulk_purge import (
     BulkPurgeRolePresetsAction,
     BulkPurgeRolePresetsActionResult,
-)
-from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
-    BulkRemoveRolePermissionPresetsAction,
-    BulkRemoveRolePermissionPresetsActionResult,
 )
 from ai.backend.manager.services.role_preset.actions.create import (
     CreateRolePresetAction,
@@ -59,8 +59,8 @@ class RolePresetProcessors(AbstractProcessorPackage):
     bulk_add_permissions: ActionProcessor[
         BulkAddRolePermissionPresetsAction, BulkAddRolePermissionPresetsActionResult
     ]
-    bulk_remove_permissions: ActionProcessor[
-        BulkRemoveRolePermissionPresetsAction, BulkRemoveRolePermissionPresetsActionResult
+    batch_remove_permissions: ActionProcessor[
+        BatchRemoveRolePermissionPresetsAction, BatchRemoveRolePermissionPresetsActionResult
     ]
 
     def __init__(
@@ -78,8 +78,8 @@ class RolePresetProcessors(AbstractProcessorPackage):
         self.purge = ActionProcessor(service.purge, action_monitors)
         self.bulk_purge = ActionProcessor(service.bulk_purge, action_monitors)
         self.bulk_add_permissions = ActionProcessor(service.bulk_add_permissions, action_monitors)
-        self.bulk_remove_permissions = ActionProcessor(
-            service.bulk_remove_permissions, action_monitors
+        self.batch_remove_permissions = ActionProcessor(
+            service.batch_remove_permissions, action_monitors
         )
 
     @override
@@ -94,5 +94,5 @@ class RolePresetProcessors(AbstractProcessorPackage):
             PurgeRolePresetAction.spec(),
             BulkPurgeRolePresetsAction.spec(),
             BulkAddRolePermissionPresetsAction.spec(),
-            BulkRemoveRolePermissionPresetsAction.spec(),
+            BatchRemoveRolePermissionPresetsAction.spec(),
         ]

@@ -2,9 +2,10 @@
 
 Exercises the observable contracts of RolePresetRepository against a real
 database: create round-trips (preset + dependent permission rows), id-based
-get, search, single-row update, soft delete / restore (count-returning),
-single and bulk hard purge (success count + skipped non-existent ids), and
-bulk add / remove of permission-preset rows.
+get, search, single-row update, bulk soft delete / restore (per-id partial
+update with silent skip for missing ids), single and bulk hard purge (success
+count + skipped non-existent ids), bulk add of permission-preset rows, and
+batch remove of permission-preset rows (single SQL count).
 """
 
 from __future__ import annotations
@@ -30,7 +31,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
-    BatchUpdater,
     BulkCreator,
     NoPagination,
 )
@@ -46,7 +46,6 @@ from ai.backend.manager.repositories.role_preset.purgers import (
 )
 from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
 from ai.backend.manager.repositories.role_preset.updaters import (
-    RolePresetDeletedFlagBatchUpdaterSpec,
     RolePresetUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState
@@ -170,24 +169,27 @@ class TestBulkDeleteRestore:
         )
         ids = [a.id, b.id]
 
-        deleted_count = await repository.bulk_delete(
-            BatchUpdater(
-                spec=RolePresetDeletedFlagBatchUpdaterSpec(deleted=True),
-                conditions=[lambda: RolePresetRow.id.in_(ids)],
-            )
-        )
-        assert deleted_count == 2
+        delete_result = await repository.bulk_delete(ids)
+        assert {row.id for row in delete_result.successes} == {a.id, b.id}
+        assert delete_result.failures == []
         # Soft delete: the row is still present, only the flag flips.
         assert (await repository.role_preset(a.id)).deleted is True
 
-        restored_count = await repository.bulk_restore(
-            BatchUpdater(
-                spec=RolePresetDeletedFlagBatchUpdaterSpec(deleted=False),
-                conditions=[lambda: RolePresetRow.id.in_(ids)],
-            )
-        )
-        assert restored_count == 2
+        restore_result = await repository.bulk_restore(ids)
+        assert {row.id for row in restore_result.successes} == {a.id, b.id}
+        assert restore_result.failures == []
         assert (await repository.role_preset(a.id)).deleted is False
+
+    async def test_skips_missing_ids(self, repository: RolePresetRepository) -> None:
+        existing = await repository.create(
+            RolePresetCreatorSpec(name="x", scope_type=ScopeType.DOMAIN), []
+        )
+
+        # Non-existent id is silently skipped, matching bulk_purge semantics.
+        result = await repository.bulk_delete([existing.id, RolePresetID(uuid4())])
+
+        assert [row.id for row in result.successes] == [existing.id]
+        assert result.failures == []
 
 
 class TestPurge:
@@ -243,7 +245,7 @@ class TestPermissions:
         assert len(added) == 2
         assert all(perm.role_preset_id == preset.id for perm in added)
 
-    async def test_bulk_remove_returns_count(
+    async def test_batch_remove_returns_count(
         self,
         repository: RolePresetRepository,
         database_connection: ExtendedAsyncSAEngine,
@@ -269,7 +271,7 @@ class TestPermissions:
         )
         permission_ids = [perm.id for perm in added]
 
-        removed_count = await repository.bulk_remove_permissions(
+        removed_count = await repository.batch_remove_permissions(
             BatchPurger(
                 spec=RolePermissionPresetByIDsBatchPurgerSpec(
                     role_preset_id=preset.id,

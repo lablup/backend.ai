@@ -5,7 +5,7 @@ from typing import Any, override
 
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.repositories.base.updater import BatchUpdaterSpec, UpdaterSpec
+from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState
 
 
@@ -15,7 +15,7 @@ class RolePresetUpdaterSpec(UpdaterSpec[RolePresetRow]):
 
     The ``deleted`` column is intentionally not exposed — soft-delete state
     is managed only by the dedicated delete/restore operations via
-    :class:`RolePresetDeletedFlagBatchUpdaterSpec`.
+    :class:`RolePresetDeletedFlagUpdaterSpec`.
     """
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -37,8 +37,8 @@ class RolePresetUpdaterSpec(UpdaterSpec[RolePresetRow]):
 
 
 @dataclass
-class RolePresetDeletedFlagBatchUpdaterSpec(BatchUpdaterSpec[RolePresetRow]):
-    """Bulk update of the ``deleted`` flag — used by delete/restore."""
+class RolePresetDeletedFlagUpdaterSpec(UpdaterSpec[RolePresetRow]):
+    """Per-row update of the ``deleted`` flag — used by bulk delete/restore."""
 
     deleted: bool
 
