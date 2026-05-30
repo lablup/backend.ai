@@ -544,10 +544,7 @@ class DeploymentController:
 
         # 2. Validate deployment state
         deployment_info = await self._deployment_repository.get_endpoint_info(deployment_id)
-        if (
-            deployment_info.current_revision is not None
-            and deployment_info.current_revision.id == revision_id
-        ):
+        if deployment_info.current_revision_id == revision_id:
             raise InvalidEndpointState(
                 f"Revision {revision_id} is already the current revision "
                 f"of deployment {deployment_id}."

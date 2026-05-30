@@ -345,12 +345,25 @@ class DeploymentRepository:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint information.
+        """Get endpoint information (modern, light: revision *ids* only).
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
         """
         return await self._db_source.get_endpoint(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_legacy_endpoint_info(
+        self,
+        endpoint_id: DeploymentID,
+    ) -> DeploymentInfo:
+        """Get endpoint information (legacy, full: includes the current/deploying
+        revision data). DO NOT USE in new code — for the REST v1 surface only.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
+        """
+        return await self._db_source.get_legacy_endpoint(endpoint_id)
 
     @deployment_repository_resilience.apply()
     async def destroy_endpoint(
@@ -1528,15 +1541,18 @@ class DeploymentRepository:
         self,
         querier: BatchQuerier,
     ) -> DeploymentInfoSearchResult:
-        """Search endpoints with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination
-
-        Returns:
-            DeploymentInfoSearchResult with items, total_count, and pagination info
-        """
+        """Search endpoints (modern, light: revision *ids* only)."""
         return await self._db_source.search_endpoints(querier)
+
+    @deployment_repository_resilience.apply()
+    async def search_legacy_endpoints(
+        self,
+        querier: BatchQuerier,
+    ) -> DeploymentInfoSearchResult:
+        """Search endpoints (legacy, full: includes the current/deploying
+        revision data). DO NOT USE in new code — for the REST v1 surface only.
+        """
+        return await self._db_source.search_legacy_endpoints(querier)
 
     @deployment_repository_resilience.apply()
     async def search_deployments_in_project(

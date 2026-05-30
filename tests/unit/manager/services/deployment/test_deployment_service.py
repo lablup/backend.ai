@@ -84,6 +84,7 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.deployment.service import (
     DeploymentService,
     _convert_deployment_info_to_data,
+    _convert_deployment_info_to_legacy_data,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
 
@@ -727,6 +728,8 @@ class TestConvertDeploymentInfoToData:
                 open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
             ),
             options=DeploymentOptions(),
+            current_revision_id=current_data.id,
+            deploying_revision_id=deploying_data.id,
             current_revision=current_data,
             deploying_revision=deploying_data,
         )
@@ -736,5 +739,8 @@ class TestConvertDeploymentInfoToData:
         assert deployment_data.current_revision_id == current_data.id
         assert deployment_data.deploying_revision_id == deploying_data.id
         assert deployment_data.current_revision_id != deployment_data.deploying_revision_id
-        assert deployment_data.revision is not None
-        assert deployment_data.revision.id == current_data.id
+
+        # The full current revision now lives on the legacy (REST v1) projection.
+        legacy_data = _convert_deployment_info_to_legacy_data(deployment_info)
+        assert legacy_data.revision is not None
+        assert legacy_data.revision.id == current_data.id

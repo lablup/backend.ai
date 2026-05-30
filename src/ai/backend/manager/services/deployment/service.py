@@ -27,6 +27,7 @@ from ai.backend.manager.data.deployment.creator import (
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     ExecutionSpec,
+    LegacyDeploymentData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
@@ -132,6 +133,10 @@ from ai.backend.manager.services.deployment.actions.get_deployment_by_id import 
     GetDeploymentByIdAction,
     GetDeploymentByIdActionResult,
 )
+from ai.backend.manager.services.deployment.actions.get_legacy_deployment_by_id import (
+    GetLegacyDeploymentByIdAction,
+    GetLegacyDeploymentByIdActionResult,
+)
 from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
@@ -178,6 +183,10 @@ from ai.backend.manager.services.deployment.actions.search_deployments_in_projec
     SearchDeploymentsInProjectAction,
     SearchDeploymentsInProjectActionResult,
 )
+from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
+    SearchLegacyDeploymentsAction,
+    SearchLegacyDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
     SearchReplicasActionResult,
@@ -220,17 +229,19 @@ def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentSta
             return ModelDeploymentStatus.STOPPED
 
 
-def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
-    """Convert DeploymentInfo to ModelDeploymentData.
-
-    Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
-    """
-    revision: ModelRevisionData | None = info.current_revision
-
+def _deployment_desired_replica_count(info: DeploymentInfo) -> int:
     desired_count = info.replica.desired_replica_count
     if desired_count is None:
         desired_count = info.replica.replica_count
+    return desired_count
 
+
+def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
+    """Convert DeploymentInfo to the modern (v2 / GraphQL) ModelDeploymentData.
+
+    Uses the revision *ids* only — the modern read path does not load the full
+    revision rows. Note: some fields default as DeploymentInfo lacks the data.
+    """
     return ModelDeploymentData(
         id=info.id,
         metadata=ModelDeploymentMetadataInfo(
@@ -244,23 +255,52 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             updated_at=info.metadata.created_at or datetime.now(UTC),
         ),
         network_access=info.network,
-        revision_history_ids=[info.current_revision.id]
-        if info.current_revision is not None
+        revision_history_ids=[info.current_revision_id]
+        if info.current_revision_id is not None
         else [],
-        revision=revision,
-        current_revision_id=info.current_revision.id if info.current_revision is not None else None,
-        deploying_revision_id=info.deploying_revision.id
-        if info.deploying_revision is not None
-        else None,
+        current_revision_id=info.current_revision_id,
+        deploying_revision_id=info.deploying_revision_id,
         scaling_rule_ids=[],  # Not available in DeploymentInfo
         replica_state=ReplicaStateData(
-            desired_replica_count=desired_count,
+            desired_replica_count=_deployment_desired_replica_count(info),
             replica_ids=[],  # Not available in DeploymentInfo
         ),
         default_deployment_strategy=DeploymentStrategy.ROLLING,
         created_user_id=info.metadata.created_user,
         options=info.options,
         scaling_state=info.state.scaling_state,
+        policy=info.policy,
+        sub_step=info.sub_step,
+    )
+
+
+def _convert_deployment_info_to_legacy_data(info: DeploymentInfo) -> LegacyDeploymentData:
+    """Convert DeploymentInfo to the legacy (REST v1) LegacyDeploymentData.
+
+    Built independently from the same ``DeploymentInfo`` — never derived from
+    ``ModelDeploymentData``. Carries the full current ``revision`` that the
+    legacy ``DeploymentDTO`` embeds, so it requires a full (legacy) read.
+    """
+    return LegacyDeploymentData(
+        id=info.id,
+        metadata=ModelDeploymentMetadataInfo(
+            name=info.metadata.name,
+            status=_map_lifecycle_to_status(info.state.lifecycle),
+            tags=[info.metadata.tag] if info.metadata.tag else [],
+            project_id=info.metadata.project,
+            domain_name=info.metadata.domain,
+            resource_group_name=info.metadata.resource_group,
+            created_at=info.metadata.created_at or datetime.now(UTC),
+            updated_at=info.metadata.created_at or datetime.now(UTC),
+        ),
+        network_access=info.network,
+        revision=info.current_revision,
+        replica_state=ReplicaStateData(
+            desired_replica_count=_deployment_desired_replica_count(info),
+            replica_ids=[],  # Not available in DeploymentInfo
+        ),
+        default_deployment_strategy=DeploymentStrategy.ROLLING,
+        created_user_id=info.metadata.created_user,
         policy=info.policy,
         sub_step=info.sub_step,
     )
@@ -526,6 +566,21 @@ class DeploymentService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def search_legacy_deployments(
+        self, action: SearchLegacyDeploymentsAction
+    ) -> SearchLegacyDeploymentsActionResult:
+        """Legacy (REST v1) search — full revision per item. DO NOT USE in new
+        code; v2 uses :meth:`search_deployments`.
+        """
+        result = await self._deployment_repository.search_legacy_endpoints(action.querier)
+        deployments = [_convert_deployment_info_to_legacy_data(info) for info in result.items]
+        return SearchLegacyDeploymentsActionResult(
+            data=deployments,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def search_deployments_in_project(
         self, action: SearchDeploymentsInProjectAction
     ) -> SearchDeploymentsInProjectActionResult:
@@ -556,6 +611,19 @@ class DeploymentService:
         """
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
         return GetDeploymentByIdActionResult(data=_convert_deployment_info_to_data(deployment_info))
+
+    async def get_legacy_deployment_by_id(
+        self, action: GetLegacyDeploymentByIdAction
+    ) -> GetLegacyDeploymentByIdActionResult:
+        """Legacy (REST v1) get-by-id — full revision. DO NOT USE in new code;
+        v2 uses :meth:`get_deployment_by_id`.
+        """
+        deployment_info = await self._deployment_repository.get_legacy_endpoint_info(
+            action.deployment_id
+        )
+        return GetLegacyDeploymentByIdActionResult(
+            data=_convert_deployment_info_to_legacy_data(deployment_info)
+        )
 
     async def get_deployment_policy(
         self, action: GetDeploymentPolicyAction

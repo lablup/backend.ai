@@ -394,7 +394,40 @@ class DeploymentDBSource:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint by ID.
+        """Get endpoint by ID (modern, light: revision *ids* only).
+
+        Loads the replica groups for the revision ids but not the full
+        revision rows. For the full revision data (REST v1) use
+        :meth:`get_legacy_endpoint`.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .options(
+                    selectinload(EndpointRow.primary_replica_group_row),
+                    selectinload(EndpointRow.target_replica_group_row),
+                    selectinload(EndpointRow.deployment_policy),
+                )
+            )
+            result = await db_sess.execute(query)
+            row: EndpointRow | None = result.scalar_one_or_none()
+
+            if not row:
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
+
+            return row.to_modern_deployment_info()
+
+    async def get_legacy_endpoint(
+        self,
+        endpoint_id: DeploymentID,
+    ) -> DeploymentInfo:
+        """Get endpoint by ID (legacy, full: includes the current/deploying
+        revision rows). DO NOT USE in new code — the REST v1 surface needs the
+        embedded revision; v2 uses :meth:`get_endpoint`.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
@@ -1127,13 +1160,41 @@ class DeploymentDBSource:
         self,
         querier: BatchQuerier,
     ) -> DeploymentInfoSearchResult:
-        """Search endpoints with pagination and filtering.
+        """Search endpoints (modern, light: revision *ids* only).
 
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination
+        Loads the replica groups for the revision ids but not the full
+        revision rows. For the full revision data (REST v1) use
+        :meth:`search_legacy_endpoints`.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(EndpointRow).options(
+                selectinload(EndpointRow.primary_replica_group_row),
+                selectinload(EndpointRow.target_replica_group_row),
+                selectinload(EndpointRow.deployment_policy),
+            )
 
-        Returns:
-            DeploymentInfoSearchResult with items, total_count, and pagination info
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.EndpointRow.to_modern_deployment_info() for row in result.rows]
+
+            return DeploymentInfoSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_legacy_endpoints(
+        self,
+        querier: BatchQuerier,
+    ) -> DeploymentInfoSearchResult:
+        """Search endpoints (legacy, full: includes the current/deploying
+        revision rows). DO NOT USE in new code — the REST v1 surface needs the
+        embedded revision; v2 uses :meth:`search_endpoints`.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             query = sa.select(EndpointRow).options(

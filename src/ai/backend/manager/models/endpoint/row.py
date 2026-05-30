@@ -845,24 +845,47 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
 
     def to_deployment_info(self) -> DeploymentInfo:
-        """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
+        """Full DeploymentInfo including the resolved current/deploying revision
+        rows. Requires the revision-row relationships to be eagerly loaded
+        (legacy REST v1 / engine read paths). The revision ids are derived from
+        those rows, so no separate replica-group load is needed.
+        """
+        current_row = self.current_revision_row
+        deploying_row = self.deploying_revision_row
         return self._build_deployment_info(
-            current_revision=(
-                self.current_revision_row.to_data() if self.current_revision_row else None
-            ),
-            deploying_revision=(
-                self.deploying_revision_row.to_data() if self.deploying_revision_row else None
-            ),
+            current_revision_id=DeploymentRevisionID(current_row.id) if current_row else None,
+            deploying_revision_id=DeploymentRevisionID(deploying_row.id) if deploying_row else None,
+            current_revision=current_row.to_data() if current_row else None,
+            deploying_revision=deploying_row.to_data() if deploying_row else None,
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+        )
+
+    def to_modern_deployment_info(self) -> DeploymentInfo:
+        """Lightweight DeploymentInfo carrying only the revision *ids* (sourced
+        from the replica groups), without loading the full revision rows. Used
+        by the modern (v2) read path, which only needs the ids. Requires the
+        replica-group relationships to be eagerly loaded.
+        """
+        return self._build_deployment_info(
+            current_revision_id=self.current_revision_id,
+            deploying_revision_id=self.deploying_revision_id,
+            current_revision=None,
+            deploying_revision=None,
             policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
         )
 
     def _build_deployment_info(
         self,
+        current_revision_id: DeploymentRevisionID | None,
+        deploying_revision_id: DeploymentRevisionID | None,
         current_revision: ModelRevisionData | None,
         deploying_revision: ModelRevisionData | None,
         policy: DeploymentPolicyData | None = None,
     ) -> DeploymentInfo:
-        """Build DeploymentInfo with current and deploying revision data."""
+        """Build DeploymentInfo. The revision *ids* and the full
+        ``current_revision`` / ``deploying_revision`` data are supplied by the
+        caller (the full data is ``None`` on the modern read path).
+        """
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(
@@ -892,6 +915,8 @@ class EndpointRow(Base):  # type: ignore[misc]
                 preferred_domain_name=None,
             ),
             options=self.options,
+            current_revision_id=current_revision_id,
+            deploying_revision_id=deploying_revision_id,
             current_revision=current_revision,
             deploying_revision=deploying_revision,
             sub_step=self.sub_step,
