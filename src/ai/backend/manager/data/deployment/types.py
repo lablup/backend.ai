@@ -186,8 +186,15 @@ class DeploymentLifecycleSubStep(enum.StrEnum):
     """
 
     # -- DEPLOYING phase --
+    DEPLOYING_INITIALIZING = "deploying_initializing"
+    """Pre-deploy cleanup of stale replica groups and creation of the target
+    replica group for the selected revision."""
     DEPLOYING_PROVISIONING = "deploying_provisioning"
     """New revision routes are being provisioned and old routes are being drained."""
+    DEPLOYING_PROMOTING = "deploying_promoting"
+    """The fully provisioned target replica group is being promoted to primary."""
+    DEPLOYING_DRAINING = "deploying_draining"
+    """The superseded replica group is being drained and removed."""
     DEPLOYING_ROLLING_BACK = "deploying_rolling_back"
     """Clearing deploying_revision and transitioning to READY."""
     DEPLOYING_COMPLETED = "deploying_completed"
