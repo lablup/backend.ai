@@ -14,6 +14,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.base import GUID, Base
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
     from ai.backend.manager.models.endpoint import EndpointRow
     from ai.backend.manager.models.routing import RoutingRow
 
@@ -32,6 +33,18 @@ def _get_replicas_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.routing import RoutingRow
 
     return ReplicaGroupRow.id == foreign(RoutingRow.replica_group_id)
+
+
+def _get_current_revision_join_condition() -> sa.sql.elements.ColumnElement[Any]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return foreign(ReplicaGroupRow.current_revision_id) == DeploymentRevisionRow.id
+
+
+def _get_target_revision_join_condition() -> sa.sql.elements.ColumnElement[Any]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return foreign(ReplicaGroupRow.target_revision_id) == DeploymentRevisionRow.id
 
 
 class ReplicaGroupRow(Base):  # type: ignore[misc]
@@ -121,4 +134,16 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
         "RoutingRow",
         primaryjoin=_get_replicas_join_condition,
         viewonly=True,
+    )
+    current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        primaryjoin=_get_current_revision_join_condition,
+        viewonly=True,
+        uselist=False,
+    )
+    target_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        primaryjoin=_get_target_revision_join_condition,
+        viewonly=True,
+        uselist=False,
     )

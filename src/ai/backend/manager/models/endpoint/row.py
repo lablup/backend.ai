@@ -101,6 +101,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
     from ai.backend.manager.models.routing import RoutingRow
     from ai.backend.manager.models.user import UserRow
 
@@ -128,16 +129,30 @@ def _get_endpoint_revisions_join_condition() -> Any:
     return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
 
 
-def _get_current_revision_row_join_condition() -> sa.ColumnElement[bool]:
+def _get_primary_replica_group_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+
+    return foreign(EndpointRow.primary_replica_group_id) == ReplicaGroupRow.id
+
+
+def _get_target_replica_group_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+
+    return foreign(EndpointRow.target_replica_group_id) == ReplicaGroupRow.id
+
+
+def _get_current_revision_secondaryjoin() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
 
-    return EndpointRow.current_revision == DeploymentRevisionRow.id
+    return foreign(ReplicaGroupRow.current_revision_id) == DeploymentRevisionRow.id
 
 
-def _get_deploying_revision_row_join_condition() -> sa.ColumnElement[bool]:
+def _get_deploying_revision_secondaryjoin() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
 
-    return EndpointRow.deploying_revision == DeploymentRevisionRow.id
+    return foreign(ReplicaGroupRow.target_revision_id) == DeploymentRevisionRow.id
 
 
 def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
@@ -313,17 +328,36 @@ class EndpointRow(Base):  # type: ignore[misc]
         primaryjoin=_get_endpoint_revisions_join_condition,
         order_by="DeploymentRevisionRow.revision_number.desc()",
     )
+    primary_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
+        "ReplicaGroupRow",
+        primaryjoin=_get_primary_replica_group_join_condition,
+        viewonly=True,
+        uselist=False,
+    )
+    target_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
+        "ReplicaGroupRow",
+        primaryjoin=_get_target_replica_group_join_condition,
+        viewonly=True,
+        uselist=False,
+    )
+    # Sourced from the replica groups: the current revision is the primary
+    # group's ``current_revision_id`` and the deploying revision is the
+    # target group's ``target_revision_id`` (``None`` when no rollout is in
+    # progress). Joined through ``replica_groups`` so existing consumers
+    # (``to_deployment_info`` and the ``selectinload`` paths) are unchanged.
     current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
-        primaryjoin=_get_current_revision_row_join_condition,
-        foreign_keys="EndpointRow.current_revision",
+        secondary="replica_groups",
+        primaryjoin=_get_primary_replica_group_join_condition,
+        secondaryjoin=_get_current_revision_secondaryjoin,
         viewonly=True,
         uselist=False,
     )
     deploying_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
-        primaryjoin=_get_deploying_revision_row_join_condition,
-        foreign_keys="EndpointRow.deploying_revision",
+        secondary="replica_groups",
+        primaryjoin=_get_target_replica_group_join_condition,
+        secondaryjoin=_get_deploying_revision_secondaryjoin,
         viewonly=True,
         uselist=False,
     )
@@ -372,7 +406,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -417,7 +460,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -462,7 +514,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -489,13 +550,19 @@ class EndpointRow(Base):  # type: ignore[misc]
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> Sequence[Self]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+        from ai.backend.manager.models.replica_group import ReplicaGroupRow
 
-        # Join through current revision to find endpoints by model
+        # Join through the primary replica group's current revision to find
+        # endpoints by model.
         query = (
             sa.select(EndpointRow)
             .join(
+                ReplicaGroupRow,
+                EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+            )
+            .join(
                 DeploymentRevisionRow,
-                EndpointRow.current_revision == DeploymentRevisionRow.id,
+                ReplicaGroupRow.current_revision_id == DeploymentRevisionRow.id,
             )
             .where(
                 EndpointRow.lifecycle_stage.in_(status_filter)
@@ -513,7 +580,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -595,38 +671,45 @@ class EndpointRow(Base):  # type: ignore[misc]
         for session_row in session_rows:
             session_row.delegate_ownership(target_user_uuid, target_access_key)
 
-    def _find_current_revision(self) -> DeploymentRevisionRow | None:
-        """Find the current revision row from eagerly loaded revisions.
+    @property
+    def current_revision_id(self) -> DeploymentRevisionID | None:
+        """Active revision id, sourced from the primary replica group.
 
-        Requires revisions to be eagerly loaded via selectinload.
-
-        Raises:
-            RuntimeError: If revisions are not loaded (programming error).
+        Requires ``primary_replica_group_row`` to be eagerly loaded.
         """
-        if not self.current_revision:
-            return None
-        for rev in self.revisions:
-            if rev.id == self.current_revision:
-                return rev
-        return None
+        group = self.primary_replica_group_row
+        return group.current_revision_id if group is not None else None
+
+    @property
+    def deploying_revision_id(self) -> DeploymentRevisionID | None:
+        """Revision being rolled out, sourced from the target replica group's
+        ``target_revision_id`` (``None`` when no rollout is in progress).
+
+        Requires ``target_replica_group_row`` to be eagerly loaded.
+        """
+        group = self.target_replica_group_row
+        return group.target_revision_id if group is not None else None
+
+    def _find_current_revision(self) -> DeploymentRevisionRow | None:
+        """Active revision row, sourced from the primary replica group.
+
+        Requires ``current_revision_row`` to be eagerly loaded.
+        """
+        return self.current_revision_row
 
     def _find_active_revision(self) -> DeploymentRevisionRow | None:
         """Return the revision representing the deployment's active spec.
 
-        Falls back to ``deploying_revision`` when ``current_revision`` is
-        unset (e.g. during the initial DEPLOYING phase before strategy
-        completion). Used by display/serialization paths that should reflect
-        the spec being deployed rather than rendering empty fields.
+        Falls back to the deploying revision (the target group's
+        ``target_revision_id``) when the current revision is unset (e.g.
+        during the initial DEPLOYING phase before strategy completion).
+        Used by display/serialization paths that should reflect the spec
+        being deployed rather than rendering empty fields.
+
+        Requires ``current_revision_row`` and ``deploying_revision_row`` to
+        be eagerly loaded.
         """
-        current = self._find_current_revision()
-        if current is not None:
-            return current
-        if not self.deploying_revision:
-            return None
-        for rev in self.revisions:
-            if rev.id == self.deploying_revision:
-                return rev
-        return None
+        return self.current_revision_row or self.deploying_revision_row
 
     def to_summary_data(self) -> DeploymentSummaryData:
         return DeploymentSummaryData(
@@ -641,8 +724,8 @@ class EndpointRow(Base):  # type: ignore[misc]
             tag=self.tag,
             open_to_public=self.open_to_public or False,
             url=self.url,
-            current_revision=self.current_revision,
-            deploying_revision=self.deploying_revision,
+            current_revision=self.current_revision_id,
+            deploying_revision=self.deploying_revision_id,
             replicas=self.replicas,
             desired_replicas=self.desired_replicas,
             created_at=self.created_at,

@@ -16,7 +16,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -30,6 +30,7 @@ from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -126,6 +127,7 @@ from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_slot.row import (
     DeploymentRevisionResourceSlotRow,
     PresetResourceSlotRow,
@@ -326,6 +328,19 @@ class DeploymentDBSource:
                 ),
             )
             await execute_rbac_entity_creator(db_sess, policy_creator)
+            await db_sess.flush()
+
+            # Every deployment owns a primary replica group that holds its
+            # revision pointers and per-revision desired replica counts. The
+            # revision pointers start empty; the first rollout populates them
+            # via ``set_deploying_revision`` / the deployment swap.
+            primary_replica_group = ReplicaGroupRow(
+                deployment_id=endpoint.id,
+                desired_current_replica_count=endpoint.replicas,
+            )
+            db_sess.add(primary_replica_group)
+            await db_sess.flush()
+            endpoint.primary_replica_group_id = ReplicaGroupID(primary_replica_group.id)
             await db_sess.flush()
 
             stmt = (
@@ -1149,12 +1164,15 @@ class DeploymentDBSource:
     ) -> DeploymentSummarySearchResult:
         """Search endpoints within a project scope with pagination and filtering.
 
-        Returns lightweight DeploymentSummaryData built from EndpointRow scalar
-        columns only (no eager-loaded relationships). Revision and policy
-        details are not included.
+        Returns lightweight DeploymentSummaryData. Only the replica group
+        rows are eagerly loaded — ``to_summary_data`` reads the current /
+        deploying revision *ids* from them (not the full revision rows).
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(EndpointRow)
+            query = sa.select(EndpointRow).options(
+                selectinload(EndpointRow.primary_replica_group_row),
+                selectinload(EndpointRow.target_replica_group_row),
+            )
 
             result = await execute_batch_querier(
                 db_sess,
@@ -1224,8 +1242,12 @@ class DeploymentDBSource:
                 .select_from(RoutingRow)
                 .join(EndpointRow, RoutingRow.endpoint == EndpointRow.id)
                 .join(
+                    ReplicaGroupRow,
+                    EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+                )
+                .join(
                     DeploymentRevisionRow,
-                    EndpointRow.current_revision == DeploymentRevisionRow.id,
+                    ReplicaGroupRow.current_revision_id == DeploymentRevisionRow.id,
                 )
                 .join(
                     RuntimeVariantRow,
@@ -2627,8 +2649,15 @@ class DeploymentDBSource:
             DeploymentRevisionNotFound: If the endpoint has no current revision.
         """
         async with self._db.begin_readonly_session() as db_sess:
-            endpoint_query = sa.select(EndpointRow.current_revision).where(
-                EndpointRow.id == endpoint_id
+            # Current revision lives on the primary replica group.
+            endpoint_query = (
+                sa.select(ReplicaGroupRow.current_revision_id)
+                .select_from(EndpointRow)
+                .join(
+                    ReplicaGroupRow,
+                    EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+                )
+                .where(EndpointRow.id == endpoint_id)
             )
             result = await db_sess.execute(endpoint_query)
             current_revision_id = result.scalar_one_or_none()
@@ -2767,21 +2796,39 @@ class DeploymentDBSource:
             ``updated=False`` means the endpoint row was not found.
         """
         async with self._begin_session_read_committed() as db_sess:
-            update_query = (
+            # Revision pointers live on the primary replica group. Resolve it
+            # (and its current revision, returned as the "previous") first.
+            group_query = (
+                sa.select(ReplicaGroupRow.id, ReplicaGroupRow.current_revision_id)
+                .select_from(EndpointRow)
+                .join(
+                    ReplicaGroupRow,
+                    EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+                )
+                .where(EndpointRow.id == endpoint_id)
+            )
+            group_row = (await db_sess.execute(group_query)).one_or_none()
+            if group_row is None:
+                return None, False
+            primary_group_id, previous_current_revision_id = group_row
+
+            # Set the rollout target on the primary group and point the
+            # deployment's target group at it (rolling within the same group).
+            await db_sess.execute(
+                sa.update(ReplicaGroupRow)
+                .where(ReplicaGroupRow.id == primary_group_id)
+                .values(target_revision_id=revision_id)
+            )
+            await db_sess.execute(
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .values(
-                    deploying_revision=revision_id,
+                    target_replica_group_id=primary_group_id,
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,
                     sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
                 )
-                .returning(EndpointRow.current_revision)
             )
-            result = await db_sess.execute(update_query)
-            row = result.one_or_none()
-            if row is None:
-                return None, False
-            return cast(DeploymentRevisionID | None, row[0]), True
+            return cast(DeploymentRevisionID | None, previous_current_revision_id), True
 
     async def prune_old_revisions(
         self,
@@ -2801,11 +2848,26 @@ class DeploymentDBSource:
         Returns the number of deleted revisions.
         """
         async with self._begin_session_read_committed() as db_sess:
-            # Fetch protected revision IDs
-            endpoint_query = sa.select(
-                EndpointRow.current_revision,
-                EndpointRow.deploying_revision,
-            ).where(EndpointRow.id == endpoint_id)
+            # Fetch protected revision IDs: the primary group's current
+            # revision and the target group's deploying revision.
+            primary_group = aliased(ReplicaGroupRow)
+            target_group = aliased(ReplicaGroupRow)
+            endpoint_query = (
+                sa.select(
+                    primary_group.current_revision_id,
+                    target_group.target_revision_id,
+                )
+                .select_from(EndpointRow)
+                .outerjoin(
+                    primary_group,
+                    EndpointRow.primary_replica_group_id == primary_group.id,
+                )
+                .outerjoin(
+                    target_group,
+                    EndpointRow.target_replica_group_id == target_group.id,
+                )
+                .where(EndpointRow.id == endpoint_id)
+            )
             ep_result = await db_sess.execute(endpoint_query)
             ep_row = ep_result.one_or_none()
             if ep_row is None:
@@ -3178,23 +3240,36 @@ class DeploymentDBSource:
         db_sess: SASession,
         completed_ids: set[DeploymentID],
     ) -> int:
-        """Swap deploying_revision → current_revision for completed deployments."""
+        """Roll each completed deployment's primary group forward: the group's
+        ``target_revision_id`` becomes its ``current_revision_id`` and the
+        deployment's rollout pointer (``target_replica_group_id``) is cleared."""
         if not completed_ids:
             return 0
-        query = (
-            sa.update(EndpointRow)
+        primary_group_ids = sa.select(EndpointRow.primary_replica_group_id).where(
+            EndpointRow.id.in_(completed_ids)
+        )
+        group_update = (
+            sa.update(ReplicaGroupRow)
             .where(
-                EndpointRow.id.in_(completed_ids),
-                EndpointRow.deploying_revision.is_not(None),
+                ReplicaGroupRow.id.in_(primary_group_ids),
+                ReplicaGroupRow.target_revision_id.is_not(None),
             )
             .values(
-                current_revision=EndpointRow.deploying_revision,
-                deploying_revision=None,
+                current_revision_id=ReplicaGroupRow.target_revision_id,
+                target_revision_id=None,
+            )
+        )
+        result = await db_sess.execute(group_update)
+        swapped = cast(CursorResult[Any], result).rowcount
+        await db_sess.execute(
+            sa.update(EndpointRow)
+            .where(EndpointRow.id.in_(completed_ids))
+            .values(
+                target_replica_group_id=None,
                 sub_step=None,
             )
         )
-        result = await db_sess.execute(query)
-        return cast(CursorResult[Any], result).rowcount
+        return swapped
 
     async def clear_deploying_revision(
         self,
@@ -3208,15 +3283,24 @@ class DeploymentDBSource:
         if not deployment_ids:
             return
         async with self._begin_session_read_committed() as db_sess:
-            query = (
+            # Drop the rollout target on each primary group, then clear the
+            # deployment's rollout pointer and sub-step.
+            primary_group_ids = sa.select(EndpointRow.primary_replica_group_id).where(
+                EndpointRow.id.in_(deployment_ids)
+            )
+            await db_sess.execute(
+                sa.update(ReplicaGroupRow)
+                .where(ReplicaGroupRow.id.in_(primary_group_ids))
+                .values(target_revision_id=None)
+            )
+            await db_sess.execute(
                 sa.update(EndpointRow)
                 .where(EndpointRow.id.in_(deployment_ids))
                 .values(
-                    deploying_revision=None,
+                    target_replica_group_id=None,
                     sub_step=None,
                 )
             )
-            await db_sess.execute(query)
 
     async def search_revision_resource_slots(
         self,

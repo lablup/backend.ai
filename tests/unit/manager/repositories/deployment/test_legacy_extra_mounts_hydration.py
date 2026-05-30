@@ -12,6 +12,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
@@ -29,6 +30,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -68,6 +70,7 @@ _REQUIRED_TABLES = [
     DeploymentRevisionRow,
     DeploymentRevisionResourceSlotRow,
     EndpointRow,
+    ReplicaGroupRow,
 ]
 
 
@@ -257,21 +260,30 @@ class TestLegacyExtraMountsHydration:
         endpoint_id = DeploymentID(uuid.uuid4())
         revision_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"ep-{suffix}",
+                created_user=user_id,
+                session_owner=user_id,
+                domain=domain_name,
+                project=project_id,
+                resource_group=scaling_group_name,
+                url="http://test.example.com",
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.READY,
+            )
+            db_sess.add(endpoint)
+            await db_sess.flush()
+            # Current revision lives on the primary replica group.
+            group_id = uuid.uuid4()
             db_sess.add(
-                EndpointRow(
-                    id=endpoint_id,
-                    name=f"ep-{suffix}",
-                    created_user=user_id,
-                    session_owner=user_id,
-                    domain=domain_name,
-                    project=project_id,
-                    resource_group=scaling_group_name,
-                    url="http://test.example.com",
-                    open_to_public=False,
-                    lifecycle_stage=EndpointLifecycle.READY,
-                    current_revision=revision_id,
+                ReplicaGroupRow(
+                    id=ReplicaGroupID(group_id),
+                    deployment_id=endpoint_id,
+                    current_revision_id=revision_id,
                 )
             )
+            endpoint.primary_replica_group_id = ReplicaGroupID(group_id)
             await db_sess.flush()
             db_sess.add(
                 DeploymentRevisionRow(
