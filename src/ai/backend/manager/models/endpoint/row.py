@@ -260,13 +260,10 @@ class EndpointRow(Base):  # type: ignore[misc]
         nullable=True,
     )
 
-    # Revision management columns
-    current_revision: Mapped[DeploymentRevisionID | None] = mapped_column(
-        "current_revision", GUID(DeploymentRevisionID), nullable=True
-    )
-    deploying_revision: Mapped[DeploymentRevisionID | None] = mapped_column(
-        "deploying_revision", GUID(DeploymentRevisionID), nullable=True
-    )
+    # Revision pointers live on the replica groups (see
+    # ``primary_replica_group_id`` / ``target_replica_group_id`` below): the
+    # current revision is the primary group's ``current_revision_id`` and the
+    # deploying revision is the target group's ``target_revision_id``.
 
     # Replica group references (no FK; mirrors ``RoutingRow.revision`` and
     # avoids a circular FK with ``replica_groups.deployment_id``).

@@ -677,7 +677,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.READY,
-                current_revision=revision_id,
             )
             db_sess.add(endpoint)
             attach_primary_replica_group(db_sess, endpoint, current_revision_id=revision_id)
@@ -915,7 +914,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     url=f"http://test{i}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.READY,
-                    current_revision=revision_id,
                 )
                 db_sess.add(endpoint)
                 attach_primary_replica_group(db_sess, endpoint, current_revision_id=revision_id)
@@ -2271,7 +2269,6 @@ class TestDeploymentAutoScalingPolicyOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -2648,7 +2645,6 @@ class TestDeploymentPolicyOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -2969,7 +2965,6 @@ class TestSearchDeploymentPolicies:
                     url=f"http://test-{eid.hex[:8]}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 db_sess.add(endpoint)
                 endpoint_ids.append(eid)
@@ -3371,7 +3366,6 @@ class TestRouteOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()

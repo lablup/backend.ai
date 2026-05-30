@@ -301,7 +301,6 @@ class TestDeploymentAutoScalingPolicyRow:
                 resource_group=test_scaling_group.name,
                 url=f"https://test-{uuid.uuid4().hex[:8]}.example.com",
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.flush()

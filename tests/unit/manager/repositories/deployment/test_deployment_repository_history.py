@@ -394,7 +394,6 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.PENDING,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -809,7 +808,6 @@ class TestUpdateRouteStatusBulkWithHistory:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.READY,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -1116,7 +1114,6 @@ class TestDeploymentHistoryMergeLogic:
                     url="http://test.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.PENDING,
-                    current_revision=uuid.uuid4(),
                 )
             )
 
@@ -1432,7 +1429,6 @@ class TestRouteHistoryMergeLogic:
                     url="http://test.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.READY,
-                    current_revision=uuid.uuid4(),
                 )
             )
 

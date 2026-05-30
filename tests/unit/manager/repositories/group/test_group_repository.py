@@ -673,7 +673,6 @@ class TestGroupRepository:
                 project=group_id,
                 resource_group=test_scaling_group,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
             await session.commit()

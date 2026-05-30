@@ -1305,9 +1305,9 @@ class DeploymentRepository:
     ) -> ModelRevisionData:
         """Get the latest revision (highest ``revision_number``) of a deployment.
 
-        Unlike :meth:`get_current_revision`, this does not consult
-        ``EndpointRow.current_revision``: it returns the most recently
-        created revision for the endpoint regardless of activation state.
+        Unlike :meth:`get_current_revision`, this does not consult the primary
+        group's ``current_revision_id``: it returns the most recently created
+        revision for the endpoint regardless of activation state.
 
         Raises:
             DeploymentRevisionNotFound: If no revisions exist for the endpoint.
