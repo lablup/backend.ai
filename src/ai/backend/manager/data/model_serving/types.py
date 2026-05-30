@@ -58,6 +58,14 @@ class EndpointAccessValidationData:
 
 @dataclass
 class EndpointData:
+    """Legacy model-serving endpoint projection — DO NOT USE in new code.
+
+    Backs the legacy ``/services`` (model-serving) responses, which flatten
+    the active revision's fields (image, model, resources, mounts, …) onto
+    the endpoint and carry no separate revision object. New deployment code
+    uses ``ModelDeploymentData`` (v2) / ``LegacyDeploymentData`` (REST v1).
+    """
+
     id: uuid.UUID
     name: str
     image: ImageData | None

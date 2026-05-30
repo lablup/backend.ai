@@ -753,6 +753,13 @@ class DeploymentInfo:
     replica: ReplicaData
     network: DeploymentNetworkData
     options: DeploymentOptions
+    # Revision ids, always populated cheaply from the replica groups (no
+    # revision-row load). The modern (v2) read path fills only these.
+    current_revision_id: DeploymentRevisionID | None = None
+    deploying_revision_id: DeploymentRevisionID | None = None
+    # Full revision data, populated only by the legacy (REST v1) / engine
+    # read paths that eagerly load the revision rows. ``None`` on the modern
+    # read path even when ``current_revision_id`` is set.
     current_revision: ModelRevisionData | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision: ModelRevisionData | None = None
@@ -1078,10 +1085,17 @@ class ReplicaStateData:
 
 @dataclass
 class ModelDeploymentData:
+    """Modern (v2 / GraphQL) deployment projection.
+
+    Carries revisions as ids only (``current_revision_id`` /
+    ``deploying_revision_id``); the full revision is resolved on demand by
+    the GraphQL DataLoader. The REST v1 surface, which embeds the full
+    revision, uses :class:`LegacyDeploymentData` instead.
+    """
+
     id: DeploymentID
     metadata: ModelDeploymentMetadataInfo
     network_access: DeploymentNetworkData
-    revision: ModelRevisionData | None
     current_revision_id: DeploymentRevisionID | None
     deploying_revision_id: DeploymentRevisionID | None
     revision_history_ids: list[DeploymentRevisionID]
@@ -1096,6 +1110,27 @@ class ModelDeploymentData:
     scaling_state: ScalingState
     policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
+
+
+@dataclass
+class LegacyDeploymentData:
+    """Legacy v1 deployment projection — DO NOT USE in new code.
+
+    Backs the REST v1 ``DeploymentDTO`` response only, which embeds the full
+    current ``revision``. v2 / GraphQL use :class:`ModelDeploymentData`
+    (revision ids only). Built independently from ``DeploymentInfo``; it is
+    never converted to or from :class:`ModelDeploymentData`.
+    """
+
+    id: DeploymentID
+    metadata: ModelDeploymentMetadataInfo
+    network_access: DeploymentNetworkData
+    revision: ModelRevisionData | None
+    replica_state: ReplicaStateData
+    default_deployment_strategy: DeploymentStrategy
+    created_user_id: UUID
+    policy: DeploymentPolicyData | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
 
 

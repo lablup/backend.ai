@@ -235,7 +235,6 @@ class TestEndpointSearchInProject:
                         project=project_a_id,
                         resource_group=sgroup_name,
                         lifecycle_stage=EndpointLifecycle.CREATED,
-                        current_revision=uuid.uuid4(),
                         replicas=1,
                     )
                 )
@@ -253,7 +252,6 @@ class TestEndpointSearchInProject:
                     project=project_b_id,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.CREATED,
-                    current_revision=uuid.uuid4(),
                     replicas=1,
                 )
             )

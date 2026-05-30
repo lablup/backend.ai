@@ -262,7 +262,6 @@ class TestGroupDBSourceDeleteEndpoints:
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)
@@ -323,7 +322,6 @@ class TestGroupDBSourceDeleteEndpoints:
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
 
@@ -401,7 +399,6 @@ class TestGroupDBSourceDeleteEndpoints:
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
             await session.commit()
@@ -450,7 +447,6 @@ class TestGroupDBSourceDeleteEndpoints:
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)

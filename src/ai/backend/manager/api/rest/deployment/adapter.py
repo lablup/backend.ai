@@ -61,7 +61,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentPolicyData,
     ExecutionSpec,
-    ModelDeploymentData,
+    LegacyDeploymentData,
     ModelRevisionData,
     MountInfo,
     ReplicaSpec,
@@ -124,10 +124,10 @@ class DeploymentAdapter(BaseFilterAdapter):
 
     def convert_to_dto(
         self,
-        data: ModelDeploymentData,
+        data: LegacyDeploymentData,
         runtime_variant_name: RuntimeVariant,
     ) -> DeploymentDTO:
-        """Convert ModelDeploymentData to DTO.
+        """Convert LegacyDeploymentData to DTO.
 
         ``runtime_variant_name`` is resolved by the caller (REST handler)
         from ``data.revision.model_runtime_config.runtime_variant_id``

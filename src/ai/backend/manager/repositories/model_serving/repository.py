@@ -187,7 +187,10 @@ class ModelServingRepository:
                     selectinload(EndpointRow.routings),
                     selectinload(EndpointRow.session_owner_row),
                     selectinload(EndpointRow.created_user_row),
-                    selectinload(EndpointRow.revisions).selectinload(
+                    selectinload(EndpointRow.current_revision_row).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                    selectinload(EndpointRow.deploying_revision_row).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
                 )
@@ -874,7 +877,7 @@ class ModelServingRepository:
                 .where(EndpointRow.session_owner == session_owner_id)
                 .where(EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
                 .options(selectinload(EndpointRow.routings))
-                .options(selectinload(EndpointRow.revisions))
+                .options(selectinload(EndpointRow.current_revision_row))
             )
 
             result = await execute_batch_querier(session, query, querier)

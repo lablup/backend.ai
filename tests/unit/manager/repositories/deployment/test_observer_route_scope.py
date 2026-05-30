@@ -274,7 +274,6 @@ class TestObserverCycleRouteScope:
                     project=project,
                     resource_group=scaling_group,
                     lifecycle_stage=EndpointLifecycle.CREATED,
-                    current_revision=revision_id,
                     replicas=4,
                 )
             )
