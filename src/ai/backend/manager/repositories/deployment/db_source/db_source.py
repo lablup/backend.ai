@@ -343,7 +343,7 @@ class DeploymentDBSource:
             # Every deployment owns a primary replica group that holds its
             # revision pointers and per-revision desired replica counts. The
             # revision pointers start empty; the first rollout populates them
-            # via ``set_deploying_revision`` / the deployment swap.
+            # via ``activate_revision`` / the deployment swap.
             primary_replica_group = ReplicaGroupRow(
                 deployment_id=endpoint.id,
                 desired_current_replica_count=endpoint.replicas,
@@ -2876,55 +2876,52 @@ class DeploymentDBSource:
             stored: DeploymentOptions = row[0]
             return stored
 
-    async def set_deploying_revision(
+    async def activate_revision(
         self,
         endpoint_id: DeploymentID,
         revision_id: DeploymentRevisionID,
     ) -> tuple[DeploymentRevisionID | None, bool]:
-        """Set deploying_revision and transition lifecycle to DEPLOYING.
+        """Record the deploy intent and transition lifecycle to DEPLOYING.
 
-        Overrides any previous ``deploying_revision`` unconditionally;
-        leftover routes from the previous rollout are picked up by
-        ``RouteEvictionHandler``'s orphan-revision branch.
+        Writes ``endpoints.deploying_revision_id`` (the deploy intent) and
+        moves the endpoint into ``DEPLOYING`` /
+        ``DEPLOYING_INITIALIZING``. Overrides any previous deploy intent
+        unconditionally; leftover routes from the previous rollout are
+        picked up by ``RouteEvictionHandler``'s orphan-revision branch.
+
+        Does not touch the replica groups or ``target_replica_group_id``;
+        the INITIALIZING handler owns the subsequent group/route work.
 
         Returns:
             Tuple of (previous_current_revision_id, updated).
             ``updated=False`` means the endpoint row was not found.
         """
         async with self._begin_session_read_committed() as db_sess:
-            # Revision pointers live on the primary replica group. Resolve it
-            # (and its current revision, returned as the "previous") first.
-            group_query = (
-                sa.select(ReplicaGroupRow.id, ReplicaGroupRow.current_revision_id)
-                .select_from(EndpointRow)
-                .join(
-                    ReplicaGroupRow,
-                    EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+            # The previous current revision (returned to the caller) lives on
+            # the primary replica group.
+            previous_current_revision_id = (
+                await db_sess.execute(
+                    sa.select(ReplicaGroupRow.current_revision_id)
+                    .select_from(EndpointRow)
+                    .join(
+                        ReplicaGroupRow,
+                        EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+                    )
+                    .where(EndpointRow.id == endpoint_id)
                 )
-                .where(EndpointRow.id == endpoint_id)
-            )
-            group_row = (await db_sess.execute(group_query)).one_or_none()
-            if group_row is None:
-                return None, False
-            primary_group_id, previous_current_revision_id = group_row
+            ).scalar_one_or_none()
 
-            # Set the rollout target on the primary group and point the
-            # deployment's target group at it (rolling within the same group).
-            await db_sess.execute(
-                sa.update(ReplicaGroupRow)
-                .where(ReplicaGroupRow.id == primary_group_id)
-                .values(target_revision_id=revision_id)
-            )
-            await db_sess.execute(
+            result = await db_sess.execute(
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .values(
-                    target_replica_group_id=primary_group_id,
+                    deploying_revision_id=revision_id,
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,
-                    sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+                    sub_step=DeploymentLifecycleSubStep.DEPLOYING_INITIALIZING,
                 )
             )
-            return cast(DeploymentRevisionID | None, previous_current_revision_id), True
+            updated = cast(CursorResult[Any], result).rowcount > 0
+            return previous_current_revision_id, updated
 
     async def prune_old_revisions(
         self,

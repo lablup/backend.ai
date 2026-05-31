@@ -41,6 +41,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
+    DeploymentLifecycleSubStep,
     DeploymentOptions,
     DeploymentPolicyData,
     ModelRevisionData,
@@ -3965,7 +3966,7 @@ class TestDeploymentRepositoryDuplicateName:
             ).scalar_one()
             assert target_stage == EndpointLifecycle.DESTROYING
 
-    async def test_set_deploying_revision_overrides_in_flight(
+    async def test_activate_revision_overrides_in_flight(
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -3973,11 +3974,12 @@ class TestDeploymentRepositoryDuplicateName:
         test_group: GroupRow,
         test_scaling_group: ScalingGroupRow,
     ) -> None:
-        """``set_deploying_revision`` overwrites a non-NULL deploying_revision.
+        """``activate_revision`` records the deploy intent on the endpoint.
 
-        A previous rollout's ``deploying_revision`` no longer guards
-        against re-activation; orphan routes from the preempted rollout
-        are cleaned up by ``RouteEvictionHandler``'s orphan branch.
+        Writes ``endpoints.deploying_revision_id`` and transitions to
+        DEPLOYING / DEPLOYING_INITIALIZING, overwriting any previous
+        deploy intent. Orphan routes from a preempted rollout are cleaned
+        up by ``RouteEvictionHandler``'s orphan branch.
         """
         endpoint_id = DeploymentID(uuid.uuid4())
         previous_deploying = DeploymentRevisionID(uuid.uuid4())
@@ -3998,14 +4000,13 @@ class TestDeploymentRepositoryDuplicateName:
                 url=None,
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                deploying_revision_id=previous_deploying,
             )
             db_sess.add(endpoint)
-            # A previous rollout's deploying revision lives on the primary
-            # group's ``target_revision_id``.
-            attach_primary_replica_group(db_sess, endpoint, target_revision_id=previous_deploying)
+            attach_primary_replica_group(db_sess, endpoint)
             await db_sess.commit()
 
-        previous_current, updated = await deployment_repository.set_deploying_revision(
+        previous_current, updated = await deployment_repository.activate_revision(
             endpoint_id, new_deploying
         )
 
@@ -4016,27 +4017,23 @@ class TestDeploymentRepositoryDuplicateName:
             row = (
                 await db_sess.execute(
                     sa.select(
-                        ReplicaGroupRow.target_revision_id,
+                        EndpointRow.deploying_revision_id,
                         EndpointRow.lifecycle_stage,
-                    )
-                    .select_from(EndpointRow)
-                    .join(
-                        ReplicaGroupRow,
-                        EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
-                    )
-                    .where(EndpointRow.id == endpoint_id)
+                        EndpointRow.sub_step,
+                    ).where(EndpointRow.id == endpoint_id)
                 )
             ).one()
-            assert row.target_revision_id == new_deploying
+            assert row.deploying_revision_id == new_deploying
             assert row.lifecycle_stage == EndpointLifecycle.DEPLOYING
+            assert row.sub_step == DeploymentLifecycleSubStep.DEPLOYING_INITIALIZING
 
-    async def test_set_deploying_revision_returns_false_for_missing_endpoint(
+    async def test_activate_revision_returns_false_for_missing_endpoint(
         self,
         deployment_repository: DeploymentRepository,
     ) -> None:
-        """``set_deploying_revision`` returns updated=False when the endpoint id
+        """``activate_revision`` returns updated=False when the endpoint id
         does not match any row, instead of raising."""
-        previous_current, updated = await deployment_repository.set_deploying_revision(
+        previous_current, updated = await deployment_repository.activate_revision(
             DeploymentID(uuid.uuid4()), DeploymentRevisionID(uuid.uuid4())
         )
         assert updated is False

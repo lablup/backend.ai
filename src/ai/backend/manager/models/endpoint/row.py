@@ -148,11 +148,10 @@ def _get_current_revision_secondaryjoin() -> sa.ColumnElement[bool]:
     return foreign(ReplicaGroupRow.current_revision_id) == DeploymentRevisionRow.id
 
 
-def _get_deploying_revision_secondaryjoin() -> sa.ColumnElement[bool]:
+def _get_deploying_revision_join_condition() -> sa.ColumnElement[bool]:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
 
-    return foreign(ReplicaGroupRow.target_revision_id) == DeploymentRevisionRow.id
+    return foreign(EndpointRow.deploying_revision_id) == DeploymentRevisionRow.id
 
 
 def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
@@ -276,6 +275,9 @@ class EndpointRow(Base):  # type: ignore[misc]
     target_replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
         "target_replica_group_id", GUID(ReplicaGroupID), nullable=True
     )
+    deploying_revision_id: Mapped[DeploymentRevisionID | None] = mapped_column(
+        "deploying_revision_id", GUID(DeploymentRevisionID), nullable=True
+    )
     sub_step: Mapped[DeploymentLifecycleSubStep | None] = mapped_column(
         "sub_step",
         StrEnumType(DeploymentLifecycleSubStep),
@@ -352,9 +354,7 @@ class EndpointRow(Base):  # type: ignore[misc]
     )
     deploying_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
-        secondary="replica_groups",
-        primaryjoin=_get_target_replica_group_join_condition,
-        secondaryjoin=_get_deploying_revision_secondaryjoin,
+        primaryjoin=_get_deploying_revision_join_condition,
         viewonly=True,
         uselist=False,
     )
@@ -676,16 +676,6 @@ class EndpointRow(Base):  # type: ignore[misc]
         """
         group = self.primary_replica_group_row
         return group.current_revision_id if group is not None else None
-
-    @property
-    def deploying_revision_id(self) -> DeploymentRevisionID | None:
-        """Revision being rolled out, sourced from the target replica group's
-        ``target_revision_id`` (``None`` when no rollout is in progress).
-
-        Requires ``target_replica_group_row`` to be eagerly loaded.
-        """
-        group = self.target_replica_group_row
-        return group.target_revision_id if group is not None else None
 
     def _find_current_revision(self) -> DeploymentRevisionRow | None:
         """Active revision row, sourced from the primary replica group.

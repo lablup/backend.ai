@@ -1349,14 +1349,14 @@ class DeploymentRepository:
         return await self._db_source.update_endpoint(updater)
 
     @deployment_repository_resilience.apply()
-    async def set_deploying_revision(
+    async def activate_revision(
         self,
         endpoint_id: DeploymentID,
         revision_id: DeploymentRevisionID,
     ) -> tuple[DeploymentRevisionID | None, bool]:
-        """Set deploying_revision and transition lifecycle to DEPLOYING.
+        """Record the deploy intent and transition lifecycle to DEPLOYING.
 
-        Overrides any previous ``deploying_revision`` unconditionally;
+        Overrides any previous deploy intent unconditionally;
         leftover routes from the preempted rollout are picked up by
         ``RouteEvictionHandler``'s orphan-revision branch.
 
@@ -1364,7 +1364,7 @@ class DeploymentRepository:
             Tuple of (previous_current_revision_id, updated).
             ``updated=False`` means the endpoint row was not found.
         """
-        return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
+        return await self._db_source.activate_revision(endpoint_id, revision_id)
 
     @deployment_repository_resilience.apply()
     async def prune_old_revisions(
