@@ -113,24 +113,20 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
         from strawberry.relay import PageInfo
 
         from ai.backend.common.data.filter_specs import StringMatchSpec
-        from ai.backend.common.dto.manager.v2.keypair.request import AdminSearchKeypairsInput
+        from ai.backend.common.dto.manager.v2.keypair.request import SearchMyKeypairsRequest
         from ai.backend.manager.api.gql.base import encode_cursor
         from ai.backend.manager.api.gql.keypair.types.node import (
             KeyPairConnection,
             KeyPairEdge,
             KeyPairGQL,
         )
-        from ai.backend.manager.api.gql.utils import check_admin_only
         from ai.backend.manager.models.keypair.conditions import KeypairConditions
 
-        # This node is reachable from non-admin entry points (e.g. myKeypairResourcePolicyV2),
-        # but the keypair listing spans all users sharing the policy — restrict to superadmins.
-        check_admin_only()
-
-        # Scope the search to keypairs assigned to this resource policy. Applied as a
-        # base condition before any user-supplied filters so it cannot be escaped.
-        result = await info.context.adapters.user.gql_admin_search_keypairs(
-            AdminSearchKeypairsInput(
+        # Scope the search to the current user's keypairs assigned to this resource policy.
+        # search_my_keypairs resolves current_user() internally; the resource-policy scope
+        # is applied as a base condition before any user-supplied filters so it cannot be escaped.
+        result = await info.context.adapters.user.search_my_keypairs(
+            SearchMyKeypairsRequest(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
                 first=first,

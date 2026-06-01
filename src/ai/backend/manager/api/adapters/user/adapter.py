@@ -658,12 +658,17 @@ class UserAdapter(BaseAdapter):
     async def search_my_keypairs(
         self,
         input: SearchMyKeypairsRequest,
+        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> SearchResult[KeypairNode]:
         """Search keypairs owned by the current user.
 
         Calls current_user() internally — the caller does not need to pass scope.
         Supports both cursor-based and offset-based pagination.
         Used by both GQL and REST layers.
+
+        The optional ``base_conditions`` are applied before any user-supplied
+        filters — e.g. the ``keypairs`` connection on the keypair resource policy
+        node passes a resource-policy scope condition.
         """
         me = current_user()
         if me is None:
@@ -681,6 +686,7 @@ class UserAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
+            base_conditions=base_conditions,
         )
         action_result = await self._processors.user.search_my_keypairs.wait_for_complete(
             SearchMyKeypairsAction(scope=scope, querier=querier)
@@ -841,14 +847,8 @@ class UserAdapter(BaseAdapter):
     async def gql_admin_search_keypairs(
         self,
         input: AdminSearchKeypairsInput,
-        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> SearchResult[KeypairNode]:
-        """Admin search all keypairs (GQL, returns SearchResult for connection).
-
-        The optional ``base_conditions`` are applied before any user-supplied
-        filters — e.g. the ``keypairs`` connection on the keypair resource policy
-        node passes a resource-policy scope condition.
-        """
+        """Admin search all keypairs (GQL, returns SearchResult for connection)."""
         conditions = self._convert_keypair_filter(input.filter) if input.filter else []
         orders = self._convert_keypair_orders(input.order) if input.order else []
         querier = self._build_querier(
@@ -861,7 +861,6 @@ class UserAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
         action_result = await self._processors.user.admin_search_keypairs.wait_for_complete(
             AdminSearchKeypairsAction(querier=querier)
