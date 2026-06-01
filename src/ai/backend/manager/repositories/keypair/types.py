@@ -11,7 +11,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.common.exception import KeypairResourcePolicyNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
@@ -84,7 +84,7 @@ class KeypairResourcePolicySearchScope(SearchScope):
             ExistenceCheck(
                 column=KeyPairResourcePolicyRow.name,
                 value=self.resource_policy_name,
-                error=ObjectNotFound(
+                error=KeypairResourcePolicyNotFound(
                     f"Keypair resource policy '{self.resource_policy_name}' not found"
                 ),
             ),

@@ -141,6 +141,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminUpdateKeypairAction,
     IssueMyKeypairAction,
     RevokeMyKeypairAction,
+    SearchKeypairsByResourcePolicyAction,
     SearchMyKeypairsAction,
     SwitchMyMainAccessKeyAction,
     UpdateMyKeypairAction,
@@ -153,9 +154,6 @@ from ai.backend.manager.services.user.actions.modify_user import (
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     PurgeUserByIdAction,
-)
-from ai.backend.manager.services.user.actions.search_keypairs_by_resource_policy import (
-    SearchKeypairsByResourcePolicyAction,
 )
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
