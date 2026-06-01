@@ -83,6 +83,7 @@ from ai.backend.manager.errors.kernel import (
     TooManySessionsMatched,
 )
 from ai.backend.manager.errors.resource import (
+    AgentNotAllocated,
     AppNotFound,
     NoCurrentTaskContext,
     TaskTemplateNotFound,
@@ -340,7 +341,6 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         try:
-            await self._agent_registry.increment_session_usage(session)
             resp = await self._agent_registry.get_completions(session, code, opts=options)
         except AssertionError as e:
             raise InvalidAPIParameters from e
@@ -862,7 +862,6 @@ class SessionService:
                 owner_access_key,
                 kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
             )
-            await self._agent_registry.increment_session_usage(session)
             result = await self._agent_registry.download_single(session, owner_access_key, file)
         except (ValueError, FileNotFoundError) as e:
             raise InvalidAPIParameters("The file is not found.") from e
@@ -890,7 +889,6 @@ class SessionService:
         try:
             if len(files) > 5:
                 raise VFolderBadRequest("Too many files (maximum 5 files allowed)")
-            await self._agent_registry.increment_session_usage(session)
             # TODO: Read all download file contents. Need to fix by using chuncking, etc.
             results = await asyncio.gather(
                 *map(
@@ -932,8 +930,6 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
         try:
-            await self._agent_registry.increment_session_usage(session)
-
             run_id: str | None
             mode: str | None
 
@@ -1072,7 +1068,6 @@ class SessionService:
                 )
 
         registry = self._agent_registry
-        await registry.increment_session_usage(compute_session)
         resp["result"]["logs"] = await registry.get_logs_from_agent(
             session=compute_session, kernel_id=kernel_id
         )
@@ -1156,7 +1151,6 @@ class SessionService:
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
-        await self._agent_registry.increment_session_usage(sess)
 
         created_at = sess.created_at or datetime.now(tzutc())
         age = datetime.now(tzutc()) - created_at
@@ -1219,7 +1213,6 @@ class SessionService:
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
-        await self._agent_registry.increment_session_usage(session)
         await self._agent_registry.interrupt_session(session)
 
         return InterruptSessionActionResult(result=None, session_data=session.to_dataclass())
@@ -1238,7 +1231,6 @@ class SessionService:
 
         resp: MutableMapping[str, Any] = {}
         try:
-            await self._agent_registry.increment_session_usage(session)
             result = await self._agent_registry.list_files(session, path)
             resp.update(result)
             log.debug("container file list for {0} retrieved", path)
@@ -1305,8 +1297,7 @@ class SessionService:
         return ShutdownServiceActionResult(result=None, session_data=session.to_dataclass())
 
     async def start_service(self, action: StartServiceAction) -> StartServiceActionResult:
-        session_name = action.session_name
-        access_key = action.access_key
+        session_id = action.session_id
         service = action.service
         port = action.port
 
@@ -1314,19 +1305,13 @@ class SessionService:
         envs = action.envs
         login_session_token = action.login_session_token
 
-        session = await asyncio.shield(
-            self._database_ptask_group.create_task(
-                self._session_repository.get_session_with_routing_minimal(
-                    session_name,
-                    access_key,
-                )
-            )
-        )
+        info = await self._session_repository.get_session_with_routing_minimal(session_id)
+        session_data = info.session
 
-        if session.scaling_group_name is None:
+        if session_data.scaling_group_name is None:
             raise ServiceUnavailable("Session has no scaling group assigned")
         wsproxy_addr = await self._session_repository.get_scaling_group_wsproxy_addr(
-            session.scaling_group_name
+            session_data.scaling_group_name
         )
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
@@ -1337,11 +1322,11 @@ class SessionService:
         else:
             wsproxy_advertise_addr = wsproxy_addr
 
-        if session.main_kernel.kernel_host is None:
-            kernel_host = urlparse(session.main_kernel.agent_addr).hostname
+        if info.kernel_host is None:
+            kernel_host = urlparse(info.agent_addr).hostname
         else:
-            kernel_host = session.main_kernel.kernel_host
-        service_ports: list[dict[str, Any]] = session.main_kernel.service_ports or []
+            kernel_host = info.kernel_host
+        service_ports: list[dict[str, Any]] = info.service_ports
         sport: dict[str, Any] = {}
         host_port: int
         for sport in service_ports:
@@ -1368,13 +1353,7 @@ class SessionService:
                         host_port = sport["host_ports"][0]
                 break
         else:
-            raise AppNotFound(f"{session_name}:{service}")
-
-        await asyncio.shield(
-            self._database_ptask_group.create_task(
-                self._agent_registry.increment_session_usage(session),
-            )
-        )
+            raise AppNotFound(f"{session_data.name}:{service}")
 
         opts: MutableMapping[str, None | str | list[str]] = {}
         if arguments is not None:
@@ -1382,9 +1361,13 @@ class SessionService:
         if envs is not None:
             opts["envs"] = load_json(envs)
 
+        if info.agent_id is None:
+            raise AgentNotAllocated(f"Session {session_id} main kernel has no agent allocated")
         result = await asyncio.shield(
             self._rpc_ptask_group.create_task(
-                self._agent_registry.start_service(session, service, opts),
+                self._agent_registry.start_service(
+                    info.main_kernel_id, info.agent_id, service, opts
+                ),
             ),
         )
         if result["status"] == "failed":
@@ -1397,11 +1380,11 @@ class SessionService:
             "kernel_host": kernel_host,
             "kernel_port": host_port,
             "session": {
-                "id": str(session.id),
-                "user_uuid": str(session.user_uuid),
-                "group_id": str(session.group_id),
-                "access_key": session.access_key,
-                "domain_name": session.domain_name,
+                "id": str(session_data.id),
+                "user_uuid": str(session_data.user_uuid),
+                "group_id": str(session_data.group_id),
+                "access_key": session_data.access_key,
+                "domain_name": session_data.domain_name,
             },
         }
 
@@ -1416,7 +1399,7 @@ class SessionService:
 
             return StartServiceActionResult(
                 result=None,
-                session_data=session.to_dataclass(),
+                session_data=session_data,
                 token=token_json["token"],
                 wsproxy_addr=wsproxy_advertise_addr,
             )
@@ -1432,7 +1415,6 @@ class SessionService:
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
 
-        await self._agent_registry.increment_session_usage(session)
         file_count = 0
 
         async with aiotools.TaskScope() as ts:

@@ -7,15 +7,21 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.types import AccessKey, ImageAlias, SessionId
+from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.types import AccessKey, AgentId, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
-from ai.backend.manager.data.session.types import SessionData, SessionListResult
+from ai.backend.manager.data.session.types import (
+    SessionData,
+    SessionListResult,
+    SessionRoutingInfo,
+)
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import (
@@ -31,6 +37,7 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
+    DEAD_SESSION_STATUSES,
     TERMINAL_SESSION_STATUSES,
     KernelLoadingStrategy,
     SessionDependencyRow,
@@ -536,20 +543,43 @@ class SessionDBSource:
 
     async def get_session_with_routing_minimal(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
-    ) -> SessionRow:
-        """Get session with minimal routing information"""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.get_session(
-                db_sess,
-                session_name_or_id,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                eager_loading_op=[
-                    selectinload(SessionRow.routing).options(noload("*")),
-                ],
+        session_id: SessionID,
+    ) -> SessionRoutingInfo:
+        """Resolve a live session by ``session_id`` into its routing info.
+
+        This is a pure lookup; session access authorization is the caller's
+        responsibility. Dead (terminated/cancelled) sessions are excluded. Returns a
+        data type rather than a SessionRow so the repository never exposes an ORM row.
+        """
+        query = (
+            sa.select(SessionRow)
+            .where((SessionRow.id == session_id) & (~SessionRow.status.in_(DEAD_SESSION_STATUSES)))
+            .options(
+                noload("*"),
+                selectinload(
+                    SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)
+                ).options(
+                    noload("*"),
+                    selectinload(KernelRow.agent_row).noload("*"),
+                ),
+                joinedload(SessionRow.user),
             )
+        )
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
+        rows: list[SessionRow] = [row.SessionRow for row in result.rows]
+        if not rows:
+            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+        session_row = rows[0]
+        main_kernel = session_row.main_kernel
+        return SessionRoutingInfo(
+            session=session_row.to_dataclass(),
+            main_kernel_id=main_kernel.id,
+            agent_id=AgentId(main_kernel.agent) if main_kernel.agent is not None else None,
+            kernel_host=main_kernel.kernel_host,
+            agent_addr=main_kernel.agent_addr,
+            service_ports=main_kernel.service_ports or [],
+        )
 
     async def search(
         self,

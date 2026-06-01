@@ -8,9 +8,10 @@ from typing import Final
 from ai.backend.common import validators as tx
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import NotImplementedAPI
+from ai.backend.manager.errors.resource import AgentNotAllocated
 from ai.backend.manager.idle import AppStreamingStatus, IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.stream.repository import StreamRepository
@@ -126,7 +127,12 @@ class StreamService:
         session = await self._repository.get_streaming_session(
             action.session_name, action.user_uuid
         )
-        result = await self._registry.start_service(session, action.service, action.opts)
+        main_kernel = session.main_kernel
+        if main_kernel.agent is None:
+            raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
+        result = await self._registry.start_service(
+            main_kernel.id, AgentId(main_kernel.agent), action.service, action.opts
+        )
         return StartServiceInStreamActionResult(result=dict(result))
 
     def create_connection_refresh_callback(

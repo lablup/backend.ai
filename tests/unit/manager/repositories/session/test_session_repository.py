@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -503,6 +504,45 @@ class TestSessionRepository:
 
         resolved = await repository.resolve_session_id("test-session", session_with_kernel.user_id)
         assert resolved == session_with_kernel.session_id
+
+    # =========================================================================
+    # Tests - get_session_with_routing_minimal
+    # =========================================================================
+
+    async def test_routing_minimal_returns_info(
+        self,
+        repository: SessionRepository,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        info = await repository.get_session_with_routing_minimal(
+            SessionID(session_with_kernel.session_id)
+        )
+        assert info.session.id == session_with_kernel.session_id
+        assert info.session.access_key == session_with_kernel.access_key
+        assert info.main_kernel_id == session_with_kernel.kernel_id
+
+    async def test_routing_minimal_not_found_for_unknown_id(
+        self,
+        repository: SessionRepository,
+    ) -> None:
+        with pytest.raises(SessionNotFound):
+            await repository.get_session_with_routing_minimal(SessionID(uuid.uuid4()))
+
+    async def test_routing_minimal_excludes_terminated(
+        self,
+        repository: SessionRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        terminated_id = await self._insert_session(
+            db_with_cleanup,
+            session_with_kernel,
+            name="terminated-session",
+            access_key=session_with_kernel.access_key,
+            status=SessionStatus.TERMINATED,
+        )
+        with pytest.raises(SessionNotFound):
+            await repository.get_session_with_routing_minimal(SessionID(terminated_id))
 
 
 class TestBatchPopulateSessionOccupiedSlots:
