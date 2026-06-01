@@ -11,7 +11,11 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.data.deployment.types import (
+    ReplicaGroupLifecycle,
+    ReplicaGroupScalingStatus,
+)
+from ai.backend.manager.models.base import GUID, Base, StrEnumType
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -109,6 +113,21 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
         nullable=False,
         default=100,
         server_default=sa.text("100"),
+    )
+
+    lifecycle: Mapped[ReplicaGroupLifecycle] = mapped_column(
+        "lifecycle",
+        StrEnumType(ReplicaGroupLifecycle),
+        nullable=False,
+        default=ReplicaGroupLifecycle.STABLE,
+        server_default=ReplicaGroupLifecycle.STABLE.value,
+    )
+    scaling_status: Mapped[ReplicaGroupScalingStatus] = mapped_column(
+        "scaling_status",
+        StrEnumType(ReplicaGroupScalingStatus),
+        nullable=False,
+        default=ReplicaGroupScalingStatus.STABLE,
+        server_default=ReplicaGroupScalingStatus.STABLE.value,
     )
 
     created_at: Mapped[datetime] = mapped_column(

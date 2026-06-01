@@ -176,6 +176,23 @@ class RouteSubStatus(enum.StrEnum):
     WARMING_UP = "warming_up"
 
 
+class ReplicaGroupLifecycle(enum.StrEnum):
+    """Lifecycle of a replica group: rollout progress and retirement."""
+
+    ROLLING = "rolling"
+    STABLE = "stable"
+    FAILED = "failed"
+    DRAINING = "draining"
+    DRAINED = "drained"
+
+
+class ReplicaGroupScalingStatus(enum.StrEnum):
+    """Whether the group's actual replica count matches its desired count."""
+
+    SCALING = "scaling"
+    STABLE = "stable"
+
+
 # ========== Status Transition Types (BEP-1030) ==========
 
 
