@@ -516,6 +516,14 @@ class TestUserFilter:
         assert f.container_gids.any_ == [30]
         assert f.container_gids.all_ is None
 
+    def test_container_gids_empty_all_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UserFilter.model_validate({"container_gids": {"all": []}})
+
+    def test_container_gids_empty_any_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UserFilter.model_validate({"container_gids": {"any": []}})
+
 
 class TestUserOrder:
     """Tests for UserOrder model."""

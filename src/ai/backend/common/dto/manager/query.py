@@ -90,11 +90,13 @@ class ArrayFilter[T](BaseRequestModel):
     all_: list[T] | None = Field(
         default=None,
         alias="all",
+        min_length=1,
         description="Column array contains ALL of these values.",
     )
     any_: list[T] | None = Field(
         default=None,
         alias="any",
+        min_length=1,
         description="Column array contains ANY of these values.",
     )
 
