@@ -18,15 +18,21 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     RolePermissionPresetNode,
 )
 from ai.backend.common.dto.manager.v2.role_preset.request import (
+    BulkDeleteRolePresetsInput,
     BulkPurgeRolePresetsInput,
+    BulkRestoreRolePresetsInput,
     CreateRolePresetInput,
     SearchRolePresetsInput,
+    UpdateRolePresetInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import (
+    BulkDeleteRolePresetsPayload,
     BulkPurgeRolePresetsPayload,
+    BulkRestoreRolePresetsPayload,
     CreateRolePresetPayload,
     RolePresetNode,
     SearchRolePresetsPayload,
+    UpdateRolePresetPayload,
 )
 from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -45,6 +51,22 @@ class RolePresetAdapter(BaseAdapter):
 
     async def search(self, input: SearchRolePresetsInput) -> SearchRolePresetsPayload:
         """Search role presets with filtering and pagination."""
+        raise NotImplementedError
+
+    async def update(
+        self, role_preset_id: RolePresetID, input: UpdateRolePresetInput
+    ) -> UpdateRolePresetPayload:
+        """Update an existing role preset's metadata."""
+        raise NotImplementedError
+
+    async def bulk_delete(self, input: BulkDeleteRolePresetsInput) -> BulkDeleteRolePresetsPayload:
+        """Bulk-soft-delete role presets."""
+        raise NotImplementedError
+
+    async def bulk_restore(
+        self, input: BulkRestoreRolePresetsInput
+    ) -> BulkRestoreRolePresetsPayload:
+        """Bulk-restore soft-deleted role presets."""
         raise NotImplementedError
 
     async def bulk_purge(self, input: BulkPurgeRolePresetsInput) -> BulkPurgeRolePresetsPayload:

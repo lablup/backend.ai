@@ -7,10 +7,13 @@ from .filters import (
 )
 from .inputs import (
     BulkAddRolePermissionPresetsInputGQL,
+    BulkDeleteRolePresetsInputGQL,
     BulkPurgeRolePresetsInputGQL,
     BulkRemoveRolePermissionPresetsInputGQL,
+    BulkRestoreRolePresetsInputGQL,
     CreateRolePresetInputGQL,
     RolePermissionPresetEntryInputGQL,
+    UpdateRolePresetInputGQL,
 )
 from .node import (
     RolePresetConnection,
@@ -18,9 +21,12 @@ from .node import (
     RolePresetGQL,
 )
 from .payloads import (
+    BulkDeleteRolePresetsPayloadGQL,
     BulkPurgeRolePresetsPayloadGQL,
+    BulkRestoreRolePresetsPayloadGQL,
     BulkRolePresetFailureInfoGQL,
     CreateRolePresetPayloadGQL,
+    UpdateRolePresetPayloadGQL,
 )
 from .permission import (
     BulkAddRolePermissionPresetFailureInfoGQL,
@@ -52,13 +58,19 @@ __all__ = [
     "RolePermissionPresetOrderFieldGQL",
     # Input types
     "CreateRolePresetInputGQL",
+    "UpdateRolePresetInputGQL",
+    "BulkDeleteRolePresetsInputGQL",
+    "BulkRestoreRolePresetsInputGQL",
     "BulkPurgeRolePresetsInputGQL",
     "RolePermissionPresetEntryInputGQL",
     "BulkAddRolePermissionPresetsInputGQL",
     "BulkRemoveRolePermissionPresetsInputGQL",
     # Payload types
     "CreateRolePresetPayloadGQL",
+    "UpdateRolePresetPayloadGQL",
     "BulkRolePresetFailureInfoGQL",
+    "BulkDeleteRolePresetsPayloadGQL",
+    "BulkRestoreRolePresetsPayloadGQL",
     "BulkPurgeRolePresetsPayloadGQL",
     "BulkRolePermissionPresetFailureInfoGQL",
     "BulkAddRolePermissionPresetFailureInfoGQL",
