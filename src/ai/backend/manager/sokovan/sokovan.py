@@ -53,6 +53,11 @@ class SokovanOrchestrator:
         """Get the route coordinator."""
         return self._route_coordinator
 
+    @property
+    def reconciler_coordinator(self) -> ReconcilerCoordinator:
+        """Get the reconciler coordinator."""
+        return self._reconciler_coordinator
+
     def create_task_specs(self) -> list[EventTaskSpec]:
         """Create task specifications for leader-based scheduling."""
         specs: list[EventTaskSpec] = []
@@ -61,5 +66,23 @@ class SokovanOrchestrator:
         specs.extend(self._schedule_coordinator.create_task_specs())
         specs.extend(self._deployment_coordinator.create_task_specs())
         specs.extend(self._route_coordinator.create_task_specs())
+        for spec in self._reconciler_task_specs:
+            if spec.short_interval is not None:
+                specs.append(
+                    EventTaskSpec(
+                        name=spec.short_task_name,
+                        event_factory=spec.create_if_needed_event,
+                        interval=spec.short_interval,
+                        initial_delay=0.0,
+                    )
+                )
+            specs.append(
+                EventTaskSpec(
+                    name=spec.long_task_name,
+                    event_factory=spec.create_process_event,
+                    interval=spec.long_interval,
+                    initial_delay=spec.initial_delay,
+                )
+            )
 
         return specs

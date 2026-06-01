@@ -34,6 +34,8 @@ from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordina
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
+from ai.backend.manager.sokovan.reconciler.flag import ValkeyReconcilerFlag
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduler.factory import (
     CoordinatorHandlersArgs,
@@ -182,11 +184,21 @@ class SokovanOrchestratorDependency(
             lock_factory=setup_input.distributed_lock_factory,
         )
 
+        # Reconciler coordinator: framework wired with no stages yet (entity stages land later).
+        reconciler_coordinator = ReconcilerCoordinator(
+            stages={},
+            lock_factory=setup_input.distributed_lock_factory,
+            config_provider=setup_input.config_provider,
+            flags=ValkeyReconcilerFlag(setup_input.valkey_schedule),
+        )
+
         # Create sokovan orchestrator with all coordinators injected
         orchestrator = SokovanOrchestrator(
             schedule_coordinator=schedule_coordinator,
             deployment_coordinator=deployment_coordinator,
             route_coordinator=route_coordinator,
+            reconciler_coordinator=reconciler_coordinator,
+            reconciler_task_specs=[],
         )
 
         log.info("Sokovan orchestrator initialized")
