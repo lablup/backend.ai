@@ -3,13 +3,18 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import yarl
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.client.v2.auth import HMACAuth
+from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -18,12 +23,15 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.user.handler import UserHandler
 from ai.backend.manager.api.rest.user.registry import register_user_routes
+from ai.backend.manager.api.rest.v2.user.handler import V2UserHandler
+from ai.backend.manager.api.rest.v2.user.registry import register_v2_user_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.keypair import keypairs
@@ -32,9 +40,13 @@ from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.testutils.fixtures import DomainFixtureData
+
+if TYPE_CHECKING:
+    from tests.component.conftest import ServerInfo, UserFixtureData
 
 UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
 
@@ -79,16 +91,40 @@ def server_module_registries(
         UserHandler(user=user_processors, config_provider=config_provider),
         route_deps,
     )
-    return [
-        register_admin_routes(
-            AdminHandler(
-                gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()
-            ),
-            route_deps,
-            sub_registries=[user_registry],
-            gql_ws_handler=MagicMock(),
+    admin_registry = register_admin_routes(
+        AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()),
+        route_deps,
+        sub_registries=[user_registry],
+        gql_ws_handler=MagicMock(),
+    )
+
+    # v2 user routes (/v2/users) — exercises the api/adapters/user adapter shared with GQL.
+    processors = MagicMock(spec=Processors)
+    processors.user = user_processors
+    v2_handler = V2UserHandler(adapter=UserAdapter(processors, auth_config=MagicMock()))
+    v2_registry = RouteRegistry.create("v2", route_deps.cors_options)
+    v2_registry.add_subregistry(register_v2_user_routes(v2_handler, route_deps))
+
+    return [admin_registry, v2_registry]
+
+
+@pytest.fixture()
+async def admin_v2_registry(
+    server: ServerInfo,
+    admin_user_fixture: UserFixtureData,
+) -> AsyncIterator[V2ClientRegistry]:
+    """V2ClientRegistry authenticated as superadmin, for /v2/users endpoints."""
+    registry = await V2ClientRegistry.create(
+        ClientConfig(endpoint=yarl.URL(server.url)),
+        HMACAuth(
+            access_key=admin_user_fixture.keypair.access_key,
+            secret_key=admin_user_fixture.keypair.secret_key,
         ),
-    ]
+    )
+    try:
+        yield registry
+    finally:
+        await registry.close()
 
 
 @pytest.fixture()
@@ -140,3 +176,83 @@ async def target_user(
 ) -> CreateUserResponse:
     """Pre-created user for tests that need an existing user."""
     return await user_factory()
+
+
+# --------------------------------------------------------------------------- #
+# Data-setup fixtures for v2 container UID/GID filter tests.
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class ScalarMatchUsers:
+    """A user matching a scalar container value (uid / main gid) and one that does not."""
+
+    value: int
+    matching: CreateUserResponse
+    other: CreateUserResponse
+
+
+@dataclass
+class ArrayMatchUsers:
+    """Users for container_gids array filter scenarios."""
+
+    query: list[int]
+    matching: CreateUserResponse
+    other: CreateUserResponse
+
+
+@dataclass
+class SingleGidUsers:
+    """One gid value present as one user's main gid and another user's supplementary gid."""
+
+    gid: int
+    via_main_gid: CreateUserResponse
+    via_gids: CreateUserResponse
+    unrelated: CreateUserResponse
+
+
+@pytest.fixture()
+async def container_uid_users(user_factory: UserFactory) -> ScalarMatchUsers:
+    return ScalarMatchUsers(
+        value=4001,
+        matching=await user_factory(container_uid=4001),
+        other=await user_factory(container_uid=4002),
+    )
+
+
+@pytest.fixture()
+async def container_main_gid_users(user_factory: UserFactory) -> ScalarMatchUsers:
+    return ScalarMatchUsers(
+        value=5001,
+        matching=await user_factory(container_main_gid=5001),
+        other=await user_factory(container_main_gid=5002),
+    )
+
+
+@pytest.fixture()
+async def container_gids_any_users(user_factory: UserFactory) -> ArrayMatchUsers:
+    return ArrayMatchUsers(
+        query=[6020, 6099],
+        matching=await user_factory(container_gids=[6010, 6020]),
+        other=await user_factory(container_gids=[6030]),
+    )
+
+
+@pytest.fixture()
+async def container_gids_all_users(user_factory: UserFactory) -> ArrayMatchUsers:
+    return ArrayMatchUsers(
+        query=[7010, 7020],
+        matching=await user_factory(container_gids=[7010, 7020, 7030]),
+        other=await user_factory(container_gids=[7010]),
+    )
+
+
+@pytest.fixture()
+async def single_gid_users(user_factory: UserFactory) -> SingleGidUsers:
+    gid = 8000
+    return SingleGidUsers(
+        gid=gid,
+        via_main_gid=await user_factory(container_main_gid=gid),
+        via_gids=await user_factory(container_gids=[gid, 8001]),
+        unrelated=await user_factory(container_main_gid=9000, container_gids=[9001]),
+    )

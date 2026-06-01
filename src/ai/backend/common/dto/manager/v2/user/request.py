@@ -11,7 +11,13 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    ArrayFilter,
+    DateTimeFilter,
+    IntFilter,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.common.dto.manager.v2.user.types import (
     OrderDirection,
     UserDomainFilter,
@@ -321,6 +327,13 @@ class UserFilter(BaseRequestModel):
     )
     sudo_session_enabled: bool | None = Field(
         default=None, description="Filter by whether sudo sessions are enabled."
+    )
+    container_uid: IntFilter | None = Field(default=None, description="Filter by container UID.")
+    container_main_gid: IntFilter | None = Field(
+        default=None, description="Filter by container main GID."
+    )
+    container_gids: ArrayFilter[int] | None = Field(
+        default=None, description="Filter by container supplementary GIDs."
     )
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter by creation timestamp."

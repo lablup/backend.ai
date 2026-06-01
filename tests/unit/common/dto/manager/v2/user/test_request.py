@@ -488,6 +488,34 @@ class TestUserFilter:
         assert f.role is not None
         assert f.role.in_ == [UserRole.ADMIN, UserRole.SUPERADMIN]
 
+    def test_container_filters_default_to_none(self) -> None:
+        f = UserFilter()
+        assert f.container_uid is None
+        assert f.container_main_gid is None
+        assert f.container_gids is None
+
+    def test_container_uid_filter(self) -> None:
+        f = UserFilter.model_validate({"container_uid": {"equals": 1000}})
+        assert f.container_uid is not None
+        assert f.container_uid.equals == 1000
+
+    def test_container_main_gid_filter(self) -> None:
+        f = UserFilter.model_validate({"container_main_gid": {"greater_than": 500}})
+        assert f.container_main_gid is not None
+        assert f.container_main_gid.greater_than == 500
+
+    def test_container_gids_all_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"all": [10, 20]}})
+        assert f.container_gids is not None
+        assert f.container_gids.all_ == [10, 20]
+        assert f.container_gids.any_ is None
+
+    def test_container_gids_any_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"any": [30]}})
+        assert f.container_gids is not None
+        assert f.container_gids.any_ == [30]
+        assert f.container_gids.all_ is None
+
 
 class TestUserOrder:
     """Tests for UserOrder model."""

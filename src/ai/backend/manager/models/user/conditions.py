@@ -6,11 +6,13 @@ from collections.abc import Collection
 from datetime import datetime
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.condition_utils import (
+    make_int_conditions,
     make_nested_string_in_factory,
     make_string_in_factory,
 )
@@ -559,6 +561,33 @@ class UserConditions:
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
+
+        return inner
+
+    # ==================== Container UID/GID Filters ====================
+
+    by_container_uid = make_int_conditions(UserRow.container_uid)
+    by_container_main_gid = make_int_conditions(UserRow.container_main_gid)
+
+    @staticmethod
+    def by_container_gids_all(values: list[int]) -> QueryCondition:
+        """Filter rows whose container_gids array contains ALL given values (PG ``@>``)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.container_gids.bool_op("@>")(
+                sa.cast(values, postgresql.ARRAY(sa.Integer))
+            )
+
+        return inner
+
+    @staticmethod
+    def by_container_gids_any(values: list[int]) -> QueryCondition:
+        """Filter rows whose container_gids array contains ANY given value (PG ``&&``)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.container_gids.bool_op("&&")(
+                sa.cast(values, postgresql.ARRAY(sa.Integer))
+            )
 
         return inner
 

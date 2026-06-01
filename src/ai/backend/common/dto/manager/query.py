@@ -78,6 +78,47 @@ class IntFilter(BaseRequestModel):
         return None
 
 
+class ArrayFilter[T](BaseRequestModel):
+    """Filter for array (list) columns of element type ``T``.
+
+    Supports two membership operations against the stored array column:
+
+    * ``all`` — the column array must contain ALL of the given values.
+    * ``any`` — the column array must contain ANY of the given values.
+    """
+
+    all_: list[T] | None = Field(
+        default=None,
+        alias="all",
+        description="Column array contains ALL of these values.",
+    )
+    any_: list[T] | None = Field(
+        default=None,
+        alias="any",
+        description="Column array contains ANY of these values.",
+    )
+
+    def build_query_condition(
+        self,
+        all_factory: Callable[[list[T]], _QC],
+        any_factory: Callable[[list[T]], _QC],
+    ) -> _QC | None:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            all_factory: Factory for "contains ALL of these values" operations.
+            any_factory: Factory for "contains ANY of these values" operations.
+
+        Returns:
+            A query condition if any filter field is set, None otherwise.
+        """
+        if self.all_ is not None:
+            return all_factory(self.all_)
+        if self.any_ is not None:
+            return any_factory(self.any_)
+        return None
+
+
 class DateTimeFilter(BaseRequestModel):
     """Filter for datetime fields supporting range and equality operations."""
 

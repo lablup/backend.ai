@@ -1127,6 +1127,31 @@ class UserAdapter(BaseAdapter):
                 UserConditions.by_sudo_session_enabled(filter_req.sudo_session_enabled)
             )
 
+        if filter_req.container_uid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_uid,
+                UserConditions.by_container_uid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_main_gid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_main_gid,
+                UserConditions.by_container_main_gid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_gids is not None:
+            condition = self.convert_array_filter(
+                filter_req.container_gids,
+                all_factory=UserConditions.by_container_gids_all,
+                any_factory=UserConditions.by_container_gids_any,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter_req.created_at is not None:
             condition = filter_req.created_at.build_query_condition(
                 before_factory=UserConditions.by_created_at_before,
@@ -1384,6 +1409,31 @@ class UserAdapter(BaseAdapter):
                         UserConditions.by_role_in([UserRole(r.value) for r in role_f.not_in])
                     ])
                 )
+
+        if filter_req.container_uid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_uid,
+                UserConditions.by_container_uid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_main_gid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_main_gid,
+                UserConditions.by_container_main_gid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_gids is not None:
+            condition = self.convert_array_filter(
+                filter_req.container_gids,
+                all_factory=UserConditions.by_container_gids_all,
+                any_factory=UserConditions.by_container_gids_any,
+            )
+            if condition is not None:
+                conditions.append(condition)
 
         if filter_req.created_at is not None:
             condition = filter_req.created_at.build_query_condition(
