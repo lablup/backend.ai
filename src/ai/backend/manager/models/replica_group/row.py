@@ -16,6 +16,10 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
+from ai.backend.manager.views.replica_group import (
+    ReplicaGroupDeploySchedulingView,
+    ReplicaGroupScalingSchedulingView,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -166,3 +170,22 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
         viewonly=True,
         uselist=False,
     )
+
+    def to_deploy_scheduling_view(self) -> ReplicaGroupDeploySchedulingView:
+        return ReplicaGroupDeploySchedulingView(
+            group_id=self.id,
+            deployment_id=self.deployment_id,
+            current_revision_id=self.current_revision_id,
+            target_revision_id=self.target_revision_id,
+            lifecycle=self.lifecycle,
+            traffic_weight=self.traffic_weight,
+        )
+
+    def to_scaling_scheduling_view(self) -> ReplicaGroupScalingSchedulingView:
+        return ReplicaGroupScalingSchedulingView(
+            group_id=self.id,
+            deployment_id=self.deployment_id,
+            desired_current_replica_count=self.desired_current_replica_count,
+            desired_target_replica_count=self.desired_target_replica_count,
+            scaling_status=self.scaling_status,
+        )

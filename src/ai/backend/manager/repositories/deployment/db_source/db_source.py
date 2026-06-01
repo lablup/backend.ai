@@ -102,7 +102,6 @@ from ai.backend.manager.errors.resource import (
     ScalingGroupProxyTargetNotFound,
 )
 from ai.backend.manager.errors.service import (
-    AutoScalingPolicyNotFound,
     AutoScalingRuleNotFound,
     DeploymentPolicyNotFound,
     EndpointNotFound,
@@ -111,10 +110,6 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import (
-    DeploymentAutoScalingPolicyData,
-    DeploymentAutoScalingPolicyRow,
-)
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import (
@@ -150,9 +145,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    Creator,
     execute_batch_querier,
-    execute_creator,
 )
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import (
@@ -3004,77 +2997,6 @@ class DeploymentDBSource:
                     revision_history_limit,
                 )
             return deleted_count
-
-    # -------------------------------------------------------------------------
-    # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
-    # -------------------------------------------------------------------------
-
-    async def create_auto_scaling_policy(
-        self,
-        creator: Creator[DeploymentAutoScalingPolicyRow],
-    ) -> DeploymentAutoScalingPolicyData:
-        """Create a new auto-scaling policy for an endpoint.
-
-        Each endpoint can have at most one auto-scaling policy (1:1 relationship).
-        If a policy already exists for the endpoint, the database will raise a
-        unique constraint violation.
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
-
-    async def get_auto_scaling_policy(
-        self,
-        endpoint_id: DeploymentID,
-    ) -> DeploymentAutoScalingPolicyData:
-        """Get the auto-scaling policy for an endpoint.
-
-        Raises:
-            AutoScalingPolicyNotFound: If no policy exists for the endpoint.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(DeploymentAutoScalingPolicyRow).where(
-                DeploymentAutoScalingPolicyRow.endpoint == endpoint_id
-            )
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            if row is None:
-                raise AutoScalingPolicyNotFound(
-                    f"Auto-scaling policy for endpoint {endpoint_id} not found"
-                )
-            return row.to_data()
-
-    async def update_auto_scaling_policy(
-        self,
-        updater: Updater[DeploymentAutoScalingPolicyRow],
-    ) -> DeploymentAutoScalingPolicyData:
-        """Update an auto-scaling policy using the provided updater spec.
-
-        The updater's pk_value should be the policy ID (primary key).
-
-        Raises:
-            AutoScalingPolicyNotFound: If the policy does not exist.
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            result = await execute_updater(db_sess, updater)
-            if result is None:
-                raise AutoScalingPolicyNotFound(f"Auto-scaling policy {updater.pk_value} not found")
-            return result.row.to_data()
-
-    async def delete_auto_scaling_policy(
-        self,
-        purger: Purger[DeploymentAutoScalingPolicyRow],
-    ) -> PurgerResult[DeploymentAutoScalingPolicyRow] | None:
-        """Delete the auto-scaling policy by primary key.
-
-        Args:
-            purger: Purger containing the policy ID (primary key) to delete.
-
-        Returns:
-            PurgerResult containing the deleted row, or None if no policy existed.
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            return await execute_purger(db_sess, purger)
 
     async def upsert_deployment_policy(
         self,

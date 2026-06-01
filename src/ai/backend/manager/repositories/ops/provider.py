@@ -181,9 +181,9 @@ class WriteOps(ReadOps):
 
     async def bulk_update_partial[TRow: Base](
         self,
-        updaters: list[Updater[TRow]],
+        updaters: Sequence[Updater[TRow]],
     ) -> BulkUpdaterResult[TRow]:
-        """Update multiple rows individually, isolating each via a savepoint for partial success."""
+        """Update multiple rows by primary key, isolating each via a savepoint for partial success."""
         return await execute_bulk_updater_partial(self._sess, updaters)
 
     async def upsert[TRow: Base](

@@ -1,3 +1,8 @@
+import uuid
+
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
@@ -30,3 +35,42 @@ def test_replica_group_status_columns_default_to_stable() -> None:
     assert scaling_status.nullable is False
     assert scaling_status.default.arg is ReplicaGroupScalingStatus.STABLE
     assert scaling_status.server_default.arg == ReplicaGroupScalingStatus.STABLE.value
+
+
+def _make_row() -> ReplicaGroupRow:
+    return ReplicaGroupRow(
+        id=ReplicaGroupID(uuid.uuid4()),
+        deployment_id=DeploymentID(uuid.uuid4()),
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        target_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        desired_current_replica_count=2,
+        desired_target_replica_count=3,
+        traffic_weight=70,
+        lifecycle=ReplicaGroupLifecycle.ROLLING,
+        scaling_status=ReplicaGroupScalingStatus.SCALING,
+    )
+
+
+def test_to_deploy_scheduling_view_carries_deploy_fields() -> None:
+    row = _make_row()
+
+    info = row.to_deploy_scheduling_view()
+
+    assert info.group_id == row.id
+    assert info.deployment_id == row.deployment_id
+    assert info.current_revision_id == row.current_revision_id
+    assert info.target_revision_id == row.target_revision_id
+    assert info.lifecycle is ReplicaGroupLifecycle.ROLLING
+    assert info.traffic_weight == 70
+
+
+def test_to_scaling_scheduling_view_carries_scaling_fields() -> None:
+    row = _make_row()
+
+    info = row.to_scaling_scheduling_view()
+
+    assert info.group_id == row.id
+    assert info.deployment_id == row.deployment_id
+    assert info.desired_current_replica_count == 2
+    assert info.desired_target_replica_count == 3
+    assert info.scaling_status is ReplicaGroupScalingStatus.SCALING

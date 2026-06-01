@@ -874,6 +874,7 @@ class RouteInfo:
     revision_id: UUID
     traffic_status: RouteTrafficStatus
     health_check: ModelHealthCheck | None
+    replica_group_id: ReplicaGroupID | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
 
     @property
