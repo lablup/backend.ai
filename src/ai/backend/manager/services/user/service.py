@@ -463,7 +463,7 @@ class UserService:
     async def search_keypairs_by_resource_policy(
         self, action: SearchKeypairsByResourcePolicyAction
     ) -> SearchKeypairsByResourcePolicyActionResult:
-        """Search keypairs assigned to a keypair resource policy (RBAC-scoped)."""
+        """Search keypairs assigned to a keypair resource policy."""
         result = await self._user_repository.search_keypairs_by_resource_policy(
             scope=action.scope, querier=action.querier
         )
