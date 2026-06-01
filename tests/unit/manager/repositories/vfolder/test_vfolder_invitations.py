@@ -523,3 +523,132 @@ class TestInvitationGettersUsernameFallback:
 
         assert len(results) == 1
         assert results[0].inviter_username is None
+
+
+class TestGetUserRoleIdFallback:
+    """Fallback system role creation when no SYSTEM role exists for a user (BA-6253)."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                VFolderRow,
+                VFolderInvitationRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def sample_domain(
+        self,
+        domain_factory: DomainFactory,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        return await domain_factory(db_with_cleanup)
+
+    async def _create_user(
+        self,
+        db: ExtendedAsyncSAEngine,
+        *,
+        domain_name: str,
+        resource_policy: str,
+        email: str,
+        username: str | None,
+    ) -> UserRow:
+        user_uuid = uuid.uuid4()
+        async with db.begin_session() as session:
+            user = UserRow(
+                uuid=user_uuid,
+                domain_name=domain_name,
+                email=email,
+                username=username,
+                password=None,
+                full_name="Test User",
+                is_active=True,
+                status=UserStatus.ACTIVE,
+                role=UserRole.USER,
+                resource_policy=resource_policy,
+                created_at=datetime.now(UTC),
+            )
+            session.add(user)
+        async with db.begin_session() as session:
+            return (await session.get(UserRow, user_uuid))  # type: ignore[return-value]
+
+    @pytest.fixture
+    async def user_resource_policy(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+        policy_name = f"user-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as session:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+            session.add(policy)
+        return policy_name
+
+    async def test_existing_role_returned_when_present(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: DomainFixtureData,
+        user_resource_policy: str,
+    ) -> None:
+        """When user already has a SYSTEM role, _get_user_role_id returns it without creating a new one."""
+        repo = VfolderRepository(db_with_cleanup)
+
+        user = await self._create_user(
+            db_with_cleanup,
+            domain_name=sample_domain.name,
+            resource_policy=user_resource_policy,
+            email="existing-role@test.com",
+            username="existing_role_user",
+        )
+
+        async with db_with_cleanup.begin_session() as session:
+            role_id = await repo._get_user_role_id(session, user.uuid)
+            assert role_id is not None
+
+            # Should be the same role on subsequent calls
+            role_id_2 = await repo._get_user_role_id(session, user.uuid)
+            assert role_id == role_id_2
+
+    async def test_fallback_creates_system_role_when_missing(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: DomainFixtureData,
+        user_resource_policy: str,
+    ) -> None:
+        """When user has no SYSTEM role, _get_user_role_id creates one and returns its id."""
+        from ai.backend.manager.models.rbac_models.role import RoleRow
+
+        repo = VfolderRepository(db_with_cleanup)
+
+        user = await self._create_user(
+            db_with_cleanup,
+            domain_name=sample_domain.name,
+            resource_policy=user_resource_policy,
+            email="no-role@test.com",
+            username="no_role_user",
+        )
+
+        async with db_with_cleanup.begin_session() as session:
+            role_id = await repo._get_user_role_id(session, user.uuid)
+            assert role_id is not None
+
+            # Verify the role was actually created and is a SYSTEM role
+            role_row = await session.get(RoleRow, role_id)
+            assert role_row is not None
+            assert role_row.source.value == "SYSTEM"
+
+            # Second call should return the same role id (no duplicate created)
+            role_id_2 = await repo._get_user_role_id(session, user.uuid)
+            assert role_id == role_id_2
