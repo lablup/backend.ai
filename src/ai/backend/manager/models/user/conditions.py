@@ -509,22 +509,28 @@ class UserConditions:
 
     # ==================== Boolean Flag Filters ====================
 
+    # ``need_password_change`` and ``totp_activated`` are nullable columns whose
+    # domain representation coalesces NULL to False (see ``_user_row_to_data``).
+    # Match that semantics with COALESCE so that ``value=False`` also selects NULL
+    # rows; a plain ``== False`` would silently drop them.
+
     @staticmethod
     def by_need_password_change(value: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRow.need_password_change == value
+            return sa.func.coalesce(UserRow.need_password_change, sa.false()) == value
 
         return inner
 
     @staticmethod
     def by_totp_activated(value: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserRow.totp_activated == value
+            return sa.func.coalesce(UserRow.totp_activated, sa.false()) == value
 
         return inner
 
     @staticmethod
     def by_sudo_session_enabled(value: bool) -> QueryCondition:
+        # NOT NULL column — plain equality is exact, no COALESCE needed.
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserRow.sudo_session_enabled == value
 

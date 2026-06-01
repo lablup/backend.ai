@@ -219,29 +219,34 @@ class TestUserConditionsStringFieldFilters:
 class TestUserConditionsBooleanFilters:
     """Tests for the boolean flag filter conditions in UserConditions."""
 
-    def test_by_need_password_change_true(self) -> None:
+    def test_by_need_password_change_coalesces_null(self) -> None:
+        # Nullable column: COALESCE(.., false) so value=False also selects NULL rows.
         sql = str(
             UserConditions.by_need_password_change(True)().compile(
                 compile_kwargs={"literal_binds": True}
             )
         )
         assert "need_password_change" in sql
+        assert "coalesce" in sql.lower()
 
-    def test_by_totp_activated_false(self) -> None:
+    def test_by_totp_activated_coalesces_null(self) -> None:
         sql = str(
             UserConditions.by_totp_activated(False)().compile(
                 compile_kwargs={"literal_binds": True}
             )
         )
         assert "totp_activated" in sql
+        assert "coalesce" in sql.lower()
 
-    def test_by_sudo_session_enabled_true(self) -> None:
+    def test_by_sudo_session_enabled_plain_equality(self) -> None:
+        # NOT NULL column: plain equality, no COALESCE.
         sql = str(
             UserConditions.by_sudo_session_enabled(True)().compile(
                 compile_kwargs={"literal_binds": True}
             )
         )
         assert "sudo_session_enabled" in sql
+        assert "coalesce" not in sql.lower()
 
 
 class TestUserConditionsDomainNestedFilters:
@@ -755,3 +760,126 @@ class TestUserNestedSearchIntegration:
 
         assert result.total_count == 1
         assert result.items[0].uuid == search_fixture.user_in_active_domain
+
+
+@dataclass
+class NullableBoolFixture:
+    user_null: uuid.UUID
+    user_false: uuid.UUID
+    user_true: uuid.UUID
+
+
+class TestUserBooleanNullableFilterIntegration:
+    """DB integration: nullable boolean filters coalesce NULL to False."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(database_connection, _WITH_TABLES):
+            yield database_connection
+
+    @pytest.fixture
+    async def user_db_source(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> UserDBSource:
+        return UserDBSource(db=db_with_cleanup)
+
+    @pytest.fixture
+    async def nullable_bool_fixture(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> NullableBoolFixture:
+        """Three users whose need_password_change is NULL, False, and True."""
+        domain_name = f"dom-{uuid.uuid4().hex[:8]}"
+        user_null = uuid.uuid4()
+        user_false = uuid.uuid4()
+        user_true = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                DomainRow(
+                    name=domain_name,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                    allowed_docker_registries=[],
+                    dotfiles=b"",
+                    integration_id=None,
+                )
+            )
+            urp = UserResourcePolicyRow(
+                name=f"urp-{uuid.uuid4().hex[:8]}",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+            session.add(urp)
+            await session.flush()
+
+            for uid, npc in [
+                (user_null, None),
+                (user_false, False),
+                (user_true, True),
+            ]:
+                session.add(
+                    UserRow(
+                        uuid=uid,
+                        username=f"user-{uid.hex[:8]}",
+                        email=f"user-{uid.hex[:8]}@test.io",
+                        password=_test_password_info(),
+                        need_password_change=npc,
+                        full_name="Test User",
+                        description="",
+                        status=UserStatus.ACTIVE,
+                        status_info="active",
+                        domain_name=domain_name,
+                        role=UserRole.USER,
+                        resource_policy=urp.name,
+                    )
+                )
+            await session.commit()
+
+        return NullableBoolFixture(
+            user_null=user_null,
+            user_false=user_false,
+            user_true=user_true,
+        )
+
+    async def test_false_filter_includes_null_rows(
+        self,
+        user_db_source: UserDBSource,
+        nullable_bool_fixture: NullableBoolFixture,
+    ) -> None:
+        """need_password_change=False matches both explicit False and NULL rows."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=50, offset=0),
+            conditions=[UserConditions.by_need_password_change(False)],
+            orders=[],
+        )
+        result = await user_db_source.search_users(querier)
+
+        matched = {item.uuid for item in result.items}
+        assert nullable_bool_fixture.user_null in matched
+        assert nullable_bool_fixture.user_false in matched
+        assert nullable_bool_fixture.user_true not in matched
+
+    async def test_true_filter_excludes_null_rows(
+        self,
+        user_db_source: UserDBSource,
+        nullable_bool_fixture: NullableBoolFixture,
+    ) -> None:
+        """need_password_change=True matches only explicit True rows, not NULL."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=50, offset=0),
+            conditions=[UserConditions.by_need_password_change(True)],
+            orders=[],
+        )
+        result = await user_db_source.search_users(querier)
+
+        matched = {item.uuid for item in result.items}
+        assert matched == {nullable_bool_fixture.user_true}
