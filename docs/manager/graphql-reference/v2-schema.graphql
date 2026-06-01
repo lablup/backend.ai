@@ -1429,6 +1429,23 @@ type BulkDeleteModelCardsV2Payload {
   failed: [BulkDeleteModelCardV2Error!]!
 }
 
+"""Added in UNRELEASED. Input for bulk-soft-deleting role presets."""
+input BulkDeleteRolePresetsInput {
+  """Role preset UUIDs to soft-delete."""
+  rolePresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-soft-deleting role presets.
+"""
+type BulkDeleteRolePresetsPayload {
+  """Role presets that were soft-deleted."""
+  items: [RolePreset!]!
+
+  """Role preset IDs that failed to soft-delete."""
+  failed: [BulkRolePresetFailureInfo!]!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input {
   """List of VFolder UUIDs to soft-delete."""
@@ -1575,6 +1592,25 @@ type BulkRemoveRolePermissionsPayload {
 
   """Permission IDs that failed to delete"""
   failed: [BulkRemoveRolePermissionFailureInfo!]!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-restoring soft-deleted role presets.
+"""
+input BulkRestoreRolePresetsInput {
+  """Role preset UUIDs to restore."""
+  rolePresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-restoring soft-deleted role presets.
+"""
+type BulkRestoreRolePresetsPayload {
+  """Role presets that were restored."""
+  items: [RolePreset!]!
+
+  """Role preset IDs that failed to restore."""
+  failed: [BulkRolePresetFailureInfo!]!
 }
 
 """
@@ -7394,6 +7430,19 @@ type Mutation {
 
   """Added in UNRELEASED. Create a new role preset (admin only)."""
   adminCreateRolePreset(input: CreateRolePresetInput!): CreateRolePresetPayload
+
+  """
+  Added in UNRELEASED. Update an existing role preset's metadata (admin only).
+  """
+  adminUpdateRolePreset(id: ID!, input: UpdateRolePresetInput!): UpdateRolePresetPayload
+
+  """Added in UNRELEASED. Bulk-soft-delete role presets (admin only)."""
+  adminDeleteRolePresets(input: BulkDeleteRolePresetsInput!): BulkDeleteRolePresetsPayload
+
+  """
+  Added in UNRELEASED. Bulk-restore soft-deleted role presets (admin only).
+  """
+  adminRestoreRolePresets(input: BulkRestoreRolePresetsInput!): BulkRestoreRolePresetsPayload
 
   """Added in UNRELEASED. Bulk-hard-delete role presets (admin only)."""
   adminPurgeRolePresets(input: BulkPurgeRolePresetsInput!): BulkPurgeRolePresetsPayload
@@ -13376,6 +13425,25 @@ input UpdateRoleInput {
   name: String
   description: String
   status: RoleStatus
+}
+
+"""
+Added in UNRELEASED. Input for updating a role preset's metadata. Permission entries are managed via the dedicated add/remove mutations; the `deleted` flag via delete/restore mutations.
+"""
+input UpdateRolePresetInput {
+  """Updated name."""
+  name: String
+
+  """
+  Updated default value for the `auto_assign` flag of instantiated roles.
+  """
+  autoAssign: Boolean
+}
+
+"""Added in UNRELEASED. Payload returned after updating a role preset."""
+type UpdateRolePresetPayload {
+  """Updated role preset."""
+  rolePreset: RolePreset!
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""
