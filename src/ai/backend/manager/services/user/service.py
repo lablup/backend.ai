@@ -469,7 +469,7 @@ class UserService:
         )
         return SearchKeypairsByResourcePolicyActionResult(
             result=result,
-            _scope_id=action.scope_id(),
+            resource_policy_name=action.scope.resource_policy_name,
         )
 
     # ------------------------------------------------------------------ admin keypair operations
