@@ -7727,6 +7727,19 @@ type InferenceSessionErrorInfo
 }
 
 """
+Added in UNRELEASED. Filter for integer array fields. Supports 'all' (column contains all of these values) and 'any' (column contains any of these values).
+"""
+input IntArrayFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Column array contains ALL of these values."""
+  all: [Int!] = null
+
+  """Column array contains ANY of these values."""
+  any: [Int!] = null
+}
+
+"""
 Added in 24.09.0. Filter for integer fields supporting equality and comparison operations.
 """
 input IntFilter
@@ -20088,6 +20101,15 @@ input UserV2Filter
 
   """Added in UNRELEASED. Filter by whether sudo sessions are enabled."""
   sudoSessionEnabled: Boolean = null
+
+  """Added in UNRELEASED. Filter by container UID."""
+  containerUid: IntFilter = null
+
+  """Added in UNRELEASED. Filter by container main GID."""
+  containerMainGid: IntFilter = null
+
+  """Added in UNRELEASED. Filter by container supplementary GIDs."""
+  containerGids: IntArrayFilter = null
   createdAt: DateTimeFilter = null
   domain: UserDomainNestedFilter = null
   project: UserProjectNestedFilter = null
