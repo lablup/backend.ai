@@ -1,17 +1,20 @@
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.types import AccessKey
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.actions.app_service_base import SessionAppServiceAction
+from ai.backend.manager.services.session.base import (
+    SessionSingleEntityAction,
+    SessionSingleEntityActionResult,
+)
 
 
 @dataclass
-class StartServiceAction(SessionAppServiceAction):
-    session_name: str
-    access_key: AccessKey
+class StartServiceAction(SessionSingleEntityAction):
+    session_id: SessionID
     service: str
     login_session_token: Any
     port: int | None
@@ -19,17 +22,21 @@ class StartServiceAction(SessionAppServiceAction):
     envs: str | None  # json_string
 
     @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.session_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.SESSION, str(self.session_id))
+
 
 @dataclass
-class StartServiceActionResult(BaseActionResult):
+class StartServiceActionResult(SessionSingleEntityActionResult):
     # TODO: Add proper type
     result: Any
     session_data: SessionData
@@ -37,5 +44,5 @@ class StartServiceActionResult(BaseActionResult):
     wsproxy_addr: str
 
     @override
-    def entity_id(self) -> str | None:
+    def target_entity_id(self) -> str:
         return str(self.session_data.id)

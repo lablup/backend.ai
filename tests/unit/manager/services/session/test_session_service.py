@@ -123,9 +123,7 @@ def mock_session_repository() -> MagicMock:
 @pytest.fixture
 def mock_agent_registry() -> MagicMock:
     """Create mocked agent registry."""
-    mock = MagicMock()
-    mock.increment_session_usage = AsyncMock()
-    return mock
+    return MagicMock()
 
 
 @pytest.fixture
@@ -701,7 +699,6 @@ class TestComplete:
         assert result.session_data == sample_session_data
         assert result.result == expected_response
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
         mock_agent_registry.get_completions.assert_called_once()
 
     async def test_session_not_found(
@@ -795,7 +792,6 @@ class TestGetSessionInfo:
         assert result.session_info.container_id == "a" * 64
         assert result.session_data == sample_session_data
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_running_session)
 
     async def test_success_with_no_container_id(
         self,
@@ -871,7 +867,6 @@ class TestDownloadFiles:
         assert result.session_data == sample_session_data
         assert result.result is not None
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
         mock_agent_registry.download_file.assert_called_once()
 
     async def test_session_not_found(
@@ -1124,7 +1119,6 @@ class TestUploadFiles:
         assert isinstance(result, UploadFilesActionResult)
         assert result.session_data == sample_session_data
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
 
     async def test_session_not_found(
         self,
@@ -1197,7 +1191,6 @@ class TestExecute:
         assert result.result is not None
         assert result.result["result"]["status"] == "finished"
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
         mock_agent_registry.execute.assert_called_once()
 
     async def test_session_not_found(
@@ -1257,7 +1250,6 @@ class TestInterrupt:
         assert isinstance(result, InterruptSessionActionResult)
         assert result.session_data == sample_session_data
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
         mock_agent_registry.interrupt_session.assert_called_once_with(mock_session)
 
     async def test_session_not_found(

@@ -80,9 +80,9 @@ from ai.backend.common.dto.manager.session.types import (
     CreationConfigV6Template,
     CreationConfigV7,
 )
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, UnreachableError
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
-    AccessKey,
     AgentId,
     KernelId,
 )
@@ -162,6 +162,9 @@ from ai.backend.manager.services.session.actions.match_sessions import (
 )
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
+)
+from ai.backend.manager.services.session.actions.resolve_session import (
+    ResolveSessionAction,
 )
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
@@ -417,6 +420,16 @@ class SessionHandler:
         self._agent = agent
         self._vfolder = vfolder
         self._config_provider = config_provider
+
+    def _require_user_id(self) -> UUID:
+        """Return the authenticated user's id from the request context.
+
+        The route requires authentication, so a missing user is unreachable.
+        """
+        user = current_user()
+        if user is None:
+            raise UnreachableError("authenticated user missing from request context")
+        return user.user_id
 
     async def _normalize_legacy_mounts(self, validated_config: dict[str, Any]) -> dict[str, Any]:
         """One-stop processor for the legacy ``mounts`` / ``mount_map`` /
@@ -1072,14 +1085,16 @@ class SessionHandler:
         request = ctx.request
         params = body.parsed
         session_name: str = request.match_info["session_name"]
-        access_key: AccessKey = request["keypair"]["access_key"]
         myself = asyncio.current_task()
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
+        user_id = self._require_user_id()
+        resolved = await self._session.resolve_session.wait_for_complete(
+            ResolveSessionAction(session_name=session_name, user_id=user_id)
+        )
         result = await self._session.start_service.wait_for_complete(
             StartServiceAction(
-                session_name=session_name,
-                access_key=access_key,
+                session_id=SessionID(resolved.session_id),
                 service=params.app,
                 login_session_token=params.login_session_token,
                 port=params.port,

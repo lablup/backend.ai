@@ -178,7 +178,7 @@ class SessionProcessors(AbstractProcessorPackage):
         SearchSessionsInProjectAction, SearchSessionsInProjectActionResult
     ]
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
-    start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
+    start_service: SingleEntityActionProcessor[StartServiceAction, StartServiceActionResult]
     terminate_sessions: BulkActionProcessor[TerminateSessionsAction, TerminateSessionsActionResult]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
     get_session: SingleEntityActionProcessor[GetSessionAction, GetSessionActionResult]
@@ -214,7 +214,6 @@ class SessionProcessors(AbstractProcessorPackage):
         self.rename_session = ActionProcessor(service.rename_session, action_monitors)
         self.resolve_session = ActionProcessor(service.resolve_session, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
-        self.start_service = ActionProcessor(service.start_service, action_monitors)
         self.upload_files = ActionProcessor(service.upload_files, action_monitors)
 
         # Scope actions with RBAC validation
@@ -276,6 +275,11 @@ class SessionProcessors(AbstractProcessorPackage):
         )
         self.modify_session = SingleEntityActionProcessor(
             service.modify_session,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
+        self.start_service = SingleEntityActionProcessor(
+            service.start_service,
             action_monitors,
             validators=rbac_single_entity_validators,
         )

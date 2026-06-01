@@ -264,7 +264,10 @@ class TestStartServiceInStream(TestStreamService):
         assert isinstance(result, StartServiceInStreamActionResult)
         assert result.result == {"status": "started"}
         mock_registry.start_service.assert_awaited_once_with(
-            mock_session, "jupyter", {"port": 8888}
+            mock_session.main_kernel.id,
+            mock_session.main_kernel.agent,
+            "jupyter",
+            {"port": 8888},
         )
 
 
