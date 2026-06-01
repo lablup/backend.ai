@@ -78,6 +78,56 @@ class IntFilter(BaseRequestModel):
         return None
 
 
+class ArrayFilter[T](BaseRequestModel):
+    """Filter for array (list) columns of element type ``T``.
+
+    Supports three membership operations against the stored array column:
+
+    * ``contains`` — the column array must contain this single value.
+    * ``contains_any`` — the column array must contain ANY of the given values.
+    * ``contains_all`` — the column array must contain ALL of the given values.
+    """
+
+    contains: T | None = Field(
+        default=None,
+        description="Column array contains this value.",
+    )
+    contains_any: list[T] | None = Field(
+        default=None,
+        min_length=1,
+        description="Column array contains ANY of these values.",
+    )
+    contains_all: list[T] | None = Field(
+        default=None,
+        min_length=1,
+        description="Column array contains ALL of these values.",
+    )
+
+    def build_query_condition(
+        self,
+        contains_factory: Callable[[T], _QC],
+        contains_any_factory: Callable[[list[T]], _QC],
+        contains_all_factory: Callable[[list[T]], _QC],
+    ) -> _QC | None:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            contains_factory: Factory for "contains this single value" operations.
+            contains_any_factory: Factory for "contains ANY of these values" operations.
+            contains_all_factory: Factory for "contains ALL of these values" operations.
+
+        Returns:
+            A query condition if any filter field is set, None otherwise.
+        """
+        if self.contains is not None:
+            return contains_factory(self.contains)
+        if self.contains_any is not None:
+            return contains_any_factory(self.contains_any)
+        if self.contains_all is not None:
+            return contains_all_factory(self.contains_all)
+        return None
+
+
 class DateTimeFilter(BaseRequestModel):
     """Filter for datetime fields supporting range and equality operations."""
 

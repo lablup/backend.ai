@@ -15,6 +15,8 @@ from ai.backend.common.dto.manager.v2.user.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
+    IntArrayFilter,
+    IntFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
@@ -164,6 +166,27 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Filter by whether sudo sessions are enabled.",
+        ),
+        default=None,
+    )
+    container_uid: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by container UID.",
+        ),
+        default=None,
+    )
+    container_main_gid: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by container main GID.",
+        ),
+        default=None,
+    )
+    container_gids: IntArrayFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by container supplementary GIDs.",
         ),
         default=None,
     )

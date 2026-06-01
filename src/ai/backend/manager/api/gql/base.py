@@ -21,12 +21,14 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
+from ai.backend.common.dto.manager.query import ArrayFilter as ArrayFilterDTO
 from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
 from ai.backend.common.dto.manager.query import DateTimeFilter as DateTimeFilterDTO
 from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
 from ai.backend.common.dto.manager.query import NullableDateTimeFilter as NullableDateTimeFilterDTO
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor as decode_cursor
 from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor as encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -259,6 +261,23 @@ class IntFilter(PydanticInputMixin[IntFilterDTO]):
     greater_than_or_equal: int | None = None
     less_than: int | None = None
     less_than_or_equal: int | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Filter for integer array fields. Supports 'contains' (column contains this "
+            "single value), 'contains_any' (column contains any of these values), and "
+            "'contains_all' (column contains all of these values)."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="IntArrayFilter",
+)
+class IntArrayFilter(PydanticInputMixin[ArrayFilterDTO[int]]):
+    contains: int | None = None
+    contains_any: list[int] | None = None
+    contains_all: list[int] | None = None
 
 
 @gql_pydantic_input(

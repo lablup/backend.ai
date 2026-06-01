@@ -488,6 +488,49 @@ class TestUserFilter:
         assert f.role is not None
         assert f.role.in_ == [UserRole.ADMIN, UserRole.SUPERADMIN]
 
+    def test_container_filters_default_to_none(self) -> None:
+        f = UserFilter()
+        assert f.container_uid is None
+        assert f.container_main_gid is None
+        assert f.container_gids is None
+
+    def test_container_uid_filter(self) -> None:
+        f = UserFilter.model_validate({"container_uid": {"equals": 1000}})
+        assert f.container_uid is not None
+        assert f.container_uid.equals == 1000
+
+    def test_container_main_gid_filter(self) -> None:
+        f = UserFilter.model_validate({"container_main_gid": {"greater_than": 500}})
+        assert f.container_main_gid is not None
+        assert f.container_main_gid.greater_than == 500
+
+    def test_container_gids_contains_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"contains": 42}})
+        assert f.container_gids is not None
+        assert f.container_gids.contains == 42
+        assert f.container_gids.contains_any is None
+        assert f.container_gids.contains_all is None
+
+    def test_container_gids_contains_all_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"contains_all": [10, 20]}})
+        assert f.container_gids is not None
+        assert f.container_gids.contains_all == [10, 20]
+        assert f.container_gids.contains_any is None
+
+    def test_container_gids_contains_any_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"contains_any": [30]}})
+        assert f.container_gids is not None
+        assert f.container_gids.contains_any == [30]
+        assert f.container_gids.contains_all is None
+
+    def test_container_gids_empty_contains_all_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UserFilter.model_validate({"container_gids": {"contains_all": []}})
+
+    def test_container_gids_empty_contains_any_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UserFilter.model_validate({"container_gids": {"contains_any": []}})
+
 
 class TestUserOrder:
     """Tests for UserOrder model."""

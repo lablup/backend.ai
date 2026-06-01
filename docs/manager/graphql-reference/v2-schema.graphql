@@ -5028,6 +5028,15 @@ type ImportArtifactsPayload {
 }
 
 """
+Added in UNRELEASED. Filter for integer array fields. Supports 'contains' (column contains this single value), 'contains_any' (column contains any of these values), and 'contains_all' (column contains all of these values).
+"""
+input IntArrayFilter {
+  contains: Int = null
+  containsAny: [Int!] = null
+  containsAll: [Int!] = null
+}
+
+"""
 Added in 24.09.0. Filter for integer fields supporting equality and comparison operations.
 """
 input IntFilter {
@@ -13925,6 +13934,15 @@ input UserV2Filter {
 
   """Added in UNRELEASED. Filter by whether sudo sessions are enabled."""
   sudoSessionEnabled: Boolean = null
+
+  """Added in UNRELEASED. Filter by container UID."""
+  containerUid: IntFilter = null
+
+  """Added in UNRELEASED. Filter by container main GID."""
+  containerMainGid: IntFilter = null
+
+  """Added in UNRELEASED. Filter by container supplementary GIDs."""
+  containerGids: IntArrayFilter = null
   createdAt: DateTimeFilter = null
   domain: UserDomainNestedFilter = null
   project: UserProjectNestedFilter = null
