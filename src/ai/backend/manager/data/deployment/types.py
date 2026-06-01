@@ -193,6 +193,13 @@ class ReplicaGroupScalingStatus(enum.StrEnum):
     STABLE = "stable"
 
 
+class ReplicaGroupHandlerCategory(enum.StrEnum):
+    """Category of replica-group handler for history separation."""
+
+    SCALING = "scaling"
+    LIFECYCLE = "lifecycle"
+
+
 # ========== Status Transition Types (BEP-1030) ==========
 
 
@@ -822,6 +829,19 @@ class DeploymentLastHistory:
     to_status: str | None
 
 
+@dataclass(frozen=True)
+class ReplicaGroupLastHistory:
+    """Most recent ``replica_group_history`` row snapshot for one group and category."""
+
+    id: UUID
+    category: ReplicaGroupHandlerCategory
+    phase: str
+    attempts: int
+    started_at: datetime
+    error_code: str | None
+    to_status: str | None
+
+
 @dataclass
 class DeploymentWithHistory:
     """Bundles a deployment with the most recent history row in its
@@ -1258,6 +1278,30 @@ class RouteHistoryData:
     to_status: str | None
     from_sub_status: str | None
     to_sub_status: str | None
+
+    result: SchedulingResult
+    error_code: str | None
+    message: str
+
+    sub_steps: list[SubStepResult]
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class ReplicaGroupHistoryData:
+    """Domain model for replica-group history."""
+
+    id: UUID
+    replica_group_id: ReplicaGroupID
+    deployment_id: DeploymentID
+
+    category: ReplicaGroupHandlerCategory
+    phase: str
+    from_status: str | None
+    to_status: str | None
 
     result: SchedulingResult
     error_code: str | None
