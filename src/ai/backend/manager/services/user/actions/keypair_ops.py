@@ -299,6 +299,7 @@ class SearchKeypairsByResourcePolicyActionResult(BaseScopeActionResult):
     """Result of searching keypairs by resource policy."""
 
     result: SearchResult[KeyPairData]
+    _scope_id: str
 
     @override
     def scope_type(self) -> ScopeType:
@@ -306,7 +307,7 @@ class SearchKeypairsByResourcePolicyActionResult(BaseScopeActionResult):
 
     @override
     def scope_id(self) -> str:
-        return ""
+        return self._scope_id
 
 
 @dataclass

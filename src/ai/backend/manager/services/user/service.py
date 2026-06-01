@@ -467,7 +467,10 @@ class UserService:
         result = await self._user_repository.search_keypairs_by_resource_policy(
             scope=action.scope, querier=action.querier
         )
-        return SearchKeypairsByResourcePolicyActionResult(result=result)
+        return SearchKeypairsByResourcePolicyActionResult(
+            result=result,
+            _scope_id=action.scope_id(),
+        )
 
     # ------------------------------------------------------------------ admin keypair operations
 
