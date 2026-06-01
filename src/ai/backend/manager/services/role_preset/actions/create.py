@@ -9,17 +9,13 @@ from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetDependentCreatorSpec,
     RolePresetCreatorSpec,
 )
-from ai.backend.manager.services.role_preset.actions.base import RolePresetAction
+from ai.backend.manager.services.role_preset.actions.base import RolePresetScopeAction
 
 
 @dataclass
-class CreateRolePresetAction(RolePresetAction):
+class CreateRolePresetAction(RolePresetScopeAction):
     creator_spec: RolePresetCreatorSpec
     permission_creator_specs: Sequence[RolePermissionPresetDependentCreatorSpec]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
     @override
     @classmethod
