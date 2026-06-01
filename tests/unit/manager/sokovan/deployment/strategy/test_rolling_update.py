@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -112,6 +113,7 @@ def make_deployment(
     current_mock = MagicMock()
     current_mock.id = DeploymentRevisionID(current_revision_id)
     return DeploymentInfo(
+        primary_replica_group_id=ReplicaGroupID(uuid4()),
         id=DeploymentID(endpoint_id),
         metadata=DeploymentMetadata(
             name="test-deploy",

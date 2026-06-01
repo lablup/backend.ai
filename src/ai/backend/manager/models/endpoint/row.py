@@ -908,6 +908,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             deploying_revision=deploying_revision,
             sub_step=self.sub_step,
             policy=policy,
+            primary_replica_group_id=self.primary_replica_group_id,
         )
 
 

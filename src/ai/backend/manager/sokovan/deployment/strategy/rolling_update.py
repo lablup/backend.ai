@@ -275,6 +275,11 @@ def _build_route_creators(
         raise DeploymentHasNoTargetRevision(
             f"Cannot create routes: deployment {deployment.id} has no deploying revision"
         )
+    if deployment.primary_replica_group_id is None:
+        raise InvalidEndpointState(
+            f"Cannot create routes: deployment {deployment.id} has no primary replica group"
+        )
+    replica_group_id = deployment.primary_replica_group_id
     revision_data = deployment.deploying_revision
     health_check = (
         revision_data.model_definition.health_check_config()
@@ -290,6 +295,7 @@ def _build_route_creators(
             project_id=deployment.metadata.project,
             revision_id=deployment.deploying_revision.id,
             health_check=health_check,
+            replica_group_id=replica_group_id,
         )
         creators.append(
             RBACEntityCreator(

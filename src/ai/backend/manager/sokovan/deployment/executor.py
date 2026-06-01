@@ -65,6 +65,7 @@ from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
+from ai.backend.manager.sokovan.deployment.exceptions import InvalidEndpointState
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import OptionalState
@@ -701,6 +702,11 @@ class DeploymentExecutor:
                 if len(routes) < target_count:
                     # Build creators for scale out
                     new_replica_count = target_count - len(routes)
+                    if deployment.primary_replica_group_id is None:
+                        raise InvalidEndpointState(
+                            f"Cannot scale deployment {deployment.id}: no primary replica group"
+                        )
+                    replica_group_id = deployment.primary_replica_group_id
                     revision_data: ModelRevisionData | None
                     if (
                         deployment.current_revision is not None
@@ -722,6 +728,7 @@ class DeploymentExecutor:
                             project_id=deployment.metadata.project,
                             revision_id=revision_id,
                             health_check=health_check,
+                            replica_group_id=replica_group_id,
                         )
                         scale_out_creators.append(
                             RBACEntityCreator(

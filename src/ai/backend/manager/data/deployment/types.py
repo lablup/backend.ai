@@ -26,6 +26,7 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.session.options import HandlerOptions
@@ -760,8 +761,7 @@ class DeploymentInfo:
     replica: ReplicaData
     network: DeploymentNetworkData
     options: DeploymentOptions
-    # Revision ids, always populated cheaply from the replica groups (no
-    # revision-row load). The modern (v2) read path fills only these.
+    primary_replica_group_id: ReplicaGroupID | None = None
     current_revision_id: DeploymentRevisionID | None = None
     deploying_revision_id: DeploymentRevisionID | None = None
     # Full revision data, populated only by the legacy (REST v1) / engine
