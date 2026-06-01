@@ -48,6 +48,7 @@ from ai.backend.storage import __version__
 from ai.backend.storage.dto.context import StorageRootCtx
 from ai.backend.storage.errors import (
     InvalidAPIParameters,
+    TusSessionNotFoundError,
     UploadChunkExceedsTotalSizeError,
     UploadOffsetMismatchError,
 )
@@ -336,16 +337,6 @@ async def tus_check_session(request: web.Request) -> web.Response:
             session_dir = (
                 volume.mangle_vfpath(token_data["vfid"]) / ".upload" / token_data["session"]
             )
-            if not session_dir.exists():
-                raise web.HTTPNotFound(
-                    body=dump_json_str(
-                        {
-                            "title": "No such upload session",
-                            "type": ("https://api.backend.ai/probs/storage/no-such-upload-session"),
-                        },
-                    ),
-                    content_type="application/problem+json",
-                )
             session = TusUploadSession(
                 TusUploadSessionArgs(
                     session_dir=session_dir,
@@ -355,6 +346,8 @@ async def tus_check_session(request: web.Request) -> web.Response:
                     lock_factory=ctx.tus_lock_factory,
                 )
             )
+            if not await session.exists():
+                raise TusSessionNotFoundError
             state = await session.read_state()
             headers = _prepare_tus_session_headers(
                 upload_offset=state.committed_offset,
@@ -364,14 +357,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
 
 
 async def tus_upload_part(request: web.Request) -> web.Response:
-    """
-    Perform a TUS PATCH chunk upload.
-
-    Concurrent PATCH requests from multiple Storage Proxy replicas are made
-    safe by writing each chunk to its own file under ``chunks/`` and updating
-    the session ``info.json`` under a short ``fcntl.flock``. See
-    ``ai.backend.storage.services.upload.tus_session`` for the layout.
-    """
+    """Perform a TUS PATCH chunk upload."""
     ctx: RootContext = request.app["ctx"]
     secret = ctx.local_config.storage_proxy.secret
 
@@ -418,16 +404,6 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             session_dir = (
                 volume.mangle_vfpath(token_data["vfid"]) / ".upload" / token_data["session"]
             )
-            if not session_dir.exists():
-                raise web.HTTPNotFound(
-                    body=dump_json_str(
-                        {
-                            "title": "No such upload session",
-                            "type": ("https://api.backend.ai/probs/storage/no-such-upload-session"),
-                        },
-                    ),
-                    content_type="application/problem+json",
-                )
             session = TusUploadSession(
                 TusUploadSessionArgs(
                     session_dir=session_dir,
@@ -437,7 +413,8 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     lock_factory=ctx.tus_lock_factory,
                 )
             )
-            await session.ensure_initialized()
+            if not await session.exists():
+                raise TusSessionNotFoundError
 
             upload_stream = TusChunkUploadStreamReader(
                 request.content, request.content_type, DEFAULT_CHUNK_SIZE
@@ -449,7 +426,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                         f"Chunk at offset {client_offset} with length {written.length} "
                         f"exceeds declared size {total_size}"
                     )
-                acceptance = await session.commit_chunk(
+                commit_result = await session.commit_chunk(
                     offset=client_offset,
                     chunk_path=written.path,
                     length=written.length,
@@ -460,8 +437,8 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     await asyncio.to_thread(written.path.unlink)
                 raise
 
-            state = acceptance.state
-            if acceptance.is_final_commit:
+            state = commit_result.state
+            if commit_result.is_final_commit:
                 parent_dir = volume.mangle_vfpath(token_data["vfid"])
                 if (dst_dir := params["dst_dir"]) is not None:
                     parent_dir = parent_dir / dst_dir

@@ -32,6 +32,23 @@ class ChunkConflictError(BackendAIError, web.HTTPConflict):
         )
 
 
+class TusSessionNotFoundError(BackendAIError, web.HTTPNotFound):
+    """
+    Raised when a TUS handler is invoked for a session that is not registered
+    in Valkey (never created, or its state expired by TTL).
+    """
+
+    error_type = "https://api.backend.ai/probs/storage/no-such-upload-session"
+    error_title = "No such upload session"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class UploadChunkExceedsTotalSizeError(BackendAIError, web.HTTPConflict):
     """
     Raised when a PATCH chunk's offset+length would write past the declared

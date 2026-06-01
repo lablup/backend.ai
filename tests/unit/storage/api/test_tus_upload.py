@@ -26,7 +26,7 @@ from ai.backend.common.clients.valkey_client.valkey_tus import ValkeyTusClient
 from ai.backend.common.defs import REDIS_STREAM_LOCK, REDIS_TUS_DB
 from ai.backend.common.lock import DistributedLockFactory
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import RedisConnectionInfo, ValkeyTarget
+from ai.backend.common.types import RedisConnectionInfo, TusSessionId, ValkeyTarget
 from ai.backend.storage.api.client import tus_upload_part
 from ai.backend.storage.errors import (
     InvalidAPIParameters,
@@ -34,6 +34,7 @@ from ai.backend.storage.errors import (
     UploadOffsetMismatchError,
 )
 from ai.backend.storage.services.upload.lock import create_tus_lock_factory
+from ai.backend.storage.services.upload.types import SessionState
 from ai.backend.testutils.bootstrap import redis_container  # noqa: F401
 
 
@@ -160,6 +161,14 @@ def _patch_handler_params(token_data: dict[str, Any]) -> Any:
     return cp
 
 
+async def _register_session_state(
+    valkey: ValkeyTusClient, session_id: str, total_size: int
+) -> None:
+    """Mimic ``create_upload_session`` having pre-registered the session in Valkey."""
+    sid = TusSessionId(session_id)
+    await valkey.set_session_state(sid, SessionState.empty(sid, total_size).model_dump_json())
+
+
 class TestUploadOffsetHeaderValidation:
     async def test_missing_offset_header_raises(
         self,
@@ -255,15 +264,17 @@ class TestUploadOffsetHeaderValidation:
 
 
 class TestSessionNotFound:
-    async def test_missing_session_dir_raises_not_found(
+    async def test_missing_valkey_state_raises_not_found(
         self,
         tmp_path: Path,
         valkey_tus_client: ValkeyTusClient,
         tus_lock_factory: DistributedLockFactory,
     ) -> None:
+        # The session has never been registered in Valkey (no
+        # `create_upload_session` call). Existence is determined by the Valkey
+        # state, so the handler must 404 regardless of any filesystem layout.
         vfpath = tmp_path / "vfpath"
         vfpath.mkdir()
-        # NOTE: do not create .upload/<session> — session has not been prepared.
 
         request = _build_request(
             vfpath=vfpath,
@@ -291,6 +302,7 @@ class TestHappyPath:
         tus_lock_factory: DistributedLockFactory,
     ) -> None:
         payload = b"hello world" * 100
+        await _register_session_state(valkey_tus_client, patch_env.session_id, len(payload))
         request = _build_request(
             vfpath=patch_env.vfpath,
             session_id=patch_env.session_id,
@@ -324,6 +336,7 @@ class TestHappyPath:
         valkey_tus_client: ValkeyTusClient,
         tus_lock_factory: DistributedLockFactory,
     ) -> None:
+        await _register_session_state(valkey_tus_client, patch_env.session_id, 2048)
         token_data = _token_data(
             session_id=patch_env.session_id, total_size=2048, relpath="result.bin"
         )
@@ -364,6 +377,7 @@ class TestHappyPath:
         valkey_tus_client: ValkeyTusClient,
         tus_lock_factory: DistributedLockFactory,
     ) -> None:
+        await _register_session_state(valkey_tus_client, patch_env.session_id, 2048)
         token_data = _token_data(
             session_id=patch_env.session_id, total_size=2048, relpath="result.bin"
         )
@@ -403,6 +417,7 @@ class TestHappyPath:
         valkey_tus_client: ValkeyTusClient,
         tus_lock_factory: DistributedLockFactory,
     ) -> None:
+        await _register_session_state(valkey_tus_client, patch_env.session_id, 10)
         token_data = _token_data(
             session_id=patch_env.session_id, total_size=10, relpath="result.bin"
         )
