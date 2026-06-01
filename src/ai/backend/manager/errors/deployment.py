@@ -59,7 +59,7 @@ class NoActiveKeypairForDeployment(ObjectNotFound):
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
