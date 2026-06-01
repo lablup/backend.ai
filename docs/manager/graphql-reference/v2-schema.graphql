@@ -5028,14 +5028,12 @@ type ImportArtifactsPayload {
 }
 
 """
-Added in UNRELEASED. Filter for integer array fields. Supports 'all' (column contains all of these values) and 'any' (column contains any of these values).
+Added in UNRELEASED. Filter for integer array fields. Supports 'contains' (column contains this single value), 'contains_any' (column contains any of these values), and 'contains_all' (column contains all of these values).
 """
 input IntArrayFilter {
-  """Column array contains ALL of these values."""
-  all: [Int!] = null
-
-  """Column array contains ANY of these values."""
-  any: [Int!] = null
+  contains: Int = null
+  containsAny: [Int!] = null
+  containsAll: [Int!] = null
 }
 
 """
