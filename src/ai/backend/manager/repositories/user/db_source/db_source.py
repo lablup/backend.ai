@@ -119,7 +119,7 @@ from ai.backend.manager.repositories.group.creators import ProjectUserMembership
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicySearchScope,
+    KeypairResourcePolicyKeypairSearchScope,
     UserKeypairSearchScope,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
@@ -1550,7 +1550,7 @@ class UserDBSource:
 
     async def search_keypairs_by_resource_policy(
         self,
-        scope: KeypairResourcePolicySearchScope,
+        scope: KeypairResourcePolicyKeypairSearchScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs assigned to a keypair resource policy.

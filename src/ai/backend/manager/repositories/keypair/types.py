@@ -20,7 +20,7 @@ from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition,
 
 __all__ = (
     "UserKeypairSearchScope",
-    "KeypairResourcePolicySearchScope",
+    "KeypairResourcePolicyKeypairSearchScope",
 )
 
 
@@ -56,7 +56,7 @@ class UserKeypairSearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class KeypairResourcePolicySearchScope(SearchScope):
+class KeypairResourcePolicyKeypairSearchScope(SearchScope):
     """Required scope for searching keypairs assigned to a keypair resource policy.
 
     Used by the ``keypairs`` connection on the keypair resource policy node.

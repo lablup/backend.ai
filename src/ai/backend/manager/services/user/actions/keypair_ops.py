@@ -17,7 +17,7 @@ from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicySearchScope,
+    KeypairResourcePolicyKeypairSearchScope,
     UserKeypairSearchScope,
 )
 from ai.backend.manager.services.user.actions.base import UserAction
@@ -266,7 +266,7 @@ class SearchKeypairsByResourcePolicyAction(BaseScopeAction):
     owned by others through the resource policy node.
     """
 
-    scope: KeypairResourcePolicySearchScope
+    scope: KeypairResourcePolicyKeypairSearchScope
     querier: BatchQuerier
 
     @override

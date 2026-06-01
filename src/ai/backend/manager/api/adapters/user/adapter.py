@@ -114,7 +114,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicySearchScope,
+    KeypairResourcePolicyKeypairSearchScope,
     UserKeypairSearchScope,
 )
 from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
@@ -699,7 +699,7 @@ class UserAdapter(BaseAdapter):
 
     async def gql_search_keypairs_by_resource_policy(
         self,
-        scope: KeypairResourcePolicySearchScope,
+        scope: KeypairResourcePolicyKeypairSearchScope,
         input: SearchKeypairsRequest,
     ) -> SearchResult[KeypairNode]:
         """Search keypairs assigned to a keypair resource policy (GQL connection).

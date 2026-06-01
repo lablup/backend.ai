@@ -38,7 +38,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import (
-    KeypairResourcePolicySearchScope,
+    KeypairResourcePolicyKeypairSearchScope,
     UserKeypairSearchScope,
 )
 from ai.backend.manager.repositories.user.db_source import UserDBSource
@@ -337,7 +337,7 @@ class UserRepository:
     @user_repository_resilience.apply()
     async def search_keypairs_by_resource_policy(
         self,
-        scope: KeypairResourcePolicySearchScope,
+        scope: KeypairResourcePolicyKeypairSearchScope,
         querier: BatchQuerier,
     ) -> SearchResult[KeyPairData]:
         """Search keypairs assigned to a keypair resource policy.
