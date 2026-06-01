@@ -119,16 +119,9 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
             KeyPairEdge,
             KeyPairGQL,
         )
-        from ai.backend.manager.api.gql.utils import check_admin_only
         from ai.backend.manager.repositories.keypair.types import (
             KeypairResourcePolicySearchScope,
         )
-
-        # This node is reachable from non-admin entry points (e.g. myKeypairResourcePolicyV2),
-        # but listing keypairs spans all users sharing the policy. The keypair resource policy
-        # entity is not RBAC-protected, so the scope-action RBAC check alone would let a regular
-        # user (who can read their own policy) enumerate everyone's keypairs — gate on superadmin.
-        check_admin_only()
 
         result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
             scope=KeypairResourcePolicySearchScope(resource_policy_name=self.name),
