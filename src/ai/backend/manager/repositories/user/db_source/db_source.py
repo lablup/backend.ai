@@ -118,7 +118,10 @@ from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updat
 from ai.backend.manager.repositories.group.creators import ProjectUserMembershipCreatorSpec
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
-from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.types import (
+    KeypairResourcePolicyKeypairSearchScope,
+    UserKeypairSearchScope,
+)
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
@@ -1529,6 +1532,31 @@ class UserDBSource:
 
         Args:
             scope: Search scope containing the user UUID whose keypairs to retrieve.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            SearchResult with matching keypairs and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(KeyPairRow)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
+            items = [row.KeyPairRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_keypairs_by_resource_policy(
+        self,
+        scope: KeypairResourcePolicyKeypairSearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[KeyPairData]:
+        """Search keypairs assigned to a keypair resource policy.
+
+        Args:
+            scope: Search scope containing the resource policy name to filter by.
             querier: BatchQuerier containing conditions, orders, and pagination.
 
         Returns:

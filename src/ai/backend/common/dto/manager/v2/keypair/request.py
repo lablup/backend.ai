@@ -79,6 +79,31 @@ class SearchMyKeypairsRequest(BaseRequestModel):
     )
 
 
+class SearchKeypairsRequest(BaseRequestModel):
+    """Generic keypair search input (filter/order/pagination), scope-agnostic.
+
+    Shared by GQL and REST; the search scope is supplied separately by the caller.
+    """
+
+    filter: KeypairFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[KeypairOrderBy] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor-based: return first N items.")
+    after: str | None = Field(default=None, description="Cursor-based: return items after cursor.")
+    last: int | None = Field(default=None, description="Cursor-based: return last N items.")
+    before: str | None = Field(
+        default=None, description="Cursor-based: return items before cursor."
+    )
+    limit: int | None = Field(
+        default=None,
+        ge=1,
+        le=MAX_PAGE_LIMIT,
+        description="Offset-based: maximum items to return.",
+    )
+    offset: int | None = Field(
+        default=None, ge=0, description="Offset-based: number of items to skip."
+    )
+
+
 class RevokeMyKeypairInput(BaseRequestModel):
     """Request to revoke a keypair owned by the current user."""
 

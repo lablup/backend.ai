@@ -346,6 +346,7 @@ class ScopeType(enum.StrEnum):
     ROLE_ASSIGNMENT = "role:assignment"
     NOTIFICATION_CHANNEL = "notification_channel"
     KEYPAIR = "keypair"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
 
     def to_element(self) -> RBACElementType:
         from ai.backend.common.exception import RBACTypeConversionError
