@@ -241,10 +241,230 @@ class UserConditions:
 
         return inner
 
+    # ==================== Full Name Filters ====================
+
+    @staticmethod
+    def by_full_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.full_name.ilike(f"%{spec.value}%")
+            else:
+                condition = UserRow.full_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_full_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserRow.full_name) == spec.value.lower()
+            else:
+                condition = UserRow.full_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_full_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.full_name.ilike(f"{spec.value}%")
+            else:
+                condition = UserRow.full_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_full_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.full_name.ilike(f"%{spec.value}")
+            else:
+                condition = UserRow.full_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    # ==================== Description Filters ====================
+
+    @staticmethod
+    def by_description_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.description.ilike(f"%{spec.value}%")
+            else:
+                condition = UserRow.description.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_description_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserRow.description) == spec.value.lower()
+            else:
+                condition = UserRow.description == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_description_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.description.ilike(f"{spec.value}%")
+            else:
+                condition = UserRow.description.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_description_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.description.ilike(f"%{spec.value}")
+            else:
+                condition = UserRow.description.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    # ==================== Status Info Filters ====================
+
+    @staticmethod
+    def by_status_info_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.status_info.ilike(f"%{spec.value}%")
+            else:
+                condition = UserRow.status_info.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_status_info_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserRow.status_info) == spec.value.lower()
+            else:
+                condition = UserRow.status_info == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_status_info_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.status_info.ilike(f"{spec.value}%")
+            else:
+                condition = UserRow.status_info.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_status_info_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.status_info.ilike(f"%{spec.value}")
+            else:
+                condition = UserRow.status_info.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    # ==================== Resource Policy Filters ====================
+
+    @staticmethod
+    def by_resource_policy_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.resource_policy.ilike(f"%{spec.value}%")
+            else:
+                condition = UserRow.resource_policy.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_policy_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserRow.resource_policy) == spec.value.lower()
+            else:
+                condition = UserRow.resource_policy == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_policy_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.resource_policy.ilike(f"{spec.value}%")
+            else:
+                condition = UserRow.resource_policy.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_policy_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.resource_policy.ilike(f"%{spec.value}")
+            else:
+                condition = UserRow.resource_policy.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
     by_email_in = staticmethod(make_string_in_factory(UserRow.email))
     by_username_in = staticmethod(make_string_in_factory(UserRow.username))
     by_integration_name_in = staticmethod(make_string_in_factory(UserRow.integration_id))
     by_domain_name_in = staticmethod(make_string_in_factory(UserRow.domain_name))
+    by_full_name_in = staticmethod(make_string_in_factory(UserRow.full_name))
+    by_description_in = staticmethod(make_string_in_factory(UserRow.description))
+    by_status_info_in = staticmethod(make_string_in_factory(UserRow.status_info))
+    by_resource_policy_in = staticmethod(make_string_in_factory(UserRow.resource_policy))
 
     # ==================== Status Filters ====================
 
@@ -284,6 +504,29 @@ class UserConditions:
     def by_role_in(roles: Collection[UserRole]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserRow.role.in_(roles)
+
+        return inner
+
+    # ==================== Boolean Flag Filters ====================
+
+    @staticmethod
+    def by_need_password_change(value: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.need_password_change == value
+
+        return inner
+
+    @staticmethod
+    def by_totp_activated(value: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.totp_activated == value
+
+        return inner
+
+    @staticmethod
+    def by_sudo_session_enabled(value: bool) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.sudo_session_enabled == value
 
         return inner
 

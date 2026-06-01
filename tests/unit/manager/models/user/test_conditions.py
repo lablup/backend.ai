@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -148,6 +148,100 @@ class TestUserConditionsIntegrationNameFilters:
         assert sql_a != sql_b
         assert "alpha" in sql_a
         assert "beta" in sql_b
+
+
+class TestUserConditionsStringFieldFilters:
+    """Tests for the additional string field filter conditions in UserConditions."""
+
+    def test_by_full_name_contains(self) -> None:
+        spec = StringMatchSpec(value="alice", case_insensitive=False, negated=False)
+        sql = str(
+            UserConditions.by_full_name_contains(spec)().compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "full_name" in sql
+        assert "%alice%" in sql
+
+    def test_by_full_name_equals_negated(self) -> None:
+        spec = StringMatchSpec(value="bob", case_insensitive=False, negated=True)
+        sql = str(
+            UserConditions.by_full_name_equals(spec)().compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "full_name" in sql
+        assert "!=" in sql or "NOT" in sql.upper()
+
+    def test_by_description_starts_with_case_insensitive(self) -> None:
+        spec = StringMatchSpec(value="team ", case_insensitive=True, negated=False)
+        sql = str(
+            UserConditions.by_description_starts_with(spec)().compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "description" in sql
+        assert "lower" in sql.lower()
+
+    def test_by_status_info_ends_with(self) -> None:
+        spec = StringMatchSpec(value="-locked", case_insensitive=False, negated=False)
+        sql = str(
+            UserConditions.by_status_info_ends_with(spec)().compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "status_info" in sql
+        assert "LIKE" in sql.upper()
+
+    def test_by_resource_policy_equals(self) -> None:
+        spec = StringMatchSpec(value="default", case_insensitive=False, negated=False)
+        sql = str(
+            UserConditions.by_resource_policy_equals(spec)().compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "resource_policy" in sql
+        assert "default" in sql
+
+    def test_string_in_filters_reference_columns(self) -> None:
+        spec = StringInMatchSpec(values=["a", "b"], case_insensitive=False, negated=False)
+        for factory, column in [
+            (UserConditions.by_full_name_in, "full_name"),
+            (UserConditions.by_description_in, "description"),
+            (UserConditions.by_status_info_in, "status_info"),
+            (UserConditions.by_resource_policy_in, "resource_policy"),
+        ]:
+            sql = str(factory(spec)().compile(compile_kwargs={"literal_binds": True}))
+            assert column in sql
+            assert "IN" in sql.upper()
+
+
+class TestUserConditionsBooleanFilters:
+    """Tests for the boolean flag filter conditions in UserConditions."""
+
+    def test_by_need_password_change_true(self) -> None:
+        sql = str(
+            UserConditions.by_need_password_change(True)().compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "need_password_change" in sql
+
+    def test_by_totp_activated_false(self) -> None:
+        sql = str(
+            UserConditions.by_totp_activated(False)().compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "totp_activated" in sql
+
+    def test_by_sudo_session_enabled_true(self) -> None:
+        sql = str(
+            UserConditions.by_sudo_session_enabled(True)().compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
+        assert "sudo_session_enabled" in sql
 
 
 class TestUserConditionsDomainNestedFilters:

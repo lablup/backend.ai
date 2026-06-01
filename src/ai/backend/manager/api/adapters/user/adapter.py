@@ -1063,8 +1063,69 @@ class UserAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter_req.full_name is not None:
+            condition = self.convert_string_filter(
+                filter_req.full_name,
+                contains_factory=UserConditions.by_full_name_contains,
+                equals_factory=UserConditions.by_full_name_equals,
+                starts_with_factory=UserConditions.by_full_name_starts_with,
+                ends_with_factory=UserConditions.by_full_name_ends_with,
+                in_factory=UserConditions.by_full_name_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.description is not None:
+            condition = self.convert_string_filter(
+                filter_req.description,
+                contains_factory=UserConditions.by_description_contains,
+                equals_factory=UserConditions.by_description_equals,
+                starts_with_factory=UserConditions.by_description_starts_with,
+                ends_with_factory=UserConditions.by_description_ends_with,
+                in_factory=UserConditions.by_description_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.status_info is not None:
+            condition = self.convert_string_filter(
+                filter_req.status_info,
+                contains_factory=UserConditions.by_status_info_contains,
+                equals_factory=UserConditions.by_status_info_equals,
+                starts_with_factory=UserConditions.by_status_info_starts_with,
+                ends_with_factory=UserConditions.by_status_info_ends_with,
+                in_factory=UserConditions.by_status_info_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.resource_policy is not None:
+            condition = self.convert_string_filter(
+                filter_req.resource_policy,
+                contains_factory=UserConditions.by_resource_policy_contains,
+                equals_factory=UserConditions.by_resource_policy_equals,
+                starts_with_factory=UserConditions.by_resource_policy_starts_with,
+                ends_with_factory=UserConditions.by_resource_policy_ends_with,
+                in_factory=UserConditions.by_resource_policy_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter_req.role is not None:
             conditions.extend(self._convert_role_filter(filter_req.role))
+
+        if filter_req.need_password_change is not None:
+            conditions.append(
+                UserConditions.by_need_password_change(filter_req.need_password_change)
+            )
+
+        if filter_req.totp_activated is not None:
+            conditions.append(UserConditions.by_totp_activated(filter_req.totp_activated))
+
+        if filter_req.sudo_session_enabled is not None:
+            conditions.append(
+                UserConditions.by_sudo_session_enabled(filter_req.sudo_session_enabled)
+            )
 
         if filter_req.created_at is not None:
             condition = filter_req.created_at.build_query_condition(
