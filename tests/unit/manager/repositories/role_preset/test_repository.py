@@ -3,9 +3,10 @@
 Exercises the observable contracts of RolePresetRepository against a real
 database: create round-trips (preset + dependent permission rows), id-based
 get, search, single-row update, bulk soft delete / restore (per-id partial
-update with silent skip for missing ids), single and bulk hard purge (success
-count + skipped non-existent ids), bulk add of permission-preset rows, and
-batch remove of permission-preset rows (single SQL count).
+update with silent skip for missing ids), single and bulk hard purge (returned
+success rows + skipped non-existent ids), bulk add of permission-preset rows
+(per-spec partial create), and bulk remove of permission-preset rows (per-id
+partial purge).
 """
 
 from __future__ import annotations
@@ -29,7 +30,6 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
-    BatchPurger,
     BatchQuerier,
     BulkCreator,
     NoPagination,
@@ -40,9 +40,6 @@ from ai.backend.manager.repositories.role_preset.creators import (
     RolePermissionPresetCreatorSpec,
     RolePermissionPresetDependentCreatorSpec,
     RolePresetCreatorSpec,
-)
-from ai.backend.manager.repositories.role_preset.purgers import (
-    RolePermissionPresetByIDsBatchPurgerSpec,
 )
 from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
 from ai.backend.manager.repositories.role_preset.updaters import (
@@ -203,7 +200,7 @@ class TestPurge:
         with pytest.raises(RolePresetNotFound):
             await repository.role_preset(created.id)
 
-    async def test_bulk_purge_counts_only_existing(self, repository: RolePresetRepository) -> None:
+    async def test_bulk_purge_returns_only_existing(self, repository: RolePresetRepository) -> None:
         a = await repository.create(
             RolePresetCreatorSpec(name="a", scope_type=ScopeType.DOMAIN), []
         )
@@ -214,7 +211,7 @@ class TestPurge:
         # One id does not exist: it is skipped, not an error.
         result = await repository.bulk_purge([a.id, b.id, RolePresetID(uuid4())])
 
-        assert result.success_count == 2
+        assert {preset.id for preset in result.successes} == {a.id, b.id}
         assert result.failures == []
 
 
@@ -225,7 +222,7 @@ class TestPermissions:
         preset = await repository.create(
             RolePresetCreatorSpec(name="p1", scope_type=ScopeType.DOMAIN), []
         )
-        added = await repository.bulk_add_permissions(
+        result = await repository.bulk_add_permissions(
             BulkCreator(
                 specs=[
                     RolePermissionPresetCreatorSpec(
@@ -242,10 +239,11 @@ class TestPermissions:
             )
         )
 
-        assert len(added) == 2
-        assert all(perm.role_preset_id == preset.id for perm in added)
+        assert len(result.successes) == 2
+        assert result.failures == []
+        assert all(perm.role_preset_id == preset.id for perm in result.successes)
 
-    async def test_batch_remove_returns_count(
+    async def test_bulk_remove_returns_rows(
         self,
         repository: RolePresetRepository,
         database_connection: ExtendedAsyncSAEngine,
@@ -269,16 +267,10 @@ class TestPermissions:
                 ]
             )
         )
-        permission_ids = [perm.id for perm in added]
+        permission_ids = [perm.id for perm in added.successes]
 
-        removed_count = await repository.batch_remove_permissions(
-            BatchPurger(
-                spec=RolePermissionPresetByIDsBatchPurgerSpec(
-                    role_preset_id=preset.id,
-                    ids=permission_ids,
-                )
-            )
-        )
+        result = await repository.bulk_remove_permissions(permission_ids)
 
-        assert removed_count == 2
+        assert {perm.id for perm in result.successes} == set(permission_ids)
+        assert result.failures == []
         assert await _count_permissions(database_connection, preset.id) == 0

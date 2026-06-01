@@ -11,10 +11,12 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.role_preset.types import (
-    RolePermissionPresetData,
+    RolePermissionPresetBulkAddResult,
+    RolePermissionPresetBulkRemoveResult,
     RolePresetBulkPurgeResult,
     RolePresetBulkUpdateResult,
     RolePresetData,
@@ -27,7 +29,6 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.repositories.base import (
-    BatchPurger,
     BatchQuerier,
     BulkCreator,
     Creator,
@@ -133,6 +134,7 @@ class RolePresetDBSource:
         purgers = [Purger(row_class=RolePresetRow, pk_value=preset_id) for preset_id in ids]
         async with self._ops.write_ops() as w:
             result = await w.bulk_purge_partial(purgers)
+        successes = [row.to_data() for row in result.successes]
         failures = [
             RolePresetPurgeFailure(
                 id=ids[error.index],
@@ -141,24 +143,27 @@ class RolePresetDBSource:
             for error in result.errors
         ]
         return RolePresetBulkPurgeResult(
-            success_count=result.success_count(),
+            successes=successes,
             failures=failures,
         )
 
     async def bulk_add_permissions(
         self,
         bulk_creator: BulkCreator[RolePermissionPresetRow],
-    ) -> list[RolePermissionPresetData]:
+    ) -> RolePermissionPresetBulkAddResult:
         if not bulk_creator.specs:
-            return []
+            return RolePermissionPresetBulkAddResult()
         async with self._ops.write_ops() as w:
-            result = await w.bulk_create(bulk_creator)
-            return [row.to_data() for row in result.rows]
+            result = await w.bulk_create_partial(bulk_creator)
+        successes = [row.to_data() for row in result.successes]
+        return RolePermissionPresetBulkAddResult(successes=successes, failures=result.errors)
 
-    async def batch_remove_permissions(
+    async def bulk_remove_permissions(
         self,
-        batch_purger: BatchPurger[RolePermissionPresetRow],
-    ) -> int:
+        ids: Sequence[RolePermissionPresetID],
+    ) -> RolePermissionPresetBulkRemoveResult:
+        purgers = [Purger(row_class=RolePermissionPresetRow, pk_value=perm_id) for perm_id in ids]
         async with self._ops.write_ops() as w:
-            result = await w.batch_purge(batch_purger)
-            return result.deleted_count
+            result = await w.bulk_purge_partial(purgers)
+        successes = [row.to_data() for row in result.successes]
+        return RolePermissionPresetBulkRemoveResult(successes=successes, failures=result.errors)

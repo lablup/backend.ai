@@ -11,9 +11,14 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.identifier.role_preset import RolePresetID
+from ai.backend.manager.repositories.base.creator import BulkCreatorError
+from ai.backend.manager.repositories.base.purger import BulkPurgerError
 from ai.backend.manager.repositories.base.updater import BulkUpdaterError
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+        RolePermissionPresetRow,
+    )
     from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 
 
@@ -53,7 +58,7 @@ class RolePresetPurgeFailure:
 
 @dataclass(frozen=True)
 class RolePresetBulkPurgeResult:
-    success_count: int
+    successes: list[RolePresetData]
     failures: list[RolePresetPurgeFailure]
 
 
@@ -61,3 +66,15 @@ class RolePresetBulkPurgeResult:
 class RolePresetBulkUpdateResult:
     successes: list[RolePresetData] = field(default_factory=list)
     failures: list[BulkUpdaterError[RolePresetRow]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RolePermissionPresetBulkAddResult:
+    successes: list[RolePermissionPresetData] = field(default_factory=list)
+    failures: list[BulkCreatorError[RolePermissionPresetRow]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RolePermissionPresetBulkRemoveResult:
+    successes: list[RolePermissionPresetData] = field(default_factory=list)
+    failures: list[BulkPurgerError[RolePermissionPresetRow]] = field(default_factory=list)
