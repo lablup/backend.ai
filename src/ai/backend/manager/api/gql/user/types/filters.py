@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserRoleFilter,
     UserStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -107,7 +108,28 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     uuid: UUIDFilter | None = None
     username: StringFilter | None = None
     email: StringFilter | None = None
+    full_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by full name.",
+        ),
+        default=None,
+    )
+    description: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by description.",
+        ),
+        default=None,
+    )
     status: UserStatusEnumFilterGQL | None = None
+    status_info: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by status info detail.",
+        ),
+        default=None,
+    )
     domain_name: StringFilter | None = None
     integration_name: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
@@ -116,7 +138,35 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
         ),
         default=None,
     )
+    resource_policy: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by user resource policy name.",
+        ),
+        default=None,
+    )
     role: UserRoleEnumFilterGQL | None = None
+    need_password_change: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by whether a password change is required.",
+        ),
+        default=None,
+    )
+    totp_activated: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by whether TOTP two-factor auth is activated.",
+        ),
+        default=None,
+    )
+    sudo_session_enabled: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by whether sudo sessions are enabled.",
+        ),
+        default=None,
+    )
     created_at: DateTimeFilter | None = None
     domain: UserDomainNestedFilterGQL | None = None
     project: UserProjectNestedFilterGQL | None = None

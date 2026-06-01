@@ -13896,12 +13896,35 @@ input UserV2Filter {
   uuid: UUIDFilter = null
   username: StringFilter = null
   email: StringFilter = null
+
+  """Added in UNRELEASED. Filter by full name."""
+  fullName: StringFilter = null
+
+  """Added in UNRELEASED. Filter by description."""
+  description: StringFilter = null
   status: UserStatusV2EnumFilter = null
+
+  """Added in UNRELEASED. Filter by status info detail."""
+  statusInfo: StringFilter = null
   domainName: StringFilter = null
 
   """Added in 26.4.2. Filter by external integration identifier."""
   integrationName: StringFilter = null
+
+  """Added in UNRELEASED. Filter by user resource policy name."""
+  resourcePolicy: StringFilter = null
   role: UserRoleV2EnumFilter = null
+
+  """Added in UNRELEASED. Filter by whether a password change is required."""
+  needPasswordChange: Boolean = null
+
+  """
+  Added in UNRELEASED. Filter by whether TOTP two-factor auth is activated.
+  """
+  totpActivated: Boolean = null
+
+  """Added in UNRELEASED. Filter by whether sudo sessions are enabled."""
+  sudoSessionEnabled: Boolean = null
   createdAt: DateTimeFilter = null
   domain: UserDomainNestedFilter = null
   project: UserProjectNestedFilter = null
