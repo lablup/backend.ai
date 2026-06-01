@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.keypair import (
     KeypairNode,
     KeypairOrderBy,
     KeypairOrderField,
+    SearchKeypairsRequest,
     SearchMyKeypairsRequest,
 )
 from ai.backend.common.dto.manager.v2.keypair.request import (
@@ -699,7 +700,7 @@ class UserAdapter(BaseAdapter):
     async def gql_search_keypairs_by_resource_policy(
         self,
         scope: KeypairResourcePolicySearchScope,
-        input: SearchMyKeypairsRequest,
+        input: SearchKeypairsRequest,
     ) -> SearchResult[KeypairNode]:
         """Search keypairs assigned to a keypair resource policy (GQL connection).
 

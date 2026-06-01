@@ -8,7 +8,7 @@ from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.actions.action.scope import BaseScopeAction
+from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
@@ -295,14 +295,18 @@ class SearchKeypairsByResourcePolicyAction(BaseScopeAction):
 
 
 @dataclass
-class SearchKeypairsByResourcePolicyActionResult(BaseActionResult):
+class SearchKeypairsByResourcePolicyActionResult(BaseScopeActionResult):
     """Result of searching keypairs by resource policy."""
 
     result: SearchResult[KeyPairData]
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.KEYPAIR_RESOURCE_POLICY
+
+    @override
+    def scope_id(self) -> str:
+        return ""
 
 
 @dataclass

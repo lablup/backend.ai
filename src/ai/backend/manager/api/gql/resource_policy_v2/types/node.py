@@ -112,7 +112,7 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     ):
         from strawberry.relay import PageInfo
 
-        from ai.backend.common.dto.manager.v2.keypair.request import SearchMyKeypairsRequest
+        from ai.backend.common.dto.manager.v2.keypair.request import SearchKeypairsRequest
         from ai.backend.manager.api.gql.base import encode_cursor
         from ai.backend.manager.api.gql.keypair.types.node import (
             KeyPairConnection,
@@ -132,7 +132,7 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
 
         result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
             scope=KeypairResourcePolicySearchScope(resource_policy_name=self.name),
-            input=SearchMyKeypairsRequest(
+            input=SearchKeypairsRequest(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
                 first=first,
