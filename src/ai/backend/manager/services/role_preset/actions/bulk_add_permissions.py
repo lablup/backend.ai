@@ -9,16 +9,12 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
 )
 from ai.backend.manager.repositories.base import BulkCreator
 from ai.backend.manager.repositories.base.creator import BulkCreatorError
-from ai.backend.manager.services.role_preset.actions.base import RolePresetAction
+from ai.backend.manager.services.role_preset.actions.base import RolePermissionPresetBulkAction
 
 
 @dataclass
-class BulkAddRolePermissionPresetsAction(RolePresetAction):
+class BulkAddRolePermissionPresetsAction(RolePermissionPresetBulkAction):
     bulk_creator: BulkCreator[RolePermissionPresetRow]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
     @override
     @classmethod

@@ -10,16 +10,12 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.repositories.base.purger import BulkPurgerError
-from ai.backend.manager.services.role_preset.actions.base import RolePresetAction
+from ai.backend.manager.services.role_preset.actions.base import RolePermissionPresetBulkAction
 
 
 @dataclass
-class BulkRemoveRolePermissionPresetsAction(RolePresetAction):
+class BulkRemoveRolePermissionPresetsAction(RolePermissionPresetBulkAction):
     ids: Sequence[RolePermissionPresetID]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
     @override
     @classmethod
