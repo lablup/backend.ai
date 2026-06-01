@@ -51,15 +51,9 @@ class RolePresetSearchResult:
 
 
 @dataclass(frozen=True)
-class RolePresetPurgeFailure:
-    id: RolePresetID
-    message: str
-
-
-@dataclass(frozen=True)
 class RolePresetBulkPurgeResult:
-    successes: list[RolePresetData]
-    failures: list[RolePresetPurgeFailure]
+    successes: list[RolePresetData] = field(default_factory=list)
+    failures: list[BulkPurgerError[RolePresetRow]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

@@ -5,17 +5,13 @@ from typing import override
 from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.role_preset.types import RolePresetData, RolePresetPurgeFailure
-from ai.backend.manager.services.role_preset.actions.base import RolePresetAction
+from ai.backend.manager.data.role_preset.types import RolePresetBulkPurgeResult
+from ai.backend.manager.services.role_preset.actions.base import RolePresetBulkAction
 
 
 @dataclass
-class BulkPurgeRolePresetsAction(RolePresetAction):
+class BulkPurgeRolePresetsAction(RolePresetBulkAction):
     ids: Sequence[RolePresetID]
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
     @override
     @classmethod
@@ -25,8 +21,7 @@ class BulkPurgeRolePresetsAction(RolePresetAction):
 
 @dataclass
 class BulkPurgeRolePresetsActionResult(BaseActionResult):
-    successes: list[RolePresetData]
-    failures: list[RolePresetPurgeFailure]
+    result: RolePresetBulkPurgeResult
 
     @override
     def entity_id(self) -> str | None:

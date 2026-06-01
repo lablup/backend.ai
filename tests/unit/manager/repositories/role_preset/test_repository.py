@@ -43,6 +43,7 @@ from ai.backend.manager.repositories.role_preset.creators import (
 )
 from ai.backend.manager.repositories.role_preset.repository import RolePresetRepository
 from ai.backend.manager.repositories.role_preset.updaters import (
+    RolePresetDeletedFlagUpdaterSpec,
     RolePresetUpdaterSpec,
 )
 from ai.backend.manager.types import OptionalState
@@ -166,13 +167,21 @@ class TestBulkDeleteRestore:
         )
         ids = [a.id, b.id]
 
-        delete_result = await repository.bulk_delete(ids)
+        delete_updaters = [
+            Updater(spec=RolePresetDeletedFlagUpdaterSpec(deleted=True), pk_value=preset_id)
+            for preset_id in ids
+        ]
+        delete_result = await repository.bulk_update(delete_updaters)
         assert {row.id for row in delete_result.successes} == {a.id, b.id}
         assert delete_result.failures == []
         # Soft delete: the row is still present, only the flag flips.
         assert (await repository.role_preset(a.id)).deleted is True
 
-        restore_result = await repository.bulk_restore(ids)
+        restore_updaters = [
+            Updater(spec=RolePresetDeletedFlagUpdaterSpec(deleted=False), pk_value=preset_id)
+            for preset_id in ids
+        ]
+        restore_result = await repository.bulk_update(restore_updaters)
         assert {row.id for row in restore_result.successes} == {a.id, b.id}
         assert restore_result.failures == []
         assert (await repository.role_preset(a.id)).deleted is False
@@ -183,7 +192,11 @@ class TestBulkDeleteRestore:
         )
 
         # Non-existent id is silently skipped, matching bulk_purge semantics.
-        result = await repository.bulk_delete([existing.id, RolePresetID(uuid4())])
+        updaters = [
+            Updater(spec=RolePresetDeletedFlagUpdaterSpec(deleted=True), pk_value=preset_id)
+            for preset_id in [existing.id, RolePresetID(uuid4())]
+        ]
+        result = await repository.bulk_update(updaters)
 
         assert [row.id for row in result.successes] == [existing.id]
         assert result.failures == []

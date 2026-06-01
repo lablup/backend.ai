@@ -60,17 +60,11 @@ class RolePresetRepository:
     async def update(self, updater: Updater[RolePresetRow]) -> RolePresetData:
         return await self._db_source.update(updater)
 
-    async def bulk_delete(
+    async def bulk_update(
         self,
-        ids: Sequence[RolePresetID],
+        updaters: list[Updater[RolePresetRow]],
     ) -> RolePresetBulkUpdateResult:
-        return await self._db_source.bulk_delete(ids)
-
-    async def bulk_restore(
-        self,
-        ids: Sequence[RolePresetID],
-    ) -> RolePresetBulkUpdateResult:
-        return await self._db_source.bulk_restore(ids)
+        return await self._db_source.bulk_update(updaters)
 
     async def purge(self, preset_id: RolePresetID) -> bool:
         return await self._db_source.purge(preset_id)

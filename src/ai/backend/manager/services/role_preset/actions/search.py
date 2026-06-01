@@ -5,16 +5,12 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.role_preset.actions.base import RolePresetAction
+from ai.backend.manager.services.role_preset.actions.base import RolePresetScopeAction
 
 
 @dataclass
-class SearchRolePresetsAction(RolePresetAction):
+class SearchRolePresetsAction(RolePresetScopeAction):
     querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
 
     @override
     @classmethod
