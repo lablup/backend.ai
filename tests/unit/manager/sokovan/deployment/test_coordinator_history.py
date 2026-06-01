@@ -8,15 +8,19 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerCategory,
     DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
+    DeploymentOptions,
     DeploymentState,
     DeploymentStatusTransitions,
-    ReplicaSpec,
+    DeploymentTargetStatuses,
+    ReplicaData,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
@@ -41,7 +45,7 @@ if TYPE_CHECKING:
 def sample_deployment_info() -> DeploymentInfo:
     """Sample DeploymentInfo for testing."""
     return DeploymentInfo(
-        id=uuid4(),
+        id=DeploymentID(uuid4()),
         metadata=DeploymentMetadata(
             name="test-deployment",
             domain="default",
@@ -54,16 +58,20 @@ def sample_deployment_info() -> DeploymentInfo:
         ),
         state=DeploymentState(
             lifecycle=EndpointLifecycle.PENDING,
+            scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
-        replica_spec=ReplicaSpec(
+        replica=ReplicaData(
             replica_count=1,
             desired_replica_count=None,
         ),
-        network=DeploymentNetworkSpec(
+        network=DeploymentNetworkData(
             open_to_public=False,
+            access_token_ids=None,
+            url=None,
+            preferred_domain_name=None,
         ),
-        model_revisions=[],
+        options=DeploymentOptions(),
     )
 
 
@@ -72,7 +80,7 @@ def sample_deployment_with_history(
     sample_deployment_info: DeploymentInfo,
 ) -> DeploymentWithHistory:
     """Sample DeploymentWithHistory for testing."""
-    return DeploymentWithHistory(deployment_info=sample_deployment_info)
+    return DeploymentWithHistory(deployment_info=sample_deployment_info, last_history=None)
 
 
 @pytest.fixture
@@ -96,7 +104,7 @@ def sample_deployment_execution_error(
 def mock_deployment_repository() -> AsyncMock:
     """Mock DeploymentRepository with minimal implementation."""
     mock = AsyncMock(spec=DeploymentRepository)
-    mock.get_deployments_for_handler = AsyncMock(return_value=[])
+    mock.search_deployments_with_last_history = AsyncMock(return_value=[])
     mock.update_endpoint_lifecycle_bulk_with_history = AsyncMock(return_value=0)
     mock.get_db_now = AsyncMock(return_value=None)
     return mock
@@ -173,9 +181,10 @@ def mock_handler_with_success(
     """Handler that returns success result."""
     mock = MagicMock(spec=DeploymentHandler)
     mock.name = MagicMock(return_value="check_pending")
+    mock.category = MagicMock(return_value=DeploymentHandlerCategory.LIFECYCLE)
     mock.lock_id = None
     mock.target_statuses = MagicMock(
-        return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING)]
+        return_value=DeploymentTargetStatuses(lifecycle_stages=[EndpointLifecycle.PENDING])
     )
     mock.status_transitions = MagicMock(
         return_value=DeploymentStatusTransitions(
@@ -199,9 +208,10 @@ def mock_handler_with_failure(
     destroyed = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED)
     mock = MagicMock(spec=DeploymentHandler)
     mock.name = MagicMock(return_value="check_pending")
+    mock.category = MagicMock(return_value=DeploymentHandlerCategory.LIFECYCLE)
     mock.lock_id = None
     mock.target_statuses = MagicMock(
-        return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING)]
+        return_value=DeploymentTargetStatuses(lifecycle_stages=[EndpointLifecycle.PENDING])
     )
     mock.status_transitions = MagicMock(
         return_value=DeploymentStatusTransitions(
@@ -226,9 +236,10 @@ def mock_handler_with_empty_result() -> MagicMock:
     """Handler that returns empty result."""
     mock = MagicMock(spec=DeploymentHandler)
     mock.name = MagicMock(return_value="check_pending")
+    mock.category = MagicMock(return_value=DeploymentHandlerCategory.LIFECYCLE)
     mock.lock_id = None
     mock.target_statuses = MagicMock(
-        return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING)]
+        return_value=DeploymentTargetStatuses(lifecycle_stages=[EndpointLifecycle.PENDING])
     )
     mock.status_transitions = MagicMock(
         return_value=DeploymentStatusTransitions(
@@ -260,7 +271,7 @@ def coordinator_with_pending_deployments(
     sample_deployment_with_history: DeploymentWithHistory,
 ) -> Generator[DeploymentCoordinator, None, None]:
     """Coordinator with PENDING deployments available."""
-    mock_deployment_repository.get_deployments_for_handler = AsyncMock(
+    mock_deployment_repository.search_deployments_with_last_history = AsyncMock(
         return_value=[sample_deployment_with_history]
     )
 
@@ -268,6 +279,7 @@ def coordinator_with_pending_deployments(
         valkey_schedule=mock_valkey_schedule,
         deployment_controller=mock_deployment_controller,
         deployment_repository=mock_deployment_repository,
+        runtime_variant_repository=MagicMock(),
         event_producer=mock_event_producer,
         lock_factory=mock_lock_factory,
         config_provider=mock_config_provider,
@@ -295,12 +307,13 @@ def coordinator_without_deployments(
     mock_route_controller: MagicMock,
 ) -> Generator[DeploymentCoordinator, None, None]:
     """Coordinator with no deployments available."""
-    mock_deployment_repository.get_deployments_for_handler = AsyncMock(return_value=[])
+    mock_deployment_repository.search_deployments_with_last_history = AsyncMock(return_value=[])
 
     coordinator = DeploymentCoordinator(
         valkey_schedule=mock_valkey_schedule,
         deployment_controller=mock_deployment_controller,
         deployment_repository=mock_deployment_repository,
+        runtime_variant_repository=MagicMock(),
         event_producer=mock_event_producer,
         lock_factory=mock_lock_factory,
         config_provider=mock_config_provider,
@@ -397,7 +410,7 @@ class TestProcessDeploymentLifecycle:
         mock_handler.name = MagicMock(return_value="deploying_progressing")
         mock_handler.lock_id = None
         mock_handler.target_statuses = MagicMock(
-            return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)]
+            return_value=DeploymentTargetStatuses(lifecycle_stages=[EndpointLifecycle.DEPLOYING])
         )
         mock_handler.status_transitions = MagicMock(
             return_value=DeploymentStatusTransitions(
@@ -433,7 +446,7 @@ class TestProcessDeploymentLifecycle:
         mock_handler.name = MagicMock(return_value="deploying_progressing")
         mock_handler.lock_id = None
         mock_handler.target_statuses = MagicMock(
-            return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)]
+            return_value=DeploymentTargetStatuses(lifecycle_stages=[EndpointLifecycle.DEPLOYING])
         )
         mock_handler.status_transitions = MagicMock(
             return_value=DeploymentStatusTransitions(

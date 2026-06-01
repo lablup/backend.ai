@@ -7,17 +7,15 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -108,12 +106,10 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
 
 def create_default_scheduler_components(
     repository: SchedulerRepository,
-    deployment_repository: DeploymentRepository,
     fair_share_repository: FairShareRepository,
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
-    event_producer: EventProducer,
     valkey_schedule: ValkeyScheduleClient,
 ) -> SchedulerComponents:
     """
@@ -121,12 +117,10 @@ def create_default_scheduler_components(
 
     Args:
         repository: The repository for accessing system data
-        deployment_repository: The deployment repository
         fair_share_repository: The fair share repository for sequencing
         config_provider: The manager configuration provider
         agent_client_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
-        event_producer: Event producer for publishing events
         valkey_schedule: Valkey client for scheduling operations
 
     Returns:
@@ -188,10 +182,8 @@ def create_default_scheduler_components(
         launcher=launcher,
         terminator=terminator,
         repository=repository,
-        deployment_repository=deployment_repository,
         config_provider=config_provider,
         agent_client_pool=agent_client_pool,
-        event_producer=event_producer,
     )
 
 

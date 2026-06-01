@@ -49,12 +49,13 @@ from ai.backend.manager.models.image import ImageRow, ImageType
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture()
 async def test_group_for_deletion(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
     """Create a test group specifically for deletion/purge tests."""
@@ -67,7 +68,7 @@ async def test_group_for_deletion(
                 name=group_name,
                 description=f"Group for deletion test {group_name}",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -80,7 +81,7 @@ async def test_group_for_deletion(
 @pytest.fixture()
 async def group_with_vfolder_mounted(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     scaling_group_fixture: str,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
@@ -102,7 +103,7 @@ async def group_with_vfolder_mounted(
                 name=group_name,
                 description="Group with mounted vfolder",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -114,7 +115,7 @@ async def group_with_vfolder_mounted(
                 user=user_uuid,
                 group=group_id,
                 host="local",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 quota_scope_id=QuotaScopeID(QuotaScopeType.USER, user_uuid),
             )
         )
@@ -127,7 +128,7 @@ async def group_with_vfolder_mounted(
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 scaling_group_name=scaling_group_fixture,
@@ -151,7 +152,7 @@ async def group_with_vfolder_mounted(
                 cluster_size=1,
                 group_id=group_id,
                 user_uuid=user_uuid,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 scaling_group=scaling_group_fixture,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
@@ -184,7 +185,7 @@ async def group_with_vfolder_mounted(
 @pytest.fixture()
 async def group_with_active_kernel(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     scaling_group_fixture: str,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
@@ -205,7 +206,7 @@ async def group_with_active_kernel(
                 name=group_name,
                 description="Group with active kernel",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -218,7 +219,7 @@ async def group_with_active_kernel(
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 scaling_group_name=scaling_group_fixture,
@@ -242,7 +243,7 @@ async def group_with_active_kernel(
                 cluster_size=1,
                 group_id=group_id,
                 user_uuid=user_uuid,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 scaling_group=scaling_group_fixture,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
@@ -271,7 +272,7 @@ async def group_with_active_kernel(
 @pytest.fixture()
 async def group_with_active_endpoint(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
     scaling_group_fixture: str,
@@ -292,7 +293,7 @@ async def group_with_active_endpoint(
                 name=group_name,
                 description="Group with active endpoint",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -331,7 +332,7 @@ async def group_with_active_endpoint(
                 id=endpoint_id,
                 name=f"ep-{secrets.token_hex(4)}",
                 project=group_id,
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 created_user=user_uuid,
                 session_owner=user_uuid,
                 resource_group=scaling_group_fixture,
@@ -360,7 +361,7 @@ async def group_with_active_endpoint(
 @pytest.fixture()
 async def multiple_test_groups(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[list[uuid.UUID]]:
     """Create multiple test groups for search tests."""
@@ -376,7 +377,7 @@ async def multiple_test_groups(
                     name=f"search-test-{unique}-{i}",
                     description=f"Search test group {i}",
                     is_active=True,
-                    domain_name=domain_fixture,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=resource_policy_fixture,
                 )
             )
@@ -570,18 +571,18 @@ class TestGroupSearch:
     async def test_search_with_domain_filter(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """S-3: Search with domain filter → groups in domain."""
         result = await admin_registry.group.search(
             SearchGroupsRequest(
-                filter=GroupFilter(domain_name=StringFilter(equals=domain_fixture)),
+                filter=GroupFilter(domain_name=StringFilter(equals=domain_fixture.domain_name)),
                 limit=10,
             ),
         )
         assert isinstance(result, SearchGroupsResponse)
         for group in result.groups:
-            assert group.domain_name == domain_fixture
+            assert group.domain_name == domain_fixture.domain_name
 
     @pytest.mark.xfail(
         strict=True,

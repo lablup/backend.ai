@@ -31,14 +31,6 @@ class EtcdDependency(BootstrapDependency[AsyncEtcd]):
         async with AsyncEtcd.create_from_config(setup_input.etcd.to_dataclass()) as etcd:
             yield etcd
 
-    def gen_health_checkers(self, resource: AsyncEtcd) -> ServiceHealthChecker:
-        """
-        Return health checker for etcd.
-
-        Args:
-            resource: The initialized etcd client
-
-        Returns:
-            EtcdHealthChecker for etcd
-        """
+    def gen_liveness_checker(self, resource: AsyncEtcd) -> ServiceHealthChecker:
+        """Liveness — stuck etcd connection observed; restart is the recovery path."""
         return EtcdHealthChecker(etcd=resource)

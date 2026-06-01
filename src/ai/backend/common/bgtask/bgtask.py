@@ -18,6 +18,7 @@ from typing import (
 )
 
 from ai.backend.common.bgtask.exception import InvalidTaskMetadataError
+from ai.backend.common.bgtask.tasks import BgtaskHeartbeatTask, BgtaskRetryTask
 from ai.backend.common.bgtask.types import (
     WHOLE_TASK_KEY,
     BgTaskKey,
@@ -34,6 +35,7 @@ from ai.backend.common.clients.valkey_client.valkey_bgtask.client import (
     TaskSetKey,
     ValkeyBgtaskClient,
 )
+from ai.backend.common.cron import LocalCron
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
@@ -83,10 +85,6 @@ type BgtaskEvents = (
     | BgtaskFailedEvent
     | BgtaskPartialSuccessEvent
 )
-
-
-_HEARTBEAT_INTERVAL = 60  # 1 minute
-_HEARTBEAT_CHECK_INTERVAL = 300  # 5 minutes
 
 
 @dataclass
@@ -268,8 +266,7 @@ class BackgroundTaskManager:
     _task_set_key: TaskSetKey
     _task_registry: BackgroundTaskHandlerRegistry
 
-    _heartbeat_loop_task: asyncio.Task[Any]
-    _retry_loop_task: asyncio.Task[Any]
+    _local_cron: LocalCron
 
     def __init__(
         self,
@@ -297,8 +294,11 @@ class BackgroundTaskManager:
             ValkeyUnregisterHook(valkey_client, self._task_set_key),
         ])
         self._task_registry = task_registry or BackgroundTaskHandlerRegistry()
-        self._heartbeat_loop_task = asyncio.create_task(self._heartbeat_loop())
-        self._retry_loop_task = asyncio.create_task(self._retry_loop())
+        self._local_cron = LocalCron([
+            BgtaskHeartbeatTask(self),
+            BgtaskRetryTask(self),
+        ])
+        asyncio.create_task(self._local_cron.start())
 
     def set_registry(self, registry: BackgroundTaskHandlerRegistry) -> None:
         self._task_registry = registry
@@ -335,16 +335,7 @@ class BackgroundTaskManager:
                     await async_task
                 except asyncio.CancelledError:
                     pass
-        try:
-            self._heartbeat_loop_task.cancel()
-            await self._heartbeat_loop_task
-        except asyncio.CancelledError:
-            pass
-        try:
-            self._retry_loop_task.cancel()
-            await self._retry_loop_task
-        except asyncio.CancelledError:
-            pass
+        await self._local_cron.stop()
 
     def _convert_bgtask_to_event(
         self, task_id: uuid.UUID, bgtask_result: DispatchResult[Any] | str | None
@@ -549,40 +540,29 @@ class BackgroundTaskManager:
                         last_message=last_message,
                     )
 
-    async def _heartbeat_loop(self) -> None:
-        """Periodically update heartbeat for running background tasks"""
-        while True:
-            try:
-                # Update heartbeat for all ongoing background tasks
-                alive_task_info: list[TaskTotalInfo] = []
-                for bg_task in self._ongoing_tasks.values():
-                    if bg_task.retriable():
-                        alive_task_info.append(bg_task.total_info())
-                await self._valkey_client.heartbeat(
-                    alive_task_info,
-                    self._task_set_key,
-                )
-            except Exception as e:
-                log.exception("Exception in heartbeat loop: {}", e)
-            await asyncio.sleep(_HEARTBEAT_INTERVAL)
+    async def do_heartbeat(self) -> None:
+        """Publish a heartbeat for ongoing background tasks. One iteration."""
+        alive_task_info: list[TaskTotalInfo] = []
+        for bg_task in self._ongoing_tasks.values():
+            if bg_task.retriable():
+                alive_task_info.append(bg_task.total_info())
+        await self._valkey_client.heartbeat(
+            alive_task_info,
+            self._task_set_key,
+        )
 
-    async def _retry_loop(self) -> None:
-        """Main recovery loop that checks for failed/stale tasks"""
-        while True:
-            try:
-                unmanaged_task_total_info_list = await self._valkey_client.fetch_unmanaged_tasks(
-                    self._task_set_key
-                )
-                async_tasks = [
-                    self._retry_bgtask(total_info) for total_info in unmanaged_task_total_info_list
-                ]
-                results = await asyncio.gather(*async_tasks, return_exceptions=True)
-                for result in results:
-                    if isinstance(result, BaseException):
-                        log.exception("Exception in retry loop: {}", result)
-            except Exception as e:
-                log.exception("Exception in retry loop: {}", e)
-            await asyncio.sleep(_HEARTBEAT_CHECK_INTERVAL)
+    async def do_retry_check(self) -> None:
+        """Scan for stale/failed tasks and revive them. One iteration."""
+        unmanaged_task_total_info_list = await self._valkey_client.fetch_unmanaged_tasks(
+            self._task_set_key
+        )
+        async_tasks = [
+            self._retry_bgtask(total_info) for total_info in unmanaged_task_total_info_list
+        ]
+        results = await asyncio.gather(*async_tasks, return_exceptions=True)
+        for result in results:
+            if isinstance(result, BaseException):
+                log.exception("Exception in retry loop: {}", result)
 
     async def _retry_bgtask(self, total_info: TaskTotalInfo) -> None:
         """Retry a background task"""

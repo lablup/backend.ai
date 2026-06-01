@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
@@ -19,6 +18,7 @@ from ai.backend.common.service_discovery.service_discovery import (
 from ai.backend.common.types import ValkeyProfileTarget
 from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
 from ai.backend.manager.api.rest.types import CORSOptions
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -29,7 +29,6 @@ from .gql_adapter import GQLAdapterDependency
 from .health_probe import HealthProbeDependency, HealthProbeInput
 from .jwt_validator import JWTValidatorDependency
 from .metrics import MetricsDependency
-from .prometheus_client import PrometheusClientDependency
 from .service_discovery import ServiceDiscoveryDependency, ServiceDiscoveryInput
 
 
@@ -46,6 +45,7 @@ class SystemInput:
     db: ExtendedAsyncSAEngine
     event_producer: EventProducer
     valkey_profile_target: ValkeyProfileTarget
+    prometheus_client: PrometheusClient
 
 
 @dataclass
@@ -90,9 +90,7 @@ class SystemComposer(DependencyComposer[SystemInput, SystemResources]):
 
         # Layer 1: Config-dependent services
         jwt_validator = await stack.enter_dependency(JWTValidatorDependency(), setup_input.config)
-        prometheus_client = await stack.enter_dependency(
-            PrometheusClientDependency(), setup_input.config
-        )
+        prometheus_client = setup_input.prometheus_client
         sd_resources = await stack.enter_dependency(
             ServiceDiscoveryDependency(),
             ServiceDiscoveryInput(

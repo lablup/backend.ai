@@ -259,6 +259,14 @@
   # ranges.
   # Added in 25.12.0
   port-range = "[30000, 32000]"
+  # Minimum seconds between releasing a host port and reallocating it to a new
+  # container. Mitigates TCP TIME_WAIT and stale firewall/monitoring state by
+  # ensuring recently freed ports are not immediately reused. Set to 0 to
+  # disable cooldown (any released port may be reused immediately). Note: this
+  # cooldown only applies to container-driven allocations; the RPC assign_port
+  # path bypasses cooldown for emergency/dynamic allocation.
+  # Added in 26.5.0
+  port-reuse-cooldown-sec = 60
   # Method for collecting container resource statistics. 'docker' uses Docker's
   # stats API (most compatible). 'cgroup' reads from cgroup filesystem directly
   # (more accurate, requires root). 'null' disables statistics collection.

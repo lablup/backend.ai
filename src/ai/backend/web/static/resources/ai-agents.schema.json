@@ -1,134 +1,329 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lablup.com/schemas/ai-agents-bundle.schema.json",
+  "title": "AIAgentsBundle",
+  "description": "Bundle of built-in AgentProfile entries shipped with Backend.AI WebUI. Follows the lablup/agent-catalog AgentProfile schema for each entry.",
   "type": "object",
+  "required": [
+    "version",
+    "updatedAt",
+    "profiles"
+  ],
+  "additionalProperties": false,
   "properties": {
-    "agents": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "profiles": {
       "type": "array",
       "items": {
-        "type": "object",
-        "required": ["config", "meta"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "The agent identifier"
-          },
-          "meta": {
-            "type": "object",
-            "required": ["title"],
-            "properties": {
-              "avatar": {
-                "type": "string",
-                "description": "The agent's avatar (emoji character)"
-              },
-              "background": {
-                "oneOf": [
-                  {
-                    "type": "string",
-                    "description": "Background color (CSS color value) or image URL"
-                  }
-                ]
-              },
-              "title": {
-                "type": "string",
-                "description": "Display title of the agent"
-              },
-              "descriptions": {
-                "type": "string",
-                "description": "Detailed description of the agent's capabilities"
-              },
-              "tags": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Tags for categorizing and filtering agents"
-              }
-            }
-          },
-          "endpoint": {
-            "type": "string",
-            "description": "The endpoint name"
-          },
-          "endpoint_id": {
-            "type": "string",
-            "description": "The endpoint identifier"
-          },
-          "endpoint_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "The external endpoint URL for the agent"
-          },
-          "endpoint_token": {
-            "type": "string",
-            "description": "The token (API key) for the external endpoint"
-          },
-          "config": {
-            "type": "object",
-            "required": ["system_prompt"],
-            "properties": {
-              "system_prompt": {
-                "type": "string",
-                "description": "The system prompt for the agent"
-              },
-              "default_model": {
-                "type": "string",
-                "description": "The default model name for the agent"
-              }
-            },
-            "additionalProperties": true
-          },
-          "params": {
-            "type": "object",
-            "properties": {
-              "temperature": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 2,
-                "default": 1,
-                "description": "Controls randomness in the output. Higher values mean more random completions."
-              },
-              "max_tokens": {
-                "type": "integer",
-                "minimum": 1,
-                "description": "The maximum number of tokens to generate"
-              },
-              "top_p": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1,
-                "default": 1,
-                "description": "Controls diversity via nucleus sampling"
-              },
-              "frequency_penalty": {
-                "type": "number",
-                "minimum": -2,
-                "maximum": 2,
-                "default": 0,
-                "description": "How much to penalize new tokens based on their existing frequency"
-              },
-              "presence_penalty": {
-                "type": "number",
-                "minimum": -2,
-                "maximum": 2,
-                "default": 0,
-                "description": "How much to penalize new tokens based on whether they appear in the text so far"
-              },
-              "stop": {
-                "oneOf": [
-                  { "type": "string" },
-                  {
-                    "type": "array",
-                    "items": { "type": "string" }
-                  }
-                ],
-                "description": "Sequences where the API will stop generating further tokens"
-              }
-            },
-            "additionalProperties": true
-          }
-        }
+        "$ref": "#/$defs/AgentProfile"
       }
     }
   },
-  "required": ["agents"]
+  "$defs": {
+    "AgentProfile": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "Optional JSON Schema reference for editor support."
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier (typically UUID v4 or a human-readable slug like 'catalog-python-expert').",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for this profile.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description of what this profile does.",
+          "default": "",
+          "maxLength": 2000
+        },
+        "version": {
+          "type": "string",
+          "description": "Profile version following semver (e.g., '1.0.0').",
+          "default": "1.0.0",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?(\\+[a-zA-Z0-9.]+)?$"
+        },
+        "author": {
+          "type": "string",
+          "description": "Author of this profile.",
+          "default": ""
+        },
+        "icon": {
+          "type": "string",
+          "description": "Emoji or icon identifier for display.",
+          "default": "\ud83e\udd16"
+        },
+        "category": {
+          "$ref": "#/$defs/AgentCategory",
+          "description": "Classification category for this profile.",
+          "default": "custom_agent"
+        },
+        "systemPrompt": {
+          "type": "string",
+          "description": "System prompt text that defines the agent's persona and behavior.",
+          "default": ""
+        },
+        "instructions": {
+          "type": "string",
+          "description": "Standing instructions applied to every task.",
+          "default": ""
+        },
+        "toolConfig": {
+          "$ref": "#/$defs/ToolConfig",
+          "description": "Tool access and permission configuration.",
+          "default": {}
+        },
+        "modelPreferences": {
+          "$ref": "#/$defs/ModelPreferences",
+          "description": "Model requirements and preferences.",
+          "default": {}
+        },
+        "settingsOverrides": {
+          "$ref": "#/$defs/AgentSettingsOverrides",
+          "description": "Operational settings overrides.",
+          "default": {}
+        },
+        "translations": {
+          "type": "object",
+          "description": "Per-locale translation overlays. Keys are IETF BCP 47 locale strings (e.g., 'ko', 'ja', 'zh-Hans'). Missing translations fall back to the base (English) fields.",
+          "default": {},
+          "additionalProperties": {
+            "$ref": "#/$defs/ProfileTranslation"
+          },
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 35
+          }
+        },
+        "tags": {
+          "type": "array",
+          "description": "Searchable tags for categorization and discovery.",
+          "default": [],
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "maxLength": 50
+          }
+        },
+        "isBuiltin": {
+          "type": "boolean",
+          "description": "Whether this is a built-in template (cannot be deleted or modified).",
+          "default": false
+        },
+        "isCommunity": {
+          "type": "boolean",
+          "description": "Whether this profile was sourced from the community marketplace.",
+          "default": false
+        },
+        "sourceUrl": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Origin URL for community-sourced profiles.",
+          "format": "uri"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp of when this profile was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp of when this profile was last updated.",
+          "format": "date-time"
+        }
+      },
+      "description": "A comprehensive agent profile for the Backend.AI Agent Marketplace. Defines an agent's identity, prompts, tool permissions, model preferences, and operational settings."
+    },
+    "AgentCategory": {
+      "type": "string",
+      "description": "Classification of an agent profile's primary purpose.",
+      "enum": [
+        "code_assistant",
+        "research_analyst",
+        "document_creator",
+        "data_analyst",
+        "custom_agent",
+        "utility"
+      ]
+    },
+    "ToolConfig": {
+      "type": "object",
+      "description": "Configuration for tool access and permissions within an agent profile.",
+      "additionalProperties": false,
+      "properties": {
+        "enabledTools": {
+          "type": "array",
+          "description": "Tool names that are explicitly enabled for this profile.",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "disabledTools": {
+          "type": "array",
+          "description": "Tool names that are explicitly disabled for this profile.",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "toolPermissionOverrides": {
+          "type": "object",
+          "description": "Per-tool permission level overrides. Values must be one of the ToolPermission variants.",
+          "default": {},
+          "additionalProperties": {
+            "$ref": "#/$defs/ToolPermission"
+          }
+        },
+        "customToolConfigs": {
+          "type": "object",
+          "description": "Tool-specific configuration as arbitrary JSON (e.g., shell timeout, file size limits).",
+          "default": {},
+          "additionalProperties": true
+        }
+      }
+    },
+    "ToolPermission": {
+      "type": "string",
+      "description": "Permission level for a tool.",
+      "enum": [
+        "always_allow",
+        "ask_once",
+        "ask_always",
+        "never_allow"
+      ]
+    },
+    "ModelPreferences": {
+      "type": "object",
+      "description": "Model preferences for an agent profile.",
+      "additionalProperties": false,
+      "properties": {
+        "preferredModelId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Preferred model identifier to use with this profile."
+        },
+        "minContextWindow": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Minimum context window size (in tokens) required by this profile.",
+          "minimum": 0
+        },
+        "requiresToolCalling": {
+          "type": "boolean",
+          "description": "Whether this profile requires tool calling / function calling support.",
+          "default": false
+        },
+        "requiresVision": {
+          "type": "boolean",
+          "description": "Whether this profile requires vision / multimodal support.",
+          "default": false
+        }
+      }
+    },
+    "AgentSettingsOverrides": {
+      "type": "object",
+      "description": "Operational settings that a profile can override from global defaults. All fields are optional; null means 'use the global default'.",
+      "additionalProperties": false,
+      "properties": {
+        "maxIterations": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum agent loop iterations before forced termination.",
+          "minimum": 1
+        },
+        "maxToolCalls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum tool calls allowed per agent run.",
+          "minimum": 1
+        },
+        "defaultTimeout": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Default timeout for tool execution in seconds.",
+          "minimum": 1
+        },
+        "contextCompressionThreshold": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Token count threshold for triggering context compression.",
+          "minimum": 0
+        },
+        "allowedPaths": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "Filesystem paths the agent is permitted to access.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ProfileTranslation": {
+      "type": "object",
+      "description": "Per-locale translation overlay for translatable agent profile fields. All fields are optional \u2014 missing translations fall back to the base (English) field.",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Translated display name.",
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "description": "Translated description.",
+          "maxLength": 2000
+        },
+        "systemPrompt": {
+          "type": "string",
+          "description": "Translated system prompt."
+        },
+        "instructions": {
+          "type": "string",
+          "description": "Translated standing instructions."
+        }
+      }
+    }
+  }
 }

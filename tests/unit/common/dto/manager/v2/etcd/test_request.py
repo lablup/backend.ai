@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.etcd.request import (
     GetResourceMetadataInput,
     SetConfigInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestGetConfigInput:
@@ -34,15 +35,15 @@ class TestGetConfigInput:
         assert req.key == "/config/key"
 
     def test_blank_key_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetConfigInput(key="   ")
 
     def test_empty_key_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetConfigInput(key="")
 
     def test_missing_key_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetConfigInput.model_validate({})
 
     def test_round_trip(self) -> None:
@@ -93,11 +94,11 @@ class TestSetConfigInput:
         assert req.key == "/config/key"
 
     def test_blank_key_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SetConfigInput(key="   ", value="val")
 
     def test_empty_key_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SetConfigInput(key="", value="val")
 
     def test_round_trip_with_string_value(self) -> None:
@@ -136,15 +137,15 @@ class TestDeleteConfigInput:
         assert req.key == "/config/key"
 
     def test_blank_key_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteConfigInput(key="   ")
 
     def test_empty_key_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteConfigInput(key="")
 
     def test_missing_key_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteConfigInput.model_validate({})
 
     def test_round_trip(self) -> None:

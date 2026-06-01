@@ -16,7 +16,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import LoginClientTypeIdPathParam
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.login_client_type import LoginClientTypeAdapter
+    from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

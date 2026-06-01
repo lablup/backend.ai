@@ -34,11 +34,11 @@ from ai.backend.manager.api.gql.utils import check_admin_only
     BackendAIGQLMeta(
         added_version="26.3.0", description="Create a new query definition (admin only)"
     )
-)  # type: ignore[misc]
+)
 async def admin_create_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     input: CreateQueryDefinitionInput,
-) -> CreateQueryDefinitionPayload:
+) -> CreateQueryDefinitionPayload | None:
     check_admin_only()
     result = await info.context.adapters.prometheus_query_preset.create(input.to_pydantic())
     return CreateQueryDefinitionPayload.from_pydantic(
@@ -50,12 +50,12 @@ async def admin_create_prometheus_query_preset(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Modify an existing query definition (admin only)."
     )
-)  # type: ignore[misc]
+)
 async def admin_modify_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
     input: ModifyQueryDefinitionInput,
-) -> ModifyQueryDefinitionPayload:
+) -> ModifyQueryDefinitionPayload | None:
     check_admin_only()
     result = await info.context.adapters.prometheus_query_preset.update(
         UUID(id), input.to_pydantic()
@@ -67,11 +67,11 @@ async def admin_modify_prometheus_query_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Delete a query definition (admin only)")
-)  # type: ignore[misc]
+)
 async def admin_delete_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,
-) -> DeleteQueryDefinitionPayload:
+) -> DeleteQueryDefinitionPayload | None:
     check_admin_only()
     result = await info.context.adapters.prometheus_query_preset.delete(
         DeleteQueryDefinitionInputDTO(id=UUID(id))

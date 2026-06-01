@@ -26,6 +26,7 @@ from .plugins.base import PluginsInput
 from .plugins.monitoring import ErrorMonitorDependency, MonitoringInput, StatsMonitorDependency
 from .processing import ProcessingComposer, ProcessingInput, ProcessingResources
 from .system import SystemComposer, SystemInput, SystemResources
+from .system.prometheus_client import PrometheusClientDependency
 
 
 @dataclass
@@ -164,6 +165,9 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             MessagingInput(config=config),
         )
 
+        # Stage 5.5: Prometheus client (depends only on config, needed by Domain and System)
+        prometheus_client = await stack.enter_dependency(PrometheusClientDependency(), config)
+
         # Stage 6: Domain (notification center, distributed lock, repositories, services)
         domain = await stack.enter_composer(
             DomainComposer(),
@@ -176,6 +180,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 valkey_live=infrastructure.valkey.live,
                 valkey_schedule=infrastructure.valkey.schedule,
                 valkey_image=infrastructure.valkey.image,
+                prometheus_client=prometheus_client,
             ),
         )
 
@@ -222,6 +227,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 db=infrastructure.db,
                 event_producer=messaging.event_producer,
                 valkey_profile_target=config.redis.to_valkey_profile_target(),
+                prometheus_client=prometheus_client,
             ),
         )
 
@@ -242,6 +248,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 scheduler_repository=domain.repositories.scheduler.repository,
                 deployment_repository=domain.repositories.deployment.repository,
                 deployment_revision_preset_repository=domain.repositories.deployment_revision_preset.repository,
+                runtime_variant_repository=domain.repositories.runtime_variant.repository,
             ),
         )
 
@@ -262,6 +269,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 fair_share_repository=domain.repositories.fair_share.repository,
                 resource_usage_repository=domain.repositories.resource_usage_history.repository,
                 agent_client_pool=agents.agent_client_pool,
+                appproxy_client_pool=agents.appproxy_client_pool,
                 network_plugin_ctx=plugins.network_plugin_ctx,
                 scheduling_controller=agents.scheduling_controller,
                 deployment_controller=agents.deployment_controller,
@@ -269,6 +277,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 service_discovery=system.service_discovery,
                 prometheus_client=system.prometheus_client,
                 prometheus_query_preset_repository=domain.repositories.prometheus_query_preset.repository,
+                runtime_variant_repository=domain.repositories.runtime_variant.repository,
             ),
         )
 
@@ -308,8 +317,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 error_monitor=monitoring.error_monitor,
                 hook_plugin_ctx=plugins.hook_plugin_ctx,
                 deployment_controller=agents.deployment_controller,
-                revision_generator_registry=agents.revision_generator_registry,
-                model_definition_generator_registry=agents.model_definition_generator_registry,
+                route_controller=agents.route_controller,
                 agent_cache=components.agent_cache,
                 notification_center=domain.notification_center,
                 appproxy_client_pool=agents.appproxy_client_pool,

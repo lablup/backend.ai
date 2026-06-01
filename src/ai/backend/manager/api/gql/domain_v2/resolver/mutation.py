@@ -39,11 +39,11 @@ def _get_user_info() -> UserInfo:
         added_version="26.4.2",
         description="Create a new domain (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_domain_v2(
     info: Info[StrawberryGQLContext],
     input: CreateDomainInputGQL,
-) -> DomainPayloadGQL:
+) -> DomainPayloadGQL | None:
     """Create a new domain."""
     check_admin_only()
     ctx = info.context
@@ -56,12 +56,12 @@ async def admin_create_domain_v2(
         added_version="26.4.2",
         description="Update a domain (admin only). Requires superadmin privileges. Only provided fields will be updated.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
     input: UpdateDomainInputGQL,
-) -> DomainPayloadGQL:
+) -> DomainPayloadGQL | None:
     """Update a domain."""
     check_admin_only()
     ctx = info.context
@@ -76,11 +76,11 @@ async def admin_update_domain_v2(
         added_version="26.4.2",
         description="Soft-delete a domain (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
-) -> DeleteDomainPayloadGQL:
+) -> DeleteDomainPayloadGQL | None:
     """Soft-delete a domain."""
     check_admin_only()
     ctx = info.context
@@ -95,11 +95,11 @@ async def admin_delete_domain_v2(
         added_version="26.4.2",
         description="Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.",
     )
-)  # type: ignore[misc]
+)
 async def admin_purge_domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
-) -> PurgeDomainPayloadGQL:
+) -> PurgeDomainPayloadGQL | None:
     """Permanently purge a domain."""
     check_admin_only()
     ctx = info.context

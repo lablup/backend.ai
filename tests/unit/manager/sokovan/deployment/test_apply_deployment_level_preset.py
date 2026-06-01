@@ -16,7 +16,11 @@ import pytest
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import ClusterMode
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
     ModelRevisionCreator,
@@ -46,19 +50,19 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
 def _make_preset(
     *,
     open_to_public: bool | None = None,
-    replica_count: int | None = None,
+    replica_count: int = 1,
     revision_history_limit: int | None = None,
-    deployment_strategy: DeploymentStrategy | None = None,
+    deployment_strategy: DeploymentStrategy = DeploymentStrategy.ROLLING,
     deployment_strategy_spec: dict[str, Any] | None = None,
 ) -> DeploymentRevisionPresetData:
     """Build a minimal preset data object with the given deployment-level overrides."""
     return DeploymentRevisionPresetData(
-        id=uuid.uuid4(),
-        runtime_variant_id=uuid.uuid4(),
+        id=DeploymentPresetID(uuid.uuid4()),
+        runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
         name="test-preset",
         description=None,
         rank=100,
-        image_id=uuid.uuid4(),
+        image_id=ImageID(uuid.uuid4()),
         model_definition=None,
         resource_opts=[],
         cluster_mode="single-node",
@@ -71,14 +75,14 @@ def _make_preset(
         replica_count=replica_count,
         revision_history_limit=revision_history_limit,
         deployment_strategy=deployment_strategy,
-        deployment_strategy_spec=deployment_strategy_spec,
+        deployment_strategy_spec=deployment_strategy_spec or {},
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         updated_at=None,
     )
 
 
 def _make_creator(
-    preset_id: uuid.UUID | None,
+    preset_id: DeploymentPresetID | None,
     *,
     metadata_history_limit: int | None = None,
     replica_spec: ReplicaSpec | None = None,
@@ -106,8 +110,13 @@ def _make_creator(
                 cluster_size=1,
                 resource_slots={},
             ),
-            mounts=VFolderMountsCreator(model_vfolder_id=uuid.uuid4()),
-            execution=ExecutionSpec(runtime_variant=RuntimeVariant("custom")),
+            mounts=VFolderMountsCreator(
+                model_vfolder_id=VFolderUUID(uuid.uuid4()),
+                model_definition_path=None,
+                model_mount_destination="/models",
+                extra_mounts=[],
+            ),
+            execution=ExecutionSpec(runtime_variant_id=RuntimeVariantID(uuid.uuid4())),
             model_definition=None,
             revision_preset_id=preset_id,
         ),
@@ -136,8 +145,7 @@ def deployment_controller(mock_preset_repository: MagicMock) -> DeploymentContro
             storage_manager=MagicMock(),
             event_producer=MagicMock(),
             valkey_schedule=MagicMock(),
-            revision_generator_registry=MagicMock(),
-            model_definition_generator_registry=AsyncMock(),
+            revision_draft_reader=MagicMock(),
             deployment_revision_preset_repository=mock_preset_repository,
         )
     )
@@ -167,7 +175,7 @@ class TestApplyDeploymentLevelPreset:
         mock_preset_repository: MagicMock,
     ) -> None:
         """All five preset fields are applied when the caller leaves them unset."""
-        preset_id = uuid.uuid4()
+        preset_id = DeploymentPresetID(uuid.uuid4())
         mock_preset_repository.get_by_id = AsyncMock(
             return_value=_make_preset(
                 open_to_public=True,
@@ -199,7 +207,7 @@ class TestApplyDeploymentLevelPreset:
         mock_preset_repository: MagicMock,
     ) -> None:
         """When the caller specifies a value, the preset default is ignored."""
-        preset_id = uuid.uuid4()
+        preset_id = DeploymentPresetID(uuid.uuid4())
         mock_preset_repository.get_by_id = AsyncMock(
             return_value=_make_preset(
                 open_to_public=True,
@@ -229,31 +237,26 @@ class TestApplyDeploymentLevelPreset:
         assert resolved.network.open_to_public is False
         assert resolved.policy is explicit_policy
 
-    async def test_partial_preset_falls_back_per_field(
+    async def test_revision_history_limit_falls_back_when_preset_leaves_it_null(
         self,
         deployment_controller: DeploymentController,
         mock_preset_repository: MagicMock,
     ) -> None:
-        """Each preset field falls back to system default independently when null."""
-        preset_id = uuid.uuid4()
+        """``revision_history_limit`` is the only deployment-level preset field
+        that is still optional; when the preset does not specify it, the
+        system default is used."""
+        preset_id = DeploymentPresetID(uuid.uuid4())
         mock_preset_repository.get_by_id = AsyncMock(
             return_value=_make_preset(
                 open_to_public=True,
-                # replica_count, revision_history_limit, deployment_strategy left as None
+                revision_history_limit=None,
             )
         )
         creator = _make_creator(preset_id=preset_id)
 
         resolved = await deployment_controller._apply_deployment_level_preset(creator)
 
-        # Specified by preset.
-        assert resolved.network is not None
-        assert resolved.network.open_to_public is True
-        # Falls back to system defaults.
         assert resolved.metadata.revision_history_limit == 10
-        assert resolved.replica_spec is not None
-        assert resolved.replica_spec.replica_count == 1
-        assert resolved.policy is None
 
     async def test_preset_rolling_strategy_with_int_or_percent_spec(
         self,
@@ -261,7 +264,7 @@ class TestApplyDeploymentLevelPreset:
         mock_preset_repository: MagicMock,
     ) -> None:
         """Rolling-update strategy_spec is reconstructed from JSON dict."""
-        preset_id = uuid.uuid4()
+        preset_id = DeploymentPresetID(uuid.uuid4())
         rolling_dict = RollingUpdateSpec(
             max_surge=IntOrPercent(count=3),
             max_unavailable=IntOrPercent(percent=0.25),
@@ -282,17 +285,19 @@ class TestApplyDeploymentLevelPreset:
         assert resolved.policy.strategy_spec.max_surge.count == 3
         assert resolved.policy.strategy_spec.max_unavailable.percent == 0.25
 
-    async def test_preset_strategy_without_spec_uses_default_spec(
+    async def test_preset_strategy_with_empty_spec_uses_default_spec(
         self,
         deployment_controller: DeploymentController,
         mock_preset_repository: MagicMock,
     ) -> None:
-        """When the preset stores strategy without spec, the default spec is built."""
-        preset_id = uuid.uuid4()
+        """When the preset stores strategy with an empty spec dict, the default
+        spec is built. (``deployment_strategy_spec`` is now ``NOT NULL``; an
+        empty ``{}`` is the contract-level "no overrides" value.)"""
+        preset_id = DeploymentPresetID(uuid.uuid4())
         mock_preset_repository.get_by_id = AsyncMock(
             return_value=_make_preset(
                 deployment_strategy=DeploymentStrategy.ROLLING,
-                deployment_strategy_spec=None,
+                deployment_strategy_spec={},
             )
         )
         creator = _make_creator(preset_id=preset_id)

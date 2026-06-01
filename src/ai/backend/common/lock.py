@@ -147,7 +147,7 @@ class FileLock(AbstractDistributedLock):
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
-                log.debug(f"file lock implicitly released by watchdog: {self._path}")
+                log.debug("file lock implicitly released by watchdog: {}", self._path)
 
     @property
     def is_locked(self) -> bool:

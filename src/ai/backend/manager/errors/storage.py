@@ -212,6 +212,18 @@ class VFolderDeletionNotAllowed(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class VFolderHasLinkedModelCard(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-has-linked-model-card"
+    error_title = "Virtual folder has linked model card(s)."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class InsufficientStoragePermission(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage-permission-not-allowed"
     error_title = "The specified storage permission is not allowed."

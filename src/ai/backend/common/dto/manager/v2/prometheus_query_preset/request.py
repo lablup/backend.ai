@@ -12,9 +12,10 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
 from .types import OrderDirection, QueryDefinitionOrderField
+from .validators import validate_query_template
 
 __all__ = (
     # Options inputs
@@ -32,6 +33,8 @@ __all__ = (
     # Execute supporting
     "MetricLabelEntry",
     "ExecuteQueryDefinitionInput",
+    # Preview
+    "PreviewQueryDefinitionInput",
     # Query time range
     "QueryTimeRangeInputDTO",
 )
@@ -77,6 +80,12 @@ class CreateQueryDefinitionInput(BaseRequestModel):
         if not stripped:
             raise ValueError("name must not be blank or whitespace-only")
         return stripped
+
+    @field_validator("query_template")
+    @classmethod
+    def _validate_query_template(cls, v: str) -> str:
+        validate_query_template(v)
+        return v
 
 
 class ModifyQueryDefinitionOptionsInput(BaseRequestModel):
@@ -143,6 +152,13 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
             raise ValueError(f"Invalid Prometheus duration format: {v!r}")
         return v
 
+    @field_validator("query_template")
+    @classmethod
+    def _validate_query_template(cls, v: str | None) -> str | None:
+        if v is not None:
+            validate_query_template(v)
+        return v
+
 
 class DeleteQueryDefinitionInput(BaseRequestModel):
     """Input for deleting a prometheus query definition."""
@@ -154,7 +170,19 @@ class QueryDefinitionFilter(BaseRequestModel):
     """Filter for prometheus query definition search."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name")
-    category_id: UUID | None = Field(default=None, description="Filter by category ID")
+    category_id: UUIDFilter | None = Field(default=None, description="Filter by category ID")
+    AND: list[QueryDefinitionFilter] | None = Field(
+        default=None, description="AND logical combinator."
+    )
+    OR: list[QueryDefinitionFilter] | None = Field(
+        default=None, description="OR logical combinator."
+    )
+    NOT: list[QueryDefinitionFilter] | None = Field(
+        default=None, description="NOT logical combinator."
+    )
+
+
+QueryDefinitionFilter.model_rebuild()
 
 
 class QueryDefinitionOrder(BaseRequestModel):
@@ -204,6 +232,18 @@ class ExecuteQueryDefinitionOptionsInput(BaseRequestModel):
         default_factory=list,
         description="Group-by labels",
     )
+
+
+class PreviewQueryDefinitionInput(BaseRequestModel):
+    """Input for previewing a prometheus query template before saving (admin only)."""
+
+    query_template: str = Field(description="PromQL template to validate")
+
+    @field_validator("query_template")
+    @classmethod
+    def _validate_query_template(cls, v: str) -> str:
+        validate_query_template(v)
+        return v
 
 
 class ExecuteQueryDefinitionInput(BaseRequestModel):

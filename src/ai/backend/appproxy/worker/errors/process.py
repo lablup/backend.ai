@@ -25,17 +25,3 @@ class SubprocessPipeError(BackendAIError):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.NOT_READY,
         )
-
-
-class InvalidMatrixSizeError(BackendAIError):
-    """Raised when matrix size is inconsistent."""
-
-    error_type = "https://api.backend.ai/probs/appproxy-worker/invalid-matrix-size"
-    error_title = "Inconsistent matrix size."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.CHECK_LIMIT,
-            error_detail=ErrorDetail.MISMATCH,
-        )

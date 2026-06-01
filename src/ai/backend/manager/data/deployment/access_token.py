@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
+
+from ai.backend.common.identifier.deployment import DeploymentID
 
 
 @dataclass
 class ModelDeploymentAccessTokenCreator:
-    model_deployment_id: UUID
-    expires_at: datetime | None
+    model_deployment_id: DeploymentID
+    expires_at: datetime

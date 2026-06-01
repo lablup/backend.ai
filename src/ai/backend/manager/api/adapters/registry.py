@@ -4,54 +4,61 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.adapters.agent import AgentAdapter
-from ai.backend.manager.api.adapters.app_config import AppConfigAdapter
-from ai.backend.manager.api.adapters.artifact import ArtifactAdapter
-from ai.backend.manager.api.adapters.artifact_registry import ArtifactRegistryAdapter
-from ai.backend.manager.api.adapters.audit_log import AuditLogAdapter
-from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
-from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
-from ai.backend.manager.api.adapters.deployment_revision_preset import (
+from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
+from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
+from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
+from ai.backend.manager.api.adapters.artifact_registry.adapter import ArtifactRegistryAdapter
+from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
+from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
-from ai.backend.manager.api.adapters.domain import DomainAdapter
-from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
-from ai.backend.manager.api.adapters.huggingface_registry import HuggingFaceRegistryAdapter
-from ai.backend.manager.api.adapters.image import ImageAdapter
-from ai.backend.manager.api.adapters.login_client_type import LoginClientTypeAdapter
-from ai.backend.manager.api.adapters.login_history import LoginHistoryAdapter
-from ai.backend.manager.api.adapters.login_session import LoginSessionAdapter
-from ai.backend.manager.api.adapters.model_card import ModelCardAdapter
-from ai.backend.manager.api.adapters.notification import NotificationAdapter
-from ai.backend.manager.api.adapters.object_storage import ObjectStorageAdapter
-from ai.backend.manager.api.adapters.project import ProjectAdapter
-from ai.backend.manager.api.adapters.prometheus_query_preset import PrometheusQueryPresetAdapter
-from ai.backend.manager.api.adapters.prometheus_query_preset_category import (
+from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
+from ai.backend.manager.api.adapters.huggingface_registry.adapter import HuggingFaceRegistryAdapter
+from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
+from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
+from ai.backend.manager.api.adapters.login_history.adapter import LoginHistoryAdapter
+from ai.backend.manager.api.adapters.login_session.adapter import LoginSessionAdapter
+from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
+from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
+from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
+from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
+from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
+    PrometheusQueryPresetAdapter,
+)
+from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter import (
     PrometheusQueryPresetCategoryAdapter,
 )
-from ai.backend.manager.api.adapters.rbac import RBACAdapter
-from ai.backend.manager.api.adapters.reservoir_registry import ReservoirRegistryAdapter
-from ai.backend.manager.api.adapters.resource_allocation import ResourceAllocationAdapter
-from ai.backend.manager.api.adapters.resource_group import ResourceGroupAdapter
-from ai.backend.manager.api.adapters.resource_policy import ResourcePolicyAdapter
-from ai.backend.manager.api.adapters.resource_preset import ResourcePresetAdapter
-from ai.backend.manager.api.adapters.resource_slot import ResourceSlotAdapter
-from ai.backend.manager.api.adapters.resource_usage import ResourceUsageAdapter
-from ai.backend.manager.api.adapters.runtime_variant import RuntimeVariantAdapter
-from ai.backend.manager.api.adapters.runtime_variant_preset import RuntimeVariantPresetAdapter
-from ai.backend.manager.api.adapters.scheduling_history import SchedulingHistoryAdapter
-from ai.backend.manager.api.adapters.service_catalog import ServiceCatalogAdapter
-from ai.backend.manager.api.adapters.session import SessionAdapter
-from ai.backend.manager.api.adapters.storage_host import StorageHostAdapter
-from ai.backend.manager.api.adapters.storage_namespace import StorageNamespaceAdapter
-from ai.backend.manager.api.adapters.user import UserAdapter
-from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
-from ai.backend.manager.api.adapters.vfs_storage import VFSStorageAdapter
+from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
+from ai.backend.manager.api.adapters.reservoir_registry.adapter import ReservoirRegistryAdapter
+from ai.backend.manager.api.adapters.resource_allocation.adapter import ResourceAllocationAdapter
+from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
+from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
+from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
+from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
+from ai.backend.manager.api.adapters.resource_usage.adapter import ResourceUsageAdapter
+from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
+from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
+    RuntimeVariantPresetAdapter,
+)
+from ai.backend.manager.api.adapters.scheduling_handler.adapter import SchedulingHandlerAdapter
+from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
+from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
+from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
+from ai.backend.manager.api.adapters.storage_host.adapter import StorageHostAdapter
+from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNamespaceAdapter
+from ai.backend.manager.api.adapters.user.adapter import UserAdapter
+from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
+from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapter
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.config.unified import AuthConfig
     from ai.backend.manager.services.processors import Processors
+    from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
+    from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
 
 class Adapters:
@@ -95,6 +102,7 @@ class Adapters:
         deployment_revision_preset: DeploymentRevisionPresetAdapter,
         model_card: ModelCardAdapter,
         resource_usage: ResourceUsageAdapter,
+        scheduling_handler: SchedulingHandlerAdapter,
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
         session: SessionAdapter,
@@ -135,6 +143,7 @@ class Adapters:
         self.deployment_revision_preset = deployment_revision_preset
         self.model_card = model_card
         self.resource_usage = resource_usage
+        self.scheduling_handler = scheduling_handler
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
         self.session = session
@@ -149,9 +158,19 @@ class Adapters:
         cls,
         processors: Processors,
         auth_config: AuthConfig,
+        deployment_coordinator: DeploymentCoordinator,
+        schedule_coordinator: ScheduleCoordinator,
         config_provider: ManagerConfigProvider | None = None,
     ) -> Adapters:
-        """Factory that wires up all adapters from the shared Processors."""
+        """Factory that wires up all adapters from the shared Processors.
+
+        ``deployment_coordinator`` / ``schedule_coordinator`` are
+        threaded through to adapters that validate or enumerate live
+        handler names (``DeploymentAdapter``, ``ResourceGroupAdapter``,
+        ``SchedulingHandlerAdapter``) so that DTO-side validation and
+        catalog endpoints always agree with the coordinators' live
+        registrations.
+        """
         return cls(
             agent=AgentAdapter(processors),
             app_config=AppConfigAdapter(processors),
@@ -159,7 +178,7 @@ class Adapters:
             artifact_registry=ArtifactRegistryAdapter(processors),
             audit_log=AuditLogAdapter(processors),
             container_registry=ContainerRegistryAdapter(processors),
-            deployment=DeploymentAdapter(processors),
+            deployment=DeploymentAdapter(processors, deployment_coordinator),
             domain=DomainAdapter(processors),
             fair_share=FairShareAdapter(processors),
             huggingface_registry=HuggingFaceRegistryAdapter(processors),
@@ -175,7 +194,9 @@ class Adapters:
             rbac=RBACAdapter(processors),
             reservoir_registry=ReservoirRegistryAdapter(processors),
             resource_allocation=ResourceAllocationAdapter(processors, config_provider),
-            resource_group=ResourceGroupAdapter(processors),
+            resource_group=ResourceGroupAdapter(
+                processors, deployment_coordinator, schedule_coordinator
+            ),
             resource_policy=ResourcePolicyAdapter(processors),
             resource_preset=ResourcePresetAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
@@ -184,6 +205,7 @@ class Adapters:
             deployment_revision_preset=DeploymentRevisionPresetAdapter(processors),
             model_card=ModelCardAdapter(processors),
             resource_usage=ResourceUsageAdapter(processors),
+            scheduling_handler=SchedulingHandlerAdapter(deployment_coordinator),
             scheduling_history=SchedulingHistoryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),
             session=SessionAdapter(processors),

@@ -8,7 +8,6 @@ import itertools
 import math
 import numbers
 import textwrap
-import uuid
 from abc import ABC, ABCMeta, abstractmethod
 from collections import UserDict, UserString, defaultdict, namedtuple
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
@@ -27,7 +26,6 @@ from typing import (
     NewType,
     NotRequired,
     Self,
-    TypeAlias,
     TypedDict,
     TypeVar,
     cast,
@@ -43,16 +41,34 @@ import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
 from pydantic import (
+    AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
     PlainValidator,
     TypeAdapter,
+    ValidationError,
+    field_validator,
 )
+from pydantic_core import ErrorDetails
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
-from .exception import GenericNotImplementedError, InvalidIpAddressValue
+from .exception import (
+    BackendAIError,
+    BackendAISchemaValidationFailed,
+    GenericNotImplementedError,
+    InvalidIpAddressValue,
+    InvalidResourceSlotQuantity,
+    UnknownResourceSlotType,
+)
+
+# Deprecated re-export: new code should import ``ImageID`` from
+# ``ai.backend.common.identifier.image``. This line lets existing
+# ``from ai.backend.common.types import ImageID`` sites keep working and
+# will be removed once call sites are migrated.
+from .identifier.image import ImageID
+from .identifier.vfolder import VFolderUUID
 from .models.minilang.mount import MountPointParser
 
 __all__ = (
@@ -69,6 +85,7 @@ __all__ = (
     "AutoPullBehavior",
     "AutoScalingMetricComparator",
     "AutoScalingMetricSource",
+    "BackendAISchema",
     "BinarySize",
     "CIStrEnum",
     "CIStrEnumTrafaret",
@@ -83,12 +100,12 @@ __all__ = (
     "DeviceId",
     "DeviceModelInfo",
     "DeviceName",
-    "EndpointId",
     "HandlerForUnknownSlotName",
     "HardwareMetadata",
     "HostPID",
     "HostPortPair",
     "ImageConfig",
+    "ImageID",
     "ImageRegistry",
     "IntrinsicSlotNames",
     "ItemResult",
@@ -101,7 +118,9 @@ __all__ = (
     "MetricValue",
     "ModelServiceProfile",
     "ModelServiceStatus",
+    "SchemaValidationFailureInfo",
     "MountExpression",
+    "MountInfoEntry",
     "MountPermission",
     "MountPermissionLiteral",
     "MountPoint",
@@ -163,6 +182,77 @@ if TYPE_CHECKING:
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
 )
+
+
+@dataclass(frozen=True)
+class SchemaValidationFailureInfo:
+    """Pydantic-decoupled view of a failed ``model_validate*`` call,
+    passed to :meth:`BackendAISchema.build_validation_error`.
+
+    ``summary`` is ``str(pydantic.ValidationError)``; ``errors`` is
+    ``exc.errors()`` as-is.
+    """
+
+    summary: str
+    errors: list[ErrorDetails]
+
+
+class BackendAISchema(BaseModel):
+    """Pydantic base whose ``model_validate`` / ``model_validate_json``
+    auto-map ``ValidationError`` to a :class:`BackendAIError` (HTTP 4xx)
+    via :meth:`build_validation_error`. Subclasses override the
+    classmethod to inject a domain-specific 400::
+
+        class MyConfig(BackendAISchema):
+            @override
+            @classmethod
+            def build_validation_error(
+                cls, info: SchemaValidationFailureInfo
+            ) -> BackendAIError:
+                return MyConfigParseError(
+                    extra_msg=info.summary,
+                    extra_data={"errors": info.errors},
+                )
+    """
+
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        """Default override raising the generic
+        :class:`BackendAISchemaValidationFailed`."""
+        return BackendAISchemaValidationFailed(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
+    @classmethod
+    def _validation_failure_info(cls, exc: ValidationError) -> SchemaValidationFailureInfo:
+        # Strip ``input`` and ``ctx`` per-entry. ``ctx`` may carry
+        # non-JSON-serializable objects (e.g. a raised ``ValueError``
+        # from a ``model_validator``), and ``BackendAIError.__init__``
+        # eagerly serializes the response body via orjson, so those
+        # values would crash exception construction itself.
+        sanitized = [
+            cast(
+                ErrorDetails,
+                {k: v for k, v in err.items() if k not in ("input", "ctx")},
+            )
+            for err in exc.errors()
+        ]
+        return SchemaValidationFailureInfo(summary=str(exc), errors=sanitized)
+
+    @classmethod
+    def model_validate(cls, *args: Any, **kwargs: Any) -> Self:
+        try:
+            return super().model_validate(*args, **kwargs)
+        except ValidationError as e:
+            raise cls.build_validation_error(cls._validation_failure_info(e)) from e
+
+    @classmethod
+    def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
+        try:
+            return super().model_validate_json(*args, **kwargs)
+        except ValidationError as e:
+            raise cls.build_validation_error(cls._validation_failure_info(e)) from e
 
 
 class aobject:
@@ -306,7 +396,6 @@ HostPID = NewType("HostPID", PID)
 ContainerPID = NewType("ContainerPID", PID)
 
 ContainerId = NewType("ContainerId", str)
-EndpointId = NewType("EndpointId", UUID)
 RuleId = NewType("RuleId", UUID)
 SessionId = NewType("SessionId", UUID)
 KernelId = NewType("KernelId", UUID)
@@ -381,11 +470,11 @@ SecretKey = NewType("SecretKey", str)
 
 ClusterRole = NewType("ClusterRole", str)
 
-ImageID = NewType("ImageID", UUID)
 ImageCanonical = NewType("ImageCanonical", str)
 
 
 class ContainerStatus(enum.StrEnum):
+    CREATED = "created"
     RUNNING = "running"
     RESTARTING = "restarting"
     PAUSED = "paused"
@@ -609,8 +698,83 @@ class MountPermission(enum.StrEnum):
     READ_WRITE = "rw"
     RW_DELETE = "wd"
 
+    def cap(self, other: MountPermission | None) -> MountPermission:
+        """Cap ``other`` at ``self`` — return the more restrictive of the two.
+
+        Used at revision-write time so a caller cannot elevate beyond
+        what the vfolder itself grants: call as
+        ``vfolder_perm.cap(user_perm)``. If ``user_perm`` exceeds
+        ``vfolder_perm``, ``vfolder_perm`` is returned (silent
+        downgrade); otherwise ``user_perm`` passes through.
+
+        ``other=None`` expresses "no caller override", which is treated
+        the same as an override exceeding the cap — ``self`` is
+        returned. This lets call sites skip the surrounding ``is None``
+        branch.
+
+        Ordering: ``READ_ONLY`` < ``READ_WRITE`` < ``RW_DELETE``.
+        """
+        if other is None:
+            return self
+        order = _MOUNT_PERMISSION_ORDER
+        return self if order[other] > order[self] else other
+
+
+_MOUNT_PERMISSION_ORDER: dict[MountPermission, int] = {
+    MountPermission.READ_ONLY: 0,
+    MountPermission.READ_WRITE: 1,
+    MountPermission.RW_DELETE: 2,
+}
+
 
 MountPermissionLiteral = Literal["ro", "rw", "wd"]
+
+
+class MountInfoEntry(BackendAISchema):
+    """Revision-stored form of a user-supplied extra mount.
+
+    The row column persists these fields; the remaining ``VFolderMount``
+    fields (``name``, ``host_path``, ``usage_mode``) are re-derived at
+    session creation via ``prepare_vfolder_mounts``.
+
+    ``mount_destination`` is ``None`` when the caller did not provide one —
+    ``prepare_vfolder_mounts`` then defaults it to ``/home/work/{vfolder_name}``
+    at session creation time. The historical internal term ``kernel_path``
+    is accepted as a validation alias so legacy rows using that key still
+    decode.
+
+    ``mount_perm`` is ``None`` when the caller leaves permission
+    unspecified — the scheduler repository's ``prepare_vfolder_mounts``
+    then adopts the vfolder's stored permission at resolve time. A
+    concrete value here overrides the stored permission for this mount
+    and is frozen onto deployment revision rows so later vfolder
+    permission changes cannot retroactively alter already-spawned
+    sessions.
+
+    ``subpath`` is the path within the vfolder to mount. ``None`` (or the
+    string ``"."``) means mount the vfolder root.
+    """
+
+    vfolder_id: VFolderUUID = Field(
+        validation_alias=AliasChoices("vfolder_id", "vfid"),
+    )
+    mount_destination: str | None = Field(
+        validation_alias=AliasChoices("mount_destination", "kernel_path"),
+        default=None,
+    )
+    mount_perm: MountPermission | None = Field(default=None)
+    subpath: str | None = Field(
+        validation_alias=AliasChoices("subpath", "vfsubpath"),
+        default=None,
+    )
+
+    @field_validator("vfolder_id", mode="before")
+    @classmethod
+    def _strip_quota_scope_prefix(cls, value: Any) -> Any:
+        # Legacy `vfid` is `str(VFolderID)`; reuse the canonical parser.
+        if isinstance(value, str):
+            return VFolderID.from_str(value).folder_id
+        return value
 
 
 class MountTypes(enum.StrEnum):
@@ -627,18 +791,19 @@ class VFolderMountOptions:
     """Typed mount options for a single vfolder mount request."""
 
     permission: MountPermission | None = None
+    subpath: str | None = None
 
 
 @attrs.define(slots=True)
 class VFolderMountRequest:
     """A single vfolder mount request combining reference, destination path, and options."""
 
-    ref: str | uuid.UUID  # vfolder name (with optional /subpath) or UUID
+    ref: str | UUID  # vfolder name (with optional /subpath) or UUID
     dst_path: str | None = None  # custom mount destination path
     options: VFolderMountOptions = attrs.Factory(VFolderMountOptions)
 
 
-class MountPoint(BaseModel):
+class MountPoint(BackendAISchema):
     model_config = ConfigDict(
         validate_by_name=True,
         protected_namespaces=(),
@@ -1066,10 +1231,11 @@ class ResourceSlot(UserDict[str, Decimal]):
         try:
             if unit == SlotTypes.BYTES:
                 if isinstance(value, Decimal):
-                    return value
-                if isinstance(value, (int, float)):
-                    return Decimal(value)
-                value = Decimal(BinarySize.from_str(value))
+                    pass
+                elif isinstance(value, (int, float)):
+                    value = Decimal(value)
+                else:
+                    value = Decimal(BinarySize.from_str(value))
             else:
                 value = Decimal(value)
                 if value.is_finite():
@@ -1079,6 +1245,8 @@ class ResourceSlot(UserDict[str, Decimal]):
             ValueError,  # catch wrapped errors from BinarySize.from_str()
         ) as e:
             raise ValueError(f"Cannot convert the slot {key!r} to decimal: {value!r}") from e
+        if value.is_finite() and value < 0:
+            raise InvalidResourceSlotQuantity(f"Resource slot {key!r} cannot be negative: {value}")
         return value
 
     @classmethod
@@ -1114,7 +1282,7 @@ class ResourceSlot(UserDict[str, Decimal]):
                 if k not in data:
                     data[k] = fill
         except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
+            raise UnknownResourceSlotType(extra_msg=f"Unknown slot type: {e.args[0]!r}") from e
         return cls(data)
 
     @classmethod
@@ -1146,18 +1314,17 @@ class ResourceSlot(UserDict[str, Decimal]):
             extra_guide = ""
             if e.args[0] == "shmem":
                 extra_guide = " (Put it at the 'resource_opts' field in API, or use '--resource-opts shmem=...' in CLI)"
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide) from e
+            raise UnknownResourceSlotType(
+                extra_msg=f"Unknown slot type: {e.args[0]!r}" + extra_guide
+            ) from e
         return cls(data)
 
     def to_humanized(self, slot_types: Mapping[str, Any]) -> Mapping[str, str]:
-        try:
-            return {
-                k: type(self)._humanize_value(Decimal(v), slot_types[k])
-                for k, v in self.data.items()
-                if v is not None
-            }
-        except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
+        result: dict[str, str] = {}
+        for k, v in self.data.items():
+            slot_type = slot_types.get(k, self._guess_slot_type(k))
+            result[k] = self._humanize_value(Decimal(v), slot_type)
+        return result
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> ResourceSlot:
@@ -1181,6 +1348,41 @@ class SlotQuantity:
 
     slot_name: str
     quantity: Decimal
+
+
+class ResourceSlotEntry(BackendAISchema):
+    """List-friendly shared form of a single resource slot allocation.
+
+    The preferred replacement for the ``ResourceSlot`` ``UserDict`` in new
+    code paths — kept as a Pydantic model so ``data/`` layer types can
+    carry it without pulling in the legacy dict mechanics. Mirrors the
+    shape of :class:`ai.backend.common.dto.manager.v2.common.ResourceSlotEntryInput`
+    and :class:`ai.backend.manager.models.base.ResourceSlotEntry` so the
+    same entry list flows through API, service, data, and repository
+    layers without re-shaping.
+    """
+
+    resource_type: str = Field(description="Resource type identifier (e.g., 'cpu', 'mem').")
+    quantity: str = Field(description="Quantity of the resource as a decimal string.")
+
+    @classmethod
+    def from_resource_slot(cls, slot: ResourceSlot) -> list[ResourceSlotEntry]:
+        """Project a legacy ``ResourceSlot`` into an entry list."""
+        return [
+            cls(resource_type=str(k), quantity=_stringify_number(Decimal(v)))
+            for k, v in slot.items()
+            if v is not None
+        ]
+
+    @classmethod
+    def to_resource_slot(cls, entries: Sequence[ResourceSlotEntry]) -> ResourceSlot:
+        """Collapse an entry list back into the legacy ``ResourceSlot``.
+
+        Transitional helper: repository layer still writes ``ResourceSlot``
+        to the DB column, so the final boundary converts back. New
+        in-memory pipelines should stay on the entry-list form.
+        """
+        return ResourceSlot({e.resource_type: Decimal(e.quantity) for e in entries})
 
 
 class ResourceSlotState(enum.StrEnum):
@@ -1209,7 +1411,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-VolumeID: TypeAlias = uuid.UUID
+VolumeID = NewType("VolumeID", UUID)
 
 
 @attrs.define(slots=True, frozen=True)

@@ -16,7 +16,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.manager.api.adapters.user import UserAdapter
+from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.keypair.handler import V2KeypairHandler
@@ -40,6 +40,7 @@ def user_processors(
         valkey_stat_client=MagicMock(),
         agent_registry=MagicMock(),
         user_repository=user_repo,
+        scheduling_controller=MagicMock(),
     )
     return UserProcessors(
         user_service=user_service,

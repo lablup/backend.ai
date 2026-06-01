@@ -27,8 +27,8 @@ from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
 from ai.backend.common.dto.manager.query import NullableDateTimeFilter as NullableDateTimeFilterDTO
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
-from ai.backend.manager.api.adapters.cursor import decode_cursor as decode_cursor
-from ai.backend.manager.api.adapters.cursor import encode_cursor as encode_cursor
+from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor as decode_cursor
+from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor as encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,

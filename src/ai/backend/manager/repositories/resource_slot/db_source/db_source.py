@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -22,7 +24,9 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceOccupancy,
     ResourceSlotTypeData,
     ResourceSlotTypeSearchResult,
+    TerminalSessionKernelReconciliation,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource_slot import (
     AgentResourceNotFound,
     ResourceAllocationNotFound,
@@ -34,6 +38,8 @@ from ai.backend.manager.models.resource_slot import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.utils import sql_json_merge
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
@@ -171,6 +177,7 @@ class ResourceSlotDBSource:
                     agent_id=row.AgentResourceRow.agent_id,
                     slot_name=row.AgentResourceRow.slot_name,
                     capacity=row.AgentResourceRow.capacity,
+                    reserved=row.AgentResourceRow.reserved,
                     used=row.AgentResourceRow.used,
                 )
                 for row in result.rows
@@ -333,85 +340,185 @@ class ResourceSlotDBSource:
         return {(row.agent, row.slot_name): row.total_amount for row in rows}
 
     async def reconcile_agent_resources(self) -> ReconciliationResult:
-        """Clean up orphaned allocations and reconcile agent_resources in one transaction.
+        """Reconcile kernel/session state and agent_resources usage in one transaction.
 
-        Within a single transaction:
-        1. Free orphaned allocations — resource_allocations where free_at IS NULL but
-           the kernel is in a terminal status (CANCELLED, TERMINATED, ERROR).
-        2. Reconcile agent_resources.used against actual active allocations (free_at IS NULL)
-           and correct any drift.
+        Runs three steps in order within a single transaction. Ordering matters: each
+        step relies on the previous step having already normalized the relevant rows.
 
-        Orphan cleanup runs first so that the subsequent reconciliation operates on
-        a corrected set of active allocations.
+        1. Sync kernels of terminal sessions — if a kernel is non-terminal but its
+           session has reached a terminal status (CANCELLED/TERMINATED/ERROR), pull
+           the kernel to the session's terminal status and free its active
+           resource_allocations in the same step.
+        2. Free stale allocations of terminal kernels — safety net for any already
+           terminal kernel whose resource_allocations row still has free_at=NULL
+           (e.g. left over from older code paths or step 1's kernels if a write
+           race happened).
+        3. Correct agent_resources.used — recalculate used against the sum of
+           active allocations (free_at IS NULL) and write back drifts. Runs last
+           so that steps 1 and 2 have already closed out every allocation that
+           should be closed.
         """
-        ra = ResourceAllocationRow.__table__
-        k = KernelRow.__table__
-        ar = AgentResourceRow.__table__
-        terminal_statuses = KernelStatus.terminal_statuses()
-        drifts: list[AgentResourceDrift] = []
-
         async with self._db.begin_session() as db_sess:
-            # Step 1: Free orphaned allocations for terminal kernels
-            orphan_result = await db_sess.execute(
-                sa.update(ra)
-                .where(
-                    ra.c.free_at.is_(None),
-                    ra.c.kernel_id.in_(sa.select(k.c.id).where(k.c.status.in_(terminal_statuses))),
-                )
-                .values(free_at=sa.func.now())
-                .returning(ra.c.kernel_id, ra.c.slot_name)
-            )
-            orphan_rows = orphan_result.all()
-            orphans = [
-                OrphanedAllocation(kernel_id=row.kernel_id, slot_name=row.slot_name)
-                for row in orphan_rows
-            ]
-
-            # Step 2: Reconcile agent_resources.used against actual allocations
-            actual_rows = (await db_sess.execute(self._build_actual_usage_query())).all()
-            actual_usage: dict[tuple[str, str], Decimal] = {
-                (row.agent, row.slot_name): row.total_amount for row in actual_rows
-            }
-
-            tracked_rows = (
-                await db_sess.execute(sa.select(ar.c.agent_id, ar.c.slot_name, ar.c.used))
-            ).all()
-
-            for row in tracked_rows:
-                agent_id = row.agent_id
-                slot_name = row.slot_name
-                tracked = row.used
-                actual = actual_usage.pop((agent_id, slot_name), Decimal(0))
-                if tracked != actual:
-                    drifts.append(
-                        AgentResourceDrift(
-                            agent_id=agent_id,
-                            slot_name=slot_name,
-                            tracked=tracked,
-                            actual=actual,
-                        )
-                    )
-                    await db_sess.execute(
-                        sa.update(ar)
-                        .where(ar.c.agent_id == agent_id, ar.c.slot_name == slot_name)
-                        .values(used=actual)
-                    )
-
-            # Remaining entries: allocations exist but no agent_resources row (orphaned)
-            for (agent_id, slot_name), actual in actual_usage.items():
-                drifts.append(
-                    AgentResourceDrift(
-                        agent_id=agent_id,
-                        slot_name=slot_name,
-                        tracked=Decimal(0),
-                        actual=actual,
-                    )
-                )
+            now = await self._db_now(db_sess)
+            reconciled_kernels = await self._finalize_kernels_of_terminal_sessions(db_sess, now)
+            orphans = await self._free_stale_allocations_of_terminal_kernels(db_sess)
+            drifts = await self._correct_agent_resource_drifts(db_sess)
 
         return ReconciliationResult(
+            reconciled_terminal_kernels=reconciled_kernels,
             orphaned_allocations=orphans,
             agent_resource_drifts=drifts,
         )
+
+    @staticmethod
+    async def _db_now(db_sess: SASession) -> datetime:
+        """Return the database's current timestamp within an existing session."""
+        result = await db_sess.execute(sa.select(sa.func.now()))
+        return result.scalar_one()
+
+    async def _finalize_kernels_of_terminal_sessions(
+        self,
+        db_sess: SASession,
+        now: datetime,
+    ) -> list[TerminalSessionKernelReconciliation]:
+        """Step 1: force-close non-terminal kernels of terminal sessions to
+        CANCELLED and free their active resource_allocations in the same call.
+
+        This is abnormal-state cleanup — we do not try to mirror the session's
+        specific terminal sub-state onto the kernel. A single CANCELLED target is
+        used because the kernel reached this inconsistent state outside of the
+        normal scheduling_controller lifecycle and the usual transition rules
+        no longer apply.
+
+        The kernel transition and the allocation free-out are one inseparable unit
+        of work — if this method returns without an exception, every reconciled
+        kernel's active allocations have free_at set.
+        """
+        k = KernelRow.__table__
+        ra = ResourceAllocationRow.__table__
+        s = SessionRow.__table__
+        kernel_terminal = KernelStatus.terminal_statuses()
+        session_terminal = SessionStatus.terminal_statuses()
+
+        drift_rows = (
+            await db_sess.execute(
+                sa.select(
+                    k.c.id.label("kernel_id"),
+                    k.c.session_id.label("session_id"),
+                    k.c.status.label("from_status"),
+                )
+                .select_from(k.join(s, k.c.session_id == s.c.id))
+                .where(
+                    s.c.status.in_(session_terminal),
+                    k.c.status.notin_(kernel_terminal),
+                )
+            )
+        ).all()
+        if not drift_rows:
+            return []
+
+        reconciliations = [
+            TerminalSessionKernelReconciliation(
+                kernel_id=row.kernel_id,
+                session_id=row.session_id,
+                from_kernel_status=KernelStatus(row.from_status).value,
+            )
+            for row in drift_rows
+        ]
+        reconciled_kernel_ids = [r.kernel_id for r in reconciliations]
+
+        await db_sess.execute(
+            sa.update(k)
+            .where(k.c.id.in_(reconciled_kernel_ids))
+            .values(
+                status=KernelStatus.CANCELLED,
+                status_info="reconciled: session reached terminal state",
+                status_changed=now,
+                terminated_at=now,
+                status_history=sql_json_merge(
+                    k.c.status_history,
+                    (),
+                    {KernelStatus.CANCELLED.name: now.isoformat()},
+                ),
+            )
+        )
+        await db_sess.execute(
+            sa.update(ra)
+            .where(
+                ra.c.kernel_id.in_(reconciled_kernel_ids),
+                ra.c.free_at.is_(None),
+            )
+            .values(free_at=now)
+        )
+        return reconciliations
+
+    async def _free_stale_allocations_of_terminal_kernels(
+        self,
+        db_sess: SASession,
+    ) -> list[OrphanedAllocation]:
+        """Step 2: set free_at on allocations whose kernel is already terminal."""
+        k = KernelRow.__table__
+        ra = ResourceAllocationRow.__table__
+        terminal_statuses = KernelStatus.terminal_statuses()
+        result = await db_sess.execute(
+            sa.update(ra)
+            .where(
+                ra.c.free_at.is_(None),
+                ra.c.kernel_id.in_(sa.select(k.c.id).where(k.c.status.in_(terminal_statuses))),
+            )
+            .values(free_at=sa.func.now())
+            .returning(ra.c.kernel_id, ra.c.slot_name)
+        )
+        return [
+            OrphanedAllocation(kernel_id=row.kernel_id, slot_name=row.slot_name)
+            for row in result.all()
+        ]
+
+    async def _correct_agent_resource_drifts(
+        self,
+        db_sess: SASession,
+    ) -> list[AgentResourceDrift]:
+        """Step 3: rewrite agent_resources.used to match sum of active allocations."""
+        ar = AgentResourceRow.__table__
+        drifts: list[AgentResourceDrift] = []
+
+        actual_rows = (await db_sess.execute(self._build_actual_usage_query())).all()
+        actual_usage: dict[tuple[str, str], Decimal] = {
+            (row.agent, row.slot_name): row.total_amount for row in actual_rows
+        }
+        tracked_rows = (
+            await db_sess.execute(sa.select(ar.c.agent_id, ar.c.slot_name, ar.c.used))
+        ).all()
+
+        for row in tracked_rows:
+            tracked = row.used
+            actual = actual_usage.pop((row.agent_id, row.slot_name), Decimal(0))
+            if tracked != actual:
+                drifts.append(
+                    AgentResourceDrift(
+                        agent_id=row.agent_id,
+                        slot_name=row.slot_name,
+                        tracked=tracked,
+                        actual=actual,
+                    )
+                )
+                await db_sess.execute(
+                    sa.update(ar)
+                    .where(ar.c.agent_id == row.agent_id, ar.c.slot_name == row.slot_name)
+                    .values(used=actual)
+                )
+
+        # Allocations exist but no agent_resources row — surface as drift for visibility.
+        for (agent_id, slot_name), actual in actual_usage.items():
+            drifts.append(
+                AgentResourceDrift(
+                    agent_id=agent_id,
+                    slot_name=slot_name,
+                    tracked=Decimal(0),
+                    actual=actual,
+                )
+            )
+        return drifts
 
     async def aggregate_occupied_by_project(self, project_id: uuid.UUID) -> ResourceOccupancy:
         """Aggregate active resource occupancy for a project (group).

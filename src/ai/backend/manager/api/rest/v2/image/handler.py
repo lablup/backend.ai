@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.image import ImageAdapter
+    from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -129,11 +129,23 @@ class AgentClientPool:
             if entry is None:
                 entry = await self._create_entry(agent_id)
                 self._entries[agent_id] = entry
+                if not entry.is_healthy:
+                    # Surface the connect failure to the caller that triggered
+                    # creation. The cached unhealthy entry already protects
+                    # subsequent acquires via the branch above.
+                    raise AgentConnectionUnavailable(agent_id, "connection unhealthy")
 
             return entry.client
 
     async def _create_entry(self, agent_id: AgentId) -> _CachedEntry:
-        """Create new entry (called within lock)."""
+        """Create new entry (called within lock).
+
+        On connect failure, releases the partially-initialized peer and
+        returns an unhealthy entry instead of raising. ``_get_or_create``
+        is responsible for caching the entry and surfacing the failure;
+        ``_health_check_loop`` later evicts the unhealthy entry once
+        ``recovery_timeout`` has elapsed so a fresh connect can be retried.
+        """
         try:
             agent_addr, agent_public_key = await self._agent_cache.get_rpc_args(agent_id)
         except ValueError as e:
@@ -169,7 +181,22 @@ class AgentClientPool:
         try:
             await client.connect()
         except Exception as e:
-            raise AgentConnectionUnavailable(agent_id, str(e)) from e
+            # ``AgentClient.connect()`` is atomic: it has already released
+            # the partially-initialized peer (and its zmq.Context). We
+            # cache an unhealthy entry so subsequent acquires short-circuit
+            # via the existing ``is_healthy=False`` branch in
+            # ``_get_or_create`` instead of re-creating peers.
+            log.debug(
+                "agent {} connect failed during pool entry creation: {}",
+                agent_id,
+                e,
+            )
+            return _CachedEntry(
+                client=client,
+                is_healthy=False,
+                failure_count=self._spec.failure_threshold,
+                unhealthy_since=time.perf_counter(),
+            )
 
         return _CachedEntry(
             client=client,

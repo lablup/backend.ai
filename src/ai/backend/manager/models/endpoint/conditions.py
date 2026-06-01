@@ -8,12 +8,14 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
@@ -27,7 +29,7 @@ class DeploymentConditions:
     """Query conditions for deployments."""
 
     @staticmethod
-    def by_ids(deployment_ids: Collection[uuid.UUID]) -> QueryCondition:
+    def by_ids(deployment_ids: Collection[DeploymentID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointRow.id.in_(deployment_ids)
 
@@ -225,6 +227,20 @@ class DeploymentConditions:
     def by_lifecycle_stages(statuses: Collection[EndpointLifecycle]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointRow.lifecycle_stage.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_scaling_state_in(states: Collection[ScalingState]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.scaling_state.in_(states)
+
+        return inner
+
+    @staticmethod
+    def by_sub_step_in(sub_steps: Collection[DeploymentLifecycleSubStep]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.sub_step.in_(sub_steps)
 
         return inner
 

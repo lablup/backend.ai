@@ -23,6 +23,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
 from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     EmailAlreadyExistsError,
@@ -53,6 +54,8 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
@@ -73,6 +76,10 @@ from ai.backend.manager.services.auth.actions.logout import LogoutAction, Logout
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
     ResolveAccessKeyScopeResult,
+)
+from ai.backend.manager.services.auth.actions.resolve_user_id_by_access_key import (
+    ResolveUserIDByAccessKeyAction,
+    ResolveUserIDByAccessKeyResult,
 )
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     ResolveUserScopeAction,
@@ -137,6 +144,8 @@ class AuthService:
     _config_provider: ManagerConfigProvider
     _valkey_session_client: ValkeySessionClient
     _user_resource_policy_repository: UserResourcePolicyRepository
+    _user_repository: UserRepository
+    _group_repository: GroupRepository
 
     def __init__(
         self,
@@ -145,12 +154,16 @@ class AuthService:
         config_provider: ManagerConfigProvider,
         valkey_session_client: ValkeySessionClient,
         user_resource_policy_repository: UserResourcePolicyRepository,
+        user_repository: UserRepository,
+        group_repository: GroupRepository,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
         self._config_provider = config_provider
         self._valkey_session_client = valkey_session_client
         self._user_resource_policy_repository = user_resource_policy_repository
+        self._user_repository = user_repository
+        self._group_repository = group_repository
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
@@ -494,18 +507,21 @@ class AuthService:
             "num_queries": 0,
         }
 
-        # Add user to the default group.
-        group_name = user_data_overriden.get("group", "default")
-
         try:
             user = await self._auth_repository.create_user_with_keypair(
                 user_data=data,
                 keypair_data=kp_data,
-                group_name=group_name,
-                domain_name=action.domain_name,
             )
         except UserCreationError as e:
             raise InternalServerError("Error creating user account") from e
+
+        # Assign the new user to the default project
+        group_name = user_data_overriden.get("group", DEFAULT_PROJECT_NAME)
+        project_id = await self._group_repository.project_id_by_name_in_domain(
+            action.domain_name, group_name
+        )
+        if project_id is not None:
+            await self._user_repository.assign_project_membership(user.uuid, project_id)
 
         # [Hooking point for POST_SIGNUP as one-way notification]
         # The hook handlers should accept a tuple of the user email,
@@ -745,6 +761,12 @@ class AuthService:
             requester_access_key=requester_ak,
             owner_access_key=owner_ak,
         )
+
+    async def resolve_user_id_by_access_key(
+        self, action: ResolveUserIDByAccessKeyAction
+    ) -> ResolveUserIDByAccessKeyResult:
+        user_id = await self._auth_repository.get_user_id_by_access_key(action.access_key)
+        return ResolveUserIDByAccessKeyResult(user_id=user_id)
 
     async def resolve_user_scope(self, action: ResolveUserScopeAction) -> ResolveUserScopeResult:
         if action.owner_user_email is None:

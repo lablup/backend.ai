@@ -83,7 +83,7 @@ class SchedulingHistoryDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(SessionSchedulingHistoryRow)
 
-            result = await execute_batch_querier(db_sess, query, querier, scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.SessionSchedulingHistoryRow.to_data() for row in result.rows]
 
@@ -155,7 +155,7 @@ class SchedulingHistoryDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(DeploymentHistoryRow)
 
-            result = await execute_batch_querier(db_sess, query, querier, scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.DeploymentHistoryRow.to_data() for row in result.rows]
 
@@ -202,7 +202,7 @@ class SchedulingHistoryDBSource:
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(RouteHistoryRow)
 
-            result = await execute_batch_querier(db_sess, query, querier, scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.RouteHistoryRow.to_data() for row in result.rows]
 

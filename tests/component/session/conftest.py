@@ -38,6 +38,7 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @dataclass
@@ -96,6 +97,7 @@ async def session_processors(
         error_monitor=error_monitor,
         idle_checker_host=AsyncMock(),
         session_repository=session_repository,
+        scheduler_repository=AsyncMock(),
         scheduling_controller=scheduling_controller_mock,
         appproxy_client_pool=appproxy_client_pool,
         user_repository=AsyncMock(),
@@ -105,7 +107,7 @@ async def session_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
         ),
     )
 
@@ -117,7 +119,7 @@ def agent_processors_mock() -> AgentProcessors:
         service=AsyncMock(),
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
         ),
     )
 
@@ -129,7 +131,7 @@ def vfolder_processors_mock() -> VFolderProcessors:
         service=AsyncMock(),
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
         ),
     )
 
@@ -161,7 +163,7 @@ def server_module_registries(
 @pytest.fixture()
 async def session_seed(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -193,7 +195,7 @@ async def session_seed(
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
@@ -218,7 +220,7 @@ async def session_seed(
                 cluster_hostname="main0",
                 cluster_mode="single-node",
                 cluster_size=1,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
@@ -240,7 +242,7 @@ async def session_seed(
         session_name=session_name,
         kernel_id=kernel_id,
         access_key=admin_user_fixture.keypair.access_key,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         user_uuid=admin_user_fixture.user_uuid,
     )
 
@@ -254,7 +256,7 @@ async def session_seed(
 @pytest.fixture()
 async def terminated_session_seed(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -285,7 +287,7 @@ async def terminated_session_seed(
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
@@ -311,7 +313,7 @@ async def terminated_session_seed(
                 cluster_hostname="main0",
                 cluster_mode="single-node",
                 cluster_size=1,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
@@ -335,7 +337,7 @@ async def terminated_session_seed(
         session_name=session_name,
         kernel_id=kernel_id,
         access_key=admin_user_fixture.keypair.access_key,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         user_uuid=admin_user_fixture.user_uuid,
     )
 
@@ -349,7 +351,7 @@ async def terminated_session_seed(
 @pytest.fixture()
 async def user_session_seed(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     regular_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
@@ -375,7 +377,7 @@ async def user_session_seed(
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_size=1,
                 cluster_mode="single-node",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=regular_user_fixture.user_uuid,
                 access_key=regular_user_fixture.keypair.access_key,
@@ -400,7 +402,7 @@ async def user_session_seed(
                 cluster_hostname="main0",
                 cluster_mode="single-node",
                 cluster_size=1,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 group_id=group_fixture,
                 user_uuid=regular_user_fixture.user_uuid,
                 access_key=regular_user_fixture.keypair.access_key,
@@ -422,7 +424,7 @@ async def user_session_seed(
         session_name=session_name,
         kernel_id=kernel_id,
         access_key=regular_user_fixture.keypair.access_key,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
         user_uuid=regular_user_fixture.user_uuid,
     )
 

@@ -109,11 +109,11 @@ async def deployment_revision_preset(
         added_version="26.4.2",
         description="Create a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     input: CreateDeploymentRevisionPresetInputGQL,
-) -> CreateDeploymentRevisionPresetPayloadGQL:
+) -> CreateDeploymentRevisionPresetPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.deployment_revision_preset.create(dto)
@@ -125,11 +125,11 @@ async def admin_create_deployment_revision_preset(
         added_version="26.4.2",
         description="Update a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     input: UpdateDeploymentRevisionPresetInputGQL,
-) -> UpdateDeploymentRevisionPresetPayloadGQL:
+) -> UpdateDeploymentRevisionPresetPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.deployment_revision_preset.update(dto)
@@ -141,11 +141,11 @@ async def admin_update_deployment_revision_preset(
         added_version="26.4.2",
         description="Delete a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteDeploymentRevisionPresetPayloadGQL:
+) -> DeleteDeploymentRevisionPresetPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.deployment_revision_preset.delete(id)
     return DeleteDeploymentRevisionPresetPayloadGQL.from_pydantic(payload)

@@ -11,6 +11,7 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -30,6 +31,7 @@ __all__ = (
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
     "CreateUploadSessionInput",
+    "CreateVFolderInScopeInput",
     "CreateVFolderInput",
     "DeleteFilesInput",
     "DeleteInvitationInput",
@@ -40,6 +42,7 @@ __all__ = (
     "MkdirInput",
     "MoveFileInput",
     "PurgeVFolderInput",
+    "PurgeVFolderOptions",
     "RenameFileInput",
     "RestoreVFolderInput",
     "ShareVFolderInput",
@@ -84,6 +87,38 @@ class CreateVFolderInput(BaseRequestModel):
         return v
 
 
+class CreateVFolderInScopeInput(BaseRequestModel):
+    """Scope-agnostic body for vfolder creation under a specific scope.
+
+    The owning scope (project, user, domain, …) is supplied externally by
+    the transport layer (REST path segment, GraphQL mutation argument)
+    and is NOT part of this body. This keeps the body reusable across
+    scope-specific endpoints without forcing clients to duplicate the
+    scope identifier.
+    """
+
+    name: VFolderName = Field(description="VFolder name")
+    host: str | None = Field(default=None, description="Storage host for the vfolder")
+    usage_mode: VFolderUsageMode = Field(
+        default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
+    )
+    permission: VFolderPermissionField = Field(
+        default=VFolderPermissionField.READ_WRITE,
+        description="Default permission of the vfolder",
+    )
+    cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def strip_and_validate_name(cls, v: object) -> object:
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                raise ValueError("name must not be blank or whitespace-only")
+            return stripped
+        return v
+
+
 class UpdateVFolderInput(BaseRequestModel):
     """Input for updating a virtual folder."""
 
@@ -113,10 +148,34 @@ class DeleteVFolderInput(BaseRequestModel):
     id: UUID = Field(description="VFolder ID to delete")
 
 
-class PurgeVFolderInput(BaseRequestModel):
-    """Input for purging a virtual folder."""
+class PurgeVFolderOptions(BaseRequestModel):
+    """Optional behavior flags for vfolder purge operations.
 
-    id: UUID = Field(description="VFolder ID to purge")
+    Wrapped as a nested object so future flags can be added without
+    flattening the input shape further.
+    """
+
+    cascade_model_card: bool = Field(
+        default=False,
+        description=(
+            "If true, also delete model card record(s) referencing the vfolder. "
+            "If false, the request is rejected when any model card still references it."
+        ),
+    )
+
+
+class PurgeVFolderInput(BaseRequestModel):
+    """Input for purging a virtual folder.
+
+    The target vfolder is identified exclusively by the URL path
+    parameter; the body carries only behavior flags so there is no
+    chance of a path/body id mismatch.
+    """
+
+    options: PurgeVFolderOptions = Field(
+        default_factory=PurgeVFolderOptions,
+        description="Optional behavior flags for the purge.",
+    )
 
 
 class BulkDeleteVFoldersInput(BaseRequestModel):
@@ -129,6 +188,10 @@ class BulkPurgeVFoldersInput(BaseRequestModel):
     """Input for permanently purging multiple virtual folders."""
 
     ids: list[UUID] = Field(description="List of VFolder UUIDs to purge.")
+    options: PurgeVFolderOptions = Field(
+        default_factory=PurgeVFolderOptions,
+        description="Optional behavior flags applied to every vfolder in the batch.",
+    )
 
 
 class RestoreVFolderInput(BaseRequestModel):
@@ -330,7 +393,7 @@ class DeployVFolderInput(BaseRequestModel):
         description="Target project UUID where the deployment will be created. "
         "Must be a general project, not MODEL_STORE.",
     )
-    revision_preset_id: UUID = Field(
+    revision_preset_id: DeploymentPresetID = Field(
         description="Deployment revision preset UUID that provides image, "
         "runtime variant, resource slots, environ, and startup command.",
     )

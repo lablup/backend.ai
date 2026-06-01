@@ -11,9 +11,14 @@ from .creator import (
     Creator,
     CreatorResult,
     CreatorSpec,
+    DependentCreatorSpec,
+    NextValuePolicy,
     execute_bulk_creator,
     execute_bulk_creator_partial,
+    execute_bulk_dependent_creator,
     execute_creator,
+    execute_dependent_creator,
+    execute_next_value_creator,
 )
 from .export import (
     ExportDataStream,
@@ -71,10 +76,12 @@ from .updater import (
     BatchUpdaterResult,
     BatchUpdaterSpec,
     BulkUpdaterError,
+    BulkUpdaterResult,
     Updater,
     UpdaterResult,
     UpdaterSpec,
     execute_batch_updater,
+    execute_bulk_updater_partial,
     execute_updater,
 )
 from .upserter import (
@@ -87,6 +94,7 @@ from .upserter import (
     execute_upserter,
 )
 from .utils import (
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
@@ -132,6 +140,13 @@ __all__ = [
     "Creator",
     "CreatorResult",
     "execute_creator",
+    # DependentCreator
+    "DependentCreatorSpec",
+    "execute_dependent_creator",
+    "execute_bulk_dependent_creator",
+    # NextValue
+    "NextValuePolicy",
+    "execute_next_value_creator",
     # BulkCreator
     "BulkCreator",
     "BulkCreatorError",
@@ -151,6 +166,8 @@ __all__ = [
     "execute_batch_updater",
     # BulkUpdater
     "BulkUpdaterError",
+    "BulkUpdaterResult",
+    "execute_bulk_updater_partial",
     # Upserter
     "UpserterSpec",
     "Upserter",
@@ -174,6 +191,7 @@ __all__ = [
     "BatchPurgerResult",
     "execute_batch_purger",
     # Utils
+    "combine_conditions_and",
     "combine_conditions_or",
     "negate_conditions",
 ]

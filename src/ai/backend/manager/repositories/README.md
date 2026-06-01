@@ -1000,35 +1000,33 @@ class SessionRepository:
 
 ```python
 @dataclass(frozen=True)
-class SessionCreationSpec:
-    """Session creation specification"""
+class WidgetCreationSpec:
+    """Widget creation specification (illustrative example)."""
     name: str
     access_key: AccessKey
-    image: str
-    type: SessionType
     requested_slots: ResourceSlot
 
 @dataclass(frozen=True)
-class SessionInfo:
-    """Session information (for external exposure)"""
-    id: SessionId
+class WidgetSummary:
+    """Widget summary data (for external exposure)."""
+    id: WidgetId
     name: str
-    status: SessionStatus
+    status: WidgetStatus
     created_at: datetime
     requested_slots: ResourceSlot
 
-async def create_session(
+async def create_widget(
     self,
-    spec: SessionCreationSpec,
-) -> SessionRow:
-    """Structured input type"""
+    spec: WidgetCreationSpec,
+) -> WidgetRow:
+    """Structured input type."""
     ...
 
-async def get_session(
+async def get_widget(
     self,
-    session_id: SessionId,
-) -> Optional[SessionInfo]:
-    """Structured output type (public method)"""
+    widget_id: WidgetId,
+) -> Optional[WidgetSummary]:
+    """Structured output type (public method)."""
     ...
 ```
 

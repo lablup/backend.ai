@@ -5,10 +5,12 @@ from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerCategory,
     DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
+    DeploymentTargetStatuses,
 )
-from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle, ScalingState
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
@@ -42,25 +44,45 @@ class ScalingDeploymentHandler(DeploymentHandler):
         """Get the name of the handler."""
         return "scaling-deployments"
 
+    @classmethod
+    def category(cls) -> DeploymentHandlerCategory:
+        return DeploymentHandlerCategory.SCALING
+
     @property
     def lock_id(self) -> LockID | None:
         """Lock for scaling deployments."""
         return LockID.LOCKID_DEPLOYMENT_AUTO_SCALER
 
     @classmethod
-    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
-        """Get the target deployment statuses for this handler."""
-        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING)]
+    def target_statuses(cls) -> DeploymentTargetStatuses:
+        """Target endpoints that have been flagged for replica reconciliation.
+
+        Scaling operates on ``READY`` **and** ``DEPLOYING`` endpoints
+        whose ``scaling_state`` has been marked ``SCALING`` by an
+        upstream handler (``replica`` or ``reconcile``). The lifecycle
+        axis is preserved across the scaling cycle so a mid-rollout
+        endpoint keeps its DEPLOYING status.
+        """
+        return DeploymentTargetStatuses(
+            lifecycle_stages=[
+                EndpointLifecycle.READY,
+                EndpointLifecycle.DEPLOYING,
+            ],
+            scaling_states=[ScalingState.SCALING],
+        )
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
-        """Define state transitions for scaling deployment handler (BEP-1030).
+        """Define state transitions for scaling deployment handler.
 
-        - success: Deployment → READY
-        - failure: None (stays in current state for all failure categories)
+        - success: scaling reconciliation completed → ``scaling_state=STABLE``
+          only; the lifecycle axis is preserved so the endpoint's
+          current lifecycle stays intact.
+        - failure: None (stays scaling for all failure categories so the
+          next tick can retry).
         """
         return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+            success=DeploymentLifecycleStatus(scaling_state=ScalingState.STABLE),
         )
 
     async def execute(

@@ -12,11 +12,13 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateDownloadSessionInput,
     CreateUploadSessionInput,
     CreateVFolderInput,
+    CreateVFolderInScopeInput,
     DeleteFilesInput,
     DeployVFolderInput,
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PurgeVFolderInput,
     SearchVFoldersInput,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
@@ -33,6 +35,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     MkdirPayload,
     MoveFilePayload,
     PurgeVFolderPayload,
+    RestoreVFolderPayload,
     SearchVFoldersPayload,
     VFolderNode,
 )
@@ -73,6 +76,19 @@ class V2VFolderClient(BaseDomainClient):
         return await self._client.typed_request(
             "POST",
             _PATH,
+            request=request,
+            response_model=CreateVFolderPayload,
+        )
+
+    async def create_in_project(
+        self,
+        project_id: UUID,
+        request: CreateVFolderInScopeInput,
+    ) -> CreateVFolderPayload:
+        """Create a vfolder owned by ``project_id``."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/projects/{project_id}/create",
             request=request,
             response_model=CreateVFolderPayload,
         )
@@ -118,12 +134,27 @@ class V2VFolderClient(BaseDomainClient):
             response_model=DeleteVFolderPayload,
         )
 
-    async def purge(self, vfolder_id: UUID) -> PurgeVFolderPayload:
-        """Permanently delete a vfolder."""
+    async def purge(
+        self,
+        vfolder_id: UUID,
+        request: PurgeVFolderInput | None = None,
+    ) -> PurgeVFolderPayload:
+        """Permanently delete a vfolder, optionally cascading linked model cards."""
+        if request is None:
+            request = PurgeVFolderInput()
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/{vfolder_id}/purge",
+            request=request,
             response_model=PurgeVFolderPayload,
+        )
+
+    async def restore(self, vfolder_id: UUID) -> RestoreVFolderPayload:
+        """Restore a trashed vfolder."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{vfolder_id}/restore",
+            response_model=RestoreVFolderPayload,
         )
 
     async def deploy(

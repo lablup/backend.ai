@@ -163,6 +163,47 @@ def get(vfolder_id: UUID) -> None:
     asyncio.run(_run())
 
 
+@vfolder.command(name="project-create")
+@click.argument("project_id", type=click.UUID)
+@click.option("--name", required=True, help="VFolder name.")
+@click.option(
+    "--usage-mode",
+    default="general",
+    type=click.Choice(["general", "model", "data"], case_sensitive=False),
+    help="Usage mode of the vfolder.",
+)
+@click.option("--host", default=None, type=str, help="Storage host.")
+@click.option("--cloneable", is_flag=True, default=False, help="Allow cloning.")
+def project_create(
+    project_id: UUID,
+    name: str,
+    usage_mode: str,
+    host: str | None,
+    cloneable: bool,
+) -> None:
+    """Create a vfolder owned by a project."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInScopeInput
+    from ai.backend.common.dto.manager.v2.vfolder.types import VFolderUsageMode
+
+    input_dto = CreateVFolderInScopeInput(
+        name=name,
+        usage_mode=VFolderUsageMode(usage_mode),
+        host=host,
+        cloneable=cloneable,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.create_in_project(project_id, input_dto)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @vfolder.command()
 @click.argument("vfolder_id", type=click.UUID)
 def delete(vfolder_id: UUID) -> None:
@@ -188,6 +229,22 @@ def purge(vfolder_id: UUID) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.vfolder.purge(vfolder_id)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=click.UUID)
+def restore(vfolder_id: UUID) -> None:
+    """Restore a trashed vfolder."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.vfolder.restore(vfolder_id)
             print_result(result)
         finally:
             await registry.close()

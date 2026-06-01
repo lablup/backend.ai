@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.v2.agent.response import AgentResourceStatsPa
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.agent import AgentAdapter
+    from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -13,24 +13,31 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.group.types import GroupData
-from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.errors.auth import AccessKeyNotFound, GroupMembershipNotFoundError
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, association_groups_users
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -38,6 +45,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -92,11 +100,15 @@ class TestAuthRepository:
                 KeyPairRow,
                 GroupRow,
                 AssocGroupUserRow,
+                AssociationScopesEntitiesRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -289,11 +301,14 @@ class TestAuthRepository:
             db_sess.add(group)
             await db_sess.flush()
 
-            # Add user to group
+            # Add user to group via RBAC scope-entity association
             await db_sess.execute(
-                association_groups_users.insert().values(
-                    user_id=sample_user_data.uuid,
-                    group_id=group_id,
+                sa.insert(AssociationScopesEntitiesRow).values(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.USER,
+                    entity_id=str(sample_user_data.uuid),
+                    relation_type=RelationType.AUTO,
                 )
             )
             await db_sess.flush()
@@ -520,3 +535,20 @@ class TestAuthRepository:
         now_utc = datetime.now(UTC)
         time_diff = abs((now_utc - result).total_seconds())
         assert time_diff < 1.0
+
+    async def test_get_user_id_by_access_key_success(
+        self,
+        auth_repository: AuthRepository,
+        sample_user_data: UserTestData,
+    ) -> None:
+        result = await auth_repository.get_user_id_by_access_key(
+            AccessKey(sample_user_data.access_key)
+        )
+
+        assert result == sample_user_data.uuid
+
+    async def test_get_user_id_by_access_key_not_found(
+        self, auth_repository: AuthRepository
+    ) -> None:
+        with pytest.raises(AccessKeyNotFound):
+            await auth_repository.get_user_id_by_access_key(AccessKey("AKIANONEXISTENT"))

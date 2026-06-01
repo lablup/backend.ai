@@ -10,7 +10,7 @@ from strawberry import Info
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
-    AdminSearchRoleAssignmentsGQLInput,
+    SearchRoleAssignmentsInput,
     SearchRolesInput,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -77,7 +77,7 @@ async def admin_roles(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RoleConnection:
+) -> RoleConnection | None:
     check_admin_only()
     result = await info.context.adapters.rbac.admin_search_roles_gql(
         SearchRolesInput(
@@ -123,10 +123,10 @@ async def admin_role_assignments(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RoleAssignmentConnection:
+) -> RoleAssignmentConnection | None:
     check_admin_only()
-    result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
-        AdminSearchRoleAssignmentsGQLInput(
+    result = await info.context.adapters.rbac.admin_search_role_assignments(
+        SearchRoleAssignmentsInput(
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,
@@ -171,15 +171,15 @@ async def my_roles(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RoleAssignmentConnection:
+) -> RoleAssignmentConnection | None:
     me = current_user()
     if me is None:
         from ai.backend.manager.errors.auth import InsufficientPrivilege
 
         raise InsufficientPrivilege("Authentication required")
 
-    result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
-        AdminSearchRoleAssignmentsGQLInput(
+    result = await info.context.adapters.rbac.admin_search_role_assignments(
+        SearchRoleAssignmentsInput(
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,
@@ -227,7 +227,7 @@ async def project_roles(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RoleConnection:
+) -> RoleConnection | None:
     result = await info.context.adapters.rbac.search_roles_in_scope(
         ScopedRoleSearchScope(element_type=RBACElementType.PROJECT, scope_id=str(project_id)),
         SearchRolesInput(
@@ -262,11 +262,11 @@ async def project_roles(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Create a new role (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_create_role(
     info: Info[StrawberryGQLContext],
     input: CreateRoleInput,
-) -> RoleGQL:
+) -> RoleGQL | None:
     check_admin_only()
     payload = await info.context.adapters.rbac.create(input.to_pydantic())
     return RoleGQL.from_pydantic(payload.role)
@@ -274,11 +274,11 @@ async def admin_create_role(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Update an existing role (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_update_role(
     info: Info[StrawberryGQLContext],
     input: UpdateRoleInput,
-) -> RoleGQL:
+) -> RoleGQL | None:
     check_admin_only()
     payload = await info.context.adapters.rbac.update(input.id, input.to_pydantic())
     return RoleGQL.from_pydantic(payload.role)
@@ -286,11 +286,11 @@ async def admin_update_role(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Soft-delete a role (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_delete_role(
     info: Info[StrawberryGQLContext],
     input: DeleteRoleInput,
-) -> DeleteRolePayload:
+) -> DeleteRolePayload | None:
     check_admin_only()
     result = await info.context.adapters.rbac.delete(input.id)
     return DeleteRolePayload.from_pydantic(result)
@@ -298,11 +298,11 @@ async def admin_delete_role(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Permanently remove a role (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_purge_role(
     info: Info[StrawberryGQLContext],
     input: PurgeRoleInput,
-) -> PurgeRolePayload:
+) -> PurgeRolePayload | None:
     check_admin_only()
     result = await info.context.adapters.rbac.purge(input.id)
     return PurgeRolePayload.from_pydantic(result)
@@ -310,11 +310,11 @@ async def admin_purge_role(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Assign a role to a user (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_assign_role(
     info: Info[StrawberryGQLContext],
     input: AssignRoleInput,
-) -> RoleAssignmentGQL:
+) -> RoleAssignmentGQL | None:
     check_admin_only()
     result = await info.context.adapters.rbac.assign_role(input.to_pydantic())
     return RoleAssignmentGQL.from_pydantic(result)
@@ -322,11 +322,11 @@ async def admin_assign_role(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Revoke a role from a user (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_revoke_role(
     info: Info[StrawberryGQLContext],
     input: RevokeRoleInput,
-) -> RoleAssignmentGQL:
+) -> RoleAssignmentGQL | None:
     check_admin_only()
     result = await info.context.adapters.rbac.revoke_role(input.to_pydantic())
     return RoleAssignmentGQL.from_pydantic(result)
@@ -336,11 +336,11 @@ async def admin_revoke_role(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Bulk assign a role to multiple users (admin only)."
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_assign_role(
     info: Info[StrawberryGQLContext],
     input: BulkAssignRoleInputGQL,
-) -> BulkAssignRolePayloadGQL:
+) -> BulkAssignRolePayloadGQL | None:
     check_admin_only()
     result = await info.context.adapters.rbac.bulk_assign_role(input.to_pydantic())
     return BulkAssignRolePayloadGQL.from_pydantic(result)
@@ -350,11 +350,11 @@ async def admin_bulk_assign_role(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Bulk revoke a role from multiple users (admin only)."
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_revoke_role(
     info: Info[StrawberryGQLContext],
     input: BulkRevokeRoleInputGQL,
-) -> BulkRevokeRolePayloadGQL:
+) -> BulkRevokeRolePayloadGQL | None:
     check_admin_only()
     result = await info.context.adapters.rbac.bulk_revoke_role(input.to_pydantic())
     return BulkRevokeRolePayloadGQL.from_pydantic(result)

@@ -1,10 +1,10 @@
 """Best-effort Prometheus metric wrappers.
 
 Provides SafeCounter, SafeGauge, and SafeHistogram that wrap
-prometheus_client metric types. On mmap corruption (ValueError from
-corrupted multiprocess .db files after OS sleep/wake), all metric
-recording is globally disabled so that metric failures never propagate
-into business logic or trigger retries.
+prometheus_client metric types. On any recording error (e.g. mmap
+corruption from corrupted multiprocess .db files after OS sleep/wake),
+all metric recording is globally disabled so that metric failures never
+propagate into business logic or trigger retries.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ _trip_error_message: str | None = None
 
 
 def is_metrics_disabled() -> bool:
-    """Return True if metric recording has been disabled due to mmap error."""
+    """Return True if metric recording has been disabled."""
     return _metrics_disabled
 
 
@@ -49,11 +49,11 @@ def _trip(error: Exception) -> None:
             return
         _metrics_disabled = True
         _tripped_at = datetime.now(UTC)
-        _trip_error_message = str(error)
+        _trip_error_message = f"{type(error).__name__}: {error}"
     if not _error_logged:
         _error_logged = True
         log.warning(
-            "Prometheus metric recording disabled due to mmap error: {}",
+            "Prometheus metric recording disabled due to error: {}",
             error,
         )
 
@@ -90,7 +90,7 @@ _NOOP_LABELED = _NoopLabeledMetric()
 
 
 class SafeLabeledMetric:
-    """Wraps a labeled prometheus metric child, catching ValueError."""
+    """Wraps a labeled prometheus metric child, catching all exceptions."""
 
     __slots__ = ("_child",)
 
@@ -102,7 +102,7 @@ class SafeLabeledMetric:
             return
         try:
             self._child.inc(amount)
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
 
     def dec(self, amount: float = 1) -> None:
@@ -110,7 +110,7 @@ class SafeLabeledMetric:
             return
         try:
             self._child.dec(amount)
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
 
     def set(self, value: float) -> None:
@@ -118,7 +118,7 @@ class SafeLabeledMetric:
             return
         try:
             self._child.set(value)
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
 
     def observe(self, amount: float) -> None:
@@ -126,7 +126,7 @@ class SafeLabeledMetric:
             return
         try:
             self._child.observe(amount)
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
 
 
@@ -136,14 +136,14 @@ class SafeLabeledMetric:
 
 
 class SafeCounter(Counter):
-    """Counter that becomes no-op on mmap corruption."""
+    """Counter that becomes no-op on any recording error."""
 
     def labels(self, *args: Any, **kwargs: Any) -> Any:
         if _metrics_disabled:
             return _NOOP_LABELED
         try:
             return SafeLabeledMetric(super().labels(*args, **kwargs))
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
             return _NOOP_LABELED
 
@@ -152,19 +152,19 @@ class SafeCounter(Counter):
             return
         try:
             super().inc(amount, exemplar)
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
 
 
 class SafeGauge(Gauge):
-    """Gauge that becomes no-op on mmap corruption."""
+    """Gauge that becomes no-op on any recording error."""
 
     def labels(self, *args: Any, **kwargs: Any) -> Any:
         if _metrics_disabled:
             return _NOOP_LABELED
         try:
             return SafeLabeledMetric(super().labels(*args, **kwargs))
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
             return _NOOP_LABELED
 
@@ -173,7 +173,7 @@ class SafeGauge(Gauge):
             return
         try:
             super().inc(amount)
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
 
     def dec(self, amount: float = 1) -> None:
@@ -181,7 +181,7 @@ class SafeGauge(Gauge):
             return
         try:
             super().dec(amount)
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
 
     def set(self, value: float) -> None:
@@ -189,19 +189,19 @@ class SafeGauge(Gauge):
             return
         try:
             super().set(value)
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
 
 
 class SafeHistogram(Histogram):
-    """Histogram that becomes no-op on mmap corruption."""
+    """Histogram that becomes no-op on any recording error."""
 
     def labels(self, *args: Any, **kwargs: Any) -> Any:
         if _metrics_disabled:
             return _NOOP_LABELED
         try:
             return SafeLabeledMetric(super().labels(*args, **kwargs))
-        except ValueError as e:
+        except Exception as e:
             _trip(e)
             return _NOOP_LABELED
 
@@ -210,5 +210,5 @@ class SafeHistogram(Histogram):
             return
         try:
             super().observe(amount, exemplar)
-        except ValueError as e:
+        except Exception as e:
             _trip(e)

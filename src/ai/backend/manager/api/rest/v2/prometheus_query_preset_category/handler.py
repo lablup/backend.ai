@@ -16,7 +16,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import CategoryIdPathParam
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.prometheus_query_preset_category import (
+    from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter import (
         PrometheusQueryPresetCategoryAdapter,
     )
 

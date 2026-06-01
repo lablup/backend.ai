@@ -12,6 +12,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -36,7 +37,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.types import (
+    KeypairResourcePolicyKeypairSearchScope,
+    UserKeypairSearchScope,
+)
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
@@ -96,6 +100,11 @@ class UserRepository:
         Create a new user with default keypair and group associations.
         """
         return await self._db_source.create_user_validated(creator, group_ids)
+
+    @user_repository_resilience.apply()
+    async def assign_project_membership(self, user_uuid: UUID, project_id: ProjectID) -> None:
+        """Add a user to a project, mapping the user to the project's member role."""
+        await self._db_source.assign_project_membership(user_uuid, project_id)
 
     @user_repository_resilience.apply()
     async def bulk_create_users_validated(
@@ -324,6 +333,23 @@ class UserRepository:
             SearchResult with matching keypairs and pagination info.
         """
         return await self._db_source.search_my_keypairs(scope, querier)
+
+    @user_repository_resilience.apply()
+    async def search_keypairs_by_resource_policy(
+        self,
+        scope: KeypairResourcePolicyKeypairSearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[KeyPairData]:
+        """Search keypairs assigned to a keypair resource policy.
+
+        Args:
+            scope: Search scope containing the resource policy name to filter by.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            SearchResult with matching keypairs and pagination info.
+        """
+        return await self._db_source.search_keypairs_by_resource_policy(scope, querier)
 
     # ------------------------------------------------------------------ admin keypair operations
 

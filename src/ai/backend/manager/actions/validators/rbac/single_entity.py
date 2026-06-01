@@ -1,12 +1,16 @@
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityAction
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
-from ai.backend.manager.data.permission.role import ScopeChainPermissionCheckInput
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.permission.role import (
+    PermissionResolutionKey,
+    ScopeChainPermissionCheckInput,
+)
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -16,23 +20,32 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
     def __init__(
         self,
         repository: PermissionControllerRepository,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._repository = repository
+        self._config_provider = config_provider
 
     @override
     async def validate(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
+        if not self._config_provider.config.manager.rbac.enforcement_enabled:
+            return
+
         user = current_user()
         if user is None:
-            raise UserNotFound("User not found in context")
+            raise UnreachableError("User context is not available")
         if user.is_superadmin:
             return
 
+        target = action.target_element()
         allowed = await self._repository.check_permission_with_scope_chain(
             ScopeChainPermissionCheckInput(
-                user_id=user.user_id,
-                target_element_ref=action.target_element(),
+                key=PermissionResolutionKey(
+                    user_id=user.user_id,
+                    element_type=target.element_type,
+                    entity_id=target.element_id,
+                    subject_entity_type=target.element_type,
+                ),
                 operation=action.operation_type().to_permission_operation(),
-                permission_entity_type=None,
             )
         )
         if not allowed:

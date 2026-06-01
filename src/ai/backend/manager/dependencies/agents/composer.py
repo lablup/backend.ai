@@ -20,17 +20,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-)
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    RegistryArgs as ModelDefinitionRegistryArgs,
-)
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
+from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
@@ -45,10 +38,6 @@ from .agent_client_pool import AgentClientPoolDependency, AgentClientPoolInput
 from .appproxy_client_pool import AppProxyClientPoolDependency
 from .deployment_controller import DeploymentControllerDependency, DeploymentControllerInput
 from .registry import AgentRegistryDependency, AgentRegistryInput
-from .revision_generator_registry import (
-    RevisionGeneratorRegistryDependency,
-    RevisionGeneratorRegistryInput,
-)
 from .route_controller import RouteControllerDependency, RouteControllerInput
 from .scheduling_controller import SchedulingControllerDependency, SchedulingControllerInput
 
@@ -74,6 +63,7 @@ class AgentsInput:
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
     deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
+    runtime_variant_repository: RuntimeVariantRepository
 
 
 @dataclass
@@ -84,8 +74,7 @@ class AgentsResources:
     """
 
     scheduling_controller: SchedulingController
-    revision_generator_registry: RevisionGeneratorRegistry
-    model_definition_generator_registry: ModelDefinitionGeneratorRegistry
+    revision_draft_reader: RevisionDraftReader
     deployment_controller: DeploymentController
     route_controller: RouteController
     agent_client_pool: AgentClientPool
@@ -94,17 +83,7 @@ class AgentsResources:
 
 
 class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
-    """Composes all agent-layer dependencies (Layer 4).
-
-    Composes agent registry, controllers, and client pools:
-    1. Scheduling controller: Manages session lifecycle and scheduling
-    2. Revision generator registry: Manages revision processors by runtime variant
-    3. Deployment controller: Manages deployment and model services
-    4. Route controller: Manages route lifecycle
-    5. Agent client pool: RPC connection pool for agents
-    6. App proxy client pool: HTTP connection pool for app proxies
-    7. Agent registry: High-level API for computation kernel management
-    """
+    """Composes all agent-layer dependencies (Layer 4)."""
 
     @property
     def stage_name(self) -> str:
@@ -116,15 +95,6 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
         stack: DependencyStack,
         setup_input: AgentsInput,
     ) -> AsyncIterator[AgentsResources]:
-        """Compose agent-layer dependencies in order.
-
-        Args:
-            stack: The dependency stack to use for composition
-            setup_input: Agents input containing config, infrastructure, and components
-
-        Yields:
-            AgentsResources containing controllers, pools, and registry
-        """
         valkey_schedule = setup_input.valkey_clients.schedule
 
         # 1. Scheduling controller
@@ -141,23 +111,12 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
             ),
         )
 
-        # 2. Revision generator registry
-        revision_generator_registry = await stack.enter_dependency(
-            RevisionGeneratorRegistryDependency(),
-            RevisionGeneratorRegistryInput(
-                deployment_repository=setup_input.deployment_repository,
-            ),
+        # 2. Revision draft reader (read-side of the revision merge pipeline)
+        revision_draft_reader = RevisionDraftReader(
+            deployment_repository=setup_input.deployment_repository,
         )
 
-        # 2.5. Model definition generator registry
-        model_definition_generator_registry = ModelDefinitionGeneratorRegistry(
-            ModelDefinitionRegistryArgs(
-                deployment_repository=setup_input.deployment_repository,
-                enable_model_definition_override=setup_input.config_provider.config.deployment.enable_model_definition_override,
-            )
-        )
-
-        # 3. Deployment controller (depends on scheduling controller + revision generator registry)
+        # 3. Deployment controller
         deployment_controller = await stack.enter_dependency(
             DeploymentControllerDependency(),
             DeploymentControllerInput(
@@ -167,8 +126,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
                 storage_manager=setup_input.storage_manager,
                 event_producer=setup_input.event_producer,
                 valkey_schedule=valkey_schedule,
-                revision_generator_registry=revision_generator_registry,
-                model_definition_generator_registry=model_definition_generator_registry,
+                revision_draft_reader=revision_draft_reader,
                 deployment_revision_preset_repository=setup_input.deployment_revision_preset_repository,
             ),
         )
@@ -181,7 +139,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
             ),
         )
 
-        # 5. Agent client pool (depends on agent cache)
+        # 5. Agent client pool
         agent_client_pool = await stack.enter_dependency(
             AgentClientPoolDependency(),
             AgentClientPoolInput(
@@ -189,13 +147,13 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
             ),
         )
 
-        # 6. App proxy client pool (no dependencies)
+        # 6. App proxy client pool
         appproxy_client_pool = await stack.enter_dependency(
             AppProxyClientPoolDependency(),
             None,
         )
 
-        # 7. Agent registry (depends on almost everything)
+        # 7. Agent registry
         registry = await stack.enter_dependency(
             AgentRegistryDependency(),
             AgentRegistryInput(
@@ -212,6 +170,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
                 hook_plugin_ctx=setup_input.hook_plugin_ctx,
                 network_plugin_ctx=setup_input.network_plugin_ctx,
                 scheduling_controller=scheduling_controller,
+                scheduler_repository=setup_input.scheduler_repository,
                 debug=setup_input.config_provider.config.debug.enabled,
                 manager_public_key=setup_input.agent_cache.manager_public_key,
                 manager_secret_key=setup_input.agent_cache.manager_secret_key,
@@ -220,8 +179,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
 
         yield AgentsResources(
             scheduling_controller=scheduling_controller,
-            revision_generator_registry=revision_generator_registry,
-            model_definition_generator_registry=model_definition_generator_registry,
+            revision_draft_reader=revision_draft_reader,
             deployment_controller=deployment_controller,
             route_controller=route_controller,
             agent_client_pool=agent_client_pool,

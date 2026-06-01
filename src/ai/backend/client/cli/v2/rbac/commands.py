@@ -10,6 +10,7 @@ import click
 
 from .assignment import assignment
 from .entity import entity
+from .invitation import invitation
 from .permission import permission
 from .role import role
 
@@ -24,3 +25,4 @@ rbac.add_command(role)
 rbac.add_command(permission)
 rbac.add_command(assignment)
 rbac.add_command(entity)
+rbac.add_command(invitation)

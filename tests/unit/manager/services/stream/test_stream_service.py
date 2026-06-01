@@ -7,7 +7,7 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.types import AccessKey, KernelId, SessionId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.idle import AppStreamingStatus, IdleCheckerHost
 from ai.backend.manager.models.session.row import SessionRow
@@ -29,10 +29,6 @@ from ai.backend.manager.services.stream.actions.interrupt_in_stream import (
     InterruptInStreamAction,
     InterruptInStreamActionResult,
 )
-from ai.backend.manager.services.stream.actions.restart_in_stream import (
-    RestartInStreamAction,
-    RestartInStreamActionResult,
-)
 from ai.backend.manager.services.stream.actions.start_service_in_stream import (
     StartServiceInStreamAction,
     StartServiceInStreamActionResult,
@@ -49,7 +45,7 @@ from ai.backend.manager.services.stream.service import StreamService
 
 FAKE_SESSION_ID = SessionId(uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"))
 FAKE_KERNEL_ID = KernelId(uuid.UUID("11111111-2222-3333-4444-555555555555"))
-FAKE_ACCESS_KEY = AccessKey("AKIAIOSFODNN7EXAMPLE")
+FAKE_USER_UUID = uuid.UUID("99999999-8888-7777-6666-555555555555")
 
 
 class TestStreamService:
@@ -115,7 +111,7 @@ class TestGetStreamingSession(TestStreamService):
         mock_repository.get_streaming_session.return_value = mock_session
         action = GetStreamingSessionAction(
             session_name="my-session",
-            access_key=FAKE_ACCESS_KEY,
+            user_uuid=FAKE_USER_UUID,
         )
 
         result = await stream_service.get_streaming_session(action)
@@ -130,9 +126,7 @@ class TestGetStreamingSession(TestStreamService):
         assert result.service_ports == [
             {"name": "jupyter", "protocol": "http", "container_ports": [8080]}
         ]
-        mock_repository.get_streaming_session.assert_awaited_once_with(
-            "my-session", FAKE_ACCESS_KEY
-        )
+        mock_repository.get_streaming_session.assert_awaited_once_with("my-session", FAKE_USER_UUID)
 
     async def test_no_service_ports_returns_empty_list(
         self,
@@ -144,7 +138,7 @@ class TestGetStreamingSession(TestStreamService):
         mock_repository.get_streaming_session.return_value = mock_session
         action = GetStreamingSessionAction(
             session_name="my-session",
-            access_key=FAKE_ACCESS_KEY,
+            user_uuid=FAKE_USER_UUID,
         )
 
         result = await stream_service.get_streaming_session(action)
@@ -159,7 +153,7 @@ class TestGetStreamingSession(TestStreamService):
         mock_repository.get_streaming_session.side_effect = SessionNotFound()
         action = GetStreamingSessionAction(
             session_name="nonexistent",
-            access_key=FAKE_ACCESS_KEY,
+            user_uuid=FAKE_USER_UUID,
         )
 
         with pytest.raises(SessionNotFound):
@@ -178,7 +172,7 @@ class TestExecuteInStream(TestStreamService):
         mock_registry.execute.return_value = {"status": "finished", "exitCode": 0}
         action = ExecuteInStreamAction(
             session_name="my-session",
-            access_key=FAKE_ACCESS_KEY,
+            user_uuid=FAKE_USER_UUID,
             api_version=(4, "websocket"),
             run_id="run-001",
             mode="query",
@@ -212,7 +206,7 @@ class TestExecuteInStream(TestStreamService):
         mock_registry.execute.return_value = {"status": "finished"}
         action = ExecuteInStreamAction(
             session_name="my-session",
-            access_key=FAKE_ACCESS_KEY,
+            user_uuid=FAKE_USER_UUID,
             api_version=(3, "batch"),
             run_id="run-002",
             mode="batch",
@@ -238,7 +232,7 @@ class TestInterruptInStream(TestStreamService):
         mock_registry.interrupt_session.return_value = {"status": "interrupted"}
         action = InterruptInStreamAction(
             session_name="my-session",
-            access_key=FAKE_ACCESS_KEY,
+            user_uuid=FAKE_USER_UUID,
         )
 
         result = await stream_service.interrupt_in_stream(action)
@@ -246,27 +240,6 @@ class TestInterruptInStream(TestStreamService):
         assert isinstance(result, InterruptInStreamActionResult)
         assert result.result == {"status": "interrupted"}
         mock_registry.interrupt_session.assert_awaited_once_with(mock_session)
-
-
-class TestRestartInStream(TestStreamService):
-    async def test_restart_calls_registry(
-        self,
-        stream_service: StreamService,
-        mock_repository: AsyncMock,
-        mock_registry: AsyncMock,
-        mock_session: MagicMock,
-    ) -> None:
-        mock_repository.get_streaming_session.return_value = mock_session
-        mock_registry.restart_session.return_value = None
-        action = RestartInStreamAction(
-            session_name="my-session",
-            access_key=FAKE_ACCESS_KEY,
-        )
-
-        result = await stream_service.restart_in_stream(action)
-
-        assert isinstance(result, RestartInStreamActionResult)
-        mock_registry.restart_session.assert_awaited_once_with(mock_session)
 
 
 class TestStartServiceInStream(TestStreamService):
@@ -281,7 +254,7 @@ class TestStartServiceInStream(TestStreamService):
         mock_registry.start_service.return_value = {"status": "started"}
         action = StartServiceInStreamAction(
             session_name="my-session",
-            access_key=FAKE_ACCESS_KEY,
+            user_uuid=FAKE_USER_UUID,
             service="jupyter",
             opts={"port": 8888},
         )

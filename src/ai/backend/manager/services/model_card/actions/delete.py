@@ -2,19 +2,22 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.model_card.types import ModelCardData
+from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.services.model_card.actions.base import ModelCardAction
 
 
 @dataclass
 class DeleteModelCardAction(ModelCardAction):
-    id: UUID
+    purger: Purger[ModelCardRow]
+    options: DeleteModelCardOptions
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.id)
+        return str(self.purger.pk_value)
 
     @override
     @classmethod
@@ -24,8 +27,8 @@ class DeleteModelCardAction(ModelCardAction):
 
 @dataclass
 class DeleteModelCardActionResult(BaseActionResult):
-    model_card: ModelCardData
+    id: UUID
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.model_card.id)
+        return str(self.id)

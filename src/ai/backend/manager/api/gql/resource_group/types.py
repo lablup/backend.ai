@@ -18,6 +18,12 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     PreemptionConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
+    ReplaceResourceGroupDefaultDeploymentOptionsGQLInput as ReplaceResourceGroupDefaultDeploymentOptionsGQLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    ReplaceResourceGroupDefaultSessionOptionsGQLInput as ReplaceResourceGroupDefaultSessionOptionsGQLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
     ResourceGroupFilter as ResourceGroupFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
@@ -68,6 +74,13 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     UpdateResourceGroupConfigPayloadNode,
     UpdateResourceGroupFairShareSpecPayloadNode,
 )
+from ai.backend.common.dto.manager.v2.resource_group.response import (
+    ReplaceResourceGroupDefaultDeploymentOptionsPayload as ReplaceResourceGroupDefaultDeploymentOptionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.response import (
+    ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
+)
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -79,12 +92,20 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.deployment.types.deployment_options import (
+    DeploymentOptionsInfoGQL,
+    DeploymentOptionsInputGQL,
+)
 from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceSlotGQL,
     ResourceWeightEntryGQL,
     ResourceWeightEntryInputGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.session_options.types import (
+    DefaultSessionOptionsInfoGQL,
+    DefaultSessionOptionsInputGQL,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
@@ -324,6 +345,24 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             description="Scheduler configuration for the resource group. Use scheduler.type to check if fair-share scheduling is enabled.",
         )
     )
+    default_deployment_options: DeploymentOptionsInfoGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Default deployment options (timeouts, etc.) snapshot-copied"
+                " onto each new deployment created in this resource group."
+            ),
+        )
+    )
+    default_session_options: DefaultSessionOptionsInfoGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Default session options used as the fallback layer for the"
+                " scheduling controller's options resolver at session enqueue time."
+            ),
+        )
+    )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -343,7 +382,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
     )  # type: ignore[misc]
     async def fair_share_spec(
         self, info: Info[StrawberryGQLContext, None]
-    ) -> FairShareScalingGroupSpecGQL:
+    ) -> FairShareScalingGroupSpecGQL | None:
         """Get fair share spec with merged resource weights from capacity."""
         ctx = info.context
         dto = await ctx.adapters.resource_group.get_fair_share_spec(self.name)
@@ -355,7 +394,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             description="Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.",
         )
     )  # type: ignore[misc]
-    async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL:
+    async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL | None:
         """Get resource information for this resource group."""
         ctx = info.context
         resource_info_dto = await ctx.adapters.resource_group.get_resource_info(self.name)
@@ -688,3 +727,84 @@ class AllowedDomainsPayloadGQL(PydanticOutputMixin[AllowedDomainsPayloadDTO]):
 )
 class AllowedProjectsPayloadGQL(PydanticOutputMixin[AllowedProjectsPayloadDTO]):
     pass
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for the replaceResourceGroupDefaultDeploymentOptions mutation."
+            " Full-replace semantics — the supplied payload is the complete new value."
+        ),
+    ),
+    name="ReplaceResourceGroupDefaultDeploymentOptionsInput",
+)
+class ReplaceResourceGroupDefaultDeploymentOptionsInputGQL(
+    PydanticInputMixin[ReplaceResourceGroupDefaultDeploymentOptionsGQLInputDTO]
+):
+    resource_group_name: str = gql_field(description="Target resource group name.")
+    options: DeploymentOptionsInputGQL = gql_field(
+        description="New default deployment options payload.",
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Payload returned after replacing a resource group's"
+            " default_deployment_options surface."
+        ),
+    ),
+    model=ReplaceResourceGroupDefaultDeploymentOptionsPayloadDTO,
+    name="ReplaceResourceGroupDefaultDeploymentOptionsPayload",
+)
+class ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL(
+    PydanticOutputMixin[ReplaceResourceGroupDefaultDeploymentOptionsPayloadDTO]
+):
+    resource_group_name: str = gql_field(
+        description="Name of the resource group whose default options were replaced.",
+    )
+    default_deployment_options: DeploymentOptionsInfoGQL = gql_field(
+        description="The newly persisted ``default_deployment_options`` surface.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for the replaceResourceGroupDefaultSessionOptions mutation."
+            " Full-replace semantics — the supplied payload is the complete new value."
+        ),
+    ),
+    name="ReplaceResourceGroupDefaultSessionOptionsInput",
+)
+class ReplaceResourceGroupDefaultSessionOptionsInputGQL(
+    PydanticInputMixin[ReplaceResourceGroupDefaultSessionOptionsGQLInputDTO]
+):
+    resource_group_name: str = gql_field(description="Target resource group name.")
+    options: DefaultSessionOptionsInputGQL = gql_field(
+        description="New default session options payload.",
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Payload returned after replacing a resource group's default_session_options surface."
+        ),
+    ),
+    model=ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
+    name="ReplaceResourceGroupDefaultSessionOptionsPayload",
+)
+class ReplaceResourceGroupDefaultSessionOptionsPayloadGQL(
+    PydanticOutputMixin[ReplaceResourceGroupDefaultSessionOptionsPayloadDTO]
+):
+    resource_group_name: str = gql_field(
+        description="Name of the resource group whose default options were replaced.",
+    )
+    default_session_options: DefaultSessionOptionsInfoGQL = gql_field(
+        description="The newly persisted ``default_session_options`` surface.",
+    )

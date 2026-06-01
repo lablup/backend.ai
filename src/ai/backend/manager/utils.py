@@ -7,14 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import AccessKey
 
+from .data.permission.types import EntityType, ScopeType
 from .data.user.types import SessionOwnerContext
 from .errors.api import InvalidAPIParameters
 from .errors.auth import AccessKeyNotFound, UserNotFound
 from .errors.common import InternalServerError
 from .models.domain import domains
-from .models.group import association_groups_users as agus
 from .models.group import groups
 from .models.keypair import keypairs
+from .models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
 from .models.resource_policy import keypair_resource_policies
 from .models.user import UserRole, users
 
@@ -159,8 +160,7 @@ async def query_userinfo(
         owner_uuid = requester_uuid
         actual_owner_role = requester_role
         # Own-session creation always goes through the USER path to enforce
-        # explicit project membership via the agus table, regardless of the
-        # requester's actual role.
+        # explicit project membership, regardless of the requester's actual role.
         role_for_group_resolution = UserRole.USER
         resource_policy = keypair_resource_policy or {}
 
@@ -211,10 +211,17 @@ async def query_userinfo(
         if requesting_domain != owner_domain:
             raise InvalidAPIParameters("You can only set the domain to your domain.")
         query = (
-            sa.select(agus.c.group_id)
-            .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
+            sa.select(groups.c.id)
+            .select_from(
+                groups.join(
+                    AssociationScopesEntitiesRow,
+                    AssociationScopesEntitiesRow.scope_id == sa.cast(groups.c.id, sa.String),
+                )
+            )
             .where(
-                (agus.c.user_id == owner_uuid)
+                (AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT)
+                & (AssociationScopesEntitiesRow.entity_type == EntityType.USER)
+                & (AssociationScopesEntitiesRow.entity_id == str(owner_uuid))
                 & (groups.c.domain_name == owner_domain)
                 & (group_match_query)
                 & (groups.c.is_active),
@@ -314,8 +321,7 @@ async def query_userinfo_from_session(
         owner_uuid = requester_uuid
         actual_owner_role = requester_role
         # Own-session creation always goes through the USER path to enforce
-        # explicit project membership via the agus table, regardless of the
-        # requester's actual role.
+        # explicit project membership, regardless of the requester's actual role.
         role_for_group_resolution = UserRole.USER
         resource_policy = keypair_resource_policy or {}
 
@@ -366,10 +372,17 @@ async def query_userinfo_from_session(
         if requesting_domain != owner_domain:
             raise InvalidAPIParameters("You can only set the domain to your domain.")
         query = (
-            sa.select(agus.c.group_id)
-            .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
+            sa.select(groups.c.id)
+            .select_from(
+                groups.join(
+                    AssociationScopesEntitiesRow,
+                    AssociationScopesEntitiesRow.scope_id == sa.cast(groups.c.id, sa.String),
+                )
+            )
             .where(
-                (agus.c.user_id == owner_uuid)
+                (AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT)
+                & (AssociationScopesEntitiesRow.entity_type == EntityType.USER)
+                & (AssociationScopesEntitiesRow.entity_id == str(owner_uuid))
                 & (groups.c.domain_name == owner_domain)
                 & (group_match_query)
                 & (groups.c.is_active),

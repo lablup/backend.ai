@@ -6,34 +6,32 @@ import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ai.backend.common.auth import PublicKey, SecretKey
+from ai.backend.common.config import (
+    ModelConfig,
+    ModelDefinition,
+    ModelHealthCheck,
+    ModelServiceConfig,
+)
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
-    MODEL_SERVICE_RUNTIME_PROFILES,
     BinarySize,
     DeviceId,
-    QuotaScopeID,
-    QuotaScopeType,
-    RuntimeVariant,
     SessionId,
     SlotName,
-    VFolderID,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
 
 
 class DummyEtcd:
@@ -132,6 +130,7 @@ async def registry_ctx() -> AsyncGenerator[
         hook_plugin_ctx=hook_plugin_ctx,
         network_plugin_ctx=network_plugin_ctx,
         scheduling_controller=mock_scheduling_controller,
+        scheduler_repository=MagicMock(),
         manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
         manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
     )
@@ -187,375 +186,67 @@ async def test_convert_resource_spec_to_resource_slot(
 
 @dataclass
 class MockEndpointData:
-    """Mock EndpointData for testing."""
+    """Minimal stand-in for ``EndpointData`` exposing only ``model_definition``.
 
-    runtime_variant: RuntimeVariant
-    model_definition_path: str | None = None
+    The runtime health-check path reads exactly that field — the persisted
+    merged result from the revision — and nothing else.
+    """
 
-
-@dataclass
-class MockVFolderRow:
-    """Mock VFolderRow for testing."""
-
-    host: str
-    vfid: VFolderID
+    model_definition: ModelDefinition | None
 
 
-@dataclass
-class MockDeploymentConfig:
-    """Mock deployment config for testing."""
+class TestResolveHealthCheck:
+    """Tests for ``AgentRegistry._resolve_health_check``."""
 
-    enable_model_definition_override: bool = False
-
-
-@dataclass
-class MockConfig:
-    """Mock config for testing."""
-
-    deployment: MockDeploymentConfig
-
-
-@dataclass
-class MockConfigProvider:
-    """Mock config provider for testing."""
-
-    config: MockConfig
-
-
-@dataclass
-class HealthCheckTestCase:
-    """Test case for health check configuration."""
-
-    input: dict[str, float | int | str]
-    expected_path: str
-    expected_interval: float = 10.0
-    expected_max_retries: int = 10
-    expected_max_wait_time: float = 15.0
-    expected_status_code: int = 200
-    expected_initial_delay: float = 60.0
-
-
-class TestGetHealthCheckInfo:
-    """Tests for get_health_check_info method."""
-
-    @pytest.fixture
-    def mock_storage_manager(self) -> AsyncMock:
-        return AsyncMock()
-
-    @pytest.fixture
-    def mock_config_provider(self) -> MockConfigProvider:
-        return MockConfigProvider(
-            config=MockConfig(
-                deployment=MockDeploymentConfig(enable_model_definition_override=False)
-            )
-        )
-
-    @pytest.fixture
-    def mock_config_provider_with_override(self) -> MockConfigProvider:
-        return MockConfigProvider(
-            config=MockConfig(
-                deployment=MockDeploymentConfig(enable_model_definition_override=True)
-            )
-        )
-
-    @pytest.fixture
-    def mock_endpoint_custom(self) -> MockEndpointData:
-        return MockEndpointData(
-            runtime_variant=RuntimeVariant("custom"),
-            model_definition_path="model-definition.yaml",
-        )
-
-    @pytest.fixture
-    def mock_endpoint_vllm_with_definition(self) -> MockEndpointData:
-        return MockEndpointData(
-            runtime_variant=RuntimeVariant("vllm"),
-            model_definition_path="model-definition.yaml",
-        )
-
-    @pytest.fixture
-    def mock_endpoint_cmd(self) -> MockEndpointData:
-        return MockEndpointData(
-            runtime_variant=RuntimeVariant("cmd"),
-            model_definition_path=None,
-        )
-
-    @pytest.fixture
-    def mock_endpoint_cmd_with_definition(self) -> MockEndpointData:
-        return MockEndpointData(
-            runtime_variant=RuntimeVariant("cmd"),
-            model_definition_path="model-definition.yaml",
-        )
-
-    @pytest.fixture
-    def mock_vfolder(self) -> MockVFolderRow:
-        quota_scope_id = QuotaScopeID(QuotaScopeType.PROJECT, uuid.uuid4())
-        return MockVFolderRow(
-            host="local",
-            vfid=VFolderID(quota_scope_id=quota_scope_id, folder_id=uuid.uuid4()),
-        )
-
-    @pytest.fixture
-    def patch_model_service_helper(self) -> Iterator[AsyncMock]:
-        """Patch ModelServiceHelper methods for testing."""
-        with (
-            patch(
-                "ai.backend.manager.registry.ModelServiceHelper.validate_model_definition_file_exists",
-                new_callable=AsyncMock,
-                return_value="model-definition.yaml",
-            ),
-            patch(
-                "ai.backend.manager.registry.ModelServiceHelper.validate_model_definition",
-                new_callable=AsyncMock,
-            ) as mock_validate_definition,
-        ):
-            yield mock_validate_definition
-
-    @pytest.fixture
-    def mock_registry(
-        self,
-        mock_storage_manager: AsyncMock,
-        mock_config_provider: MockConfigProvider,
-    ) -> MagicMock:
-        """Create a mock AgentRegistry with required dependencies."""
-        registry = MagicMock(spec=AgentRegistry)
-        registry.storage_manager = mock_storage_manager
-        registry.config_provider = mock_config_provider
-        return registry
-
-    @pytest.fixture
-    def mock_registry_with_override(
-        self,
-        mock_storage_manager: AsyncMock,
-        mock_config_provider_with_override: MockConfigProvider,
-    ) -> MagicMock:
-        """Create a mock AgentRegistry with model definition override enabled."""
-        registry = MagicMock(spec=AgentRegistry)
-        registry.storage_manager = mock_storage_manager
-        registry.config_provider = mock_config_provider_with_override
-        return registry
-
-    @pytest.fixture
-    def patch_model_service_helper_for_override(self) -> Iterator[AsyncMock]:
-        """Patch ModelServiceHelper methods for non-CUSTOM override testing."""
-        with (
-            patch(
-                "ai.backend.manager.registry.ModelServiceHelper.validate_model_definition_file_exists",
-                new_callable=AsyncMock,
-                return_value="model-definition.yaml",
-            ),
-            patch(
-                "ai.backend.manager.registry.ModelServiceHelper._read_model_definition",
-                new_callable=AsyncMock,
-            ) as mock_read_definition,
-        ):
-            yield mock_read_definition
-
-    @pytest.mark.parametrize(
-        "test_case",
-        [
-            HealthCheckTestCase(
-                input={
-                    "path": "/custom-health",
-                    "interval": 5.0,
-                    "max_retries": 3,
-                    "max_wait_time": 30.0,
-                    "expected_status_code": 201,
-                    "initial_delay": 120.0,
-                },
-                expected_path="/custom-health",
-                expected_interval=5.0,
-                expected_max_retries=3,
-                expected_max_wait_time=30.0,
-                expected_status_code=201,
-                expected_initial_delay=120.0,
-            ),
-            HealthCheckTestCase(
-                input={
-                    "path": "/health",
-                    "interval": 10.0,
-                    "max_retries": 5,
-                    "max_wait_time": 20.0,
-                    "expected_status_code": 200,
-                    # initial_delay omitted - should use Pydantic default (60.0)
-                },
-                expected_path="/health",
-                expected_interval=10.0,
-                expected_max_retries=5,
-                expected_max_wait_time=20.0,
-                expected_status_code=200,
-                expected_initial_delay=60.0,
-            ),
-            HealthCheckTestCase(
-                input={"path": "/health"},
-                # All optional fields use Pydantic defaults
-                expected_path="/health",
-                expected_interval=10.0,
-                expected_max_retries=10,
-                expected_max_wait_time=15.0,
-                expected_status_code=200,
-                expected_initial_delay=60.0,
-            ),
-        ],
-    )
-    async def test_custom_variant_health_check_config(
-        self,
-        mock_registry: MagicMock,
-        mock_endpoint_custom: MockEndpointData,
-        mock_vfolder: MockVFolderRow,
-        patch_model_service_helper: AsyncMock,
-        test_case: HealthCheckTestCase,
-    ) -> None:
-        """Test CUSTOM variant with various health check configurations."""
-        mock_validate_definition = patch_model_service_helper
-        mock_validate_definition.return_value = {
-            "models": [{"service": {"health_check": test_case.input}}]
-        }
-
-        result = await AgentRegistry.get_health_check_info(
-            mock_registry,
-            mock_endpoint_custom,  # type: ignore[arg-type]
-            mock_vfolder,  # type: ignore[arg-type]
-        )
-
-        assert result is not None
-        assert result.path == test_case.expected_path
-        assert result.interval == test_case.expected_interval
-        assert result.max_retries == test_case.expected_max_retries
-        assert result.max_wait_time == test_case.expected_max_wait_time
-        assert result.expected_status_code == test_case.expected_status_code
-        assert result.initial_delay == test_case.expected_initial_delay
-
-    async def test_custom_variant_without_health_check_returns_none(
-        self,
-        mock_registry: MagicMock,
-        mock_endpoint_custom: MockEndpointData,
-        mock_vfolder: MockVFolderRow,
-        patch_model_service_helper: AsyncMock,
-    ) -> None:
-        """Test CUSTOM variant without health_check in model definition returns None."""
-        mock_validate_definition = patch_model_service_helper
-        mock_validate_definition.return_value = {
-            "models": [{"service": {}}]  # No health_check defined
-        }
-
-        result = await AgentRegistry.get_health_check_info(
-            mock_registry,
-            mock_endpoint_custom,  # type: ignore[arg-type]
-            mock_vfolder,  # type: ignore[arg-type]
-        )
-
-        assert result is None
-
-    async def test_vllm_variant_returns_default_health_check(
-        self,
-        mock_registry: MagicMock,
-        mock_vfolder: MockVFolderRow,
-    ) -> None:
-        """Test VLLM variant returns default health check endpoint from profile."""
+    def test_returns_stored_health_check(self) -> None:
         endpoint = MockEndpointData(
-            runtime_variant=RuntimeVariant("vllm"),
-            model_definition_path=None,
+            model_definition=ModelDefinition(
+                models=[
+                    ModelConfig(
+                        name="m",
+                        model_path="/models/m",
+                        service=ModelServiceConfig(
+                            start_command=["run"],
+                            port=8000,
+                            health_check=ModelHealthCheck(
+                                path="/custom",
+                                interval=5.0,
+                                max_retries=3,
+                                max_wait_time=30.0,
+                                expected_status_code=201,
+                                initial_delay=120.0,
+                            ),
+                        ),
+                    )
+                ]
+            )
         )
-
-        result = await AgentRegistry.get_health_check_info(
-            mock_registry,
-            endpoint,  # type: ignore[arg-type]
-            mock_vfolder,  # type: ignore[arg-type]
-        )
-
+        result = AgentRegistry._resolve_health_check(endpoint)  # type: ignore[arg-type]
         assert result is not None
-        expected_path = MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant("vllm")].health_check_endpoint
-        assert result.path == expected_path
-
-    async def test_vllm_variant_override_preserves_default_initial_delay(
-        self,
-        mock_registry_with_override: MagicMock,
-        mock_endpoint_vllm_with_definition: MockEndpointData,
-        mock_vfolder: MockVFolderRow,
-        patch_model_service_helper_for_override: AsyncMock,
-    ) -> None:
-        """Test vllm variant with override preserves default initial_delay when not specified."""
-        mock_read_definition = patch_model_service_helper_for_override
-        mock_read_definition.return_value = {
-            "models": [
-                {
-                    "service": {
-                        "health_check": {
-                            "path": "/custom-health",
-                            "interval": 5.0,
-                            # initial_delay is intentionally omitted
-                        }
-                    }
-                }
-            ]
-        }
-
-        result = await AgentRegistry.get_health_check_info(
-            mock_registry_with_override,
-            mock_endpoint_vllm_with_definition,  # type: ignore[arg-type]
-            mock_vfolder,  # type: ignore[arg-type]
-        )
-
-        assert result is not None
-        # Path and interval should be overridden
-        assert result.path == "/custom-health"
+        assert result.path == "/custom"
         assert result.interval == 5.0
-        # initial_delay should use Pydantic default (60.0) since not specified in override
-        assert result.initial_delay == 60.0
+        assert result.max_retries == 3
+        assert result.max_wait_time == 30.0
+        assert result.expected_status_code == 201
+        assert result.initial_delay == 120.0
 
-    async def test_cmd_variant_without_override_returns_none(
-        self,
-        mock_registry: MagicMock,
-        mock_endpoint_cmd: MockEndpointData,
-        mock_vfolder: MockVFolderRow,
-    ) -> None:
-        """Test CMD variant without override returns None (no default health check endpoint)."""
-        result = await AgentRegistry.get_health_check_info(
-            mock_registry,
-            mock_endpoint_cmd,  # type: ignore[arg-type]
-            mock_vfolder,  # type: ignore[arg-type]
+    def test_returns_none_when_no_model_definition(self) -> None:
+        endpoint = MockEndpointData(model_definition=None)
+        assert AgentRegistry._resolve_health_check(endpoint) is None  # type: ignore[arg-type]
+
+    def test_returns_none_when_no_health_check_in_definition(self) -> None:
+        endpoint = MockEndpointData(
+            model_definition=ModelDefinition(
+                models=[
+                    ModelConfig(
+                        name="m",
+                        model_path="/models/m",
+                        service=ModelServiceConfig(start_command=["run"], port=8000),
+                    )
+                ]
+            )
         )
-
-        # CMD has no default health_check_endpoint, so returns None
-        assert result is None
-
-    async def test_cmd_variant_with_override_uses_yaml_path_and_pydantic_defaults(
-        self,
-        mock_registry_with_override: MagicMock,
-        mock_endpoint_cmd_with_definition: MockEndpointData,
-        mock_vfolder: MockVFolderRow,
-        patch_model_service_helper_for_override: AsyncMock,
-    ) -> None:
-        """Test CMD variant with override creates health check from YAML path with Pydantic defaults."""
-        mock_read_definition = patch_model_service_helper_for_override
-        mock_read_definition.return_value = {
-            "models": [
-                {
-                    "service": {
-                        "health_check": {
-                            "path": "/cmd-health",
-                            # All other fields omitted - should use Pydantic defaults
-                        }
-                    }
-                }
-            ]
-        }
-
-        result = await AgentRegistry.get_health_check_info(
-            mock_registry_with_override,
-            mock_endpoint_cmd_with_definition,  # type: ignore[arg-type]
-            mock_vfolder,  # type: ignore[arg-type]
-        )
-
-        assert result is not None
-        # Path from YAML (required for CMD since no default)
-        assert result.path == "/cmd-health"
-        # All other fields use Pydantic defaults
-        assert result.interval == 10.0
-        assert result.max_retries == 10
-        assert result.max_wait_time == 15.0
-        assert result.expected_status_code == 200
-        assert result.initial_delay == 60.0
+        assert AgentRegistry._resolve_health_check(endpoint) is None  # type: ignore[arg-type]
 
 
 def _make_scheduling_event(

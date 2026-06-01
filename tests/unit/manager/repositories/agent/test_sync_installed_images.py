@@ -22,6 +22,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -36,6 +37,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -174,6 +176,8 @@ class TestSyncInstalledImagesIntegration:
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,

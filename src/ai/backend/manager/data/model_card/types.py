@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID
 
 
@@ -19,7 +20,7 @@ class ResourceRequirementEntry:
 class ModelCardData:
     id: UUID
     name: str
-    vfolder_id: UUID
+    vfolder_id: VFolderUUID
     domain: str
     project_id: UUID
     creator_id: UUID
@@ -41,10 +42,26 @@ class ModelCardData:
 
 
 @dataclass(frozen=True)
+class BulkModelCardDeleteFailure:
+    """Error info for a single failed model card delete inside a bulk operation."""
+
+    card_id: UUID
+    message: str
+
+
+@dataclass(frozen=True)
+class BulkModelCardDeleteResultData:
+    """Result of bulk model card delete operation, with partial-failure support."""
+
+    successes: list[UUID]
+    failures: list[BulkModelCardDeleteFailure]
+
+
+@dataclass(frozen=True)
 class VFolderScanData:
     """Minimal vfolder data needed for model card scan."""
 
-    id: UUID
+    id: VFolderUUID
     name: str
     host: str
     quota_scope_id: QuotaScopeID

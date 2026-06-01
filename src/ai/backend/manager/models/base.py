@@ -36,9 +36,10 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicod
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.exception import InvalidIpAddressValue
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     AbstractPermission,
-    EndpointId,
+    BackendAISchema,
     JSONSerializableMixin,
     KernelId,
     QuotaScopeID,
@@ -719,11 +720,25 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
+
+    The optional ``subtype`` argument accepts a ``NewType`` (or any callable
+    that wraps a ``uuid.UUID``) so the ORM-level attribute can be a typed
+    identifier such as ``ImageID`` or ``VFolderUUID``. Prefer
+    ``mapped_column("col", GUID(ImageID), ...)`` over declaring a dedicated
+    subclass per identifier — ``NewType`` is identity at runtime, and the
+    subtype is invoked only to satisfy the type checker.
     """
 
     impl = CHAR
+    # ``uuid_subtype_func`` (ClassVar) is kept for the legacy subclass pattern
+    # (``SessionIDColumnType`` etc.). Instances constructed via ``GUID(subtype)``
+    # use ``self._subtype_func`` instead.
     uuid_subtype_func: ClassVar[Callable[[Any], uuid.UUID]] = lambda v: v
     cache_ok = True
+
+    def __init__(self, subtype: Callable[[uuid.UUID], TUUIDSubType] | None = None) -> None:
+        super().__init__()
+        self._subtype_func: Callable[[uuid.UUID], Any] | None = subtype
 
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "postgresql":
@@ -731,7 +746,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
         return dialect.type_descriptor(CHAR(16))
 
     def process_bind_param(self, value: Any | None, dialect: Dialect) -> str | bytes | None:
-        # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
+        # NOTE: DeploymentID, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
         #       Therefore, we just do isinstance on uuid.UUID only below.
@@ -745,17 +760,26 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
             return value.bytes
         return uuid.UUID(value).bytes
 
+    def _apply_subtype(self, raw: uuid.UUID) -> Any:
+        # Prefer the per-instance subtype (``GUID(ImageID)``). Fall back to the
+        # class-level ``uuid_subtype_func`` so existing subclasses still work.
+        if self._subtype_func is not None:
+            return self._subtype_func(raw)
+        return type(self).uuid_subtype_func(raw)
+
     def process_result_value(self, value: Any, _dialect: Dialect) -> TUUIDSubType | None:
         if value is None:
             return value
-        cls = type(self)
         if isinstance(value, bytes):
-            return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
+            return cast(TUUIDSubType, self._apply_subtype(uuid.UUID(bytes=value)))
         # Handle asyncpg's UUID type (asyncpg.pgproto.pgproto.UUID) and standard uuid.UUID
         # Both have a 'bytes' attribute, so we can use it to construct a standard uuid.UUID
         if hasattr(value, "bytes"):
-            return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value.bytes)))
-        return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(value)))
+            return cast(TUUIDSubType, self._apply_subtype(uuid.UUID(bytes=value.bytes)))
+        return cast(TUUIDSubType, self._apply_subtype(uuid.UUID(value)))
+
+    def copy(self, **_kw: Any) -> Self:
+        return type(self)(self._subtype_func)
 
 
 class SlugType(TypeDecorator[str]):
@@ -795,8 +819,12 @@ class SlugType(TypeDecorator[str]):
         return cast(str, value)
 
 
-class EndpointIDColumnType(GUID[EndpointId]):
-    uuid_subtype_func = lambda v: EndpointId(v)
+# Legacy subclass kept solely so the released alembic migration
+# ``f108628f032b_add_endpoint_and_routing_tables`` keeps working without
+# modification. New call sites should use ``GUID(DeploymentID)`` directly.
+# Safe to drop once that migration ages out of the LTS support window.
+class EndpointIDColumnType(GUID[DeploymentID]):
+    uuid_subtype_func = lambda v: DeploymentID(v)
     cache_ok = True
 
 
@@ -810,14 +838,14 @@ class KernelIDColumnType(GUID[KernelId]):
     cache_ok = True
 
 
-class ResourceSlotEntry(BaseModel):
+class ResourceSlotEntry(BackendAISchema):
     """A single resource slot entry for PydanticListColumn storage."""
 
     resource_type: str
     quantity: str
 
 
-class ResourceOptsEntry(BaseModel):
+class ResourceOptsEntry(BackendAISchema):
     """A single resource option entry for PydanticListColumn storage."""
 
     name: str
@@ -826,12 +854,6 @@ class ResourceOptsEntry(BaseModel):
 
 def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
-
-
-def EndpointIDColumn(name: str = "id") -> sa.Column[Any]:
-    return sa.Column(
-        name, EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
-    )
 
 
 def SessionIDColumn(name: str = "id") -> sa.Column[Any]:

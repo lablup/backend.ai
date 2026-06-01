@@ -14,9 +14,11 @@ from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group.row import GroupRow
@@ -41,6 +43,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import PasswordHashAlgorithm, PasswordInfo, UserRow, UserStatus
@@ -86,11 +89,14 @@ class TestSearchDomainScopes:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -338,11 +344,14 @@ class TestSearchProjectScopes:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -550,11 +559,14 @@ class TestSearchUserScopes:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -762,11 +774,14 @@ class TestSearchGlobalScope:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -809,11 +824,14 @@ class TestSearchScopesEmptyResult:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,

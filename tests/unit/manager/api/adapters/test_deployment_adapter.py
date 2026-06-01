@@ -8,16 +8,23 @@ from uuid import uuid4
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
-from ai.backend.manager.api.adapters.deployment import (
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import ClusterMode, ResourceSlot
+from ai.backend.manager.api.adapters.deployment.adapter import (
     DeploymentAdapter,
     _tristate_from_input,
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    ExecutionData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
+    PresetAttributionData,
     ResourceConfigData,
 )
 from ai.backend.manager.types import TriState
@@ -28,8 +35,9 @@ class TestRevisionDataToDTO:
 
     def test_model_definition_is_mapped_to_revision_dto(self) -> None:
         revision = ModelRevisionData(
-            id=uuid4(),
-            name="revision-1",
+            id=DeploymentRevisionID(uuid4()),
+            deployment_id=DeploymentID(uuid4()),
+            revision_number=1,
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,
                 size=1,
@@ -39,12 +47,13 @@ class TestRevisionDataToDTO:
                 resource_slot=ResourceSlot({"cpu": "2"}),
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=RuntimeVariantID(uuid4()),
             ),
             model_mount_config=ModelMountConfigData(
-                vfolder_id=uuid4(),
+                vfolder_id=VFolderUUID(uuid4()),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
+                extra_mounts=[],
             ),
             model_definition=ModelDefinition(
                 models=[
@@ -52,23 +61,30 @@ class TestRevisionDataToDTO:
                         name="demo-model",
                         model_path="/models/demo",
                         service=ModelServiceConfig(
-                            start_command="python serve.py",
+                            start_command=["python", "serve.py"],
                             port=8000,
                         ),
                     ),
                 ],
             ),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
-            image_id=uuid4(),
-            extra_vfolder_mounts=[],
+            image_id=ImageID(uuid4()),
+            execution=ExecutionData(
+                startup_command=None,
+                bootstrap_script=None,
+                callback_url=None,
+            ),
+            preset=PresetAttributionData(preset_id=None, values=[]),
         )
 
         dto = DeploymentAdapter._revision_data_to_dto(revision)
 
         assert dto.model_definition is not None
         assert dto.model_definition.models[0].name == "demo-model"
-        assert dto.model_definition.models[0].service is not None
-        assert dto.model_definition.models[0].service.port == 8000
+        service = dto.model_definition.models[0].service
+        assert service is not None
+        assert service.port == 8000
+        assert service.start_command == ["python", "serve.py"]
 
 
 class TestTriStateFromInput:

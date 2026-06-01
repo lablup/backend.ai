@@ -9,6 +9,10 @@ from ai.backend.manager.services.model_card.actions.available_presets import (
     AvailablePresetsAction,
     AvailablePresetsActionResult,
 )
+from ai.backend.manager.services.model_card.actions.bulk_delete import (
+    BulkDeleteModelCardAction,
+    BulkDeleteModelCardActionResult,
+)
 from ai.backend.manager.services.model_card.actions.create import (
     CreateModelCardAction,
     CreateModelCardActionResult,
@@ -40,6 +44,7 @@ class ModelCardProcessors(AbstractProcessorPackage):
     create: ActionProcessor[CreateModelCardAction, CreateModelCardActionResult]
     update: ActionProcessor[UpdateModelCardAction, UpdateModelCardActionResult]
     delete: ActionProcessor[DeleteModelCardAction, DeleteModelCardActionResult]
+    bulk_delete: ActionProcessor[BulkDeleteModelCardAction, BulkDeleteModelCardActionResult]
     search: ActionProcessor[SearchModelCardsAction, SearchModelCardsActionResult]
     search_in_project: ActionProcessor[
         SearchModelCardsInProjectAction, SearchModelCardsInProjectActionResult
@@ -58,6 +63,7 @@ class ModelCardProcessors(AbstractProcessorPackage):
         self.create = ActionProcessor(service.create, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
+        self.bulk_delete = ActionProcessor(service.bulk_delete, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
         self.search_in_project = ActionProcessor(
             service.search_in_project,
@@ -73,6 +79,7 @@ class ModelCardProcessors(AbstractProcessorPackage):
             CreateModelCardAction.spec(),
             UpdateModelCardAction.spec(),
             DeleteModelCardAction.spec(),
+            BulkDeleteModelCardAction.spec(),
             SearchModelCardsAction.spec(),
             SearchModelCardsInProjectAction.spec(),
             ScanProjectModelCardsAction.spec(),

@@ -13,10 +13,6 @@ echo "==> 2. Copying schema and gateway config to project root..."
 cp docs/manager/graphql-reference/supergraph.graphql ./supergraph.graphql
 cp configs/graphql/gateway.config.ts ./gateway.config.ts
 
-read -rp "==> 3. Restart Apollo Router? [y/N] " answer
-if [[ "$answer" =~ ^[Yy]$ ]]; then
-  docker compose -f docker-compose.halfstack.current.yml restart backendai-half-apollo-router
-  echo "==> Done!"
-else
-  echo "==> Skipped Apollo Router restart."
-fi
+echo "==> 3. Restarting Apollo Router..."
+docker compose -f docker-compose.halfstack.current.yml restart backendai-half-apollo-router
+echo "==> Done!"

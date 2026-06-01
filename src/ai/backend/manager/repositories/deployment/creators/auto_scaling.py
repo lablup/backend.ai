@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import override
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -21,11 +21,11 @@ from ai.backend.manager.repositories.base import CreatorSpec
 class DeploymentAutoScalingPolicyCreatorSpec(CreatorSpec[DeploymentAutoScalingPolicyRow]):
     """CreatorSpec for deployment auto-scaling policy creation.
 
-    Each endpoint can have at most one auto-scaling policy (1:1 relationship).
+    Each deployment can have at most one auto-scaling policy (1:1 relationship).
     The policy supports dual thresholds for hysteresis-based scaling.
     """
 
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     min_replicas: int
     max_replicas: int
     metric_source: AutoScalingMetricSource | None
@@ -40,7 +40,7 @@ class DeploymentAutoScalingPolicyCreatorSpec(CreatorSpec[DeploymentAutoScalingPo
     @override
     def build_row(self) -> DeploymentAutoScalingPolicyRow:
         return DeploymentAutoScalingPolicyRow(
-            endpoint=self.endpoint_id,
+            endpoint=self.deployment_id,
             min_replicas=self.min_replicas,
             max_replicas=self.max_replicas,
             metric_source=self.metric_source,

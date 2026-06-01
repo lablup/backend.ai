@@ -103,3 +103,7 @@ class CategoryIdPathParam(BaseRequestModel):
 
 class AccessKeyPathParam(BaseRequestModel):
     access_key: str = Field(description="Access key string")
+
+
+class InvitationIdPathParam(BaseRequestModel):
+    invitation_id: UUID = Field(description="Invitation UUID")

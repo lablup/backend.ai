@@ -5,6 +5,7 @@ from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -50,16 +51,16 @@ class TemplateRepository:
         requester_role: UserRole,
         requester_domain: str,
         requesting_domain: str,
-        requesting_group: str,
+        requesting_project_id: ProjectID,
         owner_access_key: str | None = None,
-    ) -> tuple[uuid.UUID, uuid.UUID]:
+    ) -> tuple[uuid.UUID, ProjectID]:
         return await self._db_source.resolve_owner(
             requester_uuid,
             requester_access_key,
             requester_role,
             requester_domain,
             requesting_domain,
-            requesting_group,
+            requesting_project_id,
             owner_access_key,
         )
 

@@ -37,7 +37,7 @@ colored = true
 format = "verbose"
 
 [otel]
-enabled = true
+enabled = false
 log-level = "INFO"
 endpoint = "http://127.0.0.1:4317"
 

@@ -186,10 +186,10 @@ class DeleteVFSStoragePayload(PydanticOutputMixin[DeleteVFSStoragePayloadDTO]):
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Create a new VFS storage"),
     name="createVFSStorage",
-)  # type: ignore[misc]
+)
 async def create_vfs_storage(
     input: CreateVFSStorageInput, info: Info[StrawberryGQLContext]
-) -> CreateVFSStoragePayload:
+) -> CreateVFSStoragePayload | None:
     result = await info.context.adapters.vfs_storage.create(input.to_pydantic())
     return CreateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
@@ -197,10 +197,10 @@ async def create_vfs_storage(
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Update an existing VFS storage"),
     name="updateVFSStorage",
-)  # type: ignore[misc]
+)
 async def update_vfs_storage(
     input: UpdateVFSStorageInput, info: Info[StrawberryGQLContext]
-) -> UpdateVFSStoragePayload:
+) -> UpdateVFSStoragePayload | None:
     result = await info.context.adapters.vfs_storage.update(input.to_pydantic())
     return UpdateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
@@ -208,9 +208,9 @@ async def update_vfs_storage(
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Delete a VFS storage"),
     name="deleteVFSStorage",
-)  # type: ignore[misc]
+)
 async def delete_vfs_storage(
     input: DeleteVFSStorageInput, info: Info[StrawberryGQLContext]
-) -> DeleteVFSStoragePayload:
+) -> DeleteVFSStoragePayload | None:
     result = await info.context.adapters.vfs_storage.delete(input.to_pydantic())
     return DeleteVFSStoragePayload.from_pydantic(result)

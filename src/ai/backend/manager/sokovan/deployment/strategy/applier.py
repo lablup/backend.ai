@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from uuid import UUID
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
@@ -17,6 +17,7 @@ from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.types import OptionalState
 
 from .types import StrategyEvaluationSummary
 
@@ -27,7 +28,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 class StrategyApplyResult:
     """Result of applying a strategy evaluation to the database."""
 
-    completed_ids: set[UUID] = field(default_factory=set)
+    completed_ids: set[DeploymentID] = field(default_factory=set)
     """Deployment IDs that completed and had their revision swapped."""
 
     routes_created: int = 0
@@ -60,10 +61,10 @@ class StrategyResultApplier:
 
     async def apply(self, summary: StrategyEvaluationSummary) -> StrategyApplyResult:
         changes = summary.route_changes
-        completed_ids: set[UUID] = set()
-        for endpoint_id, sub_step in summary.assignments.items():
+        completed_ids: set[DeploymentID] = set()
+        for deployment_id, sub_step in summary.assignments.items():
             if sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED:
-                completed_ids.add(endpoint_id)
+                completed_ids.add(deployment_id)
 
         result = StrategyApplyResult(
             completed_ids=completed_ids,
@@ -75,9 +76,8 @@ class StrategyResultApplier:
         if changes.drain_route_ids:
             drain = BatchUpdater(
                 spec=RouteBatchUpdaterSpec(
-                    status=RouteStatus.TERMINATING,
-                    traffic_ratio=0.0,
-                    traffic_status=RouteTrafficStatus.INACTIVE,
+                    status=OptionalState.update(RouteStatus.TERMINATING),
+                    traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
                 ),
                 conditions=[RouteConditions.by_ids(changes.drain_route_ids)],
             )

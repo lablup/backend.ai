@@ -15,6 +15,7 @@ from ai.backend.common.dto.storage.request import (
     CreateArchiveDownloadSessionRequest,
     TokenOperationType,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import VFolderID
 
 
@@ -71,7 +72,7 @@ class TestCreateArchiveDownloadSessionRequestFilename:
         ],
     )
     def test_filename_rejected(self, valid_body: dict[str, Any], bad_filename: str) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateArchiveDownloadSessionRequest(**valid_body, filename=bad_filename)
 
 

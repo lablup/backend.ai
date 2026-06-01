@@ -132,10 +132,10 @@ class UnregisterStorageNamespacePayload:
     BackendAIGQLMeta(
         added_version="25.15.0", description="Registers a new namespace within a storage"
     )
-)  # type: ignore[misc]
+)
 async def register_storage_namespace(
     input: RegisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
-) -> RegisterStorageNamespacePayload:
+) -> RegisterStorageNamespacePayload | None:
     payload = await info.context.adapters.storage_namespace.register(input.to_pydantic())
     return RegisterStorageNamespacePayload(id=payload.namespace.storage_id)
 
@@ -144,10 +144,10 @@ async def register_storage_namespace(
     BackendAIGQLMeta(
         added_version="25.15.0", description="Unregisters an existing namespace from a storage"
     )
-)  # type: ignore[misc]
+)
 async def unregister_storage_namespace(
     input: UnregisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
-) -> UnregisterStorageNamespacePayload:
+) -> UnregisterStorageNamespacePayload | None:
     pydantic_input = input.to_pydantic()
     payload = await info.context.adapters.storage_namespace.unregister(pydantic_input)
     return UnregisterStorageNamespacePayload(id=payload.id)

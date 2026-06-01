@@ -203,33 +203,6 @@ class DoCheckUnusedPortEvent(AbstractAnycastEvent):
         return None
 
 
-class DoHealthCheckEvent(AbstractAnycastEvent):
-    def serialize(self) -> tuple[Any, ...]:
-        return tuple()
-
-    @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
-        return cls()
-
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_health_check"
-
-    @classmethod
-    @override
-    def event_domain(cls) -> EventDomain:
-        return EventDomain.MODEL_ROUTE
-
-    @override
-    def domain_id(self) -> str | None:
-        return None
-
-    @override
-    def user_event(self) -> UserEvent | None:
-        return None
-
-
 class DoReconcileTraefikRoutesEvent(AbstractAnycastEvent):
     """Periodic trigger emitted by the coordinator leader cron to reconcile
     every active inference circuit's routing config against the live Circuit

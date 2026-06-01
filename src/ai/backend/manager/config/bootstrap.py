@@ -2,7 +2,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import Any, Self
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.loader import (
@@ -12,6 +12,7 @@ from ai.backend.common.configs.loader import (
     TomlConfigLoader,
 )
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.types import BackendAISchema
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.config.unified import (
@@ -24,7 +25,7 @@ from .constant import MANAGER_LOCAL_CFG_OVERRIDE_ENVS
 
 
 # TODO: Remove useless config fields from this
-class BootstrapConfig(BaseModel):
+class BootstrapConfig(BackendAISchema):
     db: DatabaseConfig = Field(
         default_factory=DatabaseConfig,  # type: ignore[arg-type]
         description="""

@@ -11,6 +11,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
 )
@@ -45,6 +46,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelDeploymentNetworkAccessInput as ModelDeploymentNetworkAccessInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplaceDeploymentOptionsGQLInput as ReplaceDeploymentOptionsGQLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     SyncReplicaInput as SyncReplicaInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -66,6 +70,9 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     DeploymentStatusChangedPayload as DeploymentStatusChangedPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
+    ReplaceDeploymentOptionsPayload as ReplaceDeploymentOptionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
     RevisionRefreshResultInfo as RevisionRefreshResultInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
@@ -84,6 +91,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -118,6 +126,10 @@ from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
     AutoScalingRuleFilter,
     AutoScalingRuleOrderBy,
 )
+from ai.backend.manager.api.gql.deployment.types.deployment_options import (
+    DeploymentOptionsInfoGQL,
+    DeploymentOptionsInputGQL,
+)
 from ai.backend.manager.api.gql.deployment.types.policy import (
     BlueGreenConfigInputGQL,
     DeploymentPolicyGQL,
@@ -141,7 +153,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
 )
 from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
 from ai.backend.manager.api.gql_legacy.group import GroupNode
@@ -155,6 +167,7 @@ from ai.backend.manager.data.deployment.types import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
@@ -164,6 +177,21 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
     ),
     ModelDeploymentStatus,
     name="DeploymentStatus",
+)
+
+
+ScalingStateGQL: type[ScalingState] = gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Replica scaling axis for a deployment, orthogonal to the"
+            " lifecycle status. ``SCALING`` while the replica reconciler"
+            " is adjusting replica count against desired_replica_count;"
+            " ``STABLE`` once holding at the desired count."
+        ),
+    ),
+    ScalingState,
+    name="ScalingState",
 )
 
 
@@ -204,12 +232,35 @@ class ModelDeploymentMetadata:
     tags: list[str]
     created_at: datetime
     updated_at: datetime
+    resource_group_name: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Name of the resource group (scaling group) this deployment runs in.",
+        )
+    )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The resource group this deployment runs in, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def resource_group(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ResourceGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
     @gql_field(
         description="The project of this entity.",
         deprecation_reason="Use project_v2 instead.",
     )  # type: ignore[misc]
-    async def project(self, info: Info[StrawberryGQLContext]) -> Project:
+    async def project(self, info: Info[StrawberryGQLContext]) -> Project | None:
         project_global_id = to_global_id(
             GroupNode, UUID(str(self.project_id)), is_target_graphene_object=True
         )
@@ -236,7 +287,7 @@ class ModelDeploymentMetadata:
         description="The domain of this entity.",
         deprecation_reason="Use domain_v2 instead.",
     )  # type: ignore[misc]
-    async def domain(self, info: Info[StrawberryGQLContext]) -> Domain:
+    async def domain(self, info: Info[StrawberryGQLContext]) -> Domain | None:
         domain_global_id = to_global_id(
             DomainNode, self.domain_name, is_target_graphene_object=True
         )
@@ -289,6 +340,17 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     default_deployment_strategy: DeploymentStrategyGQL
     replica_state: ReplicaState
     created_user_id: ID
+    options: DeploymentOptionsInfoGQL
+    scaling_state: ScalingStateGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle)."
+                " ``SCALING`` while the replica reconciler is adjusting replica count;"
+                " ``STABLE`` once holding at the desired count."
+            ),
+        )
+    )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -359,7 +421,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ModelRevisionConnection:
+    ) -> ModelRevisionConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_revisions(
@@ -400,7 +462,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ModelReplicaConnection:
+    ) -> ModelReplicaConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_replicas(
@@ -441,7 +503,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> AutoScalingRuleConnection:
+    ) -> AutoScalingRuleConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_rules(
@@ -484,7 +546,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> AccessTokenConnection:
+    ) -> AccessTokenConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_access_tokens(
@@ -660,6 +722,7 @@ class DeploymentStatusChangedPayload:
 class ModelDeploymentMetadataInput(PydanticInputMixin[ModelDeploymentMetadataInputDTO]):
     project_id: ID
     domain_name: str
+    resource_group_name: str
     name: str | None = None
     tags: list[str] | None = None
 
@@ -699,7 +762,7 @@ class CreateDeploymentInput(PydanticInputMixin[CreateDeploymentInputDTO]):
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
     default_deployment_strategy: DeploymentStrategyInputGQL
-    desired_replica_count: int
+    replica_count: int
     initial_revision: CreateRevisionInput | None = None
 
 
@@ -711,8 +774,7 @@ class UpdateDeploymentInput(PydanticInputMixin[UpdateDeploymentInputDTO]):
     open_to_public: bool | None = UNSET
     tags: list[str] | None = UNSET
     default_deployment_strategy: DeploymentStrategyInputGQL | None = UNSET
-    active_revision_id: ID | None = UNSET
-    desired_replica_count: int | None = UNSET
+    replica_count: int | None = UNSET
     name: str | None = UNSET
     preferred_domain_name: str | None = UNSET
 
@@ -786,3 +848,36 @@ class AdminRefreshDeploymentRevisionsPayload:
     """Payload for admin bulk revision refresh mutation result."""
 
     results: strawberry.auto
+
+
+# Replace deployment options types
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for the replaceDeploymentOptions mutation. Full-replace"
+            " semantics — the supplied payload is the complete new value."
+        ),
+    ),
+    name="ReplaceDeploymentOptionsInput",
+)
+class ReplaceDeploymentOptionsInputGQL(PydanticInputMixin[ReplaceDeploymentOptionsGQLInputDTO]):
+    deployment_id: UUID
+    options: DeploymentOptionsInputGQL
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Payload returned after replacing a deployment's options. Only"
+            " the refreshed options surface is returned; the server path uses"
+            " ``UPDATE ... RETURNING`` and does not re-read the surrounding"
+            " deployment node."
+        ),
+    ),
+    model=ReplaceDeploymentOptionsPayloadDTO,
+)
+class ReplaceDeploymentOptionsPayload(PydanticOutputMixin[ReplaceDeploymentOptionsPayloadDTO]):
+    deployment_id: ID
+    options: DeploymentOptionsInfoGQL

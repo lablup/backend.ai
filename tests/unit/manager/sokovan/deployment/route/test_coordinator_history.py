@@ -10,12 +10,16 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
     RouteTargetStatuses,
+    RouteTrafficStatus,
     RouteTransitionTarget,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -41,14 +45,16 @@ if TYPE_CHECKING:
 def sample_route_data() -> RouteData:
     """Sample RouteData for testing."""
     return RouteData(
-        route_id=uuid4(),
-        endpoint_id=uuid4(),
+        route_id=ReplicaID(uuid4()),
+        deployment_id=DeploymentID(uuid4()),
         session_id=None,
         status=RouteStatus.PROVISIONING,
         health_status=RouteHealthStatus.NOT_CHECKED,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
-        revision_id=uuid4(),
+        revision_id=DeploymentRevisionID(uuid4()),
+        traffic_status=RouteTrafficStatus.INACTIVE,
+        health_check=None,
     )
 
 
@@ -73,7 +79,7 @@ def sample_route_execution_error(
 def mock_deployment_repository() -> AsyncMock:
     """Mock DeploymentRepository with minimal implementation."""
     mock = AsyncMock(spec=DeploymentRepository)
-    mock.get_routes_by_statuses = AsyncMock(return_value=[])
+    mock.search_route_datas_with_last_history = AsyncMock(return_value=[])
     mock.update_route_status_bulk_with_history = AsyncMock(return_value=0)
     return mock
 
@@ -283,7 +289,9 @@ def coordinator_with_provisioning_routes(
     sample_route_data: RouteData,
 ) -> Generator[RouteCoordinator, None, None]:
     """Coordinator with PROVISIONING routes available."""
-    mock_deployment_repository.get_routes_by_statuses = AsyncMock(return_value=[sample_route_data])
+    mock_deployment_repository.search_route_datas_with_last_history = AsyncMock(
+        return_value=[sample_route_data]
+    )
 
     coordinator = RouteCoordinator(
         valkey_schedule=mock_valkey_schedule,
@@ -294,6 +302,7 @@ def coordinator_with_provisioning_routes(
         scheduling_controller=mock_scheduling_controller,
         client_pool=mock_client_pool,
         service_discovery=mock_service_discovery,
+        appproxy_client_pool=MagicMock(),
     )
     yield coordinator
 
@@ -310,7 +319,7 @@ def coordinator_without_routes(
     mock_service_discovery: MagicMock,
 ) -> Generator[RouteCoordinator, None, None]:
     """Coordinator with no routes available."""
-    mock_deployment_repository.get_routes_by_statuses = AsyncMock(return_value=[])
+    mock_deployment_repository.search_route_datas_with_last_history = AsyncMock(return_value=[])
 
     coordinator = RouteCoordinator(
         valkey_schedule=mock_valkey_schedule,
@@ -321,6 +330,7 @@ def coordinator_without_routes(
         scheduling_controller=mock_scheduling_controller,
         client_pool=mock_client_pool,
         service_discovery=mock_service_discovery,
+        appproxy_client_pool=MagicMock(),
     )
     yield coordinator
 
@@ -378,17 +388,19 @@ class TestProcessRouteLifecycle:
             RouteLifecycleType.HEALTH_CHECK: mock_handler_with_stale
         }
         # Update repository mock to return routes for HEALTHY status
-        mock_deployment_repository.get_routes_by_statuses = AsyncMock(
+        mock_deployment_repository.search_route_datas_with_last_history = AsyncMock(
             return_value=[
                 RouteData(
-                    route_id=uuid4(),
-                    endpoint_id=uuid4(),
+                    route_id=ReplicaID(uuid4()),
+                    deployment_id=DeploymentID(uuid4()),
                     session_id=None,
                     status=RouteStatus.RUNNING,
                     health_status=RouteHealthStatus.HEALTHY,
                     traffic_ratio=1.0,
                     created_at=datetime.now(tzutc()),
-                    revision_id=uuid4(),
+                    revision_id=DeploymentRevisionID(uuid4()),
+                    traffic_status=RouteTrafficStatus.ACTIVE,
+                    health_check=None,
                 )
             ]
         )

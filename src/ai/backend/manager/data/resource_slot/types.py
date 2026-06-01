@@ -38,6 +38,7 @@ class AgentResourceData:
     agent_id: str
     slot_name: str
     capacity: Decimal
+    reserved: Decimal
     used: Decimal
 
 
@@ -86,6 +87,20 @@ class OrphanedAllocation:
 
 
 @dataclass(frozen=True)
+class TerminalSessionKernelReconciliation:
+    """A non-terminal kernel whose session is already terminal, force-closed to
+    CANCELLED by reconciliation. Carried out in bulk regardless of the session's
+    specific terminal sub-state — this is abnormal-state cleanup, not a faithful
+    replay of a state transition.
+    """
+
+    kernel_id: uuid.UUID
+    session_id: uuid.UUID
+    from_kernel_status: str
+
+
+@dataclass(frozen=True)
 class ReconciliationResult:
+    reconciled_terminal_kernels: list[TerminalSessionKernelReconciliation]
     orphaned_allocations: list[OrphanedAllocation]
     agent_resource_drifts: list[AgentResourceDrift]

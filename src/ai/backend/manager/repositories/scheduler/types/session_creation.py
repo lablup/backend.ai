@@ -1,30 +1,23 @@
 """Types for session creation and enqueueing."""
 
-import secrets
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Self
+from typing import Any
 from uuid import UUID
 
-import yarl
-
-from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import (
     AccessKey,
-    ClusterMode,
-    KernelEnqueueingConfig,
-    KernelId,
-    ResourceSlot,
     SessionId,
-    SessionTypes,
+    SlotName,
+    SlotTypes,
     VFolderMount,
 )
-from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionSpec
-from ai.backend.manager.models.network import NetworkRow, NetworkType
+from ai.backend.manager.data.dotfile.types import DotfileBundle
+from ai.backend.manager.data.resource.types import SlotTypePolicy
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
-from ai.backend.manager.types import UserScope
 
 
 @dataclass
@@ -64,7 +57,13 @@ class ResolvedPresetValues:
 
 @dataclass
 class DeploymentContext:
-    """Context data needed to create a session from deployment info."""
+    """Context data needed to create a session from deployment info.
+
+    Consumed by
+    :class:`ai.backend.manager.sokovan.deployment.deployment_draft_builder.DeploymentSessionDraftBuilder`
+    to assemble a :class:`SessionSpecDraft` for route-executor-driven
+    inference sessions.
+    """
 
     created_user: UserContext
     session_owner: UserContext
@@ -73,231 +72,6 @@ class DeploymentContext:
     resource_policy: dict[str, Any]
     image: ImageContext
     resolved_presets: ResolvedPresetValues | None = None
-
-
-@dataclass
-class SessionUserInfo:
-    user_scope: UserScope
-    access_key: AccessKey
-    resource_policy: dict[str, Any]  # Raw policy data
-
-
-@dataclass
-class SessionCreationSpec:
-    """Specification for creating a new session."""
-
-    # Required parameters
-    session_creation_id: str
-    session_name: str
-    access_key: AccessKey
-    user_scope: UserScope
-    session_type: SessionTypes
-    cluster_mode: ClusterMode
-    cluster_size: int
-    priority: int
-    resource_policy: dict[str, Any]
-    kernel_specs: list[KernelEnqueueingConfig]
-    creation_spec: dict[str, Any]
-
-    # Optional parameters
-    is_preemptible: bool = True
-    scaling_group: str | None = None
-    session_tag: str | None = None
-    starts_at: datetime | None = None
-    batch_timeout: timedelta | None = None
-    dependency_sessions: list[SessionId] | None = None
-    callback_url: yarl.URL | None = None
-    route_id: UUID | None = None
-    sudo_session_enabled: bool = False
-    network: NetworkRow | None = None
-    designated_agent_list: list[str] | None = None
-    internal_data: dict[str, Any] | None = None
-    public_sgroup_only: bool = True
-    startup_command: str | None = None
-
-    @classmethod
-    def from_deployment_info(
-        cls,
-        deployment_info: DeploymentInfo,
-        context: DeploymentContext,
-        route_id: UUID,
-        target_revision: ModelRevisionSpec,
-    ) -> Self:
-        session_creation_id = secrets.token_urlsafe(16)
-
-        # Prepare mount spec
-        mount_spec = target_revision.mounts.to_mount_spec()
-
-        # Prepare environment variables
-        environ = dict(target_revision.execution.environ or {})
-        startup_command = target_revision.execution.startup_command
-        if "BACKEND_MODEL_NAME" not in environ:
-            environ["BACKEND_MODEL_NAME"] = deployment_info.metadata.name
-
-        # Apply resolved preset values (env vars and command args)
-        if context.resolved_presets:
-            environ.update(context.resolved_presets.environ)
-            if context.resolved_presets.args:
-                args_str = " ".join(context.resolved_presets.args)
-                startup_command = f"{startup_command} {args_str}" if startup_command else args_str
-
-        # Create kernel specs for cluster
-        DEFAULT_ROLE = "main"
-        kernel_specs = []
-        for idx in range(target_revision.resource_spec.cluster_size):
-            kernel_spec = KernelEnqueueingConfig(
-                image_ref=context.image.ref,
-                cluster_role=DEFAULT_ROLE if idx == 0 else "worker",
-                cluster_idx=idx + 1,
-                local_rank=idx,
-                cluster_hostname=f"{DEFAULT_ROLE}{idx + 1}" if idx == 0 else f"worker{idx}",
-                creation_config={
-                    "mounts": mount_spec.mounts,
-                    "mount_map": mount_spec.mount_map,
-                    "mount_options": mount_spec.mount_options,
-                    "environ": environ,
-                    "resources": target_revision.resource_spec.resource_slots,
-                    "resource_opts": target_revision.resource_spec.resource_opts,
-                },
-                uid=context.container_user.uid,
-                main_gid=context.container_user.main_gid,
-                supplementary_gids=context.container_user.supplementary_gids,
-                bootstrap_script=target_revision.execution.bootstrap_script or "",
-                startup_command=startup_command,
-            )
-            kernel_specs.append(kernel_spec)
-
-        return cls(
-            session_creation_id=session_creation_id,
-            session_name=f"{deployment_info.metadata.name}-{route_id!s}",
-            access_key=context.session_owner.access_key,
-            user_scope=UserScope(
-                domain_name=deployment_info.metadata.domain,
-                group_id=context.group_id,
-                user_uuid=context.session_owner.uuid,
-                user_role=context.session_owner.role,
-            ),
-            session_type=SessionTypes.INFERENCE,
-            cluster_mode=target_revision.resource_spec.cluster_mode,
-            cluster_size=target_revision.resource_spec.cluster_size,
-            priority=SESSION_PRIORITY_DEFAULT,
-            resource_policy=context.resource_policy,
-            kernel_specs=kernel_specs,
-            creation_spec={
-                "mounts": mount_spec.mounts,
-                "mount_map": mount_spec.mount_map,
-                "mount_options": mount_spec.mount_options,
-                "model_definition_path": target_revision.mounts.model_definition_path,
-                "runtime_variant": target_revision.execution.runtime_variant,
-                "environ": environ,
-                "scaling_group": deployment_info.metadata.resource_group,
-                "resources": target_revision.resource_spec.resource_slots,
-                "resource_opts": target_revision.resource_spec.resource_opts,
-                "preopen_ports": None,
-                "agent_list": None,
-            },
-            scaling_group=deployment_info.metadata.resource_group,
-            session_tag=deployment_info.metadata.tag,
-            callback_url=target_revision.execution.callback_url,
-            route_id=route_id,
-            sudo_session_enabled=context.session_owner.sudo_session_enabled,
-        )
-
-
-@dataclass
-class KernelEnqueueData:
-    """Data for each kernel in the session."""
-
-    id: KernelId
-    session_id: SessionId
-    session_creation_id: str
-    session_name: str
-    session_type: SessionTypes
-    cluster_mode: str  # Store as string for DB
-    cluster_size: int
-    cluster_role: str
-    cluster_idx: int
-    local_rank: int
-    cluster_hostname: str
-    scaling_group: str
-    domain_name: str
-    group_id: UUID
-    user_uuid: UUID
-    access_key: AccessKey
-    image: str  # Canonical image name (historical audit)
-    image_id: UUID | None  # Active reference to ImageRow
-    architecture: str
-    registry: str
-    tag: str | None
-    starts_at: datetime | None
-    status: str  # KernelStatus.PENDING
-    status_history: dict[str, str]
-    occupied_slots: ResourceSlot
-    requested_slots: ResourceSlot
-    occupied_shares: dict[str, Any]
-    resource_opts: dict[str, Any]
-    environ: list[str]  # List of "KEY=VALUE" strings
-    bootstrap_script: str | None
-    startup_command: str | None
-    internal_data: dict[str, Any]
-    callback_url: yarl.URL | None
-    mounts: list[str]  # Legacy field for compatibility
-    vfolder_mounts: list[VFolderMount]
-    preopen_ports: list[int]
-    use_host_network: bool
-
-    # Port fields (initially 0)
-    repl_in_port: int = 0
-    repl_out_port: int = 0
-    stdin_port: int = 0
-    stdout_port: int = 0
-
-    # Container user info
-    uid: int | None = field(default=None)
-    main_gid: int | None = field(default=None)
-    gids: list[int] = field(default_factory=list)
-
-
-@dataclass
-class SessionEnqueueData:
-    """Prepared data ready to be enqueued in database."""
-
-    # Associated data
-    kernels: list[KernelEnqueueData]
-    dependencies: list[SessionId]
-
-    id: SessionId
-    creation_id: str
-    name: str
-    access_key: AccessKey
-    user_uuid: UUID
-    group_id: UUID
-    domain_name: str
-    scaling_group_name: str
-    session_type: SessionTypes
-    cluster_mode: str  # Store as string for DB
-    cluster_size: int
-    priority: int
-    is_preemptible: bool
-    status: str  # SessionStatus.PENDING
-    status_history: dict[str, str]
-    requested_slots: ResourceSlot
-    occupying_slots: ResourceSlot
-    vfolder_mounts: list[VFolderMount]
-    environ: dict[str, str]
-    tag: str | None
-    starts_at: datetime | None
-    batch_timeout: int | None  # seconds
-    callback_url: yarl.URL | None
-    images: list[str]
-    image_ids: list[UUID]
-    designated_agent_list: list[str] | None
-    network_type: NetworkType | None = None
-    network_id: str | None = None
-    bootstrap_script: str | None = None
-    use_host_network: bool = False
-    timeout: int | None = None
-    startup_command: str | None = None
 
 
 @dataclass
@@ -349,23 +123,30 @@ class ContainerUserInfo:
 
 
 @dataclass
-class SessionCreationContext:
-    """All data needed for session creation, fetched in a single batch."""
+class SessionSpecContextFetch:
+    """Raw data fetched by ``ScheduleDBSource.fetch_session_spec_contexts``.
 
-    # Scaling group network info
-    scaling_group_network: ScalingGroupNetworkInfo
+    Kept as a plain record so the repository layer does not need to
+    import sokovan's scheduling-controller types (which would create a
+    circular import: preparer/validator types pull data-layer types
+    defined right here). The controller converts this bundle into its
+    typed :class:`SessionSpecPreparationContext` +
+    :class:`SessionSpecValidationContext` pair.
+    """
 
-    # Allowed scaling groups for validation
-    allowed_scaling_groups: list[AllowedScalingGroup]
-
-    # Image information for all kernels
-    image_infos: dict[str, ImageInfo]  # keyed by image reference
-
-    # Vfolder mounts
-    vfolder_mounts: list[VFolderMount]
-
-    # Dotfile data
-    dotfile_data: dict[str, Any]
-
-    # User (UID/GID) inside container
+    resource_group_defaults: Any  # DefaultSessionOptions (avoid data-layer import here)
+    resource_group_network: ScalingGroupNetworkInfo | None
     container_user_info: ContainerUserInfo
+    image_infos: dict[ImageID, ImageInfo]
+    resource_group_allow_fractional: bool
+    # Resolved vfolder mounts keyed by ``KernelGroup.role``. Each value
+    # is the ``VFolderMount`` tuple the controller's batch fetch
+    # materialized for that group — identical replicas share one entry,
+    # and task #33 (role-based mount override) can write distinct values
+    # per role without structural changes.
+    vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]]
+    dotfile_data: DotfileBundle
+    keypair_resource_policy: Any | None  # KeyPairResourcePolicyData
+    known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
+    slot_type_policy: SlotTypePolicy = field(default_factory=SlotTypePolicy)
+    active_session_count: int = 0

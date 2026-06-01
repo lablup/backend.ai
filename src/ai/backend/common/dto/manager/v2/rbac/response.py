@@ -21,11 +21,15 @@ from .types import (
 __all__ = (
     "AdminSearchAssociationsPayload",
     "AdminSearchPermissionsPayload",
-    "AdminSearchRoleAssignmentsPayload",
+    "SearchRoleAssignmentsPayload",
     "AdminSearchRolesPayload",
     "AssociationScopesEntitiesNode",
+    "BulkAddRolePermissionFailureInfo",
+    "BulkAddRolePermissionsPayload",
     "BulkAssignRoleFailureInfo",
     "BulkAssignRoleResultPayload",
+    "BulkRemoveRolePermissionFailureInfo",
+    "BulkRemoveRolePermissionsPayload",
     "BulkRevokeRoleFailureInfo",
     "BulkRevokeRoleResultPayload",
     "CreateRolePayload",
@@ -37,6 +41,8 @@ __all__ = (
     "OperationInfo",
     "PermissionNode",
     "PurgeRolePayload",
+    "ReplaceRolePermissionFailureInfo",
+    "ReplaceRolePermissionsPayload",
     "RoleAssignmentNode",
     "RoleNode",
     "ScopeEntityCombinationInfo",
@@ -134,6 +140,72 @@ class BulkRevokeRoleResultPayload(BaseResponseModel):
     )
 
 
+class BulkAddRolePermissionFailureInfo(BaseResponseModel):
+    """Failure detail for a single permission entry in bulk role-permission insertion."""
+
+    role_id: UUID = Field(description="Role ID of the failed entry")
+    scope_type: str = Field(description="Scope element type of the failed entry")
+    scope_id: str = Field(description="Scope element ID of the failed entry")
+    entity_type: str = Field(description="Entity element type of the failed entry")
+    operation: str = Field(description="Operation type of the failed entry")
+    message: str = Field(description="Error message describing the failure")
+
+
+class BulkRemoveRolePermissionFailureInfo(BaseResponseModel):
+    """Failure detail for a single permission ID in bulk role-permission deletion."""
+
+    permission_id: UUID = Field(description="Permission row ID that failed to delete")
+    message: str = Field(description="Error message describing the failure")
+
+
+class ReplaceRolePermissionFailureInfo(BaseResponseModel):
+    """Failure detail for a single permission entry in replace operation."""
+
+    role_id: UUID = Field(description="Role ID of the failed entry")
+    scope_type: str = Field(description="Scope element type of the failed entry")
+    scope_id: str = Field(description="Scope element ID of the failed entry")
+    entity_type: str = Field(description="Entity element type of the failed entry")
+    operation: str = Field(description="Operation type of the failed entry")
+    message: str = Field(description="Error message describing the failure")
+
+
+class BulkAddRolePermissionsPayload(BaseResponseModel):
+    """Result payload for bulk role-permission insertion."""
+
+    items: list[PermissionNode] = Field(
+        default_factory=list, description="Successfully inserted permission rows"
+    )
+    failed: list[BulkAddRolePermissionFailureInfo] = Field(
+        default_factory=list, description="Permission entries that failed to insert"
+    )
+
+
+class BulkRemoveRolePermissionsPayload(BaseResponseModel):
+    """Result payload for bulk role-permission deletion."""
+
+    items: list[PermissionNode] = Field(
+        default_factory=list, description="Successfully deleted permission rows"
+    )
+    failed: list[BulkRemoveRolePermissionFailureInfo] = Field(
+        default_factory=list, description="Permission IDs that failed to delete"
+    )
+
+
+class ReplaceRolePermissionsPayload(BaseResponseModel):
+    """Result payload for replacing a role's entire scoped-permission set.
+
+    ``items`` contains the new rows that became the role's permission set;
+    pre-existing rows wiped before the insert are not echoed back.
+    """
+
+    items: list[PermissionNode] = Field(
+        default_factory=list, description="Permission rows that make up the new set"
+    )
+    failed: list[ReplaceRolePermissionFailureInfo] = Field(
+        default_factory=list, description="Permission entries that failed to insert"
+    )
+
+
 class PermissionNode(BaseResponseModel):
     """Node representing a scoped RBAC permission."""
 
@@ -183,7 +255,7 @@ class AdminSearchPermissionsPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
-class AdminSearchRoleAssignmentsPayload(BaseResponseModel):
+class SearchRoleAssignmentsPayload(BaseResponseModel):
     """Paginated result for role assignment search."""
 
     items: list[RoleAssignmentNode] = Field(description="List of role assignment nodes.")

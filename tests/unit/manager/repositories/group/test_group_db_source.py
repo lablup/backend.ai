@@ -9,15 +9,18 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.errors.resource import ProjectHasActiveEndpointsError
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -33,6 +36,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -44,13 +48,13 @@ from ai.backend.testutils.db import with_tables
 
 @dataclasses.dataclass
 class EndpointWithSessionFixtureData:
-    endpoint_id: uuid.UUID
+    endpoint_id: DeploymentID
     session_id: uuid.UUID
 
 
 @dataclasses.dataclass
 class MultipleEndpointsWithSessionsFixtureData:
-    endpoint_ids: list[uuid.UUID]
+    endpoint_ids: list[DeploymentID]
     session_ids: list[uuid.UUID]
 
 
@@ -87,11 +91,14 @@ class TestGroupDBSourceDeleteEndpoints:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -223,9 +230,9 @@ class TestGroupDBSourceDeleteEndpoints:
         test_domain: str,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
-    ) -> list[uuid.UUID]:
+    ) -> list[DeploymentID]:
         """Create two inactive endpoints with routing entries (no sessions)"""
-        endpoint_ids = []
+        endpoint_ids: list[DeploymentID] = []
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
@@ -243,7 +250,7 @@ class TestGroupDBSourceDeleteEndpoints:
             await session.flush()
             # Create two inactive endpoints (use DESTROYED to avoid image requirement)
             for i in range(2):
-                endpoint_id = uuid.uuid4()
+                endpoint_id = DeploymentID(uuid.uuid4())
                 endpoint = EndpointRow(
                     id=endpoint_id,
                     name=f"test-endpoint-{i}-{uuid.uuid4().hex[:8]}",
@@ -255,7 +262,6 @@ class TestGroupDBSourceDeleteEndpoints:
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)
@@ -286,7 +292,7 @@ class TestGroupDBSourceDeleteEndpoints:
         test_group: uuid.UUID,
     ) -> EndpointWithSessionFixtureData:
         """Create one inactive endpoint with a session and routing entry"""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
         session_id = uuid.uuid4()
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
@@ -316,7 +322,6 @@ class TestGroupDBSourceDeleteEndpoints:
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
 
@@ -366,7 +371,7 @@ class TestGroupDBSourceDeleteEndpoints:
         test_group: uuid.UUID,
     ) -> uuid.UUID:
         """Create one active endpoint (lifecycle_stage=CREATED)"""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
@@ -394,7 +399,6 @@ class TestGroupDBSourceDeleteEndpoints:
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
             await session.commit()
@@ -428,7 +432,7 @@ class TestGroupDBSourceDeleteEndpoints:
             session.add(sgroup)
             await session.flush()
             for i in range(3):
-                endpoint_id = uuid.uuid4()
+                endpoint_id = DeploymentID(uuid.uuid4())
                 session_id = uuid.uuid4()
 
                 # Create endpoint (use DESTROYED to avoid image requirement)
@@ -443,7 +447,6 @@ class TestGroupDBSourceDeleteEndpoints:
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)
@@ -495,7 +498,7 @@ class TestGroupDBSourceDeleteEndpoints:
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
         test_group: uuid.UUID,
-        inactive_endpoints_with_routings: list[uuid.UUID],
+        inactive_endpoints_with_routings: list[DeploymentID],
     ) -> None:
         """Test successful deletion of endpoints with routing entries"""
         async with db_with_cleanup.begin_session() as session:

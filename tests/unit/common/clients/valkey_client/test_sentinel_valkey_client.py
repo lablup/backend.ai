@@ -15,9 +15,14 @@ from ai.backend.common.clients.valkey_client.client import (
     ValkeySentinelClient,
     ValkeySentinelTarget,
     ValkeyStandaloneClient,
+    ValkeyStandaloneTarget,
     create_valkey_client,
 )
-from ai.backend.common.exception import ClientNotConnectedError, ValkeySentinelMasterNotFound
+from ai.backend.common.exception import (
+    ClientNotConnectedError,
+    ValkeyRoleMismatchError,
+    ValkeySentinelMasterNotFound,
+)
 from ai.backend.common.types import ValkeyTarget
 
 INITIAL_MASTER = ("127.0.0.1", 6379)
@@ -44,6 +49,8 @@ def mock_glide_client() -> AsyncMock:
     client = AsyncMock()
     client.ping = AsyncMock(return_value=b"PONG")
     client.close = AsyncMock()
+    # ROLE response on a master node: [role, replication_offset, [replicas]]
+    client.custom_command = AsyncMock(return_value=[b"master", 0, []])
     return client
 
 
@@ -81,10 +88,12 @@ def connected_sentinel_client(
 def _create_mock_sentinel_client() -> AsyncMock:
     mock_glide = AsyncMock()
     mock_glide.ping = AsyncMock(return_value=b"PONG")
+    mock_glide.custom_command = AsyncMock(return_value=[b"master", 0, []])
 
     client = AsyncMock(spec=ValkeySentinelClient)
     client.need_reconnect = AsyncMock(return_value=False)
     client.ping = AsyncMock()
+    client.check_health = AsyncMock()
     client.connect = AsyncMock()
     client.disconnect = AsyncMock()
 
@@ -253,78 +262,81 @@ class TestMonitoringValkeyClientWithSentinel:
             spec=spec,
         )
 
-    # -- _check_connection --
+    # -- _check_connection / _check_health --
 
-    async def test_check_connection_triggers_reconnect_on_master_change(
-        self,
-        monitoring_client: MonitoringValkeyClient,
-        mock_sentinel_monitor_client: AsyncMock,
-    ) -> None:
-        mock_sentinel_monitor_client.need_reconnect.return_value = True
-        assert await monitoring_client._check_connection() is True
-
-    async def test_check_connection_no_reconnect_when_stable(
+    async def test_check_connection_no_reconnect_when_healthy(
         self, monitoring_client: MonitoringValkeyClient
     ) -> None:
         assert await monitoring_client._check_connection() is False
 
-    # -- _check_ping --
+    async def test_check_health_triggers_reconnect_on_role_mismatch(
+        self,
+        monitoring_client: MonitoringValkeyClient,
+        mock_sentinel_monitor_client: AsyncMock,
+    ) -> None:
+        """Role mismatch (failover demoted the connected master) triggers immediate reconnect."""
+        mock_sentinel_monitor_client.check_health.side_effect = ValkeyRoleMismatchError(
+            "Connected node role is 'slave', expected 'master'"
+        )
+        assert await monitoring_client._check_health() is True
+        assert monitoring_client._monitor_consecutive_failure_count == 0
 
     @pytest.mark.parametrize(
         "exception",
         [
             ClosingError("Connection closed"),
             ClientNotConnectedError("Not connected"),
+            ValkeyRoleMismatchError("Connected node role is 'slave', expected 'master'"),
         ],
-        ids=["ClosingError", "ClientNotConnectedError"],
+        ids=["ClosingError", "ClientNotConnectedError", "ValkeyRoleMismatchError"],
     )
-    async def test_check_ping_returns_true_on_reconnectable_exception(
+    async def test_check_health_returns_true_on_reconnectable_exception(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
         exception: Exception,
     ) -> None:
         """Reconnectable exceptions trigger immediate reconnection."""
-        mock_sentinel_monitor_client.ping.side_effect = exception
+        mock_sentinel_monitor_client.check_health.side_effect = exception
 
-        assert await monitoring_client._check_ping() is True
+        assert await monitoring_client._check_health() is True
         assert monitoring_client._monitor_consecutive_failure_count == 0
 
-    async def test_check_ping_accumulates_failures_until_threshold(
+    async def test_check_health_accumulates_failures_until_threshold(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
     ) -> None:
         """General exceptions accumulate; reconnect triggers at threshold (3)."""
-        mock_sentinel_monitor_client.ping.side_effect = TimeoutError("Timed out")
+        mock_sentinel_monitor_client.check_health.side_effect = TimeoutError("Timed out")
 
-        assert await monitoring_client._check_ping() is False
+        assert await monitoring_client._check_health() is False
         assert monitoring_client._monitor_consecutive_failure_count == 1
 
-        assert await monitoring_client._check_ping() is False
+        assert await monitoring_client._check_health() is False
         assert monitoring_client._monitor_consecutive_failure_count == 2
 
         # Third failure: threshold reached → reconnect
-        assert await monitoring_client._check_ping() is True
+        assert await monitoring_client._check_health() is True
         assert monitoring_client._monitor_consecutive_failure_count == 0
 
-    async def test_check_ping_resets_failure_count_on_success(
+    async def test_check_health_resets_failure_count_on_success(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
     ) -> None:
-        """Successful ping resets the consecutive failure counter."""
-        mock_sentinel_monitor_client.ping.side_effect = TimeoutError("Timed out")
+        """Successful health check resets the consecutive failure counter."""
+        mock_sentinel_monitor_client.check_health.side_effect = TimeoutError("Timed out")
 
-        await monitoring_client._check_ping()
-        await monitoring_client._check_ping()
+        await monitoring_client._check_health()
+        await monitoring_client._check_health()
         assert monitoring_client._monitor_consecutive_failure_count == 2
 
-        # Recovery: ping succeeds
-        mock_sentinel_monitor_client.ping.side_effect = None
-        mock_sentinel_monitor_client.ping.return_value = None
+        # Recovery: health check succeeds
+        mock_sentinel_monitor_client.check_health.side_effect = None
+        mock_sentinel_monitor_client.check_health.return_value = None
 
-        assert await monitoring_client._check_ping() is False
+        assert await monitoring_client._check_health() is False
         assert monitoring_client._monitor_consecutive_failure_count == 0
 
     # -- _reconnect --
@@ -371,23 +383,23 @@ class TestMonitoringValkeyClientWithSentinel:
 
     # -- monitor loop --
 
-    async def test_monitor_loop_calls_reconnect_when_check_connection_returns_true(
+    async def test_monitor_loop_calls_reconnect_on_role_mismatch(
         self,
         monitoring_client: MonitoringValkeyClient,
         mock_sentinel_monitor_client: AsyncMock,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """The monitor loop triggers _reconnect when _check_connection returns True."""
+        """Failover demotion (ROLE != master) on the monitor client triggers _reconnect."""
         call_count = 0
 
-        async def fake_need_reconnect() -> bool:
+        async def fake_check_health() -> None:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return True
+                raise ValkeyRoleMismatchError("Connected node role is 'slave', expected 'master'")
             raise asyncio.CancelledError
 
-        mock_sentinel_monitor_client.need_reconnect = fake_need_reconnect
+        mock_sentinel_monitor_client.check_health = fake_check_health
 
         mock_reconnect = AsyncMock()
         monkeypatch.setattr(monitoring_client, "_reconnect", mock_reconnect)
@@ -411,14 +423,14 @@ class TestMonitoringValkeyClientWithSentinel:
         """Monitor loop must not die when _reconnect() raises; it should log and retry."""
         check_count = 0
 
-        async def fake_need_reconnect() -> bool:
+        async def fake_check_health() -> None:
             nonlocal check_count
             check_count += 1
             if check_count <= 2:
-                return True
+                raise ValkeyRoleMismatchError("Connected node role is 'slave', expected 'master'")
             raise asyncio.CancelledError
 
-        mock_sentinel_monitor_client.need_reconnect = fake_need_reconnect
+        mock_sentinel_monitor_client.check_health = fake_check_health
 
         reconnect_call_count = 0
 
@@ -634,3 +646,103 @@ class TestCreateValkeyClientFactory:
 
         assert operation_client._target.request_timeout == 30000
         assert monitor_client._target.request_timeout == 3000
+
+
+# ---- ValkeySentinelClient.check_health() ----
+
+
+class TestValkeySentinelClientCheckHealth:
+    """Tests for ValkeySentinelClient.check_health() using ROLE."""
+
+    async def test_raises_when_not_connected(self, sentinel_client: ValkeySentinelClient) -> None:
+        with pytest.raises(ClientNotConnectedError):
+            await sentinel_client.check_health()
+
+    async def test_passes_when_role_is_master(
+        self,
+        connected_sentinel_client: ValkeySentinelClient,
+        mock_glide_client: AsyncMock,
+    ) -> None:
+        mock_glide_client.custom_command.return_value = [b"master", 0, []]
+        await connected_sentinel_client.check_health()
+        mock_glide_client.custom_command.assert_called_once_with(["ROLE"])
+
+    async def test_passes_when_role_is_master_as_str(
+        self,
+        connected_sentinel_client: ValkeySentinelClient,
+        mock_glide_client: AsyncMock,
+    ) -> None:
+        """Tolerate str role in case the Glide decoder returns text."""
+        mock_glide_client.custom_command.return_value = ["master", 0, []]
+        await connected_sentinel_client.check_health()
+
+    async def test_raises_when_role_is_slave(
+        self,
+        connected_sentinel_client: ValkeySentinelClient,
+        mock_glide_client: AsyncMock,
+    ) -> None:
+        """Failover demoted the connected node — check_health must raise."""
+        mock_glide_client.custom_command.return_value = [
+            b"slave",
+            b"10.0.0.1",
+            6379,
+            b"connected",
+            0,
+        ]
+        with pytest.raises(ValkeyRoleMismatchError):
+            await connected_sentinel_client.check_health()
+
+    async def test_raises_on_empty_role_response(
+        self,
+        connected_sentinel_client: ValkeySentinelClient,
+        mock_glide_client: AsyncMock,
+    ) -> None:
+        mock_glide_client.custom_command.return_value = []
+        with pytest.raises(ValkeyRoleMismatchError):
+            await connected_sentinel_client.check_health()
+
+    async def test_propagates_underlying_command_failure(
+        self,
+        connected_sentinel_client: ValkeySentinelClient,
+        mock_glide_client: AsyncMock,
+    ) -> None:
+        mock_glide_client.custom_command.side_effect = TimeoutError("ROLE timed out")
+        with pytest.raises(TimeoutError):
+            await connected_sentinel_client.check_health()
+
+
+# ---- ValkeyStandaloneClient.check_health() ----
+
+
+class TestValkeyStandaloneClientCheckHealth:
+    """Tests for ValkeyStandaloneClient.check_health()."""
+
+    @pytest.fixture
+    def standalone_client(self) -> ValkeyStandaloneClient:
+        target = ValkeyStandaloneTarget(address="127.0.0.1:6379")
+        return ValkeyStandaloneClient(target=target, db_id=0, human_readable_name="test.standalone")
+
+    async def test_raises_when_not_connected(
+        self, standalone_client: ValkeyStandaloneClient
+    ) -> None:
+        with pytest.raises(ClientNotConnectedError):
+            await standalone_client.check_health()
+
+    async def test_passes_when_ping_succeeds(
+        self,
+        standalone_client: ValkeyStandaloneClient,
+        mock_glide_client: AsyncMock,
+    ) -> None:
+        standalone_client._valkey_client = mock_glide_client
+        await standalone_client.check_health()
+        mock_glide_client.ping.assert_called_once()
+
+    async def test_propagates_ping_failure(
+        self,
+        standalone_client: ValkeyStandaloneClient,
+        mock_glide_client: AsyncMock,
+    ) -> None:
+        mock_glide_client.ping.side_effect = TimeoutError("PING timed out")
+        standalone_client._valkey_client = mock_glide_client
+        with pytest.raises(TimeoutError):
+            await standalone_client.check_health()

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from uuid import UUID
+from pydantic import Field
 
-from pydantic import BaseModel, Field
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.types import BackendAISchema
 
 
-class PresetValueEntry(BaseModel):
-    preset_id: UUID = Field(description="Runtime variant preset ID.")
+class PresetValueEntry(BackendAISchema):
+    preset_id: DeploymentPresetID = Field(description="Deployment preset ID.")
     value: str = Field(description="Value for this preset.")

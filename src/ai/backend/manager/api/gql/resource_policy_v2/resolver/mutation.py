@@ -41,11 +41,11 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         added_version="26.4.2",
         description="Create a new keypair resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_keypair_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     input: CreateKeypairResourcePolicyInputGQL,
-) -> CreateKeypairResourcePolicyPayloadGQL:
+) -> CreateKeypairResourcePolicyPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_create_keypair_resource_policy(
         input.to_pydantic()
@@ -58,12 +58,12 @@ async def admin_create_keypair_resource_policy_v2(
         added_version="26.4.2",
         description="Update a keypair resource policy (admin only). Only provided fields will be updated.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_keypair_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
     input: UpdateKeypairResourcePolicyInputGQL,
-) -> UpdateKeypairResourcePolicyPayloadGQL:
+) -> UpdateKeypairResourcePolicyPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_update_keypair_resource_policy(
         name, input.to_pydantic()
@@ -76,11 +76,11 @@ async def admin_update_keypair_resource_policy_v2(
         added_version="26.4.2",
         description="Delete a keypair resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_keypair_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
-) -> DeleteKeypairResourcePolicyPayloadGQL:
+) -> DeleteKeypairResourcePolicyPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_delete_keypair_resource_policy(
         DeleteKeypairResourcePolicyInput(name=name)
@@ -96,11 +96,11 @@ async def admin_delete_keypair_resource_policy_v2(
         added_version="26.4.2",
         description="Create a new user resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_user_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     input: CreateUserResourcePolicyInputGQL,
-) -> CreateUserResourcePolicyPayloadGQL:
+) -> CreateUserResourcePolicyPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_create_user_resource_policy(
         input.to_pydantic()
@@ -113,12 +113,12 @@ async def admin_create_user_resource_policy_v2(
         added_version="26.4.2",
         description="Update a user resource policy (admin only). Only provided fields will be updated.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_user_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
     input: UpdateUserResourcePolicyInputGQL,
-) -> UpdateUserResourcePolicyPayloadGQL:
+) -> UpdateUserResourcePolicyPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_update_user_resource_policy(
         name, input.to_pydantic()
@@ -131,11 +131,11 @@ async def admin_update_user_resource_policy_v2(
         added_version="26.4.2",
         description="Delete a user resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_user_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
-) -> DeleteUserResourcePolicyPayloadGQL:
+) -> DeleteUserResourcePolicyPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_delete_user_resource_policy(
         DeleteUserResourcePolicyInput(name=name)
@@ -151,11 +151,11 @@ async def admin_delete_user_resource_policy_v2(
         added_version="26.4.2",
         description="Create a new project resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_project_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     input: CreateProjectResourcePolicyInputGQL,
-) -> CreateProjectResourcePolicyPayloadGQL:
+) -> CreateProjectResourcePolicyPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_create_project_resource_policy(
         input.to_pydantic()
@@ -168,12 +168,12 @@ async def admin_create_project_resource_policy_v2(
         added_version="26.4.2",
         description="Update a project resource policy (admin only). Only provided fields will be updated.",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_project_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
     input: UpdateProjectResourcePolicyInputGQL,
-) -> UpdateProjectResourcePolicyPayloadGQL:
+) -> UpdateProjectResourcePolicyPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_update_project_resource_policy(
         name, input.to_pydantic()
@@ -186,11 +186,11 @@ async def admin_update_project_resource_policy_v2(
         added_version="26.4.2",
         description="Delete a project resource policy (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_project_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     name: str,
-) -> DeleteProjectResourcePolicyPayloadGQL:
+) -> DeleteProjectResourcePolicyPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_policy.admin_delete_project_resource_policy(
         DeleteProjectResourcePolicyInput(name=name)

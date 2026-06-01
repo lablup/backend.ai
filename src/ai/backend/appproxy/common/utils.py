@@ -28,6 +28,7 @@ from pydantic import BaseModel, ValidationError
 
 from ai.backend.appproxy.common.types import PydanticResponse
 from ai.backend.common import redis_helper
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
 
@@ -232,8 +233,13 @@ def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as e:
                 raise InvalidAPIParameters("Malformed body") from e
-            except ValidationError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.errors()) from e
+            except (BackendAISchemaValidationFailed, ValidationError) as e:
+                # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+                # skip the ``BackendAISchema`` auto-conversion override.
+                raise InvalidAPIParameters(
+                    "Input validation error",
+                    extra_data={"errors": e.errors()},
+                ) from e
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 
@@ -345,5 +351,5 @@ async def ping_redis_connection(connection: RedisConnectionInfo) -> bool:
     try:
         return cast(bool, await redis_helper.execute(connection, lambda r: r.ping()))
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
-        log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
-        raise e from e
+        log.exception("ping_redis_connection(): Connecting to redis failed: {}", e)
+        raise

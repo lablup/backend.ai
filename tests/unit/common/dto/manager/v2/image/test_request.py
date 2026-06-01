@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     SearchImagesInput,
 )
 from ai.backend.common.dto.manager.v2.image.types import ImageOrderField, OrderDirection
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestSearchImagesInput:
@@ -45,15 +46,15 @@ class TestSearchImagesInput:
         assert req.limit == 1000
 
     def test_limit_below_minimum_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchImagesInput(limit=0)
 
     def test_limit_above_maximum_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchImagesInput(limit=1001)
 
     def test_negative_offset_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchImagesInput(offset=-1)
 
     def test_offset_zero_is_valid(self) -> None:
@@ -124,11 +125,11 @@ class TestRescanImagesInput:
         assert req.architecture == "x86_64"
 
     def test_empty_canonical_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RescanImagesInput(canonical="", architecture="x86_64")
 
     def test_empty_architecture_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RescanImagesInput(canonical="python:3.11", architecture="")
 
     def test_round_trip_serialization(self) -> None:
@@ -154,11 +155,11 @@ class TestAliasImageInput:
         assert req.alias == "my-alias"
 
     def test_whitespace_only_alias_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AliasImageInput(image_id=uuid.uuid4(), alias="   ")
 
     def test_empty_alias_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AliasImageInput(image_id=uuid.uuid4(), alias="")
 
     def test_alias_max_length_valid(self) -> None:
@@ -167,11 +168,11 @@ class TestAliasImageInput:
         assert len(req.alias) == 256
 
     def test_alias_exceeds_max_length_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AliasImageInput(image_id=uuid.uuid4(), alias="a" * 257)
 
     def test_invalid_uuid_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AliasImageInput.model_validate({"image_id": "not-a-uuid", "alias": "alias"})
 
     def test_round_trip_serialization(self) -> None:
@@ -191,7 +192,7 @@ class TestDealiasImageInput:
         assert req.alias == "my-alias"
 
     def test_empty_alias_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DealiasImageInput(alias="")
 
     def test_round_trip_serialization(self) -> None:
@@ -215,11 +216,11 @@ class TestForgetImageInput:
         assert req.image_id == image_id
 
     def test_invalid_uuid_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ForgetImageInput.model_validate({"image_id": "not-a-uuid"})
 
     def test_missing_id_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ForgetImageInput.model_validate({})
 
     def test_image_id_is_uuid_instance(self) -> None:
@@ -249,11 +250,11 @@ class TestPurgeImageInput:
         assert req.image_id == image_id
 
     def test_invalid_uuid_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeImageInput.model_validate({"image_id": "not-a-uuid"})
 
     def test_missing_id_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeImageInput.model_validate({})
 
     def test_image_id_is_uuid_instance(self) -> None:

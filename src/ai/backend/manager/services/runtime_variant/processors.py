@@ -12,6 +12,10 @@ from ai.backend.manager.services.runtime_variant.actions.delete import (
     DeleteRuntimeVariantAction,
     DeleteRuntimeVariantActionResult,
 )
+from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
+    ResolveRuntimeVariantByNameAction,
+    ResolveRuntimeVariantByNameActionResult,
+)
 from ai.backend.manager.services.runtime_variant.actions.search import (
     SearchRuntimeVariantsAction,
     SearchRuntimeVariantsActionResult,
@@ -28,6 +32,9 @@ class RuntimeVariantProcessors(AbstractProcessorPackage):
     update: ActionProcessor[UpdateRuntimeVariantAction, UpdateRuntimeVariantActionResult]
     delete: ActionProcessor[DeleteRuntimeVariantAction, DeleteRuntimeVariantActionResult]
     search: ActionProcessor[SearchRuntimeVariantsAction, SearchRuntimeVariantsActionResult]
+    resolve_by_name: ActionProcessor[
+        ResolveRuntimeVariantByNameAction, ResolveRuntimeVariantByNameActionResult
+    ]
 
     def __init__(
         self,
@@ -39,6 +46,7 @@ class RuntimeVariantProcessors(AbstractProcessorPackage):
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
+        self.resolve_by_name = ActionProcessor(service.resolve_by_name, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -47,4 +55,5 @@ class RuntimeVariantProcessors(AbstractProcessorPackage):
             UpdateRuntimeVariantAction.spec(),
             DeleteRuntimeVariantAction.spec(),
             SearchRuntimeVariantsAction.spec(),
+            ResolveRuntimeVariantByNameAction.spec(),
         ]

@@ -63,6 +63,8 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimit,
 )
+from ai.backend.manager.data.permission.types import EntityType
+from ai.backend.manager.data.permission.types import ScopeType as PermissionScopeType
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.base import (
@@ -72,6 +74,7 @@ from ai.backend.manager.models.base import (
     StructuredJSONColumn,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -84,6 +87,9 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -313,8 +319,8 @@ class ImageRow(Base):  # type: ignore[misc]
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ImageID] = mapped_column(
+        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, index=True)
     project: Mapped[str | None] = mapped_column("project", sa.String, nullable=True)
@@ -328,7 +334,13 @@ class ImageRow(Base):  # type: ignore[misc]
     )
     tag: Mapped[str | None] = mapped_column("tag", sa.TEXT, nullable=True)
     registry: Mapped[str] = mapped_column("registry", sa.String, nullable=False, index=True)
-    registry_id: Mapped[UUID] = mapped_column("registry_id", GUID, nullable=False, index=True)
+    registry_id: Mapped[UUID] = mapped_column(
+        "registry_id",
+        GUID,
+        sa.ForeignKey("container_registries.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     architecture: Mapped[str] = mapped_column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )
@@ -881,7 +893,7 @@ class ImageRow(Base):  # type: ignore[misc]
     def to_dataclass(self) -> ImageData:
         _, ptag_set = self.image_ref.tag_set
         return ImageData(
-            id=ImageID(self.id),
+            id=self.id,
             name=ImageCanonical(self.name),
             project=self.project,
             image=self.image,
@@ -911,7 +923,7 @@ class ImageRow(Base):  # type: ignore[misc]
     def to_detailed_dataclass(self) -> ImageDataWithDetails:
         version, ptag_set = self.image_ref.tag_set
         return ImageDataWithDetails(
-            id=ImageID(self.id),
+            id=self.id,
             name=ImageCanonical(self.image),
             namespace=self.image,
             base_image_name=self.image_ref.name,
@@ -1014,8 +1026,8 @@ class ImageAliasRow(Base):  # type: ignore[misc]
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
-    image_id: Mapped[UUID] = mapped_column(
-        "image", GUID, sa.ForeignKey("images.id"), nullable=False
+    image_id: Mapped[ImageID] = mapped_column(
+        "image", GUID(ImageID), sa.ForeignKey("images.id", ondelete="CASCADE"), nullable=False
     )
     image: Mapped[ImageRow] = relationship("ImageRow", back_populates="aliases")
 
@@ -1341,14 +1353,21 @@ class ImagePermissionContextBuilder(
         _ctx: ClientContext,
         scope: UserScope,
     ) -> list[ProjectScope]:
-        from ai.backend.manager.models.group import AssocGroupUserRow
-
-        get_assoc_group_ids_stmt = sa.select(AssocGroupUserRow.group_id).where(
-            AssocGroupUserRow.user_id == scope.user_id
+        project_ids_stmt = (
+            sa.select(GroupRow.id)
+            .join(
+                AssociationScopesEntitiesRow,
+                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+            )
+            .where(
+                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                AssociationScopesEntitiesRow.entity_id == str(scope.user_id),
+            )
         )
-        group_ids = await self.db_session.scalars(get_assoc_group_ids_stmt)
+        project_ids = await self.db_session.scalars(project_ids_stmt)
 
-        return [ProjectScope(project_id=group_id) for group_id in group_ids]
+        return [ProjectScope(project_id=project_id) for project_id in project_ids]
 
     async def _get_domain_accessible_project_scopes(
         self,

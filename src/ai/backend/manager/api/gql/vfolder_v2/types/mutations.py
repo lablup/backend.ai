@@ -23,6 +23,9 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput as CreateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    CreateVFolderInScopeInput as CreateInScopeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.request import (
     DeleteFilesInput as DeleteFilesInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -37,11 +40,17 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     MoveFileInput as MoveFileInputDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PurgeVFolderOptions as PurgeVFolderOptionsDTO,
+)
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload as BulkDeletePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkPurgeVFoldersPayload as BulkPurgePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    BulkPurgeVFolderV2Error as BulkPurgeErrorDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     CloneVFolderPayload as ClonePayloadDTO,
@@ -79,9 +88,14 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     PurgeVFolderPayload as PurgePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder.response import (
+    RestoreVFolderPayload as RestorePayloadDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -90,6 +104,10 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     PresetDeploymentStrategyInputGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
+from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
+    VFolderMountPermissionGQL,
+    VFolderUsageModeGQL,
+)
 from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
 
 # ============================================================
@@ -115,6 +133,29 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
     )
     permission: str = gql_field(
         default="rw", description="Default permission of the vfolder (ro, rw, wd)."
+    )
+    cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Scope-agnostic body for vfolder creation. The owning scope is "
+            "supplied as a separate mutation argument."
+        ),
+    ),
+    name="CreateVFolderInScopeInput",
+)
+class CreateVFolderInScopeInputGQL(PydanticInputMixin[CreateInScopeInputDTO]):
+    name: str = gql_field(description="VFolder name.")
+    host: str | None = gql_field(default=None, description="Storage host for the vfolder.")
+    usage_mode: VFolderUsageModeGQL = gql_field(
+        default=VFolderUsageModeGQL.GENERAL, description="Usage mode of the vfolder."
+    )
+    permission: VFolderMountPermissionGQL = gql_field(
+        default=VFolderMountPermissionGQL.READ_WRITE,
+        description="Default mount permission of the vfolder.",
     )
     cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
 
@@ -276,6 +317,18 @@ class PurgeVFolderPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after restoring a virtual folder from trash.",
+    ),
+    model=RestorePayloadDTO,
+    name="RestoreVFolderPayload",
+)
+class RestoreVFolderPayloadGQL(PydanticOutputMixin[RestorePayloadDTO]):
+    id: UUID = gql_field(description="ID of the restored virtual folder.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Payload returned after cloning a virtual folder.",
     ),
@@ -394,6 +447,23 @@ class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Optional behavior flags for vfolder purge operations.",
+    ),
+    name="PurgeVFolderOptionsInput",
+)
+class PurgeVFolderOptionsInputGQL(PydanticInputMixin[PurgeVFolderOptionsDTO]):
+    cascade_model_card: bool = gql_field(
+        default=False,
+        description=(
+            "If true, also delete model card record(s) referencing the vfolder. "
+            "If false, the request is rejected when any model card still references it."
+        ),
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for permanently purging multiple virtual folders.",
     ),
@@ -401,6 +471,28 @@ class BulkDeleteVFoldersPayloadGQL(PydanticOutputMixin[BulkDeletePayloadDTO]):
 )
 class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
     ids: list[UUID] = gql_field(description="List of VFolder UUIDs to purge.")
+    options: PurgeVFolderOptionsInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Optional behavior flags applied to every vfolder in the batch. "
+                "Defaults to all-false when omitted."
+            ),
+        ),
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Failure detail for a single vfolder in a bulk purge.",
+    ),
+    model=BulkPurgeErrorDTO,
+    name="BulkPurgeVFolderV2Error",
+)
+class BulkPurgeVFolderV2ErrorGQL(PydanticOutputMixin[BulkPurgeErrorDTO]):
+    vfolder_id: UUID = gql_field(description="UUID of the vfolder that failed to purge.")
+    message: str = gql_field(description="Error message describing the failure.")
 
 
 @gql_pydantic_type(
@@ -413,6 +505,12 @@ class BulkPurgeVFoldersInputGQL(PydanticInputMixin[BulkPurgeInputDTO]):
 )
 class BulkPurgeVFoldersPayloadGQL(PydanticOutputMixin[BulkPurgePayloadDTO]):
     purged_count: int = gql_field(description="Number of virtual folders successfully purged.")
+    failed: list[BulkPurgeVFolderV2ErrorGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="List of errors for vfolders that failed to purge.",
+        ),
+    )
 
 
 @gql_pydantic_input(

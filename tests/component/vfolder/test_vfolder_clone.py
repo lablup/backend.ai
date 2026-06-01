@@ -27,7 +27,7 @@ from ai.backend.common.bgtask.types import TaskID
 from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
 from ai.backend.common.dto.manager.vfolder import CloneVFolderReq
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
-from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
+from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler

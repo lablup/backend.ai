@@ -9,7 +9,6 @@ returned as ``APIResponse`` objects.
 from __future__ import annotations
 
 import logging
-import uuid
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 
@@ -49,12 +48,14 @@ from ai.backend.common.dto.manager.model_serving.response import (
     TokenResponseModel,
     TryStartResponseModel,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     ClusterMode,
-    MountPermission,
-    MountTypes,
+    MountInfoEntry,
     RuntimeVariant,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -65,6 +66,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     ExecutionSpec,
     ImageIdentifierDraft,
+    ModelRevisionData,
     ModelRevisionSpecDraft,
     MountMetadata,
     ReplicaSpec,
@@ -77,6 +79,9 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceInfo,
 )
 from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.errors.resource import RuntimeVariantNotFound
+from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
 )
@@ -123,6 +128,13 @@ from ai.backend.manager.services.model_serving.processors.auto_scaling import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
+from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
+    ResolveRuntimeVariantByNameAction,
+)
+from ai.backend.manager.services.runtime_variant.actions.search import (
+    SearchRuntimeVariantsAction,
+)
+from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.auth.processors import AuthProcessors
@@ -131,10 +143,10 @@ if TYPE_CHECKING:
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _serve_info_from_dto(dto: ServiceInfo) -> ServeInfoModel:
+def _serve_info_from_dto(dto: ServiceInfo, runtime_variant_name: RuntimeVariant) -> ServeInfoModel:
     return ServeInfoModel(
-        endpoint_id=dto.endpoint_id,
-        model_id=dto.model_id,
+        endpoint_id=dto.deployment_id,
+        model_id=dto.model_vfolder_id,
         extra_mounts=dto.extra_mounts,
         name=dto.name,
         model_definition_path=dto.model_definition_path,
@@ -150,34 +162,47 @@ def _serve_info_from_dto(dto: ServiceInfo) -> ServeInfoModel:
         ],
         service_endpoint=dto.service_endpoint,
         is_public=dto.is_public,
-        runtime_variant=dto.runtime_variant,
+        runtime_variant=runtime_variant_name,
     )
 
 
-def _serve_info_from_deployment_info(deployment_info: DeploymentInfo) -> ServeInfoModel:
-    """Convert DeploymentInfo to ServeInfoModel."""
-    model_revision = deployment_info.model_revisions[0] if deployment_info.model_revisions else None
+def _resolve_target_revision_data(info: DeploymentInfo) -> ModelRevisionData | None:
+    """Resolve the target revision data (current first, then deploying)."""
+    return info.current_revision or info.deploying_revision
+
+
+def _serve_info_from_deployment_info(
+    deployment_info: DeploymentInfo,
+    runtime_variant_name: RuntimeVariant,
+) -> ServeInfoModel:
+    """Convert DeploymentInfo to ServeInfoModel.
+
+    ``runtime_variant_name`` is resolved by the calling handler from the
+    active revision's ``runtime_variant_id`` (internal data types are
+    id-only; the legacy REST response still exposes the name string).
+    """
+    model_revision = _resolve_target_revision_data(deployment_info)
 
     return ServeInfoModel(
         endpoint_id=deployment_info.id,
-        model_id=model_revision.mounts.model_vfolder_id if model_revision else uuid.UUID(int=0),
-        extra_mounts=[m.vfid.folder_id for m in model_revision.mounts.extra_mounts]
+        # ``None`` here covers two cases: no revision exists, or the revision's
+        # model vfolder has been deleted (SET NULL FK).
+        model_id=model_revision.model_mount_config.vfolder_id if model_revision else None,
+        extra_mounts=[m.vfolder_id for m in model_revision.model_mount_config.extra_mounts]
         if model_revision
         else [],
         name=deployment_info.metadata.name,
-        model_definition_path=model_revision.mounts.model_definition_path
+        model_definition_path=model_revision.model_mount_config.definition_path
         if model_revision
         else None,
-        replicas=deployment_info.replica_spec.replica_count,
-        desired_session_count=deployment_info.replica_spec.replica_count,
+        replicas=deployment_info.replica.replica_count,
+        desired_session_count=deployment_info.replica.replica_count,
         active_routes=[],
         service_endpoint=HttpUrl(deployment_info.network.url)
         if deployment_info.network.url
         else None,
         is_public=deployment_info.network.open_to_public,
-        runtime_variant=model_revision.execution.runtime_variant
-        if model_revision
-        else RuntimeVariant("custom"),
+        runtime_variant=runtime_variant_name,
     )
 
 
@@ -191,11 +216,34 @@ class ServiceHandler:
         deployment: DeploymentProcessors,
         model_serving: ModelServingProcessors,
         model_serving_auto_scaling: ModelServingAutoScalingProcessors,
+        runtime_variant: RuntimeVariantProcessors,
     ) -> None:
         self._auth = auth
         self._deployment = deployment
         self._model_serving = model_serving
         self._model_serving_auto_scaling = model_serving_auto_scaling
+        self._runtime_variant = runtime_variant
+
+    async def _resolve_runtime_variant_name(
+        self, runtime_variant_id: RuntimeVariantID
+    ) -> RuntimeVariant:
+        """Look up the variant name string by id for legacy response shaping.
+
+        Internal data types carry only ``runtime_variant_id``; the legacy
+        REST response preserves the historical ``runtime_variant: str``
+        field, so the handler re-resolves the name at this single
+        boundary via the runtime_variant search action.
+        """
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=1),
+            conditions=[RuntimeVariantConditions.by_ids([runtime_variant_id])],
+        )
+        result = await self._runtime_variant.search.wait_for_complete(
+            SearchRuntimeVariantsAction(querier=querier)
+        )
+        if not result.items:
+            raise RuntimeVariantNotFound()
+        return RuntimeVariant(result.items[0].name)
 
     # ------------------------------------------------------------------
     # list_serve (GET /services)
@@ -293,7 +341,10 @@ class ServiceHandler:
             await self._model_serving.get_model_service_info.wait_for_complete(action)
         )
 
-        resp = _serve_info_from_dto(result.data)
+        runtime_variant_name = await self._resolve_runtime_variant_name(
+            result.data.runtime_variant_id
+        )
+        resp = _serve_info_from_dto(result.data, runtime_variant_name)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -321,7 +372,7 @@ class ServiceHandler:
                 replica_spec=ReplicaSpec(
                     replica_count=params.replicas,
                 ),
-                draft_model_revision=self._to_model_revision(params, validation_result),
+                draft_model_revision=await self._to_model_revision(params, validation_result),
                 network=DeploymentNetworkSpec(
                     open_to_public=params.open_to_public,
                 ),
@@ -330,7 +381,14 @@ class ServiceHandler:
         deployment_result: CreateLegacyDeploymentActionResult = (
             await self._deployment.create_legacy_deployment.wait_for_complete(deployment_action)
         )
-        resp = _serve_info_from_deployment_info(deployment_result.data)
+        deployment_info = deployment_result.data
+        model_revision = _resolve_target_revision_data(deployment_info)
+        if model_revision is None:
+            raise RuntimeVariantNotFound()
+        runtime_variant_name = await self._resolve_runtime_variant_name(
+            model_revision.model_runtime_config.runtime_variant_id
+        )
+        resp = _serve_info_from_deployment_info(deployment_info, runtime_variant_name)
         return APIResponse.build(HTTPStatus.CREATED, resp)
 
     # ------------------------------------------------------------------
@@ -379,7 +437,7 @@ class ServiceHandler:
             params.service_id,
         )
 
-        deployment_action = DestroyDeploymentAction(endpoint_id=params.service_id)
+        deployment_action = DestroyDeploymentAction(deployment_id=DeploymentID(params.service_id))
         deployment_result: DestroyDeploymentActionResult = (
             await self._deployment.destroy_deployment.wait_for_complete(deployment_action)
         )
@@ -612,15 +670,9 @@ class ServiceHandler:
                 model_definition_path=params.config.model_definition_path,
                 model_version=params.config.model_version,
                 model_mount_destination=params.config.model_mount_destination,
+                vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts={
-                    k: MountOption(
-                        mount_destination=v.get("mount_destination"),
-                        type=MountTypes(v["type"]) if v.get("type") else MountTypes.BIND,
-                        permission=MountPermission(v["permission"])
-                        if v.get("permission")
-                        else None,
-                    )
-                    for k, v in params.config.extra_mounts.items()
+                    k: MountOption.from_dto(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
                 scaling_group=params.config.scaling_group,
@@ -638,11 +690,15 @@ class ServiceHandler:
         )
         return await self._model_serving.validate_model_service.wait_for_complete(action)
 
-    @staticmethod
-    def _to_model_revision(
+    async def _to_model_revision(
+        self,
         params: NewServiceRequestModel,
         validation_result: ValidateModelServiceActionResult,
     ) -> ModelRevisionSpecDraft:
+        # The legacy REST request still carries the variant as a name
+        # string; resolve it into a typed ``RuntimeVariantID`` here at the
+        # handler boundary so internal ExecutionSpec stays id-only.
+        runtime_variant_id = await self._resolve_runtime_variant_id(params.runtime_variant)
         return ModelRevisionSpecDraft(
             image_identifier=ImageIdentifierDraft(
                 canonical=params.image,
@@ -655,19 +711,39 @@ class ServiceHandler:
                 resource_opts=params.config.resource_opts,
             ),
             mounts=MountMetadata(
-                model_vfolder_id=validation_result.model_id,
+                model_vfolder_id=validation_result.model_vfolder_id,
                 model_definition_path=validation_result.model_definition_path,
                 model_mount_destination=params.config.model_mount_destination,
-                extra_mounts=list(validation_result.extra_mounts),
+                vfolder_subpath=params.config.vfolder_subpath,
+                extra_mounts=[
+                    MountInfoEntry(
+                        vfolder_id=VFolderUUID(m.vfid.folder_id),
+                        mount_destination=m.kernel_path.as_posix(),
+                        mount_perm=m.mount_perm,
+                        subpath=str(m.vfsubpath),
+                    )
+                    for m in validation_result.extra_mounts
+                ],
             ),
             execution=ExecutionSpec(
                 startup_command=params.startup_command,
                 bootstrap_script=params.bootstrap_script,
                 environ=params.config.environ,
-                runtime_variant=params.runtime_variant,
+                runtime_variant_id=runtime_variant_id,
                 callback_url=yarl.URL(str(params.callback_url)) if params.callback_url else None,
             ),
         )
+
+    async def _resolve_runtime_variant_id(self, name: RuntimeVariant) -> RuntimeVariantID:
+        """Resolve a legacy variant name into its typed id.
+
+        Uses the dedicated ``resolve_by_name`` processor added for the
+        legacy → id migration; v2 surface callers skip this step.
+        """
+        result = await self._runtime_variant.resolve_by_name.wait_for_complete(
+            ResolveRuntimeVariantByNameAction(name=str(name))
+        )
+        return result.runtime_variant_id
 
     @staticmethod
     def _to_start_action(
@@ -696,15 +772,9 @@ class ServiceHandler:
                 model_definition_path=params.config.model_definition_path,
                 model_version=params.config.model_version,
                 model_mount_destination=params.config.model_mount_destination,
+                vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts={
-                    k: MountOption(
-                        mount_destination=v.get("mount_destination"),
-                        type=MountTypes(v["type"]) if v.get("type") else MountTypes.BIND,
-                        permission=MountPermission(v["permission"])
-                        if v.get("permission")
-                        else None,
-                    )
-                    for k, v in params.config.extra_mounts.items()
+                    k: MountOption.from_dto(v) for k, v in params.config.extra_mounts.items()
                 },
                 environ=params.config.environ,
                 scaling_group=params.config.scaling_group,
@@ -714,7 +784,7 @@ class ServiceHandler:
             request_user_id=request["user"]["uuid"],
             sudo_session_enabled=request["user"]["sudo_session_enabled"],
             model_service_prepare_ctx=ModelServicePrepareCtx(
-                model_id=validation_result.model_id,
+                model_vfolder_id=validation_result.model_vfolder_id,
                 model_definition_path=validation_result.model_definition_path,
                 requester_access_key=validation_result.requester_access_key,
                 owner_access_key=validation_result.owner_access_key,

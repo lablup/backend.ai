@@ -80,7 +80,6 @@ class TestRuntimeVariantPresetRepositoryFlag:
             default_value="true",
             key="--verbose",
             category=None,
-            ui_type=None,
             display_name=None,
             ui_option=None,
         )

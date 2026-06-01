@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
-    AddRevisionGQLInputDTO,
+    AddRevisionInput,
     AddRevisionOptions,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput,
     DeleteAccessTokenInput,
     DeleteDeploymentInput,
+    ReplaceDeploymentOptionsInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
@@ -39,6 +40,8 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     SearchAllocatedResourceSlotsInput,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import (
     DeploymentIdPathParam,
@@ -58,7 +61,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
+    from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -115,7 +118,7 @@ class V2DeploymentHandler:
         path: PathParam[DeploymentIdPathParam],
     ) -> APIResponse:
         """Retrieve a single deployment by ID."""
-        result = await self._adapter.get(path.parsed.deployment_id)
+        result = await self._adapter.get(DeploymentID(path.parsed.deployment_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def get_current_revision(
@@ -123,7 +126,7 @@ class V2DeploymentHandler:
         path: PathParam[DeploymentIdPathParam],
     ) -> APIResponse:
         """Retrieve the current active revision of a deployment."""
-        result = await self._adapter.get_current_revision(path.parsed.deployment_id)
+        result = await self._adapter.get_current_revision(DeploymentID(path.parsed.deployment_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def update(
@@ -134,7 +137,7 @@ class V2DeploymentHandler:
         """Update deployment metadata and configuration."""
         result = await self._adapter.update(
             body.parsed,
-            deployment_id=path.parsed.deployment_id,
+            deployment_id=DeploymentID(path.parsed.deployment_id),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -146,6 +149,23 @@ class V2DeploymentHandler:
         result = await self._adapter.delete(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def replace_options(
+        self,
+        path: PathParam[DeploymentIdPathParam],
+        body: BodyParam[ReplaceDeploymentOptionsInput],
+    ) -> APIResponse:
+        """Fully replace a deployment's ``options`` surface.
+
+        User-accessible — a regular user may replace options on their own
+        deployment. Permission enforcement happens through the usual RBAC
+        single-entity validator wrapped around the service action.
+        """
+        result = await self._adapter.replace_options(
+            deployment_id=DeploymentID(path.parsed.deployment_id),
+            input=body.parsed,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     # ------------------------------------------------------------------
     # Revision operations
     # ------------------------------------------------------------------
@@ -153,7 +173,7 @@ class V2DeploymentHandler:
     async def add_revision(
         self,
         path: PathParam[DeploymentIdPathParam],
-        body: BodyParam[AddRevisionGQLInputDTO],
+        body: BodyParam[AddRevisionInput],
     ) -> APIResponse:
         """Add a new model revision to a deployment."""
         result = await self._adapter.add_revision(
@@ -166,7 +186,7 @@ class V2DeploymentHandler:
         path: PathParam[RevisionIdPathParam],
     ) -> APIResponse:
         """Retrieve a single revision by ID."""
-        result = await self._adapter.get_revision(path.parsed.revision_id)
+        result = await self._adapter.get_revision(DeploymentRevisionID(path.parsed.revision_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_revisions(
@@ -202,7 +222,7 @@ class V2DeploymentHandler:
     ) -> APIResponse:
         """Search resource slots allocated to a deployment revision."""
         result = await self._adapter.search_revision_resource_slots(
-            revision_id=path.parsed.revision_id,
+            revision_id=DeploymentRevisionID(path.parsed.revision_id),
             input=body.parsed,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
@@ -387,7 +407,7 @@ class V2DeploymentHandler:
         path: PathParam[DeploymentIdPathParam],
     ) -> APIResponse:
         """Retrieve a deployment policy by deployment ID."""
-        result = await self._adapter.get_policy(path.parsed.deployment_id)
+        result = await self._adapter.get_policy(DeploymentID(path.parsed.deployment_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_deployment_policies(

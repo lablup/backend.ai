@@ -22,17 +22,16 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.coordinator.config import ServerConfig
 from ai.backend.appproxy.coordinator.errors import (
     InvalidCircuitConfigError,
-    InvalidCircuitStateError,
     MissingTraefikConfigError,
 )
-from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
+from ai.backend.common.types import RuntimeVariant
 
 from .base import (
     GUID,
     Base,
     BaseMixin,
     EnumType,
-    StructuredJSONObjectListColumn,
+    PydanticListColumn,
 )
 
 if TYPE_CHECKING:
@@ -88,7 +87,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         default=[],
     )
     route_info: Mapped[list[RouteInfo]] = mapped_column(
-        StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[]
+        PydanticListColumn(RouteInfo), nullable=False, default=[]
     )
 
     created_at: Mapped[datetime | None] = mapped_column(
@@ -352,76 +351,6 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                     },
                 }
         return {}
-
-    @property
-    def healthy_routes(self) -> list[RouteInfo]:
-        """
-        Get only healthy routes for this circuit.
-
-        Health filtering is only applied for circuits in INFERENCE mode.
-        For other modes, all routes are considered healthy.
-
-        Returns:
-            List of healthy RouteInfo objects
-        """
-        # Only apply health filtering for circuits in INFERENCE mode
-        if self.app_mode != AppMode.INFERENCE or not self.endpoint_id:
-            # No health filtering, return all routes
-            return self.route_info
-
-        if not self.endpoint_row:
-            raise InvalidCircuitStateError("Endpoint row is not loaded for health filtering")
-        # Filter routes based on health status stored in JSON
-        healthy_routes = []
-        for route in self.route_info:
-            # Include routes that are explicitly healthy or have no health status (not health-checked)
-            if (
-                not self.endpoint_row.health_check_enabled
-                or route.health_status == ModelServiceStatus.HEALTHY
-            ):
-                healthy_routes.append(route)
-
-        return healthy_routes
-
-    def update_route_health_status(
-        self,
-        route_id: UUID,
-        health_status: ModelServiceStatus | None,
-        last_check_time: float | None = None,
-        consecutive_failures: int | None = None,
-    ) -> bool:
-        """
-        Update health status for a specific route in the circuit's route_info
-
-        Args:
-            route_id: ID of the route to update
-            health_status: New health status
-            last_check_time: Timestamp of last health check
-            consecutive_failures: Number of consecutive failures
-
-        Returns:
-            True if route was found and updated, False otherwise
-        """
-        for route in self.route_info:
-            if route.route_id == route_id:
-                did_update_status = False
-                if route.health_status != health_status:
-                    route.health_status = health_status
-                    did_update_status = True
-                if last_check_time is not None:
-                    route.last_health_check = last_check_time
-                if consecutive_failures is not None:
-                    route.consecutive_failures = consecutive_failures
-
-                # Mark the route_info column as modified for SQLAlchemy change tracking
-                # This is necessary because SQLAlchemy doesn't automatically detect
-                # changes to nested objects within JSON columns
-                from sqlalchemy.orm import attributes
-
-                attributes.flag_modified(self, "route_info")
-
-                return did_update_status
-        return False
 
     async def generate_jwt(
         self, db_sess: AsyncSession, jwt_secret: str, created_user: UUID, exp: datetime

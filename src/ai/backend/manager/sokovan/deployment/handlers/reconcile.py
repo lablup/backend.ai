@@ -5,10 +5,12 @@ from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerCategory,
     DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
+    DeploymentTargetStatuses,
 )
-from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle, ScalingState
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
@@ -39,6 +41,10 @@ class ReconcileDeploymentHandler(DeploymentHandler):
         """Get the name of the handler."""
         return "reconcile-deployments"
 
+    @classmethod
+    def category(cls) -> DeploymentHandlerCategory:
+        return DeploymentHandlerCategory.SCALING
+
     @property
     def lock_id(self) -> LockID | None:
         """
@@ -48,22 +54,40 @@ class ReconcileDeploymentHandler(DeploymentHandler):
         return None
 
     @classmethod
-    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
-        """Get the target deployment statuses for this handler."""
-        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)]
+    def target_statuses(cls) -> DeploymentTargetStatuses:
+        """Target READY **and** DEPLOYING endpoints that are not already
+        being scaled.
+
+        Replica-route drift can occur during the initial rollout too
+        (e.g. a kernel died mid-provisioning), so DEPLOYING endpoints
+        are eligible. Operates only on the ``STABLE`` slice so we do
+        not compete with an in-flight scaling cycle.
+        """
+        return DeploymentTargetStatuses(
+            lifecycle_stages=[
+                EndpointLifecycle.READY,
+                EndpointLifecycle.DEPLOYING,
+            ],
+            scaling_states=[ScalingState.STABLE],
+        )
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
-        """Define state transitions for reconcile deployment handler (BEP-1030).
+        """Define state transitions for reconcile deployment handler.
 
-        - success: None (stays READY)
-        - need_retry, expired, give_up: Deployment → SCALING (replica-route mismatch needs re-scaling)
+        Transitions only move the scaling axis; the endpoint's lifecycle
+        is preserved so DEPLOYING endpoints remain DEPLOYING.
+
+        - success: None (no drift detected; both axes stay).
+        - need_retry, expired, give_up: ``scaling_state=SCALING``
+          (mismatch detected — hand off to the scaling handler).
         """
+        scaling_in_progress = DeploymentLifecycleStatus(scaling_state=ScalingState.SCALING)
         return DeploymentStatusTransitions(
             success=None,
-            need_retry=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
-            expired=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
-            give_up=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
+            need_retry=scaling_in_progress,
+            expired=scaling_in_progress,
+            give_up=scaling_in_progress,
         )
 
     async def execute(

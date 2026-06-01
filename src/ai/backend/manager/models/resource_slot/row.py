@@ -42,6 +42,20 @@ class ResourceSlotTypeRow(Base):  # type: ignore[misc]
 
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     slot_type: Mapped[str] = mapped_column("slot_type", sa.String(length=16), nullable=False)
+    required: Mapped[bool] = mapped_column(
+        "required",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
+    enabled: Mapped[bool] = mapped_column(
+        "enabled",
+        sa.Boolean,
+        nullable=False,
+        default=True,
+        server_default=sa.true(),
+    )
     display_name: Mapped[str] = mapped_column(
         "display_name",
         sa.String(length=128),
@@ -108,6 +122,9 @@ class AgentResourceRow(Base):  # type: ignore[misc]
     capacity: Mapped[Decimal] = mapped_column(
         "capacity", sa.Numeric(precision=24, scale=6), nullable=False
     )
+    reserved: Mapped[Decimal] = mapped_column(
+        "reserved", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
+    )
     used: Mapped[Decimal] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
     )
@@ -147,6 +164,7 @@ class AgentResourceRow(Base):  # type: ignore[misc]
             "agent_id",
             "slot_name",
             "capacity",
+            "reserved",
             "used",
         ),
     )

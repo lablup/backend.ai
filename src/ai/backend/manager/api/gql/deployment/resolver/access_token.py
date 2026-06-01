@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from strawberry import Info
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -20,19 +21,21 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 # Mutation resolvers
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Create access token."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Create access token."))
 async def create_access_token(
     input: CreateAccessTokenInput, info: Info[StrawberryGQLContext]
-) -> CreateAccessTokenPayload:
+) -> CreateAccessTokenPayload | None:
     """Create a new access token for a deployment."""
     payload = await info.context.adapters.deployment.create_access_token(input.to_pydantic())
     return CreateAccessTokenPayload(access_token=AccessToken.from_pydantic(payload.access_token))
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Delete access token."))  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Delete access token.")
+)
 async def delete_access_token(
     input: DeleteAccessTokenInput, info: Info[StrawberryGQLContext]
-) -> DeleteAccessTokenPayload:
+) -> DeleteAccessTokenPayload | None:
     """Delete an access token."""
     payload = await info.context.adapters.deployment.delete_access_token(input.to_pydantic())
     return DeleteAccessTokenPayload(id=payload.id)

@@ -40,17 +40,6 @@ python_distribution(
             "mgr": "ai.backend.manager.cli.__main__:main",
             "mgr.start-server": "ai.backend.manager.cli.start_server:main",
         },
-        "backendai_scheduler_v10": {
-            "fifo": "ai.backend.manager.scheduler.fifo:FIFOSlotScheduler",
-            "lifo": "ai.backend.manager.scheduler.fifo:LIFOSlotScheduler",
-            "drf": "ai.backend.manager.scheduler.drf:DRFScheduler",
-        },
-        "backendai_agentselector_v10": {
-            "legacy": "ai.backend.manager.scheduler.agent_selector:LegacyAgentSelector",
-            "roundrobin": "ai.backend.manager.scheduler.agent_selector:RoundRobinAgentSelector",
-            "concentrated": "ai.backend.manager.scheduler.agent_selector:ConcentratedAgentSelector",
-            "dispersed": "ai.backend.manager.scheduler.agent_selector:DispersedAgentSelector",
-        },
         "backendai_error_monitor_v20": {
             "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorMonitor",
         },
@@ -60,10 +49,12 @@ python_distribution(
         "backendai_hook_v20": {
             "totp": "ai.backend.manager.plugin.totp.hook:TOTPHook",
             "openid": "ai.backend.manager.plugin.openid.hook:OIDCHookPlugin",
+            "auth_keypair": "ai.backend.manager.plugin.keypair.hook:KeypairAuthHookPlugin",
         },
         "backendai_webapp_v20": {
             "totp": "ai.backend.manager.plugin.totp.webapp:TOTPWebapp",
             "openid": "ai.backend.manager.plugin.openid.webapp:OIDCWebAppPlugin",
+            "auth_keypair": "ai.backend.manager.plugin.keypair.webapp:KeypairAuthWebAppPlugin",
         },
         "backendai_network_manager_v1": {
             "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",

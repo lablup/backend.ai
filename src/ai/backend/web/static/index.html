@@ -1,1 +1,182 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Backend.AI"><meta http-equiv="X-UA-Compatible" content="ie=edge"><meta name="theme-color" content="#fff"><base href="/"><link rel="icon" href="manifest/favicon.ico"><link rel="apple-touch-icon" sizes="256x256" href="manifest/backend-ai.iconset/icon_256x256@2x.png"><link rel="icon" type="image/png" sizes="32x32" href="manifest/backend-ai.iconset/icon_32x32@1x.png"><link rel="icon" type="image/png" sizes="16x16" href="manifest/backend-ai.iconset/icon_16x16@1x.png"><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="resources/fonts/roboto/roboto.css"><link rel="stylesheet" href="resources/fonts/ubuntu/ubuntu.css"><link rel="stylesheet" href="resources/webui.css"><link rel="stylesheet" href="resources/custom.css"><script src="manifest/app.js"></script><title>Backend.AI</title><style>body{margin:0;background-color:#f7f7f6}body.dark-theme{background-color:#191919}#splash{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;display:flex;align-items:center;justify-content:center;background-color:#f7f7f6;transition:opacity .3s ease-out}body.dark-theme #splash{background-color:#191919}.splash-hidden{opacity:0;pointer-events:none}</style><script nonce="{{nonce}}">globalThis.isElectron=isElectron(),isElectron&&(globalThis.electronInitialHref=window.location.href),globalThis.enableSW=!0,globalThis.packageVersion="26.4.3",globalThis.buildNumber="1",globalThis.baiNonce="{{nonce}}"</script><script defer="defer" src="/static/js/main.e7d73246.js"></script></head><body><script nonce="{{nonce}}">const storedThemeMode=localStorage.getItem("backendaiwebui.settings.themeMode"),systemPrefersDark=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;let parsedThemeMode;try{parsedThemeMode=storedThemeMode?JSON.parse(storedThemeMode):null}catch(e){parsedThemeMode=null}globalThis.isDarkMode="dark"===parsedThemeMode||"light"!==parsedThemeMode&&systemPrefersDark,globalThis.isDarkMode&&document.body.classList.add("dark-theme"),document.body.style.backgroundColor=globalThis.isDarkMode?"#191919":"rgba(247, 247, 246, 1)"</script><div><div id="react-root"></div><div id="splash" class="splash"><div class="splash-drag-area"></div><div class="splash-card"><div class="splash-header"><div class="logo"></div></div><div class="splash-information"><ul><li>Backend.AI Web UI <span id="version-detail" class="detail"></span></li><li><span id="license-detail"></span></li><li><span id="mode-detail" class="detail"></span> <span id="build-detail" class="detail"></span></li></ul><ul><li>Powered by open-source software</li><li class="copyright">Copyright &copy; 2015-2026 Lablup Inc.</li></ul></div><div class="splash-loading"><div class="sk-folding-cube"><div class="sk-cube1 sk-cube"></div><div class="sk-cube2 sk-cube"></div><div class="sk-cube3 sk-cube"></div><div class="sk-cube4 sk-cube"></div></div><div id="loading-message" class="loading-message">Loading components...</div></div></div></div><noscript><p>Could not render Backend.AI Web UI. Check that JavaScript is enabled.</p></noscript><script nonce="{{nonce}}">document.getElementById("version-detail").innerText=globalThis.packageVersion,document.getElementById("build-detail").innerText=" Build "+globalThis.buildVersion,document.getElementById("license-detail").innerText="",globalThis.isElectron?document.getElementById("mode-detail").innerText="App":document.getElementById("mode-detail").innerText="WebServer",globalThis.isIE&&(alert("Internet Explorer is not supported. Please visit with modern browsers."),document.getElementById("loading-message").innerText="Not supported browser.",document.getElementById("loading-message").style.color="red"),!["127.0.0.1","localhost"].includes(window.location.hostname)&&"enableSW"in globalThis&&!0===globalThis.enableSW&&"serviceWorker"in navigator&&!1===globalThis.isElectron&&window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js")}),function(){var e=document.getElementById("splash");if(e){var t=!1,n=null,i=null;window.__dismissSplash=l;var o=document.getElementById("react-root");o&&(n=new MutationObserver(function(){o.childNodes.length>0&&(n.disconnect(),i=setTimeout(l,3e3))})).observe(o,{childList:!0}),setTimeout(l,1e4)}function l(){t||(t=!0,n&&n.disconnect(),i&&clearTimeout(i),e.classList.add("splash-hidden"),e.addEventListener("transitionend",function t(n){"opacity"===n.propertyName&&(e.removeEventListener("transitionend",t),e.remove())}),setTimeout(function(){e.parentNode&&e.remove()},1e3))}}()</script></div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Backend.AI">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta name="theme-color" content="#fff">
+  <base href="/">
+  <link rel="icon" href="manifest/favicon.ico">
+  <link rel="apple-touch-icon" sizes="256x256" href="manifest/backend-ai.iconset/icon_256x256@2x.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="manifest/backend-ai.iconset/icon_32x32@1x.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="manifest/backend-ai.iconset/icon_16x16@1x.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="resources/fonts/roboto/roboto.css">
+  <link rel="stylesheet" href="resources/fonts/ubuntu/ubuntu.css">
+  <link rel="stylesheet" href="resources/webui.css">
+  <link rel="stylesheet" href="resources/custom.css">
+  <script src="manifest/app.js"></script>
+  <title>Backend.AI</title>
+  <!-- Critical inline CSS: ensures splash is visible before external CSS loads -->
+  <style>
+    body { margin: 0; background-color: rgba(247, 247, 246, 1); }
+    body.dark-theme { background-color: #191919; }
+    #splash {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 10000; display: flex; align-items: center; justify-content: center;
+      background-color: rgba(247, 247, 246, 1); transition: opacity 0.3s ease-out;
+    }
+    body.dark-theme #splash { background-color: #191919; }
+    .splash-hidden { opacity: 0; pointer-events: none; }
+  </style>
+  <script nonce="{{nonce}}">
+    globalThis.isElectron = isElectron();
+    if (isElectron) {
+      globalThis.electronInitialHref = window.location.href;
+    }
+    globalThis.enableSW = true;
+
+    globalThis.packageVersion = "26.4.8-rc.5";
+    globalThis.buildNumber = "8192";
+    globalThis.baiNonce = "{{nonce}}";
+
+    // DO NOT CHANGE BELOW LINE
+    
+  </script>
+  <!-- DO NOT CHANGE BELOW LINE -->
+  <script type="module" crossorigin src="/assets/index-CC9H5FpY.js"></script>
+</head>
+
+<body>
+  <script nonce="{{nonce}}">
+    //To avoid flickering when first loading the page, we add a class to the body to indicate the theme.
+    const storedThemeMode = localStorage.getItem('backendaiwebui.settings.themeMode');
+    const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // ahooks stores JSON-serialized values, so parse the stored themeMode
+    let parsedThemeMode;
+    try { parsedThemeMode = storedThemeMode ? JSON.parse(storedThemeMode) : null; } catch(e) { parsedThemeMode = null; }
+    if (parsedThemeMode === 'dark') {
+      globalThis.isDarkMode = true;
+    } else if (parsedThemeMode === 'light') {
+      globalThis.isDarkMode = false;
+    } else {
+      // 'system' or unset: use system preference
+      globalThis.isDarkMode = systemPrefersDark;
+    }
+    if (globalThis.isDarkMode) {
+      document.body.classList.add('dark-theme');
+    }
+    // Set body background immediately to prevent white flash before CSS loads
+    document.body.style.backgroundColor = globalThis.isDarkMode ? '#191919' : 'rgba(247, 247, 246, 1)';
+  </script>
+  <div>
+    <div id="react-root"></div>
+    <div id="splash" class="splash">
+      <div class="splash-drag-area"></div>
+      <div class="splash-card">
+        <div class="splash-header">
+          <div class="logo"></div>
+        </div>
+        <div class="splash-information">
+          <ul>
+            <li>Backend.AI Web UI <span id="version-detail" class="detail"></span></li>
+            <li><span id="license-detail"></span></li>
+            <li><span id="mode-detail" class="detail"></span> <span id="build-detail" class="detail"></span></li>
+          </ul>
+          <ul>
+            <li>Powered by open-source software</li>
+            <li class="copyright">Copyright &copy; 2015-2026 Lablup Inc.</li>
+          </ul>
+        </div>
+        <div class="splash-loading">
+          <div class="sk-folding-cube">
+            <div class="sk-cube1 sk-cube"></div>
+            <div class="sk-cube2 sk-cube"></div>
+            <div class="sk-cube3 sk-cube"></div>
+            <div class="sk-cube4 sk-cube"></div>
+          </div>
+          <div id="loading-message" class="loading-message">Loading components...</div>
+        </div>
+      </div>
+    </div>
+    <noscript>
+      <p>Could not render Backend.AI Web UI. Check that JavaScript is enabled.</p>
+    </noscript>
+    <!-- Backend.AI client classes are now initialized by React global-stores.ts -->
+    <script nonce="{{nonce}}">
+      document.getElementById('version-detail').innerText = globalThis.packageVersion;
+      document.getElementById('build-detail').innerText = ' Build ' + globalThis.buildVersion;
+      document.getElementById('license-detail').innerText = '';
+      if (globalThis.isElectron) {
+        document.getElementById('mode-detail').innerText = 'App';
+      } else {
+        document.getElementById('mode-detail').innerText = 'WebServer';
+      }
+      if (globalThis.isIE) {
+        alert('Internet Explorer is not supported. Please visit with modern browsers.');
+        document.getElementById('loading-message').innerText = 'Not supported browser.';
+        document.getElementById('loading-message').style.color = 'red';
+      }
+      if (window.location.hostname !== '127.0.0.1' &&
+        !window.location.hostname.endsWith('localhost') &&
+        'enableSW' in globalThis &&
+        globalThis.enableSW === true) {
+        // Service worker routine.
+        if ('serviceWorker' in navigator && globalThis.isElectron === false) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js');
+          });
+        }
+      }
+
+      // Splash fade-out: React-driven dismissal.
+      // React calls window.__dismissSplash() when meaningful UI is ready
+      // (sider/header for logged-in, login form for logged-out).
+      // MutationObserver serves as a fallback for independent routes
+      // (/verify-email, /change-password, etc.) that render content quickly.
+      (function () {
+        var splash = document.getElementById('splash');
+        if (!splash) return;
+        var dismissed = false;
+        var observer = null;
+        var fallbackTimer = null;
+        function dismiss() {
+          if (dismissed) return;
+          dismissed = true;
+          if (observer) observer.disconnect();
+          if (fallbackTimer) clearTimeout(fallbackTimer);
+          splash.classList.add('splash-hidden');
+          splash.addEventListener('transitionend', function handler(e) {
+            if (e.propertyName === 'opacity') {
+              splash.removeEventListener('transitionend', handler);
+              splash.remove();
+            }
+          });
+          // Safety net: remove even if transitionend never fires (e.g. prefers-reduced-motion)
+          setTimeout(function () { if (splash.parentNode) splash.remove(); }, 1000);
+        }
+        // Primary trigger: called by React when the visible UI is ready.
+        // Cancels the MutationObserver fallback timer to prevent premature dismissal.
+        window.__dismissSplash = dismiss;
+        // Fallback: MutationObserver for routes that don't explicitly call __dismissSplash
+        // (e.g. /verify-email, /change-password). Uses a longer delay to avoid racing
+        // with React-driven dismissal on normal routes.
+        var reactRoot = document.getElementById('react-root');
+        if (reactRoot) {
+          observer = new MutationObserver(function () {
+            if (reactRoot.childNodes.length > 0) {
+              observer.disconnect();
+              fallbackTimer = setTimeout(dismiss, 3000);
+            }
+          });
+          observer.observe(reactRoot, { childList: true });
+        }
+        // Ultimate safety fallback
+        setTimeout(dismiss, 10000);
+      })();
+    </script>
+</body>
+
+</html>

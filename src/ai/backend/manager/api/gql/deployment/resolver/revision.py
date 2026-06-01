@@ -15,6 +15,8 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchRevisionsInput,
 )
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -27,7 +29,6 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ActivateRevisionInputGQL,
     ActivateRevisionPayloadGQL,
     AddRevisionInput,
-    AddRevisionOptionsGQL,
     AddRevisionPayload,
     ModelRevision,
     ModelRevisionConnection,
@@ -98,16 +99,21 @@ async def revisions(
 async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
     """Get a specific revision by ID."""
     _, revision_id = resolve_global_id(id)
-    node = await info.context.adapters.deployment.get_revision(UUID(revision_id))
+    node = await info.context.adapters.deployment.get_revision(
+        DeploymentRevisionID(UUID(revision_id))
+    )
     return ModelRevision.from_pydantic(node)
 
 
 @gql_root_field(
     BackendAIGQLMeta(
         added_version="25.16.0", description="Get JSON Schema for inference runtime configuration"
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use the runtime_variant resources instead."
+    ),
 )  # type: ignore[misc]
-async def inference_runtime_config(name: str) -> JSON:
+async def inference_runtime_config(name: str) -> JSON | None:
     match name.lower():
         case "vllm":
             return cast(JSON, VLLMRuntimeConfig.to_json_schema())
@@ -130,9 +136,12 @@ async def inference_runtime_config(name: str) -> JSON:
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Get configuration JSON Schemas for all inference runtimes.",
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use the runtime_variant resources instead."
+    ),
 )  # type: ignore[misc]
-async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
+async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON | None:
     return cast(
         JSON,
         {
@@ -147,16 +156,16 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
 # Mutation resolvers
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Add model revision."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Add model revision."))
 async def add_model_revision(
     input: AddRevisionInput,
     info: Info[StrawberryGQLContext],
-    options: AddRevisionOptionsGQL | None = None,
-) -> AddRevisionPayload:
+) -> AddRevisionPayload | None:
     """Add a model revision to a deployment."""
+    input_dto = input.to_pydantic()
     payload = await info.context.adapters.deployment.add_revision(
-        input.to_pydantic(),
-        options=options.to_pydantic() if options else AdapterAddRevisionOptions(),
+        input_dto,
+        options=input_dto.options or AdapterAddRevisionOptions(),
     )
     return AddRevisionPayload(revision=ModelRevision.from_pydantic(payload.revision))
 
@@ -166,11 +175,11 @@ async def add_model_revision(
         added_version="25.19.0",
         description="Activate a specific revision to be the current revision",
     )
-)  # type: ignore[misc]
+)
 async def activate_deployment_revision(
     input: ActivateRevisionInputGQL,
     info: Info[StrawberryGQLContext, None],
-) -> ActivateRevisionPayloadGQL:
+) -> ActivateRevisionPayloadGQL | None:
     """Activate a revision to be the current revision for a deployment."""
     payload = await info.context.adapters.deployment.activate_revision(input.to_pydantic())
     return ActivateRevisionPayloadGQL(

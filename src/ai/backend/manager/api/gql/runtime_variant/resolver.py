@@ -109,11 +109,11 @@ async def runtime_variant(
         added_version="26.4.2",
         description="Create a new runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_runtime_variant(
     info: Info[StrawberryGQLContext],
     input: CreateRuntimeVariantInputGQL,
-) -> CreateRuntimeVariantPayloadGQL:
+) -> CreateRuntimeVariantPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.runtime_variant.create(dto)
@@ -125,11 +125,11 @@ async def admin_create_runtime_variant(
         added_version="26.4.2",
         description="Update a runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_runtime_variant(
     info: Info[StrawberryGQLContext],
     input: UpdateRuntimeVariantInputGQL,
-) -> UpdateRuntimeVariantPayloadGQL:
+) -> UpdateRuntimeVariantPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.runtime_variant.update(dto)
@@ -141,11 +141,11 @@ async def admin_update_runtime_variant(
         added_version="26.4.2",
         description="Delete a runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_runtime_variant(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteRuntimeVariantPayloadGQL:
+) -> DeleteRuntimeVariantPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.runtime_variant.delete(id)
     return DeleteRuntimeVariantPayloadGQL.from_pydantic(payload)
@@ -156,11 +156,11 @@ async def admin_delete_runtime_variant(
         added_version="26.4.2",
         description="Delete multiple runtime variants (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_runtime_variants(
     info: Info[StrawberryGQLContext],
     input: DeleteRuntimeVariantsInputGQL,
-) -> DeleteRuntimeVariantsPayloadGQL:
+) -> DeleteRuntimeVariantsPayloadGQL | None:
     """Delete multiple runtime variants.
 
     Args:

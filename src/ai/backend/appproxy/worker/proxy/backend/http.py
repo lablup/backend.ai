@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import random
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -10,21 +9,23 @@ from functools import partial
 from typing import Any, Final, override
 
 import aiohttp
-import aiotools
 from aiohttp import ClientConnectorError, web
 from multidict import CIMultiDict
 from yarl import URL
 
-from ai.backend.appproxy.common.errors import ContainerConnectionRefused, WorkerNotAvailable
+from ai.backend.appproxy.common.errors import ContainerConnectionRefused
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.common.cron import LocalCron
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseBackend, HttpRequest
+from .last_access_marker import LastAccessMarkerTask
+from .pool import RoutePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -41,11 +42,20 @@ HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
 
 
 class HTTPBackend(BaseBackend):
-    routes: list[RouteInfo]
+    """HTTP proxy backend that keeps routes in a health-checked pool.
+
+    Route selection defers to the pool so upstreams with repeated
+    connect failures are excluded from traffic. Connection-level errors
+    observed while proxying real requests feed back into the pool via
+    ``record_failure`` so that hot-path failures count toward the
+    failure threshold (the background TCP probe complements this).
+    """
+
+    _pool: RoutePool
 
     def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.routes = routes
+        self._pool = RoutePool(initial_routes=routes)
         client_timeout = aiohttp.ClientTimeout(
             total=None,
             connect=10.0,
@@ -63,21 +73,13 @@ class HTTPBackend(BaseBackend):
         )
 
     @override
-    async def close(self) -> None:
-        await self.client_pool.close()
+    async def update_routes(self, routes: list[RouteInfo]) -> None:
+        await self._pool.update(routes)
 
-    @property
-    def selected_route(self) -> RouteInfo:
-        if len(self.routes) == 0:
-            raise WorkerNotAvailable
-        if len(self.routes) == 1:
-            selected_route = self.routes[0]
-            if selected_route.traffic_ratio == 0:
-                raise WorkerNotAvailable
-        else:
-            ratios: list[float] = [r.traffic_ratio for r in self.routes]
-            selected_route = random.choices(self.routes, weights=ratios, k=1)[0]
-        return selected_route
+    @override
+    async def close(self) -> None:
+        await self._pool.close()
+        await self.client_pool.close()
 
     def get_x_forwarded_proto(self, request: web.Request) -> str:
         use_tls = (
@@ -177,7 +179,7 @@ class HTTPBackend(BaseBackend):
             backend_rqst_hdrs,
             backend_rqst_body,
         )
-        route = self.selected_route
+        route = await self._pool.select()
         await self.mark_last_used_time(route)
         await self.increase_request_counter()
         log.trace(
@@ -217,8 +219,10 @@ class HTTPBackend(BaseBackend):
                     )
                 finally:
                     await frontend_response.write_eof()
+                self._pool.record_success(route)
                 return frontend_response
         except aiohttp.ServerDisconnectedError as e:
+            self._pool.record_failure(route)
             log.debug(
                 "Backend container disconnected unexpectedly: {}:{}, method={}, path={}, error={}",
                 route.current_kernel_host,
@@ -229,8 +233,10 @@ class HTTPBackend(BaseBackend):
             )
             raise
         except ConnectionResetError as e:
+            self._pool.record_failure(route)
             raise asyncio.CancelledError() from e
         except aiohttp.ClientOSError as e:
+            self._pool.record_failure(route)
             raise ContainerConnectionRefused from e
         except:
             log.exception("Unhandled exception while proxying HTTP request")
@@ -284,10 +290,7 @@ class HTTPBackend(BaseBackend):
                 log.debug("setting stop event")
                 stop_event.set()
 
-        async def _last_access_marker_task(_interval: float) -> None:
-            await self.mark_last_used_time(route)
-
-        route = self.selected_route
+        route = await self._pool.select()
         log.trace(
             "Proxying {} {} WS Request to {}:{}",
             request.method,
@@ -307,7 +310,8 @@ class HTTPBackend(BaseBackend):
         metrics.proxy.observe_upstream_ws_connection_start()
         start = time.monotonic()
 
-        marker_task = aiotools.create_timer(_last_access_marker_task, 1.5)
+        marker_cron = LocalCron([LastAccessMarkerTask(self, route)])
+        await marker_cron.start()
         await self.increase_request_counter()
 
         try:
@@ -323,14 +327,14 @@ class HTTPBackend(BaseBackend):
                         log.debug("created tasks, now waiting until one of two tasks end")
                         await stop_event.wait()
                 finally:
-                    marker_task.cancel()
-                    await marker_task
+                    await marker_cron.stop()
                     if not downstream_ws.closed:
                         await downstream_ws.close()
                     if not upstream_ws.closed:
                         await upstream_ws.close()
             log.trace("websocket connection closed")
         except ClientConnectorError:
+            self._pool.record_failure(route)
             log.trace("upstream connection closed")
             if not downstream_ws.closed:
                 await downstream_ws.close()

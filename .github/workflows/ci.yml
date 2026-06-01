@@ -28,31 +28,65 @@ jobs:
       - uses: lablup/auto-labeler@main
 
 
-  lint-and-typecheck:
+  detect-changes:
     if: |
       !contains(github.event.pull_request.labels.*.name, 'skip:ci')
       && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
     runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
     steps:
-    - name: Calculate the fetch depth
+    - uses: actions/checkout@v6
+      with:
+        lfs: false
+    - uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          code:
+            - 'src/**'
+            - 'tests/**'
+            - '**/BUILD'
+            - 'pants.toml'
+            - 'pants.ci.toml'
+            - 'python*.lock'
+            - 'tools/*.lock'
+            - '.github/workflows/ci.yml'
+
+
+  check-build-and-lint:
+    needs: detect-changes
+    if: |
+      always()
+      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
+      && (
+        needs.detect-changes.result != 'success'
+        || needs.detect-changes.outputs.code == 'true'
+        || startsWith(github.ref, 'refs/tags/')
+      )
+    runs-on: ubuntu-latest
+    steps:
+    - name: Verify detect-changes
+      if: needs.detect-changes.result != 'success'
       run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
-            echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
-            # Fork PRs need full history to find the merge base
-            echo "GIT_FETCH_DEPTH=0" >> "${GITHUB_ENV}"
-          else
-            echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-            echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-          fi
+        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
+        exit 1
+    - name: Detect fork PR
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ] \
+          && [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
+          echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
         else
           echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
       uses: actions/checkout@v6
       with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        fetch-depth: 2
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
@@ -83,13 +117,14 @@ jobs:
     - name: Calculate base ref
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          if [ "$IS_FORK_PR" == "true" ]; then
-            # Fork PR: full history already fetched, just ensure the base SHA is available
-            git fetch origin "${{ github.event.pull_request.base.sha }}"
-          else
-            git fetch --depth=50 origin "${{ github.event.pull_request.base.sha }}"
-          fi
-          BASE_REF="${{ github.event.pull_request.base.sha }}"
+          # actions/checkout checks out refs/pull/N/merge for PR events, a
+          # synthetic merge of the PR head into the current base tip. HEAD^1
+          # is therefore the base used to construct that merge — always
+          # present in the shallow tree at depth 2, regardless of how many
+          # commits the PR has, whether it has been rebased, or whether main
+          # has been merged back into the topic branch (which would inflate
+          # pull_request.commits with non-PR commits).
+          BASE_REF=$(git rev-parse HEAD^1)
         else
           BASE_REF="HEAD~1"
         fi
@@ -102,39 +137,121 @@ jobs:
           pants tailor --check update-build-files --check --changed-since=$BASE_REF
         fi
     - name: Lint
-      id: lint
-      continue-on-error: true
       run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
-          echo "(skipping matchers for pull request from local branches)"
+        if [ "$IS_FORK_PR" == "true" ]; then
+          echo "(skipping matchers for fork pull request)"
         else
           echo "::add-matcher::.github/workflows/flake8-matcher.json"
         fi
-        pants lint --changed-since=$BASE_REF --changed-dependents=transitive
-    - name: Typecheck
-      id: typecheck
-      continue-on-error: true
+        pants lint --changed-since=$BASE_REF
+    - name: Upload pants log
+      uses: actions/upload-artifact@v5
+      with:
+        name: pants.check-build-and-lint.log
+        path: .pants.d/workdir/pants.log
+      if: always()  # We want the log even on failures.
+
+
+  typecheck:
+    needs: detect-changes
+    if: |
+      always()
+      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
+      && (
+        needs.detect-changes.result != 'success'
+        || needs.detect-changes.outputs.code == 'true'
+        || startsWith(github.ref, 'refs/tags/')
+      )
+    runs-on: ubuntu-latest
+    steps:
+    - name: Verify detect-changes
+      if: needs.detect-changes.result != 'success'
       run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
-          echo "(skipping matchers for pull request from local branches)"
+        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
+        exit 1
+    - name: Detect fork PR
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ] \
+          && [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
+          echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
+        else
+          echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
+        fi
+    - name: Check out the revision with minimal required history
+      uses: actions/checkout@v6
+      with:
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        fetch-depth: 2
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v10
+      with:
+        gha-cache-key: v0
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Calculate base ref
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          # See `check-build-and-lint` job above for rationale.
+          BASE_REF=$(git rev-parse HEAD^1)
+        else
+          BASE_REF="HEAD~1"
+        fi
+        echo "BASE_REF=$BASE_REF" >> $GITHUB_ENV
+    - name: Typecheck
+      run: |
+        if [ "$IS_FORK_PR" == "true" ]; then
+          echo "(skipping matchers for fork pull request)"
         else
           echo "::add-matcher::.github/workflows/mypy-matcher.json"
         fi
         pants check --changed-since=$BASE_REF --changed-dependents=transitive
-    - name: Check results
-      if: always()
-      run: |
-        if [ "${{ steps.lint.outcome }}" != "success" ] || [ "${{ steps.typecheck.outcome }}" != "success" ]; then
-          echo "Lint outcome: ${{ steps.lint.outcome }}"
-          echo "Typecheck outcome: ${{ steps.typecheck.outcome }}"
-          exit 1
-        fi
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
-        name: pants.lint-and-typecheck.log
+        name: pants.typecheck.log
         path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.
+
+
+  lint-and-typecheck:
+    needs: [check-build-and-lint, typecheck]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        lint_result="${{ needs.check-build-and-lint.result }}"
+        typecheck_result="${{ needs.typecheck.result }}"
+        echo "check-build-and-lint: $lint_result"
+        echo "typecheck: $typecheck_result"
+        for r in "$lint_result" "$typecheck_result"; do
+          if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
+            echo "FAIL: unexpected result $r"
+            exit 1
+          fi
+        done
+        echo "OK"
 
 
   check-alembic-migrations:
@@ -213,26 +330,34 @@ jobs:
 
 
   test-unit:
+    needs: detect-changes
     if: |
-      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      always()
+      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
       && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
+      && (
+        needs.detect-changes.result != 'success'
+        || needs.detect-changes.outputs.code == 'true'
+        || startsWith(github.ref, 'refs/tags/')
+      )
     runs-on: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON('["0/3","1/3","2/3"]') }}
     steps:
-    - name: Calculate the fetch depth
+    - name: Verify detect-changes
+      if: needs.detect-changes.result != 'success'
       run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-        else
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
-        fi
+        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
+        exit 1
     - name: Check out the revision with minimal required history
       uses: actions/checkout@v6
       with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        fetch-depth: 2
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
@@ -266,12 +391,12 @@ jobs:
             tests/unit/:: -- -v
         else
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            git fetch --depth=50 origin "${{ github.event.pull_request.base.sha }}"
-            BASE_REF="${{ github.event.pull_request.base.sha }}"
+            # See `check-build-and-lint` job for rationale on HEAD^1.
+            BASE_REF=$(git rev-parse HEAD^1)
           else
             BASE_REF="HEAD~1"
           fi
-          pants test --changed-since=$BASE_REF --changed-dependents=transitive \
+          pants test --changed-since=$BASE_REF --changed-dependents=direct \
             --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/unit/' -- -v
         fi
@@ -284,34 +409,34 @@ jobs:
 
 
   test-component:
+    needs: detect-changes
     if: |
-      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      always()
+      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
       && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
+      && (
+        needs.detect-changes.result != 'success'
+        || needs.detect-changes.outputs.code == 'true'
+        || startsWith(github.ref, 'refs/tags/')
+      )
     runs-on: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON('["0/2","1/2"]') }}
     steps:
-    - name: Calculate the fetch depth
+    - name: Verify detect-changes
+      if: needs.detect-changes.result != 'success'
       run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.event.pull_request.base.repo.full_name }}" ]; then
-            echo "IS_FORK_PR=true" >> "${GITHUB_ENV}"
-            # Fork PRs need full history to find the merge base
-            echo "GIT_FETCH_DEPTH=0" >> "${GITHUB_ENV}"
-          else
-            echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-            echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-          fi
-        else
-          echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
-        fi
+        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
+        exit 1
     - name: Check out the revision with minimal required history
       uses: actions/checkout@v6
       with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        fetch-depth: 2
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
@@ -349,17 +474,12 @@ jobs:
             tests/component/:: -- -v
         else
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            if [ "$IS_FORK_PR" == "true" ]; then
-              # Fork PR: full history already fetched, just ensure the base SHA is available
-              git fetch origin "${{ github.event.pull_request.base.sha }}"
-            else
-              git fetch --depth=50 origin "${{ github.event.pull_request.base.sha }}"
-            fi
-            BASE_REF="${{ github.event.pull_request.base.sha }}"
+            # See `check-build-and-lint` job for rationale on HEAD^1.
+            BASE_REF=$(git rev-parse HEAD^1)
           else
             BASE_REF="HEAD~1"
           fi
-          pants test --changed-since=$BASE_REF --changed-dependents=transitive \
+          pants test --changed-since=$BASE_REF --changed-dependents=direct \
             --shard='${{ matrix.shard }}' \
             --filter-address-regex='tests/component/' -- -v
         fi
@@ -372,26 +492,34 @@ jobs:
 
 
   test-integration:
+    needs: detect-changes
     if: |
-      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      always()
+      && !contains(github.event.pull_request.labels.*.name, 'skip:ci')
       && !contains(toJSON(github.event.head_commit.message), 'skip:ci')
+      && (
+        needs.detect-changes.result != 'success'
+        || needs.detect-changes.outputs.code == 'true'
+        || startsWith(github.ref, 'refs/tags/')
+      )
     runs-on: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON('["0/2","1/2"]') }}
     steps:
-    - name: Calculate the fetch depth
+    - name: Verify detect-changes
+      if: needs.detect-changes.result != 'success'
       run: |
-        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
-        else
-          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
-        fi
+        echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
+        exit 1
     - name: Check out the revision with minimal required history
       uses: actions/checkout@v6
       with:
-        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
+        # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
+        # events need HEAD plus HEAD~1. See "Calculate base ref" for usage.
+        fetch-depth: 2
         lfs: false
     - name: Extract Python version from pants.toml
       run: |
@@ -430,8 +558,8 @@ jobs:
             tests/integration/:: -- -v
         else
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            git fetch --depth=50 origin "${{ github.event.pull_request.base.sha }}"
-            BASE_REF="${{ github.event.pull_request.base.sha }}"
+            # See `check-build-and-lint` job for rationale on HEAD^1.
+            BASE_REF=$(git rev-parse HEAD^1)
           else
             BASE_REF="HEAD~1"
           fi
@@ -453,10 +581,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - run: |
-        if [ "${{ needs.test-unit.result }}" = "success" ]; then
-          echo "All test-unit shards passed"
+        r="${{ needs.test-unit.result }}"
+        echo "test-unit: $r"
+        if [ "$r" = "success" ] || [ "$r" = "skipped" ]; then
+          echo "OK"
         else
-          echo "test-unit failed: ${{ needs.test-unit.result }}"
+          echo "FAIL"
           exit 1
         fi
 
@@ -466,10 +596,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - run: |
-        if [ "${{ needs.test-component.result }}" = "success" ]; then
-          echo "All test-component shards passed"
+        r="${{ needs.test-component.result }}"
+        echo "test-component: $r"
+        if [ "$r" = "success" ] || [ "$r" = "skipped" ]; then
+          echo "OK"
         else
-          echo "test-component failed: ${{ needs.test-component.result }}"
+          echo "FAIL"
           exit 1
         fi
 
@@ -479,10 +611,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - run: |
-        if [ "${{ needs.test-integration.result }}" = "success" ]; then
-          echo "All test-integration shards passed"
+        r="${{ needs.test-integration.result }}"
+        echo "test-integration: $r"
+        if [ "$r" = "success" ] || [ "$r" = "skipped" ]; then
+          echo "OK"
         else
-          echo "test-integration failed: ${{ needs.test-integration.result }}"
+          echo "FAIL"
           exit 1
         fi
 
@@ -494,9 +628,8 @@ jobs:
       matrix:
         # ubuntu-22.04: x86-64
         # ubuntu-22.04-arm: aarch64
-        # macos-15-intel: intel
         # macos-15: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15-intel, macos-15]
+        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15]
     runs-on: ${{ matrix.os }}
     env:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
@@ -808,14 +941,6 @@ jobs:
           "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
         }'
         curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-x86_64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-x86_64"
-        }'
-        curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-aarch64' \
           -H 'accept: application/json' \
           -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
@@ -846,14 +971,6 @@ jobs:
           -H 'Content-Type: application/json' \
           -d '{
           "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
-        }'
-        curl -X 'PATCH' \
-          'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-x86_64' \
-          -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
-          -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-x86_64"
         }'
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-aarch64' \

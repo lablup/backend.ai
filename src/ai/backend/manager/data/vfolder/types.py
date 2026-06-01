@@ -6,12 +6,20 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.field import (
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
-from ai.backend.common.types import CIStrEnum, QuotaScopeID, VFolderID, VFolderUsageMode
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import (
+    CIStrEnum,
+    QuotaScopeID,
+    VFolderHostPermissionMap,
+    VFolderID,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.errors.resource import DataTransformationFailed
 
@@ -141,6 +149,19 @@ class VFolderOperationStatus(enum.StrEnum):
         return VFolderOperationStatusField(self)
 
 
+@dataclass(frozen=True)
+class UserWithVFolderHostPermissions:
+    """
+    Minimal user fields paired with the union of ``allowed_vfolder_hosts``
+    across the user's active keypair resource policies. The host permission
+    map is the merged set used for vfolder host-permission validation.
+    """
+
+    email: str
+    role: UserRole
+    allowed_vfolder_hosts: VFolderHostPermissionMap
+
+
 @dataclass
 class VFolderData:
     """
@@ -148,7 +169,7 @@ class VFolderData:
     Used by repository layer for returning full VFolder information.
     """
 
-    id: uuid.UUID
+    id: VFolderUUID
     name: str
     host: str
     domain_name: str
@@ -161,6 +182,7 @@ class VFolderData:
     cur_size: int
     created_at: datetime
     last_used: datetime | None
+    updated_at: datetime
     creator: str | None
     creator_id: uuid.UUID | None
     unmanaged_path: str | None
@@ -192,6 +214,7 @@ class VFolderInvitationData:
     id: uuid.UUID
     vfolder: uuid.UUID
     inviter: str  # email
+    inviter_username: str | None
     invitee: str  # email
     permission: VFolderMountPermission
     created_at: datetime

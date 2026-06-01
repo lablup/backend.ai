@@ -19,6 +19,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -41,6 +42,7 @@ class AgentRegistryInput:
     hook_plugin_ctx: HookPluginContext
     network_plugin_ctx: NetworkPluginContext
     scheduling_controller: SchedulingController
+    scheduler_repository: SchedulerRepository
     debug: bool
     manager_public_key: PublicKey
     manager_secret_key: SecretKey
@@ -82,6 +84,7 @@ class AgentRegistryDependency(
             setup_input.hook_plugin_ctx,
             setup_input.network_plugin_ctx,
             setup_input.scheduling_controller,
+            setup_input.scheduler_repository,
             debug=setup_input.debug,
             manager_public_key=setup_input.manager_public_key,
             manager_secret_key=setup_input.manager_secret_key,

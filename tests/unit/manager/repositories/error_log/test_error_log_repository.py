@@ -16,9 +16,11 @@ from ai.backend.manager.data.error_log.types import (
     ErrorLogSeverity,
 )
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.error_logs import ErrorLogRow, error_logs
@@ -32,6 +34,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import (
     PasswordHashAlgorithm,
@@ -78,9 +81,12 @@ class TestErrorLogRepository:
                 GroupRow,
                 AgentRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 ResourcePresetRow,
                 EndpointRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 DeploymentAutoScalingPolicyRow,
                 DeploymentPolicyRow,

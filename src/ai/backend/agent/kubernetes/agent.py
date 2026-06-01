@@ -1030,7 +1030,7 @@ class KubernetesAgent(
         return ""
 
     @override
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> list[str] | None:
         raise NotImplementedError
 
     @override

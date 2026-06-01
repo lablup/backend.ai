@@ -5,10 +5,20 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.exception import PrometheusQueryPresetNotFound
+from ai.backend.common.dto.clients.prometheus.response import (
+    PrometheusQueryData,
+    PrometheusResponse,
+)
+from ai.backend.common.exception import (
+    FailedToGetMetric,
+    PrometheusQueryEvaluationFailed,
+    PrometheusQueryPresetNotFound,
+)
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset import (
     PrometheusQueryPresetData,
 )
@@ -54,7 +64,10 @@ class TestPrometheusQueryPresetRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> PrometheusQueryPresetRepository:
-        return PrometheusQueryPresetRepository(db=db_with_cleanup)
+        return PrometheusQueryPresetRepository(
+            db=db_with_cleanup,
+            prometheus_client=MagicMock(spec=PrometheusClient),
+        )
 
     @pytest.fixture
     async def sample_preset_id(
@@ -254,3 +267,62 @@ class TestPrometheusQueryPresetRepository:
     ) -> None:
         with pytest.raises(PrometheusQueryPresetNotFound):
             await preset_repository.delete(uuid.uuid4())
+
+
+class TestPrometheusQueryPresetRepositoryPreview:
+    """Tests for preview_query_template — does not touch DB."""
+
+    @pytest.fixture
+    def canned_response(self) -> PrometheusResponse:
+        return PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(result_type="vector", result=[]),
+        )
+
+    @pytest.fixture
+    def prometheus_client(self, canned_response: PrometheusResponse) -> MagicMock:
+        client = MagicMock(spec=PrometheusClient)
+        client.preview_query_template = AsyncMock(return_value=canned_response)
+        return client
+
+    @pytest.fixture
+    def repository(
+        self,
+        prometheus_client: MagicMock,
+    ) -> PrometheusQueryPresetRepository:
+        return PrometheusQueryPresetRepository(
+            db=MagicMock(),
+            prometheus_client=prometheus_client,
+        )
+
+    async def test_delegates_to_client_with_template_and_window(
+        self,
+        repository: PrometheusQueryPresetRepository,
+        prometheus_client: MagicMock,
+        canned_response: PrometheusResponse,
+    ) -> None:
+        result = await repository.preview_template(
+            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            default_window="5m",
+        )
+
+        prometheus_client.preview_query_template.assert_called_once_with(
+            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            default_window="5m",
+        )
+        assert result is canned_response
+
+    async def test_converts_failed_to_get_metric_to_evaluation_failed(
+        self,
+        repository: PrometheusQueryPresetRepository,
+        prometheus_client: MagicMock,
+    ) -> None:
+        prometheus_client.preview_query_template = AsyncMock(
+            side_effect=FailedToGetMetric('parse error: unexpected "}" (status=400, path=query)'),
+        )
+
+        with pytest.raises(PrometheusQueryEvaluationFailed):
+            await repository.preview_template(
+                query_template="sum({invalid",
+                default_window="5m",
+            )

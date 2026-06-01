@@ -40,6 +40,7 @@ class TestRuntimeVariantPresetFixture:
                 {
                     "name": "vllm",
                     "description": "vLLM",
+                    "default_model_definition": {},
                 }
             ],
             "runtime_variant_presets": [
@@ -53,7 +54,6 @@ class TestRuntimeVariantPresetFixture:
                     "default_value": "auto",
                     "key": "--dtype",
                     "category": "model_loading",
-                    "ui_type": "select",
                     "display_name": "DType",
                     "ui_option": {
                         "ui_type": "select",
@@ -102,6 +102,7 @@ class TestRuntimeVariantPresetFixture:
                     "id": variant_id,
                     "name": "vllm",
                     "description": "vLLM",
+                    "default_model_definition": {},
                 }
             ],
             "runtime_variant_presets": [

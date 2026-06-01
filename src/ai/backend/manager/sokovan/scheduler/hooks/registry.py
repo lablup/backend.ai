@@ -8,11 +8,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 
 from .status import (
     RunningHookDependencies,
@@ -29,9 +27,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 class HookRegistryArgs:
     """Arguments for creating HookRegistry."""
 
-    deployment_repository: DeploymentRepository
     agent_client_pool: AgentClientPool
-    event_producer: EventProducer
 
 
 class HookRegistry:
@@ -52,16 +48,11 @@ class HookRegistry:
         # RUNNING transition hook
         running_deps = RunningHookDependencies(
             agent_client_pool=args.agent_client_pool,
-            deployment_repository=args.deployment_repository,
-            event_producer=args.event_producer,
         )
         self._status_hooks[SessionStatus.RUNNING] = RunningTransitionHook(running_deps)
 
         # TERMINATED transition hook
-        terminated_deps = TerminatedHookDependencies(
-            deployment_repository=args.deployment_repository,
-            event_producer=args.event_producer,
-        )
+        terminated_deps = TerminatedHookDependencies()
         self._status_hooks[SessionStatus.TERMINATED] = TerminatedTransitionHook(terminated_deps)
 
     def get_hook(self, status: SessionStatus) -> StatusTransitionHook | None:

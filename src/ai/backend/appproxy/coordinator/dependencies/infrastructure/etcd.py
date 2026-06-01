@@ -52,16 +52,8 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
         else:
             yield None
 
-    def gen_health_checkers(self, resource: TraefikEtcd | None) -> ServiceHealthChecker | None:
-        """
-        Return health checker for etcd if enabled.
-
-        Args:
-            resource: The initialized etcd client or None if not enabled
-
-        Returns:
-            Health checker for etcd if enabled, None otherwise
-        """
+    def gen_liveness_checker(self, resource: TraefikEtcd | None) -> ServiceHealthChecker | None:
+        """Liveness — stuck etcd connection observed; restart is the recovery path."""
         if resource is None:
             return None
         return EtcdHealthChecker(etcd=resource)

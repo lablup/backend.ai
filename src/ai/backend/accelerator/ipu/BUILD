@@ -1,10 +1,16 @@
 python_sources(
     name="lib",
-    sources=["**/*.py"],
+    sources=["**/*.py", "!setup.py"],
     dependencies=[
         ":resources",
     ],
     tags=["accelerator"],
+)
+
+python_sources(
+    name="setup",
+    sources=["setup.py"],
+    resolve="setuptools",
 )
 
 python_distribution(

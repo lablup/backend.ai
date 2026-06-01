@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
@@ -17,7 +18,7 @@ class CreateClusterTemplateAction(TemplateAction):
     """Action to create a cluster template."""
 
     domain_name: str
-    requesting_group: str
+    requesting_project: ProjectID
     requester_uuid: uuid.UUID
     requester_access_key: str
     requester_role: UserRole

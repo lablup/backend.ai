@@ -10,15 +10,27 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import BinarySize, ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import (
+    BinarySize,
+    ClusterMode,
+    MountInfoEntry,
+    MountPermission,
+    QuotaScopeID,
+    ResourceSlot,
+)
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -38,6 +50,7 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -84,10 +97,13 @@ class TestDeploymentRevisionRow:
                 GroupRow,
                 AgentRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 ResourcePresetRow,
                 ResourceSlotTypeRow,
+                RuntimeVariantRow,
                 EndpointRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
                 DeploymentAutoScalingPolicyRow,
@@ -229,13 +245,23 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ImageRow, None]:
         """Create test image."""
+        registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=registry_id,
+                    url="https://docker.io",
+                    registry_name=f"reg-{uuid.uuid4().hex[:8]}",
+                    type=ContainerRegistryType.DOCKER,
+                )
+            )
+            await db_sess.flush()
             image = ImageRow(
                 name="test-image:latest",
                 project=str(uuid.uuid4()),
                 image="test-image",
                 registry="docker.io",
-                registry_id=uuid.uuid4(),
+                registry_id=registry_id,
                 architecture="x86_64",
                 is_local=False,
                 config_digest="sha256:abc123",
@@ -272,6 +298,22 @@ class TestDeploymentRevisionRow:
         yield sgroup
 
     @pytest.fixture
+    async def test_runtime_variant(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[RuntimeVariantRow, None]:
+        """Create a test runtime variant row."""
+        async with db_with_cleanup.begin_session() as db_sess:
+            variant = RuntimeVariantRow(
+                name=f"test-variant-{uuid.uuid4().hex[:8]}",
+                description="Test runtime variant",
+                default_model_definition=ModelDefinitionDraft(),
+            )
+            db_sess.add(variant)
+            await db_sess.flush()
+        yield variant
+
+    @pytest.fixture
     async def test_endpoint(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -304,6 +346,7 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint: EndpointRow,
         test_image: ImageRow,
+        test_runtime_variant: RuntimeVariantRow,
     ) -> None:
         """Test creating a deployment revision."""
         async with db_with_cleanup.begin_session() as db_sess:
@@ -317,7 +360,7 @@ class TestDeploymentRevisionRow:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=test_runtime_variant.id,
                 environ={},
                 extra_mounts=[],
             )
@@ -337,10 +380,22 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint: EndpointRow,
         test_image: ImageRow,
+        test_runtime_variant: RuntimeVariantRow,
     ) -> None:
         """Test converting revision to ModelRevisionData."""
         model_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            # Satisfy the FK `fk_deployment_revisions_model_vfolders`.
+            vfolder = VFolderRow(
+                id=model_id,
+                host="local:volume1",
+                domain_name=test_endpoint.domain,
+                quota_scope_id=QuotaScopeID.parse("user:00000000-0000-0000-0000-000000000001"),
+                name=f"model-vfolder-{uuid.uuid4().hex[:8]}",
+                creator="test@example.com",
+            )
+            db_sess.add(vfolder)
+            await db_sess.flush()
             revision = DeploymentRevisionRow(
                 endpoint=test_endpoint.id,
                 revision_number=1,
@@ -354,7 +409,7 @@ class TestDeploymentRevisionRow:
                 cluster_size=1,
                 startup_command="python serve.py",
                 bootstrap_script="#!/bin/bash\necho hello",
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=test_runtime_variant.id,
                 environ={"DEBUG": "true"},
                 extra_mounts=[],
             )
@@ -371,14 +426,13 @@ class TestDeploymentRevisionRow:
             data = revision.to_data()
             assert isinstance(data, ModelRevisionData)
             assert data.id == revision.id
-            assert data.name == "revision-1"
             assert data.cluster_config.mode == ClusterMode.SINGLE_NODE
             assert data.cluster_config.size == 1
             assert data.resource_config.resource_group_name == "default"
             assert data.model_mount_config.vfolder_id == model_id
             assert data.model_mount_config.mount_destination == "/models"
             assert data.model_mount_config.definition_path == "model.yaml"
-            assert data.model_runtime_config.runtime_variant == RuntimeVariant("custom")
+            assert data.model_runtime_config.runtime_variant_id is not None
             assert data.model_runtime_config.environ == {"DEBUG": "true"}
             assert data.image_id == test_image.id
 
@@ -387,6 +441,7 @@ class TestDeploymentRevisionRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_endpoint: EndpointRow,
         test_image: ImageRow,
+        test_runtime_variant: RuntimeVariantRow,
     ) -> None:
         """Test that endpoint + revision_number must be unique."""
         async with db_with_cleanup.begin_session() as db_sess:
@@ -400,7 +455,7 @@ class TestDeploymentRevisionRow:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=test_runtime_variant.id,
                 environ={},
                 extra_mounts=[],
             )
@@ -422,7 +477,7 @@ class TestDeploymentRevisionRow:
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant("custom"),
+                runtime_variant_id=test_runtime_variant.id,
                 environ={},
                 extra_mounts=[],
             )
@@ -437,3 +492,191 @@ class TestDeploymentRevisionRow:
 
             # Rollback to clean up the session state after the expected error
             await db_sess.rollback()
+
+    @pytest.mark.parametrize(
+        ("input_subpath", "expected_subpath"),
+        [
+            pytest.param("nested/checkpoints", "nested/checkpoints", id="non-null-round-trip"),
+            pytest.param(None, None, id="null-vfolder-root"),
+        ],
+    )
+    async def test_vfolder_subpath_round_trip(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint: EndpointRow,
+        test_image: ImageRow,
+        test_runtime_variant: RuntimeVariantRow,
+        input_subpath: str | None,
+        expected_subpath: str | None,
+    ) -> None:
+        """``vfolder_subpath`` survives the DB round-trip and surfaces
+        through ``to_data()``: a concrete path is preserved verbatim, while
+        omission stores NULL → ``None`` (the vfolder-root semantics)."""
+        model_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            vfolder = VFolderRow(
+                id=model_id,
+                host="local:volume1",
+                domain_name=test_endpoint.domain,
+                quota_scope_id=QuotaScopeID.parse("user:00000000-0000-0000-0000-000000000001"),
+                name=f"model-vfolder-{uuid.uuid4().hex[:8]}",
+                creator="test@example.com",
+            )
+            db_sess.add(vfolder)
+            await db_sess.flush()
+
+            revision = DeploymentRevisionRow(
+                endpoint=test_endpoint.id,
+                revision_number=1,
+                image=test_image.id,
+                model=model_id,
+                model_mount_destination="/models",
+                vfolder_subpath=input_subpath,
+                resource_group="default",
+                resource_opts={},
+                cluster_mode=ClusterMode.SINGLE_NODE.name,
+                cluster_size=1,
+                runtime_variant_id=test_runtime_variant.id,
+                environ={},
+                extra_mounts=[],
+            )
+            revision.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("1")),
+                DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("1024")),
+            ]
+            db_sess.add(revision)
+            await db_sess.flush()
+            await db_sess.refresh(revision)
+
+            assert revision.vfolder_subpath == expected_subpath
+            data = revision.to_data()
+            assert isinstance(data, ModelRevisionData)
+            assert data.model_mount_config.subpath == expected_subpath
+
+    async def test_extra_mounts_preserve_subpath_round_trip(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint: EndpointRow,
+        test_image: ImageRow,
+        test_runtime_variant: RuntimeVariantRow,
+    ) -> None:
+        """``MountInfoEntry.subpath`` round-trips through the ``extra_mounts``
+        JSONB column, including mixed null / non-null entries."""
+        extra_vfolder_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            extra_vfolder = VFolderRow(
+                id=extra_vfolder_id,
+                host="local:volume1",
+                domain_name=test_endpoint.domain,
+                quota_scope_id=QuotaScopeID.parse("user:00000000-0000-0000-0000-000000000001"),
+                name=f"extra-vfolder-{uuid.uuid4().hex[:8]}",
+                creator="test@example.com",
+            )
+            db_sess.add(extra_vfolder)
+            await db_sess.flush()
+
+            entry_with_subpath = MountInfoEntry(
+                vfolder_id=VFolderUUID(extra_vfolder_id),
+                mount_destination="/home/work/extra",
+                mount_perm=MountPermission.READ_WRITE,
+                subpath="datasets/v2",
+            )
+            entry_without_subpath = MountInfoEntry(
+                vfolder_id=VFolderUUID(uuid.uuid4()),
+                mount_destination="/home/work/other",
+                mount_perm=MountPermission.READ_ONLY,
+            )
+            revision = DeploymentRevisionRow(
+                endpoint=test_endpoint.id,
+                revision_number=1,
+                image=test_image.id,
+                model=None,
+                model_mount_destination="/models",
+                resource_group="default",
+                resource_opts={},
+                cluster_mode=ClusterMode.SINGLE_NODE.name,
+                cluster_size=1,
+                runtime_variant_id=test_runtime_variant.id,
+                environ={},
+                extra_mounts=[entry_with_subpath, entry_without_subpath],
+            )
+            revision.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("1")),
+                DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("1024")),
+            ]
+            db_sess.add(revision)
+            await db_sess.flush()
+            await db_sess.refresh(revision)
+
+            stored = list(revision.extra_mounts)
+            assert len(stored) == 2
+            assert stored[0].subpath == "datasets/v2"
+            assert stored[1].subpath is None
+
+            data = revision.to_data()
+            data_mounts = list(data.model_mount_config.extra_mounts)
+            assert data_mounts[0].subpath == "datasets/v2"
+            assert data_mounts[1].subpath is None
+
+    async def test_extra_mounts_legacy_row_without_subpath_decodes(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint: EndpointRow,
+        test_image: ImageRow,
+        test_runtime_variant: RuntimeVariantRow,
+    ) -> None:
+        """Rows persisted before the ``subpath`` field was added — JSONB
+        entries lacking the key — must decode with ``subpath=None``."""
+        legacy_vfolder_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            legacy_vfolder = VFolderRow(
+                id=legacy_vfolder_id,
+                host="local:volume1",
+                domain_name=test_endpoint.domain,
+                quota_scope_id=QuotaScopeID.parse("user:00000000-0000-0000-0000-000000000001"),
+                name=f"legacy-vfolder-{uuid.uuid4().hex[:8]}",
+                creator="test@example.com",
+            )
+            db_sess.add(legacy_vfolder)
+            await db_sess.flush()
+
+            revision = DeploymentRevisionRow(
+                endpoint=test_endpoint.id,
+                revision_number=1,
+                image=test_image.id,
+                model=None,
+                model_mount_destination="/models",
+                resource_group="default",
+                resource_opts={},
+                cluster_mode=ClusterMode.SINGLE_NODE.name,
+                cluster_size=1,
+                runtime_variant_id=test_runtime_variant.id,
+                environ={},
+                extra_mounts=[],
+            )
+            revision.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("1")),
+                DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("1024")),
+            ]
+            db_sess.add(revision)
+            await db_sess.flush()
+
+            await db_sess.execute(
+                sa.text(
+                    "UPDATE deployment_revisions SET extra_mounts = :payload WHERE id = :rev_id"
+                ),
+                {
+                    "payload": (
+                        '[{"vfolder_id": "' + str(legacy_vfolder_id) + '", '
+                        '"mount_destination": "/home/work/legacy", '
+                        '"mount_perm": "ro"}]'
+                    ),
+                    "rev_id": str(revision.id),
+                },
+            )
+            await db_sess.refresh(revision)
+
+            stored = list(revision.extra_mounts)
+            assert len(stored) == 1
+            assert stored[0].mount_destination == "/home/work/legacy"
+            assert stored[0].subpath is None

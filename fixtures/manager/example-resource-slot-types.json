@@ -3,6 +3,7 @@
     {
       "slot_name": "cpu",
       "slot_type": "count",
+      "required": true,
       "display_name": "CPU",
       "description": "CPU",
       "display_unit": "Core",
@@ -13,6 +14,7 @@
     {
       "slot_name": "mem",
       "slot_type": "bytes",
+      "required": true,
       "display_name": "RAM",
       "description": "Memory",
       "display_unit": "GiB",
@@ -23,6 +25,7 @@
     {
       "slot_name": "cuda.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "GPU",
       "description": "CUDA-capable GPU",
       "display_unit": "GPU",
@@ -33,6 +36,7 @@
     {
       "slot_name": "cuda.shares",
       "slot_type": "count",
+      "required": false,
       "display_name": "fGPU",
       "description": "CUDA-capable GPU (fractional)",
       "display_unit": "fGPU",
@@ -43,6 +47,7 @@
     {
       "slot_name": "rocm.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "GPU",
       "description": "ROCm-capable GPU",
       "display_unit": "GPU",
@@ -53,6 +58,7 @@
     {
       "slot_name": "tpu.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "TPU",
       "description": "TPU device",
       "display_unit": "GPU",
@@ -63,6 +69,7 @@
     {
       "slot_name": "ipu.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "IPU",
       "description": "IPU device",
       "display_unit": "IPU",
@@ -73,6 +80,7 @@
     {
       "slot_name": "atom.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "ATOM Device",
       "description": "ATOM",
       "display_unit": "ATOM",
@@ -83,6 +91,7 @@
     {
       "slot_name": "atom-plus.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "ATOM+ Device",
       "description": "ATOM+",
       "display_unit": "ATOM+",
@@ -93,6 +102,7 @@
     {
       "slot_name": "atom-max.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "ATOM Max Device",
       "description": "ATOM Max",
       "display_unit": "ATOM Max",
@@ -103,6 +113,7 @@
     {
       "slot_name": "gaudi2.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "Gaudi 2 Device",
       "description": "Gaudi 2",
       "display_unit": "Gaudi 2",
@@ -113,6 +124,7 @@
     {
       "slot_name": "warboy.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "Warboy Device",
       "description": "Furiosa Warboy",
       "display_unit": "Warboy",
@@ -123,6 +135,7 @@
     {
       "slot_name": "rngd.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "RNGD Device",
       "description": "Furiosa RNGD",
       "display_unit": "RNGD",
@@ -133,6 +146,7 @@
     {
       "slot_name": "hyperaccel-lpu.device",
       "slot_type": "count",
+      "required": false,
       "display_name": "Hyperaccel LPU Device",
       "description": "Hyperaccel LPU",
       "display_unit": "LPU",

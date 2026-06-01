@@ -65,6 +65,12 @@ def register_v2_deployment_routes(
         handler.delete,
         middlewares=[auth_required],
     )
+    registry.add(
+        "PUT",
+        "/{deployment_id}/options",
+        handler.replace_options,
+        middlewares=[auth_required],
+    )
 
     # ------------------------------------------------------------------
     # Revision operations

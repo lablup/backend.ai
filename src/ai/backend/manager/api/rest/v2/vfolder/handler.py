@@ -13,17 +13,19 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateDownloadSessionInput,
     CreateUploadSessionInput,
     CreateVFolderInput,
+    CreateVFolderInScopeInput,
     DeleteFilesInput,
     DeployVFolderInput,
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PurgeVFolderInput,
     SearchVFoldersInput,
 )
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
+    from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 
 
 class V2VFolderHandler:
@@ -93,10 +95,28 @@ class V2VFolderHandler:
     async def purge(
         self,
         path: PathParam[VFolderIdPathParam],
+        body: BodyParam[PurgeVFolderInput],
     ) -> APIResponse:
-        """Permanently delete a vfolder."""
-        result = await self._adapter.purge(path.parsed.vfolder_id)
+        """Permanently delete a vfolder, optionally cascading linked model cards."""
+        result = await self._adapter.purge(path.parsed.vfolder_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def restore(
+        self,
+        path: PathParam[VFolderIdPathParam],
+    ) -> APIResponse:
+        """Restore a trashed vfolder."""
+        result = await self._adapter.restore(path.parsed.vfolder_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def project_create(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[CreateVFolderInScopeInput],
+    ) -> APIResponse:
+        """Create a vfolder owned by a project. Scope comes from the URL path."""
+        result = await self._adapter.create_in_project(path.parsed.project_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def deploy(
         self,
@@ -173,6 +193,6 @@ class V2VFolderHandler:
         self,
         body: BodyParam[BulkPurgeVFoldersInput],
     ) -> APIResponse:
-        """Permanently purge multiple vfolders."""
+        """Permanently purge multiple vfolders, optionally cascading linked model cards."""
         result = await self._adapter.bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

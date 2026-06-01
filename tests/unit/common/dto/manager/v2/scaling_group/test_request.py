@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.scaling_group.types import (
     PreemptionOrder,
     SchedulerType,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestPreemptionConfigInput:
@@ -45,11 +46,11 @@ class TestPreemptionConfigInput:
         assert req.preemptible_priority == 10
 
     def test_priority_below_min_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PreemptionConfigInput(preemptible_priority=0)
 
     def test_priority_above_max_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PreemptionConfigInput(preemptible_priority=11)
 
     def test_round_trip(self) -> None:

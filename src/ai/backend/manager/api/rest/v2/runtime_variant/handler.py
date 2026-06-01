@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     SearchRuntimeVariantsInput,
     UpdateRuntimeVariantInput,
 )
-from ai.backend.manager.api.adapters.runtime_variant import RuntimeVariantAdapter
+from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 
 
 class VariantIdPathParam(BaseRequestModel):

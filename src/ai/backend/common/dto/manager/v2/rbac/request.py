@@ -9,10 +9,12 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
 from .types import (
+    OperationTypeFilter,
     OrderDirection,
+    RBACElementTypeFilter,
     RoleSource,
     RoleSourceFilter,
     RoleStatus,
@@ -23,10 +25,12 @@ from .types import (
 __all__ = (
     "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",
-    "AdminSearchRoleAssignmentsGQLInput",
+    "SearchRoleAssignmentsInput",
     "SearchRolesInput",
     "AssignRoleInput",
+    "BulkAddRolePermissionsInput",
     "BulkAssignRoleInput",
+    "BulkRemoveRolePermissionsInput",
     "BulkRevokeRoleInput",
     "CreatePermissionInput",
     "CreateRoleInput",
@@ -38,6 +42,7 @@ __all__ = (
     "PermissionNestedFilter",
     "PermissionOrderBy",
     "PurgeRoleInput",
+    "ReplaceRolePermissionsInput",
     "RevokeRoleInput",
     "RoleAssignmentFilter",
     "RoleAssignmentOrderBy",
@@ -46,6 +51,7 @@ __all__ = (
     "RoleOrderBy",
     "UpdatePermissionInput",
     "UpdateRoleInput",
+    "UserNestedFilter",
 )
 
 
@@ -162,12 +168,59 @@ class BulkRevokeRoleInput(BaseRequestModel):
     user_ids: list[UUID] = Field(description="List of user IDs to revoke the role from")
 
 
+class BulkAddRolePermissionsInput(BaseRequestModel):
+    """Input for bulk-adding scoped permissions across one or more roles."""
+
+    permissions: list[CreatePermissionInput] = Field(
+        description="Permission entries to insert. Duplicates are surfaced as failures.",
+    )
+
+
+class BulkRemoveRolePermissionsInput(BaseRequestModel):
+    """Input for bulk-deleting permission rows by primary key.
+
+    The permission row ID is globally unique, so a single call can remove rows
+    belonging to multiple roles.
+    """
+
+    permission_ids: list[UUID] = Field(
+        description="Permission row IDs to delete. Unknown IDs are silently ignored.",
+    )
+
+
+class ReplaceRolePermissionsInput(BaseRequestModel):
+    """Input for replacing one role's entire scoped-permission set in one call.
+
+    Every entry in ``permissions`` must carry the same ``role_id`` as the
+    top-level field; the server rejects the call otherwise so the operation
+    cannot accidentally span multiple roles.
+    """
+
+    role_id: UUID = Field(description="Role whose permission set is being replaced")
+    permissions: list[CreatePermissionInput] = Field(
+        description="New permission set for the role. An empty list clears all permissions.",
+    )
+
+
+class UserNestedFilter(BaseRequestModel):
+    """Filter roles by their user assignments."""
+
+    user_id: UUIDFilter | None = None
+    AND: list[UserNestedFilter] | None = None
+    OR: list[UserNestedFilter] | None = None
+    NOT: list[UserNestedFilter] | None = None
+
+
+UserNestedFilter.model_rebuild()
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
+    assigned_user: UserNestedFilter | None = None
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -193,10 +246,10 @@ RoleNestedFilter.model_rebuild()
 class PermissionNestedFilter(BaseRequestModel):
     """Nested filter for permissions within a role assignment."""
 
-    scope_id: str | None = None
-    scope_type: str | None = None
-    entity_type: str | None = None
-    operation: str | None = None
+    scope_id: StringFilter | None = None
+    scope_type: RBACElementTypeFilter | None = None
+    entity_type: RBACElementTypeFilter | None = None
+    operation: OperationTypeFilter | None = None
     AND: list[PermissionNestedFilter] | None = None
     OR: list[PermissionNestedFilter] | None = None
     NOT: list[PermissionNestedFilter] | None = None
@@ -208,7 +261,7 @@ PermissionNestedFilter.model_rebuild()
 class RoleAssignmentFilter(BaseRequestModel):
     """Filter for role assignments."""
 
-    role_id: UUID | None = None
+    role_id: UUIDFilter | None = None
     role: RoleNestedFilter | None = None
     permission: PermissionNestedFilter | None = None
     username: StringFilter | None = None
@@ -224,7 +277,7 @@ RoleAssignmentFilter.model_rebuild()
 class EntityFilter(BaseRequestModel):
     """Filter for entity associations."""
 
-    entity_type: str | None = None
+    entity_type: RBACElementTypeFilter | None = None
     entity_id: StringFilter | None = None
     AND: list[EntityFilter] | None = None
     OR: list[EntityFilter] | None = None
@@ -237,9 +290,10 @@ EntityFilter.model_rebuild()
 class PermissionFilter(BaseRequestModel):
     """Filter for scoped permissions."""
 
-    role_id: UUID | None = None
-    scope_type: str | None = None
-    entity_type: str | None = None
+    role_id: UUIDFilter | None = None
+    scope_type: RBACElementTypeFilter | None = None
+    scope_id: StringFilter | None = None
+    entity_type: RBACElementTypeFilter | None = None
     created_at: DateTimeFilter | None = None
     AND: list[PermissionFilter] | None = None
     OR: list[PermissionFilter] | None = None
@@ -303,8 +357,8 @@ class SearchRolesInput(BaseRequestModel):
     offset: int | None = None
 
 
-class AdminSearchRoleAssignmentsGQLInput(BaseRequestModel):
-    """GQL pagination search input for role assignments."""
+class SearchRoleAssignmentsInput(BaseRequestModel):
+    """Pagination search input for role assignments."""
 
     filter: RoleAssignmentFilter | None = None
     order: list[RoleAssignmentOrderBy] | None = None

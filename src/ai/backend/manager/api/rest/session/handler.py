@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import timedelta
 from http import HTTPStatus
+from itertools import chain
 from typing import TYPE_CHECKING, Any, Final, cast
 from uuid import UUID
 
@@ -63,7 +66,6 @@ from ai.backend.common.dto.manager.session.response import (
     ListFilesResponse,
     MatchSessionsResponse,
     StartServiceResponse,
-    TransitSessionStatusResponse,
 )
 from ai.backend.common.dto.manager.session.types import (
     CreationConfigV1,
@@ -83,13 +85,12 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     KernelId,
-    SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.dto.context import RequestCtx
-from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAPI
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.errors.user import UserNotFound
@@ -99,9 +100,6 @@ from ai.backend.manager.services.agent.actions.sync_agent_registry import (
 )
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
-)
-from ai.backend.manager.services.session.actions.check_and_transit_status import (
-    CheckAndTransitStatusAction,
 )
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -165,9 +163,6 @@ from ai.backend.manager.services.session.actions.match_sessions import (
 from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
 )
-from ai.backend.manager.services.session.actions.restart_session import (
-    RestartSessionAction,
-)
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
 )
@@ -178,6 +173,9 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
 )
 from ai.backend.manager.services.vfolder.actions.base import GetTaskLogsAction
+from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
+    ResolveIdsByNamesAction,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -237,6 +235,171 @@ def _validate_creation_config(
         ) from e
 
 
+@dataclass(frozen=True, slots=True)
+class LegacyMountResolution:
+    """One resolved legacy name-keyed mount entry.
+
+    Produced by :meth:`SessionHandler._resolve_legacy_name_mounts` and
+    consumed by :func:`_merge_resolved_legacy_mounts`. Carries both the
+    resolved vfolder UUID and any subpath suffix peeled off the legacy
+    ``"name/subpath"`` key so the merge step needs a single map keyed by
+    vfolder name.
+    """
+
+    vfid: UUID
+    subpath: str | None = None
+
+
+def _split_legacy_mount_key(key: str) -> tuple[str, str | None]:
+    """Peel an optional ``/<subpath>`` suffix off a legacy mount key.
+
+    The v1 CLI flattens ``-v vfname/sub:/dest`` into ``source="vfname/sub"``
+    + a separate ``target="/dest"``; the REST payload then carries the
+    ``vfname/sub`` source verbatim across ``mounts`` AND the ``mount_map``
+    / ``mount_options`` keys. This helper recovers the bare vfolder name
+    so name resolution and dst/opts lookup all key off the same string.
+    """
+    name, sep, subpath = key.partition("/")
+    if sep and subpath:
+        return name, subpath
+    return key, None
+
+
+def _route_legacy_uuid_mounts(creation_config: dict[str, Any]) -> dict[str, Any]:
+    """Split mixed legacy mount input by key shape so legacy buckets
+    (``mounts`` / ``mount_map``) carry only names and id buckets
+    (``mount_ids`` / ``mount_id_map``) carry only UUIDs.
+
+    Each entry's key may be a vfolder name or a UUID-shaped string;
+    UUID-shaped keys are parsed to ``UUID`` and lifted into the id
+    buckets, names stay in the legacy buckets for the async resolver.
+    ``mount_options`` is the one exception — both halves coexist on
+    output until :func:`_merge_resolved_legacy_mounts` re-keys the
+    name half onto the resolved UUIDs.
+    """
+    legacy_mounts = creation_config.get("mounts") or ()
+    legacy_mount_map = creation_config.get("mount_map") or {}
+    legacy_mount_options = creation_config.get("mount_options") or {}
+
+    mount_ids: list[UUID] = list(creation_config.get("mount_ids") or [])
+    mount_id_map: dict[UUID, str] = dict(creation_config.get("mount_id_map") or {})
+    mount_options: dict[str | UUID, Any] = {}
+    name_mounts: list[str] = []
+    name_mount_map: dict[str, str] = {}
+
+    legacy_mounts_keys = {str(m) for m in legacy_mounts}
+    seen: set[str] = set()
+    for raw in list(legacy_mounts) + list(legacy_mount_map) + list(legacy_mount_options):
+        key = str(raw)
+        if key in seen:
+            continue
+        seen.add(key)
+        dst = legacy_mount_map.get(key)
+        opts = legacy_mount_options.get(key)
+        try:
+            vfid = UUID(key)
+        except (ValueError, TypeError):
+            if key in legacy_mounts_keys:
+                name_mounts.append(raw)
+            if dst is not None:
+                name_mount_map[key] = dst
+            if opts is not None:
+                mount_options[key] = opts
+            continue
+        if vfid not in mount_ids:
+            mount_ids.append(vfid)
+        if dst is not None:
+            mount_id_map.setdefault(vfid, dst)
+        if opts is not None:
+            mount_options.setdefault(vfid, opts)
+
+    next_config = dict(creation_config)
+    next_config["mounts"] = name_mounts
+    next_config["mount_map"] = name_mount_map
+    next_config["mount_options"] = mount_options
+    next_config["mount_ids"] = mount_ids
+    next_config["mount_id_map"] = mount_id_map
+    return next_config
+
+
+def _merge_resolved_legacy_mounts(
+    creation_config: dict[str, Any],
+    resolutions: Mapping[str, LegacyMountResolution],
+) -> dict[str, Any]:
+    """Merge resolved legacy name-keyed mounts into the UUID-keyed buckets
+    of ``creation_config`` and drop the now-resolved name-keyed legacy keys.
+
+    The resolved ids are appended to ``mount_ids`` (skipping duplicates),
+    and entries from the name-keyed ``mount_map`` / ``mount_options``
+    dicts are re-keyed onto the resolved UUIDs without overwriting an
+    explicit UUID-keyed entry the caller already supplied.
+
+    When a resolution carries a ``subpath`` (the caller passed a legacy
+    ``mounts`` entry in the ``"vfname/subdir"`` shape), it is injected
+    into ``mount_options[uuid]["subpath"]`` so the downstream UUID-keyed
+    consumer (``prepare_vfolder_mounts``) sees the same shape as a
+    modern caller supplying ``mount_options`` directly.
+    """
+    if not resolutions:
+        return creation_config
+
+    # ``mount_ids``/``mount_id_map`` are Pydantic-validated to ``list[UUID]``
+    # / ``dict[UUID, str]`` upstream and ``_route_legacy_uuid_mounts`` only
+    # ever appends ``UUID`` instances, so trust the typing here.
+    merged_mount_ids: list[UUID] = list(creation_config.get("mount_ids") or [])
+    existing_uuid_set: set[UUID] = set(merged_mount_ids)
+    merged_mount_id_map: dict[UUID, str] = dict(creation_config.get("mount_id_map") or {})
+    merged_mount_options: dict[str | UUID, Any] = dict(creation_config.get("mount_options") or {})
+    legacy_mount_map = creation_config.get("mount_map") or {}
+    legacy_mount_options = creation_config.get("mount_options") or {}
+
+    # Re-key legacy mount_map/mount_options entries onto the bare vfolder
+    # name so a CLI-shaped ``{"vfname/sub": "/dest"}`` resolves alongside
+    # the bare-name lookup. First-wins if both shapes appear for one name.
+    mount_map_by_name: dict[str, str] = {}
+    for raw, dst in legacy_mount_map.items():
+        name, _ = _split_legacy_mount_key(str(raw))
+        mount_map_by_name.setdefault(name, dst)
+
+    mount_options_by_name: dict[str, Any] = {}
+    for raw, opts in legacy_mount_options.items():
+        name, _ = _split_legacy_mount_key(str(raw))
+        mount_options_by_name.setdefault(name, opts)
+
+    for name, res in resolutions.items():
+        vfid = res.vfid
+        if vfid not in existing_uuid_set:
+            merged_mount_ids.append(vfid)
+            existing_uuid_set.add(vfid)
+        if (dst := mount_map_by_name.get(name)) and vfid not in merged_mount_id_map:
+            merged_mount_id_map[vfid] = dst
+        if (opts := mount_options_by_name.get(name)) and vfid not in merged_mount_options:
+            merged_mount_options[vfid] = opts
+        if res.subpath is not None:
+            existing_opts = merged_mount_options.get(vfid) or {}
+            # Do not clobber a subpath explicitly supplied via the modern
+            # UUID-keyed ``mount_options`` surface for the same vfolder —
+            # the explicit value wins over the legacy name/subpath form.
+            if "subpath" not in existing_opts:
+                merged_mount_options[vfid] = {**existing_opts, "subpath": res.subpath}
+
+    # Drop any leftover name-keyed entries from ``mount_options`` — once
+    # they have been re-keyed onto the resolved UUID, the original
+    # name-keyed copy is dead weight that downstream consumers (which
+    # look up by UUID only) would never read.
+    uuid_keyed_mount_options: dict[UUID, Any] = {
+        k: v for k, v in merged_mount_options.items() if isinstance(k, UUID)
+    }
+
+    next_config = dict(creation_config)
+    next_config["mount_ids"] = merged_mount_ids
+    next_config["mount_id_map"] = merged_mount_id_map
+    next_config["mount_options"] = uuid_keyed_mount_options
+    next_config.pop("mounts", None)
+    next_config.pop("mount_map", None)
+    return next_config
+
+
 class SessionHandler:
     """Session API handler with constructor-injected dependencies."""
 
@@ -254,6 +417,88 @@ class SessionHandler:
         self._agent = agent
         self._vfolder = vfolder
         self._config_provider = config_provider
+
+    async def _normalize_legacy_mounts(self, validated_config: dict[str, Any]) -> dict[str, Any]:
+        """One-stop processor for the legacy ``mounts`` / ``mount_map`` /
+        ``mount_options`` surfaces: route UUID-shaped entries onto the
+        UUID-keyed buckets, then resolve any remaining names to UUIDs and
+        merge the resolution back in.
+        """
+        legacy_mounts = validated_config.get("mounts") or ()
+        legacy_mount_map = validated_config.get("mount_map") or {}
+        legacy_mount_options = validated_config.get("mount_options") or {}
+        if not (legacy_mounts or legacy_mount_map or legacy_mount_options):
+            return validated_config
+        validated_config = _route_legacy_uuid_mounts(validated_config)
+        resolutions = await self._resolve_legacy_name_mounts(
+            validated_config.get("mounts") or (),
+            validated_config.get("mount_map") or {},
+            validated_config.get("mount_options") or {},
+        )
+        return _merge_resolved_legacy_mounts(validated_config, resolutions)
+
+    async def _resolve_legacy_name_mounts(
+        self,
+        mounts: Sequence[str],
+        mount_map: Mapping[str, str],
+        mount_options: Mapping[str, Any],
+    ) -> dict[str, LegacyMountResolution]:
+        """Resolve legacy v1 CLI name-keyed mount surfaces into a map
+        ``name → LegacyMountResolution(vfid, subpath_or_None)``.
+
+        ``mounts`` (list of names, optionally ``"<name>/<subpath>"``),
+        ``mount_map`` (dict keyed by name, optionally with the same
+        ``"<name>/<subpath>"`` suffix), and ``mount_options`` (same key
+        shape) are all name-based legacy inputs populated together by
+        ``-v vfname[/sub][:dst][,opt]`` on the v1 CLI; the CLI keeps the
+        slash-with-subpath in the source string verbatim, so the same
+        ``"<name>/<sub>"`` key can appear across all three surfaces.
+
+        We peel that suffix off every key, resolve only the bare vfolder
+        name, and attach the parsed subpath to the resolution so
+        :func:`_merge_resolved_legacy_mounts` can inject it into
+        ``mount_options[uuid]["subpath"]``. Escape validation on the
+        subpath value is performed downstream by ``prepare_vfolder_mounts``.
+        """
+        if not mounts and not mount_map and not mount_options:
+            return {}
+
+        names_to_resolve: list[str] = []
+        seen: set[str] = set()
+        subpath_by_name: dict[str, str] = {}
+
+        # Walk the three legacy name-keyed surfaces, peel any
+        # ``"name/subpath"`` suffix, and skip keys whose bare-name parses
+        # as a UUID — those represent UUID-keyed entries that
+        # ``_route_legacy_uuid_mounts`` should already have lifted, or
+        # malformed ``<UUID>/<sub>`` inputs outside the legacy contract.
+        for raw in chain(mounts, mount_map.keys(), mount_options.keys()):
+            name, subpath = _split_legacy_mount_key(str(raw))
+            try:
+                UUID(name)
+                continue
+            except (ValueError, TypeError):
+                pass
+            if subpath is not None:
+                # The same ``-v`` flag populates mounts/mount_map/mount_options
+                # with the same source, so the subpath should agree across all
+                # three; if a caller supplies divergent forms, first-wins.
+                subpath_by_name.setdefault(name, subpath)
+            if name in seen:
+                continue
+            seen.add(name)
+            names_to_resolve.append(name)
+
+        if not names_to_resolve:
+            return {}
+
+        result = await self._vfolder.resolve_vfolder_ids_by_names.wait_for_complete(
+            ResolveIdsByNamesAction(vfolder_names=names_to_resolve)
+        )
+        return {
+            name: LegacyMountResolution(vfid=vfid, subpath=subpath_by_name.get(name))
+            for name, vfid in result.name_to_id.items()
+        }
 
     # ------------------------------------------------------------------
     # create_from_template (POST /_/create-from-template)
@@ -276,6 +521,8 @@ class SessionHandler:
             params.config,
             template=True,
         )
+
+        validated_config = await self._normalize_legacy_mounts(validated_config)
 
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
@@ -378,6 +625,8 @@ class SessionHandler:
 
         api_version = request["api_version"]
         validated_config = _validate_creation_config(api_version, params.config)
+
+        validated_config = await self._normalize_legacy_mounts(validated_config)
 
         agent_list = cast(list[str] | None, validated_config.get("agent_list"))
         if agent_list is not None:
@@ -570,46 +819,21 @@ class SessionHandler:
     # ------------------------------------------------------------------
     # check_and_transit_status (POST /_/transit-status)
     # ------------------------------------------------------------------
+    # Manual status reconciliation is no longer supported — the sokovan
+    # scheduler's coordinator runs a reconciliation loop that keeps
+    # session and kernel statuses in sync without external triggers.
+    # The endpoint is retained as a 501 stub for wire compatibility.
 
     async def check_and_transit_status(
         self,
         body: BodyParam[TransitSessionStatusRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
-        request = ctx.request
-        params = body.parsed
-        session_ids = [SessionId(id_) for id_ in params.ids]
-        user_role = cast(UserRole, request["user"]["role"])
-        user_id = cast(UUID, request["user"]["uuid"])
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
-                owner_access_key=None,
-            )
-        )
-        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
-        log.info(
-            "TRANSIT_STATUS (ak:{}/{}, s:{})",
-            requester_access_key,
-            owner_access_key,
-            session_ids,
-        )
-
-        session_status_map: dict[SessionId, str] = {}
-        for session_id in session_ids:
-            result = await self._session.check_and_transit_status.wait_for_complete(
-                CheckAndTransitStatusAction(
-                    user_id=user_id,
-                    user_role=user_role,
-                    session_id=session_id,
-                )
-            )
-            session_status_map.update(result.result)
-        return APIResponse.build(
-            HTTPStatus.OK,
-            TransitSessionStatusResponse(session_status_map=session_status_map),
+        raise NotImplementedAPI(
+            extra_msg=(
+                "Manual session status reconciliation is no longer supported. "
+                "Session status is automatically reconciled by the scheduler."
+            ),
         )
 
     # ------------------------------------------------------------------
@@ -653,41 +877,22 @@ class SessionHandler:
     # ------------------------------------------------------------------
     # restart (PATCH /{session_name})
     # ------------------------------------------------------------------
+    # Session restart is no longer supported — the sokovan scheduler's
+    # lifecycle handlers do not restart containers in place; terminate
+    # the session and enqueue a new one instead. The endpoint is
+    # retained as a 501 stub for wire compatibility.
 
     async def restart(
         self,
         query: QueryParam[RestartSessionRequest],
         ctx: RequestCtx,
     ) -> web.Response:
-        request = ctx.request
-        params = query.parsed
-        session_name = request.match_info["session_name"]
-        scope = await self._auth.resolve_access_key_scope.wait_for_complete(
-            ResolveAccessKeyScopeAction(
-                requester_access_key=request["keypair"]["access_key"],
-                requester_role=request["user"]["role"],
-                requester_domain=request["user"]["domain_name"],
-                owner_access_key=params.owner_access_key,
-            )
+        raise NotImplementedAPI(
+            extra_msg=(
+                "Session restart is no longer supported. "
+                "Terminate the session and enqueue a new one instead."
+            ),
         )
-        requester_access_key, owner_access_key = scope.requester_access_key, scope.owner_access_key
-        log.info(
-            "RESTART (ak:{0}/{1}, s:{2})",
-            requester_access_key,
-            owner_access_key,
-            session_name,
-        )
-        try:
-            await self._session.restart_session.wait_for_complete(
-                RestartSessionAction(
-                    session_name=session_name,
-                    owner_access_key=owner_access_key,
-                )
-            )
-        except BackendAIError:
-            log.exception("RESTART: exception")
-            raise
-        return web.Response(status=HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # destroy (DELETE /{session_name})

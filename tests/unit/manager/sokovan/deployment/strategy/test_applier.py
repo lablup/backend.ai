@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
 from ai.backend.manager.sokovan.deployment.strategy.applier import (
     StrategyApplyResult,
@@ -23,7 +24,7 @@ from ai.backend.manager.sokovan.deployment.strategy.types import (
 
 
 def _build_summary(
-    assignments: dict[UUID, DeploymentLifecycleSubStep] | None = None,
+    assignments: dict[DeploymentID, DeploymentLifecycleSubStep] | None = None,
     route_changes: RouteChanges | None = None,
 ) -> StrategyEvaluationSummary:
     return StrategyEvaluationSummary(
@@ -56,13 +57,15 @@ def empty_summary() -> StrategyEvaluationSummary:
 
 @pytest.fixture
 def provisioning_summary() -> StrategyEvaluationSummary:
-    return _build_summary({uuid4(): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING})
+    return _build_summary({
+        DeploymentID(uuid4()): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
+    })
 
 
 @pytest.fixture
 def summary_with_rollout() -> StrategyEvaluationSummary:
     return _build_summary(
-        {uuid4(): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING},
+        {DeploymentID(uuid4()): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING},
         route_changes=RouteChanges(rollout_specs=[MagicMock()]),
     )
 
@@ -70,15 +73,15 @@ def summary_with_rollout() -> StrategyEvaluationSummary:
 @pytest.fixture
 def summary_with_drain() -> StrategyEvaluationSummary:
     return _build_summary(
-        {uuid4(): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING},
+        {DeploymentID(uuid4()): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING},
         route_changes=RouteChanges(drain_route_ids=[uuid4()]),
     )
 
 
 @pytest.fixture
-def completed_summary() -> tuple[StrategyEvaluationSummary, set[UUID]]:
-    ep_id_1 = uuid4()
-    ep_id_2 = uuid4()
+def completed_summary() -> tuple[StrategyEvaluationSummary, set[DeploymentID]]:
+    ep_id_1 = DeploymentID(uuid4())
+    ep_id_2 = DeploymentID(uuid4())
     completed_ids = {ep_id_1, ep_id_2}
     summary = _build_summary({
         ep_id_1: DeploymentLifecycleSubStep.DEPLOYING_COMPLETED,
@@ -88,17 +91,17 @@ def completed_summary() -> tuple[StrategyEvaluationSummary, set[UUID]]:
 
 
 @pytest.fixture
-def rolled_back_summary() -> tuple[StrategyEvaluationSummary, set[UUID]]:
-    ep_id = uuid4()
+def rolled_back_summary() -> tuple[StrategyEvaluationSummary, set[DeploymentID]]:
+    ep_id = DeploymentID(uuid4())
     summary = _build_summary({ep_id: DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING})
     return summary, {ep_id}
 
 
 @pytest.fixture
-def mixed_summary() -> tuple[StrategyEvaluationSummary, UUID, UUID, UUID]:
-    provisioning_id = uuid4()
-    completed_id = uuid4()
-    rolled_back_id = uuid4()
+def mixed_summary() -> tuple[StrategyEvaluationSummary, DeploymentID, DeploymentID, DeploymentID]:
+    provisioning_id = DeploymentID(uuid4())
+    completed_id = DeploymentID(uuid4())
+    rolled_back_id = DeploymentID(uuid4())
     summary = _build_summary(
         {
             provisioning_id: DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
@@ -183,7 +186,7 @@ class TestStrategyResultApplier:
     ) -> None:
         """Summary with only rollout should pass drain=None."""
         summary = _build_summary(
-            {uuid4(): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING},
+            {DeploymentID(uuid4()): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING},
             route_changes=RouteChanges(rollout_specs=[MagicMock()]),
         )
         await applier.apply(summary)
@@ -196,7 +199,7 @@ class TestStrategyResultApplier:
         self,
         applier: StrategyResultApplier,
         mock_deployment_repo: AsyncMock,
-        completed_summary: tuple[StrategyEvaluationSummary, set[UUID]],
+        completed_summary: tuple[StrategyEvaluationSummary, set[DeploymentID]],
     ) -> None:
         summary, completed_ids = completed_summary
         mock_deployment_repo.apply_strategy_mutations.return_value = 2
@@ -211,7 +214,7 @@ class TestStrategyResultApplier:
         self,
         applier: StrategyResultApplier,
         mock_deployment_repo: AsyncMock,
-        mixed_summary: tuple[StrategyEvaluationSummary, UUID, UUID, UUID],
+        mixed_summary: tuple[StrategyEvaluationSummary, DeploymentID, DeploymentID, DeploymentID],
     ) -> None:
         summary, _provisioning_id, completed_id, _rolled_back_id = mixed_summary
         mock_deployment_repo.apply_strategy_mutations.return_value = 1

@@ -159,6 +159,7 @@ class TestDeploymentHistoryNodeCreation:
         node = DeploymentHistoryNode(
             id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
+            category="scaling",
             phase="scaling",
             result="SUCCESS",
             attempts=1,
@@ -173,6 +174,7 @@ class TestDeploymentHistoryNodeCreation:
         node = DeploymentHistoryNode(
             id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
+            category="scaling",
             phase="scaling",
             result="FAILURE",
             sub_steps=[make_substep("check", "failure")],
@@ -189,6 +191,7 @@ class TestDeploymentHistoryNodeCreation:
         node = DeploymentHistoryNode(
             id=record_id,
             deployment_id=dep_id,
+            category="scaling",
             phase="scaling",
             result="SUCCESS",
             attempts=2,
@@ -320,6 +323,7 @@ class TestListDeploymentHistoryPayload:
         node = DeploymentHistoryNode(
             id=uuid.uuid4(),
             deployment_id=uuid.uuid4(),
+            category="scaling",
             phase="scaling",
             result="SUCCESS",
             attempts=1,
@@ -336,6 +340,7 @@ class TestListDeploymentHistoryPayload:
         node = DeploymentHistoryNode(
             id=record_id,
             deployment_id=uuid.uuid4(),
+            category="scaling",
             phase="scaling",
             result="SUCCESS",
             attempts=1,

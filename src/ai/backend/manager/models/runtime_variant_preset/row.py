@@ -63,10 +63,12 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
 
     # UI metadata
     category: Mapped[str | None] = mapped_column("category", sa.String(length=64), nullable=True)
-    ui_type: Mapped[str | None] = mapped_column("ui_type", sa.String(length=32), nullable=True)
     display_name: Mapped[str | None] = mapped_column(
         "display_name", sa.String(length=256), nullable=True
     )
+    # ``ui_option`` JSONB carries both ``ui_type`` and the type-specific
+    # sub-field config (slider/number/choices/text). The previously
+    # separate ``ui_type`` column has been folded into this JSONB.
     ui_option: Mapped[UIOption | None] = mapped_column(
         "ui_option", PydanticColumn(UIOption), nullable=True
     )
@@ -108,6 +110,7 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
         )
 
     def to_data(self) -> RuntimeVariantPresetData:
+        ui_option_data = self._convert_ui_option_to_data(self.ui_option)
         return RuntimeVariantPresetData(
             id=self.id,
             runtime_variant_id=self.runtime_variant,
@@ -119,9 +122,9 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
             default_value=self.default_value,
             key=self.key,
             category=self.category,
-            ui_type=self.ui_type,
+            ui_type=ui_option_data.ui_type if ui_option_data is not None else None,
             display_name=self.display_name,
-            ui_option=self._convert_ui_option_to_data(self.ui_option),
+            ui_option=ui_option_data,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

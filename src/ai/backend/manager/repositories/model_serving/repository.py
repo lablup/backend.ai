@@ -5,7 +5,6 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from pydantic import HttpUrl
-from ruamel.yaml import YAML
 from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
@@ -15,6 +14,8 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -25,10 +26,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.types import RouteHealthStatus
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
     EndpointAutoScalingRuleData,
-    EndpointAutoScalingRuleListResult,
     EndpointData,
     EndpointTokenData,
     ModelServiceValidationContext,
@@ -40,10 +41,11 @@ from ai.backend.manager.data.model_serving.types import (
     UserData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.vfolder.types import VFolderLocation, VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -58,6 +60,7 @@ from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -79,9 +82,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
-from ai.backend.manager.repositories.deployment.storage_source.storage_source import (
-    DeploymentStorageSource,
-)
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import (
@@ -161,25 +161,17 @@ class ModelServingRepository:
             )
 
     @model_serving_repository_resilience.apply()
-    async def get_endpoint_by_name_validated(
-        self, name: str, user_id: uuid.UUID
-    ) -> EndpointData | None:
-        """
-        Get endpoint by name with ownership validation.
-        Returns None if endpoint doesn't exist or user doesn't own it.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            endpoint = await self._get_endpoint_by_name(session, name, user_id)
-            if not endpoint:
-                return None
-            return endpoint.to_data()
-
-    @model_serving_repository_resilience.apply()
     async def list_endpoints_by_owner_validated(
         self, session_owner_id: uuid.UUID, name: str | None = None
     ) -> list[EndpointData]:
         """
         List endpoints owned by a specific user with optional name filter.
+
+        Eagerly loads every relationship that ``EndpointRow.to_data()``
+        traverses (``routings``, ``session_owner_row``, ``created_user_row``,
+        ``revisions`` -> ``image_row``) so the projection runs entirely on
+        cached state and never triggers ``MissingGreenlet`` from sync
+        ``to_data()`` invoked inside an async transaction.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query_conds = (EndpointRow.session_owner == session_owner_id) & (
@@ -191,7 +183,17 @@ class ModelServingRepository:
             query = (
                 sa.select(EndpointRow)
                 .where(query_conds)
-                .options(selectinload(EndpointRow.routings))
+                .options(
+                    selectinload(EndpointRow.routings),
+                    selectinload(EndpointRow.session_owner_row),
+                    selectinload(EndpointRow.created_user_row),
+                    selectinload(EndpointRow.current_revision_row).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                    selectinload(EndpointRow.deploying_revision_row).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
             )
             result = await session.execute(query)
             rows = cast(list[EndpointRow], result.scalars().all())
@@ -348,7 +350,11 @@ class ModelServingRepository:
             await session.execute(query)
 
             endpoint = await self._get_endpoint_by_id(
-                session, service_id, load_routes=True, load_session_owner=True
+                session,
+                service_id,
+                load_routes=True,
+                load_session_owner=True,
+                load_revisions=True,
             )
             if endpoint is None:
                 raise NoResultFound
@@ -452,19 +458,6 @@ class ModelServingRepository:
             )
         except NoResultFound:
             return None
-
-    async def _get_endpoint_by_name(
-        self, session: SASession, name: str, user_id: uuid.UUID
-    ) -> EndpointRow | None:
-        """
-        Private method to get endpoint by name and owner using an existing session.
-        """
-        query = sa.select(EndpointRow).where(
-            (EndpointRow.name == name) & (EndpointRow.session_owner == user_id)
-        )
-        result = await session.execute(query)
-
-        return result.scalar()
 
     async def _get_route_by_id(
         self,
@@ -754,6 +747,20 @@ class ModelServingRepository:
             return await ImageRow.resolve(session, identifiers)
 
     @model_serving_repository_resilience.apply()
+    async def get_image_by_id(self, image_id: uuid.UUID) -> ImageData:
+        """Look up image data by its UUID.
+
+        Used by the legacy model-serving create path after the revision
+        pipeline resolves the merged ``image_id``. Returns a Data type —
+        the full ORM row must not cross the repository boundary.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            image_row = await session.scalar(sa.select(ImageRow).where(ImageRow.id == image_id))
+            if image_row is None:
+                raise ObjectNotFound(f"Image {image_id} not found")
+            return image_row.to_dataclass()
+
+    @model_serving_repository_resilience.apply()
     async def modify_endpoint_fields(
         self,
         action: ModifyEndpointAction,
@@ -772,7 +779,7 @@ class ModelServingRepository:
                 try:
                     endpoint_row = await EndpointRow.get(
                         db_session,
-                        action.endpoint_id,
+                        action.deployment_id,
                         load_session_owner=True,
                         load_revisions=True,
                         load_routes=True,
@@ -822,7 +829,7 @@ class ModelServingRepository:
                     endpoint_row.resource_group,
                     AccessKey(session_owner.main_access_key),
                     endpoint_row.domain,
-                    endpoint_row.project,
+                    ProjectID(endpoint_row.project),
                 )
 
                 await db_session.commit()
@@ -853,76 +860,6 @@ class ModelServingRepository:
         except Exception:
             raise
 
-    async def _fetch_model_definition_from_vfolder(
-        self,
-        db_session: SASession,
-        storage_manager: StorageSessionManager,
-        vfolder_id: uuid.UUID | None,
-        model_definition_path: str | None,
-    ) -> dict[str, Any] | None:
-        """Re-read model definition file from the vfolder storage.
-
-        Returns the parsed YAML content, or None if the file cannot be read.
-        """
-        if vfolder_id is None:
-            return None
-        try:
-            vf_query = sa.select(
-                VFolderRow.id,
-                VFolderRow.host,
-                VFolderRow.quota_scope_id,
-                VFolderRow.ownership_type,
-                VFolderRow.usage_mode,
-            ).where(VFolderRow.id == vfolder_id)
-            vf_result = await db_session.execute(vf_query)
-            vf_row = vf_result.one_or_none()
-            if vf_row is None:
-                return None
-
-            vfolder_location = VFolderLocation(
-                id=vf_row.id,
-                quota_scope_id=vf_row.quota_scope_id,
-                host=vf_row.host,
-                ownership_type=vf_row.ownership_type,
-                usage_mode=vf_row.usage_mode,
-            )
-            candidates = (
-                [model_definition_path]
-                if model_definition_path
-                else ["model-definition.yaml", "model-definition.yml"]
-            )
-            storage_source = DeploymentStorageSource(storage_manager)
-            content = await storage_source.fetch_definition_file(vfolder_location, candidates)
-            yaml = YAML()
-            return cast(dict[str, Any], yaml.load(content))
-        except Exception:
-            return None
-
-    @model_serving_repository_resilience.apply()
-    async def search_auto_scaling_rules(
-        self,
-        querier: BatchQuerier,
-    ) -> EndpointAutoScalingRuleListResult:
-        """
-        Search auto scaling rules.
-        Access control conditions should be injected into querier.conditions by the caller.
-        """
-        async with self._db.begin_readonly_session() as session:
-            query = sa.select(EndpointAutoScalingRuleRow).join(
-                EndpointRow, EndpointAutoScalingRuleRow.endpoint == EndpointRow.id
-            )
-
-            result = await execute_batch_querier(session, query, querier)
-
-            items = [row.EndpointAutoScalingRuleRow.to_data() for row in result.rows]
-
-            return EndpointAutoScalingRuleListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
     @model_serving_repository_resilience.apply()
     async def search_services_paginated(
         self,
@@ -940,7 +877,7 @@ class ModelServingRepository:
                 .where(EndpointRow.session_owner == session_owner_id)
                 .where(EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
                 .options(selectinload(EndpointRow.routings))
-                .options(selectinload(EndpointRow.revisions))
+                .options(selectinload(EndpointRow.current_revision_row))
             )
 
             result = await execute_batch_querier(session, query, querier)
@@ -1000,6 +937,7 @@ class ModelServingRepository:
         model: str,
         model_mount_destination: str,
         extra_mounts: dict[uuid.UUID, MountOptionModel],
+        runtime_variant_name: str,
         legacy_etcd_loader: LegacyEtcdLoader,
         storage_manager: StorageSessionManager,
     ) -> ModelServiceValidationContext:
@@ -1092,8 +1030,16 @@ class ModelServingRepository:
                 resource_policy,
             )
 
+            reads_vfolder_config_files = await conn.scalar(
+                sa.select(RuntimeVariantRow.reads_vfolder_config_files).where(
+                    RuntimeVariantRow.name == runtime_variant_name
+                )
+            )
+            if reads_vfolder_config_files is None:
+                raise InvalidAPIParameters(f"Unknown runtime variant '{runtime_variant_name}'.")
+
         return ModelServiceValidationContext(
-            model_id=model_id,
+            model_vfolder_id=VFolderUUID(model_id),
             model_folder_host=folder_row["host"],
             model_folder_quota_scope_id=folder_row["quota_scope_id"],
             model_folder_usage_mode=str(folder_row["usage_mode"]),
@@ -1105,4 +1051,5 @@ class ModelServingRepository:
             resource_policy=resource_policy,
             scaling_group=checked_scaling_group,
             extra_mounts=vfolder_mounts,
+            variant_reads_vfolder_config_files=reads_vfolder_config_files,
         )

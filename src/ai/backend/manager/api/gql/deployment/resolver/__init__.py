@@ -22,6 +22,7 @@ from .deployment import (
     deployment_status_changed,
     my_deployments,
     project_deployments,
+    replace_deployment_options,
     sync_replicas,
     update_model_deployment,
 )
@@ -71,6 +72,7 @@ __all__ = [
     "create_model_deployment",
     "update_model_deployment",
     "delete_model_deployment",
+    "replace_deployment_options",
     "sync_replicas",
     "deployment_status_changed",
     # Policy

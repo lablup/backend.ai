@@ -17,6 +17,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.types import BackendAISchema
 
 from .errors import (
     GroupNotFoundError,
@@ -30,7 +31,7 @@ from .types import DigestModType
 # FIXME: merge majority of common definitions to ai.backend.common when ready
 
 
-class BaseSchema(BaseModel):
+class BaseSchema(BackendAISchema):
     model_config = ConfigDict(
         populate_by_name=True,
         from_attributes=True,
@@ -723,7 +724,7 @@ class UnsupportedTypeError(RuntimeError):
 
 
 def generate_example_json(
-    schema: type[BaseModel] | types.GenericAlias | types.UnionType,
+    schema: type[BackendAISchema] | types.GenericAlias | types.UnionType,
     parent: list[str] | None = None,
 ) -> dict[str, Any] | list[Any]:
     if parent is None:

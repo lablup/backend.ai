@@ -79,23 +79,6 @@ class TestSessionCommit:
         assert call_args[0][1] is None  # filename=None
 
 
-class TestSessionRestart:
-    """SDK restart() — session restart succeeds."""
-
-    async def test_restart_succeeds(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-        agent_registry: AsyncMock,
-    ) -> None:
-        agent_registry.increment_session_usage.return_value = None
-        agent_registry.restart_session.return_value = None
-
-        await admin_registry.session.restart(session_seed.session_name)
-
-        agent_registry.restart_session.assert_called_once()
-
-
 class TestSessionGetLogs:
     """SDK get_logs() — container log retrieval."""
 

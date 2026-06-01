@@ -6,7 +6,6 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
-from pathlib import PurePosixPath
 from uuid import UUID, uuid4
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -48,6 +47,7 @@ from ai.backend.common.dto.manager.deployment.types import (
     RouteOrderField,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.creator import (
@@ -61,7 +61,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentPolicyData,
     ExecutionSpec,
-    ModelDeploymentData,
+    LegacyDeploymentData,
     ModelRevisionData,
     MountInfo,
     ReplicaSpec,
@@ -106,17 +106,44 @@ __all__ = (
 class DeploymentAdapter(BaseFilterAdapter):
     """Adapter for converting deployment requests to repository queries."""
 
-    def convert_to_dto(self, data: ModelDeploymentData) -> DeploymentDTO:
-        """Convert ModelDeploymentData to DTO."""
+    def __init__(
+        self,
+        *,
+        revision_adapter: RevisionAdapter,
+        policy_adapter: DeploymentPolicyAdapter,
+    ) -> None:
+        """Inject the sub-adapters this converter delegates to.
+
+        ``RevisionAdapter`` / ``DeploymentPolicyAdapter`` are the single
+        place that knows how to render a revision or policy surface into
+        a DTO — recomputing them per call would duplicate that knowledge
+        and lose the ability to swap implementations (e.g. testing).
+        """
+        self._revision_adapter = revision_adapter
+        self._policy_adapter = policy_adapter
+
+    def convert_to_dto(
+        self,
+        data: LegacyDeploymentData,
+        runtime_variant_name: RuntimeVariant,
+    ) -> DeploymentDTO:
+        """Convert LegacyDeploymentData to DTO.
+
+        ``runtime_variant_name`` is resolved by the caller (REST handler)
+        from ``data.revision.model_runtime_config.runtime_variant_id``
+        via the RuntimeVariant resolver path — the legacy REST response
+        preserves the historical name-based field so old clients keep
+        seeing the same shape.
+        """
         current_revision = None
         if data.revision:
-            revision_adapter = RevisionAdapter()
-            current_revision = revision_adapter.convert_to_dto(data.revision)
+            current_revision = self._revision_adapter.convert_to_dto(
+                data.revision, runtime_variant_name
+            )
 
         deployment_policy = None
         if data.policy:
-            policy_adapter = DeploymentPolicyAdapter()
-            deployment_policy = policy_adapter.convert_to_dto(data.policy)
+            deployment_policy = self._policy_adapter.convert_to_dto(data.policy)
 
         return DeploymentDTO(
             id=data.id,
@@ -223,14 +250,23 @@ class DeploymentAdapter(BaseFilterAdapter):
 class RevisionAdapter(BaseFilterAdapter):
     """Adapter for converting revision requests to repository queries."""
 
-    def convert_to_dto(self, data: ModelRevisionData) -> RevisionDTO:
-        """Convert ModelRevisionData to DTO."""
+    def convert_to_dto(
+        self,
+        data: ModelRevisionData,
+        runtime_variant_name: RuntimeVariant,
+    ) -> RevisionDTO:
+        """Convert ModelRevisionData to DTO.
+
+        ``runtime_variant_name`` is resolved by the caller (legacy handler)
+        from ``data.model_runtime_config.runtime_variant_id`` via the
+        RuntimeVariant resolver path; the legacy response DTO carries the
+        name-based field so old clients keep seeing the same shape.
+        """
         mount_config = data.model_mount_config
         if mount_config.vfolder_id is None:
             raise IncompleteRevisionData(f"Revision {data.id} has incomplete model mount config")
         return RevisionDTO(
             id=data.id,
-            name=data.name,
             cluster_config=ClusterConfigDTO(
                 mode=data.cluster_config.mode,
                 size=data.cluster_config.size,
@@ -240,7 +276,7 @@ class RevisionAdapter(BaseFilterAdapter):
                 resource_slot=dict(data.resource_config.resource_slot),
             ),
             model_runtime_config=ModelRuntimeConfigDTO(
-                runtime_variant=data.model_runtime_config.runtime_variant,
+                runtime_variant=runtime_variant_name,
             ),
             model_mount_config=ModelMountConfigDTO(
                 vfolder_id=mount_config.vfolder_id,
@@ -299,7 +335,7 @@ class RevisionAdapter(BaseFilterAdapter):
         if order.field == RevisionOrderField.CLUSTER_MODE:
             return RevisionOrders.cluster_mode(ascending=ascending)
         if order.field == RevisionOrderField.RUNTIME_VARIANT:
-            return RevisionOrders.runtime_variant(ascending=ascending)
+            return RevisionOrders.runtime_variant_name(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
 
     def _build_pagination(self, limit: int, offset: int) -> OffsetPagination:
@@ -314,7 +350,7 @@ class RouteAdapter(BaseFilterAdapter):
         """Convert RouteInfo to DTO."""
         return RouteDTO(
             id=data.route_id,
-            endpoint_id=data.endpoint_id,
+            endpoint_id=data.deployment_id,
             session_id=str(data.session_id) if data.session_id else None,
             status=CommonRouteStatus(data.status.value),
             traffic_ratio=data.traffic_ratio,
@@ -387,11 +423,18 @@ class RouteAdapter(BaseFilterAdapter):
         return OffsetPagination(limit=limit, offset=offset)
 
 
-def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreator:
+def build_revision_creator(
+    revision_input: RevisionInput,
+    runtime_variant_id: RuntimeVariantID,
+) -> ModelRevisionCreator:
     """Build ModelRevisionCreator from RevisionInput.
 
     Shared by AddRevisionAdapter and CreateDeploymentAdapter to avoid
-    duplicated conversion logic.
+    duplicated conversion logic. ``runtime_variant_id`` is resolved by
+    the caller (legacy REST handler) from the name-based
+    ``revision_input.model_runtime_config.runtime_variant`` via the
+    RuntimeVariant resolver service; the id flows into the id-typed
+    internal chain from here on.
     """
     resource_spec = ResourceSpec(
         cluster_mode=ClusterMode(revision_input.cluster_config.mode),
@@ -409,9 +452,9 @@ def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreato
         extra_mounts = [
             MountInfo(
                 vfolder_id=mount.vfolder_id,
-                kernel_path=PurePosixPath(mount.mount_destination)
-                if mount.mount_destination
-                else None,
+                mount_destination=mount.mount_destination,
+                mount_perm=mount.mount_perm,
+                subpath=mount.subpath,
             )
             for mount in revision_input.extra_mounts
         ]
@@ -421,10 +464,11 @@ def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreato
         model_definition_path=revision_input.model_mount_config.definition_path,
         model_mount_destination=revision_input.model_mount_config.mount_destination,
         extra_mounts=extra_mounts,
+        vfolder_subpath=revision_input.model_mount_config.subpath,
     )
 
     execution = ExecutionSpec(
-        runtime_variant=RuntimeVariant(revision_input.model_runtime_config.runtime_variant),
+        runtime_variant_id=runtime_variant_id,
         inference_runtime_config=(
             dict(revision_input.model_runtime_config.inference_runtime_config)
             if revision_input.model_runtime_config.inference_runtime_config
@@ -450,9 +494,12 @@ class AddRevisionAdapter:
     """Adapter for converting add revision request to ModelRevisionCreator."""
 
     @staticmethod
-    def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreator:
+    def build_revision_creator(
+        revision_input: RevisionInput,
+        runtime_variant_id: RuntimeVariantID,
+    ) -> ModelRevisionCreator:
         """Build ModelRevisionCreator from revision input."""
-        return build_revision_creator(revision_input)
+        return build_revision_creator(revision_input, runtime_variant_id)
 
 
 class CreateDeploymentAdapter:
@@ -462,16 +509,14 @@ class CreateDeploymentAdapter:
         self,
         request: CreateDeploymentRequest,
         user_uuid: UUID,
+        runtime_variant_id: RuntimeVariantID,
     ) -> NewDeploymentCreator:
         """
         Convert CreateDeploymentRequest to NewDeploymentCreator.
 
-        Args:
-            request: Create deployment request DTO
-            user_uuid: UUID of the user creating the deployment
-
-        Returns:
-            NewDeploymentCreator for service layer
+        ``runtime_variant_id`` is resolved by the caller (legacy handler)
+        from the name in ``request.initial_revision.model_runtime_config.runtime_variant``;
+        adapter-side flows are id-typed only.
         """
         # Generate name if not provided
         name = request.metadata.name or f"deployment-{uuid4().hex[:8]}"
@@ -482,7 +527,7 @@ class CreateDeploymentAdapter:
             name=name,
             domain=request.metadata.domain_name,
             project=request.metadata.project_id,
-            resource_group=request.initial_revision.resource_config.resource_group,
+            resource_group=request.metadata.resource_group_name,
             created_user=user_uuid,
             session_owner=user_uuid,
             created_at=None,
@@ -491,7 +536,7 @@ class CreateDeploymentAdapter:
         )
 
         # Build replica spec
-        replica_spec = ReplicaSpec(replica_count=request.desired_replica_count)
+        replica_spec = ReplicaSpec(replica_count=request.replica_count)
 
         # Build network spec
         network = DeploymentNetworkSpec(
@@ -500,7 +545,7 @@ class CreateDeploymentAdapter:
         )
 
         # Build model revision creator
-        model_revision = build_revision_creator(request.initial_revision)
+        model_revision = build_revision_creator(request.initial_revision, runtime_variant_id)
 
         # Build policy config
         policy = self._build_policy_config(request.default_deployment_strategy)
@@ -550,17 +595,18 @@ class CreateDeploymentAdapter:
 class CreateRevisionAdapter:
     """Adapter for converting create revision request to creators."""
 
-    def build_creator(self, request: RevisionInput) -> ModelRevisionCreator:
+    def build_creator(
+        self,
+        request: RevisionInput,
+        runtime_variant_id: RuntimeVariantID,
+    ) -> ModelRevisionCreator:
         """
         Convert RevisionInput to ModelRevisionCreator.
 
-        Args:
-            request: Revision input DTO
-
-        Returns:
-            ModelRevisionCreator for service layer
+        ``runtime_variant_id`` is resolved by the caller (legacy handler)
+        from ``request.model_runtime_config.runtime_variant`` name.
         """
-        return build_revision_creator(request)
+        return build_revision_creator(request, runtime_variant_id)
 
 
 class DeploymentPolicyAdapter:

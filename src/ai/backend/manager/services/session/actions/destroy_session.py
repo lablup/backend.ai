@@ -1,7 +1,7 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, SessionId
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user import UserRole
@@ -34,8 +34,13 @@ class DestroySessionAction(SessionAction):
 class DestroySessionActionResult(BaseActionResult):
     # TODO: Add proper type
     result: Any
+    session_ids: list[SessionId] = field(default_factory=list)
 
-    # TODO: Change this to `entity_ids`
+    # TODO: Change this to `entity_ids` once BaseActionResultMeta supports
+    # multiple ids; until then, comma-join so audit logs capture every
+    # affected session (recursive destroy can target several).
     @override
     def entity_id(self) -> str | None:
-        return None
+        if not self.session_ids:
+            return None
+        return ",".join(str(sid) for sid in self.session_ids)

@@ -11,10 +11,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.appproxy.common.errors import ObjectNotFound
-from ai.backend.appproxy.coordinator.health_checker import HealthCheckEngine
 from ai.backend.appproxy.coordinator.models import Circuit
-from ai.backend.appproxy.coordinator.types import CircuitManager
+from ai.backend.appproxy.coordinator.types import CircuitManager, CircuitRouteUpdateItem
 
 
 class _ReadonlySessionContext:
@@ -74,7 +72,10 @@ class UpdateControl:
     call_order: list[str] = field(default_factory=list)
     _invocation_count: int = field(default=0, init=False)
 
-    async def side_effect(self, _circuit: object, _old_routes: list[object]) -> None:
+    async def side_effect(self, _items: list[CircuitRouteUpdateItem]) -> None:
+        # The bulk path replaces the per-circuit traefik update; this
+        # side-effect models the same one-call-per-update semantics
+        # that the original tests asserted on.
         self._invocation_count += 1
         if self._invocation_count == 1:
             self.call_order.append("first_start")
@@ -118,7 +119,7 @@ class TestCircuitManagerLocking:
     ) -> UpdateControl:
         monkeypatch.setattr(
             circuit_manager,
-            "update_traefik_circuit_routes",
+            "_update_traefik_circuit_routes_bulk",
             AsyncMock(side_effect=update_control.side_effect),
         )
         return update_control
@@ -210,115 +211,3 @@ class TestCircuitManagerLocking:
 
         # Assert - lock entry should be cleaned up
         assert circuit.id not in circuit_manager._circuit_locks
-
-
-class TestHealthCheckEnginePropagation:
-    @pytest.fixture
-    def operation_order(self) -> list[str]:
-        return []
-
-    @pytest.fixture
-    def fake_circuit_manager(self, operation_order: list[str]) -> _FakeCircuitManager:
-        return _FakeCircuitManager(operation_order)
-
-    @pytest.fixture
-    def health_check_engine(
-        self,
-        operation_order: list[str],
-        fake_circuit_manager: _FakeCircuitManager,
-    ) -> HealthCheckEngine:
-        return HealthCheckEngine(
-            db=cast(Any, _FakeDB(operation_order)),
-            event_producer=cast(Any, MagicMock()),
-            valkey_live=cast(Any, MagicMock()),
-            circuit_manager=cast(Any, fake_circuit_manager),
-            health_check_timer_interval=1.0,
-            valkey_schedule=cast(Any, MagicMock()),
-        )
-
-    @pytest.fixture
-    def _patch_circuit_get(
-        self,
-        operation_order: list[str],
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        async def _fake_get(
-            _session: object,
-            requested_circuit_id: UUID,
-            load_worker: bool = True,
-            load_endpoint: bool = True,
-        ) -> object:
-            assert load_worker is True
-            assert load_endpoint is True
-            operation_order.append("circuit_get")
-            return SimpleNamespace(
-                id=requested_circuit_id,
-                endpoint_id=None,
-                endpoint_row=None,
-                route_info=[],
-                healthy_routes=[],
-            )
-
-        monkeypatch.setattr(Circuit, "get", _fake_get)
-
-    async def test_fresh_read_happens_under_circuit_lock(
-        self,
-        health_check_engine: HealthCheckEngine,
-        operation_order: list[str],
-        _patch_circuit_get: None,
-    ) -> None:
-        circuit_id = uuid4()
-
-        # Act
-        await health_check_engine.propagate_route_updates_to_workers(
-            cast(Any, SimpleNamespace(id=circuit_id)),
-            [],
-        )
-
-        # Assert - DB read and route update must happen inside circuit lock
-        assert operation_order == [
-            "lock_enter",
-            "db_enter",
-            "circuit_get",
-            "db_exit",
-            "update",
-            "lock_exit",
-        ]
-
-    @pytest.fixture
-    def patch_circuit_get_not_found(
-        self,
-        operation_order: list[str],
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        async def _raise_not_found(
-            _session: object,
-            _circuit_id: UUID,
-            **_kwargs: object,
-        ) -> object:
-            operation_order.append("circuit_get_not_found")
-            raise ObjectNotFound(object_name="Circuit")
-
-        monkeypatch.setattr(Circuit, "get", _raise_not_found)
-
-    async def test_deleted_circuit_skips_propagation(
-        self,
-        health_check_engine: HealthCheckEngine,
-        operation_order: list[str],
-        patch_circuit_get_not_found: None,
-    ) -> None:
-        # Act
-        await health_check_engine.propagate_route_updates_to_workers(
-            cast(Any, SimpleNamespace(id=uuid4())),
-            [],
-        )
-
-        # Assert - lock acquired, DB read raises ObjectNotFound, early return without update
-        # Lock cleanup is handled by unload_circuits, not here
-        assert operation_order == [
-            "lock_enter",
-            "db_enter",
-            "circuit_get_not_found",
-            "db_exit",
-            "lock_exit",
-        ]

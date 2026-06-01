@@ -249,7 +249,7 @@ async def user_app_config(
 )  # type: ignore[misc]
 async def merged_app_config(
     info: Info[StrawberryGQLContext],
-) -> AppConfig:
+) -> AppConfig | None:
     """Get merged app configuration for the current user."""
     me = current_user()
     if me is None:
@@ -265,11 +265,11 @@ async def merged_app_config(
         description="Create or update domain-level app configuration (admin only). The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. All users in this domain will be affected by these settings when their configurations are merged, unless they have user-level configurations that override specific keys",
     ),
     name="adminUpsertDomainAppConfig",
-)  # type: ignore[misc]
+)
 async def admin_upsert_domain_app_config(
     input: UpsertDomainConfigInput,
     info: Info[StrawberryGQLContext],
-) -> UpsertDomainConfigPayload:
+) -> UpsertDomainConfigPayload | None:
     """Create or update domain-level app configuration (admin only)."""
     check_admin_only()
     result = await info.context.adapters.app_config.upsert_domain_config(
@@ -285,11 +285,11 @@ async def admin_upsert_domain_app_config(
     ),
     name="upsertDomainAppConfig",
     deprecation_reason="Use admin_upsert_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def upsert_domain_app_config(
     input: UpsertDomainConfigInput,
     info: Info[StrawberryGQLContext],
-) -> UpsertDomainConfigPayload:
+) -> UpsertDomainConfigPayload | None:
     """Create or update domain-level app configuration."""
     me = current_user()
     if me is None or not (me.is_admin or me.is_superadmin):
@@ -307,11 +307,11 @@ async def upsert_domain_app_config(
         description="Create or update user-level app configuration. The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. These settings will override domain-level settings when configurations are merged for this user. If user_id is not provided, the current user's configuration will be updated. Users can only modify their own configuration, but admins can modify any user's configuration",
     ),
     name="upsertUserAppConfig",
-)  # type: ignore[misc]
+)
 async def upsert_user_app_config(
     input: UpsertUserConfigInput,
     info: Info[StrawberryGQLContext],
-) -> UpsertUserConfigPayload:
+) -> UpsertUserConfigPayload | None:
     """Create or update user-level app configuration."""
     me = current_user()
     if me is None:
@@ -335,11 +335,11 @@ async def upsert_user_app_config(
         description="Delete domain-level app configuration (admin only). All users in this domain may be affected by this deletion. After deletion, users will only receive their user-level configurations when configurations are merged, with no domain-level defaults",
     ),
     name="adminDeleteDomainAppConfig",
-)  # type: ignore[misc]
+)
 async def admin_delete_domain_app_config(
     input: DeleteDomainConfigInput,
     info: Info[StrawberryGQLContext],
-) -> DeleteDomainConfigPayload:
+) -> DeleteDomainConfigPayload | None:
     """Delete domain-level app configuration (admin only)."""
     check_admin_only()
     result = await info.context.adapters.app_config.delete_domain_config(input.domain_name)
@@ -353,11 +353,11 @@ async def admin_delete_domain_app_config(
     ),
     name="deleteDomainAppConfig",
     deprecation_reason="Use admin_delete_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def delete_domain_app_config(
     input: DeleteDomainConfigInput,
     info: Info[StrawberryGQLContext],
-) -> DeleteDomainConfigPayload:
+) -> DeleteDomainConfigPayload | None:
     """Delete domain-level app configuration."""
     me = current_user()
     if me is None or not (me.is_admin or me.is_superadmin):
@@ -373,11 +373,11 @@ async def delete_domain_app_config(
         description="Delete user-level app configuration. After deletion, the user will still receive domain-level configuration values when configurations are merged, as domain settings remain unaffected. If user_id is not provided, the current user's configuration will be deleted. Users can only delete their own configuration, but admins can delete any user's configuration",
     ),
     name="deleteUserAppConfig",
-)  # type: ignore[misc]
+)
 async def delete_user_app_config(
     input: DeleteUserConfigInput,
     info: Info[StrawberryGQLContext],
-) -> DeleteUserConfigPayload:
+) -> DeleteUserConfigPayload | None:
     """Delete user-level app configuration."""
     me = current_user()
     if me is None:

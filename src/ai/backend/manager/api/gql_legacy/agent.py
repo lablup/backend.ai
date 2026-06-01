@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import (
@@ -17,6 +16,7 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -212,7 +212,19 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         if self.status != AgentStatus.ALIVE.name:
             return None
         graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.gather_agent_hwinfo(self.id)
+        devices = await graph_ctx.registry.gather_agent_hwinfo(AgentId(self.id))
+        # Adapt v3 ``list[DeviceHardwareInfo]`` back into the legacy
+        # ``{device_name: HardwareMetadata}`` JSON shape that existing
+        # GraphQL clients query. The registry-layer call now uses v3
+        # types natively; this layer owns the legacy schema contract.
+        return {
+            device.device_name: {
+                "status": device.status.value,
+                "status_info": device.status_info,
+                "metadata": device.metadata,
+            }
+            for device in devices
+        }
 
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         return {
@@ -437,7 +449,19 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
         if self.status != AgentStatus.ALIVE.name:
             return None
         graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.gather_agent_hwinfo(self.id)
+        devices = await graph_ctx.registry.gather_agent_hwinfo(self.id)
+        # Adapt v3 ``list[DeviceHardwareInfo]`` back into the legacy
+        # ``{device_name: HardwareMetadata}`` JSON shape that existing
+        # GraphQL clients query. The registry-layer call now uses v3
+        # types natively; this layer owns the legacy schema contract.
+        return {
+            device.device_name: {
+                "status": device.status.value,
+                "status_info": device.status_info,
+                "metadata": dict(device.metadata),
+            }
+            for device in devices
+        }
 
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         return {
@@ -633,7 +657,7 @@ async def _query_domain_groups_by_ak(
     db_conn: SAConnection,
     access_key: str,
     domain_name: str | None,
-) -> tuple[str, list[uuid.UUID]]:
+) -> tuple[str, list[ProjectID]]:
     kp_user_join = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
     group_join: sa.FromClause
     if domain_name is None:
@@ -658,7 +682,7 @@ async def _query_domain_groups_by_ak(
         group_cond = keypairs.c.access_key == access_key
     query = sa.select(AssocGroupUserRow.group_id).select_from(group_join).where(group_cond)
     rows = (await db_conn.execute(query)).fetchall()
-    group_ids = [row.group_id for row in rows]
+    group_ids = [ProjectID(row.group_id) for row in rows]
     return user_domain, group_ids
 
 

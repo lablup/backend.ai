@@ -14,8 +14,9 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
     VFolderFilter,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
-from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
+from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPermission,
@@ -48,7 +49,7 @@ class TestVFolderAdapterMySearch:
     @pytest.fixture
     def vfolder_data(self) -> VFolderData:
         return VFolderData(
-            id=uuid4(),
+            id=VFolderUUID(uuid4()),
             name="test-vfolder",
             host="local:volume1",
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
@@ -68,6 +69,7 @@ class TestVFolderAdapterMySearch:
             status=VFolderOperationStatus.READY,
             created_at=datetime.now(tz=UTC),
             last_used=None,
+            updated_at=datetime.now(tz=UTC),
             domain_name="default",
         )
 
@@ -100,7 +102,7 @@ class TestVFolderAdapterMySearch:
         input_dto = SearchVFoldersInput(limit=10, offset=0)
 
         with patch(
-            "ai.backend.manager.api.adapters.vfolder.current_user",
+            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
             return_value=user_data,
         ):
             await adapter.my_search(input_dto)
@@ -119,7 +121,7 @@ class TestVFolderAdapterMySearch:
         input_dto = SearchVFoldersInput(limit=10, offset=0)
 
         with patch(
-            "ai.backend.manager.api.adapters.vfolder.current_user",
+            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
             return_value=user_data,
         ):
             result = await adapter.my_search(input_dto)
@@ -141,7 +143,7 @@ class TestVFolderAdapterProjectSearch:
     def vfolder_data(self) -> VFolderData:
         group_id = uuid4()
         return VFolderData(
-            id=uuid4(),
+            id=VFolderUUID(uuid4()),
             name="project-vfolder",
             host="local:volume1",
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
@@ -161,6 +163,7 @@ class TestVFolderAdapterProjectSearch:
             status=VFolderOperationStatus.READY,
             created_at=datetime.now(tz=UTC),
             last_used=None,
+            updated_at=datetime.now(tz=UTC),
             domain_name="default",
         )
 

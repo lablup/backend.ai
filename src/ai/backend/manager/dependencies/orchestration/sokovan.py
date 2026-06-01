@@ -9,7 +9,6 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -17,6 +16,8 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
@@ -27,6 +28,7 @@ from ai.backend.manager.repositories.prometheus_query_preset.repository import (
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -60,6 +62,7 @@ class SokovanOrchestratorInput:
     resource_usage_repository: ResourceUsageHistoryRepository
     config_provider: ManagerConfigProvider
     agent_client_pool: AgentClientPool
+    appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
@@ -75,6 +78,9 @@ class SokovanOrchestratorInput:
     # Prometheus
     prometheus_client: PrometheusClient
     prometheus_query_preset_repository: PrometheusQueryPresetRepository
+    # Runtime variant lookup (used by deployment executor to resolve id→name
+    # at the AppProxy wire boundary)
+    runtime_variant_repository: RuntimeVariantRepository
 
 
 class SokovanOrchestratorDependency(
@@ -106,12 +112,10 @@ class SokovanOrchestratorDependency(
         # Create scheduler components
         scheduler_components = create_default_scheduler_components(
             setup_input.scheduler_repository,
-            setup_input.deployment_repository,
             setup_input.fair_share_repository,
             setup_input.config_provider,
             setup_input.agent_client_pool,
             setup_input.network_plugin_ctx,
-            setup_input.event_producer,
             setup_input.valkey_schedule,
         )
 
@@ -132,6 +136,7 @@ class SokovanOrchestratorDependency(
             route_controller=setup_input.route_controller,
             prometheus_client=setup_input.prometheus_client,
             prometheus_query_preset_repository=setup_input.prometheus_query_preset_repository,
+            runtime_variant_repository=setup_input.runtime_variant_repository,
         )
 
         # Create route coordinator
@@ -144,6 +149,7 @@ class SokovanOrchestratorDependency(
             scheduling_controller=setup_input.scheduling_controller,
             client_pool=client_pool,
             service_discovery=setup_input.service_discovery,
+            appproxy_client_pool=setup_input.appproxy_client_pool,
         )
 
         # Create fair share components

@@ -14,21 +14,27 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AccessKeyNotFound
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -36,6 +42,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow
@@ -55,12 +62,15 @@ ALL_ROWS = [
     UserRow,
     KeyPairRow,
     GroupRow,
-    AssocGroupUserRow,
+    AssociationScopesEntitiesRow,
+    ContainerRegistryRow,
     ImageRow,
     VFolderRow,
     EndpointRow,
     DeploymentPolicyRow,
     DeploymentAutoScalingPolicyRow,
+    RuntimeVariantRow,
+    DeploymentRevisionPresetRow,
     DeploymentRevisionRow,
     SessionRow,
     AgentRow,
@@ -199,7 +209,15 @@ class TestQueryUserinfo:
                 )
             )
             await sess.flush()
-            sess.add(AssocGroupUserRow(user_id=user_uuid, group_id=group_id))
+            sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.USER,
+                    entity_id=str(user_uuid),
+                    relation_type=RelationType.AUTO,
+                )
+            )
             await sess.commit()
 
         yield SeedData(
@@ -561,7 +579,15 @@ class TestQueryUserinfoFromSession:
                 )
             )
             await sess.flush()
-            sess.add(AssocGroupUserRow(user_id=user_uuid, group_id=group_id))
+            sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.USER,
+                    entity_id=str(user_uuid),
+                    relation_type=RelationType.AUTO,
+                )
+            )
             await sess.commit()
 
         yield SeedData(

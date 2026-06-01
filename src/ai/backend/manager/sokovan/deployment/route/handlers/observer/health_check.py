@@ -1,9 +1,8 @@
 """Observer for performing HTTP health checks on routes.
 
-Reads RouteHealthRecord from Valkey, performs HTTP health checks in parallel,
-and writes manager_healthy/manager_last_check back to Valkey.
-During initial_delay, failures are ignored (not written).
-The HealthCheckRouteHandler reads from Valkey and performs DB transitions.
+Reads ReplicaProbeTarget from Valkey to get probe config (health_path, host, port),
+performs HTTP health checks in parallel, and writes RouteHealthStatus back to Valkey.
+The short TTL on RouteHealthStatus automatically signals DEGRADED on expiry.
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ from collections.abc import Sequence
 import aiohttp
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
-    RouteHealthRecord,
+    ReplicaHealthResult,
     ValkeyScheduleClient,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -30,12 +29,11 @@ HEALTH_CHECK_TIMEOUT_SEC = 5
 
 
 class RouteHealthObserver(RouteObserver):
-    """Performs HTTP health checks on routes using RouteHealthRecord.
+    """Performs HTTP health checks on routes using ReplicaProbeTarget from Valkey.
 
-    Reads RouteHealthRecord from Valkey to get health_path, replica_host, inference_port.
+    Reads ReplicaProbeTarget (health_path, replica_host, inference_port) from Valkey.
     HTTP checks run in parallel via asyncio.gather.
-    During initial_delay period, health check failures are ignored (not written to Valkey).
-    After initial_delay, both success and failure results are written.
+    Writes RouteHealthStatus back to Valkey; TTL expiry signals DEGRADED automatically.
     """
 
     def __init__(
@@ -51,59 +49,46 @@ class RouteHealthObserver(RouteObserver):
         return "route-health-observer"
 
     async def observe(self, routes: Sequence[RouteData]) -> RouteObservationResult:
-        """Check health for routes using RouteHealthRecord from Valkey."""
+        """Check health for routes using ReplicaProbeTarget from Valkey."""
         if not routes:
             return RouteObservationResult(observed_count=0)
 
-        # Filter routes that have replica connection info
-        checkable = [r for r in routes if r.replica_host and r.replica_port]
+        # Load ReplicaProbeTargets from Valkey (keyed by ReplicaID)
+        replica_ids = [r.route_id for r in routes]
+        probe_targets = await self._valkey_schedule.get_route_probe_targets_batch(replica_ids)
+
+        # Collect routes that have probe targets
+        checkable = [
+            (route, target)
+            for route in routes
+            if (target := probe_targets.get(route.route_id)) is not None
+        ]
+
         if not checkable:
-            return RouteObservationResult(observed_count=0)
-
-        # Load RouteHealthRecords from Valkey
-        route_ids = [str(r.route_id) for r in checkable]
-        records = await self._valkey_schedule.get_route_health_records_batch(route_ids)
-
-        # Collect routes that have records
-        targets: list[tuple[str, RouteHealthRecord]] = []
-        for route in checkable:
-            route_id_str = str(route.route_id)
-            record = records.get(route_id_str)
-            if record is not None:
-                targets.append((route_id_str, record))
-
-        if not targets:
-            if checkable:
+            if routes:
                 log.warning(
-                    "Health observer: {} checkable routes but 0 have records in Valkey",
-                    len(checkable),
+                    "Health observer: {} routes but 0 have probe targets in Valkey",
+                    len(routes),
                 )
             return RouteObservationResult(observed_count=0)
 
         # Perform HTTP health checks in parallel
         check_tasks = [
-            self._http_health_check(record.replica_host, record.inference_port, record.health_path)
-            for _, record in targets
+            self._http_health_check(target.replica_host, target.inference_port, target.health_path)
+            for _, target in checkable
         ]
         results = await asyncio.gather(*check_tasks)
 
-        # Write results to Valkey
-        current_time = await self._valkey_schedule.get_redis_time()
-        for (route_id_str, record), is_healthy in zip(targets, results, strict=False):
-            within_initial_delay = current_time < record.initial_delay_until
+        # Write results to Valkey in a single batch (TTL refreshed on every call)
+        health_results = [
+            ReplicaHealthResult(replica_id=route.route_id, healthy=is_healthy)
+            for (route, _target), is_healthy in zip(checkable, results, strict=False)
+        ]
+        await self._valkey_schedule.record_route_health_statuses_batch(health_results)
 
-            # Always refresh TTL to prevent key expiry
-            await self._valkey_schedule.refresh_route_health_ttl(route_id_str)
-
-            if is_healthy:
-                await self._valkey_schedule.update_route_manager_health(route_id_str, True)
-            elif not within_initial_delay:
-                await self._valkey_schedule.update_route_manager_health(route_id_str, False)
-            # else: failure within initial_delay → ignore (don't write)
-
-        if targets:
-            log.debug("Health observer: checked {} routes", len(targets))
-        return RouteObservationResult(observed_count=len(targets))
+        if checkable:
+            log.debug("Health observer: checked {} routes", len(checkable))
+        return RouteObservationResult(observed_count=len(checkable))
 
     @staticmethod
     async def _http_health_check(host: str, port: int, path: str) -> bool:

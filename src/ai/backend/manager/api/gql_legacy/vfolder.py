@@ -15,7 +15,6 @@ import graphene
 import graphene_federation
 import graphql
 import sqlalchemy as sa
-import trafaret as t
 from dateutil.parser import ParserError
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -25,9 +24,9 @@ from ruamel.yaml.error import YAMLError
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
-from ai.backend.common.config import model_definition_iv
+from ai.backend.common.config import ModelDefinition, ModelMetadata
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.exception import VFolderNotFound
+from ai.backend.common.exception import ModelDefinitionValidationError, VFolderNotFound
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -35,7 +34,12 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.resource import DataTransformationFailed
+from ai.backend.manager.data.permission.types import (
+    EntityType as PermissionEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as PermissionScopeType,
+)
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
     QuotaScopeNotFoundError,
@@ -53,6 +57,9 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import (
@@ -563,39 +570,33 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext,
         vfolder_row: VFolderRow,
         *,
-        model_def: dict[str, Any] | None = None,
+        model_def: ModelDefinition | None = None,
         readme: str | None = None,
         readme_filetype: str | None = None,
     ) -> Self:
-        if model_def is not None:
-            models = model_def["models"]
-        else:
-            models = []
-        try:
-            metadata = models[0]["metadata"] or {}
-            name = models[0]["name"]
-        except (IndexError, KeyError):
-            metadata = {}
-            name = vfolder_row.name
+        first_model = model_def.models[0] if model_def is not None and model_def.models else None
+        # If the first model does not exist, fallback to metadata with all fields filled with none values
+        metadata = (first_model.metadata if first_model is not None else None) or ModelMetadata()
+        name = first_model.name if first_model is not None else vfolder_row.name
         return cls(
             id=vfolder_row.id,
             row_id=vfolder_row.id,
             vfolder=VirtualFolder.from_orm_row(vfolder_row),
             vfolder_node=VirtualFolderNode.from_row(graph_ctx, vfolder_row),
             name=name,
-            author=metadata.get("author") or vfolder_row.creator or "",
-            title=metadata.get("title") or vfolder_row.name,
-            version=metadata.get("version") or "",
-            created_at=metadata.get("created") or vfolder_row.created_at,
-            modified_at=metadata.get("last_modified") or vfolder_row.last_used,
-            description=metadata.get("description") or "",
-            task=metadata.get("task") or "",
-            architecture=metadata.get("architecture") or "",
-            framework=metadata.get("framework") or [],
-            label=metadata.get("label") or [],
-            category=metadata.get("category") or "",
-            license=metadata.get("license") or "",
-            min_resource=metadata.get("min_resource") or {},
+            author=metadata.author or vfolder_row.creator or "",
+            title=metadata.title or vfolder_row.name,
+            version=metadata.version or "",
+            created_at=metadata.created or vfolder_row.created_at,
+            modified_at=metadata.last_modified or vfolder_row.last_used,
+            description=metadata.description or "",
+            task=metadata.task or "",
+            architecture=metadata.architecture or "",
+            framework=metadata.framework or [],
+            label=metadata.label or [],
+            category=metadata.category or "",
+            license=metadata.license or "",
+            min_resource=metadata.min_resource or {},
             readme=readme,
             readme_filetype=readme_filetype,
         )
@@ -666,16 +667,11 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
                     extra_msg=f"Invalid YAML syntax (filename:{model_definition_filename}, detail:{e!s})"
                 ) from e
             try:
-                model_definition = model_definition_iv.check(model_definition_dict)
-            except t.DataError as e:
+                model_definition = ModelDefinition.model_validate(model_definition_dict)
+            except ModelDefinitionValidationError as e:
                 raise ModelCardParseError(
                     extra_msg=f"Failed to validate model definition file (data:{model_definition_dict}, detail:{e!s})"
                 ) from e
-            if model_definition is None:
-                raise DataTransformationFailed(
-                    "Model definition validation returned None unexpectedly"
-                )
-            model_definition["id"] = vfolder_row_id
         else:
             model_definition = None
 
@@ -1220,16 +1216,19 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
         filter: str | None = None,
     ) -> int:
-        from ai.backend.manager.models.group import association_groups_users as agus
         from ai.backend.manager.models.group import groups
 
-        query = sa.select(agus.c.group_id).select_from(agus).where(agus.c.user_id == user_id)
+        membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+            AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+            AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+            AssociationScopesEntitiesRow.entity_id == str(user_id),
+        )
 
         async with graph_ctx.db.begin_readonly() as conn:
-            result = await conn.execute(query)
+            membership_result = await conn.execute(membership_query)
 
-        grps = result.fetchall()
-        group_ids = [g.group_id for g in grps]
+        grps = membership_result.fetchall()
+        group_ids = [uuid.UUID(g.scope_id) for g in grps]
         j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
         query = sa.select(sa.func.count()).select_from(j).where(vfolders.c.group.in_(group_ids))
 
@@ -1255,14 +1254,17 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
         order: str | None = None,
     ) -> list[VirtualFolder]:
-        from ai.backend.manager.models.group import association_groups_users as agus
         from ai.backend.manager.models.group import groups
 
-        query = sa.select(agus.c.group_id).select_from(agus).where(agus.c.user_id == user_id)
+        membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+            AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+            AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+            AssociationScopesEntitiesRow.entity_id == str(user_id),
+        )
         async with graph_ctx.db.begin_readonly() as conn:
-            result = await conn.execute(query)
-        grps = result.fetchall()
-        group_ids = [g.group_id for g in grps]
+            membership_result = await conn.execute(membership_query)
+        grps = membership_result.fetchall()
+        group_ids = [uuid.UUID(g.scope_id) for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = (
             sa.select(

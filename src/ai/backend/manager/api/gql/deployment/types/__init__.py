@@ -46,12 +46,24 @@ from .deployment import (
     ModelDeploymentNetworkAccess,
     ModelDeploymentNetworkAccessInput,
     ProjectDeploymentScopeGQL,
+    ReplaceDeploymentOptionsInputGQL,
+    ReplaceDeploymentOptionsPayload,
     ReplicaState,
     RevisionRefreshResult,
     SyncReplicaInput,
     SyncReplicaPayload,
     UpdateDeploymentInput,
     UpdateDeploymentPayload,
+)
+from .deployment_options import (
+    DeploymentHandlerOptionsInfoGQL,
+    DeploymentHandlerOptionsInputGQL,
+    DeploymentOptionsInfoGQL,
+    DeploymentOptionsInputGQL,
+    HandlerOptionsEntryInfoGQL,
+    HandlerOptionsEntryInputGQL,
+    HandlerOptionsInfoGQL,
+    HandlerOptionsInputGQL,
 )
 from .policy import (
     BlueGreenConfigInputGQL,
@@ -80,10 +92,8 @@ from .replica import (
     TrafficStatusFilter,
 )
 from .resource_slot import (
-    AllocatedResourceSlotConnection,
-    AllocatedResourceSlotEdge,
     AllocatedResourceSlotFilterGQL,
-    AllocatedResourceSlotNodeGQL,
+    AllocatedResourceSlotGQL,
     AllocatedResourceSlotOrderByGQL,
     AllocatedResourceSlotOrderFieldGQL,
 )
@@ -109,7 +119,6 @@ from .revision import (
     MountPermission,
     ResourceConfig,
     ResourceConfigInput,
-    ResourceGroupInput,
 )
 from .revision_preset import (
     CreateDeploymentRevisionPresetInputGQL,
@@ -185,12 +194,23 @@ __all__ = [
     "ProjectDeploymentScopeGQL",
     "ModelDeploymentNetworkAccess",
     "ModelDeploymentNetworkAccessInput",
+    "ReplaceDeploymentOptionsInputGQL",
+    "ReplaceDeploymentOptionsPayload",
     "ReplicaState",
     "RevisionRefreshResult",
     "SyncReplicaInput",
     "SyncReplicaPayload",
     "UpdateDeploymentInput",
     "UpdateDeploymentPayload",
+    # Deployment Options
+    "DeploymentHandlerOptionsInfoGQL",
+    "DeploymentHandlerOptionsInputGQL",
+    "DeploymentOptionsInfoGQL",
+    "DeploymentOptionsInputGQL",
+    "HandlerOptionsEntryInfoGQL",
+    "HandlerOptionsEntryInputGQL",
+    "HandlerOptionsInfoGQL",
+    "HandlerOptionsInputGQL",
     # Policy
     "BlueGreenConfigInputGQL",
     "BlueGreenStrategySpecGQL",
@@ -237,12 +257,9 @@ __all__ = [
     "MountPermission",
     "ResourceConfig",
     "ResourceConfigInput",
-    "ResourceGroupInput",
     # Allocated Resource Slot
-    "AllocatedResourceSlotConnection",
-    "AllocatedResourceSlotEdge",
     "AllocatedResourceSlotFilterGQL",
-    "AllocatedResourceSlotNodeGQL",
+    "AllocatedResourceSlotGQL",
     "AllocatedResourceSlotOrderByGQL",
     "AllocatedResourceSlotOrderFieldGQL",
     # Route

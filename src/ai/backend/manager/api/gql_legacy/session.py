@@ -35,6 +35,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.group.row import GroupRow
@@ -72,9 +73,6 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.models.vfolder import get_permission_ctx as get_vfolder_permission_ctx
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
-from ai.backend.manager.services.session.actions.check_and_transit_status import (
-    CheckAndTransitStatusAction,
-)
 from ai.backend.manager.services.session.actions.modify_session import ModifySessionAction
 from ai.backend.manager.types import OptionalState
 
@@ -952,28 +950,17 @@ class CheckAndTransitStatus(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         input: CheckAndTransitStatusInput,
     ) -> CheckAndTransitStatus:
-        graph_ctx: GraphQueryContext = info.context
-        session_ids = [SessionId(sid) for _, sid in input.ids]
-
-        user_role = cast(UserRole, graph_ctx.user["role"])
-        user_id = cast(uuid.UUID, graph_ctx.user["uuid"])
-
-        session_nodes = []
-        for session_id in session_ids:
-            action_result = (
-                await graph_ctx.processors.session.check_and_transit_status.wait_for_complete(
-                    CheckAndTransitStatusAction(
-                        user_id=user_id,
-                        user_role=user_role,
-                        session_id=session_id,
-                    )
-                )
-            )
-            session_nodes.append(
-                ComputeSessionNode.from_dataclass(graph_ctx, action_result.session_data)
-            )
-
-        return CheckAndTransitStatus(session_nodes, input.get("client_mutation_id"))
+        # Manual status reconciliation is no longer supported — the
+        # sokovan scheduler's coordinator runs a reconciliation loop
+        # that keeps session and kernel statuses in sync without
+        # external triggers. The mutation is retained as a 501 stub
+        # for wire compatibility.
+        raise NotImplementedAPI(
+            extra_msg=(
+                "Manual session status reconciliation is no longer supported. "
+                "Session status is automatically reconciled by the scheduler."
+            ),
+        )
 
 
 class ComputeSession(graphene.ObjectType):  # type: ignore[misc]

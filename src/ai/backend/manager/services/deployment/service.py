@@ -14,43 +14,43 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.types import (
-    ResourceSlot,
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
+    MintEndpointTokenRequest,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
     VFolderMountsCreator,
 )
 from ai.backend.manager.data.deployment.types import (
-    ClusterConfigData,
     DeploymentInfo,
-    ExtraVFolderMountData,
+    ExecutionSpec,
+    LegacyDeploymentData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
-    ModelMountConfigData,
     ModelReplicaData,
     ModelRevisionData,
-    ModelRevisionSpec,
-    ModelRuntimeConfigData,
+    MountInfo,
     ReplicaStateData,
-    ResourceConfigData,
+    ResourceSpec,
     RevisionRefreshResult,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.data.deployment_revision_preset.types import (
-    PresetValueData,
-)
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
 )
 from ai.backend.manager.models.endpoint import EndpointTokenRow
+from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -133,6 +133,10 @@ from ai.backend.manager.services.deployment.actions.get_deployment_by_id import 
     GetDeploymentByIdAction,
     GetDeploymentByIdActionResult,
 )
+from ai.backend.manager.services.deployment.actions.get_legacy_deployment_by_id import (
+    GetLegacyDeploymentByIdAction,
+    GetLegacyDeploymentByIdActionResult,
+)
 from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
@@ -157,6 +161,10 @@ from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions
     RefreshDeploymentRevisionsAction,
     RefreshDeploymentRevisionsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.replace_deployment_options import (
+    ReplaceDeploymentOptionsAction,
+    ReplaceDeploymentOptionsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
@@ -175,6 +183,10 @@ from ai.backend.manager.services.deployment.actions.search_deployments_in_projec
     SearchDeploymentsInProjectAction,
     SearchDeploymentsInProjectActionResult,
 )
+from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
+    SearchLegacyDeploymentsAction,
+    SearchLegacyDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
     SearchReplicasActionResult,
@@ -188,26 +200,27 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentActionResult,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-)
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentStatus:
-    """Map EndpointLifecycle to ModelDeploymentStatus."""
+    """Map EndpointLifecycle to ModelDeploymentStatus for the v2 status surface.
+
+    The lifecycle axis is monotonic (PENDING → DEPLOYING → READY → DESTROYING
+    → DESTROYED); v2 exposes replica reconciliation as the orthogonal
+    ``scaling_state`` field on the deployment node. ``SCALING`` is therefore
+    no longer surfaced through ``ModelDeploymentStatus`` — a legacy
+    ``lifecycle=SCALING`` row folds into ``READY`` so clients only have to
+    consult ``scaling_state`` to decide whether a replica reconcile is in
+    flight. Legacy ``CREATED`` (never-deployed) folds into ``PENDING``.
+    """
     match lifecycle:
-        case EndpointLifecycle.PENDING:
+        case EndpointLifecycle.PENDING | EndpointLifecycle.CREATED:
             return ModelDeploymentStatus.PENDING
-        case EndpointLifecycle.CREATED | EndpointLifecycle.READY:
+        case EndpointLifecycle.READY | EndpointLifecycle.SCALING:
             return ModelDeploymentStatus.READY
-        case EndpointLifecycle.SCALING:
-            return ModelDeploymentStatus.SCALING
         case EndpointLifecycle.DEPLOYING:
             return ModelDeploymentStatus.DEPLOYING
         case EndpointLifecycle.DESTROYING:
@@ -216,53 +229,19 @@ def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentSta
             return ModelDeploymentStatus.STOPPED
 
 
-def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
-    """Convert DeploymentInfo to ModelDeploymentData.
-
-    Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
-    """
-    # Map revision if available
-    revision: ModelRevisionData | None = None
-    if info.model_revisions:
-        rev = info.model_revisions[0]
-        if rev.revision_id is None:
-            raise ValueError(f"ModelRevisionSpec has no revision_id for deployment {info.id}")
-        revision = ModelRevisionData(
-            id=rev.revision_id,
-            name=rev.image_identifier.canonical,
-            cluster_config=ClusterConfigData(
-                mode=rev.resource_spec.cluster_mode,
-                size=rev.resource_spec.cluster_size,
-            ),
-            resource_config=ResourceConfigData(
-                resource_group_name=info.metadata.resource_group,
-                resource_slot=ResourceSlot.from_json(rev.resource_spec.resource_slots),
-            ),
-            model_mount_config=ModelMountConfigData(
-                vfolder_id=rev.mounts.model_vfolder_id,
-                mount_destination=rev.mounts.model_mount_destination,
-                definition_path=rev.mounts.model_definition_path or "",
-            ),
-            model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=rev.execution.runtime_variant,
-                inference_runtime_config=rev.execution.inference_runtime_config or {},
-            ),
-            extra_vfolder_mounts=[
-                ExtraVFolderMountData(
-                    vfolder_id=m.vfid.folder_id,
-                    mount_destination=m.kernel_path.as_posix(),
-                )
-                for m in rev.mounts.extra_mounts
-            ],
-            image_id=rev.image_id or UUID(int=0),
-            created_at=info.metadata.created_at or datetime.now(UTC),
-            model_definition=rev.model_definition,
-        )
-
-    desired_count = info.replica_spec.desired_replica_count
+def _deployment_desired_replica_count(info: DeploymentInfo) -> int:
+    desired_count = info.replica.desired_replica_count
     if desired_count is None:
-        desired_count = info.replica_spec.replica_count
+        desired_count = info.replica.replica_count
+    return desired_count
 
+
+def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
+    """Convert DeploymentInfo to the modern (v2 / GraphQL) ModelDeploymentData.
+
+    Uses the revision *ids* only — the modern read path does not load the full
+    revision rows. Note: some fields default as DeploymentInfo lacks the data.
+    """
     return ModelDeploymentData(
         id=info.id,
         metadata=ModelDeploymentMetadataInfo(
@@ -271,16 +250,53 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             tags=[info.metadata.tag] if info.metadata.tag else [],
             project_id=info.metadata.project,
             domain_name=info.metadata.domain,
+            resource_group_name=info.metadata.resource_group,
             created_at=info.metadata.created_at or datetime.now(UTC),
             updated_at=info.metadata.created_at or datetime.now(UTC),
         ),
         network_access=info.network,
-        revision_history_ids=[info.current_revision_id] if info.current_revision_id else [],
-        revision=revision,
+        revision_history_ids=[info.current_revision_id]
+        if info.current_revision_id is not None
+        else [],
+        current_revision_id=info.current_revision_id,
         deploying_revision_id=info.deploying_revision_id,
         scaling_rule_ids=[],  # Not available in DeploymentInfo
         replica_state=ReplicaStateData(
-            desired_replica_count=desired_count,
+            desired_replica_count=_deployment_desired_replica_count(info),
+            replica_ids=[],  # Not available in DeploymentInfo
+        ),
+        default_deployment_strategy=DeploymentStrategy.ROLLING,
+        created_user_id=info.metadata.created_user,
+        options=info.options,
+        scaling_state=info.state.scaling_state,
+        policy=info.policy,
+        sub_step=info.sub_step,
+    )
+
+
+def _convert_deployment_info_to_legacy_data(info: DeploymentInfo) -> LegacyDeploymentData:
+    """Convert DeploymentInfo to the legacy (REST v1) LegacyDeploymentData.
+
+    Built independently from the same ``DeploymentInfo`` — never derived from
+    ``ModelDeploymentData``. Carries the full current ``revision`` that the
+    legacy ``DeploymentDTO`` embeds, so it requires a full (legacy) read.
+    """
+    return LegacyDeploymentData(
+        id=info.id,
+        metadata=ModelDeploymentMetadataInfo(
+            name=info.metadata.name,
+            status=_map_lifecycle_to_status(info.state.lifecycle),
+            tags=[info.metadata.tag] if info.metadata.tag else [],
+            project_id=info.metadata.project,
+            domain_name=info.metadata.domain,
+            resource_group_name=info.metadata.resource_group,
+            created_at=info.metadata.created_at or datetime.now(UTC),
+            updated_at=info.metadata.created_at or datetime.now(UTC),
+        ),
+        network_access=info.network,
+        revision=info.current_revision,
+        replica_state=ReplicaStateData(
+            desired_replica_count=_deployment_desired_replica_count(info),
             replica_ids=[],  # Not available in DeploymentInfo
         ),
         default_deployment_strategy=DeploymentStrategy.ROLLING,
@@ -333,40 +349,68 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
     liveness = _ROUTE_STATUS_TO_LIVENESS.get(route.status) or LivenessStatus.NOT_CHECKED
     return ModelReplicaData(
         id=route.route_id,
-        revision_id=route.revision_id or route.endpoint_id,
-        session_id=route.session_id or route.route_id,
+        revision_id=route.revision_id or route.deployment_id,
+        session_id=route.session_id,
         readiness_status=readiness,
         liveness_status=liveness,
         activeness_status=_resolve_activeness(route.traffic_status, readiness, liveness),
+        status=route.status,
+        traffic_status=route.traffic_status,
+        health_status=route.health_status,
         detail=route.error_data,
         created_at=route.created_at,
     )
 
 
-def _build_creator_from_revision_spec(spec: ModelRevisionSpec) -> ModelRevisionCreator:
-    """Rebuild a ``ModelRevisionCreator`` from an existing revision's spec.
+def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionCreator:
+    """Rebuild a ``ModelRevisionCreator`` from a persisted revision.
 
-    ``model_definition`` is reset to ``None`` so ``DeploymentController.add_revision``
-    re-resolves it from the vfolder. ``revision_preset_id`` is left ``None`` since
-    it is not persisted on the revision row; the materialized ``preset_values``
-    carry forward the preset effect without requiring re-application.
-    ``extra_mounts`` is left empty because ``add_revision`` does not propagate
-    this field to the new revision spec (see ``DeploymentController.add_revision``).
+    ``model_definition`` is cleared so ``add_revision`` re-resolves it via
+    the merge chain. Mount identity (``extra_mounts``, ``vfolder_subpath``)
+    is copied verbatim — refreshing must not silently drop them.
     """
+    if data.model_mount_config.vfolder_id is None:
+        raise InvalidAPIParameters(
+            f"Revision {data.id} has no model vfolder; cannot rebuild creator"
+        )
     return ModelRevisionCreator(
-        image_id=spec.image_id,
-        resource_spec=spec.resource_spec,
-        mounts=VFolderMountsCreator(
-            model_vfolder_id=spec.mounts.model_vfolder_id,
-            model_definition_path=spec.mounts.model_definition_path,
-            model_mount_destination=spec.mounts.model_mount_destination,
+        image_id=data.image_id,
+        resource_spec=ResourceSpec(
+            cluster_mode=data.cluster_config.mode,
+            cluster_size=data.cluster_config.size,
+            resource_slots=dict(data.resource_config.resource_slot),
+            resource_opts=dict(data.resource_config.resource_opts) or None,
         ),
-        execution=spec.execution,
+        mounts=VFolderMountsCreator(
+            model_vfolder_id=data.model_mount_config.vfolder_id,
+            model_definition_path=data.model_mount_config.definition_path or None,
+            model_mount_destination=data.model_mount_config.mount_destination or "/models",
+            extra_mounts=[
+                MountInfo(
+                    vfolder_id=m.vfolder_id,
+                    mount_destination=m.mount_destination,
+                    mount_perm=m.mount_perm,
+                    subpath=m.subpath,
+                )
+                for m in data.model_mount_config.extra_mounts
+            ],
+            vfolder_subpath=data.model_mount_config.subpath,
+        ),
+        execution=ExecutionSpec(
+            startup_command=data.execution.startup_command,
+            bootstrap_script=data.execution.bootstrap_script,
+            environ=(
+                {k: str(v) for k, v in data.model_runtime_config.environ.items()}
+                if data.model_runtime_config.environ
+                else None
+            ),
+            runtime_variant_id=data.model_runtime_config.runtime_variant_id,
+            callback_url=data.execution.callback_url,
+            inference_runtime_config=data.model_runtime_config.inference_runtime_config,
+        ),
         model_definition=None,
-        revision_preset_id=None,
-        preset_values=[
-            PresetValueData(preset_id=pv.preset_id, value=pv.value) for pv in spec.preset_values
-        ],
+        revision_preset_id=data.preset.preset_id,
+        preset_values=list(data.preset.values),
     )
 
 
@@ -375,8 +419,7 @@ class DeploymentService:
 
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
-    _revision_generator_registry: RevisionGeneratorRegistry
-    _model_definition_generator_registry: ModelDefinitionGeneratorRegistry
+    _appproxy_client_pool: AppProxyClientPool
     _deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
     _runtime_variant_preset_repository: RuntimeVariantPresetRepository | None
 
@@ -384,16 +427,14 @@ class DeploymentService:
         self,
         deployment_controller: DeploymentController,
         deployment_repository: DeploymentRepository,
-        revision_generator_registry: RevisionGeneratorRegistry,
-        model_definition_generator_registry: ModelDefinitionGeneratorRegistry,
+        appproxy_client_pool: AppProxyClientPool,
         deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None = None,
         runtime_variant_preset_repository: RuntimeVariantPresetRepository | None = None,
     ) -> None:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
         self._deployment_repository = deployment_repository
-        self._revision_generator_registry = revision_generator_registry
-        self._model_definition_generator_registry = model_definition_generator_registry
+        self._appproxy_client_pool = appproxy_client_pool
         self._deployment_revision_preset_repository = deployment_revision_preset_repository
         self._runtime_variant_preset_repository = runtime_variant_preset_repository
 
@@ -414,7 +455,7 @@ class DeploymentService:
         deployment_info = await self._deployment_controller.create_deployment(action.creator)
         if action.creator.model_revision is not None:
             await self._deployment_controller.add_deployment_revision(
-                deployment_id=deployment_info.id,
+                deployment_id=DeploymentID(deployment_info.id),
                 revision=action.creator.model_revision,
                 auto_activate=action.auto_activate,
             )
@@ -442,7 +483,7 @@ class DeploymentService:
         )
         deployment_info = await self._deployment_controller.create_deployment(creator)
         await self._deployment_controller.add_deployment_revision(
-            deployment_id=deployment_info.id,
+            deployment_id=DeploymentID(deployment_info.id),
             revision=revision,
             auto_activate=True,
         )
@@ -461,10 +502,28 @@ class DeploymentService:
             UpdateDeploymentActionResult: Result containing the updated deployment data
         """
         log.info("Updating deployment with ID: {}", action.updater.pk_value)
-        endpoint_id = cast(UUID, action.updater.pk_value)
+        endpoint_id = DeploymentID(cast(UUID, action.updater.pk_value))
         spec = cast(DeploymentUpdaterSpec, action.updater.spec)
         deployment_info = await self._deployment_controller.update_deployment(endpoint_id, spec)
         return UpdateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
+
+    async def replace_deployment_options(
+        self, action: ReplaceDeploymentOptionsAction
+    ) -> ReplaceDeploymentOptionsActionResult:
+        """Replace the ``options`` surface of a deployment in full.
+
+        The repository returns the persisted :class:`DeploymentOptions`
+        via ``UPDATE ... RETURNING`` so this path does a single round-trip
+        and does not re-materialise the surrounding deployment node.
+        """
+        log.info("Replacing deployment options for ID: {}", action.deployment_id)
+        options = await self._deployment_repository.replace_deployment_options(
+            action.deployment_id, action.options
+        )
+        return ReplaceDeploymentOptionsActionResult(
+            deployment_id=action.deployment_id,
+            options=options,
+        )
 
     async def destroy_deployment(
         self, action: DestroyDeploymentAction
@@ -480,10 +539,10 @@ class DeploymentService:
         Raises:
             EndpointNotFound: If the endpoint does not exist
         """
-        log.info("Destroying deployment with ID: {}", action.endpoint_id)
+        log.info("Destroying deployment with ID: {}", action.deployment_id)
         # Validate endpoint exists before attempting destruction
-        await self._deployment_repository.get_endpoint_info(action.endpoint_id)
-        success = await self._deployment_controller.destroy_deployment(action.endpoint_id)
+        await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        success = await self._deployment_controller.destroy_deployment(action.deployment_id)
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
         return DestroyDeploymentActionResult(success=success)
 
@@ -501,6 +560,21 @@ class DeploymentService:
         result = await self._deployment_repository.search_endpoints(action.querier)
         deployments = [_convert_deployment_info_to_data(info) for info in result.items]
         return SearchDeploymentsActionResult(
+            data=deployments,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_legacy_deployments(
+        self, action: SearchLegacyDeploymentsAction
+    ) -> SearchLegacyDeploymentsActionResult:
+        """Legacy (REST v1) search — full revision per item. DO NOT USE in new
+        code; v2 uses :meth:`search_deployments`.
+        """
+        result = await self._deployment_repository.search_legacy_endpoints(action.querier)
+        deployments = [_convert_deployment_info_to_legacy_data(info) for info in result.items]
+        return SearchLegacyDeploymentsActionResult(
             data=deployments,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -538,6 +612,19 @@ class DeploymentService:
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
         return GetDeploymentByIdActionResult(data=_convert_deployment_info_to_data(deployment_info))
 
+    async def get_legacy_deployment_by_id(
+        self, action: GetLegacyDeploymentByIdAction
+    ) -> GetLegacyDeploymentByIdActionResult:
+        """Legacy (REST v1) get-by-id — full revision. DO NOT USE in new code;
+        v2 uses :meth:`get_deployment_by_id`.
+        """
+        deployment_info = await self._deployment_repository.get_legacy_endpoint_info(
+            action.deployment_id
+        )
+        return GetLegacyDeploymentByIdActionResult(
+            data=_convert_deployment_info_to_legacy_data(deployment_info)
+        )
+
     async def get_deployment_policy(
         self, action: GetDeploymentPolicyAction
     ) -> GetDeploymentPolicyActionResult:
@@ -552,7 +639,7 @@ class DeploymentService:
         Raises:
             DeploymentPolicyNotFound: If the policy does not exist
         """
-        data = await self._deployment_repository.get_deployment_policy(action.endpoint_id)
+        data = await self._deployment_repository.get_deployment_policy(action.deployment_id)
         return GetDeploymentPolicyActionResult(data=data)
 
     async def search_deployment_policies(
@@ -573,7 +660,7 @@ class DeploymentService:
         """Create or update a deployment policy using ON CONFLICT."""
         policy_upserter = action.upserter
         spec = DeploymentPolicyUpserterSpec(
-            endpoint_id=policy_upserter.deployment_id,
+            deployment_id=DeploymentID(policy_upserter.deployment_id),
             strategy=policy_upserter.strategy,
             strategy_spec=policy_upserter.strategy_spec,
         )
@@ -594,7 +681,7 @@ class DeploymentService:
         activates the new revision based on ``action.auto_activate``.
         """
         revision_data = await self._deployment_controller.add_deployment_revision(
-            deployment_id=action.model_deployment_id,
+            deployment_id=DeploymentID(action.model_deployment_id),
             revision=action.adder,
             auto_activate=action.auto_activate,
         )
@@ -657,22 +744,30 @@ class DeploymentService:
         # Bulk scan + independent per-deployment orchestration: multiple repo
         # and controller calls are required by design to preserve partial
         # success semantics. Each inner call owns its own transaction boundary.
-        endpoint_ids = await self._deployment_repository.list_active_endpoint_ids()
+        active_querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                DeploymentConditions.by_lifecycle_stages(EndpointLifecycle.active_states()),
+            ],
+        )
+        deployment_ids = await self._deployment_repository.search_deployment_ids(
+            querier=active_querier,
+        )
         results: list[RevisionRefreshResult] = []
         succeeded = 0
         failed = 0
-        for endpoint_id in endpoint_ids:
+        for deployment_id in deployment_ids:
             try:
-                spec = await self._deployment_repository.get_current_revision_spec(endpoint_id)
-                creator = _build_creator_from_revision_spec(spec)
+                data = await self._deployment_repository.get_current_revision(deployment_id)
+                creator = _build_creator_from_revision_data(data)
                 new_revision = await self._deployment_controller.add_deployment_revision(
-                    deployment_id=endpoint_id,
+                    deployment_id=deployment_id,
                     revision=creator,
                     auto_activate=True,
                 )
                 results.append(
                     RevisionRefreshResult(
-                        deployment_id=endpoint_id,
+                        deployment_id=deployment_id,
                         new_revision_id=new_revision.id,
                         success=True,
                         failure_reason=None,
@@ -682,13 +777,13 @@ class DeploymentService:
             except Exception as exc:
                 log.warning(
                     "admin_refresh_deployment_revisions failed for deployment {}: {}: {}",
-                    endpoint_id,
+                    deployment_id,
                     type(exc).__name__,
                     exc,
                 )
                 results.append(
                     RevisionRefreshResult(
-                        deployment_id=endpoint_id,
+                        deployment_id=deployment_id,
                         new_revision_id=None,
                         success=False,
                         failure_reason=f"{type(exc).__name__}: {exc}",
@@ -697,7 +792,7 @@ class DeploymentService:
                 failed += 1
         log.info(
             "admin_refresh_deployment_revisions summary: total={} succeeded={} failed={}",
-            len(endpoint_ids),
+            len(deployment_ids),
             succeeded,
             failed,
         )
@@ -862,10 +957,49 @@ class DeploymentService:
 
     # ========== Access Token ==========
 
+    async def _mint_endpoint_jwt(
+        self,
+        *,
+        deployment_id: UUID,
+        resource_group: str,
+        user_uuid: UUID,
+        expires_at: datetime,
+    ) -> str:
+        """Ask the deployment's app-proxy coordinator to mint an inference JWT.
+
+        Resolves the coordinator behind the deployment's scaling group and
+        delegates to :class:`AppProxyClient`. Raises
+        :class:`InvalidAPIParameters` when the scaling group has no proxy
+        target configured — an opaque local fallback would not pass the
+        worker's HS256 check, so refusing here is the only safe option.
+        """
+        proxy_targets = await self._deployment_repository.fetch_scaling_group_proxy_targets({
+            resource_group
+        })
+        proxy_target = proxy_targets.get(resource_group)
+        if proxy_target is None:
+            raise InvalidAPIParameters(
+                f"No app-proxy target configured for scaling group {resource_group!r}; "
+                "cannot issue a deployment access token."
+            )
+
+        client = self._appproxy_client_pool.load_client(proxy_target.addr, proxy_target.api_token)
+        response = await client.mint_endpoint_token(
+            endpoint_id=deployment_id,
+            body=MintEndpointTokenRequest(user_uuid=user_uuid, exp=expires_at),
+        )
+        return response.token
+
     async def create_access_token(
         self, action: CreateAccessTokenAction
     ) -> CreateAccessTokenActionResult:
         """Create a new access token for a model deployment.
+
+        The token returned to the caller is a JWT issued by the app-proxy
+        coordinator (signed with the coordinator's ``jwt_secret``). The
+        inference frontend in the worker validates this JWT against the
+        circuit id, so a randomly generated opaque token would always be
+        rejected with 401.
 
         Args:
             action: CreateAccessTokenAction containing the creator spec.
@@ -873,26 +1007,35 @@ class DeploymentService:
         Returns:
             CreateAccessTokenActionResult with the created token data.
         """
-        # Get endpoint info to retrieve domain, project, session_owner
+        # Get endpoint info to retrieve domain, project, session_owner, resource_group
         endpoint_info = await self._deployment_repository.get_endpoint_info(
             action.creator.model_deployment_id
         )
 
-        # Create the RBACEntityCreator with EndpointTokenCreatorSpec
-        endpoint_id = action.creator.model_deployment_id
+        expires_at = action.creator.expires_at
+        jwt_token = await self._mint_endpoint_jwt(
+            deployment_id=action.creator.model_deployment_id,
+            resource_group=endpoint_info.metadata.resource_group,
+            user_uuid=endpoint_info.metadata.session_owner,
+            expires_at=expires_at,
+        )
+
+        # Create the RBACEntityCreator with the JWT-bearing spec
+        deployment_id = DeploymentID(action.creator.model_deployment_id)
         spec = EndpointTokenCreatorSpec(
-            endpoint_id=endpoint_id,
+            deployment_id=deployment_id,
             domain=endpoint_info.metadata.domain,
             project_id=endpoint_info.metadata.project,
             session_owner_id=endpoint_info.metadata.session_owner,
-            expires_at=action.creator.expires_at,
+            expires_at=expires_at,
+            token=jwt_token,
         )
         creator: RBACEntityCreator[EndpointTokenRow] = RBACEntityCreator(
             spec=spec,
             element_type=RBACElementType.DEPLOYMENT_TOKEN,
             scope_ref=RBACElementRef(
                 element_type=RBACElementType.MODEL_DEPLOYMENT,
-                element_id=str(endpoint_id),
+                element_id=str(deployment_id),
             ),
         )
 

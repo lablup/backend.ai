@@ -69,7 +69,7 @@ async def _report_status_bgtask(
             try:
                 await report_manager_status(valkey_stat, db, config_provider)
             except Exception as e:
-                log.exception(f"Failed to report manager health status (e:{e!s})")
+                log.exception("Failed to report manager health status (e:{!s})", e)
     except asyncio.CancelledError:
         pass
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -14,6 +15,7 @@ from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
+    SearchScope,
     execute_batch_querier,
     execute_creator,
 )
@@ -70,6 +72,32 @@ class AuditLogDBSource:
                 db_sess,
                 query,
                 querier,
+            )
+
+            items = [row.AuditLogRow.to_dataclass() for row in result.rows]
+
+            return AuditLogListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @audit_log_db_source_resilience.apply()
+    async def scoped_search(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> AuditLogListResult:
+        """Search audit logs whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(AuditLogRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scopes=scopes,
             )
 
             items = [row.AuditLogRow.to_dataclass() for row in result.rows]

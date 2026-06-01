@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from aiohttp import web
 
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.api.rest.middleware.auth import (
     admin_required,
     auth_required,
@@ -21,6 +22,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderStatusSet,
 )
 from ai.backend.manager.services.vfolder.actions.base import GetAccessibleVFolderAction
+from ai.backend.manager.services.vfolder.actions.get_row import GetVFolderLegacyRowAction
 
 from .handler import VFolderHandler
 
@@ -38,8 +40,15 @@ def _vfolder_resolver(
 ) -> RouteMiddleware:
     """Route middleware that resolves vfolder rows and checks status.
 
-    Uses the ``get_accessible_vfolder`` processor to resolve, validate
-    count (0 → NotFound, >1 → TooMany), and check status in a single call.
+    Branches on the path parameter type:
+
+    - When the path parameter is a UUID, fetch the row directly without
+      legacy permission filtering and without status validation. Permission
+      evaluation is delegated to the downstream RBAC validator on the action
+      invoked by the handler.
+    - When the path parameter is a name (str), use the legacy
+      ``get_accessible_vfolder`` flow, which scopes the lookup by the
+      requester's permissions to disambiguate folders sharing a name.
 
     Sets ``request["vfolder_row"]`` so that ``VFolderAuthContext`` can
     extract the row in handler methods.
@@ -49,24 +58,27 @@ def _vfolder_resolver(
         @functools.wraps(handler)
         async def wrapper(request: web.Request) -> web.StreamResponse:
             piece = request.match_info["name"]
-            folder_name_or_id: str | uuid.UUID
             try:
-                folder_name_or_id = uuid.UUID(piece)
+                vfolder_uuid = VFolderUUID(uuid.UUID(piece))
             except ValueError:
-                folder_name_or_id = piece
-            result = await vfolder_processors.get_accessible_vfolder.wait_for_complete(
-                GetAccessibleVFolderAction(
-                    user_uuid=request["user"]["uuid"],
-                    user_role=request["user"]["role"],
-                    domain_name=request["user"]["domain_name"],
-                    is_admin=request["is_admin"],
-                    perm=perm,
-                    folder_id_or_name=folder_name_or_id,
-                    required_status=status,
-                    allow_privileged_access=allow_privileged_access,
+                result = await vfolder_processors.get_accessible_vfolder.wait_for_complete(
+                    GetAccessibleVFolderAction(
+                        user_uuid=request["user"]["uuid"],
+                        user_role=request["user"]["role"],
+                        domain_name=request["user"]["domain_name"],
+                        is_admin=request["is_admin"],
+                        perm=perm,
+                        folder_id_or_name=piece,
+                        required_status=status,
+                        allow_privileged_access=allow_privileged_access,
+                    )
                 )
-            )
-            request["vfolder_row"] = result.row
+                request["vfolder_row"] = result.row
+            else:
+                row_result = await vfolder_processors.get_vfolder_row.wait_for_complete(
+                    GetVFolderLegacyRowAction(vfolder_uuid=vfolder_uuid)
+                )
+                request["vfolder_row"] = row_result.row
             return await handler(request)
 
         return wrapper

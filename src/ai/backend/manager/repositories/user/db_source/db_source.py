@@ -17,6 +17,7 @@ from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.common.types import SearchResult
@@ -47,10 +48,8 @@ from ai.backend.manager.errors.user import (
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.group import (
-    AssocGroupUserRow,
     GroupRow,
     ProjectType,
-    association_groups_users,
 )
 from ai.backend.manager.models.kernel import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -103,6 +102,10 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityBatchPurger,
+    execute_rbac_entity_batch_purger,
+)
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
@@ -112,18 +115,21 @@ from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     execute_rbac_scope_entity_unbinder,
 )
 from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater, execute_updater
-from ai.backend.manager.repositories.group.creators import AssocGroupUserCreatorSpec
+from ai.backend.manager.repositories.group.creators import ProjectUserMembershipCreatorSpec
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
-from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.types import (
+    KeypairResourcePolicyKeypairSearchScope,
+    UserKeypairSearchScope,
+)
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.purgers import (
+    UserBatchPurgerSpec,
     create_user_error_log_purger,
     create_user_group_association_purger,
     create_user_keypair_purger,
-    create_user_purger,
     create_user_vfolder_permission_purger,
 )
 from ai.backend.manager.repositories.user.types import (
@@ -246,9 +252,8 @@ class UserDBSource:
             row.main_access_key = kp_data.access_key
             created_user.main_access_key = kp_data.access_key
 
-            # Add user to groups (using already-resolved project_ids)
-            if project_ids:
-                await self._add_user_to_groups(db_session, created_user.uuid, project_ids)
+            # User-project membership is recorded as AssociationScopesEntitiesRow rows
+            # by RBACEntityCreator above (via additional_scope_refs).
 
             # Create RBAC role and map user to role
             # Note: Entity-Scope association is handled by RBACEntityCreator above
@@ -345,9 +350,8 @@ class UserDBSource:
         row.main_access_key = kp_data.access_key
         created_user.main_access_key = kp_data.access_key
 
-        # Add user to groups (using already-resolved project_ids)
-        if project_ids:
-            await self._add_user_to_groups(db_session, created_user.uuid, project_ids)
+        # User-project membership is recorded as AssociationScopesEntitiesRow rows
+        # by RBACEntityCreator above (via additional_scope_refs).
 
         # Create RBAC role and map user to role
         role = await self._role_manager.create_system_role(db_session, created_user)
@@ -635,8 +639,12 @@ class UserDBSource:
             await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
             await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
 
-            # Finally delete the user
-            await execute_batch_purger(session, create_user_purger(user_uuid))
+            # Finally delete the user itself with RBAC scope/permission cleanup
+            # to avoid dangling association_scopes_entities and permission rows.
+            await execute_rbac_entity_batch_purger(
+                session,
+                RBACEntityBatchPurger(spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1),
+            )
 
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
         """Completely purge user and all associated data by UUID."""
@@ -647,8 +655,12 @@ class UserDBSource:
             await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
             await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
 
-            # Finally delete the user
-            await execute_batch_purger(session, create_user_purger(user_uuid))
+            # Finally delete the user itself with RBAC scope/permission cleanup
+            # to avoid dangling association_scopes_entities and permission rows.
+            await execute_rbac_entity_batch_purger(
+                session,
+                RBACEntityBatchPurger(spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1),
+            )
 
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
         """Check if user's vfolders are mounted to active kernels."""
@@ -869,18 +881,6 @@ class UserDBSource:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return cast(UserRow, res)
 
-    async def _add_user_to_groups(
-        self, db_session: SASession, user_uuid: UUID, project_ids: Iterable[UUID]
-    ) -> None:
-        """Add user to groups using pre-resolved project IDs.
-
-        Note: RBAC scope associations are handled by RBACEntityCreator in create_user_validated().
-        This method only handles the association_groups_users table.
-        """
-        group_data = [{"user_id": user_uuid, "group_id": pid} for pid in project_ids]
-        if group_data:
-            await db_session.execute(sa.insert(association_groups_users).values(group_data))
-
     async def _get_project_scope_ids_for_user(
         self, db_session: SASession, domain_name: str, project_ids: Iterable[UUID]
     ) -> list[UUID]:
@@ -1008,12 +1008,16 @@ class UserDBSource:
             )
         )
 
-        current_rows = (
+        current_entity_ids = (
             await session.scalars(
-                sa.select(AssocGroupUserRow.group_id).where(AssocGroupUserRow.user_id == user_uuid)
+                sa.select(AssociationScopesEntitiesRow.scope_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+                )
             )
         ).all()
-        current_project_ids = set(current_rows)
+        current_project_ids = {UUID(sid) for sid in current_entity_ids}
 
         to_remove = current_project_ids - target_project_ids
         to_add = target_project_ids - current_project_ids
@@ -1021,6 +1025,15 @@ class UserDBSource:
         for project_id in to_remove:
             await self._remove_user_from_project_in_session(session, user_uuid, project_id)
         for project_id in to_add:
+            await self._add_user_to_project_in_session(session, user_uuid, project_id)
+
+    async def assign_project_membership(
+        self,
+        user_uuid: UUID,
+        project_id: ProjectID,
+    ) -> None:
+        """Add a user to a project, mapping the user to the project's member role."""
+        async with self._db.begin_session_read_committed() as session:
             await self._add_user_to_project_in_session(session, user_uuid, project_id)
 
     async def _add_user_to_project_in_session(
@@ -1032,12 +1045,13 @@ class UserDBSource:
         """Add a user to a project within an existing session.
 
         Mirrors GroupDBSource._add_users_to_project_in_session for the
-        single-user case: inserts the business association, creates the RBAC
-        scope binding, and maps the user to the project's member role (only).
+        single-user case: inserts the RBAC scope binding (ASE) via
+        ``RBACScopeBinder`` and maps the user to the project's member role
+        (only).
         """
         project_scope_ref = RBACElementRef(RBACElementType.PROJECT, str(project_id))
         pair = RBACScopeBindingPair(
-            spec=AssocGroupUserCreatorSpec(user_id=user_uuid, group_id=project_id),
+            spec=ProjectUserMembershipCreatorSpec(user_id=user_uuid, project_id=project_id),
             entity_ref=RBACElementRef(RBACElementType.USER, str(user_uuid)),
             scope_ref=project_scope_ref,
         )
@@ -1085,8 +1099,8 @@ class UserDBSource:
         """Remove a user from a project within an existing session.
 
         Mirrors GroupDBSource._remove_users_from_project_in_session for the
-        single-user case: deletes the business association, removes the RBAC
-        scope binding, and unmaps the user from any project-scoped roles.
+        single-user case: deletes the RBAC scope binding (ASE) via the
+        unbinder API and unmaps the user from any project-scoped roles.
         """
         unbinder = UserProjectEntityUnbinder(
             user_uuids=[user_uuid],
@@ -1296,7 +1310,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(UserRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
@@ -1313,7 +1327,8 @@ class UserDBSource:
     ) -> UserSearchResult:
         """Search users within a project.
 
-        Joins with association_groups_users to find project members.
+        Joins with association_scopes_entities (PROJECT scope, USER entity)
+        to find project members.
 
         Args:
             scope: ProjectUserSearchScope defining the project to search within.
@@ -1327,11 +1342,15 @@ class UserDBSource:
                 sa.select(UserRow)
                 .select_from(UserRow)
                 .join(
-                    AssocGroupUserRow,
-                    UserRow.uuid == AssocGroupUserRow.user_id,
+                    AssociationScopesEntitiesRow,
+                    sa.and_(
+                        sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    ),
                 )
             )
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
@@ -1359,7 +1378,7 @@ class UserDBSource:
                     UserRow.uuid == UserRoleRow.user_id,
                 )
             )
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
@@ -1520,7 +1539,32 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
+            items = [row.KeyPairRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_keypairs_by_resource_policy(
+        self,
+        scope: KeypairResourcePolicyKeypairSearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[KeyPairData]:
+        """Search keypairs assigned to a keypair resource policy.
+
+        Args:
+            scope: Search scope containing the resource policy name to filter by.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            SearchResult with matching keypairs and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(KeyPairRow)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
             items = [row.KeyPairRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,

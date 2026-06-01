@@ -1,4 +1,3 @@
-import json
 import logging
 from collections.abc import Mapping, Sequence
 from typing import (
@@ -7,7 +6,6 @@ from typing import (
     Self,
     cast,
 )
-from uuid import UUID
 
 from glide import (
     Batch,
@@ -22,7 +20,6 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
-from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -544,34 +541,6 @@ class ValkeyLiveClient:
             str_result[str_key] = str_value
 
         return str_result
-
-    @valkey_live_resilience.apply()
-    async def update_appproxy_redis_info(
-        self,
-        endpoint_id: UUID,
-        connection_info: dict[str, Any],
-        health_check_config: ModelHealthCheck | None,
-    ) -> None:
-        pipe = self._create_batch()
-        pipe.set(
-            f"endpoint.{endpoint_id}.route_connection_info",
-            json.dumps(connection_info),
-            expiry=ExpirySet(ExpiryType.SEC, 3600),
-        )
-        pipe.set(
-            f"endpoint.{endpoint_id}.health_check_enabled",
-            "true" if health_check_config is not None else "false",
-            expiry=ExpirySet(ExpiryType.SEC, 3600),
-        )
-        # TODO: Don't update health_check_config when route is updated.
-        if health_check_config:
-            pipe.set(
-                f"endpoint.{endpoint_id}.health_check_config",
-                health_check_config.model_dump_json(),
-                expiry=ExpirySet(ExpiryType.SEC, 3600),
-            )
-        async with self._client.client() as conn:
-            await conn.exec(pipe, raise_on_error=True)
 
     @valkey_live_resilience.apply()
     async def delete_key(self, key: str) -> int:

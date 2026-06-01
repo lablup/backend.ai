@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 from .base import KernelPostProcessor, KernelPostProcessorContext
 

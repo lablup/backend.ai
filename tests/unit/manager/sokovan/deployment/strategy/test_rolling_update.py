@@ -13,23 +13,32 @@ route mutations) or COMPLETED.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import cast
+from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
+from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
+    DeploymentOptions,
     DeploymentState,
-    ReplicaSpec,
+    ModelRevisionData,
+    ReplicaData,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
@@ -53,6 +62,7 @@ def make_int_or_percent(value: int | float) -> IntOrPercent:
 
 
 OLD_REV = UUID("11111111-1111-1111-1111-111111111111")
+_STUB_HEALTH_CHECK = ModelHealthCheck(path="/health", interval=10.0, initial_delay=30.0)
 NEW_REV = UUID("22222222-2222-2222-2222-222222222222")
 PROJECT_ID = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
 USER_ID = UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")
@@ -97,8 +107,12 @@ def make_deployment(
     current_revision_id: UUID = OLD_REV,
     endpoint_id: UUID = ENDPOINT_ID,
 ) -> DeploymentInfo:
+    deploying_mock = MagicMock()
+    deploying_mock.id = DeploymentRevisionID(deploying_revision_id)
+    current_mock = MagicMock()
+    current_mock.id = DeploymentRevisionID(current_revision_id)
     return DeploymentInfo(
-        id=endpoint_id,
+        id=DeploymentID(endpoint_id),
         metadata=DeploymentMetadata(
             name="test-deploy",
             domain="default",
@@ -111,15 +125,19 @@ def make_deployment(
         ),
         state=DeploymentState(
             lifecycle=EndpointLifecycle.DEPLOYING,
+            scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
-        replica_spec=ReplicaSpec(
+        replica=ReplicaData(
             replica_count=desired,
+            desired_replica_count=None,
         ),
-        network=DeploymentNetworkSpec(open_to_public=False),
-        model_revisions=[],
-        current_revision_id=current_revision_id,
-        deploying_revision_id=deploying_revision_id,
+        network=DeploymentNetworkData(
+            open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+        ),
+        options=DeploymentOptions(),
+        current_revision=cast(ModelRevisionData, current_mock),
+        deploying_revision=cast(ModelRevisionData, deploying_mock),
     )
 
 
@@ -130,10 +148,11 @@ def make_route(
     health_status: RouteHealthStatus = RouteHealthStatus.HEALTHY,
     endpoint_id: UUID = ENDPOINT_ID,
     route_id: UUID | None = None,
+    health_check: ModelHealthCheck | None = _STUB_HEALTH_CHECK,
 ) -> RouteInfo:
     return RouteInfo(
         route_id=route_id or uuid4(),
-        endpoint_id=endpoint_id,
+        deployment_id=DeploymentID(endpoint_id),
         session_id=SessionId(uuid4()),
         status=status,
         health_status=health_status,
@@ -143,6 +162,7 @@ def make_route(
         traffic_status=RouteTrafficStatus.ACTIVE
         if status.is_active()
         else RouteTrafficStatus.INACTIVE,
+        health_check=health_check,
     )
 
 
@@ -736,7 +756,7 @@ class TestEdgeCases:
 
     def test_deploying_rev_none_rejected(self) -> None:
         """If deploying_revision_id is None, evaluate_cycle raises."""
-        deployment = make_deployment(desired=1, deploying_revision_id=None)  # type: ignore[arg-type]
+        deployment = dataclasses.replace(make_deployment(desired=1), deploying_revision=None)
         spec = RollingUpdateSpec(
             max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
         )
@@ -782,7 +802,7 @@ class TestRouteCreatorSpecs:
         creator_spec = result.route_changes.rollout_specs[0].spec
         assert isinstance(creator_spec, RouteCreatorSpec)
         assert creator_spec.revision_id == NEW_REV
-        assert creator_spec.endpoint_id == ENDPOINT_ID
+        assert creator_spec.deployment_id == ENDPOINT_ID
         assert creator_spec.session_owner_id == USER_ID
         assert creator_spec.domain == "default"
         assert creator_spec.project_id == PROJECT_ID
@@ -919,7 +939,7 @@ class TestDesiredReplicaCount:
     def test_desired_replica_count_overrides_replica_count(self) -> None:
         """When desired_replica_count is set, it takes precedence."""
         deployment = make_deployment(desired=3)
-        deployment.replica_spec = ReplicaSpec(
+        deployment.replica = ReplicaData(
             replica_count=1,
             desired_replica_count=3,
         )
@@ -935,7 +955,7 @@ class TestDesiredReplicaCount:
     def test_replica_count_used_when_no_desired(self) -> None:
         """When desired_replica_count is None, uses replica_count."""
         deployment = make_deployment(desired=2)
-        deployment.replica_spec = ReplicaSpec(
+        deployment.replica = ReplicaData(
             replica_count=2,
             desired_replica_count=None,
         )
@@ -1054,13 +1074,13 @@ class TestFractionSpec:
         assert spec.resolve_max_unavailable(100) == 2
 
     def test_fraction_over_1_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RollingUpdateSpec(
                 max_surge=make_int_or_percent(1.5), max_unavailable=make_int_or_percent(0)
             )
 
     def test_negative_fraction_rejected(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             RollingUpdateSpec(
                 max_surge=make_int_or_percent(-0.1), max_unavailable=make_int_or_percent(0)
             )
@@ -1116,3 +1136,70 @@ class TestFractionStrategy:
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 1
+
+
+# ===========================================================================
+# No-health-check scenario
+# ===========================================================================
+
+
+class TestNoHealthCheck:
+    """Routes without health_check stay DEGRADED in DB but must allow READY transition."""
+
+    def test_running_degraded_no_health_check_completes(self) -> None:
+        """RUNNING + DEGRADED + no health_check → counts as healthy → COMPLETED."""
+        deployment = make_deployment(desired=1)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [
+            make_route(
+                revision_id=NEW_REV,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.DEGRADED,
+                health_check=None,
+            )
+        ]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED
+
+    def test_running_degraded_with_health_check_does_not_complete(self) -> None:
+        """RUNNING + DEGRADED + has health_check → still unhealthy → PROVISIONING."""
+        deployment = make_deployment(desired=1)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [
+            make_route(
+                revision_id=NEW_REV,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.DEGRADED,
+                health_check=_STUB_HEALTH_CHECK,
+            )
+        ]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
+
+    def test_multiple_replicas_no_health_check_completes(self) -> None:
+        """2 desired, 2 RUNNING DEGRADED no-health-check → COMPLETED."""
+        deployment = make_deployment(desired=2)
+        spec = RollingUpdateSpec(
+            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
+        )
+        routes = [
+            make_route(
+                revision_id=NEW_REV,
+                status=RouteStatus.RUNNING,
+                health_status=RouteHealthStatus.DEGRADED,
+                health_check=None,
+            )
+            for _ in range(2)
+        ]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED

@@ -89,6 +89,24 @@ def register_v2_rbac_routes(
         handler.delete_permission,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "POST",
+        "/permissions/bulk-add",
+        handler.bulk_add_role_permissions,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/permissions/bulk-remove",
+        handler.bulk_remove_role_permissions,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/permissions/replace",
+        handler.replace_role_permissions,
+        middlewares=[superadmin_required],
+    )
 
     # Assignments
     registry.add(
@@ -108,6 +126,12 @@ def register_v2_rbac_routes(
         "/assignments/search",
         handler.search_assignments,
         middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/assignments/my/search",
+        handler.my_search_assignments,
+        middlewares=[auth_required],
     )
     registry.add(
         "POST",

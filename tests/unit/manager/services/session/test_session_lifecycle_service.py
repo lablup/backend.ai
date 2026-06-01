@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import inspect
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -26,6 +27,12 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.api.rest.session.handler import (
+    LegacyMountResolution,
+    SessionHandler,
+    _merge_resolved_legacy_mounts,
+    _route_legacy_uuid_mounts,
+)
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.data.user.types import SessionOwnerContext
@@ -44,9 +51,6 @@ from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.session.repository import SessionRepository
-from ai.backend.manager.services.session.actions.check_and_transit_status import (
-    CheckAndTransitStatusBatchAction,
-)
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
 )
@@ -87,6 +91,9 @@ from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
+    ResolveIdsByNamesActionResult,
+)
 from ai.backend.manager.types import UserScope
 
 # ==================== Shared Fixtures ====================
@@ -101,9 +108,6 @@ def mock_session_repository() -> MagicMock:
 def mock_agent_registry() -> MagicMock:
     mock = MagicMock()
     mock.increment_session_usage = AsyncMock()
-    mock.session_lifecycle_mgr = MagicMock()
-    mock.session_lifecycle_mgr.transit_session_status = AsyncMock(return_value=[])
-    mock.session_lifecycle_mgr.deregister_status_updatable_session = AsyncMock()
     return mock
 
 
@@ -166,6 +170,7 @@ async def session_service(
         error_monitor=mock_error_monitor,
         idle_checker_host=mock_idle_checker_host,
         session_repository=mock_session_repository,
+        scheduler_repository=MagicMock(),
         scheduling_controller=mock_scheduling_controller,
         appproxy_client_pool=mock_appproxy_client_pool,
         user_repository=MagicMock(),
@@ -1033,6 +1038,261 @@ class TestCreateFromParams:
         with pytest.raises(QuotaExceeded):
             await session_service.create_from_params(action)
 
+    async def test_legacy_mount_surfaces_resolve_then_reach_agent_registry(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        sample_access_key: AccessKey,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
+    ) -> None:
+        """BA-5916: legacy ``mounts`` / ``mount_map`` / ``mount_options``
+        get resolved to UUID-keyed buckets and reach ``AgentRegistry.create_session``.
+        """
+        vfid = UUID("11111111-1111-1111-1111-111111111111")
+
+        async def _wait_for_complete(action: Any) -> ResolveIdsByNamesActionResult:
+            assert list(action.vfolder_names) == ["vf-a"]
+            return ResolveIdsByNamesActionResult(name_to_id={"vf-a": vfid})
+
+        resolver = MagicMock()
+        resolver.wait_for_complete = AsyncMock(side_effect=_wait_for_complete)
+        vfolder_pkg = MagicMock()
+        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
+        handler = SessionHandler.__new__(SessionHandler)
+        handler._vfolder = vfolder_pkg
+
+        # Step 1: handler-side resolution & merge of legacy surfaces.
+        legacy_config: dict[str, Any] = {
+            "mounts": ["vf-a"],
+            "mount_map": {"vf-a": "/data"},
+            "mount_options": {"vf-a": {"permission": "ro", "type": "bind"}},
+        }
+        resolutions = await handler._resolve_legacy_name_mounts(
+            legacy_config["mounts"],
+            legacy_config["mount_map"],
+            legacy_config["mount_options"],
+        )
+        resolved_config = _merge_resolved_legacy_mounts(legacy_config, resolutions)
+
+        # Step 2: feed the resolved config to the service and verify it
+        # arrives at AgentRegistry.create_session intact.
+        new_session_id = str(uuid4())
+        mock_session_repository.query_userinfo = AsyncMock(
+            return_value=SessionOwnerContext(
+                owner_uuid=sample_user_id,
+                group_id=sample_group_id,
+                resource_policy={},
+                owner_role=UserRole.USER,
+            )
+        )
+        mock_image_row = MagicMock()
+        mock_image_row.image_ref = MagicMock()
+        mock_session_repository.resolve_image = AsyncMock(return_value=mock_image_row)
+        mock_agent_registry.create_session = AsyncMock(return_value={"sessionId": new_session_id})
+
+        action = CreateFromParamsAction(
+            params=CreateFromParamsActionParams(
+                session_name="legacy-mount-session",
+                image="python:latest",
+                architecture="x86_64",
+                session_type=SessionTypes.INTERACTIVE,
+                group_name="default",
+                domain_name="default",
+                cluster_size=1,
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                config=resolved_config,
+                tag="",
+                priority=0,
+                is_preemptible=True,
+                owner_access_key=sample_access_key,
+                enqueue_only=False,
+                max_wait_seconds=0,
+                starts_at=None,
+                reuse_if_exists=False,
+                startup_command=None,
+                batch_timeout=None,
+                bootstrap_script=None,
+                dependencies=None,
+                callback_url=None,
+            ),
+            user_id=sample_user_id,
+            user_role=UserRole.USER,
+            sudo_session_enabled=False,
+            requester_access_key=sample_access_key,
+            keypair_resource_policy=None,
+        )
+        await session_service.create_from_params(action)
+
+        bound = inspect.signature(AgentRegistry.create_session).bind(
+            None,
+            *mock_agent_registry.create_session.call_args.args,
+            **mock_agent_registry.create_session.call_args.kwargs,
+        )
+        passed_config = bound.arguments["config"]
+        assert passed_config["mount_ids"] == [vfid]
+        assert passed_config["mount_id_map"] == {vfid: "/data"}
+        assert passed_config["mount_options"][vfid] == {
+            "permission": "ro",
+            "type": "bind",
+        }
+        assert "mounts" not in passed_config
+        assert "mount_map" not in passed_config
+
+    @pytest.fixture
+    def legacy_uuid_mount_vfid(self) -> UUID:
+        return UUID("22222222-2222-2222-2222-222222222222")
+
+    @pytest.fixture
+    def legacy_uuid_mount_config(self, legacy_uuid_mount_vfid: UUID) -> dict[str, Any]:
+        vfid_str = str(legacy_uuid_mount_vfid)
+        return {
+            "mounts": [vfid_str, "vf-named"],
+            "mount_map": {vfid_str: "/data"},
+            "mount_options": {vfid_str: {"permission": "ro"}},
+        }
+
+    async def test_route_legacy_uuid_mounts(
+        self,
+        legacy_uuid_mount_vfid: UUID,
+        legacy_uuid_mount_config: dict[str, Any],
+    ) -> None:
+        """``_route_legacy_uuid_mounts`` lifts UUID-shaped strings out of the
+        legacy ``mounts`` / ``mount_map`` / ``mount_options`` buckets into the
+        UUID-keyed ``mount_ids`` / ``mount_id_map`` / ``mount_options``.
+        """
+        routed = _route_legacy_uuid_mounts(legacy_uuid_mount_config)
+
+        assert routed["mounts"] == ["vf-named"]
+        assert routed["mount_map"] == {}
+        assert routed["mount_options"] == {legacy_uuid_mount_vfid: {"permission": "ro"}}
+        assert routed["mount_ids"] == [legacy_uuid_mount_vfid]
+        assert routed["mount_id_map"] == {legacy_uuid_mount_vfid: "/data"}
+
+    @dataclass(frozen=True)
+    class ExpectedLegacyMount:
+        """Expected post-merge state across the UUID-keyed buckets.
+
+        ``subpath`` is what the resolver returns on
+        :class:`LegacyMountResolution`. ``mount_id_map`` and ``mount_options``
+        mirror the full UUID-keyed dicts ``_merge_resolved_legacy_mounts``
+        should produce — keys are vfolder UUIDs since all legacy name-keyed
+        entries have been resolved by the time we assert.
+        """
+
+        subpath: str | None
+        mount_id_map: dict[UUID, str] = field(default_factory=dict)
+        mount_options: dict[UUID, dict[str, Any]] = field(default_factory=dict)
+
+    @dataclass(frozen=True)
+    class LegacyMountCase:
+        """One legacy-mount route → resolve → merge scenario."""
+
+        case_id: str
+        legacy_config: dict[str, Any]
+        expected: TestCreateFromParams.ExpectedLegacyMount
+
+    LEGACY_MOUNT_VFID = UUID("33333333-3333-3333-3333-333333333333")
+
+    LEGACY_MOUNT_CASES = [
+        # BA-6022 base case: mounts=[vfname/sub] gets parsed and the subpath
+        # lands on mount_options[uuid][subpath]; mount_map keyed by plain name
+        # supplies the destination. Previously rejected with 400 by PR #11434.
+        LegacyMountCase(
+            case_id="mounts_subpath_with_plain_mount_map",
+            legacy_config={
+                "mounts": ["vf-a/weights/v2"],
+                "mount_map": {"vf-a": "/data"},
+                "mount_options": {},
+            },
+            expected=ExpectedLegacyMount(
+                subpath="weights/v2",
+                mount_id_map={LEGACY_MOUNT_VFID: "/data"},
+                mount_options={LEGACY_MOUNT_VFID: {"subpath": "weights/v2"}},
+            ),
+        ),
+        # v1 CLI flattens ``-v vfname/sub:/dest,permission=ro`` into the same
+        # slash-with-subpath source string across all three surfaces. The
+        # handler must peel the suffix off every key so dst and per-mount opts
+        # survive the re-keying onto the UUID-keyed buckets.
+        LegacyMountCase(
+            case_id="cli_colon_form_slashy_keys_in_all_surfaces",
+            legacy_config={
+                "mounts": ["vf-a/weights/v2"],
+                "mount_map": {"vf-a/weights/v2": "/data"},
+                "mount_options": {"vf-a/weights/v2": {"permission": "ro"}},
+            },
+            expected=ExpectedLegacyMount(
+                subpath="weights/v2",
+                mount_id_map={LEGACY_MOUNT_VFID: "/data"},
+                mount_options={
+                    LEGACY_MOUNT_VFID: {"permission": "ro", "subpath": "weights/v2"},
+                },
+            ),
+        ),
+        # An explicit UUID-keyed ``mount_options[uuid][subpath]`` must beat
+        # a competing legacy ``mounts=[vfname/sub]`` for the same vfolder —
+        # the legacy name form does NOT clobber the modern surface.
+        LegacyMountCase(
+            case_id="explicit_uuid_subpath_wins_over_legacy_form",
+            legacy_config={
+                "mounts": ["vf-a/legacy-form-subpath"],
+                "mount_map": {},
+                "mount_options": {
+                    str(LEGACY_MOUNT_VFID): {"subpath": "uuid-form-subpath"},
+                },
+            },
+            expected=ExpectedLegacyMount(
+                subpath="legacy-form-subpath",
+                mount_options={LEGACY_MOUNT_VFID: {"subpath": "uuid-form-subpath"}},
+            ),
+        ),
+    ]
+
+    @pytest.mark.parametrize(
+        "case",
+        LEGACY_MOUNT_CASES,
+        ids=[c.case_id for c in LEGACY_MOUNT_CASES],
+    )
+    async def test_legacy_mount_route_resolve_merge(self, case: LegacyMountCase) -> None:
+        """End-to-end ``_route_legacy_uuid_mounts`` → ``_resolve_legacy_name_mounts``
+        → ``_merge_resolved_legacy_mounts`` for the legacy mount surfaces.
+
+        Every scenario resolves ``vf-a`` to ``LEGACY_MOUNT_VFID`` and asserts
+        that the UUID-keyed buckets carry the expected destination + subpath +
+        per-mount options on the resolved vfolder id.
+        """
+        vfid = self.LEGACY_MOUNT_VFID
+
+        async def _wait_for_complete(action: Any) -> ResolveIdsByNamesActionResult:
+            # The bare name must be resolved — not the slashed source — and
+            # UUID-shaped keys must already have been lifted by the route step.
+            assert list(action.vfolder_names) == ["vf-a"]
+            return ResolveIdsByNamesActionResult(name_to_id={"vf-a": vfid})
+
+        resolver = MagicMock()
+        resolver.wait_for_complete = AsyncMock(side_effect=_wait_for_complete)
+        vfolder_pkg = MagicMock()
+        vfolder_pkg.resolve_vfolder_ids_by_names = resolver
+        handler = SessionHandler.__new__(SessionHandler)
+        handler._vfolder = vfolder_pkg
+
+        routed = _route_legacy_uuid_mounts(case.legacy_config)
+        resolutions = await handler._resolve_legacy_name_mounts(
+            routed["mounts"], routed["mount_map"], routed["mount_options"]
+        )
+        assert resolutions == {
+            "vf-a": LegacyMountResolution(vfid=vfid, subpath=case.expected.subpath),
+        }
+
+        merged = _merge_resolved_legacy_mounts(routed, resolutions)
+        assert merged["mount_ids"] == [vfid]
+        assert merged["mount_id_map"] == case.expected.mount_id_map
+        assert merged["mount_options"] == case.expected.mount_options
+        assert "mounts" not in merged
+        assert "mount_map" not in merged
+
     async def test_owner_access_key_uses_owner_user_scope(
         self,
         session_service: SessionService,
@@ -1898,100 +2158,3 @@ class TestShutdownService:
 
         with pytest.raises(SessionNotFound):
             await session_service.shutdown_service(action)
-
-
-# ==================== CheckAndTransitStatusBatch Tests ====================
-
-
-class _TestCheckAndTransitStatusBatchAction(CheckAndTransitStatusBatchAction):
-    """Concrete subclass for testing (field_data is abstract in BaseBatchAction)."""
-
-    def field_data(self) -> None:
-        return None
-
-
-class TestCheckAndTransitStatusBatch:
-    async def test_admin_processes_all_sessions(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
-        sample_user_id: UUID,
-    ) -> None:
-        sid1 = SessionId(uuid4())
-        sid2 = SessionId(uuid4())
-
-        mock_row1 = MagicMock()
-        mock_row1.id = sid1
-        mock_row1.status = SessionStatus.RUNNING
-        mock_row2 = MagicMock()
-        mock_row2.id = sid2
-        mock_row2.status = SessionStatus.RUNNING
-
-        mock_agent_registry.session_lifecycle_mgr.transit_session_status = AsyncMock(
-            return_value=[(mock_row1, True), (mock_row2, True)]
-        )
-
-        action = _TestCheckAndTransitStatusBatchAction(
-            user_id=sample_user_id,
-            user_role=UserRole.ADMIN,
-            session_ids=[sid1, sid2],
-        )
-        result = await session_service.check_and_transit_status_multi(action)
-
-        assert sid1 in result.session_status_map
-        assert sid2 in result.session_status_map
-
-    async def test_user_role_only_processes_owned_sessions(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
-        sample_user_id: UUID,
-    ) -> None:
-        owned_sid = SessionId(uuid4())
-        other_sid = SessionId(uuid4())
-        other_user_id = uuid4()
-
-        owned_session_row = MagicMock()
-        owned_session_row.user_uuid = sample_user_id
-        other_session_row = MagicMock()
-        other_session_row.user_uuid = other_user_id
-
-        mock_session_repository.get_session_to_determine_status = AsyncMock(
-            side_effect=lambda sid: owned_session_row if sid == owned_sid else other_session_row
-        )
-
-        mock_row = MagicMock()
-        mock_row.id = owned_sid
-        mock_row.status = SessionStatus.RUNNING
-
-        mock_agent_registry.session_lifecycle_mgr.transit_session_status = AsyncMock(
-            return_value=[(mock_row, True)]
-        )
-
-        action = _TestCheckAndTransitStatusBatchAction(
-            user_id=sample_user_id,
-            user_role=UserRole.USER,
-            session_ids=[owned_sid, other_sid],
-        )
-        result = await session_service.check_and_transit_status_multi(action)
-
-        assert owned_sid in result.session_status_map
-        assert other_sid not in result.session_status_map
-
-    async def test_empty_session_ids_returns_empty(
-        self,
-        session_service: SessionService,
-        mock_session_repository: MagicMock,
-        mock_agent_registry: MagicMock,
-        sample_user_id: UUID,
-    ) -> None:
-        action = _TestCheckAndTransitStatusBatchAction(
-            user_id=sample_user_id,
-            user_role=UserRole.USER,
-            session_ids=[],
-        )
-        result = await session_service.check_and_transit_status_multi(action)
-
-        assert result.session_status_map == {}

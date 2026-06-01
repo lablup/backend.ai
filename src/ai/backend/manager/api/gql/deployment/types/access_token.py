@@ -34,6 +34,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -121,8 +122,11 @@ class CreateAccessTokenInput(PydanticInputMixin[CreateAccessTokenInputDTO]):
     model_deployment_id: ID = gql_field(
         description="The ID of the model deployment for which the access token is created."
     )
-    expires_at: datetime | None = gql_field(
-        description="The expiration timestamp of the access token."
+    expires_at: datetime = gql_field(
+        description=(
+            "The expiration timestamp of the access token. Required — callers must "
+            "decide the token lifetime themselves."
+        )
     )
 
 
@@ -137,7 +141,7 @@ class CreateAccessTokenPayload:
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for deleting an access token.",
-        added_version="25.16.0",
+        added_version=NEXT_RELEASE_VERSION,
     ),
 )
 class DeleteAccessTokenInput(PydanticInputMixin[DeleteAccessTokenInputDTO]):
@@ -145,7 +149,9 @@ class DeleteAccessTokenInput(PydanticInputMixin[DeleteAccessTokenInputDTO]):
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version="25.16.0", description="Payload for deleting an access token."),
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Payload for deleting an access token."
+    ),
     model=DeleteAccessTokenPayloadDTO,
 )
 class DeleteAccessTokenPayload:

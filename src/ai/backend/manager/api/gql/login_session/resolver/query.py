@@ -49,7 +49,7 @@ async def admin_login_sessions_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> LoginSessionV2ConnectionGQL:
+) -> LoginSessionV2ConnectionGQL | None:
     check_admin_only()
     result = await info.context.adapters.login_session.admin_search(
         AdminSearchLoginSessionsInput(
@@ -93,7 +93,7 @@ async def my_login_sessions_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> LoginSessionV2ConnectionGQL:
+) -> LoginSessionV2ConnectionGQL | None:
     result = await info.context.adapters.login_session.my_search(
         MySearchLoginSessionsInput(
             filter=filter.to_pydantic() if filter else None,
@@ -125,11 +125,11 @@ async def my_login_sessions_v2(
         added_version="26.4.2",
         description="Revoke a login session. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_revoke_login_session(
     info: Info[StrawberryGQLContext],
     session_id: UUID,
-) -> RevokeLoginSessionPayloadGQL:
+) -> RevokeLoginSessionPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.login_session.admin_revoke(
         AdminRevokeLoginSessionInput(session_id=session_id)
@@ -142,11 +142,11 @@ async def admin_revoke_login_session(
         added_version="26.4.2",
         description="Revoke a login session owned by the current user.",
     )
-)  # type: ignore[misc]
+)
 async def my_revoke_login_session(
     info: Info[StrawberryGQLContext],
     session_id: UUID,
-) -> RevokeLoginSessionPayloadGQL:
+) -> RevokeLoginSessionPayloadGQL | None:
     payload = await info.context.adapters.login_session.my_revoke(
         MyRevokeLoginSessionInput(session_id=session_id)
     )
@@ -158,11 +158,11 @@ async def my_revoke_login_session(
         added_version="26.4.2",
         description="Clear the failed-login rate limit block for a user. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_unblock_user(
     info: Info[StrawberryGQLContext],
     username: str,
-) -> UnblockUserPayloadGQL:
+) -> UnblockUserPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.login_session.admin_unblock_user(
         AdminUnblockUserInput(username=username)

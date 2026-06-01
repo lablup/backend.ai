@@ -67,11 +67,11 @@ from ai.backend.manager.types import OptionalState, TriState
         added_version="26.2.0",
         description="Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_user_v2(
     info: Info[StrawberryGQLContext],
     input: CreateUserInputGQL,
-) -> CreateUserPayloadGQL:
+) -> CreateUserPayloadGQL | None:
     """Create a new user.
 
     Args:
@@ -94,11 +94,11 @@ async def admin_create_user_v2(
         added_version="26.2.0",
         description="Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications",
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_create_users_v2(
     info: Info[StrawberryGQLContext],
     input: BulkCreateUserV2InputGQL,
-) -> BulkCreateUsersV2PayloadGQL:
+) -> BulkCreateUsersV2PayloadGQL | None:
     """Create multiple users in bulk with individual specifications.
 
     Args:
@@ -159,12 +159,12 @@ async def admin_bulk_create_users_v2(
         added_version="26.3.0",
         description="Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
     input: UpdateUserV2InputGQL,
-) -> UpdateUserPayloadGQL:
+) -> UpdateUserPayloadGQL | None:
     """Update a user's information.
 
     Args:
@@ -188,11 +188,11 @@ async def admin_update_user_v2(
         added_version="26.3.0",
         description="Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications",
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_update_users_v2(
     info: Info[StrawberryGQLContext],
     input: BulkUpdateUserV2InputGQL,
-) -> BulkUpdateUsersV2PayloadGQL:
+) -> BulkUpdateUsersV2PayloadGQL | None:
     """Update multiple users in bulk with individual specifications.
 
     Args:
@@ -317,11 +317,11 @@ async def admin_bulk_update_users_v2(
         added_version="26.2.0",
         description="Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role",
     )
-)  # type: ignore[misc]
+)
 async def update_user_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateUserV2InputGQL,
-) -> UpdateUserPayloadGQL:
+) -> UpdateUserPayloadGQL | None:
     """Update the current user's own information.
 
     Args:
@@ -349,11 +349,11 @@ async def update_user_v2(
         added_version="26.2.0",
         description="Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-) -> DeleteUserPayloadGQL:
+) -> DeleteUserPayloadGQL | None:
     """Soft-delete a single user.
 
     Args:
@@ -376,11 +376,11 @@ async def admin_delete_user_v2(
         added_version="26.2.0",
         description="Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_users_v2(
     info: Info[StrawberryGQLContext],
     input: DeleteUsersInputGQL,
-) -> DeleteUsersPayloadGQL:
+) -> DeleteUsersPayloadGQL | None:
     """Soft-delete multiple users.
 
     Args:
@@ -408,11 +408,11 @@ async def admin_delete_users_v2(
         added_version="26.2.0",
         description="Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted",
     )
-)  # type: ignore[misc]
+)
 async def admin_purge_user_v2(
     info: Info[StrawberryGQLContext],
     input: PurgeUserInputGQL,
-) -> PurgeUserPayloadGQL:
+) -> PurgeUserPayloadGQL | None:
     """Permanently delete a single user.
 
     Args:
@@ -447,11 +447,11 @@ async def admin_purge_user_v2(
         added_version="26.3.0",
         description="Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted",
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_purge_users_v2(
     info: Info[StrawberryGQLContext],
     input: BulkPurgeUsersV2InputGQL,
-) -> BulkPurgeUsersV2PayloadGQL:
+) -> BulkPurgeUsersV2PayloadGQL | None:
     """Permanently delete multiple users in bulk.
 
     Args:
@@ -507,11 +507,11 @@ async def admin_bulk_purge_users_v2(
         added_version="26.4.0",
         description="Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention)",
     )
-)  # type: ignore[misc]
+)
 async def update_my_allowed_client_ip(
     info: Info[StrawberryGQLContext],
     input: UpdateMyAllowedClientIPInputGQL,
-) -> UpdateMyAllowedClientIPPayloadGQL:
+) -> UpdateMyAllowedClientIPPayloadGQL | None:
     """Update the current user's allowed client IP addresses."""
     me = current_user()
     if me is None:

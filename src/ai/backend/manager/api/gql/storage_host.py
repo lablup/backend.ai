@@ -63,6 +63,6 @@ class MyStorageHostPermissionsPayloadGQL(PydanticOutputMixin[MyStorageHostPermis
 )  # type: ignore[misc]
 async def my_storage_host_permissions(
     info: Info[StrawberryGQLContext],
-) -> MyStorageHostPermissionsPayloadGQL:
+) -> MyStorageHostPermissionsPayloadGQL | None:
     payload = await info.context.adapters.storage_host.my_storage_host_permissions()
     return MyStorageHostPermissionsPayloadGQL.from_pydantic(payload)

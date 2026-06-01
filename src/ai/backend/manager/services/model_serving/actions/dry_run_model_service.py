@@ -50,8 +50,17 @@ class DryRunModelServiceAction(ModelServiceAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-    def with_revision(self, revision: ModelRevisionSpec) -> DryRunModelServiceAction:
-        """Return a new action with revision results applied."""
+    def with_revision(
+        self,
+        revision: ModelRevisionSpec,
+        image: str,
+        architecture: str,
+    ) -> DryRunModelServiceAction:
+        """Return a new action with revision results applied.
+
+        Image canonical / architecture are resolved by the caller from the
+        revision's ``image_id`` since the spec no longer carries them.
+        """
         overrided_service_config = dataclasses.replace(
             self.config,
             resources=dict(revision.resource_spec.resource_slots),
@@ -59,8 +68,8 @@ class DryRunModelServiceAction(ModelServiceAction):
         )
         return dataclasses.replace(
             self,
-            image=revision.image_identifier.canonical,
-            architecture=revision.image_identifier.architecture,
+            image=image,
+            architecture=architecture,
             config=overrided_service_config,
         )
 

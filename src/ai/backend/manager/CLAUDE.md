@@ -31,5 +31,5 @@ Each layer has its own `CLAUDE.md`. Read it before modifying code in that direct
 
 ## Scheduler
 
-- Scheduling logic belongs in `manager/scheduler/` — do not add scheduling decisions inside
-  API handlers or service methods.
+- Scheduling logic belongs in `manager/sokovan/scheduler/` — do not add scheduling decisions
+  inside API handlers or service methods.

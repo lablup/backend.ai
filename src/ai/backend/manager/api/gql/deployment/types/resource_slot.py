@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Self
-
-from strawberry import Info
-from strawberry.relay import Connection, Edge, NodeID
+from typing import Self
 
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AllocatedResourceSlotFilter as AllocatedResourceSlotFilterDTO,
@@ -23,62 +19,33 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
-    gql_connection_type,
     gql_enum,
     gql_field,
-    gql_node_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.errors.api import UnsupportedOperation
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
+
+# A resource slot row is bound to a single revision/preset and the slot count
+# per parent is bounded by the number of declared resource slot types
+# (CPU, MEM, GPU SKUs, …), which is small in practice. This limit effectively
+# returns all rows without exposing cursor pagination on the field.
+RESOURCE_SLOTS_FETCH_LIMIT = 10000
 
 
-@gql_node_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.4.2",
-        description="Represents a single allocated resource slot entry for a deployment revision or preset.",
+        description="An allocated resource slot entry on a deployment revision or preset.",
     ),
+    model=AllocatedResourceSlotNodeDTO,
     name="AllocatedResourceSlot",
 )
-class AllocatedResourceSlotNodeGQL(PydanticNodeMixin[AllocatedResourceSlotNodeDTO]):
-    id: NodeID[str]
+class AllocatedResourceSlotGQL(PydanticOutputMixin[AllocatedResourceSlotNodeDTO]):
     slot_name: str = gql_field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
     )
     quantity: Decimal = gql_field(description="Allocated quantity for this resource slot.")
-
-    @classmethod
-    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
-        cls,
-        *,
-        info: Info[StrawberryGQLContext],
-        node_ids: Iterable[str],
-        required: bool = False,
-    ) -> Iterable[Self | None]:
-        raise UnsupportedOperation(
-            "AllocatedResourceSlotNodeGQL does not support root-level node resolution. "
-            "Access resource slots through the parent revision or preset."
-        )
-
-
-AllocatedResourceSlotEdge = Edge[AllocatedResourceSlotNodeGQL]
-
-
-@gql_connection_type(
-    BackendAIGQLMeta(
-        added_version="26.4.2",
-        description="Connection type for paginated allocated resource slot results.",
-    )
-)
-class AllocatedResourceSlotConnection(Connection[AllocatedResourceSlotNodeGQL]):
-    count: int = gql_field(
-        description="Total number of allocated resource slots matching the filter criteria."
-    )
-
-    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.count = count
 
 
 @gql_enum(
@@ -102,11 +69,17 @@ class AllocatedResourceSlotOrderFieldGQL(StrEnum):
     name="AllocatedResourceSlotFilter",
 )
 class AllocatedResourceSlotFilterGQL(PydanticInputMixin[AllocatedResourceSlotFilterDTO]):
-    slot_name: StringFilter | None = None
+    slot_name: StringFilter | None = gql_field(default=None, description="Filter by slot name.")
 
-    AND: list[Self] | None = None
-    OR: list[Self] | None = None
-    NOT: list[Self] | None = None
+    AND: list[Self] | None = gql_field(
+        default=None, description="Logical AND of multiple filter conditions."
+    )
+    OR: list[Self] | None = gql_field(
+        default=None, description="Logical OR of multiple filter conditions."
+    )
+    NOT: list[Self] | None = gql_field(
+        default=None, description="Logical NOT of filter conditions."
+    )
 
 
 @gql_pydantic_input(
@@ -117,5 +90,7 @@ class AllocatedResourceSlotFilterGQL(PydanticInputMixin[AllocatedResourceSlotFil
     name="AllocatedResourceSlotOrderBy",
 )
 class AllocatedResourceSlotOrderByGQL(PydanticInputMixin[AllocatedResourceSlotOrderDTO]):
-    field: AllocatedResourceSlotOrderFieldGQL
-    direction: OrderDirection = OrderDirection.ASC
+    field: AllocatedResourceSlotOrderFieldGQL = gql_field(description="Field to order by.")
+    direction: OrderDirection = gql_field(
+        default=OrderDirection.ASC, description="Order direction."
+    )

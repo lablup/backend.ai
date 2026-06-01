@@ -89,7 +89,7 @@ class VolumeService:
         except OSError as e:
             msg = str(e) if e.strerror is None else e.strerror
             msg = f"{msg} (errno:{e.errno})"
-            log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{msg})")
+            log.exception("VFolder deletion task failed. (vfolder_id:{}, e:{})", vfolder_id, msg)
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
@@ -97,7 +97,7 @@ class VolumeService:
                 )
             )
         except Exception as e:
-            log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{e!s})")
+            log.exception("VFolder deletion task failed. (vfolder_id:{}, e:{!s})", vfolder_id, e)
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
@@ -105,9 +105,9 @@ class VolumeService:
                 )
             )
         except asyncio.CancelledError:
-            log.warning(f"Vfolder deletion task cancelled. (vfolder_id:{vfolder_id})")
+            log.warning("Vfolder deletion task cancelled. (vfolder_id:{})", vfolder_id)
         else:
-            log.info(f"VFolder deletion task successed. (vfolder_id:{vfolder_id})")
+            log.info("VFolder deletion task succeeded. (vfolder_id:{})", vfolder_id)
             await self._event_producer.anycast_event(VFolderDeletionSuccessEvent(vfolder_id))
 
     async def get_volume(self, volume_id: VolumeID) -> VolumeMeta:
@@ -126,11 +126,11 @@ class VolumeService:
         volumes = self._volume_pool.list_volumes()
         return [
             VolumeMeta(
-                volume_id=uuid.UUID(volume_id),
+                volume_id=VolumeID(uuid.UUID(volume_id)),
                 backend=info.backend,
                 path=info.path,
                 fsprefix=info.fsprefix,
-                capabilities=await self._get_capabilities(uuid.UUID(volume_id)),
+                capabilities=await self._get_capabilities(VolumeID(uuid.UUID(volume_id))),
             )
             for volume_id, info in volumes.items()
         ]

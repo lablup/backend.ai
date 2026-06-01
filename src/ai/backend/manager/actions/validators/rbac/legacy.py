@@ -9,6 +9,7 @@ import logging
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.metrics.safe import SafeCounter
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action import BaseActionTriggerMeta
@@ -16,8 +17,10 @@ from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityAction
 from ai.backend.manager.actions.validator.scope import ScopeActionValidator
 from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
-from ai.backend.manager.data.permission.role import ScopeChainPermissionCheckInput
-from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.data.permission.role import (
+    PermissionResolutionKey,
+    ScopeChainPermissionCheckInput,
+)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -53,7 +56,7 @@ class LegacySingleEntityActionRBACValidator(SingleEntityActionValidator):
     async def validate(self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta) -> None:
         user = current_user()
         if user is None:
-            raise UserNotFound("User not found in context")
+            raise UnreachableError("User context is not available")
         if user.is_superadmin:
             return
 
@@ -61,10 +64,13 @@ class LegacySingleEntityActionRBACValidator(SingleEntityActionValidator):
         target = action.target_element()
         allowed = await self._repository.check_permission_with_scope_chain(
             ScopeChainPermissionCheckInput(
-                user_id=user.user_id,
-                target_element_ref=target,
+                key=PermissionResolutionKey(
+                    user_id=user.user_id,
+                    element_type=target.element_type,
+                    entity_id=target.element_id,
+                    subject_entity_type=target.element_type,
+                ),
                 operation=operation,
-                permission_entity_type=None,
             )
         )
         if not allowed:
@@ -94,7 +100,7 @@ class LegacyScopeActionRBACValidator(ScopeActionValidator):
     async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
         user = current_user()
         if user is None:
-            raise UserNotFound("User not found in context")
+            raise UnreachableError("User context is not available")
         if user.is_superadmin:
             return
 
@@ -103,10 +109,13 @@ class LegacyScopeActionRBACValidator(ScopeActionValidator):
         target = action.target_element()
         allowed = await self._repository.check_permission_with_scope_chain(
             ScopeChainPermissionCheckInput(
-                user_id=user.user_id,
-                target_element_ref=target,
+                key=PermissionResolutionKey(
+                    user_id=user.user_id,
+                    element_type=target.element_type,
+                    entity_id=target.element_id,
+                    subject_entity_type=entity_type.to_element(),
+                ),
                 operation=operation,
-                permission_entity_type=entity_type,
             )
         )
         if not allowed:

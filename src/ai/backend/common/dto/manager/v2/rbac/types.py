@@ -5,6 +5,7 @@ Common types for RBAC DTO v2.
 from __future__ import annotations
 
 from enum import StrEnum
+from uuid import UUID
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.data.permission.types import (
@@ -18,13 +19,15 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "EntityOrderField",
     "EntityType",
-    "EntityTypeFilter",
+    "EntityTypeScope",
     "OperationType",
     "OperationTypeDTO",
+    "OperationTypeFilter",
     "OrderDirection",
     "PermissionOrderField",
     "PermissionSummary",
     "RBACElementTypeDTO",
+    "RBACElementTypeFilter",
     "RoleAssignmentOrderField",
     "RoleOrderField",
     "RoleSource",
@@ -34,6 +37,7 @@ __all__ = (
     "RoleStatusDTO",
     "RoleStatusFilter",
     "ScopeInputDTO",
+    "UUIDScope",
 )
 
 
@@ -116,6 +120,12 @@ class RBACElementTypeDTO(StrEnum):
     DEPLOYMENT_POLICY = "deployment:policy"
     DEPLOYMENT_REVISION = "deployment:revision"
     IMAGE_ALIAS = "image:alias"
+    ROLE_ASSIGNMENT = "role:assignment"
+
+    # Sub-entity permissions split from parent metadata access
+    VFOLDER_DATA = "vfolder:data"
+    SESSION_APP_SERVICE = "session:app_service"
+    USER_EMAIL = "user:email"
 
     # Entity-level scopes
     ARTIFACT_REVISION = "artifact_revision"
@@ -169,13 +179,27 @@ class RoleStatusFilter(BaseRequestModel):
     not_in: list[str] | None = None
 
 
-class EntityTypeFilter(BaseRequestModel):
-    """Filter for entity type with equality and membership operators."""
+class RBACElementTypeFilter(BaseRequestModel):
+    """Filter for RBAC element type (scope_type / entity_type) columns.
 
-    equals: str | None = None
-    in_: list[str] | None = None
-    not_equals: str | None = None
-    not_in: list[str] | None = None
+    Mirrors the Strawberry GQL EnumFilter pattern: equals / in / not_equals / not_in.
+    Used for both ``scope_type`` and ``entity_type`` fields, which share the
+    ``RBACElementTypeDTO`` value space at the API surface.
+    """
+
+    equals: RBACElementTypeDTO | None = None
+    in_: list[RBACElementTypeDTO] | None = None
+    not_equals: RBACElementTypeDTO | None = None
+    not_in: list[RBACElementTypeDTO] | None = None
+
+
+class OperationTypeFilter(BaseRequestModel):
+    """Filter for permission operation columns over ``OperationTypeDTO``."""
+
+    equals: OperationTypeDTO | None = None
+    in_: list[OperationTypeDTO] | None = None
+    not_equals: OperationTypeDTO | None = None
+    not_in: list[OperationTypeDTO] | None = None
 
 
 class ScopeInputDTO(BaseRequestModel):
@@ -183,6 +207,28 @@ class ScopeInputDTO(BaseRequestModel):
 
     scope_type: RBACElementTypeDTO
     scope_id: str
+
+
+class EntityTypeScope(BaseRequestModel):
+    """Entity reference parametrized by RBAC element type.
+
+    A typed (element_type, id) pair used to reference a specific entity in
+    contexts such as batch RBAC validation or scoped queries.
+    """
+
+    entity_type: RBACElementTypeDTO
+    entity_id: str
+
+
+class UUIDScope(BaseRequestModel):
+    """Single-UUID scope item wrapper.
+
+    A thin wrapper around a UUID used as a scope item. The wrapper exists so
+    that scope-input lists stay structurally uniform with other scope item
+    types and leave room for per-item metadata in the future.
+    """
+
+    value: UUID
 
 
 class PermissionSummary(BaseResponseModel):

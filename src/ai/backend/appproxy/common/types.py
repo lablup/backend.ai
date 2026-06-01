@@ -14,9 +14,9 @@ from uuid import UUID
 
 import aiohttp_cors
 from aiohttp import web
-from pydantic import AliasChoices, AnyUrl, BaseModel, Field
+from pydantic import AliasChoices, AnyUrl, BaseModel, ConfigDict, Field
 
-from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
+from ai.backend.common.types import BackendAISchema, ModelServiceStatus, RuntimeVariant
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
 
@@ -84,19 +84,20 @@ type AppCreator = Callable[
 ]
 
 
-class RouteInfo(BaseModel):
-    """
-    Information about a route within a circuit.
+class RouteInfo(BackendAISchema):
+    """Information about a route within a circuit.
 
-    Health Status Evaluation:
-    Individual route health status is only evaluated and updated when the circuit
-    is in INFERENCE mode. For circuits in other modes (e.g., DEVELOPMENT, BATCH),
-    health checking is disabled and routes are assumed to be healthy.
-
-    Health status fields (health_status, last_health_check, consecutive_failures)
-    are managed by the HealthCheckEngine and stored directly in the circuit's
-    route_info JSON column for efficient filtering and atomic updates.
+    Routes describe a kernel endpoint (``kernel_host`` + ``kernel_port``)
+    that the proxy fans traffic to for a given session. Coordinator no
+    longer tracks per-route health state: HTTP traffic relies on
+    Traefik's loadBalancer.healthCheck; TCP traffic is filtered by the
+    worker-side ``RoutePool``. Legacy rows may still carry
+    ``health_status`` / ``last_health_check`` / ``consecutive_failures``
+    in their stored JSONB — ``extra="ignore"`` drops those on read so no
+    database migration is needed.
     """
+
+    model_config = ConfigDict(extra="ignore")
 
     route_id: Annotated[
         UUID | None,
@@ -147,27 +148,6 @@ class RouteInfo(BaseModel):
     ]
     protocol: ProxyProtocol
     traffic_ratio: Annotated[float, Field(default=1.0)]
-    health_status: Annotated[
-        ModelServiceStatus | None,
-        Field(
-            default=None,
-            description="Health status of this route - only evaluated in INFERENCE mode",
-        ),
-    ]
-    last_health_check: Annotated[
-        float | None,
-        Field(
-            default=None,
-            description="Timestamp of last health check - only updated in INFERENCE mode",
-        ),
-    ]
-    consecutive_failures: Annotated[
-        int,
-        Field(
-            default=0,
-            description="Number of consecutive health check failures - only tracked in INFERENCE mode",
-        ),
-    ]
 
     def __hash__(self) -> int:
         return hash(json.dumps(self.model_dump(mode="json")))
@@ -177,7 +157,7 @@ class RouteInfo(BaseModel):
         return self.kernel_host or "localhost"
 
 
-class SerializableCircuit(BaseModel):
+class SerializableCircuit(BackendAISchema):
     """
     Serializable representation of `ai.backend.appproxy.coordinator.models.Circuit`
     """
@@ -261,7 +241,7 @@ class SerializableCircuit(BaseModel):
         return f"bai_router_{self.id}@etcd"
 
 
-class SerializableToken(BaseModel):
+class SerializableToken(BackendAISchema):
     login_session_token: str | None
     kernel_host: str
     kernel_port: int
@@ -272,21 +252,26 @@ class SerializableToken(BaseModel):
     domain_name: str
 
 
-class SessionConfig(BaseModel):
+class SessionConfig(BackendAISchema):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: Annotated[UUID | None, Field(default=None)]
     user_uuid: UUID
-    group_id: UUID
+    # Renamed from ``group_id`` to ``project_id`` to align with v2 naming.
+    # ``group_id`` is accepted as a validation alias so older Manager peers
+    # that still send the legacy key continue to work on the wire.
+    project_id: UUID = Field(validation_alias=AliasChoices("project_id", "group_id"))
     access_key: Annotated[str | None, Field(default=None)]
     domain_name: str
 
 
-class EndpointConfig(BaseModel):
+class EndpointConfig(BackendAISchema):
     id: UUID
     runtime_variant: Annotated[RuntimeVariant | None, Field(default=None)]
     existing_url: AnyUrl | None
 
 
-class HealthCheckState(BaseModel):
+class HealthCheckState(BackendAISchema):
     """
     Runtime health check state
     """

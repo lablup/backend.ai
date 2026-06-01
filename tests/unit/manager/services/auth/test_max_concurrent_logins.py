@@ -123,6 +123,8 @@ def auth_service(
     mock_config_provider: MagicMock,
     mock_valkey_session_client: AsyncMock,
     mock_user_resource_policy_repository: AsyncMock,
+    mock_user_repository: AsyncMock,
+    mock_group_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
@@ -130,6 +132,8 @@ def auth_service(
         config_provider=mock_config_provider,
         valkey_session_client=mock_valkey_session_client,
         user_resource_policy_repository=mock_user_resource_policy_repository,
+        user_repository=mock_user_repository,
+        group_repository=mock_group_repository,
     )
 
 

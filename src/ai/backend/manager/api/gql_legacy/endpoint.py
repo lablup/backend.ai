@@ -4,7 +4,7 @@ import datetime
 import decimal
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self
 from uuid import UUID
 
 import graphene
@@ -19,13 +19,13 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import DeprecatedAPI, InvalidAPIParameters
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
-    EndpointId,
     MountPermission,
     MountTypes,
     ResourceSlot,
@@ -61,6 +61,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.updater import Updater
@@ -286,7 +287,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
             if not raw_endpoint_id:
                 raw_endpoint_id = endpoint
             try:
-                _endpoint_id = EndpointId(UUID(raw_endpoint_id))
+                _endpoint_id = DeploymentID(UUID(raw_endpoint_id))
             except ValueError as e:
                 raise ObjectNotFound(object_name="Endpoint") from e
             try:
@@ -337,9 +338,9 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):  # type: ignore[mi
     min_replicas = graphene.Int()
     max_replicas = graphene.Int()
 
-    def to_action(self, endpoint_id: EndpointId) -> CreateEndpointAutoScalingRuleAction:
+    def to_action(self, endpoint_id: DeploymentID) -> CreateEndpointAutoScalingRuleAction:
         return CreateEndpointAutoScalingRuleAction(
-            endpoint_id=endpoint_id,
+            deployment_id=endpoint_id,
             creator=EndpointAutoScalingRuleCreator(
                 metric_source=AutoScalingMetricSource(self.metric_source),
                 metric_name=self.metric_name,
@@ -449,7 +450,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):  # type: ignore[misc
         if not raw_endpoint_id:
             raw_endpoint_id = endpoint
         try:
-            _endpoint_id = EndpointId(UUID(raw_endpoint_id))
+            _endpoint_id = DeploymentID(UUID(raw_endpoint_id))
         except ValueError as e:
             raise ObjectNotFound(object_name="Endpoint") from e
 
@@ -678,15 +679,37 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         Requires revisions and revisions.image_row to be eagerly loaded.
         """
         dto = row.to_data()
-        result = cls.from_dto(ctx, dto)
+        result = await cls.from_dto(ctx, dto)
         if result is None:
             raise ValueError(f"Failed to convert EndpointRow {row.id} to GQL type")
         return result
 
     @classmethod
-    def from_dto(cls, ctx: GraphQueryContext, dto: EndpointData | None) -> Self | None:
+    async def from_dto(cls, ctx: GraphQueryContext, dto: EndpointData | None) -> Self | None:
         if dto is None:
             return None
+        # Resolve ``runtime_variant_id`` → the legacy
+        # ``{name, human_readable_name}`` shape here so the public
+        # graphene schema surface keeps its original contract while
+        # internal data types carry only the id. ``dto.runtime_variant_id``
+        # can be ``None`` for PENDING endpoints that have no active
+        # revision yet (v2 create is two-step) or for orphaned pre-
+        # existing rows — the legacy field becomes ``None`` in that
+        # case rather than synthesising a misleading "custom" value.
+        runtime_variant_info: RuntimeVariantInfo | None = None
+        if dto.runtime_variant_id is not None:
+            async with ctx.db.begin_readonly_session() as db_sess:
+                variant_row = await db_sess.scalar(
+                    sa.select(RuntimeVariantRow).where(
+                        RuntimeVariantRow.id == dto.runtime_variant_id
+                    )
+                )
+            if variant_row is not None:
+                profile = MODEL_SERVICE_RUNTIME_PROFILES.get(RuntimeVariant(variant_row.name))
+                runtime_variant_info = RuntimeVariantInfo(
+                    name=variant_row.name,
+                    human_readable_name=profile.name if profile is not None else variant_row.name,
+                )
         return cls(
             endpoint_id=dto.id,
             image_object=ImageNode.from_row(ctx, ImageRow.from_optional_dataclass(dto.image)),
@@ -724,7 +747,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             if dto.routings is not None
             else [],
             lifecycle_stage=dto.lifecycle_stage,
-            runtime_variant=RuntimeVariantInfo.from_enum(dto.runtime_variant),
+            runtime_variant=runtime_variant_info,
         )
 
     @classmethod
@@ -785,7 +808,12 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             .limit(limit)
             .offset(offset)
             .options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
             .options(selectinload(EndpointRow.routings))
             .options(selectinload(EndpointRow.session_owner_row))
@@ -903,7 +931,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             endpoint_row = await EndpointRow.get(sess, self.endpoint_id, load_revisions=True)
             current_rev = endpoint_row._find_current_revision()
             extra_mounts = current_rev.extra_mounts if current_rev else []
-            extra_mount_folder_ids = [m.vfid.folder_id for m in extra_mounts]
+            extra_mount_folder_ids = [m.vfolder_id for m in extra_mounts]
             query = (
                 sa.select(VFolderRow)
                 .where(VFolderRow.id.in_(extra_mount_folder_ids))
@@ -940,11 +968,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         return errors
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(
-            graph_ctx, "EndpointStatistics.by_endpoint"
-        )
-        return cast(Mapping[str, Any] | None, await loader.load(self.endpoint_id))
+        raise DeprecatedAPI(extra_msg="Endpoint live_stat is no longer supported.")
 
 
 class EndpointList(graphene.ObjectType):  # type: ignore[misc]
@@ -1019,19 +1043,6 @@ class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
 
             return ImageRef(graphene_image_input.name, registry, architecture)
 
-        def convert_runtime_variant(
-            value: str | None | UndefinedType,
-        ) -> RuntimeVariant | UndefinedType:
-            if isinstance(value, UndefinedType):
-                return value
-            if value is None:
-                raise InvalidAPIParameters("Runtime variant cannot be None")
-
-            try:
-                return RuntimeVariant(value)
-            except KeyError as e:
-                raise InvalidAPIParameters(f"Unsupported runtime {self.runtime_variant}") from e
-
         if self.desired_session_count is not Undefined and self.replicas is not Undefined:
             raise InvalidAPIParameters(
                 "Cannot set both desired_session_count and replicas. Use replicas for future use."
@@ -1079,12 +1090,16 @@ class ModifyEndpointInput(graphene.InputObjectType):  # type: ignore[misc]
             environ=TriState.from_graphql(
                 self.environ,
             ),
-            runtime_variant=OptionalState.from_graphql(
-                convert_runtime_variant(self.runtime_variant),
-            ),
+            # Legacy ``runtime_variant`` input is a name string; the
+            # updater spec now keys on ``runtime_variant_id`` and we do
+            # not have an async context here to resolve the name. The
+            # legacy mutation therefore cannot mutate the runtime
+            # variant — upstream callers should migrate to the v2
+            # add-revision path (which accepts ``runtime_variant_id``).
+            runtime_variant_id=OptionalState.nop(),
         )
         return ModifyEndpointAction(
-            endpoint_id=endpoint_id,
+            deployment_id=DeploymentID(endpoint_id),
             updater=Updater(spec=spec, pk_value=endpoint_id),
         )
 
@@ -1120,7 +1135,7 @@ class ModifyEndpoint(graphene.Mutation):  # type: ignore[misc]
         return cls(
             ok=result.success,
             msg="success" if result.success else "failed",
-            endpoint=Endpoint.from_dto(graph_ctx, result.data),
+            endpoint=await Endpoint.from_dto(graph_ctx, result.data),
         )
 
 

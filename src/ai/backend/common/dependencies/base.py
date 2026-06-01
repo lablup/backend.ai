@@ -45,44 +45,55 @@ class DependencyProvider[SetupInputT, ResourceT](ABC):
         """
         raise NotImplementedError
 
-    @abstractmethod
-    def gen_health_checkers(self, resource: ResourceT) -> ServiceHealthChecker | None:
+    def gen_liveness_checker(self, resource: ResourceT) -> ServiceHealthChecker | None:
         """
-        Return a health checker for the provided resource.
+        Return a liveness health checker for the provided resource.
 
-        Override this method to provide health checking capability for this dependency.
-        The health checker will be automatically collected by DependencyBuilderStack
-        and registered using checker.target_service_group as the key.
+        Override this method when the dependency should contribute to the liveness
+        probe — typically connection-stuck issues where a process restart is the
+        actual recovery path (e.g., Etcd, Valkey, Docker daemon).
 
         Args:
             resource: The initialized resource from provide()
 
         Returns:
-            ServiceHealthChecker instance or None if no health checking is needed
+            ServiceHealthChecker instance or None if this dependency does not
+            contribute to liveness checks.
         """
-        raise NotImplementedError
+        return None
+
+    def gen_readiness_checker(self, resource: ResourceT) -> ServiceHealthChecker | None:
+        """
+        Return a readiness health checker for the provided resource.
+
+        Override this method when the dependency should contribute to the readiness
+        probe only — failure should drain traffic but no process restart is needed
+        (e.g., database connections).
+
+        Args:
+            resource: The initialized resource from provide()
+
+        Returns:
+            ServiceHealthChecker instance or None if this dependency does not
+            contribute to readiness checks.
+        """
+        return None
 
 
 class NonMonitorableDependencyProvider(DependencyProvider[SetupInputT, ResourceT]):
     """
     Base class for dependency providers that do not require health monitoring.
 
-    This class provides a default implementation of gen_health_checkers()
-    that returns None, indicating no health checks are needed.
+    Both liveness and readiness checkers are pinned to None.
     """
 
     @final
-    def gen_health_checkers(self, resource: ResourceT) -> None:
-        """
-        Return None as this dependency does not require health monitoring.
+    def gen_liveness_checker(self, resource: ResourceT) -> None:
+        return None
 
-        Args:
-            resource: The initialized resource from provide()
-
-        Returns:
-            None indicating no health checks
-        """
-        return
+    @final
+    def gen_readiness_checker(self, resource: ResourceT) -> None:
+        return None
 
 
 class DependencyComposer[SetupInputT, ResourcesT](ABC):

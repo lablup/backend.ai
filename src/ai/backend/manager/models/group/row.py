@@ -122,6 +122,14 @@ container_registry_iv = t.Dict({}) | t.Dict({
 
 
 class AssocGroupUserRow(Base):  # type: ignore[misc]
+    """DEPRECATED -- scheduled for sunset.
+
+    Project membership is moving to ``association_scopes_entities`` (ASE) with
+    ``scope_type=PROJECT, entity_type=USER`` as the single source of truth. New
+    code MUST query ASE; do not add new readers or writers against this table.
+    The table itself will be dropped after every reader is migrated.
+    """
+
     __tablename__ = "association_groups_users"
     __table_args__ = (
         sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
@@ -147,8 +155,8 @@ class AssocGroupUserRow(Base):  # type: ignore[misc]
     group: Mapped[GroupRow] = relationship("GroupRow", back_populates="users")
 
 
-# NOTE: Deprecated legacy table reference for backward compatibility.
-# Use AssocGroupUserRow class directly for new code.
+# DEPRECATED: scheduled for sunset; project membership lives in
+# `association_scopes_entities`. Do not use in new code.
 association_groups_users = AssocGroupUserRow.__table__
 
 

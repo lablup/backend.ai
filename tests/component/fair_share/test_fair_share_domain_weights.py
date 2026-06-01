@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.fair_share import (
     UpsertDomainFairShareWeightRequest,
     UpsertDomainFairShareWeightResponse,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestDomainFairShareWeights:
@@ -25,16 +26,16 @@ class TestDomainFairShareWeights:
         self,
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Get domain fair share → returns weight data."""
         result = await admin_registry.fair_share.get_domain_fair_share(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
         )
         assert isinstance(result, GetDomainFairShareResponse)
         assert result.item is not None
-        assert result.item.domain_name == domain_fixture
+        assert result.item.domain_name == domain_fixture.domain_name
         assert result.item.resource_group == scaling_group_fixture
 
     async def test_search_domain_fair_shares(
@@ -52,24 +53,24 @@ class TestDomainFairShareWeights:
         self,
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Upsert domain fair share → weight created/updated."""
         weight = Decimal("2.5")
         result = await admin_registry.fair_share.upsert_domain_fair_share_weight(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
             request=UpsertDomainFairShareWeightRequest(weight=weight),
         )
         assert isinstance(result, UpsertDomainFairShareWeightResponse)
-        assert result.item.domain_name == domain_fixture
+        assert result.item.domain_name == domain_fixture.domain_name
         assert result.item.resource_group == scaling_group_fixture
         assert result.item.spec.weight == weight
 
         # Verify the weight persists
         get_result = await admin_registry.fair_share.get_domain_fair_share(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
         )
         assert get_result.item is not None
         assert get_result.item.spec.weight == weight
@@ -82,7 +83,7 @@ class TestBulkUpsertDomainWeights:
         self,
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Bulk upsert success → all weights updated."""
         result = await admin_registry.fair_share.bulk_upsert_domain_fair_share_weight(
@@ -90,7 +91,7 @@ class TestBulkUpsertDomainWeights:
                 resource_group=scaling_group_fixture,
                 inputs=[
                     DomainWeightEntryInput(
-                        domain_name=domain_fixture,
+                        domain_name=domain_fixture.domain_name,
                         weight=Decimal("5.0"),
                     ),
                 ],
@@ -118,12 +119,12 @@ class TestBulkUpsertDomainWeights:
         self,
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Bulk upsert overwrites existing weight."""
         await admin_registry.fair_share.upsert_domain_fair_share_weight(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
             request=UpsertDomainFairShareWeightRequest(weight=Decimal("10.0")),
         )
 
@@ -133,7 +134,7 @@ class TestBulkUpsertDomainWeights:
                 resource_group=scaling_group_fixture,
                 inputs=[
                     DomainWeightEntryInput(
-                        domain_name=domain_fixture,
+                        domain_name=domain_fixture.domain_name,
                         weight=new_weight,
                     ),
                 ],
@@ -144,7 +145,7 @@ class TestBulkUpsertDomainWeights:
 
         get_result = await admin_registry.fair_share.get_domain_fair_share(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
         )
         assert get_result.item is not None
         assert get_result.item.spec.weight == new_weight
@@ -157,13 +158,13 @@ class TestDomainScopeAccessControl:
         self,
         user_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Global-scoped domain access as regular user → 403 (denied)."""
         with pytest.raises(PermissionDeniedError):
             await user_registry.fair_share.get_domain_fair_share(
                 resource_group=scaling_group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
             )
 
         with pytest.raises(PermissionDeniedError):
@@ -174,7 +175,7 @@ class TestDomainScopeAccessControl:
         with pytest.raises(PermissionDeniedError):
             await user_registry.fair_share.upsert_domain_fair_share_weight(
                 resource_group=scaling_group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 request=UpsertDomainFairShareWeightRequest(weight=Decimal("1.0")),
             )
 
@@ -182,12 +183,12 @@ class TestDomainScopeAccessControl:
         self,
         user_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """RG-scoped domain access as regular user → 200 (allowed)."""
         get_result = await user_registry.fair_share.rg_get_domain_fair_share(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
         )
         assert isinstance(get_result, GetDomainFairShareResponse)
 
@@ -201,12 +202,12 @@ class TestDomainScopeAccessControl:
         self,
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Admin global scope access → 200 (allowed)."""
         result = await admin_registry.fair_share.get_domain_fair_share(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
         )
         assert isinstance(result, GetDomainFairShareResponse)
 
@@ -218,12 +219,12 @@ class TestDomainDefaultValueFallback:
         self,
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Get existing domain with no fair-share row → default value returned."""
         result = await admin_registry.fair_share.get_domain_fair_share(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
         )
         assert isinstance(result, GetDomainFairShareResponse)
         assert result.item is not None

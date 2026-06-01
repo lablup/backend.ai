@@ -22,7 +22,6 @@ from collections.abc import (
     Iterable,
     Mapping,
     MutableMapping,
-    MutableSequence,
     Sequence,
 )
 from contextlib import contextmanager
@@ -51,8 +50,6 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 from cachetools import LRUCache, cached
-from ruamel.yaml import YAML
-from ruamel.yaml.error import YAMLError
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -62,7 +59,6 @@ from tenacity import (
     stop_after_delay,
     wait_fixed,
 )
-from trafaret import DataError
 
 from ai.backend.agent.errors import (
     AsyncioTaskNotAvailableError,
@@ -70,10 +66,20 @@ from ai.backend.agent.errors import (
     KernelNotFoundError,
 )
 from ai.backend.agent.etcd import AgentEtcdClientView
+from ai.backend.agent.health.heartbeat import HeartbeatTask
 from ai.backend.agent.metrics.metric import (
     StatScope,
     StatTaskObserver,
     SyncContainerLifecycleObserver,
+)
+from ai.backend.agent.port_pool import PortPool
+from ai.backend.agent.tasks import (
+    CleanupReportedKernelsTask,
+    CollectContainerStatTask,
+    CollectProcessStatTask,
+    ReportKernelCommitStatusTask,
+    ScanImagesTask,
+    SyncContainerLifecyclesTask,
 )
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks, current_loop
@@ -86,7 +92,8 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
-from ai.backend.common.config import model_definition_iv
+from ai.backend.common.config import ModelConfig, ModelDefinition
+from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
 from ai.backend.common.data.image.types import InstalledImageInfo, ScannedImage
 from ai.backend.common.defs import (
@@ -137,12 +144,6 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatedBroadcastEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    ModelServiceStatusAnycastEvent,
-)
-from ai.backend.common.events.event_types.model_serving.broadcast import (
-    ModelServiceStatusBroadcastEvent,
-)
 from ai.backend.common.events.event_types.session.anycast import (
     ExecutionFinishedAnycastEvent,
     ExecutionStartedAnycastEvent,
@@ -165,7 +166,10 @@ from ai.backend.common.events.types import (
     AbstractBroadcastEvent,
     AbstractEvent,
 )
-from ai.backend.common.exception import ConfigurationError, VolumeMountFailed
+from ai.backend.common.exception import (
+    ConfigurationError,
+    VolumeMountFailed,
+)
 from ai.backend.common.json import (
     dump_json,
     dump_json_str,
@@ -180,13 +184,11 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import (
-    MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
     AgentId,
     AutoPullBehavior,
@@ -205,12 +207,10 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelCreationResult,
     KernelId,
-    ModelServiceStatus,
     MountPermission,
     MountTypes,
     RedisTarget,
     ResourceSlot,
-    RuntimeVariant,
     Sentinel,
     ServicePort,
     ServicePortProtocols,
@@ -240,12 +240,9 @@ from .errors import (
     ContainerStartupFailedError,
     ContainerStartupTimeoutError,
     ImageArchitectureMismatchError,
-    ImageCommandRequiredError,
     ImagePullTimeoutError,
     ModelDefinitionEmptyError,
-    ModelDefinitionInvalidYAMLError,
     ModelDefinitionNotFoundError,
-    ModelDefinitionValidationError,
     ModelFolderNotSpecifiedError,
     PortConflictError,
     ReservedPortError,
@@ -287,17 +284,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _sentinel = Sentinel.TOKEN
 
-ACTIVE_STATUS_SET = frozenset([
-    ContainerStatus.RUNNING,
-    ContainerStatus.RESTARTING,
-    ContainerStatus.PAUSED,
-])
-
-DEAD_STATUS_SET = frozenset([
-    ContainerStatus.EXITED,
-    ContainerStatus.DEAD,
-    ContainerStatus.REMOVING,
-])
+ACTIVE_STATUS_SET = ContainerStatus.active_set()
+DEAD_STATUS_SET = ContainerStatus.dead_set()
 
 COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
@@ -653,9 +641,6 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             jail_path = None
 
         dotfile_extractor_path = self.resolve_krunner_filepath("runner/extract_dotfiles.py")
-        persistent_files_warning_doc_path = self.resolve_krunner_filepath(
-            "runner/DO_NOT_STORE_PERSISTENT_FILES_HERE.md"
-        )
         entrypoint_sh_path = self.resolve_krunner_filepath("runner/entrypoint.sh")
 
         fantompass_path = self.resolve_krunner_filepath("runner/fantompass.py")
@@ -673,11 +658,6 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")
         if jail_path is not None:
             _mount(MountTypes.BIND, jail_path, "/opt/kernel/jail")
-        _mount(
-            MountTypes.BIND,
-            persistent_files_warning_doc_path,
-            "/home/work/DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
-        )
 
         _mount(MountTypes.VOLUME, krunner_volume, "/opt/backend.ai")
         pylib_path = f"/opt/backend.ai/lib/python{krunner_pyver}/site-packages/"
@@ -840,10 +820,10 @@ class AbstractAgent[
     slots: Mapping[SlotName, Decimal]
     computers: Mapping[DeviceName, ComputerContext]
     images: Mapping[ImageCanonical, InstalledImageInfo]
-    port_pool: set[int]
+    port_pool: PortPool
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
-    timer_tasks: MutableSequence[asyncio.Task[Any]]
+    _local_cron: LocalCron | None
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
     agent_public_key: PublicKey | None
@@ -933,12 +913,10 @@ class AbstractAgent[
             if local_config.container.stats_type
             else None,
         )
-        self.timer_tasks = []
-        self.port_pool = set(
-            range(
-                local_config.container.port_range[0],
-                local_config.container.port_range[1] + 1,
-            )
+        self._local_cron = None
+        self.port_pool = PortPool(
+            local_config.container.port_range,
+            cooldown_sec=local_config.container.port_reuse_cooldown_sec,
         )
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
@@ -1034,40 +1012,24 @@ class AbstractAgent[
         )
         self.affinity_map = AffinityMap.build(all_devices)
 
+        periodic_tasks: list[PeriodicTask] = []
+
         if not self._skip_initial_scan:
             scan_images_result = await self.scan_images()
             self.images = scan_images_result.scanned_images
-            self.timer_tasks.append(aiotools.create_timer(self._scan_images_wrapper, 20.0))
+            periodic_tasks.append(ScanImagesTask(self))
             await self.scan_running_kernels()
 
         # Prepare stat collector tasks.
-        self.timer_tasks.append(
-            aiotools.create_timer(
-                self.collect_container_stat,
-                UTILIZATION_METRIC_INTERVAL,
-                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
-            )
-        )
-        self.timer_tasks.append(
-            aiotools.create_timer(
-                self.collect_process_stat,
-                UTILIZATION_METRIC_INTERVAL,
-                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
-            )
-        )
+        periodic_tasks.append(CollectContainerStatTask(self))
+        periodic_tasks.append(CollectProcessStatTask(self))
 
         # Prepare heartbeats.
-        heartbeat_interval = self.local_config.debug.heartbeat_interval
-        self.timer_tasks.append(aiotools.create_timer(self.heartbeat, heartbeat_interval))
+        periodic_tasks.append(HeartbeatTask(self))
 
         # Prepare auto-cleaning of idle kernels.
-        sync_container_lifecycles_config = self.local_config.agent.sync_container_lifecycles
-        if sync_container_lifecycles_config.enabled:
-            self.timer_tasks.append(
-                aiotools.create_timer(
-                    self.sync_container_lifecycles, sync_container_lifecycles_config.interval
-                )
-            )
+        if self.local_config.agent.sync_container_lifecycles.enabled:
+            periodic_tasks.append(SyncContainerLifecyclesTask(self))
 
         self._agent_runner = Runner(resources=[])
         host_port_observer = HostPortObserver(self)
@@ -1083,12 +1045,13 @@ class AbstractAgent[
                 "Monitoring abnormal kernel activities reported by Watcher at {}", abuse_report_path
             )
             abuse_report_path.mkdir(exist_ok=True, parents=True)
-            self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 30.0))
+            periodic_tasks.append(CleanupReportedKernelsTask(self))
 
         # Report commit status
-        self.timer_tasks.append(
-            aiotools.create_timer(self._report_all_kernel_commit_status_map, 7.0)
-        )
+        periodic_tasks.append(ReportKernelCommitStatusTask(self))
+
+        self._local_cron = LocalCron(periodic_tasks)
+        await self._local_cron.start()
 
         loop = current_loop()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
@@ -1144,7 +1107,8 @@ class AbstractAgent[
             await self.save_last_registry(force=True)
 
         # Stop timers.
-        await aiotools.cancel_and_wait(self.timer_tasks)
+        if self._local_cron is not None:
+            await self._local_cron.stop()
         await self._agent_runner.close()
         self._clean_kernel_registry_task.cancel()
 
@@ -1227,7 +1191,7 @@ class AbstractAgent[
         await self._pre_anycast_event(anycast_event)
         await self.event_producer.anycast_and_broadcast_event(anycast_event, broadcast_event)
 
-    async def _report_all_kernel_commit_status_map(self, interval: float) -> None:
+    async def report_all_kernel_commit_status_map(self) -> None:
         """
         Commit statuses are managed by `lock` file.
         +- base_commit_path
@@ -1272,7 +1236,7 @@ class AbstractAgent[
             log.exception("unexpected error in commit status reporting")
             return
 
-    async def heartbeat(self, interval: float) -> None:
+    async def heartbeat(self) -> None:
         """
         Send my status information and available kernel images to the manager(s).
         """
@@ -1382,7 +1346,7 @@ class AbstractAgent[
             await self.stat_ctx.collect_node_stat(resource_scaling_factors)
 
     @_observe_stat_task(stat_scope=StatScope.CONTAINER)
-    async def collect_container_stat(self, interval: float) -> None:
+    async def collect_container_stat(self) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting container statistics")
         container_ids: set[ContainerId] = set()
@@ -1394,7 +1358,7 @@ class AbstractAgent[
             await self.stat_ctx.collect_container_stat(list(container_ids))
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
-    async def collect_process_stat(self, interval: float) -> None:
+    async def collect_process_stat(self) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting process statistics in container")
         container_ids: set[ContainerId] = set()
@@ -1562,59 +1526,10 @@ class AbstractAgent[
         )
 
     def _restore_ports(self, host_ports: Iterable[int]) -> None:
-        # Restore used ports to the port pool.
-        port_range = self.local_config.container.port_range
-        # Exclude out-of-range ports, because when the agent restarts
-        # with a different port range, existing containers' host ports
-        # may not belong to the new port range.
-        restored_ports = [
-            *filter(
-                lambda p: port_range[0] <= p <= port_range[1],
-                host_ports,
-            )
-        ]
-        self.port_pool.update(restored_ports)
-
-    def current_used_port_set(self) -> set[int]:
-        """
-        Get the current port pool.
-        """
-        total_port_set = set(
-            range(
-                self.local_config.container.port_range[0],
-                self.local_config.container.port_range[1] + 1,
-            )
-        )
-        return total_port_set - self.port_pool
-
-    def release_unused_ports(self, unused_ports: set[int]) -> None:
-        """
-        Release the given unused ports back to the port pool.
-        """
-        if not unused_ports:
-            return
-        log.info(
-            "releasing unused ports back to port pool. current port-pool length: {}, releasing length: {}",
-            len(self.port_pool),
-            len(unused_ports),
-        )
-        self.port_pool.update(unused_ports)
-
-    def reset_port_pool(self, used_ports: Iterable[int]) -> None:
-        """
-        Reset the port pool by excluding the given used ports.
-        """
-        used_port_set = set(used_ports)
-        port_range = self.local_config.container.port_range
-        log.info(
-            "reset port pool with used ports. current port-pool length: {}, used ports length: {}",
-            len(self.port_pool),
-            len(used_port_set),
-        )
-        original_port_pool: set[int] = {
-            p for p in range(port_range[0], port_range[1] + 1) if p not in used_port_set
-        }
-        self.port_pool = original_port_pool
+        # PortPool.release ignores out-of-range ports, which handles the
+        # case where the agent restarts with a different port_range and
+        # existing containers still hold ports from the old range.
+        self.port_pool.release_many(host_ports)
 
     def update_scaling_group(self, scaling_group: str) -> None:
         self.local_config.update(agent_update={"scaling_group": scaling_group})
@@ -1714,7 +1629,7 @@ class AbstractAgent[
                 # attrs currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
                 if self.local_config.debug.log_events:
-                    log.info(f"lifecycle event: {ev!r}")
+                    log.info("lifecycle event: {!r}", ev)
                 try:
                     match ev.event:
                         case LifecycleEvent.START:
@@ -1838,7 +1753,7 @@ class AbstractAgent[
                             kernel_id,
                         )
 
-    async def sync_container_lifecycles(self, interval: float) -> None:
+    async def sync_container_lifecycles(self) -> None:
         """
         Periodically synchronize the alive/known container sets,
         for cases when we miss the container lifecycle events from the underlying implementation APIs
@@ -1860,7 +1775,9 @@ class AbstractAgent[
                 return SessionId(UUID(_session_id))
             except ValueError:
                 log.warning(
-                    f"sync_container_lifecycles() invalid session-id (cid: {container.id}, sid:{_session_id})"
+                    "sync_container_lifecycles() invalid session-id (cid: {}, sid:{})",
+                    container.id,
+                    _session_id,
                 )
                 return None
 
@@ -1876,7 +1793,8 @@ class AbstractAgent[
                         if container.status in DEAD_STATUS_SET
                     ]
                     log.debug(
-                        f"detected dead containers: {[container.id[:12] for _, container in dead_containers]}"
+                        "detected dead containers: {}",
+                        [container.id[:12] for _, container in dead_containers],
                     )
                     for kernel_id, container in dead_containers:
                         if kernel_id in self.restarting_kernels:
@@ -1902,7 +1820,8 @@ class AbstractAgent[
                         if container.status in ACTIVE_STATUS_SET
                     ]
                     log.debug(
-                        f"detected active containers: {[container.id[:12] for _, container in active_containers]}"
+                        "detected active containers: {}",
+                        [container.id[:12] for _, container in active_containers],
                     )
                     for kernel_id, container in active_containers:
                         alive_kernels[kernel_id] = container.id
@@ -1927,7 +1846,7 @@ class AbstractAgent[
                             or kernel_obj.state != KernelLifecycleStatus.RUNNING
                         ):
                             continue
-                        log.debug(f"kernel with no container (kid: {kernel_id})")
+                        log.debug("kernel with no container (kid: {})", kernel_id)
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                             kernel_id,
                             kernel_session_map[kernel_id],
@@ -1939,7 +1858,7 @@ class AbstractAgent[
                     for kernel_id in alive_kernels.keys() - known_kernels.keys():
                         if kernel_id in self.restarting_kernels:
                             continue
-                        log.debug(f"kernel not found in registry (kid:{kernel_id})")
+                        log.debug("kernel not found in registry (kid:{})", kernel_id)
                         terminated_kernels[kernel_id] = ContainerLifecycleEvent(
                             kernel_id,
                             kernel_session_map[kernel_id],
@@ -1951,7 +1870,7 @@ class AbstractAgent[
                     # Enqueue the events.
                     terminated_kernel_ids = ",".join([str(kid) for kid in terminated_kernels])
                     if terminated_kernel_ids:
-                        log.debug(f"Terminate kernels(ids:[{terminated_kernel_ids}])")
+                        log.debug("Terminate kernels(ids:[{}])", terminated_kernel_ids)
                     for kernel_id, ev in terminated_kernels.items():
                         await self.container_lifecycle_queue.put(ev)
 
@@ -1967,7 +1886,7 @@ class AbstractAgent[
                 agent_id=self.id, exception=e
             )
         except Exception as e:
-            log.exception(f"sync_container_lifecycles() failure, continuing (detail: {e!r})")
+            log.exception("sync_container_lifecycles() failure, continuing (detail: {!r})", e)
             self._sync_container_lifecycle_observer.observe_container_lifecycle_failure(
                 agent_id=self.id, exception=e
             )
@@ -2033,7 +1952,7 @@ class AbstractAgent[
                     hwinfo[device_name] = result
         return hwinfo
 
-    async def _cleanup_reported_kernels(self, interval: float) -> None:
+    async def cleanup_reported_kernels(self) -> None:
         # dest_path == abuse_report_path
         dest_path = self.local_config.agent.abuse_report_path
         if dest_path is None:
@@ -2096,7 +2015,7 @@ class AbstractAgent[
         manual image addition and deletions by admins.
         """
 
-    async def _scan_images_wrapper(self, interval: float) -> None:
+    async def scan_images_periodically(self) -> None:
         result = await self.scan_images()
         self.images = result.scanned_images
         if result.removed_images:
@@ -2178,7 +2097,7 @@ class AbstractAgent[
             # Track pull operation for health monitoring
             with self.track_pull(img_canonical) as should_proceed:
                 if not should_proceed:
-                    log.debug(f"Image {img_canonical} is already being pulled, skipping")
+                    log.debug("Image {} is already being pulled, skipping", img_canonical)
                     return
 
                 need_to_pull = await self.check_image(
@@ -2186,7 +2105,7 @@ class AbstractAgent[
                 )
 
                 if need_to_pull:
-                    log.info(f"check_and_pull() start pulling {img_ref!s}")
+                    log.info("check_and_pull() start pulling {!s}", img_ref)
 
                     await self.anycast_event(
                         ImagePullStartedEvent(
@@ -2205,7 +2124,7 @@ class AbstractAgent[
 
                     except TimeoutError:
                         log.exception(
-                            f"Image pull timeout (img:{img_ref!s}, sec:{image_pull_timeout})"
+                            "Image pull timeout (img:{!s}, sec:{})", img_ref, image_pull_timeout
                         )
 
                         await self.anycast_event(
@@ -2219,7 +2138,7 @@ class AbstractAgent[
                         raise
 
                     except Exception as e:
-                        log.exception(f"Image pull failed (img:{img_ref}, err:{e!r})")
+                        log.exception("Image pull failed (img:{}, err:{!r})", img_ref, e)
 
                         await self.anycast_event(
                             ImagePullFailedEvent(
@@ -2232,7 +2151,7 @@ class AbstractAgent[
                         raise
 
                     else:
-                        log.info(f"Image pull succeeded {img_ref}")
+                        log.info("Image pull succeeded {}", img_ref)
                         await self.anycast_event(
                             ImagePullFinishedEvent(
                                 image=str(img_ref),
@@ -2242,7 +2161,7 @@ class AbstractAgent[
                             )
                         )
                 else:
-                    log.debug(f"No need to pull image {img_ref}")
+                    log.debug("No need to pull image {}", img_ref)
 
                     await self.anycast_event(
                         ImagePullFinishedEvent(
@@ -2532,6 +2451,26 @@ class AbstractAgent[
             ),
         )
 
+    async def _apply_image_cmd_fallback(
+        self,
+        models: list[ModelConfig],
+        image: str,
+    ) -> list[ModelConfig]:
+        image_command_loaded = False
+        image_command: list[str] | None = None
+        for model in models:
+            if model.service is None:
+                continue
+            if model.service.start_command:
+                continue
+            if not image_command_loaded:
+                image_command = await self.extract_image_command(image)
+                image_command_loaded = True
+            if not image_command:
+                continue
+            model.service.start_command = list(image_command)
+        return models
+
     async def create_kernel(
         self,
         ownership_data: KernelOwnershipData,
@@ -2551,7 +2490,7 @@ class AbstractAgent[
         # Track kernel creation for health monitoring
         with self.track_create(kernel_id, session_id) as should_proceed:
             if not should_proceed:
-                log.debug(f"Kernel {kernel_id} is already being created, skipping")
+                log.debug("Kernel {} is already being created, skipping", kernel_id)
                 raise ResourceError("Kernel creation already in progress")
 
             if throttle_sema is None:
@@ -2644,7 +2583,10 @@ class AbstractAgent[
 
                     except TimeoutError as e:
                         log.exception(
-                            f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
+                            "Image pull timeout after {} seconds. Destroying kernel (k:{}, img:{})",
+                            image_pull_timeout,
+                            kernel_id,
+                            ctx.image_ref.canonical,
                         )
                         raise ImagePullTimeoutError(
                             f"Image pull timeout after {image_pull_timeout} seconds. (img:{ctx.image_ref.canonical})"
@@ -2746,6 +2688,12 @@ class AbstractAgent[
                     vfolder_mounts = [
                         VFolderMount.from_json(item) for item in kernel_config["mounts"]
                     ]
+                    # NOTE: Inline injection until EnvironProvisioner is wired
+                    #  into the kernel creation pipeline. See also:
+                    #  agent/stage/kernel_lifecycle/docker/environ.py
+                    if vfolder_mounts:
+                        persistent_paths = ":".join(str(m.kernel_path) for m in vfolder_mounts)
+                        environ["BACKENDAI_PERSISTENT_PATHS"] = persistent_paths
                     if not restarting:
                         await ctx.mount_vfolders(vfolder_mounts, resource_spec)
                         await ctx.mount_krunner(resource_spec, environ)
@@ -2848,7 +2796,7 @@ class AbstractAgent[
                         "is_inference": False,
                     })
 
-                    model_definition: Mapping[str, Any] | None = None
+                    model_definition: ModelDefinition | None = None
                     # Read model config
                     model_folders = [
                         folder
@@ -2906,12 +2854,7 @@ class AbstractAgent[
                         service_ports,
                     )
                     if kernel_config["session_type"] == SessionTypes.INFERENCE:
-                        model_definition = await self.load_model_definition(
-                            RuntimeVariant(
-                                (kernel_config["internal_data"] or {}).get(
-                                    "runtime_variant", "custom"
-                                )
-                            ),
+                        model_definition = await self._load_model_definition(
                             model_folders,
                             environ,
                             service_ports,
@@ -3021,8 +2964,9 @@ class AbstractAgent[
                     except ContainerCreationError as e:
                         msg = e.message or "unknown"
                         log.error(
-                            "Kernel failed to create container. Kernel is going to be destroyed."
-                            f" (k:{kernel_id}, detail:{msg})",
+                            "Kernel failed to create container. Kernel is going to be destroyed. (k:{}, detail:{})",
+                            kernel_id,
+                            msg,
                         )
                         cid = e.container_id
                         async with self.registry_lock:
@@ -3219,7 +3163,31 @@ class AbstractAgent[
                     }
 
                     if ctx.kernel_config["cluster_role"] in ("main", "master") and model_definition:
-                        for model in model_definition["models"]:
+                        populated_models = await self._apply_image_cmd_fallback(
+                            model_definition.models,
+                            ctx.image_ref.canonical,
+                        )
+                        for model in populated_models:
+                            if model.service is None:
+                                log.warning(
+                                    "create_kernel(kernel:{}, session:{}) skipping model"
+                                    " '{}': no service definition",
+                                    kernel_id,
+                                    session_id,
+                                    model.name,
+                                )
+                                continue
+                            if not model.service.start_command:
+                                log.warning(
+                                    "create_kernel(kernel:{}, session:{}) cannot start model"
+                                    " service '{}': no start_command and image {} has no"
+                                    " Config.Cmd",
+                                    kernel_id,
+                                    session_id,
+                                    model.name,
+                                    ctx.image_ref.canonical,
+                                )
+                                continue
                             asyncio.create_task(
                                 self.start_and_monitor_model_service_health(kernel_obj, model)
                             )
@@ -3228,7 +3196,7 @@ class AbstractAgent[
                                 kernel_id,
                                 session_id,
                                 pretty_container_id,
-                                model["name"],
+                                model.name,
                             )
 
                     # Finally we are done.
@@ -3271,38 +3239,30 @@ class AbstractAgent[
     async def start_and_monitor_model_service_health(
         self,
         kernel_obj: KernelObjectType,
-        model: Any,
+        model: ModelConfig,
     ) -> None:
-        log.debug("starting model service of model {}", model["name"])
-        result = await kernel_obj.start_model_service(model)
+        log.debug("starting model service of model {}", model.name)
+        result = await kernel_obj.start_model_service(model.model_dump(mode="json"))
         if result["status"] == "failed":
-            # handle cases where krunner fails to spawn model service process
-            # if everything went well then krunner itself will report the status via zmq
-            await self.anycast_and_broadcast_event(
-                ModelServiceStatusAnycastEvent(
-                    kernel_obj.session_id,
-                    ModelServiceStatus.UNHEALTHY,
-                ),
-                ModelServiceStatusBroadcastEvent(
-                    kernel_obj.session_id,
-                    ModelServiceStatus.UNHEALTHY,
-                ),
+            log.error(
+                "Model service failed to start for kernel {} (session {}). Destroying kernel.",
+                kernel_obj.kernel_id,
+                kernel_obj.session_id,
+            )
+            await self.inject_container_lifecycle_event(
+                kernel_obj.kernel_id,
+                kernel_obj.session_id,
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.FAILED_TO_START,
             )
 
-    async def load_model_definition(
+    async def _load_model_definition(
         self,
-        runtime_variant: RuntimeVariant,
         model_folders: list[VFolderMount],
         environ: MutableMapping[str, Any],
         service_ports: list[ServicePort],
         kernel_config: KernelCreationConfig,
-    ) -> Any:
-        image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
-        if runtime_variant != "custom" and not image_command:
-            raise ImageCommandRequiredError(
-                "Image should have its own command when runtime variant is set to values other than CUSTOM"
-            )
-
+    ) -> ModelDefinition:
         if len(model_folders) == 0:
             raise ModelFolderNotSpecifiedError(
                 "At least one model virtual folder must be specified"
@@ -3310,173 +3270,51 @@ class AbstractAgent[
 
         model_folder: VFolderMount = model_folders[0]
 
-        raw_definition: dict[str, Any]
-        match runtime_variant:
-            case "vllm":
-                _model = {
-                    "name": "vllm-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
+        # The manager resolves the final ModelDefinition at deployment-
+        # revision creation time (variant baseline → preset → yaml →
+        # overrides) and persists it on the revision row. The scheduler
+        # inlines that value into the kernel's ``internal_data`` via
+        # ``InternalDataRule``, so the agent must treat it as the sole
+        # source of truth — no per-variant construction, no on-disk read.
+        inlined = (kernel_config.get("internal_data") or {}).get("model_definition")
+        if not inlined:
+            raise ModelDefinitionNotFoundError(
+                "Model definition not inlined in kernel internal_data;"
+                f" vFolder {model_folder.name} (ID {model_folder.vfid})",
+            )
 
-            case "huggingface-tgi":
-                _model = {
-                    "name": "tgi-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "nim":
-                _model = {
-                    "name": "nim-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "sglang":
-                _model = {
-                    "name": "sglang-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "modular-max":
-                _model = {
-                    "name": "max-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "cmd":
-                _model = {
-                    "name": "image-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": 8000,
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case "custom":
-                if _fname := (kernel_config.get("internal_data") or {}).get(
-                    "model_definition_path"
-                ):
-                    model_definition_candidates = [_fname]
-                else:
-                    model_definition_candidates = [
-                        "model-definition.yaml",
-                        "model-definition.yml",
-                    ]
-
-                model_definition_path = None
-                for filename in model_definition_candidates:
-                    if (Path(model_folder.host_path) / filename).is_file():
-                        model_definition_path = Path(model_folder.host_path) / filename
-                        break
-
-                if not model_definition_path:
-                    raise ModelDefinitionNotFoundError(
-                        f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under vFolder"
-                        f" {model_folder.name} (ID {model_folder.vfid})",
+        model_definition = ModelDefinition.model_validate(inlined)
+        if not model_definition.models:
+            raise ModelDefinitionEmptyError
+        for model in model_definition.models:
+            if "BACKEND_MODEL_NAME" not in environ:
+                environ["BACKEND_MODEL_NAME"] = model.name
+            environ["BACKEND_MODEL_PATH"] = model.model_path
+            if model.service is not None:
+                if model.service.port in (2000, 2001):
+                    raise ReservedPortError("Port 2000 and 2001 are reserved for internal use")
+                overlapping_services = [
+                    s for s in service_ports if model.service.port in s["container_ports"]
+                ]
+                if len(overlapping_services) > 0:
+                    raise PortConflictError(
+                        f"Port {model.service.port} overlaps with built-in service"
+                        f" {overlapping_services[0]['name']}"
                     )
-                try:
-                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
-                        None, model_definition_path.read_text
-                    )
-                except FileNotFoundError as e:
-                    raise ModelDefinitionNotFoundError(
-                        "Model definition file (model-definition.yml) does not exist under"
-                        f" vFolder {model_folder.name} (ID {model_folder.vfid})",
-                    ) from e
-                try:
-                    yaml = YAML()
-                    raw_definition = yaml.load(model_definition_yaml)
-                except YAMLError as e:
-                    raise ModelDefinitionInvalidYAMLError(f"Invalid YAML syntax: {e}") from e
-        try:
-            model_definition = model_definition_iv.check(raw_definition)
-            if model_definition is None:
-                raise ModelDefinitionEmptyError
-            for model in model_definition["models"]:
-                if "BACKEND_MODEL_NAME" not in environ:
-                    environ["BACKEND_MODEL_NAME"] = model["name"]
-                environ["BACKEND_MODEL_PATH"] = model["model_path"]
-                if service := model.get("service"):
-                    if service["port"] in (2000, 2001):
-                        raise ReservedPortError("Port 2000 and 2001 are reserved for internal use")
-                    overlapping_services = [
-                        s for s in service_ports if service["port"] in s["container_ports"]
-                    ]
-                    if len(overlapping_services) > 0:
-                        raise PortConflictError(
-                            f"Port {service['port']} overlaps with built-in service"
-                            f" {overlapping_services[0]['name']}"
-                        )
-                    service_ports.append({
-                        "name": f"{model['name']}-{service['port']}",
-                        "protocol": ServicePortProtocols.PREOPEN,
-                        "container_ports": (service["port"],),
-                        "host_ports": (None,),
-                        "is_inference": True,
-                    })
-            return model_definition
-        except DataError as e:
-            raise ModelDefinitionValidationError(
-                "Failed to validate model definition from vFolder"
-                f" {model_folder.name} (ID {model_folder.vfid})",
-            ) from e
+                service_ports.append({
+                    "name": f"{model.name}-{model.service.port}",
+                    "protocol": ServicePortProtocols.PREOPEN,
+                    "container_ports": (model.service.port,),
+                    "host_ports": (None,),
+                    "is_inference": True,
+                })
+        return model_definition
 
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
     @abstractmethod
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> list[str] | None:
         raise NotImplementedError
 
     @abstractmethod
@@ -3834,7 +3672,7 @@ async def handle_volume_umount(
     except VolumeMountFailed as e:
         err_msg = str(e)
     if not did_umount:
-        log.warning(f"{real_path} does not exist. Skip umount")
+        log.warning("{} does not exist. Skip umount", real_path)
     await context.event_producer.broadcast_event(
         VolumeUnmounted(
             str(context.id),

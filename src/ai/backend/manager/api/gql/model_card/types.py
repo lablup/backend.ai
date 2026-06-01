@@ -19,10 +19,13 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    BulkDeleteModelCardsInput as BulkDeleteCardsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput as CreateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
-    DeleteModelCardsInput as DeleteCardsInputDTO,
+    DeleteModelCardOptions as DeleteOptionsDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     DeployModelCardInput as DeployInputDTO,
@@ -37,13 +40,16 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
     UpdateModelCardInput as UpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
+    BulkDeleteModelCardsPayload as BulkDeleteCardsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.response import (
+    BulkDeleteModelCardV2Error as BulkDeleteModelCardV2ErrorDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.response import (
     CreateModelCardPayload as CreatePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
     DeleteModelCardPayload as DeletePayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.model_card.response import (
-    DeleteModelCardsPayload as DeleteCardsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import (
     DeployModelCardPayload as DeployPayloadDTO,
@@ -69,7 +75,9 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
+from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -373,8 +381,8 @@ class ModelCardAvailablePresetsScopeGQL(PydanticInputMixin[AvailablePresetsScope
 )
 class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
-    domain_name: str | None = gql_field(default=None, description="Domain filter.")
-    project_id: UUID | None = gql_field(default=None, description="Project filter.")
+    domain_name: StringFilterGQL | None = gql_field(default=None, description="Domain filter.")
+    project_id: UUIDFilterGQL | None = gql_field(default=None, description="Project filter.")
     storage_host: StringFilterGQL | None = gql_field(
         default=None,
         description=(
@@ -536,22 +544,63 @@ class DeployModelCardPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.2",
-        description="Input for deleting multiple model cards.",
+        added_version=NEXT_RELEASE_VERSION,
+        description="Options for the model card delete operation.",
     ),
-    name="DeleteModelCardsV2Input",
+    name="DeleteModelCardV2Options",
 )
-class DeleteModelCardsInputGQL(PydanticInputMixin[DeleteCardsInputDTO]):
+class DeleteModelCardOptionsGQL(PydanticInputMixin[DeleteOptionsDTO]):
+    """Options for the model card delete operation."""
+
+    delete_associated_vfolder: bool = gql_field(
+        description=(
+            "If true, also soft-delete (move to trash) the model VFolder(s) "
+            "associated with the deleted model card(s)."
+        ),
+        default=False,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for bulk-deleting multiple model cards.",
+    ),
+    name="BulkDeleteModelCardsV2Input",
+)
+class BulkDeleteModelCardsV2InputGQL(PydanticInputMixin[BulkDeleteCardsInputDTO]):
     ids: list[UUID] = gql_field(description="List of model card UUIDs to delete.")
+    options: DeleteModelCardOptionsGQL | None = gql_field(
+        description="Options for the delete operation.",
+        default=None,
+    )
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.2",
+        added_version=NEXT_RELEASE_VERSION,
+        description="Error information for a model card that failed during bulk deletion.",
+    ),
+    model=BulkDeleteModelCardV2ErrorDTO,
+    name="BulkDeleteModelCardV2Error",
+)
+class BulkDeleteModelCardV2ErrorGQL:
+    card_id: UUID = gql_field(description="UUID of the model card that failed to delete.")
+    message: str = gql_field(description="Error message describing the failure.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description="Payload for bulk model card deletion.",
     ),
-    model=DeleteCardsPayloadDTO,
-    name="DeleteModelCardsV2Payload",
+    model=BulkDeleteCardsPayloadDTO,
+    name="BulkDeleteModelCardsV2Payload",
 )
-class DeleteModelCardsPayloadGQL(PydanticOutputMixin[DeleteCardsPayloadDTO]):
-    deleted_count: int = gql_field(description="Number of model cards successfully deleted.")
+class BulkDeleteModelCardsV2PayloadGQL:
+    successes: list[UUID] = gql_field(
+        description="UUIDs of model cards that were successfully deleted.",
+    )
+    failed: list[BulkDeleteModelCardV2ErrorGQL] = gql_field(
+        description="List of errors for model cards that failed to delete.",
+    )

@@ -12,25 +12,31 @@ import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.exception import BackendAIError, UserNotFound
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.auth import (
+    AccessKeyNotFound,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
     UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
-from ai.backend.manager.models.group import association_groups_users, groups
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
@@ -97,13 +103,14 @@ class AuthDBSource:
     async def fetch_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
         """Fetch group membership from database."""
         async with self._db.begin() as conn:
-            query = (
-                sa.select(association_groups_users.c.group_id, association_groups_users.c.user_id)
-                .select_from(association_groups_users)
-                .where(
-                    (association_groups_users.c.group_id == group_id)
-                    & (association_groups_users.c.user_id == user_id)
-                )
+            query = sa.select(
+                AssociationScopesEntitiesRow.scope_id,
+                AssociationScopesEntitiesRow.entity_id,
+            ).where(
+                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                AssociationScopesEntitiesRow.scope_id == str(group_id),
+                AssociationScopesEntitiesRow.entity_id == str(user_id),
             )
             result = await conn.execute(query)
             row = result.first()
@@ -111,7 +118,7 @@ class AuthDBSource:
                 raise GroupMembershipNotFoundError(
                     extra_msg="No such project or you are not the member of it."
                 )
-        return GroupMembershipData(group_id=row.group_id, user_id=row.user_id)
+        return GroupMembershipData(group_id=group_id, user_id=user_id)
 
     @auth_db_source_resilience.apply()
     async def verify_email_exists(self, email: str) -> bool:
@@ -127,10 +134,8 @@ class AuthDBSource:
         self,
         user_data: dict[str, Any],
         keypair_data: dict[str, Any],
-        group_name: str,
-        domain_name: str,
     ) -> UserData:
-        """Insert a new user with keypair and add to default group in database."""
+        """Insert a new user with the default keypair."""
         async with self._db.begin_session_read_committed() as db_session:
             conn = await db_session.connection()
 
@@ -151,19 +156,6 @@ class AuthDBSource:
             keypair_data["user"] = user_row.uuid
             keypair_query = keypairs.insert().values(keypair_data)
             await conn.execute(keypair_query)
-
-            # Add to default group
-            group_query = (
-                sa.select(groups.c.id)
-                .select_from(groups)
-                .where((groups.c.domain_name == domain_name) & (groups.c.name == group_name))
-            )
-            result = await conn.execute(group_query)
-            grp = result.first()
-            if grp is not None:
-                values = [{"user_id": user_row.uuid, "group_id": grp.id}]
-                assoc_query = association_groups_users.insert().values(values)
-                await conn.execute(assoc_query)
 
             # Create RBAC system role and map user to role
             role_spec = UserSystemRoleSpec(user_id=user_row.uuid)
@@ -302,6 +294,15 @@ class AuthDBSource:
             if row is None:
                 raise ValueError("Unknown owner access key")
             return row.domain_name, row.role
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_id_by_access_key(self, access_key: AccessKey) -> UserID:
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(KeyPairRow.user).where(KeyPairRow.access_key == access_key)
+            user_id = await db_session.scalar(query)
+            if user_id is None:
+                raise AccessKeyNotFound("Unknown access key")
+            return UserID(user_id)
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
@@ -675,7 +676,7 @@ class AuthDBSource:
         """Search all login sessions without scope restriction (admin only)."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginSessionRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=None)
+            result = await execute_batch_querier(db_session, query, querier)
             items = [row.LoginSessionRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,
@@ -693,7 +694,7 @@ class AuthDBSource:
         """Search login sessions within a given scope."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginSessionRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
             items = [row.LoginSessionRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,
@@ -768,7 +769,7 @@ class AuthDBSource:
         """Search all login history without scope restriction (admin only)."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginHistoryRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=None)
+            result = await execute_batch_querier(db_session, query, querier)
             items = [row.LoginHistoryRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,
@@ -786,7 +787,7 @@ class AuthDBSource:
         """Search login history within a given scope."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginHistoryRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
             items = [row.LoginHistoryRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,

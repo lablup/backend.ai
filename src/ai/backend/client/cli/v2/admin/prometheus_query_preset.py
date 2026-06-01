@@ -1,7 +1,7 @@
 """Admin CLI commands for the v2 prometheus query definition resource.
 
-Only write operations (create, update, delete) live here. Read operations
-(search, get, execute) are user-facing and live under
+Write operations (create, update, delete) and template preview live here.
+Read operations (search, get, execute) are user-facing and live under
 ``cli/v2/prometheus_query_preset/commands.py``.
 """
 
@@ -145,6 +145,32 @@ def delete(preset_id: UUID) -> None:
         try:
             result = await registry.prometheus_query_preset.delete(
                 DeleteQueryDefinitionInput(id=preset_id),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@prometheus_query_preset.command()
+@click.option(
+    "--query-template",
+    required=True,
+    type=str,
+    help="PromQL template to validate.",
+)
+def preview(query_template: str) -> None:
+    """Preview a prometheus query template before saving (superadmin only)."""
+    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+        PreviewQueryDefinitionInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.prometheus_query_preset.admin_preview(
+                PreviewQueryDefinitionInput(query_template=query_template),
             )
             print_result(result)
         finally:

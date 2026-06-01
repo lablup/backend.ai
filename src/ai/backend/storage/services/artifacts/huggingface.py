@@ -383,7 +383,7 @@ class HuggingFaceService:
         Raises:
             HuggingFaceAPIError: If API call fails
         """
-        log.info(f"Scanning HuggingFace models: limit={limit}, search={search}, sort={sort}")
+        log.info("Scanning HuggingFace models: limit={}, search={}, sort={}", limit, search, sort)
 
         models = await self._make_scanner(registry_name).scan_models(
             limit=limit, search=search, sort=sort
@@ -421,7 +421,7 @@ class HuggingFaceService:
         log.info("Retrieving single HuggingFace model: {}", model)
         scanner = self._make_scanner(registry_name)
         model_data = await scanner.scan_model(model)
-        log.debug(f"Successfully retrieved single model with metadata: {model}")
+        log.debug("Successfully retrieved single model with metadata: {}", model)
         return model_data
 
     async def get_model_commit_hash(
@@ -459,7 +459,7 @@ class HuggingFaceService:
             HuggingFaceModelNotFoundError: If any model is not found
             HuggingFaceAPIError: If API call fails
         """
-        log.info(f"Retrieving {len(models)} HuggingFace models")
+        log.info("Retrieving {} HuggingFace models", len(models))
 
         scanner = self._make_scanner(registry_name)
         retrieved_models = []
@@ -468,9 +468,9 @@ class HuggingFaceService:
             try:
                 model_data = await scanner.scan_model_without_metadata(model)
                 retrieved_models.append(model_data)
-                log.debug(f"Successfully retrieved basic model data: {model}")
+                log.debug("Successfully retrieved basic model data: {}", model)
             except Exception as e:
-                log.error(f"Failed to retrieve model {model}: {e!s}")
+                log.error("Failed to retrieve model {}: {!s}", model, e)
                 raise
 
         # Start background metadata processing for multiple models
@@ -481,7 +481,7 @@ class HuggingFaceService:
                 )
             )
 
-        log.info(f"Successfully retrieved {len(retrieved_models)} models")
+        log.info("Successfully retrieved {} models", len(retrieved_models))
         return retrieved_models
 
     async def scan_model(self, registry_name: str, model: ModelTarget) -> ModelData:
@@ -498,7 +498,7 @@ class HuggingFaceService:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
-        log.info(f"Scanning HuggingFace model: {model}")
+        log.info("Scanning HuggingFace model: {}", model)
         return await self._make_scanner(registry_name).scan_model(model)
 
     async def list_model_files(
@@ -517,7 +517,7 @@ class HuggingFaceService:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
-        log.info(f"Listing model files: {model}")
+        log.info("Listing model files: {}", model)
         return await self._make_scanner(registry_name).list_model_files_info(model)
 
     def get_download_url(self, registry_name: str, model: ModelTarget, filename: str) -> str:
@@ -531,7 +531,7 @@ class HuggingFaceService:
         Returns:
             Download URL string
         """
-        log.info(f"Getting download URL: {model}, filename={filename}")
+        log.info("Getting download URL: {}, filename={}", model, filename)
         return self._make_scanner(registry_name).get_download_url(model, filename)
 
     async def import_model(
@@ -577,7 +577,7 @@ class HuggingFaceService:
             # Extract verification result from context (None if verification step was not executed)
             verification_result = context.step_metadata.get("verification_result")
 
-            log.info(f"Model import completed: {model}")
+            log.info("Model import completed: {}", model)
         except HuggingFaceModelNotFoundError:
             raise
         except Exception as e:
@@ -614,10 +614,10 @@ class HuggingFaceService:
                 async with session.get(download_url) as resp:
                     if resp.status == 200:
                         return await resp.text()
-                    log.warning(f"Failed to download README.md: HTTP {resp.status}")
+                    log.warning("Failed to download README.md: HTTP {}", resp.status)
                     return None
         except Exception as e:
-            log.error(f"Error downloading README.md: {e!s}")
+            log.error("Error downloading README.md: {!s}", e)
             return None
 
     async def import_models_batch(
@@ -651,7 +651,7 @@ class HuggingFaceService:
 
             reporter.total_progress = model_count
 
-            log.info(f"Starting batch model import: model_count={model_count}")
+            log.info("Starting batch model import: model_count={}", model_count)
 
             try:
                 successful_models = 0
@@ -665,7 +665,10 @@ class HuggingFaceService:
                     model_id = model.model_id
                     try:
                         log.info(
-                            f"Processing model in batch: model_id={model_id}, progress={idx}/{model_count}"
+                            "Processing model in batch: model_id={}, progress={}/{}",
+                            model_id,
+                            idx,
+                            model_count,
                         )
 
                         await self.import_model(
@@ -678,20 +681,30 @@ class HuggingFaceService:
 
                         successful_models += 1
                         log.info(
-                            f"Successfully imported model in batch: model_id={model_id}, progress={idx}/{model_count}"
+                            "Successfully imported model in batch: model_id={}, progress={}/{}",
+                            model_id,
+                            idx,
+                            model_count,
                         )
 
                     except HuggingFaceModelNotFoundError as e:
                         failed_models += 1
                         log.error(
-                            f"Model not found in batch import: model_id={model_id}, progress={idx}/{model_count}"
+                            "Model not found in batch import: model_id={}, progress={}/{}",
+                            model_id,
+                            idx,
+                            model_count,
                         )
                         errors.append(str(e))
 
                     except Exception as e:
                         failed_models += 1
                         log.error(
-                            f"Failed to import model in batch: {e!s}, model_id={model_id}, progress={idx}/{model_count}"
+                            "Failed to import model in batch: {!s}, model_id={}, progress={}/{}",
+                            e,
+                            model_id,
+                            idx,
+                            model_count,
                         )
                         errors.append(str(e))
                     finally:
@@ -701,17 +714,19 @@ class HuggingFaceService:
                         )
 
                 log.info(
-                    f"Batch model import completed: total_models={model_count}, "
-                    f"successful_models={successful_models}, failed_models={failed_models}"
+                    "Batch model import completed: total_models={}, successful_models={}, failed_models={}",
+                    model_count,
+                    successful_models,
+                    failed_models,
                 )
 
                 if failed_models > 0:
                     log.warning(
-                        f"Some models failed to import in batch: failed_count={failed_models}"
+                        "Some models failed to import in batch: failed_count={}", failed_models
                     )
                     return DispatchResult.partial_success(None, errors=errors)
             except Exception as e:
-                log.error(f"Batch model import failed: {e!s}")
+                log.error("Batch model import failed: {!s}", e)
                 return DispatchResult.error(f"Batch import failed: {e!s}")
 
             return DispatchResult.success(None)
@@ -788,15 +803,17 @@ class HuggingFaceDownloadStep(ImportStep[None]):
 
         chunk_size = registry_config.download_chunk_size
 
-        log.info(f"Rescanning model for latest metadata: {context.model}")
+        log.info("Rescanning model for latest metadata: {}", context.model)
         scanner = self._make_scanner(context.registry_name)
         file_infos = await scanner.list_model_files_info(context.model)
 
         file_count = len(file_infos)
         file_total_size = sum(file.size for file in file_infos)
         log.info(
-            f"Found files to download: model={context.model}, file_count={file_count}, "
-            f"total_size={file_total_size / (1024 * 1024)} MB"
+            "Found files to download: model={}, file_count={}, total_size={} MB",
+            context.model,
+            file_count,
+            file_total_size / (1024 * 1024),
         )
 
         # Initialize artifact download tracking in Redis with all file information
@@ -861,8 +878,11 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
 
         log.info(
-            f"[download] Starting download to {storage_name}: file_path={file_info.path}, "
-            f"storage_key={storage_key}, file_size={file_info.size}"
+            "[download] Starting download to {}: file_path={}, storage_key={}, file_size={}",
+            storage_name,
+            file_info.path,
+            storage_key,
+            file_info.size,
         )
 
         ctype = mimetypes.guess_type(file_info.path)[0] or "application/octet-stream"
@@ -884,7 +904,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             data_stream=data_stream,
         )
 
-        log.info(f"[download] Successfully downloaded to {storage_name}: {storage_key}")
+        log.info("[download] Successfully downloaded to {}: {}", storage_name, storage_key)
         return storage_key
 
 

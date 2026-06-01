@@ -6,7 +6,7 @@ import aiohttp
 import jwt
 import yarl
 from aiohttp import web
-from pydantic import AnyUrl, BaseModel
+from pydantic import AnyUrl
 from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_exponential
 from tenacity.stop import stop_after_attempt
 
@@ -33,6 +33,7 @@ from ai.backend.appproxy.worker.config import (
 )
 from ai.backend.appproxy.worker.coordinator_client import get_circuit_info
 from ai.backend.appproxy.worker.types import InteractiveAppInfo, RootContext
+from ai.backend.common.types import BackendAISchema
 
 
 def generate_proxy_url(
@@ -87,11 +88,11 @@ async def ensure_traefik_route_set_up(traefik_api_port: int, circuit: Circuit) -
                         raise TryAgain
 
 
-class ProxySetupRequestModel(BaseModel):
+class ProxySetupRequestModel(BackendAISchema):
     token: str
 
 
-class ProxySetupResponseModel(BaseModel):
+class ProxySetupResponseModel(BackendAISchema):
     redirect: AnyUrl
     redirectURI: AnyUrl
 
@@ -152,18 +153,20 @@ async def setup(
         raise InvalidAPIParameters("E20011: Not supported for inference apps")
 
     # Web browsers block redirect between cross-origins if Access-Control-Allow-Origin value is set to a concrete Origin instead of wildcard;
-    # Hence we need to send "*" as allowed origin manually, instead of benefiting from aiohttp-cors
+    # Hence we need to send "*" as allowed origin manually, instead of benefiting from aiohttp-cors.
+    # `Cache-Control: no-store` keeps the Set-Cookie-bearing redirect uncacheable.
     cors_headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "*",
         "Access-Control-Expose-Headers": "*",
+        "Cache-Control": "no-store",
     }
     match circuit.protocol:
         case ProxyProtocol.HTTP:
             protocol = "https" if use_tls else "http"
             redirect_path = jwt_body.get("redirect", "")
             proxy_url = generate_proxy_url(port_config, protocol, circuit, redirect_path)
-            response = web.HTTPPermanentRedirect(proxy_url, headers=cors_headers)
+            response = web.HTTPFound(proxy_url, headers=cors_headers)
             cookie_domain = None
             if circuit.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
                 wildcard_info = config.wildcard_domain
@@ -189,7 +192,7 @@ async def setup(
                 "gateway": generate_proxy_url(port_config, protocol, circuit, redirect_path=None),
             }
             if jwt_body["redirect"]:
-                return web.HTTPPermanentRedirect(
+                return web.HTTPFound(
                     f"http://localhost:45678/start?{urllib.parse.urlencode(queryparams)}",
                     headers=cors_headers,
                 )

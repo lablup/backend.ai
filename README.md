@@ -67,7 +67,7 @@ cd backend.ai
 This script will:
 - Check required dependencies (Docker, Python, etc.)
 - Set up Python virtual environment with Pantsbuild
-- Start halfstack infrastructure (PostgreSQL, Redis, etcd, Grafana, etc.)
+- Start halfstack infrastructure (PostgreSQL, Redis, etcd, Apollo Router) — only required services by default; observability and object storage are opt-in via Compose profiles (`--profile observability`, `--profile storage`)
 - Initialize database schemas
 - Create default API keypairs and user accounts
 

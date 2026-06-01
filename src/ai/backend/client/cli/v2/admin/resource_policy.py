@@ -48,11 +48,11 @@ def _load_input(
 
 def _build_dto(dto_cls: type, data: dict[str, Any]) -> Any:
     """Build a Pydantic DTO from a dict, catching validation errors."""
-    from pydantic import ValidationError
+    from ai.backend.common.exception import BackendAISchemaValidationFailed
 
     try:
-        return dto_cls(**data)
-    except ValidationError as e:
+        return dto_cls.model_validate(data)
+    except BackendAISchemaValidationFailed as e:
         click.echo("Validation error:", err=True)
         for err in e.errors():
             field = ".".join(str(loc) for loc in err["loc"])

@@ -25,7 +25,7 @@ from ai.backend.appproxy.common.errors import InvalidAPIParameters
 from ai.backend.appproxy.common.utils import ensure_json_serializable
 from ai.backend.appproxy.coordinator.errors import InvalidEnumTypeError
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.types import ReadableCIDR
+from ai.backend.common.types import BackendAISchema, ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 
 SAFE_MIN_INT = -9007199254740991
@@ -174,9 +174,9 @@ class StructuredJSONColumn(TypeDecorator[BaseModel]):
 
     impl = JSONB
     cache_ok = True
-    _schema: type[BaseModel]
+    _schema: type[BackendAISchema]
 
-    def __init__(self, schema: type[BaseModel]) -> None:
+    def __init__(self, schema: type[BackendAISchema]) -> None:
         super().__init__()
         self._schema = schema
 
@@ -215,7 +215,7 @@ class StructuredJSONObjectColumn(TypeDecorator[BaseModel]):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: type[BaseModel]) -> None:
+    def __init__(self, schema: type[BackendAISchema]) -> None:
         super().__init__()
         self._schema = schema
 
@@ -263,6 +263,54 @@ class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator[list[T
 
     def copy(self, **kw: Any) -> StructuredJSONObjectListColumn[TBaseModel]:
         return StructuredJSONObjectListColumn(self._schema)
+
+
+class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]]):
+    """A column type for storing a list of Pydantic v2 models in JSONB.
+
+    Unlike :class:`StructuredJSONObjectListColumn`, which serializes the
+    entire list as a JSON *string* into the JSONB slot, this decorator
+    hands a list of native Python dicts to the DB driver so PostgreSQL
+    stores it as a native JSONB document. Reads use Pydantic's
+    ``model_validate`` so unknown keys are dropped cleanly (set
+    ``model_config = ConfigDict(extra="ignore")`` on the schema).
+
+    Always returns an empty list instead of ``None`` for null values.
+    Mirrors ``ai.backend.manager.models.base.PydanticListColumn`` so
+    the two components share the same on-wire shape.
+    """
+
+    impl = JSONB
+    cache_ok = True
+
+    def __init__(self, schema: type[TBaseModel]) -> None:
+        super().__init__()
+        self._schema = schema
+
+    def coerce_compared_value(self, _op: Any, _value: Any) -> JSONB:
+        return JSONB()
+
+    def process_bind_param(
+        self, value: list[TBaseModel] | None, _dialect: sa.Dialect
+    ) -> list[dict[str, Any]]:
+        if value is not None:
+            return [item.model_dump(mode="json") for item in value]
+        return []
+
+    def process_result_value(
+        self, value: list[dict[str, Any]] | str | None, _dialect: sa.Dialect
+    ) -> list[TBaseModel]:
+        # JSONB returns native Python objects, but legacy rows written
+        # by StructuredJSONObjectListColumn stored a JSON string — handle
+        # both so no offline migration is needed.
+        if value is not None:
+            if isinstance(value, str):
+                value = json.loads(value)
+            return [self._schema.model_validate(item) for item in value]
+        return []
+
+    def copy(self, **kw: Any) -> PydanticListColumn[TBaseModel]:
+        return PydanticListColumn(self._schema)
 
 
 class URLColumn(TypeDecorator[yarl.URL]):

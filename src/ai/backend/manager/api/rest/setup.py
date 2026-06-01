@@ -33,6 +33,8 @@ def setup_api(
     adapters = Adapters.create(
         r.processing.processors,
         r.bootstrap.config_provider.config.auth,
+        deployment_coordinator=r.orchestration.sokovan_orchestrator.deployment_coordinator,
+        schedule_coordinator=r.orchestration.sokovan_orchestrator.coordinator,
         config_provider=r.bootstrap.config_provider,
     )
     gql_context_deps = GQLContextDeps(
@@ -70,6 +72,7 @@ def setup_api(
         valkey_rate_limit=r.infrastructure.valkey.rate_limit,
         root_app=root_app,
         stream_cleanup_handler=r.processing.stream_cleanup_handler,
+        health_probe=r.system.health_probe,
         pidx=pidx,
     ):
         root_registry.add_subregistry(sub)

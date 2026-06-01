@@ -8,7 +8,12 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringInMatchSpec,
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.status import RoleStatus
@@ -198,6 +203,22 @@ class RoleConditions:
 
         return inner
 
+    @staticmethod
+    def by_assigned_user_id(
+        user_conditions: list[QueryCondition],
+    ) -> QueryCondition:
+        """Match roles whose ``user_roles`` rows satisfy ``user_conditions`` (correlated EXISTS)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = (
+                sa.select(sa.literal(1)).where(UserRoleRow.role_id == RoleRow.id).correlate(RoleRow)
+            )
+            for cond in user_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
 
 class PermissionConditions:
     """Query conditions for permissions."""
@@ -252,6 +273,46 @@ class AssignedUserConditions:
     def by_role_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserRoleRow.role_id.in_(role_ids)
+
+        return inner
+
+    @staticmethod
+    def by_role_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserRoleRow.role_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_role_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserRoleRow.role_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_user_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserRoleRow.user_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_user_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserRoleRow.user_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -761,6 +822,34 @@ class EntityScopeConditions:
     by_entity_id_in = staticmethod(make_string_in_factory(AssociationScopesEntitiesRow.entity_id))
 
     @staticmethod
+    def by_entity_type_equals(element_type: RBACElementType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.entity_type == element_type
+
+        return inner
+
+    @staticmethod
+    def by_entity_type_not_equals(element_type: RBACElementType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.entity_type != element_type
+
+        return inner
+
+    @staticmethod
+    def by_entity_type_in(element_types: Collection[RBACElementType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.entity_type.in_(list(element_types))
+
+        return inner
+
+    @staticmethod
+    def by_entity_type_not_in(element_types: Collection[RBACElementType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.entity_type.not_in(list(element_types))
+
+        return inner
+
+    @staticmethod
     def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AssociationScopesEntitiesRow.id.in_(ids)
@@ -916,6 +1005,13 @@ class ScopedPermissionConditions:
         return inner
 
     @staticmethod
+    def by_scope_id(scope_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.scope_id == scope_id
+
+        return inner
+
+    @staticmethod
     def by_ids(permission_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return PermissionRow.id.in_(permission_ids)
@@ -926,6 +1022,166 @@ class ScopedPermissionConditions:
     def by_role_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return PermissionRow.role_id.in_(role_ids)
+
+        return inner
+
+    # ---------------- UUIDFilter / StringFilter factories ----------------
+
+    @staticmethod
+    def by_role_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = PermissionRow.role_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_role_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = PermissionRow.role_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_equals(element_type: RBACElementType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.scope_type == element_type
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_not_equals(element_type: RBACElementType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.scope_type != element_type
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_in(element_types: Collection[RBACElementType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.scope_type.in_(list(element_types))
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_not_in(element_types: Collection[RBACElementType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.scope_type.not_in(list(element_types))
+
+        return inner
+
+    @staticmethod
+    def by_scope_id_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = PermissionRow.scope_id.ilike(f"%{spec.value}%")
+            else:
+                condition = PermissionRow.scope_id.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scope_id_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(PermissionRow.scope_id) == spec.value.lower()
+            else:
+                condition = PermissionRow.scope_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scope_id_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = PermissionRow.scope_id.ilike(f"{spec.value}%")
+            else:
+                condition = PermissionRow.scope_id.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scope_id_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = PermissionRow.scope_id.ilike(f"%{spec.value}")
+            else:
+                condition = PermissionRow.scope_id.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_scope_id_in = staticmethod(make_string_in_factory(PermissionRow.scope_id))
+
+    @staticmethod
+    def by_entity_type_equals(element_type: RBACElementType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.entity_type == element_type
+
+        return inner
+
+    @staticmethod
+    def by_entity_type_not_equals(element_type: RBACElementType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.entity_type != element_type
+
+        return inner
+
+    @staticmethod
+    def by_entity_type_in(element_types: Collection[RBACElementType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.entity_type.in_(list(element_types))
+
+        return inner
+
+    @staticmethod
+    def by_entity_type_not_in(element_types: Collection[RBACElementType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.entity_type.not_in(list(element_types))
+
+        return inner
+
+    @staticmethod
+    def by_operation_equals(operation: OperationType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation == operation
+
+        return inner
+
+    @staticmethod
+    def by_operation_not_equals(operation: OperationType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation != operation
+
+        return inner
+
+    @staticmethod
+    def by_operation_in(operations: Collection[OperationType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation.in_(list(operations))
+
+        return inner
+
+    @staticmethod
+    def by_operation_not_in(operations: Collection[OperationType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation.not_in(list(operations))
 
         return inner
 

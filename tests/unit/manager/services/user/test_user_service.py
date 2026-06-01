@@ -123,6 +123,7 @@ def _make_service(mock_repo: MagicMock) -> UserService:
         valkey_stat_client=MagicMock(),
         agent_registry=MagicMock(),
         user_repository=mock_repo,
+        scheduling_controller=MagicMock(),
     )
 
 
@@ -872,13 +873,13 @@ class TestPurgeUser:
         mock_session = MagicMock()
         mock_session.id = uuid.uuid4()
         mock_user_repository.retrieve_active_sessions = AsyncMock(return_value=[mock_session])
-        mock_agent_registry = cast(MagicMock, service._agent_registry)
-        mock_agent_registry.destroy_session = AsyncMock(return_value=None)
+        mock_scheduling_controller = cast(MagicMock, service._scheduling_controller)
+        mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(return_value=None)
 
         action = self._make_purge_action()
         await service.purge_user(action)
 
-        mock_agent_registry.destroy_session.assert_called_once()
+        mock_scheduling_controller.mark_sessions_for_termination.assert_called_once()
         mock_user_repository.purge_user.assert_called_once_with("user@example.com")
 
 

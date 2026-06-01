@@ -20,7 +20,11 @@ from glide import (
 from glide.exceptions import ClosingError  # type: ignore[import-not-found]
 from redis.asyncio.sentinel import Sentinel
 
-from ai.backend.common.exception import ClientNotConnectedError, ValkeySentinelMasterNotFound
+from ai.backend.common.exception import (
+    ClientNotConnectedError,
+    ValkeyRoleMismatchError,
+    ValkeySentinelMasterNotFound,
+)
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.common.utils import addr_to_hostport_pair
 from ai.backend.logging import BraceStyleAdapter
@@ -139,6 +143,24 @@ class AbstractValkeyClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def check_health(self) -> None:
+        """
+        Verify that the underlying connection is alive and points to a usable node.
+
+        Standalone clients fall back to PING. Sentinel clients additionally verify
+        that the connected node is currently a master via the ROLE command, so a
+        Sentinel failover that demotes the previously-connected master to a replica
+        is detected on the next health check.
+
+        Raises:
+            ClientNotConnectedError: If the client is not connected.
+            ValkeyRoleMismatchError: If the connected node is no longer a master
+                (Sentinel mode only).
+            Exception: If the underlying command fails (network error, timeout, ...).
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def client(self) -> AbstractAsyncContextManager[GlideClient]:
         """
         Acquire the client for an operation.
@@ -235,6 +257,18 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
 
     async def need_reconnect(self) -> bool:
         return self._valkey_client is None
+
+    async def check_health(self) -> None:
+        """
+        Verify that the standalone connection is alive by pinging the server.
+
+        Raises:
+            ClientNotConnectedError: If the client is not connected.
+            Exception: If the ping fails.
+        """
+        if self._valkey_client is None:
+            raise ClientNotConnectedError("ValkeyStandaloneClient is not connected")
+        await self._valkey_client.ping()
 
     @asynccontextmanager
     async def client(self) -> AsyncIterator[GlideClient]:
@@ -378,6 +412,32 @@ class ValkeySentinelClient(AbstractValkeyClient):
 
         return current_master != self._master_address
 
+    async def check_health(self) -> None:
+        """
+        Verify that the connected node is still a master via the ROLE command.
+
+        Running ROLE on the connected node (rather than asking Sentinel) detects
+        the case where the previously-connected master has been demoted to a
+        replica after a Sentinel failover, even before Sentinel's master view
+        propagates. The command also doubles as a liveness check, so PING and
+        master-change detection collapse into a single round-trip.
+
+        Raises:
+            ClientNotConnectedError: If the client is not connected.
+            ValkeyRoleMismatchError: If the connected node is no longer a master.
+            Exception: If the underlying ROLE command fails.
+        """
+        if self._valkey_client is None:
+            raise ClientNotConnectedError("ValkeySentinelClient is not connected")
+        result = await self._valkey_client.custom_command(["ROLE"])
+        role = result[0] if result else None
+        # ROLE responses come back as bytes from Glide; tolerate str for test/mocks.
+        if role not in (b"master", "master"):
+            raise ValkeyRoleMismatchError(
+                f"Connected node role is {role!r}, expected 'master' "
+                f"(service={self._target.service_name!r})"
+            )
+
     @asynccontextmanager
     async def client(self) -> AsyncIterator[GlideClient]:
         if self._valkey_client is None:
@@ -443,11 +503,12 @@ class MonitoringValkeyClientSpec:
     reconnectable_exceptions: tuple[type[Exception], ...] = (
         ClosingError,
         ClientNotConnectedError,
+        ValkeyRoleMismatchError,
     )
     """Exception types that indicate a broken connection requiring immediate reconnection."""
 
     monitor_failure_threshold: int = _DEFAULT_MONITOR_FAILURE_THRESHOLD
-    """Number of consecutive monitor ping failures before triggering reconnection."""
+    """Number of consecutive monitor health-check failures before triggering reconnection."""
 
     operation_failure_threshold: int = _DEFAULT_OPERATION_FAILURE_THRESHOLD
     """Number of consecutive operation failures before triggering reconnection."""
@@ -526,6 +587,17 @@ class MonitoringValkeyClient(AbstractValkeyClient):
     async def need_reconnect(self) -> bool:
         return await self._monitor_client.need_reconnect()
 
+    async def check_health(self) -> None:
+        """
+        Run the unified health check via the monitor client.
+
+        Raises:
+            ClientNotConnectedError: If the monitor client is not connected.
+            ValkeyRoleMismatchError: If the connected node is no longer a master (Sentinel).
+            Exception: If the underlying health check command fails.
+        """
+        await self._monitor_client.check_health()
+
     @asynccontextmanager
     async def client(self) -> AsyncIterator[GlideClient]:
         """
@@ -558,20 +630,25 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         else:
             self._operation_failure_count = 0
 
-    async def _check_ping(self) -> bool:
+    async def _check_health(self) -> bool:
         """
-        Ping the monitor client and determine if reconnection is needed.
+        Run a unified health check on the monitor client and decide if reconnection
+        is needed.
+
+        Reconnectable exceptions (including role mismatch after a Sentinel failover)
+        trigger immediate reconnection. Other transient errors accumulate against
+        the monitor failure threshold before triggering reconnection.
 
         Returns:
             True if reconnection is needed, False otherwise.
         """
         reconnectable_exceptions = self._reconnectable_exceptions
         try:
-            await self._monitor_client.ping()
+            await self._monitor_client.check_health()
             self._monitor_consecutive_failure_count = 0
             return False
         except reconnectable_exceptions as e:
-            log.warning("Connection error: {}, reconnecting immediately...", e)
+            log.warning("Health check signaled reconnect: {}, reconnecting immediately...", e)
             self._monitor_consecutive_failure_count = 0
             return True
         except Exception as e:
@@ -593,19 +670,12 @@ class MonitoringValkeyClient(AbstractValkeyClient):
 
     async def _check_connection(self) -> bool:
         """
-        Check if reconnection is needed by ping and need_reconnect.
+        Check if reconnection is needed via the unified health check.
 
         Returns:
             True if reconnection is needed, False otherwise.
         """
-        if await self._check_ping():
-            return True
-
-        if await self._monitor_client.need_reconnect():
-            log.info("Reconnection needed (master changed), reconnecting...")
-            return True
-
-        return False
+        return await self._check_health()
 
     async def _monitor_connection(self) -> None:
         log.info("Starting Valkey connection monitor task...")

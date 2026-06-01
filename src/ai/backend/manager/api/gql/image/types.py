@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
     ImageTagInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -301,7 +302,7 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         after: str | None = None,
         first: int | None = None,
         last: int | None = None,
-    ) -> ImageV2AliasConnectionGQL:
+    ) -> ImageV2AliasConnectionGQL | None:
         """Get the aliases for this image with pagination, filtering, and ordering."""
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
@@ -445,6 +446,10 @@ class ImageV2FilterGQL(PydanticInputMixin[ImageFilterInputDTO], GQLFilter):
     status: ImageV2StatusFilterGQL | None = None
     name: StringFilter | None = None
     architecture: StringFilter | None = None
+    id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by image UUID."),
+        default=None,
+    )
     registry_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.4.0", description="Filter by container registry ID."),
         default=None,

@@ -23,6 +23,15 @@ from .my import my
 @click.group()
 def v2() -> None:
     """V2 REST API commands."""
+    # The real entry point for `./bai v2 ...` is the `LazyGroup` wrapper in
+    # `client/cli/__init__.py`, because `LazyGroup` does not delegate
+    # `MultiCommand.invoke` to the underlying group. This callback only runs
+    # when the inner group is invoked directly (e.g. tests, REPL), so we
+    # mirror the wrapper's `.env` auto-load here as a safety net.
+    # `load_dotenv` is idempotent — running on both paths is harmless.
+    from dotenv import find_dotenv, load_dotenv
+
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
 
 
 # Infrastructure commands

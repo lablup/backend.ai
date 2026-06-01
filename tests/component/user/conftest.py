@@ -34,6 +34,7 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
 
@@ -60,6 +61,7 @@ def user_processors(
         valkey_stat_client=valkey_clients.stat,
         agent_registry=agent_registry,
         user_repository=user_repository,
+        scheduling_controller=AsyncMock(),
     )
     return UserProcessors(
         user_service=service, action_monitors=[], validators=_create_mock_validators()
@@ -92,7 +94,7 @@ def server_module_registries(
 @pytest.fixture()
 async def user_factory(
     admin_registry: BackendAIClientRegistry,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
     db_engine: SAEngine,
 ) -> AsyncIterator[UserFactory]:
@@ -105,7 +107,7 @@ async def user_factory(
             "email": f"test-{unique}@test.local",
             "username": f"test-{unique}",
             "password": "test-password-1234",
-            "domain_name": domain_fixture,
+            "domain_name": domain_fixture.domain_name,
             "resource_policy": resource_policy_fixture,
             "status": UserStatus.ACTIVE,
         }

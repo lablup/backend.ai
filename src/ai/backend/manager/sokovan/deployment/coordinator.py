@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -20,29 +19,30 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.common.data.notification.messages import EndpointLifecycleChangedMessage
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    DoSyncRouteInfoToAppProxyEvent,
-    EndpointRouteListUpdatedEvent,
-)
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerCategory,
     DeploymentInfo,
+    DeploymentLastHistory,
     DeploymentLifecycleStatus,
     DeploymentLifecycleSubStep,
+    DeploymentTargetStatuses,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
-from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
@@ -51,6 +51,7 @@ from ai.backend.manager.repositories.deployment.creators import (
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
@@ -90,43 +91,73 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 # sub_step is None for handlers that don't filter by sub-step.
 type HandlerKey = tuple[DeploymentLifecycleType, DeploymentLifecycleSubStep | None]
 
-# Timeout thresholds for deployment lifecycle statuses (seconds).
-_DEPLOYMENT_STATUS_TIMEOUT_MAP: dict[EndpointLifecycle, float] = {
-    EndpointLifecycle.DEPLOYING: 3600.0,  # 1 hour
-    EndpointLifecycle.SCALING: 3600.0,  # 1 hour
-}
+
+def _collect_last_history_map(
+    result: DeploymentExecutionResult,
+) -> dict[DeploymentID, DeploymentLastHistory | None]:
+    """Build a ``deployment_id → last_history`` map from every bucket
+    of a :class:`DeploymentExecutionResult`.
+
+    The repository already attached the category-scoped last history
+    to each :class:`DeploymentWithHistory` it returned, so the
+    coordinator can look up the prior row without another DB round-trip.
+    """
+    out: dict[DeploymentID, DeploymentLastHistory | None] = {}
+    for deployment in result.successes:
+        out[DeploymentID(deployment.deployment_info.id)] = deployment.last_history
+    for deployment in result.skipped:
+        out[DeploymentID(deployment.deployment_info.id)] = deployment.last_history
+    for error in result.failures:
+        dep = error.deployment_info
+        out[DeploymentID(dep.deployment_info.id)] = dep.last_history
+    return out
 
 
-def _is_transition_timed_out(
-    started_at: datetime | None,
-    lifecycle: EndpointLifecycle,
-    current_dbtime: datetime,
-) -> bool:
-    """Check if timeout exceeded for the given lifecycle status."""
-    if started_at is None:
-        return False
-    timeout = _DEPLOYMENT_STATUS_TIMEOUT_MAP.get(lifecycle)
-    if not timeout:
-        return False
-    current_utc = (
-        current_dbtime.astimezone(UTC)
-        if current_dbtime.tzinfo
-        else current_dbtime.replace(tzinfo=UTC)
-    )
-    started_utc = (
-        started_at.astimezone(UTC) if started_at.tzinfo else started_at.replace(tzinfo=UTC)
-    )
-    elapsed = (current_utc - started_utc).total_seconds()
-    return elapsed > timeout
+def _classify_history_specs(
+    specs: list[DeploymentHistoryCreatorSpec],
+    last_history_map: dict[DeploymentID, DeploymentLastHistory | None],
+) -> tuple[list[DeploymentHistoryCreatorSpec], list[UUID]]:
+    """Split history specs into (new_inserts, merge_target_ids).
+
+    A spec merges onto its deployment's last history row when the
+    (phase, error_code, to_status) triple matches. The category axis
+    is already guaranteed to match — ``last_history_map`` was populated
+    by a category-scoped query, so every prior row has the current
+    handler's category.
+    """
+    new_specs: list[DeploymentHistoryCreatorSpec] = []
+    merge_ids: list[UUID] = []
+    for spec in specs:
+        last = last_history_map.get(spec.deployment_id)
+        if last is None:
+            new_specs.append(spec)
+            continue
+        spec_to_status = spec.to_status.value if spec.to_status is not None else None
+        if (
+            last.phase == spec.phase
+            and last.error_code == spec.error_code
+            and last.to_status == spec_to_status
+        ):
+            merge_ids.append(last.id)
+        else:
+            new_specs.append(spec)
+    return new_specs, merge_ids
 
 
 @dataclass
 class FailureClassificationResult:
     """Result of classifying failures into give_up, expired, and need_retry.
 
-    Classification priority (first match wins):
-    1. give_up: phase_attempts >= SERVICE_MAX_RETRIES
-    2. expired: phase_started_at elapsed > DEPLOYMENT_STATUS_TIMEOUT_MAP threshold
+    Classification priority (first match wins), resolved against
+    ``DeploymentWithHistory.last_history`` narrowed to the current
+    handler phase. Both retry and timeout limits come from the
+    deployment's frozen ``DeploymentHandlerOptions`` —
+    ``resolve(handler_name)`` per-handler with field-level fallback to
+    ``default``. ``None`` on either dimension means "no limit"; the
+    matching classification simply does not fire on that dimension:
+    1. give_up: ``max_retry_count`` set AND attempts in current phase
+       reached it
+    2. expired: ``timeout`` set AND elapsed exceeded it
     3. need_retry: default (can be retried)
     """
 
@@ -224,6 +255,7 @@ class DeploymentCoordinator:
         route_controller: RouteController,
         prometheus_client: PrometheusClient,
         prometheus_query_preset_repository: PrometheusQueryPresetRepository,
+        runtime_variant_repository: RuntimeVariantRepository,
     ) -> None:
         """Initialize the deployment coordinator."""
         self._valkey_schedule = valkey_schedule
@@ -243,6 +275,7 @@ class DeploymentCoordinator:
             valkey_stat=valkey_stat,
             prometheus_client=prometheus_client,
             preset_repo=prometheus_query_preset_repository,
+            runtime_variant_repo=runtime_variant_repository,
         )
 
         # Create strategy components for deploying handlers
@@ -258,6 +291,16 @@ class DeploymentCoordinator:
         applier = StrategyResultApplier(deployment_repo=self._deployment_repository)
 
         self._registry = self._init_handlers(executor, evaluator, applier)
+
+    def registered_handlers(self) -> tuple[DeploymentHandler, ...]:
+        """Return the live set of handler instances registered on this coordinator.
+
+        The coordinator owns the authoritative registry; callers that need
+        handler names (e.g. for validating ``DeploymentOptions.handler_options.by_handler``)
+        or handler metadata (e.g. for ``/v2/scheduling-handlers``) should
+        consult this method rather than maintaining a parallel static list.
+        """
+        return tuple(self._registry.handlers.values())
 
     def _init_handlers(
         self,
@@ -351,6 +394,24 @@ class DeploymentCoordinator:
                 await stack.enter_async_context(self._lock_factory(lock_id, lock_lifetime))
             await self._run_handler(handler)
 
+    @staticmethod
+    def _build_deployment_querier(target: DeploymentTargetStatuses) -> BatchQuerier:
+        """Assemble a :class:`BatchQuerier` from the handler's target declaration.
+
+        Each non-empty axis list becomes a separate ``IN (...)`` predicate
+        and the three predicates AND together. Pagination is skipped —
+        coordinator fetches need every matching deployment per tick.
+        """
+        conditions: list[QueryCondition] = []
+        if target.lifecycle_stages:
+            conditions.append(DeploymentConditions.by_lifecycle_stages(target.lifecycle_stages))
+        if target.scaling_states:
+            conditions.append(DeploymentConditions.by_scaling_state_in(target.scaling_states))
+        if target.sub_steps:
+            conditions.append(DeploymentConditions.by_sub_step_in(target.sub_steps))
+
+        return BatchQuerier(pagination=NoPagination(), conditions=conditions)
+
     async def _run_handler(
         self,
         handler: DeploymentHandler,
@@ -358,14 +419,10 @@ class DeploymentCoordinator:
         """Run a single handler: fetch filtered deployments -> execute -> transitions -> post_process."""
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
-        lifecycle_stages = [status.lifecycle for status in target_statuses]
-        target_sub_steps: list[DeploymentLifecycleSubStep] = [
-            status.sub_step for status in target_statuses if status.sub_step is not None
-        ]
-        deployments = await self._deployment_repository.get_deployments_for_handler(
-            lifecycle_stages,
-            handler_name,
-            sub_steps=target_sub_steps or None,
+        querier = self._build_deployment_querier(target_statuses)
+        deployments = await self._deployment_repository.search_deployments_with_last_history(
+            querier=querier,
+            category=handler.category(),
         )
         if not deployments:
             log.trace("No deployments to process for handler: {}", handler_name)
@@ -406,10 +463,11 @@ class DeploymentCoordinator:
     ) -> None:
         """Handle status transitions with history recording.
 
-        Classifies failures into need_retry/expired/give_up using phase_attempts
-        and phase_started_at from DeploymentWithHistory embedded in each error,
-        then applies per-category transitions. All transitions are processed
-        in a single transaction.
+        Classifies failures into need_retry/expired/give_up using the
+        ``last_history`` carried on each :class:`DeploymentWithHistory`
+        (filtered by the handler's :class:`DeploymentHandlerCategory`),
+        then applies per-category transitions. All transitions are
+        processed in a single transaction.
 
         Args:
             handler: The route handler that was executed
@@ -417,7 +475,9 @@ class DeploymentCoordinator:
             records: Execution records from the recorder context
         """
         handler_name = handler.name()
-        target_statuses = handler.target_statuses()
+        handler_category = handler.category()
+        target = handler.target_statuses()
+        target_lifecycle_stages = target.lifecycle_stages
 
         batch_updaters: list[BatchUpdater[EndpointRow]] = []
         all_history_specs: list[DeploymentHistoryCreatorSpec] = []
@@ -430,9 +490,10 @@ class DeploymentCoordinator:
         if result.successes and transitions.success is not None:
             transition = self._build_success_transition(
                 handler_name=handler_name,
+                handler_category=handler_category,
                 deployments=result.successes,
                 lifecycle_status=transitions.success,
-                target_lifecycles=target_statuses,
+                target_lifecycle_stages=target_lifecycle_stages,
                 records=records,
                 timestamp_now=timestamp_now,
             )
@@ -446,8 +507,12 @@ class DeploymentCoordinator:
             current_dbtime = await self._deployment_repository.get_db_now()
             timed_out: list[DeploymentWithHistory] = []
             for deployment in result.skipped:
-                lifecycle = deployment.deployment_info.state.lifecycle
-                if _is_transition_timed_out(deployment.phase_started_at, lifecycle, current_dbtime):
+                last = deployment.last_history
+                started_at = (
+                    last.started_at if last is not None and last.phase == handler_name else None
+                )
+                policy = deployment.deployment_info.options.handler_options.resolve(handler_name)
+                if policy.is_timed_out(started_at, current_dbtime):
                     timed_out.append(deployment)
             if timed_out:
                 log.warning(
@@ -457,9 +522,10 @@ class DeploymentCoordinator:
                 )
                 transition = self._build_success_transition(
                     handler_name=handler_name,
+                    handler_category=handler_category,
                     deployments=timed_out,
                     lifecycle_status=transitions.expired,
-                    target_lifecycles=target_statuses,
+                    target_lifecycle_stages=target_lifecycle_stages,
                     records=records,
                     timestamp_now=timestamp_now,
                 )
@@ -470,7 +536,7 @@ class DeploymentCoordinator:
         # Failure transitions — classify into need_retry/expired/give_up
         if result.failures:
             current_dbtime = await self._deployment_repository.get_db_now()
-            classified = self._classify_failures(result.failures, current_dbtime)
+            classified = self._classify_failures(result.failures, current_dbtime, handler_name)
 
             failure_categories = [
                 (classified.give_up, transitions.give_up, SchedulingResult.GIVE_UP, "give_up"),
@@ -490,10 +556,11 @@ class DeploymentCoordinator:
                     continue
                 transition = self._build_failure_transition(
                     handler_name=handler_name,
+                    handler_category=handler_category,
                     errors=errors,
                     lifecycle_status=lifecycle_status,
                     scheduling_result=scheduling_result,
-                    target_lifecycles=target_statuses,
+                    target_lifecycle_stages=target_lifecycle_stages,
                     records=records,
                     timestamp_now=timestamp_now,
                     transition_label=label,
@@ -504,8 +571,14 @@ class DeploymentCoordinator:
 
         # Execute all updates in a single transaction
         if batch_updaters:
+            last_history_map = _collect_last_history_map(result)
+            new_history_specs, merge_history_ids = _classify_history_specs(
+                all_history_specs, last_history_map
+            )
             await self._deployment_repository.update_endpoint_lifecycle_bulk_with_history(
-                batch_updaters, BulkCreator(specs=all_history_specs)
+                batch_updaters,
+                new_history_specs=new_history_specs,
+                merge_history_ids=merge_history_ids,
             )
 
         # Anycast notification events
@@ -517,42 +590,50 @@ class DeploymentCoordinator:
 
     def _build_lifecycle_updater(
         self,
-        endpoint_ids: list[UUID],
+        deployment_ids: list[DeploymentID],
         lifecycle_status: DeploymentLifecycleStatus,
         target_lifecycles: list[EndpointLifecycle],
     ) -> BatchUpdater[EndpointRow]:
+        conditions = [DeploymentConditions.by_ids(deployment_ids)]
+        # Only narrow by lifecycle stage when the target set actually
+        # restricts it — scaling-category transitions accept every
+        # lifecycle in the handler's target set, which may already cover
+        # everything the ``by_ids`` condition does.
+        if target_lifecycles:
+            conditions.append(DeploymentConditions.by_lifecycle_stages(target_lifecycles))
         return BatchUpdater(
             spec=EndpointLifecycleBatchUpdaterSpec(
                 lifecycle_stage=lifecycle_status.lifecycle,
                 sub_step=lifecycle_status.sub_step,
+                scaling_state=lifecycle_status.scaling_state,
             ),
-            conditions=[
-                DeploymentConditions.by_ids(endpoint_ids),
-                DeploymentConditions.by_lifecycle_stages(target_lifecycles),
-            ],
+            conditions=conditions,
         )
 
     def _build_success_transition(
         self,
         *,
         handler_name: str,
+        handler_category: DeploymentHandlerCategory,
         deployments: list[DeploymentWithHistory],
         lifecycle_status: DeploymentLifecycleStatus,
-        target_lifecycles: list[DeploymentLifecycleStatus],
+        target_lifecycle_stages: list[EndpointLifecycle],
         records: Mapping[UUID, ExecutionRecord],
         timestamp_now: str,
     ) -> _TransitionResult:
         next_lifecycle = lifecycle_status.lifecycle
-        target_lifecycle_stages = [status.lifecycle for status in target_lifecycles]
-        endpoint_ids = [deployment.deployment_info.id for deployment in deployments]
+        deployment_ids = [deployment.deployment_info.id for deployment in deployments]
         history_specs = [
             DeploymentHistoryCreatorSpec(
-                deployment_id=deployment.deployment_info.id,
+                deployment_id=DeploymentID(deployment.deployment_info.id),
                 phase=handler_name,
                 result=SchedulingResult.SUCCESS,
                 message=f"{handler_name} completed successfully",
+                handler_category=handler_category,
                 from_status=deployment.deployment_info.state.lifecycle,
-                to_status=next_lifecycle,
+                to_status=next_lifecycle
+                if next_lifecycle is not None
+                else deployment.deployment_info.state.lifecycle,
                 sub_steps=self._build_history_sub_steps(
                     deployment.deployment_info.id,
                     records,
@@ -562,18 +643,24 @@ class DeploymentCoordinator:
             )
             for deployment in deployments
         ]
-        events = [
-            self._build_lifecycle_notification_event(
-                deployment=deployment.deployment_info,
-                from_status=deployment.deployment_info.state.lifecycle,
-                to_status=next_lifecycle,
-                transition_result="success",
-                timestamp=timestamp_now,
-            )
-            for deployment in deployments
-        ]
+        # Only emit lifecycle-changed notifications when the lifecycle
+        # axis actually moves; scaling-only transitions leave lifecycle
+        # untouched and therefore don't trigger endpoint-lifecycle
+        # notification subscribers.
+        events: list[NotificationTriggeredEvent] = []
+        if next_lifecycle is not None:
+            events = [
+                self._build_lifecycle_notification_event(
+                    deployment=deployment.deployment_info,
+                    from_status=deployment.deployment_info.state.lifecycle,
+                    to_status=next_lifecycle,
+                    transition_result="success",
+                    timestamp=timestamp_now,
+                )
+                for deployment in deployments
+            ]
         updater = self._build_lifecycle_updater(
-            endpoint_ids, lifecycle_status, target_lifecycle_stages
+            deployment_ids, lifecycle_status, target_lifecycle_stages
         )
         return _TransitionResult(
             updater=updater,
@@ -585,25 +672,30 @@ class DeploymentCoordinator:
         self,
         *,
         handler_name: str,
+        handler_category: DeploymentHandlerCategory,
         errors: list[DeploymentExecutionError],
         lifecycle_status: DeploymentLifecycleStatus,
         scheduling_result: SchedulingResult,
-        target_lifecycles: list[DeploymentLifecycleStatus],
+        target_lifecycle_stages: list[EndpointLifecycle],
         records: Mapping[UUID, ExecutionRecord],
         timestamp_now: str,
         transition_label: str,
     ) -> _TransitionResult:
         next_lifecycle = lifecycle_status.lifecycle
-        target_lifecycle_stages = [status.lifecycle for status in target_lifecycles]
-        endpoint_ids = [error.deployment_info.deployment_info.id for error in errors]
+        deployment_ids = [error.deployment_info.deployment_info.id for error in errors]
         history_specs = [
             DeploymentHistoryCreatorSpec(
-                deployment_id=error.deployment_info.deployment_info.id,
+                deployment_id=DeploymentID(error.deployment_info.deployment_info.id),
                 phase=handler_name,
                 result=scheduling_result,
                 message=error.reason,
+                handler_category=handler_category,
                 from_status=error.deployment_info.deployment_info.state.lifecycle,
-                to_status=next_lifecycle,
+                to_status=(
+                    next_lifecycle
+                    if next_lifecycle is not None
+                    else error.deployment_info.deployment_info.state.lifecycle
+                ),
                 error_code=error.error_code,
                 sub_steps=self._build_history_sub_steps(
                     error.deployment_info.deployment_info.id,
@@ -614,18 +706,20 @@ class DeploymentCoordinator:
             )
             for error in errors
         ]
-        events = [
-            self._build_lifecycle_notification_event(
-                deployment=error.deployment_info.deployment_info,
-                from_status=error.deployment_info.deployment_info.state.lifecycle,
-                to_status=next_lifecycle,
-                transition_result=transition_label,
-                timestamp=timestamp_now,
-            )
-            for error in errors
-        ]
+        events: list[NotificationTriggeredEvent] = []
+        if next_lifecycle is not None:
+            events = [
+                self._build_lifecycle_notification_event(
+                    deployment=error.deployment_info.deployment_info,
+                    from_status=error.deployment_info.deployment_info.state.lifecycle,
+                    to_status=next_lifecycle,
+                    transition_result=transition_label,
+                    timestamp=timestamp_now,
+                )
+                for error in errors
+            ]
         updater = self._build_lifecycle_updater(
-            endpoint_ids, lifecycle_status, target_lifecycle_stages
+            deployment_ids, lifecycle_status, target_lifecycle_stages
         )
         return _TransitionResult(
             updater=updater,
@@ -637,15 +731,25 @@ class DeploymentCoordinator:
     def _classify_failures(
         errors: list[DeploymentExecutionError],
         current_dbtime: datetime,
+        handler_name: str,
     ) -> FailureClassificationResult:
         """Classify failures into give_up, expired, need_retry.
 
         Pure classification based on conditions only. The caller (_handle_status_transitions)
         decides whether to apply transitions based on handler's transition definitions.
 
+        Only the last history row in the handler's own category is supplied
+        by the repository; here we further narrow by ``phase`` so a failure
+        coming right after a phase change (same category, different phase)
+        is treated as a fresh attempt.
+
+        Per-deployment ``DeploymentHandlerOptions`` resolves both limits
+        per handler. ``None`` on either field means "no limit" — the
+        matching classification skips that dimension entirely.
+
         Classification priority (first match wins):
-        1. give_up: phase_attempts >= SERVICE_MAX_RETRIES
-        2. expired: timeout exceeded
+        1. give_up: per-handler max_retry_count set AND attempts reached it
+        2. expired: per-handler timeout set AND elapsed exceeded it
         3. need_retry: default
         """
         give_up_errors: list[DeploymentExecutionError] = []
@@ -654,15 +758,20 @@ class DeploymentCoordinator:
 
         for error in errors:
             deployment = error.deployment_info
+            last = deployment.last_history
+            in_current_phase = last is not None and last.phase == handler_name
+            attempts = last.attempts if in_current_phase and last is not None else 0
+            started_at = last.started_at if in_current_phase and last is not None else None
+
+            policy = deployment.deployment_info.options.handler_options.resolve(handler_name)
 
             # 1. Check max retries exceeded → give_up
-            if deployment.phase_attempts >= SERVICE_MAX_RETRIES:
+            if policy.is_retry_exhausted(attempts):
                 give_up_errors.append(error)
                 continue
 
             # 2. Check timeout exceeded → expired
-            lifecycle = deployment.deployment_info.state.lifecycle
-            if _is_transition_timed_out(deployment.phase_started_at, lifecycle, current_dbtime):
+            if policy.is_timed_out(started_at, current_dbtime):
                 expired_errors.append(error)
                 continue
 
@@ -807,42 +916,8 @@ class DeploymentCoordinator:
             )
             specs.append(long_spec)
 
-        # Periodic reconcile of every active endpoint's route info into Redis,
-        # acting as a safety net for missed RUNNING/TERMINATED hook invocations
-        # so the app proxy coordinator eventually converges on the manager's
-        # DB state. Runs leader-only via the sokovan LeaderCron.
-        specs.append(
-            EventTaskSpec(
-                name="sync_route_info_to_appproxy",
-                event_factory=lambda: DoSyncRouteInfoToAppProxyEvent(),
-                interval=30.0,
-                initial_delay=15.0,
-            )
-        )
-
+        # The periodic AppProxy reconcile previously implemented here lives
+        # on RouteCoordinator now (RouteLifecycleType.APPPROXY_SYNC short +
+        # long cycle), so the deployment coordinator no longer schedules a
+        # standalone sync task.
         return specs
-
-    async def sync_route_info_to_appproxy(self) -> None:
-        """Re-publish route_connection_info for every active endpoint into
-        Redis and fire EndpointRouteListUpdatedEvent per endpoint.
-
-        The per-endpoint call chain is identical to the RUNNING/TERMINATED
-        transition hook so downstream receivers (coordinator on_route_update_event)
-        behave the same regardless of which path triggered the update.
-        """
-        endpoint_ids = await self._deployment_repository.list_active_endpoint_ids()
-        if not endpoint_ids:
-            return
-        log.debug(
-            "sync_route_info_to_appproxy: syncing {} active endpoints",
-            len(endpoint_ids),
-        )
-        for endpoint_id in endpoint_ids:
-            try:
-                await self._deployment_repository.update_endpoint_route_info(endpoint_id)
-                await self._event_producer.anycast_event(EndpointRouteListUpdatedEvent(endpoint_id))
-            except Exception:
-                log.exception(
-                    "sync_route_info_to_appproxy: failed for endpoint {}",
-                    endpoint_id,
-                )

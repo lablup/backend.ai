@@ -306,6 +306,20 @@
   # Added in 25.8.0
   ## public-metrics-port = 9090
 
+  # RBAC (Role-Based Access Control) configuration. Controls runtime RBAC
+  # enforcement behavior including the ability to toggle enforcement on or off
+  # without a restart.
+  # Added in 26.4.4
+  [manager.rbac]
+    # Whether to enable RBAC enforcement on the manager's read/validation path.
+    # When true (default), all RBAC validators run normally. When false, RBAC
+    # validators short-circuit so that only the legacy permission path
+    # (user.role / is_admin / domain and project membership) applies. RBAC write
+    # paths continue to populate association and role-mapping rows regardless of
+    # this flag, so re-enabling does not require data backfill.
+    # Added in 26.4.4
+    enforcement-enabled = true
+
 # Deprecated Docker registry configuration. This legacy configuration controls
 # basic Docker registry connection settings. For new deployments, use the
 # container registry configuration through the API instead. This setting may be
@@ -1068,15 +1082,6 @@
 # model definition handling.
 # Added in 25.8.0
 [deployment]
-  # Enable custom model definition override from storage for non-CUSTOM runtime
-  # variants. When enabled, after generating the standard model definition
-  # programmatically, the system attempts to fetch a custom definition from
-  # storage if model_definition_path is specified in the model revision. The
-  # custom definition overrides the generated one if found; otherwise, the
-  # generated definition is used as fallback. This allows customizing model
-  # serving configurations while maintaining automatic defaults.
-  # Added in 25.8.0
-  enable-model-definition-override = true
 
 # Export API configuration. Controls CSV export functionality including row
 # limits, timeouts, and concurrency limits. These settings prevent resource

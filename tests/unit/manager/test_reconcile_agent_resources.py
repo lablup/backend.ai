@@ -20,6 +20,7 @@ from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ResourceSlot, SlotName
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -90,10 +91,7 @@ class TestReconcileAgentResources:
         mock_config: MagicMock = MagicMock()
         mock_config.config.network.rpc.keepalive_timeout = 30
 
-        with (
-            patch("ai.backend.manager.registry.aiodocker.Docker"),
-            patch("ai.backend.manager.registry.SessionLifecycleManager"),
-        ):
+        with patch("ai.backend.manager.registry.aiodocker.Docker"):
             reg = AgentRegistry(
                 config_provider=mock_config,
                 db=db_with_tables,
@@ -108,6 +106,7 @@ class TestReconcileAgentResources:
                 hook_plugin_ctx=MagicMock(),
                 network_plugin_ctx=MagicMock(),
                 scheduling_controller=MagicMock(),
+                scheduler_repository=MagicMock(),
                 manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
                 manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
             )
@@ -486,10 +485,7 @@ class TestOrphanedAllocationCleanup:
         mock_config: MagicMock = MagicMock()
         mock_config.config.network.rpc.keepalive_timeout = 30
 
-        with (
-            patch("ai.backend.manager.registry.aiodocker.Docker"),
-            patch("ai.backend.manager.registry.SessionLifecycleManager"),
-        ):
+        with patch("ai.backend.manager.registry.aiodocker.Docker"):
             reg = AgentRegistry(
                 config_provider=mock_config,
                 db=db,
@@ -504,6 +500,7 @@ class TestOrphanedAllocationCleanup:
                 hook_plugin_ctx=MagicMock(),
                 network_plugin_ctx=MagicMock(),
                 scheduling_controller=MagicMock(),
+                scheduler_repository=MagicMock(),
                 manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
                 manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
             )
@@ -885,3 +882,314 @@ class TestOrphanedAllocationCleanup:
                 )
             ).one()
             assert row.used == Decimal("2")
+
+
+class TestTerminalSessionKernelReconciliation:
+    """Tests for Step 1 of reconcile_agent_resources: pulling non-terminal kernels
+    of terminal sessions to the session's terminal status and freeing their
+    active allocations atomically.
+    """
+
+    @pytest.fixture
+    async def database_connection(
+        self,
+        postgres_container: tuple[str, HostPortPairModel],
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        _, addr = postgres_container
+        url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
+        engine = create_async_engine(
+            url,
+            pool_size=8,
+            pool_pre_ping=False,
+            max_overflow=64,
+        )
+        yield engine
+        await engine.dispose()
+
+    @pytest.fixture
+    async def db(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ProjectResourcePolicyRow,
+                ScalingGroupRow,
+                GroupRow,
+                AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
+                SessionRow,
+                KernelRow,
+                ResourceSlotTypeRow,
+                ResourceAllocationRow,
+                AgentResourceRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def registry(
+        self,
+        db: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[AgentRegistry, None]:
+        mock_config: MagicMock = MagicMock()
+        mock_config.config.network.rpc.keepalive_timeout = 30
+
+        with patch("ai.backend.manager.registry.aiodocker.Docker"):
+            reg = AgentRegistry(
+                config_provider=mock_config,
+                db=db,
+                agent_cache=MagicMock(),
+                agent_client_pool=MagicMock(),
+                valkey_stat=MagicMock(),
+                valkey_live=MagicMock(),
+                valkey_image=MagicMock(),
+                event_producer=MagicMock(),
+                event_hub=MagicMock(),
+                storage_manager=MagicMock(),
+                hook_plugin_ctx=MagicMock(),
+                network_plugin_ctx=MagicMock(),
+                scheduling_controller=MagicMock(),
+                scheduler_repository=MagicMock(),
+                manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
+                manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
+            )
+        await reg.init()
+        try:
+            yield reg
+        finally:
+            await reg.shutdown()
+
+    @pytest.fixture
+    async def infra(
+        self,
+        db: ExtendedAsyncSAEngine,
+    ) -> tuple[str, uuid.UUID, str]:
+        domain_name = "test-domain"
+        project_id = uuid4()
+        sg_name = "test-sg"
+        agent_id = "i-test-agent"
+        async with db.begin_session() as db_sess:
+            db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=0))
+            db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=1))
+        async with db.begin_session() as db_sess:
+            db_sess.add(DomainRow(name=domain_name))
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=0,
+                    max_network_count=5,
+                )
+            )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                ScalingGroupRow(
+                    name=sg_name,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ScalingGroupOpts(),
+                )
+            )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                GroupRow(
+                    id=project_id,
+                    name="test-project",
+                    domain_name=domain_name,
+                    resource_policy="default",
+                )
+            )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                AgentRow(
+                    id=agent_id,
+                    status=AgentStatus.ALIVE,
+                    status_changed=datetime.now(tzutc()),
+                    region="test-region",
+                    scaling_group=sg_name,
+                    available_slots=ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "32768"}),
+                    occupied_slots=ResourceSlot({}),
+                    addr="tcp://127.0.0.1:6001",
+                    version="24.12.0",
+                    architecture="x86_64",
+                    compute_plugins={},
+                )
+            )
+        return domain_name, project_id, agent_id
+
+    async def _seed_drift(
+        self,
+        db: ExtendedAsyncSAEngine,
+        infra: tuple[str, uuid.UUID, str],
+        *,
+        session_status: SessionStatus,
+        kernel_status: KernelStatus,
+        cpu_requested: Decimal,
+        cpu_used: Decimal | None,
+        agent_used: Decimal,
+    ) -> tuple[uuid.UUID, uuid.UUID, str]:
+        """Create session in terminal state + kernel in non-terminal state with
+        an active allocation + agent_resources.used inflated.
+
+        Returns (session_id, kernel_id, agent_id).
+        """
+        domain_name, project_id, agent_id = infra
+        empty_slots = ResourceSlot({})
+        session_id = uuid4()
+        kernel_id = uuid4()
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                SessionRow(
+                    id=session_id,
+                    domain_name=domain_name,
+                    group_id=project_id,
+                    user_uuid=uuid4(),
+                    status=session_status,
+                    occupying_slots=empty_slots,
+                    requested_slots=empty_slots,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                KernelRow(
+                    id=kernel_id,
+                    session_id=session_id,
+                    domain_name=domain_name,
+                    group_id=project_id,
+                    user_uuid=uuid4(),
+                    status=kernel_status,
+                    occupied_slots=empty_slots,
+                    requested_slots=empty_slots,
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                    scaling_group="test-sg",
+                    agent=agent_id,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                ResourceAllocationRow(
+                    kernel_id=kernel_id,
+                    slot_name="cpu",
+                    requested=cpu_requested,
+                    used=cpu_used,
+                )
+            )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=agent_id,
+                    slot_name="cpu",
+                    capacity=Decimal("8"),
+                    used=agent_used,
+                )
+            )
+        return session_id, kernel_id, agent_id
+
+    @pytest.mark.parametrize(
+        ("session_status", "kernel_status"),
+        [
+            pytest.param(
+                SessionStatus.CANCELLED,
+                KernelStatus.PREPARED,
+                id="cancelled-session-prepared-kernel",
+            ),
+            pytest.param(
+                SessionStatus.TERMINATED,
+                KernelStatus.RUNNING,
+                id="terminated-session-running-kernel",
+            ),
+            pytest.param(
+                SessionStatus.ERROR,
+                KernelStatus.PULLING,
+                id="error-session-pulling-kernel",
+            ),
+        ],
+    )
+    async def test_drift_kernel_is_force_cancelled(
+        self,
+        db: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        infra: tuple[str, uuid.UUID, str],
+        session_status: SessionStatus,
+        kernel_status: KernelStatus,
+    ) -> None:
+        """Regardless of session's terminal sub-status, drift kernel is forced to
+        CANCELLED. Allocation is freed and agent_resources.used is corrected in
+        the same reconciliation pass.
+        """
+        _, kernel_id, agent_id = await self._seed_drift(
+            db,
+            infra,
+            session_status=session_status,
+            kernel_status=kernel_status,
+            cpu_requested=Decimal("4"),
+            cpu_used=Decimal("4"),
+            agent_used=Decimal("4"),
+        )
+
+        await registry._reconcile_agent_resources()
+
+        k = KernelRow.__table__
+        ra = ResourceAllocationRow.__table__
+        ar = AgentResourceRow.__table__
+        async with db.begin_session() as db_sess:
+            kernel_row = (
+                await db_sess.execute(
+                    sa.select(k.c.status, k.c.terminated_at).where(k.c.id == kernel_id)
+                )
+            ).one()
+            assert kernel_row.status == KernelStatus.CANCELLED
+            assert kernel_row.terminated_at is not None
+
+            alloc_row = (
+                await db_sess.execute(sa.select(ra.c.free_at).where(ra.c.kernel_id == kernel_id))
+            ).one()
+            assert alloc_row.free_at is not None
+
+            agent_row = (
+                await db_sess.execute(
+                    sa.select(ar.c.used).where(ar.c.agent_id == agent_id, ar.c.slot_name == "cpu")
+                )
+            ).one()
+            assert agent_row.used == Decimal("0")
+
+    async def test_non_terminal_session_kernel_left_untouched(
+        self,
+        db: ExtendedAsyncSAEngine,
+        registry: AgentRegistry,
+        infra: tuple[str, uuid.UUID, str],
+    ) -> None:
+        """Session is still RUNNING — kernel state must not be touched by Step 1."""
+        _, kernel_id, _ = await self._seed_drift(
+            db,
+            infra,
+            session_status=SessionStatus.RUNNING,
+            kernel_status=KernelStatus.PREPARED,
+            cpu_requested=Decimal("2"),
+            cpu_used=Decimal("2"),
+            agent_used=Decimal("2"),
+        )
+
+        await registry._reconcile_agent_resources()
+
+        k = KernelRow.__table__
+        ra = ResourceAllocationRow.__table__
+        async with db.begin_session() as db_sess:
+            kernel_row = (
+                await db_sess.execute(sa.select(k.c.status).where(k.c.id == kernel_id))
+            ).one()
+            assert kernel_row.status == KernelStatus.PREPARED
+
+            alloc_row = (
+                await db_sess.execute(sa.select(ra.c.free_at).where(ra.c.kernel_id == kernel_id))
+            ).one()
+            assert alloc_row.free_at is None

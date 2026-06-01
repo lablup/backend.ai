@@ -7,9 +7,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from pydantic import BaseModel
-
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.types import BackendAISchema
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
@@ -56,8 +56,8 @@ class StrategyEvaluationSummary:
     revision swaps.  Sub-step transitions are handled by the coordinator.
     """
 
-    # Mapping from endpoint ID to its evaluated sub_step — used to bulk-update the DB.
-    assignments: dict[UUID, DeploymentLifecycleSubStep] = field(default_factory=dict)
+    # Mapping from deployment ID to its evaluated sub_step — used to bulk-update the DB.
+    assignments: dict[DeploymentID, DeploymentLifecycleSubStep] = field(default_factory=dict)
 
     # Aggregated route mutations from all per-deployment evaluations.
     route_changes: RouteChanges = field(default_factory=RouteChanges)
@@ -87,7 +87,7 @@ class DeploymentStrategyRegistryEntry:
     """Maps a deployment strategy to its implementation class and expected spec type."""
 
     strategy_cls: type[AbstractDeploymentStrategy]
-    spec_type: type[BaseModel]
+    spec_type: type[BackendAISchema]
 
 
 class DeploymentStrategyRegistry:
@@ -100,7 +100,7 @@ class DeploymentStrategyRegistry:
         self,
         strategy: DeploymentStrategy,
         strategy_cls: type[AbstractDeploymentStrategy],
-        spec_type: type[BaseModel],
+        spec_type: type[BackendAISchema],
     ) -> None:
         self._entries[strategy] = DeploymentStrategyRegistryEntry(strategy_cls, spec_type)
 

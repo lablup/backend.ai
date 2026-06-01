@@ -9,10 +9,11 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AliasImageResponse",
@@ -26,21 +27,21 @@ __all__ = (
 )
 
 
-class ImageTagEntryDTO(BaseModel):
+class ImageTagEntryDTO(BackendAISchema):
     """A single parsed tag component from the image reference."""
 
     key: str = Field(description="Tag key")
     value: str = Field(description="Tag value")
 
 
-class ImageLabelEntryDTO(BaseModel):
+class ImageLabelEntryDTO(BackendAISchema):
     """A single label from the image metadata."""
 
     key: str = Field(description="Label key")
     value: str = Field(description="Label value")
 
 
-class ImageResourceLimitDTO(BaseModel):
+class ImageResourceLimitDTO(BackendAISchema):
     """Resource limit for an image."""
 
     key: str = Field(description="Resource slot name")
@@ -48,7 +49,7 @@ class ImageResourceLimitDTO(BaseModel):
     max: Decimal | None = Field(default=None, description="Maximum limit (None means unlimited)")
 
 
-class ImageDTO(BaseModel):
+class ImageDTO(BackendAISchema):
     """DTO for image data."""
 
     id: UUID = Field(description="Image ID")

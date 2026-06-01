@@ -189,5 +189,5 @@ class ValkeyLeaderClient:
             )
         released = bool(result == 1)
         if released:
-            log.info(f"Server {server_id} released leadership for {leader_key}")
+            log.info("Server {} released leadership for {}", server_id, leader_key)
         return released

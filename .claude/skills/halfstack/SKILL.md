@@ -44,21 +44,62 @@ docker compose -f docker-compose.halfstack.current.yml restart <service-name>
 docker compose -f docker-compose.halfstack.current.yml up -d --wait
 ```
 
-### Service Names
+### Service Names & Profiles
 
-| Service | Image | Purpose |
-|---------|-------|---------|
-| `backendai-half-db` | postgres:16.3-alpine | Main database |
-| `backendai-half-redis` | redis:7.2-alpine | Cache / pub-sub |
-| `backendai-half-etcd` | etcd v3.5 | Config store |
-| `backendai-half-minio` | MinIO | Object storage |
-| `backendai-half-prometheus` | Prometheus | Metrics |
-| `backendai-half-otel-collector` | OTel Collector | Telemetry |
-| `backendai-half-loki` | Loki | Log aggregation |
-| `backendai-half-tempo` | Tempo | Tracing |
-| `backendai-half-grafana` | Grafana | Dashboards |
-| `backendai-half-pyroscope` | Pyroscope | Profiling |
-| `backendai-half-apollo-router` | Hive Gateway | GraphQL federation |
+Optional services are gated behind Docker Compose profiles. By default (`docker compose up -d`)
+only the **required** services start. To include optional ones, pass `--profile <name>`.
+
+| Service | Image | Purpose | Profile |
+|---------|-------|---------|---------|
+| `backendai-half-db` | postgres:16.3-alpine | Main database | (required) |
+| `backendai-half-redis` | redis:7.2-alpine | Cache / pub-sub | (required) |
+| `backendai-half-etcd` | etcd v3.5 | Config store | (required) |
+| `backendai-half-apollo-router` | Hive Gateway | GraphQL federation (manager has 2 GQL servers federated through this) | (required) |
+| `backendai-half-prometheus` | Prometheus | Metrics — manager queries it for deployment autoscale rule evaluation | (required) |
+| `backendai-half-otel-collector` | OTel Collector | Trace / metric export | `telemetry`, `observability` |
+| `backendai-half-loki` | Loki | Log aggregation | `telemetry`, `observability` |
+| `backendai-half-grafana` | Grafana | Dashboards | `observability` |
+| `backendai-half-tempo` | Tempo | Tracing | `observability` |
+| `backendai-half-pyroscope` | Pyroscope | Profiling | `observability` |
+| `backendai-half-db-exporter` | postgres-exporter | Postgres metrics | `observability` |
+| `backendai-half-redis-exporter` | redis_exporter | Redis metrics | `observability` |
+| `backendai-half-minio` | MinIO | Object storage | `storage` |
+
+**Profile semantics:**
+- `telemetry` — service-level export only (`otel-collector` + `loki`). Visualisation
+  (Grafana) and supporting backends (Tempo, Pyroscope, exporters) are typically managed
+  centrally; this profile is a good default for dev installs that just want their logs
+  and traces forwarded.
+- `observability` — superset of `telemetry`. Brings up the full local stack including
+  Grafana / Tempo / Pyroscope / exporters.
+- `storage` — MinIO only.
+
+### Enabling optional profiles
+
+```bash
+# Required only (default)
+docker compose -f docker-compose.halfstack.current.yml up -d --wait
+
+# + telemetry export (OTel collector + Loki forwarding logs/traces to a central monitor)
+docker compose -f docker-compose.halfstack.current.yml --profile telemetry up -d --wait
+
+# + full observability stack (Grafana / Tempo / Pyroscope / exporters in addition to telemetry)
+docker compose -f docker-compose.halfstack.current.yml --profile observability up -d --wait
+
+# + object storage (MinIO)
+docker compose -f docker-compose.halfstack.current.yml --profile storage up -d --wait
+
+# Everything
+docker compose -f docker-compose.halfstack.current.yml --profile observability --profile storage up -d --wait
+```
+
+When stopping/removing, profile flags must also be passed for those containers to be torn down:
+
+```bash
+docker compose -f docker-compose.halfstack.current.yml --profile observability --profile storage down
+```
+
+`scripts/delete-dev.sh` already passes both profiles so a clean wipe works regardless of what was enabled.
 
 ## Docker Configs — Files That Must Exist in Project Root
 

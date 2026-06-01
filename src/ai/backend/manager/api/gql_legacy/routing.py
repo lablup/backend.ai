@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self
 
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.exc import NoResultFound
 
+from ai.backend.common.exception import DeprecatedAPI
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.routing import RoutingRow
@@ -199,11 +200,7 @@ class Routing(graphene.ObjectType):  # type: ignore[misc]
         )
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "EndpointStatistics.by_replica")
-        return cast(
-            Mapping[str, Any] | None, await loader.load((self._endpoint_row.id, self.routing_id))
-        )
+        raise DeprecatedAPI(extra_msg="Routing live_stat is no longer supported.")
 
 
 class RoutingList(graphene.ObjectType):  # type: ignore[misc]

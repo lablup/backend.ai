@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ai.backend.common.dto.manager.v2.common import EnvironmentVariableEntryInput
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsDTOInput,
     ResourceOptsEntryDTO,
@@ -13,6 +14,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ServicePortsInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.streaming.types import ServiceProtocol
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_enum,
@@ -150,6 +152,23 @@ class ResourceOptsInput(PydanticInputMixin[ResourceOptsDTOInput]):
     entries: list[ResourceOptsEntryInput] = gql_field(
         description="List of resource option entries."
     )
+
+
+# ========== Environment Variable Input Types ==========
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A single environment variable entry with key and value.",
+    ),
+    name="EnvironEntryInput",
+)
+class EnvironEntryInputGQL(PydanticInputMixin[EnvironmentVariableEntryInput]):
+    """Single environment variable entry input with key and value."""
+
+    key: str = gql_field(description="Environment variable key (e.g., 'CUDA_VISIBLE_DEVICES').")
+    value: str = gql_field(description="Environment variable value.")
 
 
 # ========== Service Port Types ==========

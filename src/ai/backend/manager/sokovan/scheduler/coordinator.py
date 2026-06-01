@@ -36,7 +36,6 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.session.conditions import SessionConditions
@@ -49,7 +48,6 @@ from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatc
 from ai.backend.manager.repositories.scheduling_history.creators import (
     SessionSchedulingHistoryCreatorSpec,
 )
-from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.data import (
     KernelCreationInfo,
     PromotionSpec,
@@ -58,6 +56,7 @@ from ai.backend.manager.sokovan.data import (
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
 
@@ -85,14 +84,6 @@ from .results import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-# Status timeout thresholds (in seconds) for failure classification
-# Sessions exceeding these times in a status are classified as 'expired'
-STATUS_TIMEOUT_MAP: dict[SessionStatus, float] = {
-    SessionStatus.PREPARING: 900.0,  # 15 minutes
-    SessionStatus.PULLING: 900.0,  # 15 minutes
-    SessionStatus.CREATING: 600.0,  # 10 minutes
-}
 
 # Batch size for observer kernel processing
 _OBSERVER_BATCH_SIZE: Final[int] = 500
@@ -146,8 +137,11 @@ class FailureClassificationResult:
     """Result of classifying failures into give_up, expired, and need_retry.
 
     Classification priority (first match wins):
-    1. give_up: phase_attempts >= SERVICE_MAX_RETRIES
-    2. expired: status_changed elapsed > STATUS_TIMEOUT_MAP threshold
+    1. give_up: per-handler ``max_retry_count`` is set AND
+       ``phase_attempts`` reached it. ``None`` means "no retry limit"
+       — give-up never fires.
+    2. expired: per-handler ``timeout`` is set AND phase elapsed time
+       exceeded it. ``None`` means "no timeout" — expired never fires.
     3. need_retry: default (can be retried)
     """
 
@@ -216,6 +210,24 @@ class ScheduleCoordinator:
         self._kernel_post_processors = create_kernel_post_processors(
             scheduling_controller,
         )
+
+    def registered_lifecycle_handlers(self) -> tuple[SessionLifecycleHandler, ...]:
+        """Return the unique set of lifecycle handlers attached to this
+        coordinator.
+
+        Used by the ResourceGroup admin-replace path to validate
+        ``SessionHandlerOptions.by_handler`` keys against the live registry.
+        Deduplicates on ``id()`` because a single handler instance may
+        be registered under multiple ``ScheduleType`` keys.
+        """
+        seen: set[int] = set()
+        unique: list[SessionLifecycleHandler] = []
+        for handler in self._handlers.lifecycle_handlers.values():
+            if id(handler) in seen:
+                continue
+            seen.add(id(handler))
+            unique.append(handler)
+        return tuple(unique)
 
     async def process_lifecycle_schedule(
         self,
@@ -1131,7 +1143,9 @@ class ScheduleCoordinator:
 
         # FAILURE transitions - Coordinator classifies failures into give_up/expired/need_retry
         if result.failures:
-            classified = self._classify_failures(result.failures, sessions, current_time)
+            classified = self._classify_failures(
+                result.failures, sessions, current_time, handler_name
+            )
 
             # Apply transitions for each classification
             if classified.give_up and transitions.give_up:
@@ -1175,21 +1189,31 @@ class ScheduleCoordinator:
         failures: list[SessionTransitionInfo],
         sessions: list[SessionWithKernels],
         current_time: datetime,
+        handler_name: str,
     ) -> FailureClassificationResult:
         """Classify failures into give_up, expired, need_retry.
 
         Pure classification based on conditions only. The caller (_handle_result)
         decides whether to apply transitions based on handler's transition definitions.
 
+        Per-session ``handler_options`` (frozen on the session at enqueue
+        time) drives the policy: ``resolve(handler_name).max_retry_count``
+        and ``resolve(handler_name).timeout`` give the give-up and
+        timeout thresholds. ``None`` on either field means "no limit"
+        for that dimension — give-up never fires when ``max_retry_count``
+        is ``None``; ``expired`` never fires when ``timeout`` is ``None``.
+
         Classification priority (first match wins):
-        1. give_up: phase_attempts >= SERVICE_MAX_RETRIES
-        2. expired: timeout exceeded
+        1. give_up: max_retry_count set AND phase_attempts >= max_retry_count
+        2. expired: timeout set AND phase elapsed > timeout
         3. need_retry: default
 
         Args:
             failures: Failed session transition info
             sessions: Original sessions with phase_attempts and phase_started_at populated
             current_time: Current database time for timeout comparison
+            handler_name: ``SessionLifecycleHandler.name()`` for resolving
+                per-handler policy from ``SessionHandlerOptions``
 
         Returns:
             FailureClassificationResult with give_up, expired, need_retry lists
@@ -1206,20 +1230,17 @@ class ScheduleCoordinator:
                 # Session not found - skip (shouldn't happen)
                 continue
 
+            policy = session.session_info.handler_options.resolve(handler_name)
+
             # 1. Check max retries exceeded → give_up
-            if session.phase_attempts >= SERVICE_MAX_RETRIES:
+            if policy.is_retry_exhausted(session.phase_attempts):
                 give_up_failures.append(failure)
                 continue
 
             # 2. Check timeout exceeded → expired
-            if session.phase_started_at:
-                status = session.session_info.lifecycle.status
-                timeout = STATUS_TIMEOUT_MAP.get(status)
-                if timeout:
-                    elapsed = (current_time - session.phase_started_at).total_seconds()
-                    if elapsed > timeout:
-                        expired_failures.append(failure)
-                        continue
+            if policy.is_timed_out(session.phase_started_at, current_time):
+                expired_failures.append(failure)
+                continue
 
             # 3. Default → need_retry
             retry_failures.append(failure)

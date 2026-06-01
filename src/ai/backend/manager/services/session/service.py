@@ -20,6 +20,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -28,14 +29,20 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     UnknownImageReference,
 )
+from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
+    BinarySize,
     ContainerId,
     ImageAlias,
-    KernelEnqueueingConfig,
-    SessionId,
+    ResourceSlotEntry,
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -44,7 +51,24 @@ from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.session.draft import (
+    KernelExecutionSpecDraft,
+    KernelGroupDraft,
+    SchedulingTargetDraft,
+    SessionClassificationDraft,
+    SessionIdentityDraft,
+    SessionNetworkDraft,
+    SessionOptionsDraft,
+    SessionScopeDraft,
+    SessionSpecDraft,
+)
+from ai.backend.manager.data.session.options import (
+    InternalDataExtras,
+    ResourceOpts,
+    SessionHandlerOptions,
+)
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -71,18 +95,11 @@ from ai.backend.manager.models.session import (
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
 )
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
-from ai.backend.manager.services.session.actions.check_and_transit_status import (
-    CheckAndTransitStatusAction,
-    CheckAndTransitStatusActionResult,
-    CheckAndTransitStatusBatchAction,
-    CheckAndTransitStatusBatchActionResult,
-)
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
@@ -179,10 +196,6 @@ from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
 )
-from ai.backend.manager.services.session.actions.restart_session import (
-    RestartSessionAction,
-    RestartSessionActionResult,
-)
 from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
@@ -206,10 +219,6 @@ from ai.backend.manager.services.session.actions.start_service import (
 from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
     TerminateSessionsActionResult,
-)
-from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
-    TerminateSessionsInProjectAction,
-    TerminateSessionsInProjectActionResult,
 )
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
@@ -236,6 +245,7 @@ class SessionServiceArgs:
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
     session_repository: SessionRepository
+    scheduler_repository: SchedulerRepository
     scheduling_controller: SchedulingController
     appproxy_client_pool: AppProxyClientPool
     user_repository: UserRepository
@@ -249,6 +259,7 @@ class SessionService:
     _error_monitor: ErrorPluginContext
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
+    _scheduler_repository: SchedulerRepository
     _user_repository: UserRepository
     _scheduling_controller: SchedulingController
     _appproxy_client_pool: AppProxyClientPool
@@ -266,6 +277,7 @@ class SessionService:
         self._error_monitor = args.error_monitor
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
+        self._scheduler_repository = args.scheduler_repository
         self._user_repository = args.user_repository
         self._scheduling_controller = args.scheduling_controller
         self._appproxy_client_pool = args.appproxy_client_pool
@@ -801,7 +813,7 @@ class SessionService:
 
         # Return response - same format for both recursive and non-recursive
         resp = {"stats": last_stat}
-        return DestroySessionActionResult(result=resp)
+        return DestroySessionActionResult(result=resp, session_ids=list(session_ids))
 
     async def terminate_sessions(
         self, action: TerminateSessionsAction
@@ -816,37 +828,10 @@ class SessionService:
             action.session_ids, reason=reason.value, forced=action.forced
         )
         return TerminateSessionsActionResult(
-            cancelled=[uuid.UUID(str(s)) for s in mark_result.cancelled_sessions],
-            terminating=[uuid.UUID(str(s)) for s in mark_result.terminating_sessions],
-            force_terminated=[uuid.UUID(str(s)) for s in mark_result.force_terminated_sessions],
-            skipped=[uuid.UUID(str(s)) for s in mark_result.skipped_sessions],
-        )
-
-    async def terminate_sessions_in_project(
-        self, action: TerminateSessionsInProjectAction
-    ) -> TerminateSessionsInProjectActionResult:
-        """Terminate multiple sessions within a project scope.
-
-        Sessions not belonging to the project are filtered out and
-        included in the ``skipped`` list of the result.
-        """
-        valid_ids = await self._session_repository.filter_sessions_in_project(
-            action.session_ids, action.project_id
-        )
-        valid_set = set(valid_ids)
-        not_in_project = [uuid.UUID(str(sid)) for sid in action.session_ids if sid not in valid_set]
-        if valid_ids:
-            result = await self.terminate_sessions(
-                TerminateSessionsAction(session_ids=valid_ids, forced=action.forced)
-            )
-            return TerminateSessionsInProjectActionResult(
-                cancelled=result.cancelled,
-                terminating=result.terminating,
-                force_terminated=result.force_terminated,
-                skipped=result.skipped + not_in_project,
-            )
-        return TerminateSessionsInProjectActionResult(
-            skipped=not_in_project,
+            cancelled=mark_result.cancelled_sessions,
+            terminating=mark_result.terminating_sessions,
+            force_terminated=mark_result.force_terminated_sessions,
+            skipped=mark_result.skipped_sessions,
         )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
@@ -1289,19 +1274,6 @@ class SessionService:
 
         return RenameSessionActionResult(session_data=compute_session.to_dataclass())
 
-    async def restart_session(self, action: RestartSessionAction) -> RestartSessionActionResult:
-        session_name = action.session_name
-        owner_access_key = action.owner_access_key
-
-        session = await self._session_repository.get_session_validated(
-            session_name,
-            owner_access_key,
-            kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-        )
-        await self._agent_registry.increment_session_usage(session)
-        await self._agent_registry.restart_session(session)
-        return RestartSessionActionResult(result=None, session_data=session.to_dataclass())
-
     async def shutdown_service(self, action: ShutdownServiceAction) -> ShutdownServiceActionResult:
         session_name = action.session_name
         owner_access_key = action.owner_access_key
@@ -1495,81 +1467,6 @@ class SessionService:
             session_data=session_row.to_dataclass(owner=session_owner_data)
         )
 
-    async def check_and_transit_status(
-        self, action: CheckAndTransitStatusAction
-    ) -> CheckAndTransitStatusActionResult:
-        user_id = action.user_id
-        user_role = action.user_role
-        session_id = action.session_id
-
-        # Fetch session by ID without ownership check
-        session_row = await self._session_repository.get_session_by_id(session_id)
-        if session_row is None:
-            raise SessionNotFound(f"Session not found (id:{session_id})")
-
-        # Regular users can only transit their own sessions
-        if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
-            if session_row.user_uuid != user_id:
-                log.warning(
-                    f"You are not allowed to transit other user's session status, skip (s:{session_id})"
-                )
-                return CheckAndTransitStatusActionResult(
-                    result={}, session_data=session_row.to_dataclass()
-                )
-
-        now = datetime.now(tzutc())
-        session_rows = await self._agent_registry.session_lifecycle_mgr.transit_session_status(
-            [session_id], now
-        )
-        await self._agent_registry.session_lifecycle_mgr.deregister_status_updatable_session([
-            row.id for row, is_transited in session_rows if is_transited
-        ])
-        session_owner_data = await self._session_repository.get_session_owner(session_id)
-
-        result = {row.id: row.status.name for row, _ in session_rows}
-        return CheckAndTransitStatusActionResult(
-            result=result, session_data=session_row.to_dataclass(owner=session_owner_data)
-        )
-
-    async def check_and_transit_status_multi(
-        self, action: CheckAndTransitStatusBatchAction
-    ) -> CheckAndTransitStatusBatchActionResult:
-        user_id = action.user_id
-        user_role = action.user_role
-        session_ids = action.session_ids
-        accessible_session_ids: list[SessionId] = []
-
-        for sid in session_ids:
-            if user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
-                accessible_session_ids.append(sid)
-            else:
-                try:
-                    session_row = await self._session_repository.get_session_to_determine_status(
-                        sid
-                    )
-                    if session_row.user_uuid == user_id:
-                        accessible_session_ids.append(sid)
-                    else:
-                        log.warning(
-                            f"You are not allowed to transit others's sessions status, skip (s:{sid})"
-                        )
-                except Exception:
-                    log.warning(f"Session not found or access denied, skip (s:{sid})")
-
-        now = datetime.now(tzutc())
-        if accessible_session_ids:
-            session_rows = await self._agent_registry.session_lifecycle_mgr.transit_session_status(
-                accessible_session_ids, now
-            )
-            await self._agent_registry.session_lifecycle_mgr.deregister_status_updatable_session([
-                row.id for row, is_transited in session_rows if is_transited
-            ])
-            result = {row.id: row.status.name for row, _ in session_rows}
-        else:
-            result = {}
-
-        return CheckAndTransitStatusBatchActionResult(session_status_map=result)
-
     async def search(self, action: SearchSessionsAction) -> SearchSessionsActionResult:
         """Search sessions with querier pattern."""
         result = await self._session_repository.search(action.querier)
@@ -1603,17 +1500,16 @@ class SessionService:
         )
 
     async def enqueue_session(self, action: EnqueueSessionAction) -> EnqueueSessionActionResult:
-        """Enqueue a new compute session for scheduling.
+        """Enqueue a new compute session (PENDING) through the scheduler.
 
-        Resolves the image, builds a SessionCreationSpec, and delegates
-        to the scheduling controller. Returns immediately with PENDING status.
-
-        When ``action.owner_id`` is set, the target user's main access key,
-        role, and domain are loaded from the user repository and used in place
-        of the caller's identity for delegation.
+        Builds a :class:`SessionSpecDraft` inline from the caller-supplied
+        action, resolves delegation (``action.owner_id``), and hands the
+        draft straight to the scheduling controller. The controller owns
+        every DB read the preparer / validator chain needs — this
+        service just extracts values from the action and shapes them
+        into the draft.
         """
         user_id = action.user_id
-        user_role = action.user_role
         access_key = action.access_key
         domain_name = action.domain_name
         if action.owner_id is not None:
@@ -1632,112 +1528,135 @@ class SessionService:
                 )
             user_id = owner.id
             access_key = AccessKey(owner.main_access_key)
-            user_role = owner.role
             domain_name = owner.domain_name
 
-        image_row = await self._session_repository.resolve_image_by_id(action.image_id)
-        resource_policy = await self._session_repository.get_keypair_resource_policy(
-            access_key,
-        )
+        # Keep the image resolve so callers passing a stale UUID get a
+        # sharp error here instead of deep inside the preparer chain.
+        await self._session_repository.resolve_image_by_id(action.image_id)
 
-        user_scope = UserScope(
-            domain_name=domain_name,
-            group_id=action.group_id,
-            user_uuid=user_id,
-            user_role=user_role,
+        resource_entries = tuple(
+            ResourceSlotEntry(resource_type=entry.resource_type, quantity=entry.quantity)
+            for entry in action.resource.entries
         )
-
-        # Build creation_spec dict from typed action fields
-        resource_entries = {
-            entry.resource_type: entry.quantity for entry in action.resource.entries
-        }
-        resource_opts: dict[str, Any] = {}
+        resource_opts_payload: dict[str, Any] = {}
         if action.resource.shmem is not None:
-            resource_opts["shmem"] = action.resource.shmem
+            resource_opts_payload["shmem"] = BinarySize.from_str(action.resource.shmem)
+        resource_opts = ResourceOpts.model_validate(resource_opts_payload)
 
-        mount_ids: list[uuid.UUID] = []
-        mount_id_map: dict[uuid.UUID, str] = {}
-        mount_options: dict[uuid.UUID, dict[str, str]] = {}
-        if action.mounts:
-            for item in action.mounts:
-                mount_ids.append(item.vfolder_id)
-                if item.mount_path is not None:
-                    mount_id_map[item.vfolder_id] = item.mount_path
-                opts: dict[str, str] = {}
-                if item.permission is not None:
-                    opts["permission"] = item.permission.value
-                if opts:
-                    mount_options[item.vfolder_id] = opts
+        mount_entries = tuple(action.mounts or ())
 
-        creation_spec: dict[str, Any] = {
-            "resources": resource_entries,
-            "resource_opts": resource_opts or None,
-            "scaling_group": action.resource.resource_group,
-            "mount_ids": mount_ids or None,
-            "mount_id_map": mount_id_map or None,
-            "mount_options": mount_options or None,
-            "environ": action.execution.environ if action.execution else None,
-            "preopen_ports": action.execution.preopen_ports if action.execution else None,
-            "agent_list": action.scheduling.agent_list,
-            "attach_network": action.scheduling.attach_network,
-        }
-
+        environ: dict[str, str] = (
+            dict(action.execution.environ) if action.execution and action.execution.environ else {}
+        )
+        preopen_ports = tuple(action.execution.preopen_ports or ()) if action.execution else ()
         bootstrap_script = action.execution.bootstrap_script if action.execution else None
         startup_command = action.batch.startup_command if action.batch else None
-
-        # Build kernel specs (one per cluster member)
-        kernel_specs: list[KernelEnqueueingConfig] = []
-        for i in range(action.resource.cluster_size):
-            is_main = i == 0
-            role = "main" if is_main else "worker"
-            kernel_specs.append(
-                KernelEnqueueingConfig(
-                    image_ref=image_row.image_ref,
-                    cluster_role=role,
-                    cluster_idx=i + 1,
-                    local_rank=i,
-                    cluster_hostname=f"{role}{i + 1}",
-                    creation_config=creation_spec,
-                    bootstrap_script=bootstrap_script or "",
-                    startup_command=startup_command,
-                    uid=None,
-                    main_gid=None,
-                    supplementary_gids=[],
-                ),
-            )
-
-        session_creation_id = secrets.token_urlsafe(16)
-
-        spec = SessionCreationSpec(
-            session_creation_id=session_creation_id,
-            session_name=action.session_name,
-            access_key=access_key,
-            user_scope=user_scope,
-            session_type=action.session_type,
-            cluster_mode=action.resource.cluster_mode,
-            cluster_size=action.resource.cluster_size,
-            priority=action.scheduling.priority,
-            resource_policy=resource_policy,
-            kernel_specs=kernel_specs,
-            creation_spec=creation_spec,
-            is_preemptible=action.scheduling.is_preemptible,
-            scaling_group=action.resource.resource_group,
-            session_tag=action.tag,
-            starts_at=action.batch.starts_at if action.batch else None,
-            batch_timeout=action.batch.batch_timeout if action.batch else None,
-            dependency_sessions=(
-                [SessionId(d) for d in action.scheduling.dependencies]
-                if action.scheduling.dependencies
-                else None
-            ),
-            callback_url=(yarl.URL(action.callback_url) if action.callback_url else None),
-            startup_command=startup_command,
-            designated_agent_list=action.scheduling.agent_list,
-            public_sgroup_only=action.session_type not in PRIVATE_SESSION_TYPES,
+        starts_at = action.batch.starts_at if action.batch else None
+        batch_timeout_sec = (
+            int(action.batch.batch_timeout.total_seconds())
+            if action.batch and action.batch.batch_timeout is not None
+            else None
         )
 
-        session_id = await self._scheduling_controller.enqueue_session(spec)
+        dependencies = tuple(SessionID(dep_id) for dep_id in (action.scheduling.dependencies or ()))
+        callback_url = yarl.URL(action.callback_url) if action.callback_url else None
+
+        if action.resource.resource_group:
+            resource_group_name = ResourceGroupName(action.resource.resource_group)
+        else:
+            resource_group_name = await self._scheduler_repository.pick_default_resource_group(
+                access_key=access_key,
+                domain_name=domain_name,
+                project_id=ProjectID(action.group_id),
+            )
+        kernel_groups = await self._resolve_kernel_groups(
+            cluster_size=action.resource.cluster_size,
+            preopen_ports=preopen_ports,
+            execution_spec=KernelExecutionSpecDraft(
+                image_id=ImageID(action.image_id),
+                resources=resource_entries,
+                resource_opts=resource_opts,
+                environ=environ,
+                mounts=mount_entries,
+                startup_command=startup_command,
+                bootstrap_script=bootstrap_script,
+                starts_at=starts_at,
+                batch_timeout_sec=batch_timeout_sec,
+            ),
+        )
+
+        draft = SessionSpecDraft(
+            identity=SessionIdentityDraft(
+                session_id=SessionID(uuid.uuid4()),
+                creation_id=secrets.token_urlsafe(16),
+                session_name=action.session_name,
+                access_key=access_key,
+                user_uuid=user_id,
+            ),
+            scope=SessionScopeDraft(
+                domain_name=DomainName(domain_name),
+                project_id=ProjectID(action.group_id),
+                resource_group_name=resource_group_name,
+            ),
+            classification=SessionClassificationDraft(
+                session_type=action.session_type,
+                tag=action.tag,
+            ),
+            network=SessionNetworkDraft(
+                network_id=(
+                    str(action.scheduling.attach_network)
+                    if action.scheduling.attach_network is not None
+                    else None
+                ),
+            ),
+            callback_url=callback_url,
+            dependencies=dependencies,
+            options=SessionOptionsDraft(
+                priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
+                is_preemptible=action.scheduling.is_preemptible,
+                cluster_mode=action.resource.cluster_mode,
+                cluster_size=action.resource.cluster_size,
+                scheduling_target=SchedulingTargetDraft(
+                    designated_agents=tuple(
+                        AgentId(a) for a in (action.scheduling.agent_list or ())
+                    ),
+                ),
+                kernel_groups=kernel_groups,
+                handler_options=SessionHandlerOptions(),
+            ),
+            internal_data_extras=InternalDataExtras(
+                sudo_session_enabled=False,
+            ),
+        )
+
+        session_id = await self._scheduling_controller.enqueue_session_from_draft(draft)
 
         session_data = await self._session_repository.get_session_data_by_id(session_id)
 
         return EnqueueSessionActionResult(session_data=session_data)
+
+    async def _resolve_kernel_groups(
+        self,
+        cluster_size: int,
+        preopen_ports: tuple[int, ...],
+        execution_spec: KernelExecutionSpecDraft,
+    ) -> tuple[KernelGroupDraft, ...]:
+        # 1 main + (cluster_size - 1) sub, matching legacy registry Shape (a).
+        groups: tuple[KernelGroupDraft, ...] = (
+            KernelGroupDraft(
+                role=DEFAULT_ROLE,
+                replica_count=1,
+                preopen_ports=preopen_ports,
+                execution_spec=execution_spec,
+            ),
+        )
+        if cluster_size > 1:
+            groups += (
+                KernelGroupDraft(
+                    role="sub",
+                    replica_count=cluster_size - 1,
+                    preopen_ports=preopen_ports,
+                    execution_spec=execution_spec,
+                ),
+            )
+        return groups

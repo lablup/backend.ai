@@ -103,7 +103,7 @@ class libnuma:
                     )
                     return None
             docker_cpuset_path = mount_point / cgroup_parent / cpuset_source_name
-            log.debug(f"docker_cpuset_path: {docker_cpuset_path}")
+            log.debug("docker_cpuset_path: {}", docker_cpuset_path)
             cpuset_source = f"the docker cgroup (v{version})"
             try:
                 docker_cpuset = docker_cpuset_path.read_text()

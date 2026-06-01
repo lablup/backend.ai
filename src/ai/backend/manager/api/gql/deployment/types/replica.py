@@ -35,6 +35,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ReplicaOrderField,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
@@ -55,6 +56,7 @@ from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -109,6 +111,15 @@ TrafficStatus: type[RouteTrafficStatus] = gql_enum(
     ),
     RouteTrafficStatus,
     name="TrafficStatus",
+)
+
+ReplicaHealthStatusGQL: type[RouteHealthStatus] = gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="This enum represents the health check status of a replica.",
+    ),
+    RouteHealthStatus,
+    name="ReplicaHealthStatus",
 )
 
 
@@ -179,7 +190,7 @@ class ReplicaOrderBy(PydanticInputMixin[ReplicaOrderDTO]):
 )
 class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     id: NodeID[str]
-    session_id: ID
+    session_id: ID | None
     revision_id: ID
     readiness_status: ReadinessStatus = gql_field(
         description="Whether the replica has been checked and its health state."
@@ -190,13 +201,33 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     activeness_status: ActivenessStatus = gql_field(
         description="Whether the replica is actively receiving traffic."
     )
+    status: ReplicaStatus = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Provisioning status of the replica (mirrors the underlying route status).",
+        )
+    )
+    traffic_status: TrafficStatus = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Traffic status of the replica.",
+        )
+    )
+    health_status: ReplicaHealthStatusGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Health check status of the replica.",
+        )
+    )
     created_at: datetime = gql_field(description="Timestamp when the replica was created.")
 
     @gql_field(
-        description="The session ID associated with the replica. This can be null right after replica creation.",
+        description="The session associated with the replica. Can be null if the replica is still provisioning.",
         deprecation_reason="Use session_v2 instead.",
     )  # type: ignore[misc]
-    async def session(self, info: Info[StrawberryGQLContext]) -> Session:
+    async def session(self, info: Info[StrawberryGQLContext]) -> Session | None:
+        if self.session_id is None:
+            return None
         session_global_id = to_global_id(
             ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
         )
@@ -217,6 +248,8 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         ]
         | None
     ):
+        if self.session_id is None:
+            return None
         from ai.backend.common.types import SessionId
 
         return await info.context.data_loaders.session_loader.load(
@@ -224,7 +257,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         )
 
     @gql_field(description="The revision of this entity.")  # type: ignore[misc]
-    async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
+    async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
         """Resolve revision by ID using DataLoader."""
         result = await info.context.data_loaders.revision_loader.load(UUID(str(self.revision_id)))
         if result is None:

@@ -23,6 +23,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageCanonical, ImageID, SlotName
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -131,8 +132,10 @@ class ImageServiceBaseFixtures:
         mock_scope.validate = AsyncMock()
         mock_single_entity = MagicMock(spec=SingleEntityActionRBACValidator)
         mock_single_entity.validate = AsyncMock()
+        mock_bulk = MagicMock(spec=BulkActionRBACValidator)
+        mock_bulk.validate = AsyncMock()
         validators = ActionValidators(
-            rbac=RBACValidators(scope=mock_scope, single_entity=mock_single_entity),
+            rbac=RBACValidators(scope=mock_scope, single_entity=mock_single_entity, bulk=mock_bulk),
         )
         return ImageProcessors(image_service, [], validators)
 

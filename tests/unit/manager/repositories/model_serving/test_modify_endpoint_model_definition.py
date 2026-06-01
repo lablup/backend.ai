@@ -13,21 +13,27 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -38,6 +44,7 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -50,7 +57,9 @@ from ai.backend.manager.services.model_serving.actions.modify_endpoint import Mo
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 
-OLD_MODEL_DEF = {"models": [{"name": "old-snapshot"}]}
+OLD_MODEL_DEF = {
+    "models": [{"name": "old-snapshot", "model_path": "/models/old"}],
+}
 NEW_MODEL_DEF = {"models": [{"name": "updated-from-disk"}]}
 
 
@@ -82,7 +91,10 @@ class TestModifyEndpointModelDefinitionRefresh:
                 VFolderRow,
                 SessionRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 RoutingRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 ResourceSlotTypeRow,
                 DeploymentRevisionResourceSlotRow,
@@ -234,7 +246,7 @@ class TestModifyEndpointModelDefinitionRefresh:
                 labels={},
                 resources={"cpu": {"min": "1"}, "mem": {"min": "64m"}},
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             sess.add(image)
             await sess.flush()
         return image_id
@@ -252,6 +264,7 @@ class TestModifyEndpointModelDefinitionRefresh:
         """Create endpoint + revision with OLD model_definition. Returns (endpoint_id, revision_id)."""
         endpoint_id = uuid.uuid4()
         revision_id = uuid.uuid4()
+        runtime_variant_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as sess:
             sess.add(
                 EndpointRow(
@@ -270,6 +283,14 @@ class TestModifyEndpointModelDefinitionRefresh:
 
             sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count"))
             sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes"))
+            sess.add(
+                RuntimeVariantRow(
+                    id=runtime_variant_id,
+                    name=f"variant-{runtime_variant_id.hex[:8]}",
+                    description="test variant",
+                    default_model_definition=ModelDefinitionDraft(),
+                )
+            )
             await sess.flush()
 
             sess.add(
@@ -280,13 +301,13 @@ class TestModifyEndpointModelDefinitionRefresh:
                     image=test_image_id,
                     model_mount_destination="/models",
                     model_definition_path="model-definition.yaml",
-                    model_definition=OLD_MODEL_DEF,
+                    model_definition=ModelDefinition.model_validate(OLD_MODEL_DEF),
                     resource_group=test_scaling_group,
                     resource_opts={},
                     cluster_mode="single-node",
                     cluster_size=1,
                     environ={},
-                    runtime_variant="custom",
+                    runtime_variant_id=runtime_variant_id,
                     extra_mounts=[],
                 )
             )
@@ -308,10 +329,20 @@ class TestModifyEndpointModelDefinitionRefresh:
             )
             await sess.flush()
 
+            # Current revision lives on the primary replica group.
+            group_id = uuid.uuid4()
+            sess.add(
+                ReplicaGroupRow(
+                    id=ReplicaGroupID(group_id),
+                    deployment_id=DeploymentID(endpoint_id),
+                    current_revision_id=revision_id,
+                )
+            )
+            await sess.flush()
             await sess.execute(
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
-                .values(current_revision=revision_id)
+                .values(primary_replica_group_id=group_id)
             )
             await sess.flush()
         return endpoint_id, revision_id
@@ -346,10 +377,11 @@ class TestModifyEndpointModelDefinitionRefresh:
         revision creation is now handled by DeploymentController.add_revision."""
 
         endpoint_id, _ = endpoint_and_revision
+        deployment_id = DeploymentID(endpoint_id)
         spec = EndpointUpdaterSpec(environ=TriState.update({"NEW_VAR": "1"}))
         action = ModifyEndpointAction(
-            endpoint_id=endpoint_id,
-            updater=Updater(spec=spec, pk_value=endpoint_id),
+            deployment_id=deployment_id,
+            updater=Updater(spec=spec, pk_value=deployment_id),
         )
 
         with (
@@ -382,4 +414,5 @@ class TestModifyEndpointModelDefinitionRefresh:
             )
 
         assert len(rows) == 1
-        assert rows[0].model_definition == OLD_MODEL_DEF
+        assert rows[0].model_definition is not None
+        assert rows[0].model_definition.model_dump(exclude_none=True) == OLD_MODEL_DEF

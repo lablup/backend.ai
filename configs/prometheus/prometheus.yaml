@@ -18,6 +18,12 @@ scrape_configs:
     http_sd_configs:
       - url: 'http://host.docker.internal:18080/metrics/service_discovery'
         refresh_interval: "60s"
+    relabel_configs:
+      # Rewrite loopback targets to host-accessible address for Docker-based Prometheus
+      - source_labels: [__address__]
+        regex: '127\.0\.0\.1(.*)'
+        target_label: __address__
+        replacement: 'host.docker.internal${1}'
   - job_name: 'etcd'
     scrape_interval: 10s
     metrics_path: /metrics
@@ -32,3 +38,7 @@ scrape_configs:
     static_configs:
       - targets:
           - backendai-half-db-exporter:9187
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+          - backendai-half-node-exporter:9100

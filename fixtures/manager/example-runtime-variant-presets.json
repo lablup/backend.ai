@@ -10,7 +10,6 @@
       "default_value": "Qwen/Qwen3-0.6B",
       "key": "--model",
       "category": "model_loading",
-      "ui_type": "text_input",
       "display_name": "Model",
       "ui_option": {
         "ui_type": "text_input",
@@ -29,7 +28,6 @@
       "default_value": "auto",
       "key": "--dtype",
       "category": "model_loading",
-      "ui_type": "select",
       "display_name": "DType",
       "ui_option": {
         "ui_type": "select",
@@ -73,7 +71,6 @@
       "default_value": null,
       "key": "--quantization",
       "category": "model_loading",
-      "ui_type": "select",
       "display_name": "Quantization",
       "ui_option": {
         "ui_type": "select",
@@ -129,7 +126,6 @@
       "default_value": null,
       "key": "--max-model-len",
       "category": "model_loading",
-      "ui_type": "number_input",
       "display_name": "Max Context Length",
       "ui_option": {
         "ui_type": "number_input",
@@ -149,7 +145,6 @@
       "default_value": null,
       "key": "--served-model-name",
       "category": "model_loading",
-      "ui_type": "text_input",
       "display_name": "Served Model Name",
       "ui_option": {
         "ui_type": "text_input"
@@ -165,7 +160,6 @@
       "default_value": null,
       "key": "--trust-remote-code",
       "category": "model_loading",
-      "ui_type": "checkbox",
       "display_name": "Trust Remote Code",
       "ui_option": {
         "ui_type": "checkbox"
@@ -181,7 +175,6 @@
       "default_value": "0.9",
       "key": "--gpu-memory-utilization",
       "category": "resource_memory",
-      "ui_type": "slider",
       "display_name": "GPU Memory Utilization",
       "ui_option": {
         "ui_type": "slider",
@@ -202,7 +195,6 @@
       "default_value": "1",
       "key": "--tensor-parallel-size",
       "category": "resource_memory",
-      "ui_type": "select",
       "display_name": "Tensor Parallel Size",
       "ui_option": {
         "ui_type": "select",
@@ -238,7 +230,6 @@
       "default_value": "1",
       "key": "--pipeline-parallel-size",
       "category": "resource_memory",
-      "ui_type": "number_input",
       "display_name": "Pipeline Parallel Size",
       "ui_option": {
         "ui_type": "number_input",
@@ -258,7 +249,6 @@
       "default_value": "1",
       "key": "--data-parallel-size",
       "category": "resource_memory",
-      "ui_type": "number_input",
       "display_name": "Data Parallel Size",
       "ui_option": {
         "ui_type": "number_input",
@@ -278,7 +268,6 @@
       "default_value": "auto",
       "key": "--kv-cache-dtype",
       "category": "resource_memory",
-      "ui_type": "select",
       "display_name": "KV Cache DType",
       "ui_option": {
         "ui_type": "select",
@@ -322,7 +311,6 @@
       "default_value": null,
       "key": "--enable-prefix-caching",
       "category": "resource_memory",
-      "ui_type": "checkbox",
       "display_name": "Enable Prefix Caching",
       "ui_option": {
         "ui_type": "checkbox"
@@ -338,7 +326,6 @@
       "default_value": null,
       "key": "--max-num-seqs",
       "category": "serving_performance",
-      "ui_type": "number_input",
       "display_name": "Max Num Seqs",
       "ui_option": {
         "ui_type": "number_input",
@@ -358,7 +345,6 @@
       "default_value": null,
       "key": "--max-num-batched-tokens",
       "category": "serving_performance",
-      "ui_type": "number_input",
       "display_name": "Max Num Batched Tokens",
       "ui_option": {
         "ui_type": "number_input",
@@ -378,7 +364,6 @@
       "default_value": null,
       "key": "--enable-chunked-prefill",
       "category": "serving_performance",
-      "ui_type": "checkbox",
       "display_name": "Enable Chunked Prefill",
       "ui_option": {
         "ui_type": "checkbox"
@@ -394,7 +379,6 @@
       "default_value": "fcfs",
       "key": "--scheduling-policy",
       "category": "serving_performance",
-      "ui_type": "select",
       "display_name": "Scheduling Policy",
       "ui_option": {
         "ui_type": "select",
@@ -422,7 +406,6 @@
       "default_value": "balanced",
       "key": "--performance-mode",
       "category": "serving_performance",
-      "ui_type": "select",
       "display_name": "Performance Mode",
       "ui_option": {
         "ui_type": "select",
@@ -454,7 +437,6 @@
       "default_value": "{}",
       "key": "--limit-mm-per-prompt",
       "category": "multimodal",
-      "ui_type": "text_input",
       "display_name": "Limit MM Per Prompt",
       "ui_option": {
         "ui_type": "text_input",
@@ -473,7 +455,6 @@
       "default_value": null,
       "key": "--enable-auto-tool-choice",
       "category": "tool_reasoning",
-      "ui_type": "checkbox",
       "display_name": "Enable Auto Tool Choice",
       "ui_option": {
         "ui_type": "checkbox"
@@ -489,7 +470,6 @@
       "default_value": null,
       "key": "--tool-call-parser",
       "category": "tool_reasoning",
-      "ui_type": "select",
       "display_name": "Tool Call Parser",
       "ui_option": {
         "ui_type": "select",
@@ -589,7 +569,6 @@
       "default_value": "",
       "key": "--reasoning-parser",
       "category": "tool_reasoning",
-      "ui_type": "select",
       "display_name": "Reasoning Parser",
       "ui_option": {
         "ui_type": "select",
@@ -677,7 +656,6 @@
       "default_value": null,
       "key": "--host",
       "category": "network",
-      "ui_type": "text_input",
       "display_name": "Host",
       "ui_option": {
         "ui_type": "text_input",
@@ -696,7 +674,6 @@
       "default_value": "8000",
       "key": "--port",
       "category": "network",
-      "ui_type": "number_input",
       "display_name": "Port",
       "ui_option": {
         "ui_type": "number_input",
@@ -716,7 +693,6 @@
       "default_value": null,
       "key": "--enable-log-requests",
       "category": "monitoring",
-      "ui_type": "checkbox",
       "display_name": "Enable Log Requests",
       "ui_option": {
         "ui_type": "checkbox"
@@ -732,7 +708,6 @@
       "default_value": null,
       "key": "--disable-log-stats",
       "category": "monitoring",
-      "ui_type": "checkbox",
       "display_name": "Disable Log Stats",
       "ui_option": {
         "ui_type": "checkbox"
@@ -748,7 +723,6 @@
       "default_value": null,
       "key": "--enable-lora",
       "category": "lora",
-      "ui_type": "checkbox",
       "display_name": "Enable LoRA",
       "ui_option": {
         "ui_type": "checkbox"
@@ -764,7 +738,6 @@
       "default_value": null,
       "key": "--lora-modules",
       "category": "lora",
-      "ui_type": "text_input",
       "display_name": "LoRA Modules",
       "ui_option": {
         "ui_type": "text_input",
@@ -783,7 +756,6 @@
       "default_value": null,
       "key": "CUDA_VISIBLE_DEVICES",
       "category": "environment",
-      "ui_type": "text_input",
       "display_name": "CUDA Visible Devices",
       "ui_option": {
         "ui_type": "text_input",
@@ -802,7 +774,6 @@
       "default_value": null,
       "key": "HF_TOKEN",
       "category": "environment",
-      "ui_type": "text_input",
       "display_name": "HF Token",
       "ui_option": {
         "ui_type": "text_input"
@@ -818,7 +789,6 @@
       "default_value": null,
       "key": "--model-path",
       "category": "model_loading",
-      "ui_type": "text_input",
       "display_name": "Model",
       "ui_option": {
         "ui_type": "text_input",
@@ -837,7 +807,6 @@
       "default_value": "auto",
       "key": "--dtype",
       "category": "model_loading",
-      "ui_type": "select",
       "display_name": "DType",
       "ui_option": {
         "ui_type": "select",
@@ -881,7 +850,6 @@
       "default_value": null,
       "key": "--quantization",
       "category": "model_loading",
-      "ui_type": "text_input",
       "display_name": "Quantization",
       "ui_option": {
         "ui_type": "text_input",
@@ -900,7 +868,6 @@
       "default_value": null,
       "key": "--context-length",
       "category": "model_loading",
-      "ui_type": "number_input",
       "display_name": "Context Length",
       "ui_option": {
         "ui_type": "number_input",
@@ -920,7 +887,6 @@
       "default_value": null,
       "key": "--served-model-name",
       "category": "model_loading",
-      "ui_type": "text_input",
       "display_name": "Served Model Name",
       "ui_option": {
         "ui_type": "text_input"
@@ -936,7 +902,6 @@
       "default_value": null,
       "key": "--trust-remote-code",
       "category": "model_loading",
-      "ui_type": "checkbox",
       "display_name": "Trust Remote Code",
       "ui_option": {
         "ui_type": "checkbox"
@@ -952,7 +917,6 @@
       "default_value": "0.9",
       "key": "--mem-fraction-static",
       "category": "resource_memory",
-      "ui_type": "slider",
       "display_name": "Memory Fraction Static",
       "ui_option": {
         "ui_type": "slider",
@@ -973,7 +937,6 @@
       "default_value": "1",
       "key": "--tp-size",
       "category": "resource_memory",
-      "ui_type": "select",
       "display_name": "Tensor Parallel Size",
       "ui_option": {
         "ui_type": "select",
@@ -1009,7 +972,6 @@
       "default_value": "1",
       "key": "--pp-size",
       "category": "resource_memory",
-      "ui_type": "number_input",
       "display_name": "Pipeline Parallel Size",
       "ui_option": {
         "ui_type": "number_input",
@@ -1029,7 +991,6 @@
       "default_value": "1",
       "key": "--dp-size",
       "category": "resource_memory",
-      "ui_type": "number_input",
       "display_name": "Data Parallel Size",
       "ui_option": {
         "ui_type": "number_input",
@@ -1049,7 +1010,6 @@
       "default_value": "auto",
       "key": "--kv-cache-dtype",
       "category": "resource_memory",
-      "ui_type": "select",
       "display_name": "KV Cache DType",
       "ui_option": {
         "ui_type": "select",
@@ -1089,7 +1049,6 @@
       "default_value": null,
       "key": "--disable-radix-cache",
       "category": "resource_memory",
-      "ui_type": "checkbox",
       "display_name": "Disable Prefix Caching",
       "ui_option": {
         "ui_type": "checkbox"
@@ -1105,7 +1064,6 @@
       "default_value": null,
       "key": "--max-running-requests",
       "category": "serving_performance",
-      "ui_type": "number_input",
       "display_name": "Max Running Requests",
       "ui_option": {
         "ui_type": "number_input",
@@ -1125,7 +1083,6 @@
       "default_value": null,
       "key": "--max-total-tokens",
       "category": "serving_performance",
-      "ui_type": "number_input",
       "display_name": "Max Total Tokens",
       "ui_option": {
         "ui_type": "number_input",
@@ -1145,7 +1102,6 @@
       "default_value": null,
       "key": "--chunked-prefill-size",
       "category": "serving_performance",
-      "ui_type": "number_input",
       "display_name": "Chunked Prefill Size",
       "ui_option": {
         "ui_type": "number_input",
@@ -1165,7 +1121,6 @@
       "default_value": "fcfs",
       "key": "--schedule-policy",
       "category": "serving_performance",
-      "ui_type": "select",
       "display_name": "Scheduling Policy",
       "ui_option": {
         "ui_type": "select",
@@ -1213,7 +1168,6 @@
       "default_value": null,
       "key": "--tool-call-parser",
       "category": "tool_reasoning",
-      "ui_type": "text_input",
       "display_name": "Tool Call Parser",
       "ui_option": {
         "ui_type": "text_input",
@@ -1232,7 +1186,6 @@
       "default_value": null,
       "key": "--reasoning-parser",
       "category": "tool_reasoning",
-      "ui_type": "select",
       "display_name": "Reasoning Parser",
       "ui_option": {
         "ui_type": "select",
@@ -1284,7 +1237,6 @@
       "default_value": "127.0.0.1",
       "key": "--host",
       "category": "network",
-      "ui_type": "text_input",
       "display_name": "Host",
       "ui_option": {
         "ui_type": "text_input",
@@ -1303,7 +1255,6 @@
       "default_value": "30000",
       "key": "--port",
       "category": "network",
-      "ui_type": "number_input",
       "display_name": "Port",
       "ui_option": {
         "ui_type": "number_input",
@@ -1323,7 +1274,6 @@
       "default_value": "info",
       "key": "--log-level",
       "category": "monitoring",
-      "ui_type": "select",
       "display_name": "Log Level",
       "ui_option": {
         "ui_type": "select",
@@ -1359,7 +1309,6 @@
       "default_value": null,
       "key": "--log-requests",
       "category": "monitoring",
-      "ui_type": "checkbox",
       "display_name": "Log Requests",
       "ui_option": {
         "ui_type": "checkbox"
@@ -1375,7 +1324,6 @@
       "default_value": null,
       "key": "--log-requests-level",
       "category": "monitoring",
-      "ui_type": "select",
       "display_name": "Log Requests Level",
       "ui_option": {
         "ui_type": "select",
@@ -1411,7 +1359,6 @@
       "default_value": null,
       "key": "--enable-lora",
       "category": "lora",
-      "ui_type": "checkbox",
       "display_name": "Enable LoRA",
       "ui_option": {
         "ui_type": "checkbox"
@@ -1427,7 +1374,6 @@
       "default_value": null,
       "key": "--lora-paths",
       "category": "lora",
-      "ui_type": "text_input",
       "display_name": "LoRA Paths",
       "ui_option": {
         "ui_type": "text_input",
@@ -1446,7 +1392,6 @@
       "default_value": null,
       "key": "CUDA_VISIBLE_DEVICES",
       "category": "environment",
-      "ui_type": "text_input",
       "display_name": "CUDA Visible Devices",
       "ui_option": {
         "ui_type": "text_input",
@@ -1465,7 +1410,6 @@
       "default_value": null,
       "key": "HF_TOKEN",
       "category": "environment",
-      "ui_type": "text_input",
       "display_name": "HF Token",
       "ui_option": {
         "ui_type": "text_input"

@@ -17,7 +17,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.manager.api.adapters.deployment_revision_preset import (
+from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -32,6 +32,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentRevisionPresetRepository,
 )
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentRevisionPresetProcessors,
 )
@@ -61,7 +62,7 @@ async def _seed_resource_slot_types(db_engine: SAEngine) -> None:
 def deployment_revision_preset_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> DeploymentRevisionPresetProcessors:
-    repo = DeploymentRevisionPresetRepository(database_engine)
+    repo = DeploymentRevisionPresetRepository(DBOpsProvider(database_engine))
     service = DeploymentRevisionPresetService(repo)
     return DeploymentRevisionPresetProcessors(
         service=service,

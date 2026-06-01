@@ -75,6 +75,8 @@ class RouteHistoryDTO(BaseResponseModel):
     phase: str
     from_status: str | None = None
     to_status: str | None = None
+    from_sub_status: str | None = None
+    to_sub_status: str | None = None
     result: str
     error_code: str | None = None
     message: str | None = None

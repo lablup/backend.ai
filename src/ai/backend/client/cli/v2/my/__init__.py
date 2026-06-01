@@ -21,6 +21,11 @@ def keypair() -> None:
     """My keypair commands."""
 
 
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.role:role")
+def role() -> None:
+    """My role commands."""
+
+
 @my.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.my.login_history:login_history",

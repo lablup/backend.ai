@@ -124,7 +124,7 @@ class TestRevisionOrderField:
         assert RevisionOrderField.CLUSTER_MODE.value == "cluster_mode"
 
     def test_runtime_variant_value(self) -> None:
-        assert RevisionOrderField.RUNTIME_VARIANT.value == "runtime_variant"
+        assert RevisionOrderField.RUNTIME_VARIANT_NAME.value == "runtime_variant_name"
 
     def test_enum_members_count(self) -> None:
         members = list(RevisionOrderField)

@@ -1,4 +1,3 @@
-import functools
 import json
 import logging
 import random
@@ -9,11 +8,11 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import (
     Any,
+    Final,
 )
 
 import aiohttp
 import aiohttp_cors
-import aiotools
 import jwt
 import sqlalchemy as sa
 import yarl
@@ -22,13 +21,19 @@ from authlib.common.security import generate_token  # pants: no-infer-dep
 from authlib.integrations.httpx_client import AsyncOAuth2Client  # pants: no-infer-dep
 from authlib.jose import jwt as joseJWT  # pants: no-infer-dep
 from authlib.oidc.core import CodeIDToken  # pants: no-infer-dep
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
-from ai.backend.manager.models.group import association_groups_users, groups
+from ai.backend.manager.data.permission.types import EntityType, RelationType, ScopeType
+from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair, generate_ssh_keypair
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
@@ -39,7 +44,6 @@ from ai.backend.manager.repositories.permission_controller.role_manager import (
     UserSystemRoleSpec,
 )
 
-from . import __version__
 from .config import OIDCWebAppConfig
 from .valkey_client import ValkeyOpenIDClient
 
@@ -53,7 +57,7 @@ class OpenIDError(Exception):
 
 
 async def ping(_request: web.Request) -> web.Response:
-    return web.Response(status=200, body=f"Backend.AI OpenID Connect SSO plugin ({__version__}).")
+    return web.Response(status=200, body="Backend.AI OpenID Connect SSO plugin.")
 
 
 def generate_random_string(length: int = 10) -> str:
@@ -151,11 +155,17 @@ async def associate_user_with_group(
     )
     group_id = await conn.scalar(query)
     if group_id:
-        query = association_groups_users.insert().values({
-            "user_id": user.uuid,
-            "group_id": group_id,
-        })
-        await conn.execute(query)
+        await conn.execute(
+            pg_insert(AssociationScopesEntitiesRow.__table__)
+            .values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(group_id),
+                entity_type=EntityType.USER,
+                entity_id=str(user.uuid),
+                relation_type=RelationType.AUTO,
+            )
+            .on_conflict_do_nothing()
+        )
 
 
 async def create_user_if_not_exists(
@@ -235,11 +245,34 @@ async def create_user_if_not_exists(
     return user
 
 
-async def update_jwks(app: web.Application, _interval: float) -> None:
-    async with aiohttp.ClientSession() as sess:
-        async with sess.get(app["openid.jwks_uri"]) as resp:
-            app["openid.jwks"] = await resp.json()
-            log.info("Updated JSON Web Key Set")
+_JWKS_REFRESH_INTERVAL: Final[float] = 86400.0
+
+
+class JwksRefreshTask(PeriodicTask):
+    """Periodically refresh the OpenID JSON Web Key Set."""
+
+    _app: Final[web.Application]
+
+    def __init__(self, app: web.Application) -> None:
+        self._app = app
+
+    @property
+    def name(self) -> str:
+        return "openid.jwks_refresh"
+
+    @property
+    def interval(self) -> float:
+        return _JWKS_REFRESH_INTERVAL
+
+    @property
+    def initial_delay(self) -> float:
+        return 0.0
+
+    async def run(self) -> None:
+        async with aiohttp.ClientSession() as sess:
+            async with sess.get(self._app["openid.jwks_uri"]) as resp:
+                self._app["openid.jwks"] = await resp.json()
+                log.info("Updated JSON Web Key Set")
 
 
 class OIDCWebAppPlugin(WebappPlugin):
@@ -277,9 +310,8 @@ class OIDCWebAppPlugin(WebappPlugin):
                     raise OpenIDError(f"both well_known and {key} not configured")
                 app[f"openid.{key}"] = value
 
-        app["openid.jwks_refresh_task"] = aiotools.create_timer(
-            functools.partial(update_jwks, app), 86400
-        )
+        app["openid.jwks_refresh_cron"] = LocalCron([JwksRefreshTask(app)])
+        await app["openid.jwks_refresh_cron"].start()
 
         root_app = app["_root_app"]
         config_provider = root_app["_config_provider"]
@@ -290,8 +322,7 @@ class OIDCWebAppPlugin(WebappPlugin):
         )
 
     async def _webapp_shutdown(self, app: web.Application) -> None:
-        app["openid.jwks_refresh_task"].cancel()
-        await app["openid.jwks_refresh_task"]
+        await app["openid.jwks_refresh_cron"].stop()
 
         valkey_client: ValkeyOpenIDClient = app["valkey_client"]
         await valkey_client.close()

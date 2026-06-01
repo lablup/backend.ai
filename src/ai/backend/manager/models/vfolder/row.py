@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -41,6 +42,12 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.permission.types import (
+    EntityType as PermissionEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as PermissionScopeType,
+)
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderInvitationState,
@@ -70,7 +77,7 @@ from ai.backend.manager.models.base import (
     StrEnumType,
     metadata,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -88,6 +95,9 @@ from ai.backend.manager.models.rbac.exceptions import NotEnoughPermission
 from ai.backend.manager.models.rbac.permission_defs import StorageHostPermission
 from ai.backend.manager.models.rbac.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
@@ -289,8 +299,11 @@ class VFolderCloneInfo(NamedTuple):
 class VFolderRow(Base):  # type: ignore[misc]
     __tablename__ = "vfolders"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[VFolderUUID] = mapped_column(
+        "id",
+        GUID(VFolderUUID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     # host will be '' if vFolder is unmanaged
     host: Mapped[str] = mapped_column("host", sa.String(length=128), nullable=False, index=True)
@@ -324,6 +337,13 @@ class VFolderRow(Base):  # type: ignore[misc]
     )
     last_used: Mapped[datetime | None] = mapped_column(
         "last_used", sa.DateTime(timezone=True), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+        onupdate=sa.func.now(),
     )
     # creator is always set to the user who created vfolder (regardless user/project types)
     creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
@@ -433,6 +453,7 @@ class VFolderRow(Base):  # type: ignore[misc]
             cur_size=self.cur_size or 0,
             created_at=self.created_at or datetime.now(UTC),
             last_used=self.last_used,
+            updated_at=self.updated_at,
             creator=self.creator,
             creator_id=self.creator_id,
             unmanaged_path=self.unmanaged_path,
@@ -491,9 +512,9 @@ class VFolderInvitationRow(Base):  # type: ignore[misc]
         nullable=True,
         onupdate=sa.func.current_timestamp(),
     )
-    vfolder: Mapped[uuid.UUID] = mapped_column(
+    vfolder: Mapped[VFolderUUID] = mapped_column(
         "vfolder",
-        GUID,
+        GUID(VFolderUUID),
         sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
@@ -516,9 +537,9 @@ class VFolderPermissionRow(Base):  # type: ignore[misc]
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
     )
-    vfolder: Mapped[uuid.UUID] = mapped_column(
+    vfolder: Mapped[VFolderUUID] = mapped_column(
         "vfolder",
-        GUID,
+        GUID(VFolderUUID),
         sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
@@ -563,7 +584,6 @@ async def query_accessible_vfolders(
     extra_vf_group_conds: Any = None,
     allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[Mapping[str, Any]]:
-    from ai.backend.manager.models.group import association_groups_users as agus
     from ai.backend.manager.models.group import groups
     from ai.backend.manager.models.user import users
 
@@ -579,6 +599,7 @@ async def query_accessible_vfolders(
         vfolders.c.usage_mode,
         vfolders.c.created_at,
         vfolders.c.last_used,
+        vfolders.c.updated_at,
         vfolders.c.max_files,
         vfolders.c.max_size,
         vfolders.c.ownership_type,
@@ -616,6 +637,7 @@ async def query_accessible_vfolders(
                 "usage_mode": row.vfolders_usage_mode,
                 "created_at": row.vfolders_created_at,
                 "last_used": row.vfolders_last_used,
+                "updated_at": row.vfolders_updated_at,
                 "max_size": row.vfolders_max_size,
                 "max_files": row.vfolders_max_files,
                 "ownership_type": row.vfolders_ownership_type,
@@ -694,11 +716,14 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
-            j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select(agus.c.group_id).select_from(j).where(agus.c.user_id == user_uuid)
+            query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+                AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+            )
             result = await conn.execute(query)
             grps = result.fetchall()
-            group_ids = [g.group_id for g in grps]
+            group_ids = [uuid.UUID(g.scope_id) for g in grps]
             # Include MODEL_STORE projects in the same domain for cross-project model access
             from ai.backend.manager.data.group.types import ProjectType
 
@@ -795,8 +820,8 @@ async def get_allowed_vfolder_hosts_by_group(
             result_hosts = allowed_hosts | values
             allowed_hosts = result_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    final_result: VFolderHostPermissionMap = (
-        allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    final_result: VFolderHostPermissionMap = allowed_hosts | resource_policy.get(
+        "allowed_vfolder_hosts", VFolderHostPermissionMap()
     )
     return final_result
 
@@ -814,7 +839,7 @@ async def get_allowed_vfolder_hosts_by_user(
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     """
     from ai.backend.manager.models.domain import domains
-    from ai.backend.manager.models.group import association_groups_users, groups
+    from ai.backend.manager.models.group import groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -825,37 +850,26 @@ async def get_allowed_vfolder_hosts_by_user(
         result_hosts: VFolderHostPermissionMap = allowed_hosts | values
         allowed_hosts = result_hosts
     # User's Groups' allowed_vfolder_hosts.
+    join_cond = sa.and_(
+        sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+        AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+        AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+        AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+    )
     if group_id is not None:
-        j = groups.join(
-            association_groups_users,
-            (
-                (groups.c.id == association_groups_users.c.group_id)
-                & (groups.c.id == group_id)
-                & (association_groups_users.c.user_id == user_uuid)
-            ),
-        )
-    else:
-        j = groups.join(
-            association_groups_users,
-            (
-                (groups.c.id == association_groups_users.c.group_id)
-                & (association_groups_users.c.user_id == user_uuid)
-            ),
-        )
+        join_cond = sa.and_(join_cond, groups.c.id == group_id)
     query = (
         sa.select(groups.c.allowed_vfolder_hosts)
-        .select_from(j)
-        .where(
-            (groups.c.domain_name == domain_name) & (groups.c.is_active),
-        )
+        .select_from(groups.join(AssociationScopesEntitiesRow, join_cond))
+        .where(groups.c.domain_name == domain_name, groups.c.is_active)
     )
     if rows := (await conn.execute(query)).fetchall():
         for row in rows:
             result_hosts = allowed_hosts | row.allowed_vfolder_hosts
             allowed_hosts = result_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    final_result: VFolderHostPermissionMap = (
-        allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    final_result: VFolderHostPermissionMap = allowed_hosts | resource_policy.get(
+        "allowed_vfolder_hosts", VFolderHostPermissionMap()
     )
     return final_result
 
@@ -881,6 +895,27 @@ def check_overlapping_mounts(mounts: Iterable[str] | Iterable[PurePosixPath]) ->
                 raise InvalidAPIParameters(
                     f"VFolder path '{_p1}' overlaps with '{_p2}'",
                 )
+
+
+def _normalize_mount_subpath(raw_subpath: str | None) -> str:
+    """Normalize a UUID-keyed mount's ``subpath`` option and reject any
+    attempt to escape the vfolder root.
+
+    Returns the normalized subpath (or ``"."`` when nothing was supplied).
+    Raises :class:`InvalidAPIParameters` when the normalized form would
+    leave the vfolder root via ``..``, ``../…``, or an absolute path.
+
+    Note: ``PurePosixPath('..').is_relative_to('.')`` is ``True`` in
+    Python ≥ 3.12, so the ``is_relative_to`` shorthand cannot be used
+    as the escape guard — the explicit checks below are required.
+    """
+    candidate = raw_subpath if raw_subpath else "."
+    normed = os.path.normpath(candidate)
+    if normed == ".." or normed.startswith("../") or PurePosixPath(normed).is_absolute():
+        raise InvalidAPIParameters(
+            f"The subpath '{candidate}' must not escape the vfolder root.",
+        )
+    return normed
 
 
 async def prepare_vfolder_mounts(
@@ -933,7 +968,10 @@ async def prepare_vfolder_mounts(
         requested_vfolder_subpaths[key] = os.path.normpath(subpath)
         _already_resolved.add(name)
     for vfolder_uuid, value in requested_mount_map.items():
-        requested_vfolder_subpaths[vfolder_uuid] = "."
+        uuid_opts = requested_mount_options.get(vfolder_uuid)
+        requested_vfolder_subpaths[vfolder_uuid] = _normalize_mount_subpath(
+            uuid_opts.subpath if uuid_opts else None
+        )
         requested_vfolder_dstpaths[vfolder_uuid] = value
     for key, value in requested_mount_name_map.items():
         requested_vfolder_dstpaths[key] = value
@@ -1001,7 +1039,10 @@ async def prepare_vfolder_mounts(
         name = row["name"]
         if vfid in requested_vfolder_ids:
             requested_vfolder_names[vfid] = name
-            requested_vfolder_subpaths[vfid] = "."
+            vfid_opts = requested_mount_options.get(vfid)
+            requested_vfolder_subpaths[vfid] = _normalize_mount_subpath(
+                vfid_opts.subpath if vfid_opts else None
+            )
         if name in _already_resolved:
             continue
         if name not in requested_names:
@@ -1385,8 +1426,6 @@ async def ensure_quota_scope_accessible_by_user(
     quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
 ) -> None:
-    from ai.backend.manager.models.group import association_groups_users as agus
-
     # Lookup user table to match if quota is scoped to the user
     query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
     quota_scope_user: UserRow | None = await conn.scalar(query)
@@ -1413,14 +1452,13 @@ async def ensure_quota_scope_accessible_by_user(
                 if quota_scope_group.domain_name == user["domain_name"]:
                     return
             case _:
-                query = (
-                    sa.select(agus.c.group_id)
-                    .select_from(agus)
-                    .where(
-                        (agus.c.group_id == quota_scope.scope_id) & (agus.c.user_id == user["uuid"])
-                    )
+                membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+                    AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+                    AssociationScopesEntitiesRow.scope_id == str(quota_scope.scope_id),
+                    AssociationScopesEntitiesRow.entity_id == str(user["uuid"]),
                 )
-                matched_group_id = await conn.scalar(query)
+                matched_group_id = await conn.scalar(membership_query)
                 if matched_group_id:
                     return
 
@@ -1545,7 +1583,7 @@ _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP: Mapping[
 # RBAC
 @dataclass
 class VFolderPermissionContext(
-    AbstractPermissionContext[VFolderRBACPermission, VFolderRow, uuid.UUID]
+    AbstractPermissionContext[VFolderRBACPermission, VFolderRow, VFolderUUID]
 ):
     host_permission_ctx: StorageHostPermissionContext | None = None
 
@@ -1714,17 +1752,18 @@ class VFolderPermissionContextBuilder(
 
         j = sa.join(
             GroupRow,
-            AssocGroupUserRow,
-            GroupRow.id == AssocGroupUserRow.group_id,
+            AssociationScopesEntitiesRow,
+            sa.and_(
+                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+                AssociationScopesEntitiesRow.entity_id == str(ctx.user_id),
+            ),
         )
         _project_stmt = (
             sa.select(GroupRow)
             .select_from(j)
-            .where(
-                sa.and_(
-                    GroupRow.domain_name == domain_name, AssocGroupUserRow.user_id == ctx.user_id
-                )
-            )
+            .where(GroupRow.domain_name == domain_name)
             .options(load_only(GroupRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):

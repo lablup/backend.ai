@@ -66,6 +66,51 @@ class DeploymentHasNoTargetRevision(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class RevisionMissingModelVFolder(BackendAIError, web.HTTPBadRequest):
+    """A revision's model vfolder reference is null.
+
+    Raised when the draft / session pipeline reads a
+    ``ModelRevisionData`` whose ``model_mount_config.vfolder_id`` has
+    collapsed to ``NULL`` because the backing vfolder row was deleted
+    (``vfolders.id`` SET NULL FK on ``deployment_revisions.model``).
+    The revision is preserved for history, but no new session can be
+    spawned from it until a new revision pointing at a live model
+    vfolder takes over.
+    """
+
+    error_type = "https://api.backend.ai/probs/revision-missing-model-vfolder"
+    error_title = "Deployment revision has no model vfolder."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class RevisionNotDeployable(BackendAIError, web.HTTPConflict):
+    """A revision references resources that no longer exist.
+
+    Raised when a ``DeploymentRevisionRow`` is converted to a
+    ``ModelRevisionSpec`` but one of its SET NULL-backed references —
+    ``image`` or ``model`` — has collapsed to NULL because the
+    underlying row was deleted. The revision is preserved for history
+    yet cannot be redeployed; the scheduler is expected to catch this
+    exception and transition the deployment to ``BLOCKED``.
+    """
+
+    error_type = "https://api.backend.ai/probs/revision-not-deployable"
+    error_title = "Deployment revision references deleted resources."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class InvalidDeploymentStrategy(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-deployment-strategy"
     error_title = "Unknown or invalid deployment strategy."

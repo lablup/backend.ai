@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
+from strawberry import UNSET
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
@@ -68,7 +69,6 @@ class RuntimeVariantOrderFieldGQL(StrEnum):
 )
 class RuntimeVariantGQL(PydanticNodeMixin[RuntimeVariantNodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
-    row_id: UUID = gql_field(description="The unique database identifier of this runtime variant.")
     name: str = gql_field(
         description="Unique short identifier for the runtime engine (e.g., 'vllm', 'sglang', 'nim', 'tgi')."
     )
@@ -134,7 +134,9 @@ class CreateRuntimeVariantInputGQL(PydanticInputMixin[CreateRuntimeVariantInputD
 class UpdateRuntimeVariantInputGQL(PydanticInputMixin[UpdateRuntimeVariantInputDTO]):
     id: UUID = gql_field(description="Runtime variant ID.")
     name: str | None = gql_field(default=None, description="New name.")
-    description: str | None = gql_field(default=None, description="New description.")
+    description: str | None = gql_field(
+        default=UNSET, description="New description. Set to null to clear."
+    )
 
 
 @gql_pydantic_type(

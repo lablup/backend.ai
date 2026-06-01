@@ -7,10 +7,10 @@ from functools import partial
 from typing import Any, cast
 
 import aiohttp
-from pydantic_core._pydantic_core import ValidationError
 
 from ai.backend.common.clients.http_client import ClientKey, ClientPool, tcp_client_session_factory
 from ai.backend.common.exception import (
+    BackendAISchemaValidationFailed,
     BaseNFSMountCheckFailed,
     ExportPathNotFound,
     ShowmountNotFound,
@@ -138,7 +138,7 @@ class HammerspaceAPIClient:
                     if share.name == params.name:
                         await self._check_nfs_export(share.path)
                         return share
-                except ValidationError:
+                except BackendAISchemaValidationFailed:
                     continue
             retry -= 1
             await asyncio.sleep(wait_sec)  # wait for a moment and try again
@@ -167,7 +167,7 @@ class HammerspaceAPIClient:
                 share = Share.model_validate(raw_share)
                 if share.name == params.name:
                     return share
-            except ValidationError:
+            except BackendAISchemaValidationFailed:
                 continue
         return None
 
@@ -183,7 +183,7 @@ class HammerspaceAPIClient:
             for raw_share in data:
                 try:
                     share = Share.model_validate(raw_share)
-                except ValidationError:
+                except BackendAISchemaValidationFailed:
                     continue
                 if share.name == params.name:
                     return share
@@ -213,7 +213,7 @@ class HammerspaceAPIClient:
                 try:
                     site = Site.model_validate(s)
                     sites.append(site)
-                except ValidationError:
+                except BackendAISchemaValidationFailed:
                     log.warning("Failed to parse the site data: {}", s)
                     continue
             return sites

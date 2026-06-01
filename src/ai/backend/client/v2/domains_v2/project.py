@@ -7,6 +7,7 @@ from uuid import UUID
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
+    AssignUsersToProjectInput,
     CreateProjectInput,
     DeleteProjectInput,
     PurgeProjectInput,
@@ -15,6 +16,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
+    AssignUsersToProjectPayload,
     DeleteProjectPayload,
     ProjectNode,
     ProjectPayload,
@@ -82,6 +84,19 @@ class V2ProjectClient(BaseDomainClient):
             f"{_PATH}/purge",
             request=request,
             response_model=PurgeProjectPayload,
+        )
+
+    async def assign_users(
+        self,
+        project_id: UUID,
+        request: AssignUsersToProjectInput,
+    ) -> AssignUsersToProjectPayload:
+        """Assign users to a project with a specific project role."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{project_id}/users/assign",
+            request=request,
+            response_model=AssignUsersToProjectPayload,
         )
 
     async def unassign_users(

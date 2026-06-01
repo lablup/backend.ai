@@ -21,6 +21,7 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import AsyncExitStack, asynccontextmanager
+from http import HTTPStatus
 from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
@@ -43,7 +44,6 @@ from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
 from callosum.rpc import Peer, RPCMessage
 from etcd_client import WatchEventType
-from pydantic import ValidationError
 from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
@@ -53,6 +53,11 @@ from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import scan_gpu_alloc_map
+from ai.backend.agent.rpc.health.registry import register_health_domain
+from ai.backend.agent.rpc.hwinfo.registry import register_hwinfo_domain
+from ai.backend.agent.rpc.kernel.registry import register_kernel_domain
+from ai.backend.agent.rpc.middlewares.metric import build_metric_middleware
+from ai.backend.agent.rpc.routing import AgentRPCRegistry
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.agent.types import AgentBackend
 from ai.backend.common import config, identity, msgpack, utils
@@ -67,7 +72,11 @@ from ai.backend.common.dto.agent.response import (
     CodeCompletionResp,
     PurgeImagesResp,
 )
-from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+from ai.backend.common.dto.internal.health import (
+    ConnectivityCheckResponse,
+    HealthResponse,
+    HealthStatus,
+)
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.event_types.kernel.anycast import (
@@ -77,7 +86,7 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatedBroadcastEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.exception import ConfigurationError
+from ai.backend.common.exception import BackendAISchemaValidationFailed, ConfigurationError
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
@@ -407,21 +416,22 @@ class AgentRPCServer(aobject):
         # Initialize health probe
         self.health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
 
-        # Register health checkers
-        await self.health_probe.register(EtcdHealthChecker(etcd=self.etcd))
+        # Liveness-registered: also surfaced in readiness — connection-stuck
+        # issues observed where restart is the actual recovery path.
+        await self.health_probe.register_liveness(EtcdHealthChecker(etcd=self.etcd))
 
         # Get default agent for health checking
         default_agent = self.runtime.get_agent(None)
 
-        # Register Docker health checker based on config
         if self.local_config.agent_common.backend == AgentBackend.DOCKER:
             from ai.backend.agent.docker.agent import DockerAgent
 
             docker_agent = cast(DockerAgent, default_agent)
-            await self.health_probe.register(DockerHealthChecker(docker=docker_agent.docker))
+            await self.health_probe.register_liveness(
+                DockerHealthChecker(docker=docker_agent.docker)
+            )
 
-        # Register Valkey health checker with all 4 agent valkey clients
-        await self.health_probe.register(
+        await self.health_probe.register_liveness(
             ValkeyHealthChecker(
                 clients={
                     ComponentId("stat"): default_agent.valkey_stat_client,
@@ -434,6 +444,24 @@ class AgentRPCServer(aobject):
 
         # Start periodic health checking
         await self.health_probe.start()
+
+        # v3 pydantic-typed RPC methods — handlers are registered
+        # explicitly via per-domain registrar functions (see
+        # ``agent/rpc/routing.py`` and the per-domain ``registry.py``
+        # modules under ``agent/rpc/<domain>/``). Must run after
+        # ``self.health_probe`` is initialised above, since
+        # ``register_health_domain`` captures the probe at registration
+        # time. Middleware providers are injected here so cross-cutting
+        # concerns (metrics, …) compose at setup time rather than being
+        # hard-coded.
+        self._rpc_registry = AgentRPCRegistry(
+            runtime=self.runtime,
+            middlewares=[build_metric_middleware(RPCMetricObserver.instance())],
+        )
+        register_kernel_domain(self._rpc_registry)
+        register_health_domain(self._rpc_registry, health_probe=self.health_probe)
+        register_hwinfo_domain(self._rpc_registry)
+        self._rpc_registry.bind_to_rpc(self.rpc_server)
 
     async def status_snapshot_request_handler(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -569,7 +597,7 @@ class AgentRPCServer(aobject):
 
                 self.local_config.update(container_update=container_updates)
         except Exception as e:
-            log.warning(f"etcd: container-config error: {e}")
+            log.warning("etcd: container-config error: {}", e)
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
@@ -1228,14 +1256,17 @@ class AgentRPCServer(aobject):
     async def assign_port(self, agent_id: AgentId | None = None) -> int:
         log.debug("rpc::assign_port()")
         agent = self.runtime.get_agent(agent_id)
-        return agent.port_pool.pop()
+        # RPC path bypasses cooldown: callers (e.g. manager scheduler)
+        # use this for ad-hoc/emergency allocation outside the normal
+        # container creation flow.
+        return agent.port_pool.acquire(respect_cooldown=False)
 
     @rpc_function
     @collect_error
     async def release_port(self, port_no: int, agent_id: AgentId | None = None) -> None:
         log.debug("rpc::release_port(port_no:{})", port_no)
         agent = self.runtime.get_agent(agent_id)
-        agent.port_pool.add(port_no)
+        agent.port_pool.release(port_no)
 
     @rpc_function
     @collect_error
@@ -1273,15 +1304,11 @@ async def server_main_logwrapper(
         traceback.print_exc(file=sys.stderr)
 
 
-async def check_health(request: web.Request) -> web.Response:
-    """Health check endpoint with dependency connectivity status"""
-
+def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """Detail /health — always 200; informational tier failures reported as
+    DEGRADED in the body but not surfaced via HTTP status."""
     from . import __version__
 
-    request["do_not_print_access_log"] = True
-
-    health_probe: HealthProbe = request.app["health_probe"]
-    connectivity = await health_probe.get_connectivity_status()
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
@@ -1289,6 +1316,47 @@ async def check_health(request: web.Request) -> web.Response:
         connectivity=connectivity,
     )
     return web.json_response(response.model_dump(mode="json"))
+
+
+def _build_agent_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
+    from . import __version__
+
+    is_healthy = connectivity.overall_healthy
+    response = HealthResponse(
+        status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
+        version=__version__,
+        component="agent",
+        connectivity=connectivity,
+    )
+    return web.json_response(
+        response.model_dump(mode="json"),
+        status=HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
+    )
+
+
+async def check_health(request: web.Request) -> web.Response:
+    """Aggregated health (union of liveness and readiness)."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_connectivity_status()
+    return _build_agent_health_response(connectivity)
+
+
+async def check_livez(request: web.Request) -> web.Response:
+    """Liveness probe — only liveness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_liveness_status()
+    return _build_agent_probe_response(connectivity)
+
+
+async def check_readyz(request: web.Request) -> web.Response:
+    """Readiness probe — only readiness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_readiness_status()
+    return _build_agent_probe_response(connectivity)
 
 
 def build_root_server() -> web.Application:
@@ -1307,6 +1375,8 @@ def build_root_server() -> web.Application:
         },
     )
     cors.add(app.router.add_route("GET", r"/health", check_health))
+    cors.add(app.router.add_route("GET", r"/livez", check_livez))
+    cors.add(app.router.add_route("GET", r"/readyz", check_readyz))
     cors.add(
         app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     )
@@ -1669,7 +1739,7 @@ def main(
         if server_config.debug.enabled:
             print("== Agent configuration ==")
             pprint(server_config.model_dump(by_alias=True))
-    except ValidationError as e:
+    except BackendAISchemaValidationFailed as e:
         print(
             "ConfigurationError: Agent local config failed validation checks:",
             file=sys.stderr,

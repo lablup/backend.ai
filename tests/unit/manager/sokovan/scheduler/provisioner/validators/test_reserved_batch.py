@@ -79,5 +79,8 @@ class TestReservedBatchSessionValidator:
 
         workload = batch_session_future_start_time
 
-        with pytest.raises(SchedulingValidationError, match="Before start time"):
+        with pytest.raises(
+            SchedulingValidationError,
+            match="Batch session is scheduled to start at",
+        ):
             validator.validate(snapshot, workload)

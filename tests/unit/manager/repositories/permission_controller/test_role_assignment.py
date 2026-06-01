@@ -17,10 +17,10 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow, association_groups_users
-from ai.backend.manager.models.group.row import AssocGroupUserRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -79,8 +79,8 @@ class TestRoleAssignment:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
-                AssocGroupUserRow,
                 AssociationScopesEntitiesRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
@@ -324,14 +324,16 @@ class TestRoleAssignment:
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
-        """bind_user_to_project creates business + RBAC associations."""
+        """bind_user_to_project creates the ASE row (PROJECT/USER)."""
         await group_db_source.bind_user_to_project(user_1, test_project)
 
         async with db_with_cleanup.begin_readonly_session() as session:
             assoc = await session.execute(
-                sa.select(association_groups_users).where(
-                    association_groups_users.c.user_id == user_1,
-                    association_groups_users.c.group_id == test_project,
+                sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(test_project),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_1),
                 )
             )
             assert len(assoc.fetchall()) == 1
@@ -349,9 +351,11 @@ class TestRoleAssignment:
 
         async with db_with_cleanup.begin_readonly_session() as session:
             assoc = await session.execute(
-                sa.select(association_groups_users).where(
-                    association_groups_users.c.user_id == user_1,
-                    association_groups_users.c.group_id == test_project,
+                sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(test_project),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_1),
                 )
             )
             assert len(assoc.fetchall()) == 1
@@ -363,14 +367,16 @@ class TestRoleAssignment:
         user_1: uuid.UUID,
         test_project: uuid.UUID,
     ) -> None:
-        """unbind_user_from_project removes business + RBAC associations."""
+        """unbind_user_from_project removes the ASE row."""
         await group_db_source.bind_user_to_project(user_1, test_project)
         await group_db_source.unbind_user_from_project(user_1, test_project)
 
         async with db_with_cleanup.begin_readonly_session() as session:
             assoc = await session.execute(
-                sa.select(association_groups_users).where(
-                    association_groups_users.c.group_id == test_project,
+                sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(test_project),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                 )
             )
             assert len(assoc.fetchall()) == 0

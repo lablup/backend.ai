@@ -33,7 +33,11 @@ from ai.backend.common.api_handlers import (
     api_handler,
 )
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
-from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
+from ai.backend.common.dto.internal.health import (
+    ConnectivityCheckResponse,
+    HealthResponse,
+    HealthStatus,
+)
 from ai.backend.common.dto.storage.request import (
     ArchiveDownloadTokenData,
     CreateArchiveDownloadSessionRequest,
@@ -141,22 +145,58 @@ def skip_token_auth(
     return handler
 
 
-@skip_token_auth
-async def check_health(request: web.Request) -> web.Response:
-    """Health check endpoint with dependency connectivity status"""
-
-    request["do_not_print_access_log"] = True
-
-    ctx: RootContext = request.app["ctx"]
-    connectivity = await ctx.health_probe.get_connectivity_status()
+def _build_storage_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """Detail /health — always 200; informational tier failures reported as
+    DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
         component="storage-proxy",
         connectivity=connectivity,
     )
-
     return web.json_response(response.model_dump(mode="json"))
+
+
+def _build_storage_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
+    """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
+    is_healthy = connectivity.overall_healthy
+    response = HealthResponse(
+        status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
+        version=__version__,
+        component="storage-proxy",
+        connectivity=connectivity,
+    )
+    return web.json_response(
+        response.model_dump(mode="json"),
+        status=HTTPStatus.OK if is_healthy else HTTPStatus.SERVICE_UNAVAILABLE,
+    )
+
+
+@skip_token_auth
+async def check_health(request: web.Request) -> web.Response:
+    """Aggregated health (union of liveness and readiness)."""
+    request["do_not_print_access_log"] = True
+    ctx: RootContext = request.app["ctx"]
+    connectivity = await ctx.health_probe.get_connectivity_status()
+    return _build_storage_health_response(connectivity)
+
+
+@skip_token_auth
+async def check_livez(request: web.Request) -> web.Response:
+    """Liveness probe — only liveness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    ctx: RootContext = request.app["ctx"]
+    connectivity = await ctx.health_probe.get_liveness_status()
+    return _build_storage_probe_response(connectivity)
+
+
+@skip_token_auth
+async def check_readyz(request: web.Request) -> web.Response:
+    """Readiness probe — only readiness-registered checkers."""
+    request["do_not_print_access_log"] = True
+    ctx: RootContext = request.app["ctx"]
+    connectivity = await ctx.health_probe.get_readiness_status()
+    return _build_storage_probe_response(connectivity)
 
 
 @skip_token_auth
@@ -1308,6 +1348,8 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
 
     app.router.add_route("GET", "/", check_status)
     app.router.add_route("GET", "/health", check_health)
+    app.router.add_route("GET", "/livez", check_livez)
+    app.router.add_route("GET", "/readyz", check_readyz)
     app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
@@ -1359,6 +1401,8 @@ def init_internal_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     metric_registry = CommonMetricRegistry.instance()
     app.router.add_route("GET", "/health", check_health)
+    app.router.add_route("GET", "/livez", check_livez)
+    app.router.add_route("GET", "/readyz", check_readyz)
     app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 
@@ -1371,7 +1415,7 @@ async def handle_volume_mount(
     if context.pidx != 0:
         return
     if context.watcher is None:
-        log.debug(f"{context.node_id}: Watcher is disabled. Skip handling mount event.")
+        log.debug("{}: Watcher is disabled. Skip handling mount event.", context.node_id)
         return
     err_msg: str | None = None
     mount_prefix = await context.etcd.get("volumes/_mount")
@@ -1418,7 +1462,7 @@ async def handle_volume_umount(
     if context.pidx != 0:
         return
     if context.watcher is None:
-        log.debug(f"{context.node_id}: Watcher is disabled. Skip handling umount event.")
+        log.debug("{}: Watcher is disabled. Skip handling umount event.", context.node_id)
         return
     mount_prefix = await context.etcd.get("volumes/_mount")
     timeout = await context.etcd.get("config/watcher/file-io-timeout")

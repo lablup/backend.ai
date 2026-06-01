@@ -11,9 +11,15 @@ from .object_permission import (
     ObjectPermissionCreateInput,
     ObjectPermissionData,
 )
-from .permission import ScopedPermissionCreateInput
+from .permission import PermissionData, ScopedPermissionCreateInput
 from .status import RoleStatus
-from .types import EntityType, OperationType, RBACElementRef, RoleSource
+from .types import (
+    EntityType,
+    OperationType,
+    RBACElementType,
+    RoleSource,
+    ScopeType,
+)
 
 
 @dataclass(frozen=True)
@@ -87,11 +93,34 @@ class BatchEntityPermissionCheckInput:
 
 
 @dataclass(frozen=True)
-class ScopeChainPermissionCheckInput:
+class PermissionResolutionKey:
+    """Identifies a single (user, element_type, entity) target for permission resolution.
+
+    A bulk permission resolver accepts a sequence of these keys and returns a
+    mapping keyed by the same object, so each result is unambiguously tied to
+    its input target.
+
+    ``element_type`` controls scope-chain entry; ``subject_entity_type`` controls
+    which ``permission.entity_type`` rows are matched. Callers that want the
+    default mapping pass ``element_type`` itself.
+    """
+
     user_id: uuid.UUID
-    target_element_ref: RBACElementRef
+    element_type: RBACElementType
+    entity_id: str
+    subject_entity_type: RBACElementType
+
+
+@dataclass(frozen=True)
+class ScopeChainPermissionCheckInput:
+    key: PermissionResolutionKey
     operation: OperationType
-    permission_entity_type: EntityType | None
+
+
+@dataclass(frozen=True)
+class BulkPermissionCheckInput:
+    keys: list[PermissionResolutionKey]
+    operation: OperationType
 
 
 @dataclass(frozen=True)
@@ -220,6 +249,51 @@ class BulkRoleRevocationResultData:
 
     successes: list[UserRoleRevocationData] = field(default_factory=list)
     failures: list[BulkRoleRevocationFailure] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class BulkRolePermissionAddFailure:
+    """Failure information for a single permission entry in bulk add (or replace)."""
+
+    role_id: uuid.UUID
+    scope_type: ScopeType
+    scope_id: str
+    entity_type: EntityType
+    operation: OperationType
+    message: str
+
+
+@dataclass(frozen=True)
+class BulkRolePermissionRemoveFailure:
+    """Failure information for a single permission ID in bulk remove."""
+
+    permission_id: uuid.UUID
+    message: str
+
+
+@dataclass(frozen=True)
+class BulkRolePermissionAddResultData:
+    """Result of bulk inserting role-permission rows."""
+
+    successes: list[PermissionData] = field(default_factory=list)
+    failures: list[BulkRolePermissionAddFailure] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class BulkRolePermissionRemoveResultData:
+    """Result of bulk deleting role-permission rows."""
+
+    successes: list[PermissionData] = field(default_factory=list)
+    failures: list[BulkRolePermissionRemoveFailure] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class BulkRolePermissionReplaceResultData:
+    """Result of replacing a role's entire scoped-permission set."""
+
+    role_id: uuid.UUID
+    successes: list[PermissionData] = field(default_factory=list)
+    failures: list[BulkRolePermissionAddFailure] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

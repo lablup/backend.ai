@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey, RuntimeVariant, VFolderMount
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
@@ -39,7 +40,7 @@ class ValidateModelServiceAction(ModelServiceAction):
 
 @dataclass
 class ValidateModelServiceActionResult(BaseActionResult):
-    model_id: uuid.UUID
+    model_vfolder_id: VFolderUUID
     model_definition_path: str | None
     requester_access_key: AccessKey
     owner_access_key: AccessKey

@@ -71,14 +71,14 @@ class TemplateService:
         self, action: CreateTaskTemplateAction
     ) -> CreateTaskTemplateActionResult:
         """Validate and create one or more task templates."""
-        # Resolve owner UUID and group ID (moved from handler)
+        # Authorize owner against the pre-resolved project
         default_user_uuid, default_group_id = await self._repository.resolve_owner(
             requester_uuid=action.requester_uuid,
             requester_access_key=action.requester_access_key,
             requester_role=action.requester_role,
             requester_domain=action.requester_domain,
             requesting_domain=action.domain_name,
-            requesting_group=action.requesting_group,
+            requesting_project_id=action.requesting_project,
             owner_access_key=action.owner_access_key,
         )
 
@@ -139,14 +139,14 @@ class TemplateService:
         if not exists:
             raise TaskTemplateNotFound
 
-        # Resolve owner UUID and group ID (moved from handler)
+        # Authorize owner against the pre-resolved project
         default_user_uuid, default_group_id = await self._repository.resolve_owner(
             requester_uuid=action.requester_uuid,
             requester_access_key=action.requester_access_key,
             requester_role=action.requester_role,
             requester_domain=action.requester_domain,
             requesting_domain=action.domain_name,
-            requesting_group=action.requesting_group,
+            requesting_project_id=action.requesting_project,
             owner_access_key=action.owner_access_key,
         )
 
@@ -188,14 +188,14 @@ class TemplateService:
         self, action: CreateClusterTemplateAction
     ) -> CreateClusterTemplateActionResult:
         """Validate and create a cluster template."""
-        # Resolve owner UUID and group ID (moved from handler)
+        # Authorize owner against the pre-resolved project
         owner_uuid, group_id = await self._repository.resolve_owner(
             requester_uuid=action.requester_uuid,
             requester_access_key=action.requester_access_key,
             requester_role=action.requester_role,
             requester_domain=action.requester_domain,
             requesting_domain=action.domain_name,
-            requesting_group=action.requesting_group,
+            requesting_project_id=action.requesting_project,
             owner_access_key=action.owner_access_key,
         )
 

@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
-    AddRevisionGQLInputDTO,
+    AddRevisionInput,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
     BulkDeleteAccessTokensInput,
@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput,
     DeleteAccessTokenInput,
     DeleteDeploymentInput,
+    ReplaceDeploymentOptionsInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
@@ -49,6 +50,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     GetAccessTokenPayload,
     GetAutoScalingRulePayload,
     GetDeploymentPolicyPayload,
+    ReplaceDeploymentOptionsPayload,
     ReplicaNode,
     RevisionNode,
     SearchAccessTokensPayload,
@@ -62,6 +64,8 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateRouteTrafficStatusPayload,
     UpsertDeploymentPolicyPayload,
 )
+from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
+from ai.backend.common.identifier.deployment import DeploymentID
 
 _PATH = "/v2/deployments"
 
@@ -165,7 +169,7 @@ class V2DeploymentClient(BaseDomainClient):
     async def add_revision(
         self,
         deployment_id: UUID,
-        body: AddRevisionGQLInputDTO,
+        body: AddRevisionInput,
     ) -> AddRevisionPayload:
         """Add a new model revision to a deployment."""
         return await self._client.typed_request(
@@ -504,4 +508,29 @@ class V2DeploymentClient(BaseDomainClient):
             _PATH + "/policies/upsert",
             request=body,
             response_model=UpsertDeploymentPolicyPayload,
+        )
+
+    # ------------------------------------------------------------------
+    # Deployment options
+    # ------------------------------------------------------------------
+
+    async def get_options(self, deployment_id: DeploymentID) -> DeploymentOptionsInfo:
+        """Read the current ``options`` surface of a deployment.
+
+        Reads the full deployment node and returns its ``options`` field.
+        """
+        node = await self.get(deployment_id)
+        return node.options
+
+    async def replace_options(
+        self,
+        deployment_id: DeploymentID,
+        body: ReplaceDeploymentOptionsInput,
+    ) -> ReplaceDeploymentOptionsPayload:
+        """Fully replace a deployment's ``options`` surface."""
+        return await self._client.typed_request(
+            "PUT",
+            f"{_PATH}/{deployment_id}/options",
+            request=body,
+            response_model=ReplaceDeploymentOptionsPayload,
         )

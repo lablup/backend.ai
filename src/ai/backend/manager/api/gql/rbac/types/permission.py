@@ -14,6 +14,12 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    BulkAddRolePermissionsInput as BulkAddRolePermissionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    BulkRemoveRolePermissionsInput as BulkRemoveRolePermissionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     CreatePermissionInput as CreatePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -29,7 +35,22 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    ReplaceRolePermissionsInput as ReplaceRolePermissionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    BulkAddRolePermissionFailureInfo as BulkAddRolePermissionFailureInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    BulkAddRolePermissionsPayload as BulkAddRolePermissionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    BulkRemoveRolePermissionFailureInfo as BulkRemoveRolePermissionFailureInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    BulkRemoveRolePermissionsPayload as BulkRemoveRolePermissionsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     DeletePermissionPayload as DeletePermissionPayloadDTO,
@@ -44,11 +65,21 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     PermissionNode as PermissionNodeDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    ReplaceRolePermissionFailureInfo as ReplaceRolePermissionFailureInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    ReplaceRolePermissionsPayload as ReplaceRolePermissionsPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    OperationTypeFilter as OperationTypeFilterDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -61,7 +92,10 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
-from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import (
+    RBACElementTypeFilterGQL,
+    RBACElementTypeGQL,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -74,6 +108,32 @@ OperationTypeGQL: type[OperationTypeDTO] = gql_enum(
     OperationTypeDTO,
     name="OperationType",
 )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Filter for permission operation columns. Supports equals / in / not_equals / not_in."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="OperationTypeFilter",
+)
+class OperationTypeFilterGQL(PydanticInputMixin[OperationTypeFilterDTO]):
+    equals: OperationTypeGQL | None = gql_field(
+        description="Matches rows with this exact operation.", default=None
+    )
+    in_: list[OperationTypeGQL] | None = gql_field(
+        description="Matches rows whose operation is in this list.",
+        name="in",
+        default=None,
+    )
+    not_equals: OperationTypeGQL | None = gql_field(
+        description="Excludes rows with this exact operation.", default=None
+    )
+    not_in: list[OperationTypeGQL] | None = gql_field(
+        description="Excludes rows whose operation is in this list.", default=None
+    )
 
 
 @gql_enum(BackendAIGQLMeta(added_version="26.3.0", description="Permission ordering field"))
@@ -188,6 +248,10 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.MODEL_CARD
                 | RBACElementType.PROJECT_ADMIN_PAGE
                 | RBACElementType.DOMAIN_ADMIN_PAGE
+                | RBACElementType.ROLE_ASSIGNMENT
+                | RBACElementType.VFOLDER_DATA
+                | RBACElementType.SESSION_APP_SERVICE
+                | RBACElementType.USER_EMAIL
             ):
                 return None
 
@@ -203,10 +267,10 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     name="PermissionNestedFilter",
 )
 class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
-    scope_id: str | None = None
-    scope_type: RBACElementTypeGQL | None = None
-    entity_type: RBACElementTypeGQL | None = None
-    operation: OperationTypeGQL | None = None
+    scope_id: StringFilter | None = None
+    scope_type: RBACElementTypeFilterGQL | None = None
+    entity_type: RBACElementTypeFilterGQL | None = None
+    operation: OperationTypeFilterGQL | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -218,9 +282,10 @@ class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
     name="PermissionFilter",
 )
 class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
-    role_id: UUID | None = None
-    scope_type: RBACElementTypeGQL | None = None
-    entity_type: RBACElementTypeGQL | None = None
+    role_id: UUIDFilter | None = None
+    scope_type: RBACElementTypeFilterGQL | None = None
+    scope_id: StringFilter | None = None
+    entity_type: RBACElementTypeFilterGQL | None = None
     created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -271,6 +336,43 @@ class DeletePermissionInput(PydanticInputMixin[DeletePermissionInputDTO]):
     id: UUID
 
 
+# -------- Bulk role-permission inputs --------
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk-inserting scoped permissions across one or more roles",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="BulkAddRolePermissionsInput",
+)
+class BulkAddRolePermissionsInputGQL(PydanticInputMixin[BulkAddRolePermissionsInputDTO]):
+    permissions: list[CreatePermissionInput]
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk-deleting permission rows by primary key",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="BulkRemoveRolePermissionsInput",
+)
+class BulkRemoveRolePermissionsInputGQL(PydanticInputMixin[BulkRemoveRolePermissionsInputDTO]):
+    permission_ids: list[UUID]
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for replacing one role's entire scoped-permission set",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ReplaceRolePermissionsInput",
+)
+class ReplaceRolePermissionsInputGQL(PydanticInputMixin[ReplaceRolePermissionsInputDTO]):
+    role_id: UUID
+    permissions: list[CreatePermissionInput]
+
+
 # ==================== Payload Types ====================
 
 
@@ -281,6 +383,113 @@ class DeletePermissionInput(PydanticInputMixin[DeletePermissionInputDTO]):
 )
 class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted permission.")
+
+
+# -------- Bulk role-permission payloads --------
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        description="Failure detail for a single permission entry in bulk add",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    model=BulkAddRolePermissionFailureInfoDTO,
+    name="BulkAddRolePermissionFailureInfo",
+)
+class BulkAddRolePermissionFailureInfoGQL(
+    PydanticOutputMixin[BulkAddRolePermissionFailureInfoDTO],
+):
+    role_id: UUID = gql_field(description="Role ID of the failed entry.")
+    scope_type: str = gql_field(description="Scope element type of the failed entry.")
+    scope_id: str = gql_field(description="Scope element ID of the failed entry.")
+    entity_type: str = gql_field(description="Entity element type of the failed entry.")
+    operation: str = gql_field(description="Operation type of the failed entry.")
+    message: str = gql_field(description="Error message describing the failure.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        description="Failure detail for a single permission ID in bulk remove",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    model=BulkRemoveRolePermissionFailureInfoDTO,
+    name="BulkRemoveRolePermissionFailureInfo",
+)
+class BulkRemoveRolePermissionFailureInfoGQL(
+    PydanticOutputMixin[BulkRemoveRolePermissionFailureInfoDTO],
+):
+    permission_id: UUID = gql_field(description="Permission row ID that failed to delete.")
+    message: str = gql_field(description="Error message describing the failure.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        description="Failure detail for a single permission entry in replace",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    model=ReplaceRolePermissionFailureInfoDTO,
+    name="ReplaceRolePermissionFailureInfo",
+)
+class ReplaceRolePermissionFailureInfoGQL(
+    PydanticOutputMixin[ReplaceRolePermissionFailureInfoDTO],
+):
+    role_id: UUID = gql_field(description="Role ID of the failed entry.")
+    scope_type: str = gql_field(description="Scope element type of the failed entry.")
+    scope_id: str = gql_field(description="Scope element ID of the failed entry.")
+    entity_type: str = gql_field(description="Entity element type of the failed entry.")
+    operation: str = gql_field(description="Operation type of the failed entry.")
+    message: str = gql_field(description="Error message describing the failure.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        description="Payload for bulk role-permission insertion",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    model=BulkAddRolePermissionsPayloadDTO,
+    name="BulkAddRolePermissionsPayload",
+)
+class BulkAddRolePermissionsPayloadGQL(
+    PydanticOutputMixin[BulkAddRolePermissionsPayloadDTO],
+):
+    items: list[PermissionGQL] = gql_field(description="Successfully inserted permission rows.")
+    failed: list[BulkAddRolePermissionFailureInfoGQL] = gql_field(
+        description="Permission entries that failed to insert."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        description="Payload for bulk role-permission deletion",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    model=BulkRemoveRolePermissionsPayloadDTO,
+    name="BulkRemoveRolePermissionsPayload",
+)
+class BulkRemoveRolePermissionsPayloadGQL(
+    PydanticOutputMixin[BulkRemoveRolePermissionsPayloadDTO],
+):
+    items: list[PermissionGQL] = gql_field(description="Successfully deleted permission rows.")
+    failed: list[BulkRemoveRolePermissionFailureInfoGQL] = gql_field(
+        description="Permission IDs that failed to delete."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        description="Payload for replacing a role's entire scoped-permission set",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    model=ReplaceRolePermissionsPayloadDTO,
+    name="ReplaceRolePermissionsPayload",
+)
+class ReplaceRolePermissionsPayloadGQL(
+    PydanticOutputMixin[ReplaceRolePermissionsPayloadDTO],
+):
+    items: list[PermissionGQL] = gql_field(description="Permission rows that make up the new set.")
+    failed: list[ReplaceRolePermissionFailureInfoGQL] = gql_field(
+        description="Permission entries that failed to insert."
+    )
 
 
 # ==================== Connection Types ====================

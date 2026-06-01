@@ -31,15 +31,16 @@ from aiohttp import web
 from aiotools import apartial
 
 from ai.backend.common.api_handlers import PathParam, QueryParam
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.stream.request import SessionNamePath, StreamProxyRequest
 from ai.backend.common.dto.manager.stream.response import StreamAppItem
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.json import dump_json, load_json
-from ai.backend.common.types import AccessKey, KernelId, SessionId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.utils import call_non_bursty
 from ai.backend.manager.api.wsproxy import TCPProxy
-from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import InvalidStreamMode
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
@@ -69,6 +70,13 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.stream.processors import StreamProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def _require_current_user_id() -> uuid.UUID:
+    user = current_user()
+    if user is None:
+        raise UnreachableError("User context is not available")
+    return user.user_id
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -109,17 +117,16 @@ class StreamHandler:
         self,
         path: PathParam[SessionNamePath],
         ctx: RequestCtx,
-        user_ctx: UserContext,
     ) -> web.StreamResponse:
         request = ctx.request
         app_ctx = self._ctx
+        user_id = _require_current_user_id()
         session_name = path.parsed.session_name
-        access_key = AccessKey(user_ctx.access_key)
         api_version = request["api_version"]
         result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
+            GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
         )
-        log.info("STREAM_PTY(ak:{0}, s:{1})", access_key, session_name)
+        log.info("STREAM_PTY(s:{0})", session_name)
         stream_key = KernelId(uuid.UUID(result.kernel_id))
         kernel_host: str
         if result.kernel_host is None:
@@ -194,7 +201,7 @@ class StreamHandler:
                                 await self._stream.execute_in_stream.wait_for_complete(
                                     ExecuteInStreamAction(
                                         session_name=session_name,
-                                        access_key=access_key,
+                                        user_uuid=user_id,
                                         api_version=api_version,
                                         run_id=run_id,
                                         mode="query",
@@ -207,7 +214,7 @@ class StreamHandler:
                                 await self._stream.execute_in_stream.wait_for_complete(
                                     ExecuteInStreamAction(
                                         session_name=session_name,
-                                        access_key=access_key,
+                                        user_uuid=user_id,
                                         api_version=api_version,
                                         run_id=run_id,
                                         mode="query",
@@ -222,7 +229,7 @@ class StreamHandler:
                                     await self._stream.restart_in_stream.wait_for_complete(
                                         RestartInStreamAction(
                                             session_name=session_name,
-                                            access_key=access_key,
+                                            user_uuid=user_id,
                                         ),
                                     )
                                     socks[0].close()
@@ -242,7 +249,7 @@ class StreamHandler:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                await self.error_monitor.capture_exception(context={"user": user_ctx.user_uuid})
+                await self.error_monitor.capture_exception(context={"user": user_id})
                 log.exception("stream_stdin({0}): unexpected error", stream_key)
             finally:
                 log.debug("stream_stdin({0}): terminated", stream_key)
@@ -275,7 +282,7 @@ class StreamHandler:
             except asyncio.CancelledError:
                 pass
             except Exception:
-                await self.error_monitor.capture_exception(context={"user": user_ctx.user_uuid})
+                await self.error_monitor.capture_exception(context={"user": user_id})
                 log.exception("stream_stdout({0}): unexpected error", stream_key)
             finally:
                 log.debug("stream_stdout({0}): terminated", stream_key)
@@ -285,7 +292,7 @@ class StreamHandler:
         try:
             await stream_stdin()
         except Exception:
-            await self.error_monitor.capture_exception(context={"user": user_ctx.user_uuid})
+            await self.error_monitor.capture_exception(context={"user": user_id})
             log.exception("stream_pty({0}): unexpected error", stream_key)
         finally:
             app_ctx.stream_pty_handlers[stream_key].discard(myself)
@@ -302,19 +309,18 @@ class StreamHandler:
         self,
         path: PathParam[SessionNamePath],
         ctx: RequestCtx,
-        user_ctx: UserContext,
     ) -> web.StreamResponse:
         """WebSocket-version of gateway.kernel.execute()."""
         request = ctx.request
         app_ctx = self._ctx
 
         config = self.config_provider.config
+        user_id = _require_current_user_id()
         session_name = path.parsed.session_name
-        access_key = AccessKey(user_ctx.access_key)
         api_version = request["api_version"]
-        log.info("STREAM_EXECUTE(ak:{0}, s:{1})", access_key, session_name)
+        log.info("STREAM_EXECUTE(s:{0})", session_name)
         session_result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
+            GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
         )
         stream_key = KernelId(uuid.UUID(session_result.kernel_id))
 
@@ -345,7 +351,7 @@ class StreamHandler:
                 exec_result = await self._stream.execute_in_stream.wait_for_complete(
                     ExecuteInStreamAction(
                         session_name=session_name,
-                        access_key=access_key,
+                        user_uuid=user_id,
                         api_version=api_version,
                         run_id=run_id,
                         mode=mode,
@@ -360,7 +366,7 @@ class StreamHandler:
                     await self._stream.interrupt_in_stream.wait_for_complete(
                         InterruptInStreamAction(
                             session_name=session_name,
-                            access_key=access_key,
+                            user_uuid=user_id,
                         ),
                     )
                     break
@@ -418,20 +424,19 @@ class StreamHandler:
         path: PathParam[SessionNamePath],
         query: QueryParam[StreamProxyRequest],
         ctx: RequestCtx,
-        user_ctx: UserContext,
     ) -> web.StreamResponse:
         request = ctx.request
         app_ctx = self._ctx
         rpc_ptask_group = app_ctx.rpc_ptask_group
+        user_id = _require_current_user_id()
         session_name: str = path.parsed.session_name
-        access_key = AccessKey(user_ctx.access_key)
         params = query.parsed
         service: str = params.app
         myself = asyncio.current_task()
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
         session_result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
+            GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
         )
         kernel_id = KernelId(uuid.UUID(session_result.kernel_id))
         session_id = SessionId(uuid.UUID(session_result.session_id))
@@ -473,8 +478,7 @@ class StreamHandler:
             raise AppNotFound(f"{session_name}:{service}")
 
         log.info(
-            "STREAM_WSPROXY (ak:{}, s:{}): tunneling {}:{} to {}",
-            access_key,
+            "STREAM_WSPROXY (s:{}): tunneling {}:{} to {}",
             session_name,
             service,
             sport["protocol"],
@@ -548,7 +552,7 @@ class StreamHandler:
             start_result = await self._stream.start_service_in_stream.wait_for_complete(
                 StartServiceInStreamAction(
                     session_name=session_name,
-                    access_key=access_key,
+                    user_uuid=user_id,
                     service=service,
                     opts=opts,
                 ),
@@ -588,12 +592,11 @@ class StreamHandler:
         self,
         path: PathParam[SessionNamePath],
         ctx: RequestCtx,
-        user_ctx: UserContext,
     ) -> web.StreamResponse:
+        user_id = _require_current_user_id()
         session_name = path.parsed.session_name
-        access_key = AccessKey(user_ctx.access_key)
         result = await self._stream.get_streaming_session.wait_for_complete(
-            GetStreamingSessionAction(session_name=session_name, access_key=access_key),
+            GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
         )
         service_ports: list[dict[str, Any]] = result.service_ports
         if not service_ports:

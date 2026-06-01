@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SessionHistoryScopeDTO,
     SubStepResultInfo,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -238,6 +239,16 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     attempts: int
     created_at: datetime
     updated_at: datetime
+    category: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Handler category that produced this row. ``lifecycle``"
+                " for monotonic lifecycle transitions; ``scaling`` for"
+                " replica-reconcile transitions; ``health`` is reserved."
+            ),
+        )
+    )
 
     @gql_added_field(
         BackendAIGQLMeta(

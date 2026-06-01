@@ -19,7 +19,10 @@ import pytest
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
-from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
+from ai.backend.manager.sokovan.deployment.types import (
+    DeploymentExecutionError,
+    DeploymentWithHistory,
+)
 
 # =============================================================================
 # TestCheckReadyDeployments (CR-001 ~ CR-004)
@@ -46,7 +49,7 @@ class TestCheckReadyDeployments:
         """
         # Arrange - Routes matching replica count
         mock_route = MagicMock()
-        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
+        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
             ready_deployment.deployment_info.id: [mock_route, mock_route]  # 2 routes = 2 target
         }
 
@@ -75,7 +78,7 @@ class TestCheckReadyDeployments:
         """
         # Arrange - Fewer routes than target
         mock_route = MagicMock()
-        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
+        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
             ready_deployment.deployment_info.id: [mock_route]  # 1 route != 2 target
         }
 
@@ -125,7 +128,7 @@ class TestCheckReadyDeployments:
         """
         # Routes count does not matter: the skip happens before the
         # replica-count check.
-        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
+        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
             ready_deployment_no_current_revision.deployment_info.id: []
         }
         entity_ids = [ready_deployment_no_current_revision.deployment_info.id]
@@ -168,7 +171,7 @@ class TestScaleDeployment:
         """
         # Arrange - 1 route exists, target is 3, so need 2 new routes
         mock_route = MagicMock()
-        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
+        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
             ready_deployment_needs_scale_up.deployment_info.id: [mock_route]
         }
 
@@ -209,7 +212,7 @@ class TestScaleDeployment:
         mock_route3.route_id = uuid4()
         mock_route3.termination_priority = 3
 
-        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
+        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
             ready_deployment_needs_scale_down.deployment_info.id: [
                 mock_route1,
                 mock_route2,
@@ -247,7 +250,7 @@ class TestScaleDeployment:
         # Arrange - Routes match target
         mock_route1 = MagicMock()
         mock_route2 = MagicMock()
-        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
+        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
             ready_deployment.deployment_info.id: [mock_route1, mock_route2]
         }
 
@@ -273,7 +276,7 @@ class TestScaleDeployment:
         Then: Error captured in result
         """
         # Arrange - Route fetch raises exception
-        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {}
+        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {}
 
         entity_ids = [ready_deployment_needs_scale_up.deployment_info.id]
         with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -312,15 +315,24 @@ class TestDestroyDeployment:
         # Arrange
         mock_route = MagicMock()
         mock_route.route_id = uuid4()
-        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
+        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
             destroying_deployment.deployment_info.id: [mock_route]
         }
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
 
+        async def _fake_dispatch(
+            addr: str,
+            token: str,
+            group: list[DeploymentWithHistory],
+            successes: list[DeploymentWithHistory],
+            errors: list[object],
+        ) -> None:
+            successes.extend(group)
+
         with patch.object(
-            deployment_executor, "_unregister_endpoint", return_value=None
+            deployment_executor, "_dispatch_bulk_unregister", side_effect=_fake_dispatch
         ) as mock_unregister:
             entity_ids = [destroying_deployment.deployment_info.id]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -359,12 +371,23 @@ class TestDestroyDeployment:
             mock_route.route_id = uuid4()
             routes_map[deployment.deployment_info.id] = [mock_route]
 
-        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = routes_map
+        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = routes_map
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
 
-        with patch.object(deployment_executor, "_unregister_endpoint", return_value=None):
+        async def _fake_dispatch_multi(
+            addr: str,
+            token: str,
+            group: list[DeploymentWithHistory],
+            successes: list[DeploymentWithHistory],
+            errors: list[object],
+        ) -> None:
+            successes.extend(group)
+
+        with patch.object(
+            deployment_executor, "_dispatch_bulk_unregister", side_effect=_fake_dispatch_multi
+        ):
             entity_ids = [dep.deployment_info.id for dep in destroying_deployments_multiple]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
                 # Act
@@ -390,17 +413,32 @@ class TestDestroyDeployment:
         Then: Error captured in result
         """
         # Arrange
-        mock_deployment_repo.fetch_active_routes_by_endpoint_ids.return_value = {
+        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
             destroying_deployment.deployment_info.id: []
         }
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
 
+        async def _fake_dispatch_failure(
+            addr: str,
+            token: str,
+            group: list[DeploymentWithHistory],
+            successes: list[DeploymentWithHistory],
+            errors: list[object],
+        ) -> None:
+            for deployment in group:
+                errors.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="Failed to unregister endpoint",
+                        error_detail="Unregister failed",
+                        error_code=None,
+                    )
+                )
+
         with patch.object(
-            deployment_executor,
-            "_unregister_endpoint",
-            side_effect=RuntimeError("Unregister failed"),
+            deployment_executor, "_dispatch_bulk_unregister", side_effect=_fake_dispatch_failure
         ):
             entity_ids = [destroying_deployment.deployment_info.id]
             with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
@@ -437,9 +475,9 @@ class TestCalculateDesiredReplicas:
         Then: Manual replica count applied
         """
         # Arrange - No autoscaling rules, routes don't match
-        mock_deployment_repo.fetch_auto_scaling_rules_by_endpoint_ids.return_value = {}
+        mock_deployment_repo.fetch_auto_scaling_rules_by_deployment_ids.return_value = {}
         mock_metrics = MagicMock()
-        mock_metrics.routes_by_endpoint = {ready_deployment.deployment_info.id: []}  # 0 routes
+        mock_metrics.routes_by_deployment = {ready_deployment.deployment_info.id: []}  # 0 routes
         mock_deployment_repo.fetch_metrics_for_autoscaling.return_value = mock_metrics
 
         entity_ids = [ready_deployment.deployment_info.id]
@@ -469,9 +507,9 @@ class TestCalculateDesiredReplicas:
         Then: Deployment in skipped list
         """
         # Arrange - Routes match replica count
-        mock_deployment_repo.fetch_auto_scaling_rules_by_endpoint_ids.return_value = {}
+        mock_deployment_repo.fetch_auto_scaling_rules_by_deployment_ids.return_value = {}
         mock_metrics = MagicMock()
-        mock_metrics.routes_by_endpoint = {
+        mock_metrics.routes_by_deployment = {
             ready_deployment.deployment_info.id: [MagicMock(), MagicMock()]
         }  # 2 routes = 2 replicas
         mock_deployment_repo.fetch_metrics_for_autoscaling.return_value = mock_metrics
@@ -498,7 +536,7 @@ class TestCalculateDesiredReplicas:
         Then: Error captured in result
         """
         # Arrange
-        mock_deployment_repo.fetch_auto_scaling_rules_by_endpoint_ids.return_value = {}
+        mock_deployment_repo.fetch_auto_scaling_rules_by_deployment_ids.return_value = {}
         mock_deployment_repo.fetch_metrics_for_autoscaling.side_effect = RuntimeError(
             "Metrics fetch failed"
         )
@@ -527,9 +565,9 @@ class TestCalculateDesiredReplicas:
               ``scale_deployment`` would then skip it forever because it
               also refuses to act on a None revision id.
         """
-        mock_deployment_repo.fetch_auto_scaling_rules_by_endpoint_ids.return_value = {}
+        mock_deployment_repo.fetch_auto_scaling_rules_by_deployment_ids.return_value = {}
         mock_metrics = MagicMock()
-        mock_metrics.routes_by_endpoint = {
+        mock_metrics.routes_by_deployment = {
             ready_deployment_no_current_revision.deployment_info.id: []
         }
         mock_deployment_repo.fetch_metrics_for_autoscaling.return_value = mock_metrics

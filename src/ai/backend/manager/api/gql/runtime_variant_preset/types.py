@@ -52,6 +52,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption as UIOptionDTO,
 )
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
+from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -199,7 +200,6 @@ class PresetTargetSpecGQL(PydanticOutputMixin[PresetTargetSpecDTO]):
 )
 class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
-    row_id: UUID = gql_field(description="The unique database identifier of this preset.")
     runtime_variant_id: UUID = gql_field(description="The runtime variant this preset belongs to.")
     name: str = gql_field(
         description="Human-readable name of the configurable parameter (e.g., 'Tensor Parallel Size', 'Quantization')."
@@ -245,7 +245,9 @@ class RuntimeVariantPresetConnection(Connection[RuntimeVariantPresetGQL]):
 )
 class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
-    runtime_variant_id: UUID | None = gql_field(default=None, description="Variant ID filter.")
+    runtime_variant_id: UUIDFilterGQL | None = gql_field(
+        default=None, description="Variant ID filter."
+    )
 
 
 @gql_pydantic_input(

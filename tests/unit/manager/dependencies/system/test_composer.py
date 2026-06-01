@@ -110,6 +110,7 @@ class TestSystemComposer:
         mock_db = MagicMock()
         mock_event_producer = MagicMock()
         mock_valkey_profile_target = MagicMock()
+        mock_prometheus_client = MagicMock()
 
         # Setup mock client pool
         mock_client_pool = MagicMock()
@@ -126,7 +127,9 @@ class TestSystemComposer:
 
         # Setup mock health probe
         mock_probe = MagicMock()
-        mock_probe.register = AsyncMock()
+        mock_probe.register_liveness = AsyncMock()
+        mock_probe.register_readiness = AsyncMock()
+        mock_probe.register_informational = AsyncMock()
         mock_probe.start = AsyncMock()
         mock_probe.stop = AsyncMock()
         mock_health_probe_class.return_value = mock_probe
@@ -146,6 +149,7 @@ class TestSystemComposer:
                 db=mock_db,
                 event_producer=mock_event_producer,
                 valkey_profile_target=mock_valkey_profile_target,
+                prometheus_client=mock_prometheus_client,
             )
 
             composer = SystemComposer()
@@ -174,7 +178,7 @@ class TestSystemComposer:
                     assert resources.health_probe is mock_probe
 
             # Verify cleanup was called
-            mock_client_pool.close.assert_awaited_once()
+            # PrometheusClient lifecycle is managed by the main composer, not SystemComposer
             mock_sd_loop.close.assert_called_once()
             mock_bgtask_manager.shutdown.assert_awaited_once()
             mock_probe.stop.assert_awaited_once()

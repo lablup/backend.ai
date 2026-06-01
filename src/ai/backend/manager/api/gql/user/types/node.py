@@ -116,7 +116,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         self,
         info: Info,
         scope: UserFairShareScopeGQL,
-    ) -> UserFairShareGQL:
+    ) -> UserFairShareGQL | None:
         from ai.backend.common.dto.manager.v2.fair_share.request import GetUserFairShareInput
 
         if self.organization.domain_name is None:
@@ -147,7 +147,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> UserUsageBucketConnection:
+    ) -> UserUsageBucketConnection | None:
         from strawberry.relay import PageInfo
 
         from ai.backend.manager.api.gql.base import encode_cursor
@@ -233,10 +233,13 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        ProjectV2Connection,
-        strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
-    ]:
+    ) -> (
+        Annotated[
+            ProjectV2Connection,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
         from strawberry.relay import PageInfo
 
         from ai.backend.common.dto.manager.v2.group.request import AdminSearchProjectsInput

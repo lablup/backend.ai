@@ -13,31 +13,41 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     LivenessStatus,
     ReadinessStatus,
 )
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant, SessionId
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     ClusterConfigData,
     DeploymentInfo,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
+    DeploymentOptions,
     DeploymentState,
+    ExecutionData,
     ModelDeploymentAccessTokenData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    ReplicaSpec,
+    PresetAttributionData,
+    ReplicaData,
     ResourceConfigData,
     RouteHealthStatus,
     RouteInfo,
@@ -71,9 +81,6 @@ from ai.backend.manager.services.deployment.actions.sync_replicas import (
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
 
@@ -89,21 +96,20 @@ class DeploymentCRUDBaseFixtures:
         return MagicMock(spec=DeploymentController)
 
     @pytest.fixture
-    def mock_revision_generator_registry(self) -> MagicMock:
-        return MagicMock(spec=RevisionGeneratorRegistry)
+    def mock_appproxy_client_pool(self) -> MagicMock:
+        return MagicMock(spec=AppProxyClientPool)
 
     @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
-        mock_revision_generator_registry: MagicMock,
+        mock_appproxy_client_pool: MagicMock,
     ) -> DeploymentService:
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
-            revision_generator_registry=mock_revision_generator_registry,
-            model_definition_generator_registry=MagicMock(),
+            appproxy_client_pool=mock_appproxy_client_pool,
         )
 
     @pytest.fixture
@@ -115,6 +121,7 @@ class DeploymentCRUDBaseFixtures:
                 rbac=RBACValidators(
                     scope=MagicMock(spec=ScopeActionRBACValidator),
                     single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                    bulk=MagicMock(spec=BulkActionRBACValidator),
                 ),
             ),
         )
@@ -130,7 +137,7 @@ class DeploymentCRUDBaseFixtures:
     @pytest.fixture
     def endpoint_info(self, endpoint_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
-            id=endpoint_id,
+            id=DeploymentID(endpoint_id),
             metadata=DeploymentMetadata(
                 name="test-deployment",
                 domain="default",
@@ -141,10 +148,16 @@ class DeploymentCRUDBaseFixtures:
                 created_at=datetime(2024, 1, 1, tzinfo=UTC),
                 revision_history_limit=10,
             ),
-            state=DeploymentState(lifecycle=EndpointLifecycle.READY, retry_count=0),
-            replica_spec=ReplicaSpec(replica_count=2),
-            network=DeploymentNetworkSpec(open_to_public=False),
-            model_revisions=[],
+            state=DeploymentState(
+                lifecycle=EndpointLifecycle.READY,
+                scaling_state=ScalingState.STABLE,
+                retry_count=0,
+            ),
+            replica=ReplicaData(replica_count=2, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
+            options=DeploymentOptions(),
         )
 
     @pytest.fixture
@@ -245,7 +258,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.destroy_deployment = AsyncMock(return_value=True)
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
-        action = DestroyDeploymentAction(endpoint_id=endpoint_id)
+        action = DestroyDeploymentAction(deployment_id=DeploymentID(endpoint_id))
         result = await processors.destroy_deployment.wait_for_complete(action)
 
         assert result.success is True
@@ -264,7 +277,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
             side_effect=Exception("EndpointNotFound")
         )
 
-        action = DestroyDeploymentAction(endpoint_id=uuid.uuid4())
+        action = DestroyDeploymentAction(deployment_id=DeploymentID(uuid.uuid4()))
         with pytest.raises(Exception, match="EndpointNotFound"):
             await processors.destroy_deployment.wait_for_complete(action)
 
@@ -281,7 +294,7 @@ class TestDestroyDeployment(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.destroy_deployment = AsyncMock(return_value=True)
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
-        action = DestroyDeploymentAction(endpoint_id=endpoint_id)
+        action = DestroyDeploymentAction(deployment_id=DeploymentID(endpoint_id))
         result = await processors.destroy_deployment.wait_for_complete(action)
 
         assert result.success is True
@@ -295,7 +308,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
     def route_info(self, endpoint_id: uuid.UUID) -> RouteInfo:
         return RouteInfo(
             route_id=uuid.uuid4(),
-            endpoint_id=endpoint_id,
+            deployment_id=DeploymentID(endpoint_id),
             session_id=SessionId(uuid.uuid4()),
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
@@ -303,6 +316,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
 
     async def test_existing_replica_returns_data(
@@ -345,7 +359,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
         """traffic_status=INACTIVE returned correctly."""
         inactive_route = RouteInfo(
             route_id=uuid.uuid4(),
-            endpoint_id=endpoint_id,
+            deployment_id=DeploymentID(endpoint_id),
             session_id=SessionId(uuid.uuid4()),
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
@@ -353,6 +367,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.INACTIVE,
+            health_check=None,
         )
         mock_deployment_repository.get_route = AsyncMock(return_value=inactive_route)
 
@@ -362,6 +377,34 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
         assert result.data is not None
         assert result.data.activeness_status == ActivenessStatus.INACTIVE
 
+    async def test_unassigned_session_id_is_none(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        endpoint_id: uuid.UUID,
+    ) -> None:
+        """Regression for BA-5838: a route without a compute session must yield
+        ``session_id=None``, not a fallback to ``route_id``."""
+        route = RouteInfo(
+            route_id=uuid.uuid4(),
+            deployment_id=DeploymentID(endpoint_id),
+            session_id=None,
+            status=RouteStatus.PROVISIONING,
+            health_status=RouteHealthStatus.NOT_CHECKED,
+            traffic_ratio=1.0,
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+            revision_id=uuid.uuid4(),
+            traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
+        )
+        mock_deployment_repository.get_route = AsyncMock(return_value=route)
+
+        action = GetReplicaByIdAction(replica_id=route.route_id)
+        result = await processors.get_replica_by_id.wait_for_complete(action)
+
+        assert result.data is not None
+        assert result.data.session_id is None
+
 
 class TestSearchReplicas(DeploymentCRUDBaseFixtures):
     """Tests for DeploymentService.search_replicas"""
@@ -370,7 +413,7 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
     def route_info(self, endpoint_id: uuid.UUID) -> RouteInfo:
         return RouteInfo(
             route_id=uuid.uuid4(),
-            endpoint_id=endpoint_id,
+            deployment_id=DeploymentID(endpoint_id),
             session_id=SessionId(uuid.uuid4()),
             status=RouteStatus.RUNNING,
             health_status=RouteHealthStatus.HEALTHY,
@@ -378,6 +421,7 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
 
     async def test_default_pagination(
@@ -526,7 +570,7 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         """Replica count mismatch triggers CHECK_REPLICA marking."""
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
-        action = SyncReplicaAction(deployment_id=deployment_id)
+        action = SyncReplicaAction(deployment_id=DeploymentID(deployment_id))
         result = await processors.sync_replicas.wait_for_complete(action)
 
         assert result.success is True
@@ -543,7 +587,7 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         """Already synced state still performs marking."""
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
-        action = SyncReplicaAction(deployment_id=deployment_id)
+        action = SyncReplicaAction(deployment_id=DeploymentID(deployment_id))
         result = await processors.sync_replicas.wait_for_complete(action)
 
         assert result.success is True
@@ -558,8 +602,9 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
     @pytest.fixture
     def revision_data(self) -> ModelRevisionData:
         return ModelRevisionData(
-            id=uuid.uuid4(),
-            name="rev-1",
+            id=DeploymentRevisionID(uuid.uuid4()),
+            deployment_id=DeploymentID(uuid.uuid4()),
+            revision_number=1,
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,
                 size=1,
@@ -569,16 +614,22 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
                 resource_slot=ResourceSlot({"cpu": "4", "mem": "8g"}),
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant("vllm"),
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
             ),
             model_mount_config=ModelMountConfigData(
-                vfolder_id=uuid.uuid4(),
+                vfolder_id=VFolderUUID(uuid.uuid4()),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
+                extra_mounts=[],
             ),
-            image_id=uuid.uuid4(),
+            image_id=ImageID(uuid.uuid4()),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
-            extra_vfolder_mounts=[],
+            execution=ExecutionData(
+                startup_command=None,
+                bootstrap_script=None,
+                callback_url=None,
+            ),
+            preset=PresetAttributionData(preset_id=None, values=[]),
         )
 
     async def test_existing_revision_returns_data(
@@ -587,18 +638,17 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
         mock_deployment_repository: MagicMock,
         revision_data: ModelRevisionData,
     ) -> None:
-        """Existing revision returns ModelRevisionData with name/cluster_config/resource_config/image_id/extra_vfolder_mounts."""
+        """Existing revision returns ModelRevisionData with cluster_config/resource_config/image_id/extra_mounts."""
         mock_deployment_repository.get_revision = AsyncMock(return_value=revision_data)
 
         action = GetRevisionByIdAction(revision_id=revision_data.id)
         result = await processors.get_revision_by_id.wait_for_complete(action)
 
         assert result.data == revision_data
-        assert result.data.name == "rev-1"
         assert result.data.cluster_config.mode == ClusterMode.SINGLE_NODE
         assert result.data.resource_config.resource_group_name == "default"
         assert result.data.image_id == revision_data.image_id
-        assert result.data.extra_vfolder_mounts == []
+        assert result.data.model_mount_config.extra_mounts == []
         mock_deployment_repository.get_revision.assert_called_once_with(revision_data.id)
 
     async def test_non_existent_revision_raises(
@@ -611,6 +661,6 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
             side_effect=Exception("DeploymentRevisionNotFound")
         )
 
-        action = GetRevisionByIdAction(revision_id=uuid.uuid4())
+        action = GetRevisionByIdAction(revision_id=DeploymentRevisionID(uuid.uuid4()))
         with pytest.raises(Exception, match="DeploymentRevisionNotFound"):
             await processors.get_revision_by_id.wait_for_complete(action)

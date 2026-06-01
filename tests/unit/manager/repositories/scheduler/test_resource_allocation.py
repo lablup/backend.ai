@@ -31,7 +31,6 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -633,7 +632,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             assert by_slot["cpu"] == Decimal("2")  # Not 4
             assert by_slot["mem"] == Decimal("4096")  # Not 8192
 
-    async def test_raises_on_capacity_exceeded(
+    async def test_running_does_not_reject_over_capacity(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
@@ -644,7 +643,11 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         test_agent_id: str,
         resource_slot_types: None,
     ) -> None:
-        """update_kernel_status_running raises AgentResourceCapacityExceeded on overflow."""
+        """RUNNING activation never rejects: it moves the kernel's hold from
+        ``reserved`` to ``used`` (a net-zero move already admitted at SCHEDULED
+        time), recording the actual amount even beyond remaining capacity rather
+        than raising. Capacity is enforced earlier, at reservation time.
+        """
         await self._seed_agent_resources(
             db_with_cleanup,
             test_agent_id,
@@ -665,10 +668,26 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         )
 
         db_source = ScheduleDBSource(db_with_cleanup)
-        with pytest.raises(AgentResourceCapacityExceeded):
-            await db_source.update_kernel_status_running(
-                kernel_id, "test-started", _make_creation_info(cpu="4", mem="1024")
+        result = await db_source.update_kernel_status_running(
+            kernel_id, "test-started", _make_creation_info(cpu="4", mem="1024")
+        )
+        assert result is True
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            agent_resources = (
+                (
+                    await db_sess.execute(
+                        sa.select(AgentResourceRow).where(
+                            AgentResourceRow.agent_id == test_agent_id,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
             )
+            by_slot = {ar.slot_name: ar.used for ar in agent_resources}
+            # used grew by the actual amount; RUNNING did not reject the overflow.
+            assert by_slot["cpu"] == Decimal("5")  # seeded used 1 + actual 4
 
     async def test_returns_false_when_kernel_not_in_valid_status(
         self,

@@ -17,12 +17,13 @@ from ai.backend.manager.models.scaling_group import (
     sgroups_for_domains,
     sgroups_for_groups,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture()
 async def extra_scaling_group_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
 ) -> AsyncIterator[str]:
     """Create a second scaling group associated with the domain AND group."""
@@ -43,7 +44,7 @@ async def extra_scaling_group_fixture(
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
                 scaling_group=sgroup_name,
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
             )
         )
         await conn.execute(
@@ -66,7 +67,7 @@ async def extra_scaling_group_fixture(
 @pytest.fixture()
 async def private_scaling_group_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
 ) -> AsyncIterator[str]:
     """Create a private (is_public=False) scaling group associated with the domain."""
     sgroup_name = f"private-sgroup-{secrets.token_hex(6)}"
@@ -86,7 +87,7 @@ async def private_scaling_group_fixture(
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
                 scaling_group=sgroup_name,
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
             )
         )
     yield sgroup_name

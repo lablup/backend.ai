@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
 from ai.backend.common.bgtask.types import BgtaskNameBase
+from ai.backend.common.types import BackendAISchema
 
 
-class BaseBackgroundTaskManifest(BaseModel):
+class BaseBackgroundTaskManifest(BackendAISchema):
     """
     Base class for background task manifests using Pydantic.
     Provides automatic serialization/deserialization via model_dump() and model_validate().
@@ -19,7 +20,7 @@ class BaseBackgroundTaskManifest(BaseModel):
     )
 
 
-class BaseBackgroundTaskResult(BaseModel):
+class BaseBackgroundTaskResult(BackendAISchema):
     """
     Base class for background task results using Pydantic.
     Provides automatic serialization/deserialization via model_dump() and model_validate().

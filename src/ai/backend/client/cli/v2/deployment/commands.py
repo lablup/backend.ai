@@ -117,7 +117,8 @@ def get(deployment_id: str) -> None:
 @click.option("--name", required=True, type=str, help="Deployment name.")
 @click.option("--project-id", required=True, type=str, help="Project (group) UUID.")
 @click.option("--domain-name", default="default", type=str, help="Domain name.")
-@click.option("--desired-replicas", default=0, type=int, help="Desired number of replicas.")
+@click.option("--resource-group", required=True, type=str, help="Resource group name.")
+@click.option("--replicas", default=0, type=int, help="Number of replicas.")
 @click.option("--open-to-public", default=False, is_flag=True, help="Make publicly accessible.")
 @click.option(
     "--strategy",
@@ -135,7 +136,8 @@ def create(
     name: str,
     project_id: str,
     domain_name: str,
-    desired_replicas: int,
+    resource_group: str,
+    replicas: int,
     open_to_public: bool,
     strategy: str,
     initial_revision: str | None,
@@ -147,25 +149,27 @@ def create(
     from ai.backend.common.data.model_deployment.types import DeploymentStrategy
     from ai.backend.common.dto.manager.v2.deployment.request import (
         CreateDeploymentInput,
-        CreateRevisionInputDTO,
+        CreateRevisionInput,
         DeploymentStrategyInput,
         ModelDeploymentMetadataInput,
         ModelDeploymentNetworkAccessInput,
     )
+    from ai.backend.common.identifier.resource_group import ResourceGroupName
 
-    revision_dto: CreateRevisionInputDTO | None = None
+    revision_dto: CreateRevisionInput | None = None
     if initial_revision is not None:
         if initial_revision.startswith("@"):
             with Path(initial_revision[1:]).open() as f:
                 rev_data = json.load(f)
         else:
             rev_data = json.loads(initial_revision)
-        revision_dto = CreateRevisionInputDTO.model_validate(rev_data)
+        revision_dto = CreateRevisionInput.model_validate(rev_data)
 
     body = CreateDeploymentInput(
         metadata=ModelDeploymentMetadataInput(
             project_id=project_id,
             domain_name=domain_name,
+            resource_group_name=ResourceGroupName(resource_group),
             name=name,
         ),
         network_access=ModelDeploymentNetworkAccessInput(
@@ -174,7 +178,7 @@ def create(
         default_deployment_strategy=DeploymentStrategyInput(
             type=DeploymentStrategy(strategy),
         ),
-        desired_replica_count=desired_replicas,
+        replica_count=replicas,
         initial_revision=revision_dto,
     )
 
@@ -192,13 +196,13 @@ def create(
 @deployment.command()
 @click.argument("deployment_id", type=str)
 @click.option("--name", default=None, type=str, help="Updated deployment name.")
-@click.option("--desired-replicas", default=None, type=int, help="Desired number of replicas.")
+@click.option("--replicas", default=None, type=int, help="Number of replicas.")
 @click.option("--open-to-public", default=None, type=bool, help="Network visibility.")
 @click.option("--preferred-domain-name", default=None, type=str, help="Preferred domain name.")
 def update(
     deployment_id: str,
     name: str | None,
-    desired_replicas: int | None,
+    replicas: int | None,
     open_to_public: bool | None,
     preferred_domain_name: str | None,
 ) -> None:
@@ -210,7 +214,7 @@ def update(
 
     body = UpdateDeploymentInput(
         name=name,
-        desired_replica_count=desired_replicas,
+        replica_count=replicas,
         open_to_public=open_to_public,
         preferred_domain_name=preferred_domain_name,
     )

@@ -7,6 +7,7 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
 
@@ -31,7 +32,7 @@ class TestScalingGroupOptsDefaults:
 
     def test_frozen_model_raises_on_mutation(self) -> None:
         opts = ScalingGroupOpts()
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             opts.pending_timeout = timedelta(seconds=30)  # type: ignore[misc]
 
 
@@ -109,7 +110,7 @@ class TestScalingGroupOptsPendingTimeout:
         assert dumped["pending_timeout"] == 90.0
 
     def test_validate_invalid_type_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScalingGroupOpts(pending_timeout="not-a-number")  # type: ignore[arg-type]
 
 
@@ -127,11 +128,11 @@ class TestScalingGroupOptsAllowedSessionTypes:
         assert opts.allowed_session_types == [SessionTypes.INFERENCE]
 
     def test_validate_invalid_session_type_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises(BackendAISchemaValidationFailed):
             ScalingGroupOpts.model_validate({"allowed_session_types": ["not_a_valid_type"]})
 
     def test_validate_non_list_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises(BackendAISchemaValidationFailed):
             ScalingGroupOpts.model_validate({"allowed_session_types": "interactive"})
 
     def test_serialize_to_string_list(self) -> None:

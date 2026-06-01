@@ -49,6 +49,9 @@ from ai.backend.common.dto.manager.deployment.request import (
     RevisionInput,
     UpdateRouteTrafficStatusRequest,
 )
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 
 from .conftest import MockAuth
@@ -94,8 +97,8 @@ _SAMPLE_REVISION_ID = uuid4()
 _SAMPLE_ROUTE_ID = uuid4()
 _SAMPLE_PROJECT_ID = uuid4()
 _SAMPLE_USER_ID = uuid4()
-_SAMPLE_IMAGE_ID = uuid4()
-_SAMPLE_VFOLDER_ID = uuid4()
+_SAMPLE_IMAGE_ID = ImageID(uuid4())
+_SAMPLE_VFOLDER_ID = VFolderUUID(uuid4())
 
 _SAMPLE_DEPLOYMENT_DTO = {
     "id": str(_SAMPLE_DEPLOYMENT_ID),
@@ -161,17 +164,17 @@ class TestDeploymentCRUD:
             metadata=DeploymentMetadataInput(
                 project_id=_SAMPLE_PROJECT_ID,
                 domain_name="default",
+                resource_group_name=ResourceGroupName("default"),
                 name="my-deployment",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group="default",
                     resource_slots={"cpu": "1"},
                 ),
                 image=ImageInput(id=_SAMPLE_IMAGE_ID),

@@ -6,7 +6,6 @@ from typing import Any, override
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
@@ -22,9 +21,6 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     image_id: TriState[uuid.UUID] = field(default_factory=TriState[uuid.UUID].nop)
     model_definition: TriState[ModelDefinition] = field(
         default_factory=TriState[ModelDefinition].nop
-    )
-    resource_slots: OptionalState[list[ResourceSlotEntryData]] = field(
-        default_factory=OptionalState[list[ResourceSlotEntryData]].nop
     )
     resource_opts: OptionalState[list[ResourceOptsEntry]] = field(
         default_factory=OptionalState[list[ResourceOptsEntry]].nop

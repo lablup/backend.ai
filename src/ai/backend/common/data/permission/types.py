@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import enum
+import functools
+from collections.abc import Mapping
 
 
 class PermissionStatus(enum.StrEnum):
@@ -97,6 +99,7 @@ class EntityType(enum.StrEnum):
     AUDIT_LOG = "audit_log"
     CONTAINER_METRIC = "container_metric"
     CONTAINER_METRIC_METADATA = "container_metric_metadata"
+    CONTAINER_LIVE_STAT = "container_live_stat"
     CONTAINER_REGISTRY = "container_registry"
     DEPLOYMENT = "deployment"
     ERROR_LOG = "error_log"
@@ -146,7 +149,6 @@ class EntityType(enum.StrEnum):
     APP_CONFIG_DOMAIN = "app_config:domain"
     APP_CONFIG_USER = "app_config:user"
     # Session sub
-    SESSION_KERNEL = "session:kernel"
     SESSION_FILE = "session:file"
     SESSION_DIRECTORY = "session:directory"
     SESSION_APP_SERVICE = "session:app_service"
@@ -190,6 +192,7 @@ class EntityType(enum.StrEnum):
     VFOLDER_FILE = "vfolder:file"
     VFOLDER_DIRECTORY = "vfolder:directory"
     VFOLDER_INVITATION = "vfolder:invitation"
+    VFOLDER_DATA = "vfolder:data"
     # Resource group sub
     RESOURCE_GROUP_DOMAIN = "resource_group:domain"
     RESOURCE_GROUP_KEYPAIR = "resource_group:keypair"
@@ -224,6 +227,7 @@ class EntityType(enum.StrEnum):
     GROUP_USAGE = "group:usage"
     # User sub
     USER_STATS = "user:stats"
+    USER_EMAIL = "user:email"
     # Agent sub
     AGENT_WATCHER = "agent:watcher"
     AGENT_REGISTRY = "agent:registry"
@@ -339,8 +343,10 @@ class ScopeType(enum.StrEnum):
     ARTIFACT_REVISION = "artifact_revision"
     AGENT = "agent"
     ROLE = "role"
+    ROLE_ASSIGNMENT = "role:assignment"
     NOTIFICATION_CHANNEL = "notification_channel"
     KEYPAIR = "keypair"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
 
     def to_element(self) -> RBACElementType:
         from ai.backend.common.exception import RBACTypeConversionError
@@ -411,6 +417,15 @@ class RBACElementType(enum.StrEnum):
     DEPLOYMENT_POLICY = "deployment:policy"
     DEPLOYMENT_REVISION = "deployment:revision"
     IMAGE_ALIAS = "image:alias"
+    ROLE_ASSIGNMENT = "role:assignment"
+
+    # === Sub-entity permissions split from parent metadata access ===
+    # These split permission control of a parent entity into sub-aspects so that
+    # access to listings/detail (parent) and access to internal data or
+    # sub-operations (child) can be granted independently.
+    VFOLDER_DATA = "vfolder:data"
+    SESSION_APP_SERVICE = "session:app_service"
+    USER_EMAIL = "user:email"
 
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"
@@ -449,3 +464,77 @@ class RelationType(enum.StrEnum):
 
     AUTO = "auto"
     REF = "ref"
+
+
+# ---------------------------------------------------------------------------
+# Per-entity allowed-operation tables
+#
+# These tables define which operations are valid for a given role-kind on a
+# given entity. Entity types not listed in an override map fall back to the
+# corresponding default set. The helper functions are cached because the
+# answer is purely a function of the inputs.
+# ---------------------------------------------------------------------------
+
+_STANDARD_OPS: frozenset[OperationType] = frozenset({
+    OperationType.CREATE,
+    OperationType.READ,
+    OperationType.UPDATE,
+    OperationType.SOFT_DELETE,
+    OperationType.HARD_DELETE,
+})
+_READ_ONLY_OPS: frozenset[OperationType] = frozenset({OperationType.READ})
+
+_DEFAULT_ADMIN_OPS: frozenset[OperationType] = _STANDARD_OPS
+_DEFAULT_OWNER_OPS: frozenset[OperationType] = _STANDARD_OPS
+_DEFAULT_MEMBER_OPS: frozenset[OperationType] = _READ_ONLY_OPS
+
+# vfolder:data CRUD on internal files/directories — soft-delete is intentionally
+# omitted because there is no two-stage delete for vfolder data.
+_VFOLDER_DATA_OWNER_OPS: frozenset[OperationType] = frozenset({
+    OperationType.CREATE,
+    OperationType.READ,
+    OperationType.UPDATE,
+    OperationType.HARD_DELETE,
+})
+
+_ADMIN_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    # vfolder:data and session:app_service are owner-only — admins of the parent scope
+    # have access to listings/metadata but not to internal data or app endpoints.
+    RBACElementType.VFOLDER_DATA: frozenset(),
+    RBACElementType.SESSION_APP_SERVICE: frozenset(),
+}
+_OWNER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    RBACElementType.VFOLDER_DATA: _VFOLDER_DATA_OWNER_OPS,
+    RBACElementType.SESSION_APP_SERVICE: _READ_ONLY_OPS,
+}
+_MEMBER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    # Members of a project may create their own sessions, vfolders,
+    # and model deployments (a.k.a. model services).
+    RBACElementType.SESSION: frozenset({OperationType.READ, OperationType.CREATE}),
+    RBACElementType.VFOLDER: frozenset({OperationType.READ, OperationType.CREATE}),
+    RBACElementType.MODEL_DEPLOYMENT: frozenset({
+        OperationType.READ,
+        OperationType.CREATE,
+    }),
+    # Owner-only sub-entities — members of the parent scope have no access.
+    RBACElementType.VFOLDER_DATA: frozenset(),
+    RBACElementType.SESSION_APP_SERVICE: frozenset(),
+}
+
+
+@functools.cache
+def admin_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
+    """Operations granted to an *admin* role on the given entity type."""
+    return _ADMIN_OPS_OVERRIDES.get(entity_type, _DEFAULT_ADMIN_OPS)
+
+
+@functools.cache
+def owner_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
+    """Operations granted to an *owner* role on the given entity type."""
+    return _OWNER_OPS_OVERRIDES.get(entity_type, _DEFAULT_OWNER_OPS)
+
+
+@functools.cache
+def member_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
+    """Operations granted to a *member* role on the given entity type."""
+    return _MEMBER_OPS_OVERRIDES.get(entity_type, _DEFAULT_MEMBER_OPS)

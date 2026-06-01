@@ -265,7 +265,9 @@ class ResourceUsageHistoryDBSource:
         """Search domain usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(DomainUsageBucketRow)
-            result = await execute_batch_querier(db_sess, query, querier, scope)
+            result = await execute_batch_querier(
+                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+            )
             items = [
                 DomainUsageBucketData.from_row(row.DomainUsageBucketRow) for row in result.rows
             ]
@@ -308,7 +310,9 @@ class ResourceUsageHistoryDBSource:
         """Search project usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(ProjectUsageBucketRow)
-            result = await execute_batch_querier(db_sess, query, querier, scope)
+            result = await execute_batch_querier(
+                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+            )
             items = [
                 ProjectUsageBucketData.from_row(row.ProjectUsageBucketRow) for row in result.rows
             ]
@@ -351,7 +355,9 @@ class ResourceUsageHistoryDBSource:
         """Search user usage buckets with pagination."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(UserUsageBucketRow)
-            result = await execute_batch_querier(db_sess, query, querier, scope)
+            result = await execute_batch_querier(
+                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+            )
             items = [UserUsageBucketData.from_row(row.UserUsageBucketRow) for row in result.rows]
             return UserUsageBucketSearchResult(
                 items=items,

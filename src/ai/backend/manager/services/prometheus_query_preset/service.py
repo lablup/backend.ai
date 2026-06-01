@@ -1,10 +1,8 @@
 import logging
 
-from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
-from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
@@ -23,6 +21,8 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
     GetPresetActionResult,
     ModifyPresetAction,
     ModifyPresetActionResult,
+    PreviewPresetAction,
+    PreviewPresetActionResult,
     SearchPresetsAction,
     SearchPresetsActionResult,
 )
@@ -90,11 +90,12 @@ class PrometheusQueryPresetService:
                     f"Allowed: {sorted(preset_data.group_labels)}"
                 )
 
-    def _build_filter_label_matchers(
-        self,
-        filter_labels: dict[str, str],
-    ) -> dict[str, LabelMatcher]:
-        return {key: LabelMatcher.exact(value) for key, value in filter_labels.items()}
+    async def preview_preset(self, action: PreviewPresetAction) -> PreviewPresetActionResult:
+        response = await self._repository.preview_template(
+            query_template=action.query_template,
+            default_window=self._default_timewindow,
+        )
+        return PreviewPresetActionResult(response=response)
 
     async def execute_preset(self, action: ExecutePresetAction) -> ExecutePresetActionResult:
         preset_data = await self._repository.get_by_id(action.preset_id)
@@ -102,18 +103,11 @@ class PrometheusQueryPresetService:
         # Window fallback: request → preset → server default
         time_window = action.time_window or preset_data.time_window or self._default_timewindow
 
-        metric_preset = MetricPreset(
-            template=preset_data.query_template,
-            labels=self._build_filter_label_matchers(action.options.filter_labels),
-            group_by=set(action.options.group_labels),
-            window=time_window,
+        response = await self._prometheus_client.execute_preset(
+            query_template=preset_data.query_template,
+            filter_labels=action.options.filter_labels,
+            group_labels=action.options.group_labels,
+            time_window=time_window,
+            time_range=action.time_range,
         )
-        response: PrometheusResponse
-        if action.time_range is None:
-            response = await self._prometheus_client.query_instant(preset=metric_preset)
-        else:
-            response = await self._prometheus_client.query_range(
-                preset=metric_preset,
-                time_range=action.time_range,
-            )
         return ExecutePresetActionResult(response=response)

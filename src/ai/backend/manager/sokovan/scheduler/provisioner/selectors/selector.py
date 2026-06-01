@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -19,6 +18,7 @@ from ai.backend.common.types import (
     AgentId,
     BinarySize,
     ClusterMode,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -28,8 +28,10 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from .exceptions import (
     ContainerLimitExceededError,
     InsufficientResourcesError,
+    NoAgentsInResourceGroupError,
     NoAvailableAgentError,
     NoCompatibleAgentError,
+    TrackerCompatibilityError,
 )
 
 if TYPE_CHECKING:
@@ -157,7 +159,7 @@ class ResourceRequirements:
     # Kernel IDs that these requirements are for
     # For single-node, this includes all kernel IDs
     # For multi-node, this includes only one kernel ID
-    kernel_ids: Sequence[UUID]
+    kernel_ids: Sequence[KernelId]
 
 
 @dataclass
@@ -219,7 +221,7 @@ class AgentSelectionCriteria:
             # Use the common architecture
             architecture = list(architectures)[0]
             # Include all kernel IDs in the aggregated requirement
-            kernel_ids = list(self.kernel_requirements.keys())
+            kernel_ids = [KernelId(k) for k in self.kernel_requirements.keys()]
             return [
                 ResourceRequirements(
                     requested_slots=total_slots,
@@ -232,7 +234,7 @@ class AgentSelectionCriteria:
             ResourceRequirements(
                 requested_slots=req.requested_slots,
                 required_architecture=req.required_architecture,
-                kernel_ids=[kernel_id],
+                kernel_ids=[KernelId(kernel_id)],
             )
             for kernel_id, req in self.kernel_requirements.items()
         ]
@@ -343,9 +345,7 @@ class AgentSelector:
             # Return empty list for sessions with no kernels
             return []
         if not agents:
-            raise NoAvailableAgentError(
-                f"No agents available in scaling group '{criteria.session_metadata.scaling_group}'"
-            )
+            raise NoAgentsInResourceGroupError(criteria.session_metadata.scaling_group)
 
         # Track agent state changes as diffs using AgentStateTracker
         state_trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
@@ -407,8 +407,7 @@ class AgentSelector:
 
         # Second pass: filter by resource availability (quantitative check)
         compatible_trackers: list[AgentStateTracker] = []
-        error_messages: defaultdict[str, int] = defaultdict(int)
-        agent_errors: dict[AgentId, str] = {}
+        agent_errors: dict[AgentId, TrackerCompatibilityError] = {}
         for tracker in arch_compatible_trackers:
             try:
                 self._check_tracker_compatibility(
@@ -417,15 +416,16 @@ class AgentSelector:
                     config,
                 )
                 compatible_trackers.append(tracker)
-            except Exception as e:
-                error_messages[str(e)] += 1
-                agent_errors[tracker.original_agent.agent_id] = str(e)
+            except TrackerCompatibilityError as e:
+                agent_errors[tracker.original_agent.agent_id] = e
 
         if not compatible_trackers:
-            error_messages_summary = "; ".join(
-                f"{count}x {msg}" for msg, count in error_messages.items()
+            raise NoAvailableAgentError(
+                kernel_ids=resource_req.kernel_ids,
+                required_architecture=resource_req.required_architecture,
+                requested_slots=resource_req.requested_slots,
+                agent_errors=agent_errors,
             )
-            raise NoAvailableAgentError(f"no available agents. Details: {error_messages_summary}")
 
         # Handle designated agent first (user's explicit choice takes precedence)
         if designated_agent_ids:
@@ -433,15 +433,12 @@ class AgentSelector:
                 if tracker.original_agent.agent_id in designated_agent_ids:
                     return tracker
 
-            error_messages_list = []
-            for designated_agent_id in designated_agent_ids:
-                if designated_agent_id in agent_errors:
-                    error_messages_list.append(
-                        f"Designated agent '{designated_agent_id}' is not compatible. Details: {agent_errors[designated_agent_id]}"
-                    )
-            error_message = " ".join(error_messages) if error_messages else "not found"
             raise NoAvailableAgentError(
-                f"Designated agent '{designated_agent_ids}' is not compatible. Details: {error_message}"
+                kernel_ids=resource_req.kernel_ids,
+                required_architecture=resource_req.required_architecture,
+                requested_slots=resource_req.requested_slots,
+                agent_errors=agent_errors,
+                designated_agent_ids=designated_agent_ids,
             )
 
         # Third pass: deprioritize agents that previously failed for this session

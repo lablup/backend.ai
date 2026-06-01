@@ -195,6 +195,9 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         zshrc_path = Path(str(files("ai.backend.runner").joinpath(".zshrc")))
         vimrc_path = Path(str(files("ai.backend.runner").joinpath(".vimrc")))
         tmux_conf_path = Path(str(files("ai.backend.runner").joinpath(".tmux.conf")))
+        persistent_files_warning_doc_path = Path(
+            str(files("ai.backend.runner").joinpath("DO_NOT_STORE_PERSISTENT_FILES_HERE.md"))
+        )
         jupyter_custom_dir = work_dir / ".jupyter" / "custom"
         jupyter_custom_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy(jupyter_custom_css_path.resolve(), jupyter_custom_dir / "custom.css")
@@ -206,6 +209,10 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
         shutil.copy(zshrc_path.resolve(), work_dir / ".zshrc")
         shutil.copy(vimrc_path.resolve(), work_dir / ".vimrc")
         shutil.copy(tmux_conf_path.resolve(), work_dir / ".tmux.conf")
+        shutil.copy(
+            persistent_files_warning_doc_path.resolve(),
+            work_dir / "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
+        )
 
         paths = [
             work_dir,
@@ -216,6 +223,7 @@ class ScratchProvisioner(Provisioner[ScratchSpec, ScratchResult]):
             work_dir / ".zshrc",
             work_dir / ".vimrc",
             work_dir / ".tmux.conf",
+            work_dir / "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
         ]
         self._chown_paths_if_root(paths, spec.container_config)
 

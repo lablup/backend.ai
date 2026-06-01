@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.operations.request import (
     UpdateAnnouncementInput,
     UpdateManagerStatusInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestAppendErrorLogInput:
@@ -89,7 +90,7 @@ class TestAppendErrorLogInput:
         assert req.traceback == "Traceback (most recent call last)..."
 
     def test_missing_severity_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AppendErrorLogInput.model_validate({
                 "source": "manager",
                 "message": "Error",
@@ -98,7 +99,7 @@ class TestAppendErrorLogInput:
             })
 
     def test_missing_source_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AppendErrorLogInput.model_validate({
                 "severity": "error",
                 "message": "Error",
@@ -107,7 +108,7 @@ class TestAppendErrorLogInput:
             })
 
     def test_missing_message_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AppendErrorLogInput.model_validate({
                 "severity": "error",
                 "source": "manager",
@@ -126,7 +127,7 @@ class TestAppendErrorLogInput:
         assert req.severity == ErrorLogSeverity.CRITICAL
 
     def test_invalid_severity_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             AppendErrorLogInput.model_validate({
                 "severity": "debug",
                 "source": "manager",
@@ -166,23 +167,23 @@ class TestListErrorLogsInput:
         assert req.mark_read is True
 
     def test_page_size_below_min_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_size=0)
 
     def test_page_size_above_max_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_size=101)
 
     def test_page_no_below_min_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_no=0)
 
     def test_negative_page_size_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_size=-1)
 
     def test_negative_page_no_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListErrorLogsInput(page_no=-1)
 
 
@@ -200,11 +201,11 @@ class TestClearErrorLogInput:
         assert req.log_id == log_id
 
     def test_invalid_uuid_string_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ClearErrorLogInput.model_validate({"log_id": "not-a-uuid"})
 
     def test_missing_log_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ClearErrorLogInput.model_validate({})
 
     def test_log_id_is_uuid_instance(self) -> None:
@@ -253,11 +254,11 @@ class TestUpdateManagerStatusInput:
         assert req.status == ManagerStatus.RUNNING
 
     def test_invalid_status_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateManagerStatusInput.model_validate({"status": "invalid-status"})
 
     def test_missing_status_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateManagerStatusInput.model_validate({})
 
 
@@ -327,18 +328,18 @@ class TestPerformSchedulerOpsInput:
         assert req.op == SchedulerOps.EXCLUDE_AGENTS
 
     def test_invalid_op_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PerformSchedulerOpsInput.model_validate({
                 "op": "invalid-op",
                 "args": [],
             })
 
     def test_missing_op_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PerformSchedulerOpsInput.model_validate({"args": []})
 
     def test_missing_args_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PerformSchedulerOpsInput.model_validate({"op": "include-agents"})
 
 
@@ -389,11 +390,11 @@ class TestSubscribeBackgroundTaskInput:
         assert req.task_id == task_id
 
     def test_invalid_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SubscribeBackgroundTaskInput.model_validate({"task_id": "not-a-uuid"})
 
     def test_missing_task_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SubscribeBackgroundTaskInput.model_validate({})
 
     def test_task_id_is_uuid_instance(self) -> None:

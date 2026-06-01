@@ -33,7 +33,11 @@ from ai.backend.common.dto.manager.deployment import (
     UpdateDeploymentRequest,
 )
 from ai.backend.common.dto.manager.deployment.request import ClusterConfigInput
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 _RANDOM_DEPLOYMENT_ID = uuid.uuid4()
 _RANDOM_REVISION_ID = uuid.uuid4()
@@ -49,31 +53,30 @@ class TestCreateDeployment:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Creating a deployment with a non-existent image raises an error."""
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
+                resource_group_name=ResourceGroupName("nonexistent-sgroup"),
                 name="test-deployment",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
-                name="rev-1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group="nonexistent-sgroup",
                     resource_slots={"cpu": "1", "mem": "1073741824"},
                 ),
-                image=ImageInput(id=uuid.uuid4()),
+                image=ImageInput(id=ImageID(uuid.uuid4())),
                 model_runtime_config=ModelRuntimeConfigInput(),
                 model_mount_config=ModelMountConfigInput(
-                    vfolder_id=uuid.uuid4(),
+                    vfolder_id=VFolderUUID(uuid.uuid4()),
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
@@ -87,28 +90,27 @@ class TestCreateDeployment:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
-        scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        domain_fixture: DomainFixtureData,
+        scaling_group_fixture: ResourceGroupName,
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Creating a deployment with valid config returns deployment with initial status."""
         image_id, vfolder_id = deployment_seed_data
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group=scaling_group_fixture,
                     resource_slots={"cpu": "2", "mem": "2147483648"},
                 ),
                 image=ImageInput(id=image_id),
@@ -137,7 +139,7 @@ class TestUpdateDeployment:
         with pytest.raises(NotFoundError):
             await admin_registry.deployment.update_deployment(
                 _RANDOM_DEPLOYMENT_ID,
-                UpdateDeploymentRequest(desired_replicas=5),
+                UpdateDeploymentRequest(replica_count=5),
             )
 
     async def test_update_deployment_name_nonexistent(
@@ -155,29 +157,28 @@ class TestUpdateDeployment:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
-        scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        domain_fixture: DomainFixtureData,
+        scaling_group_fixture: ResourceGroupName,
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
-        """Updating deployment config (name, desired_replicas) succeeds."""
+        """Updating deployment config (name, replica_count) succeeds."""
         image_id, vfolder_id = deployment_seed_data
         # Create deployment
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group=scaling_group_fixture,
                     resource_slots={"cpu": "2", "mem": "2147483648"},
                 ),
                 image=ImageInput(id=image_id),
@@ -197,7 +198,7 @@ class TestUpdateDeployment:
         new_name = f"updated-deployment-{secrets.token_hex(4)}"
         await admin_registry.deployment.update_deployment(
             deployment.id,
-            UpdateDeploymentRequest(name=new_name, desired_replicas=3),
+            UpdateDeploymentRequest(name=new_name, replica_count=3),
         )
 
         # Verify update
@@ -226,9 +227,9 @@ class TestDestroyDeployment:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
-        scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        domain_fixture: DomainFixtureData,
+        scaling_group_fixture: ResourceGroupName,
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Destroying a deployment terminates it successfully."""
         image_id, vfolder_id = deployment_seed_data
@@ -236,19 +237,18 @@ class TestDestroyDeployment:
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group=scaling_group_fixture,
                     resource_slots={"cpu": "2", "mem": "2147483648"},
                 ),
                 image=ImageInput(id=image_id),
@@ -293,17 +293,15 @@ class TestRevisionManagement:
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
-        scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        domain_fixture: DomainFixtureData,
+        scaling_group_fixture: ResourceGroupName,
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Adding a revision and searching revisions works correctly."""
         image_id, vfolder_id = deployment_seed_data
         revision_input = RevisionInput(
-            name="v1",
             cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
             resource_config=ResourceConfigInput(
-                resource_group=scaling_group_fixture,
                 resource_slots={"cpu": "2", "mem": "2147483648"},
             ),
             image=ImageInput(id=image_id),
@@ -320,14 +318,15 @@ class TestRevisionManagement:
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=0,
+            replica_count=0,
             initial_revision=revision_input,
         )
         response = await admin_registry.deployment.create_deployment(request)
@@ -338,10 +337,8 @@ class TestRevisionManagement:
             deployment.id,
             AddRevisionRequest(
                 revision=RevisionInput(
-                    name="v2",
                     cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                     resource_config=ResourceConfigInput(
-                        resource_group=scaling_group_fixture,
                         resource_slots={"cpu": "2", "mem": "2147483648"},
                     ),
                     image=ImageInput(id=image_id),
@@ -373,32 +370,31 @@ class TestRevisionManagement:
 
 
 class TestReplicaManagement:
-    async def test_change_desired_replicas(
+    async def test_change_replica_count(
         self,
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
-        scaling_group_fixture: str,
-        deployment_seed_data: tuple[uuid.UUID, uuid.UUID],
+        domain_fixture: DomainFixtureData,
+        scaling_group_fixture: ResourceGroupName,
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
-        """Changing desired_replicas updates the replica count."""
+        """Changing replica_count updates the replica count."""
         image_id, vfolder_id = deployment_seed_data
         request = CreateDeploymentRequest(
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
+                resource_group_name=scaling_group_fixture,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
             ),
-            desired_replica_count=1,
+            replica_count=1,
             initial_revision=RevisionInput(
-                name="v1",
                 cluster_config=ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
                 resource_config=ResourceConfigInput(
-                    resource_group=scaling_group_fixture,
                     resource_slots={"cpu": "2", "mem": "2147483648"},
                 ),
                 image=ImageInput(id=image_id),
@@ -417,7 +413,7 @@ class TestReplicaManagement:
         # Scale to 5 replicas
         await admin_registry.deployment.update_deployment(
             deployment.id,
-            UpdateDeploymentRequest(desired_replicas=5),
+            UpdateDeploymentRequest(replica_count=5),
         )
 
         # Verify replica count updated

@@ -117,6 +117,30 @@ class TestRuntimeVariantCRUD:
         finally:
             await admin_v2_registry.runtime_variant.delete(variant_id)
 
+    async def test_update_name_only_preserves_description(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        database_fixture: None,
+    ) -> None:
+        """Updating only the name must not clear the description (BA-6090)."""
+        create_result = await admin_v2_registry.runtime_variant.create(
+            CreateRuntimeVariantInput(
+                name="partial-update-variant",
+                description="original description",
+            )
+        )
+        variant_id = create_result.runtime_variant.id
+
+        try:
+            update_result = await admin_v2_registry.runtime_variant.update(
+                variant_id,
+                UpdateRuntimeVariantInput(id=variant_id, name="renamed-variant"),
+            )
+            assert update_result.runtime_variant.name == "renamed-variant"
+            assert update_result.runtime_variant.description == "original description"
+        finally:
+            await admin_v2_registry.runtime_variant.delete(variant_id)
+
     async def test_delete(
         self,
         admin_v2_registry: V2ClientRegistry,

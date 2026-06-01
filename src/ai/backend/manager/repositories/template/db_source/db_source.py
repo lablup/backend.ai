@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import DBOperationFailed
@@ -39,13 +40,14 @@ class TemplateDBSource:
         requester_role: UserRole,
         requester_domain: str,
         requesting_domain: str,
-        requesting_group: str,
+        requesting_project_id: ProjectID,
         owner_access_key: str | None = None,
-    ) -> tuple[uuid.UUID, uuid.UUID]:
-        """Resolve owner UUID and group ID for template operations.
+    ) -> tuple[uuid.UUID, ProjectID]:
+        """Resolve owner UUID for template operations against a pre-resolved project.
 
-        Adapted from utils.query_userinfo — handles on-behalf-of access key
-        delegation, domain validation, and role-based group resolution.
+        The caller is responsible for resolving the project name to ``requesting_project_id``
+        (e.g. via ``GroupRepository.project_id_by_name_in_domain``); this method handles
+        on-behalf-of access-key delegation, domain validation, and role-based authorization.
         """
         async with self._db.begin_readonly() as conn:
             if owner_access_key is not None and owner_access_key != requester_access_key:
@@ -85,48 +87,22 @@ class TemplateDBSource:
             if qresult.scalar() is None:
                 raise InvalidAPIParameters("Invalid domain")
 
-            # Resolve group by role
+            # Authorize owner against the pre-resolved project
             if owner_role == UserRole.SUPERADMIN:
-                query = (
-                    sa.select(groups.c.id)
-                    .select_from(groups)
-                    .where(
-                        (groups.c.domain_name == requesting_domain)
-                        & (groups.c.name == requesting_group)
-                        & groups.c.is_active,
-                    )
-                )
+                pass  # already validated upstream by project-name resolution
             elif owner_role == UserRole.ADMIN:
                 if requesting_domain != owner_domain:
                     raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
-                query = (
-                    sa.select(groups.c.id)
-                    .select_from(groups)
-                    .where(
-                        (groups.c.domain_name == owner_domain)
-                        & (groups.c.name == requesting_group)
-                        & groups.c.is_active,
-                    )
-                )
             else:
                 if requesting_domain != owner_domain:
                     raise InvalidAPIParameters("You can only set the domain to your domain.")
-                query = (
-                    sa.select(agus.c.group_id)
-                    .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
-                    .where(
-                        (agus.c.user_id == owner_uuid)
-                        & (groups.c.domain_name == owner_domain)
-                        & (groups.c.name == requesting_group)
-                        & groups.c.is_active,
-                    )
+                membership_query = sa.select(agus.c.group_id).where(
+                    (agus.c.user_id == owner_uuid) & (agus.c.group_id == requesting_project_id)
                 )
-            qresult = await conn.execute(query)
-            group_id = qresult.scalar()
-            if group_id is None:
-                raise InvalidAPIParameters("Invalid group")
+                if await conn.scalar(membership_query) is None:
+                    raise InvalidAPIParameters("Invalid group")
 
-        return owner_uuid, group_id
+        return owner_uuid, requesting_project_id
 
     # --- Task template operations ---
 

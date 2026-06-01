@@ -1332,6 +1332,27 @@ class OverridableContainerConfig(BaseConfigSchema):
             example=ConfigExample(local="[30000, 31000]", prod="[30000, 32000]"),
         ),
     ]
+    port_reuse_cooldown_sec: Annotated[
+        int,
+        Field(
+            default=60,
+            ge=0,
+            validation_alias=AliasChoices("port-reuse-cooldown-sec", "port_reuse_cooldown_sec"),
+            serialization_alias="port-reuse-cooldown-sec",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Minimum seconds between releasing a host port and reallocating it to a new "
+                "container. Mitigates TCP TIME_WAIT and stale firewall/monitoring state by "
+                "ensuring recently freed ports are not immediately reused. "
+                "Set to 0 to disable cooldown (any released port may be reused immediately). "
+                "Note: this cooldown only applies to container-driven allocations; the "
+                "RPC assign_port path bypasses cooldown for emergency/dynamic allocation."
+            ),
+            added_version="26.5.0",
+            example=ConfigExample(local="60", prod="60"),
+        ),
+    ]
     stats_type: Annotated[
         StatModes | None,
         Field(

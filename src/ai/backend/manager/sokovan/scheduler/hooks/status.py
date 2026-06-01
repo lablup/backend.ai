@@ -10,10 +10,6 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    EndpointRouteListUpdatedEvent,
-)
 from ai.backend.common.types import (
     AgentId,
     SessionId,
@@ -21,7 +17,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.data import SessionWithKernels
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 
@@ -50,8 +45,6 @@ class RunningHookDependencies:
     """Dependencies for RunningTransitionHook."""
 
     agent_client_pool: AgentClientPool
-    deployment_repository: DeploymentRepository
-    event_producer: EventProducer
 
 
 class RunningTransitionHook(StatusTransitionHook):
@@ -59,7 +52,10 @@ class RunningTransitionHook(StatusTransitionHook):
 
     Handles:
     - BATCH: Trigger batch execution
-    - INFERENCE: Update route info and notify app proxy
+    - INFERENCE: no-op — the route coordinator pushes to AppProxy
+      synchronously from the health-check handler when a route first
+      transitions to HEALTHY, and the long-cycle ``AppProxySyncRouteHandler``
+      keeps state convergent as a fallback.
 
     Note: Resource allocation (occupied_slots) is handled per-kernel at
     kernel RUNNING transition time, not here at session level.
@@ -82,8 +78,6 @@ class RunningTransitionHook(StatusTransitionHook):
         match session_type:
             case SessionTypes.BATCH:
                 await self._execute_batch(session)
-            case SessionTypes.INFERENCE:
-                await self._execute_inference_running(session)
             case _:
                 log.debug(
                     "No specific RUNNING hook for session type {}",
@@ -124,70 +118,25 @@ class RunningTransitionHook(StatusTransitionHook):
             agent_id,
         )
 
-    async def _execute_inference_running(self, session: SessionWithKernels) -> None:
-        """Create model service route for INFERENCE sessions."""
-        session_id = session.session_info.identity.id
-        log.info(
-            "Creating model service route for inference session {}",
-            session_id,
-        )
-
-        # Get endpoint ID from session
-        endpoint_id = await self._deps.deployment_repository.get_endpoint_id_by_session(session_id)
-        if not endpoint_id:
-            log.warning(
-                "No endpoint ID found for inference session {}, skipping route update",
-                session_id,
-            )
-            return
-
-        pool = RecorderContext[SessionId].current_pool()
-        recorder = pool.recorder(session_id)
-        with recorder.phase(
-            "finalize_start",
-            success_detail="Session startup finalized",
-        ):
-            with recorder.step(
-                "setup_route",
-                success_detail=f"Set up route for endpoint {endpoint_id}",
-            ):
-                try:
-                    # Update route info
-                    await self._deps.deployment_repository.update_endpoint_route_info(endpoint_id)
-
-                    # Send event to app proxy
-                    await self._deps.event_producer.anycast_event(
-                        EndpointRouteListUpdatedEvent(endpoint_id)
-                    )
-
-                    log.info(
-                        "Successfully updated route info and notified app proxy for endpoint {} (session {})",
-                        endpoint_id,
-                        session_id,
-                    )
-                except Exception as e:
-                    log.exception(
-                        "Unexpected error updating route info for endpoint {} (session {}): {}",
-                        endpoint_id,
-                        session_id,
-                        e,
-                    )
-                    raise
-
 
 @dataclass
 class TerminatedHookDependencies:
-    """Dependencies for TerminatedTransitionHook."""
+    """Dependencies for TerminatedTransitionHook (currently empty).
 
-    deployment_repository: DeploymentRepository
-    event_producer: EventProducer
+    Kept as a placeholder so adding new TERMINATED-specific hooks does
+    not require re-threading dependency injection wiring.
+    """
 
 
 class TerminatedTransitionHook(StatusTransitionHook):
     """Hook executed when sessions transition to TERMINATED status.
 
-    Handles:
-    - INFERENCE: Update route info (removal) and notify app proxy
+    Currently a no-op for every session type. Inference termination
+    used to mark APPPROXY_SYNC needed; that is no longer required
+    because :class:`TerminatingRouteHandler` unregisters routes from
+    AppProxy synchronously before destroying kernels, and the long-
+    cycle ``AppProxySyncRouteHandler`` keeps state convergent as a
+    fallback.
     """
 
     _deps: TerminatedHookDependencies
@@ -197,66 +146,7 @@ class TerminatedTransitionHook(StatusTransitionHook):
 
     async def execute(self, session: SessionWithKernels) -> None:
         """Execute TERMINATED transition hook."""
-        session_type = session.session_info.metadata.session_type
-        match session_type:
-            case SessionTypes.INFERENCE:
-                await self._execute_inference_terminated(session)
-            case _:
-                log.debug(
-                    "No specific TERMINATED hook for session type {}",
-                    session_type,
-                )
-
-    async def _execute_inference_terminated(self, session: SessionWithKernels) -> None:
-        """Delete model service route for INFERENCE sessions."""
-        session_id = session.session_info.identity.id
-        log.info(
-            "Deleting model service route for inference session {}",
-            session_id,
+        log.debug(
+            "TERMINATED transition hook is currently a no-op for session type {}",
+            session.session_info.metadata.session_type,
         )
-
-        # Get endpoint ID from session
-        endpoint_id = await self._deps.deployment_repository.get_endpoint_id_by_session(session_id)
-        if not endpoint_id:
-            log.warning(
-                "No endpoint ID found for inference session {}, skipping route update",
-                session_id,
-            )
-            return
-
-        pool = RecorderContext[SessionId].current_pool()
-        recorder = pool.recorder(session_id)
-        with recorder.phase(
-            "finalize_termination",
-            success_detail="Session termination finalized",
-        ):
-            with recorder.step(
-                "cleanup_route",
-                success_detail=f"Cleaned up route for endpoint {endpoint_id}",
-            ):
-                try:
-                    # Update route info (removal)
-                    await (
-                        self._deps.deployment_repository.update_endpoint_route_info_for_termination(
-                            endpoint_id
-                        )
-                    )
-
-                    # Send event to app proxy
-                    await self._deps.event_producer.anycast_event(
-                        EndpointRouteListUpdatedEvent(endpoint_id)
-                    )
-
-                    log.info(
-                        "Successfully updated route info and notified app proxy of route removal for endpoint {} (session {})",
-                        endpoint_id,
-                        session_id,
-                    )
-                except Exception as e:
-                    log.exception(
-                        "Unexpected error updating route info for endpoint {} (session {}): {}",
-                        endpoint_id,
-                        session_id,
-                        e,
-                    )
-                    raise

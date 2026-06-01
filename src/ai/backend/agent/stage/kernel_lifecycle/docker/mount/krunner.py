@@ -117,10 +117,6 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
             self._parse_mount("runner/fantompass.py", "/opt/kernel/fantompass.py"),
             self._parse_mount("runner/hash_phrase.py", "/opt/kernel/hash_phrase.py"),
             self._parse_mount("runner/words.json", "/opt/kernel/words.json"),
-            self._parse_mount(
-                "runner/DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
-                "/home/work/DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
-            ),
         ]
 
     def _prepare_musl_mounts(self, runner_info: KernelRunnerInfo) -> list[Mount]:

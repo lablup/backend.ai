@@ -92,11 +92,11 @@ async def login_client_types(
         added_version="26.4.2",
         description="Create a new login client type (super admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_login_client_type(
     info: Info[StrawberryGQLContext],
     input: CreateLoginClientTypeInputGQL,
-) -> CreateLoginClientTypePayloadGQL:
+) -> CreateLoginClientTypePayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.login_client_type.admin_create(input.to_pydantic())
     return CreateLoginClientTypePayloadGQL.from_pydantic(payload)
@@ -107,12 +107,12 @@ async def admin_create_login_client_type(
         added_version="26.4.2",
         description="Update a login client type (super admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_login_client_type(
     info: Info[StrawberryGQLContext],
     id: UUID,
     input: UpdateLoginClientTypeInputGQL,
-) -> UpdateLoginClientTypePayloadGQL:
+) -> UpdateLoginClientTypePayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.login_client_type.admin_update(id, input.to_pydantic())
     return UpdateLoginClientTypePayloadGQL.from_pydantic(payload)
@@ -123,11 +123,11 @@ async def admin_update_login_client_type(
         added_version="26.4.2",
         description="Delete a login client type (super admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_login_client_type(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteLoginClientTypePayloadGQL:
+) -> DeleteLoginClientTypePayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.login_client_type.admin_delete(id)
     return DeleteLoginClientTypePayloadGQL.from_pydantic(payload)

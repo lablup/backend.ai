@@ -64,8 +64,15 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
 
         - success: Session/kernel → PREPARING
         - need_retry: None (stays SCHEDULED)
-        - expired: Session/kernel → PENDING (re-scheduling after timeout)
-        - give_up: None (image pulling is time-based, only timeout applies)
+        - expired: Session/kernel → PENDING (re-scheduling after timeout —
+          a transient agent / network issue may resolve in a different
+          slot, so put the session back in the queue)
+        - give_up: Session/kernel → TERMINATING (retry budget exhausted —
+          image pull failures that survive every attempt indicate a
+          permanent problem such as a missing image or registry
+          credentials; rescheduling repeatedly would just re-run the
+          same failing pull, so we surface the failure to the user
+          instead)
         """
         return StatusTransitions(
             success=TransitionStatus(
@@ -77,7 +84,10 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
                 session=SessionStatus.PENDING,
                 kernel=KernelStatus.PENDING,
             ),
-            give_up=None,
+            give_up=TransitionStatus(
+                session=SessionStatus.TERMINATING,
+                kernel=KernelStatus.TERMINATING,
+            ),
         )
 
     @property

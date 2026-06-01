@@ -20,7 +20,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     CreateSessionTypeEnum,
 )
 from ai.backend.common.types import ClusterMode, SessionResult, SessionTypes
-from ai.backend.manager.api.adapters.session import SessionAdapter
+from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 
 

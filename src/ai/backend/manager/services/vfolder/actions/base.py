@@ -382,6 +382,8 @@ class DeleteForeverVFolderAction(VFolderSingleEntityAction):
 
     vfolder_uuid: uuid.UUID
 
+    cascade_model_card: bool = False
+
     @override
     def entity_id(self) -> str | None:
         return str(self.vfolder_uuid)

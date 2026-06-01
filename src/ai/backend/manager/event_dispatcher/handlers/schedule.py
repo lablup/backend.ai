@@ -1,9 +1,6 @@
 import logging
 
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    DoSyncRouteInfoToAppProxyEvent,
-)
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
@@ -21,12 +18,12 @@ from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
-from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -120,13 +117,3 @@ class ScheduleEventHandler:
         """Handle route lifecycle event (unconditional)."""
         lifecycle_type = RouteLifecycleType(ev.lifecycle_type)
         await self._route_coordinator.process_route_lifecycle(lifecycle_type)
-
-    async def handle_do_sync_route_info_to_appproxy(
-        self, _context: None, _agent_id: str, _ev: DoSyncRouteInfoToAppProxyEvent
-    ) -> None:
-        """Periodic reconcile trigger: push every active endpoint's route
-        info into Redis and re-fire EndpointRouteListUpdatedEvent so the
-        app proxy coordinator converges on the manager's DB state even if
-        individual hook invocations were missed.
-        """
-        await self._deployment_coordinator.sync_route_info_to_appproxy()

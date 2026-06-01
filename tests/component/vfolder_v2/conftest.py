@@ -27,7 +27,7 @@ from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
-from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
+from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
@@ -49,6 +49,7 @@ from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -103,7 +104,9 @@ def vfolder_processors(
         user_repository=user_repository,
         valkey_stat_client=MagicMock(),
     )
-    real_single_entity_validator = SingleEntityActionRBACValidator(rbac_permission_repo)
+    real_single_entity_validator = SingleEntityActionRBACValidator(
+        rbac_permission_repo, MagicMock()
+    )
     return VFolderProcessors(
         service=service,
         action_monitors=[],
@@ -111,6 +114,7 @@ def vfolder_processors(
             rbac=RBACValidators(
                 scope=AsyncMock(),
                 single_entity=real_single_entity_validator,
+                bulk=AsyncMock(),
             )
         ),
     )
@@ -172,7 +176,7 @@ async def user_v2_registry(
 @pytest.fixture()
 async def vfolder_host_permission_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[None]:
     """Grant all VFolderHostPermission flags for the 'local' host."""
@@ -181,7 +185,7 @@ async def vfolder_host_permission_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             domains.update()
-            .where(domains.c.name == domain_fixture)
+            .where(domains.c.name == domain_fixture.domain_name)
             .values(allowed_vfolder_hosts=host_perms)
         )
         await conn.execute(
@@ -199,7 +203,7 @@ async def vfolder_host_permission_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             domains.update()
-            .where(domains.c.name == domain_fixture)
+            .where(domains.c.name == domain_fixture.domain_name)
             .values(allowed_vfolder_hosts=empty_perms)
         )
         await conn.execute(
@@ -212,7 +216,7 @@ async def vfolder_host_permission_fixture(
 @pytest.fixture()
 async def vfolder_factory(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     admin_user_fixture: UserFixtureData,
     vfolder_host_permission_fixture: None,
 ) -> AsyncIterator[VFolderFactory]:
@@ -231,7 +235,7 @@ async def vfolder_factory(
             "id": vfolder_id,
             "name": f"test-vfolder-{unique}",
             "host": "local",
-            "domain_name": domain_fixture,
+            "domain_name": domain_fixture.domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": VFolderUsageMode.GENERAL,
             "permission": VFolderMountPermission.READ_WRITE,

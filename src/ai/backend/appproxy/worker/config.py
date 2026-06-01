@@ -38,6 +38,7 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import AutoDirectoryPath
 from ai.backend.common.types import ServiceDiscoveryType
@@ -757,20 +758,6 @@ class ProxyWorkerConfig(BaseSchema):
         ),
     ]
 
-    inference_metric_collection_interval: Annotated[
-        float,
-        Field(default=5.0),
-        BackendAIConfigMeta(
-            description=(
-                "The interval in seconds between collecting metrics from inference model endpoints. "
-                "Metrics include request counts, latencies, and throughput. Lower values provide "
-                "more granular data but increase overhead on model services."
-            ),
-            added_version="25.9.0",
-            example=ConfigExample(local="5.0", prod="5.0"),
-        ),
-    ]
-
     client_pool_cleanup_interval: Annotated[
         float,
         Field(default=60.0),
@@ -1002,12 +989,14 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
                 raise ConfigValidationError("Pyroscope enabled but config is not populated")
             if server_config.profiling.pyroscope_config.application_name is None:
                 server_config.profiling.pyroscope_config.application_name = f"proxy-worker-{server_config.proxy_worker.authority}-{server_config.proxy_worker.api_bind_addr.port}"
-    except (ValidationError, ConfigValidationError) as e:
+    except (BackendAISchemaValidationFailed, ValidationError, ConfigValidationError) as e:
+        # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+        # skip the ``BackendAISchema`` auto-conversion override.
         print(
             "ConfigurationError: Could not read or validate the manager local config:",
             file=sys.stderr,
         )
-        if isinstance(e, ValidationError):
+        if isinstance(e, (BackendAISchemaValidationFailed, ValidationError)):
             detail = str(e)
         else:
             detail = pformat(e)

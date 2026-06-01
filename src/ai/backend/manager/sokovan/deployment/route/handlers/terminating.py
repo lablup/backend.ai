@@ -68,10 +68,13 @@ class TerminatingRouteHandler(RouteHandler):
         )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Execute termination for routes."""
-        log.debug("Terminating {} routes", len(routes))
+        """Execute termination for routes.
 
-        # Execute route termination logic via executor
+        ``RouteExecutor.terminate_routes`` drains AppProxy traffic via a
+        synchronous unregister before destroying kernels, so this
+        handler just delegates to it.
+        """
+        log.debug("Terminating {} routes", len(routes))
         return await self._route_executor.terminate_routes(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:

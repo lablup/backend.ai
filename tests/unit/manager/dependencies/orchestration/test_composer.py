@@ -48,6 +48,7 @@ class TestOrchestrationComposer:
             fair_share_repository=MagicMock(),
             resource_usage_repository=MagicMock(),
             agent_client_pool=MagicMock(),
+            appproxy_client_pool=MagicMock(),
             network_plugin_ctx=MagicMock(),
             scheduling_controller=MagicMock(),
             deployment_controller=MagicMock(),
@@ -55,6 +56,7 @@ class TestOrchestrationComposer:
             service_discovery=MagicMock(),
             prometheus_client=MagicMock(),
             prometheus_query_preset_repository=MagicMock(),
+            runtime_variant_repository=MagicMock(),
         )
 
         async with DependencyBuilderStack() as stack:
@@ -88,9 +90,9 @@ class TestOrchestrationComposer:
         mock_sokovan_dep.stage_name = "sokovan-orchestrator"
         mock_leader_dep.stage_name = "leader-election"
 
-        mock_idle_checker_dep.gen_health_checkers.return_value = None
-        mock_sokovan_dep.gen_health_checkers.return_value = None
-        mock_leader_dep.gen_health_checkers.return_value = None
+        for dep in (mock_idle_checker_dep, mock_sokovan_dep, mock_leader_dep):
+            dep.gen_liveness_checker.return_value = None
+            dep.gen_readiness_checker.return_value = None
 
         def make_provide(name: str, result: MagicMock) -> object:
             @asynccontextmanager
@@ -123,6 +125,7 @@ class TestOrchestrationComposer:
             fair_share_repository=MagicMock(),
             resource_usage_repository=MagicMock(),
             agent_client_pool=MagicMock(),
+            appproxy_client_pool=MagicMock(),
             network_plugin_ctx=MagicMock(),
             scheduling_controller=MagicMock(),
             deployment_controller=MagicMock(),
@@ -130,6 +133,7 @@ class TestOrchestrationComposer:
             service_discovery=MagicMock(),
             prometheus_client=MagicMock(),
             prometheus_query_preset_repository=MagicMock(),
+            runtime_variant_repository=MagicMock(),
         )
 
         async with DependencyBuilderStack() as stack:

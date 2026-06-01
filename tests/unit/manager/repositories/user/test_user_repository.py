@@ -18,9 +18,11 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import UserConflict, UserCreationBadRequest, UserNotFound
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, ProjectType
@@ -41,6 +43,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -54,6 +57,7 @@ from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
 @dataclass(frozen=True)
@@ -99,11 +103,14 @@ class TestUserRepository:
                 KeyPairRow,
                 GroupRow,
                 AssocGroupUserRow,  # Association table for users-groups
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -120,23 +127,13 @@ class TestUserRepository:
         return UserRepository(db=db_with_cleanup)
 
     @pytest.fixture
-    async def sample_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
-        """Create a test domain and return its name."""
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        async with db_with_cleanup.begin_session() as session:
-            domain = DomainRow(
-                name=domain_name,
-                description=f"Test domain {domain_name}",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-                dotfiles=b"",
-                integration_id=None,
-            )
-            session.add(domain)
-            await session.commit()
-        return domain_name
+    async def sample_domain(
+        self,
+        domain_factory: DomainFactory,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
+        """Create a test domain and return its identifiers."""
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def user_resource_policy(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
@@ -193,7 +190,7 @@ class TestUserRepository:
     async def sample_user_email(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> str:
         """Create a test user and return the email."""
@@ -209,7 +206,7 @@ class TestUserRepository:
                 description="Test Description",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
             )
@@ -221,7 +218,7 @@ class TestUserRepository:
     async def sample_user_username(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> str:
         """Create a test user and return the username."""
@@ -237,7 +234,7 @@ class TestUserRepository:
                 description="Test Description",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
             )
@@ -249,7 +246,7 @@ class TestUserRepository:
     async def sample_group_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         project_resource_policy: str,
     ) -> str:
         """Create a test group with both admin and member roles bound at
@@ -265,7 +262,7 @@ class TestUserRepository:
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group",
                 is_active=True,
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 integration_id=None,
@@ -297,7 +294,7 @@ class TestUserRepository:
     @pytest.fixture
     def sample_user_creator(
         self,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> Creator[UserRow]:
         """Create a Creator for a test user."""
@@ -309,7 +306,7 @@ class TestUserRepository:
             full_name="Test User",
             description="Test Description",
             status=UserStatus.ACTIVE,
-            domain_name=sample_domain,
+            domain_name=sample_domain.domain_name,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -364,7 +361,7 @@ class TestUserRepository:
     async def test_create_user_validated_success(
         self,
         user_repository: UserRepository,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
         default_keypair_resource_policy: str,
         sample_group_id: str,
@@ -379,7 +376,7 @@ class TestUserRepository:
             full_name="New User",
             description="New User Description",
             status=UserStatus.ACTIVE,
-            domain_name=sample_domain,
+            domain_name=sample_domain.domain_name,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -437,7 +434,7 @@ class TestUserRepository:
         self,
         user_repository: UserRepository,
         sample_user_email: str,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> None:
         """Test user creation fails when email already exists"""
@@ -450,7 +447,7 @@ class TestUserRepository:
             full_name="New User",
             description="New User Description",
             status=UserStatus.ACTIVE,
-            domain_name=sample_domain,
+            domain_name=sample_domain.domain_name,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -469,7 +466,7 @@ class TestUserRepository:
         self,
         user_repository: UserRepository,
         sample_user_username: str,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> None:
         """Test user creation fails when username already exists"""
@@ -481,7 +478,7 @@ class TestUserRepository:
             full_name="New User",
             description="New User Description",
             status=UserStatus.ACTIVE,
-            domain_name=sample_domain,
+            domain_name=sample_domain.domain_name,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -500,7 +497,7 @@ class TestUserRepository:
     async def model_store_project_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         project_resource_policy: str,
     ) -> uuid.UUID:
         """Create a model store project and return its id."""
@@ -511,7 +508,7 @@ class TestUserRepository:
                 name=f"model-store-{uuid.uuid4().hex[:8]}",
                 description="Model Store Project",
                 is_active=True,
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts={},
                 integration_id=None,
@@ -526,7 +523,7 @@ class TestUserRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         user_repository: UserRepository,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
         default_keypair_resource_policy: str,
     ) -> None:
@@ -540,7 +537,7 @@ class TestUserRepository:
             full_name="New User",
             description="New User Description",
             status=UserStatus.ACTIVE,
-            domain_name=sample_domain,
+            domain_name=sample_domain.domain_name,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -561,7 +558,7 @@ class TestUserRepository:
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id == str(result.user.uuid),
                     AssociationScopesEntitiesRow.scope_type == ScopeType.DOMAIN,
-                    AssociationScopesEntitiesRow.scope_id == sample_domain,
+                    AssociationScopesEntitiesRow.scope_id == sample_domain.domain_name,
                 )
             )
             assert domain_assoc is not None
@@ -570,7 +567,7 @@ class TestUserRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         user_repository: UserRepository,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
         default_keypair_resource_policy: str,
         sample_group_id: str,
@@ -585,7 +582,7 @@ class TestUserRepository:
             full_name="New User",
             description="New User Description",
             status=UserStatus.ACTIVE,
-            domain_name=sample_domain,
+            domain_name=sample_domain.domain_name,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -615,7 +612,7 @@ class TestUserRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         user_repository: UserRepository,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
         default_keypair_resource_policy: str,
         model_store_project_id: uuid.UUID,
@@ -630,7 +627,7 @@ class TestUserRepository:
             full_name="New User",
             description="New User Description",
             status=UserStatus.ACTIVE,
-            domain_name=sample_domain,
+            domain_name=sample_domain.domain_name,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,
@@ -656,15 +653,6 @@ class TestUserRepository:
                 )
             )
             assert model_store_assoc is not None
-
-            # Also verify user was added to the model store group
-            group_assoc = await session.scalar(
-                sa.select(AssocGroupUserRow).where(
-                    AssocGroupUserRow.user_id == result.user.uuid,
-                    AssocGroupUserRow.group_id == model_store_project_id,
-                )
-            )
-            assert group_assoc is not None
 
     async def test_update_user_validated_success(
         self,
@@ -703,12 +691,17 @@ class TestUserRepository:
         )
 
         async with db_with_cleanup.begin_session() as session:
-            groups = await session.scalars(
-                sa.select(AssocGroupUserRow).where(AssocGroupUserRow.user_id == result.user.uuid)
-            )
-            group_list = list(groups)
-            assert len(group_list) == 1
-            assert str(group_list[0].group_id) == sample_group_id
+            scope_bindings = (
+                await session.scalars(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id == str(result.user.uuid),
+                    )
+                )
+            ).all()
+            scope_ids = {row.scope_id for row in scope_bindings}
+            assert sample_group_id in scope_ids
 
     async def test_update_user_role_preserves_group_associations(
         self,
@@ -741,17 +734,21 @@ class TestUserRepository:
 
         # Assert: Group associations should be PRESERVED (not deleted)
         async with db_with_cleanup.begin_session() as session:
-            final_groups = await session.scalars(
-                sa.select(AssocGroupUserRow).where(
-                    AssocGroupUserRow.user_id == sample_user_with_group.user_uuid
+            final_groups = (
+                await session.scalars(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id
+                        == str(sample_user_with_group.user_uuid),
+                    )
                 )
-            )
-            final_group_list = list(final_groups)
-            assert len(final_group_list) == 1, (
+            ).all()
+            assert len(final_groups) == 1, (
                 "Group associations should be preserved after role change. "
                 "If this fails, the bug where role changes delete groups has regressed."
             )
-            assert str(final_group_list[0].group_id) == sample_user_with_group.group_id
+            assert final_groups[0].scope_id == sample_user_with_group.group_id
 
     async def test_update_user_validated_group_ids_syncs_rbac(
         self,
@@ -761,9 +758,9 @@ class TestUserRepository:
         sample_group_id: str,
     ) -> None:
         """Assigning a user to a new project via update_user_validated must
-        produce the same RBAC state as the modifyGroup path: business
-        association, (PROJECT, user) scope binding, and a user-role mapping
-        to the project member role (not the admin role).
+        produce the same RBAC state as the modifyGroup path: a (PROJECT, user)
+        scope binding and a user-role mapping to the project member role
+        (not the admin role).
         """
         updater_spec = UserUpdaterSpec(
             group_ids=OptionalState.update([sample_group_id]),
@@ -782,14 +779,6 @@ class TestUserRepository:
                 sa.select(UserRow.uuid).where(UserRow.email == sample_user_email)
             )
             assert user_uuid is not None
-
-            business_assoc = await session.scalar(
-                sa.select(AssocGroupUserRow).where(
-                    AssocGroupUserRow.user_id == user_uuid,
-                    AssocGroupUserRow.group_id == project_id,
-                )
-            )
-            assert business_assoc is not None
 
             scope_binding = await session.scalar(
                 sa.select(AssociationScopesEntitiesRow).where(
@@ -869,16 +858,6 @@ class TestUserRepository:
             )
             assert user_uuid is not None
 
-            business_assocs = (
-                await session.scalars(
-                    sa.select(AssocGroupUserRow).where(
-                        AssocGroupUserRow.user_id == user_uuid,
-                        AssocGroupUserRow.group_id == project_id,
-                    )
-                )
-            ).all()
-            assert len(business_assocs) == 0
-
             scope_bindings = (
                 await session.scalars(
                     sa.select(AssociationScopesEntitiesRow).where(
@@ -950,7 +929,7 @@ class TestUserRepository:
     async def test_bulk_create_users_validated_success(
         self,
         user_repository: UserRepository,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
         default_keypair_resource_policy: str,
     ) -> None:
@@ -966,7 +945,7 @@ class TestUserRepository:
                 full_name=f"Bulk User {i}",
                 description=f"Bulk created user {i}",
                 status=UserStatus.ACTIVE,
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
                 allowed_client_ip=None,
@@ -985,14 +964,14 @@ class TestUserRepository:
         assert len(result.successes) == 3
         # Verify each created user has expected data
         for user_data in result.successes:
-            assert user_data.domain_name == sample_domain
+            assert user_data.domain_name == sample_domain.domain_name
             assert user_data.role == UserRole.USER
             assert user_data.status == UserStatus.ACTIVE
 
     async def test_bulk_create_users_validated_partial_failure(
         self,
         user_repository: UserRepository,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
         default_keypair_resource_policy: str,
     ) -> None:
@@ -1011,7 +990,7 @@ class TestUserRepository:
                 full_name=f"Bulk User {i}",
                 description=f"Bulk created user {i}",
                 status=UserStatus.ACTIVE,
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
                 allowed_client_ip=None,
@@ -1038,7 +1017,7 @@ class TestUserRepository:
     async def test_bulk_update_users_validated_success(
         self,
         user_repository: UserRepository,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
         default_keypair_resource_policy: str,
     ) -> None:
@@ -1055,7 +1034,7 @@ class TestUserRepository:
                 full_name=f"Bulk Update User {i}",
                 description=f"Bulk update test user {i}",
                 status=UserStatus.ACTIVE,
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
                 allowed_client_ip=None,
@@ -1088,13 +1067,13 @@ class TestUserRepository:
         for i, user_data in enumerate(result.successes):
             assert user_data.full_name == f"Updated Name {i}"
             assert user_data.description == f"Updated Description {i}"
-            assert user_data.domain_name == sample_domain
+            assert user_data.domain_name == sample_domain.domain_name
             assert user_data.role == UserRole.USER
 
     async def test_bulk_update_users_validated_partial_failure(
         self,
         user_repository: UserRepository,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
         default_keypair_resource_policy: str,
     ) -> None:
@@ -1109,7 +1088,7 @@ class TestUserRepository:
             full_name="Bulk Update User",
             description="Bulk update test user",
             status=UserStatus.ACTIVE,
-            domain_name=sample_domain,
+            domain_name=sample_domain.domain_name,
             role=UserRole.USER,
             resource_policy=user_resource_policy,
             allowed_client_ip=None,

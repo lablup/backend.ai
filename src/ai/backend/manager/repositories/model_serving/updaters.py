@@ -4,12 +4,12 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, override
 
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
     ResourceSlot,
-    RuntimeVariant,
 )
 from ai.backend.manager.data.model_serving.modifier import ExtraMount, ImageRef
 from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow, EndpointRow
@@ -38,8 +38,8 @@ class EndpointUpdaterSpec(UpdaterSpec[EndpointRow]):
         default_factory=OptionalState[list[ExtraMount]].nop
     )
     environ: TriState[dict[str, str]] = field(default_factory=TriState[dict[str, str]].nop)
-    runtime_variant: OptionalState[RuntimeVariant] = field(
-        default_factory=OptionalState[RuntimeVariant].nop
+    runtime_variant_id: OptionalState[RuntimeVariantID] = field(
+        default_factory=OptionalState[RuntimeVariantID].nop
     )
 
     @property
@@ -76,7 +76,7 @@ class EndpointUpdaterSpec(UpdaterSpec[EndpointRow]):
             self.model_definition_path.optional_value() is not None,
             self.extra_mounts.optional_value() is not None,
             self.environ.optional_value() is not None,
-            self.runtime_variant.optional_value() is not None,
+            self.runtime_variant_id.optional_value() is not None,
         ])
 
 

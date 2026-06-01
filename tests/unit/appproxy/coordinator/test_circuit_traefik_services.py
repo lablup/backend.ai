@@ -21,7 +21,6 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.coordinator.models.circuit import Circuit
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.types import ModelServiceStatus
 
 
 def _make_route(kernel_host: str = "127.0.0.1", kernel_port: int = 8000) -> RouteInfo:
@@ -33,9 +32,6 @@ def _make_route(kernel_host: str = "127.0.0.1", kernel_port: int = 8000) -> Rout
         kernel_port=kernel_port,
         protocol=ProxyProtocol.HTTP,
         traffic_ratio=1.0,
-        health_status=None,
-        last_health_check=None,
-        consecutive_failures=0,
     )
 
 
@@ -231,7 +227,6 @@ class TestCircuitTraefikServicesUnhealthyRoutesExposed:
         # every route is fed into Traefik which decides which backend receives traffic.
         healthy = _make_route(kernel_port=8000)
         unhealthy = _make_route(kernel_port=8001)
-        unhealthy.health_status = ModelServiceStatus.UNHEALTHY
 
         circuit = _make_inference_circuit(
             routes=[healthy, unhealthy],

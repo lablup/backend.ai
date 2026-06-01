@@ -19,11 +19,11 @@ from ai.backend.client.cli.v2.helpers import (
 
 
 def _build_dto(dto_cls: type, data: dict[str, Any]) -> Any:
-    from pydantic import ValidationError
+    from ai.backend.common.exception import BackendAISchemaValidationFailed
 
     try:
-        return dto_cls(**data)
-    except ValidationError as e:
+        return dto_cls.model_validate(data)
+    except BackendAISchemaValidationFailed as e:
         click.echo("Validation error:", err=True)
         for err in e.errors():
             field = ".".join(str(loc) for loc in err["loc"])
@@ -158,7 +158,8 @@ def create(body: str) -> None:
 def update(variant_id: uuid.UUID, body: str) -> None:
     """Update a runtime variant (superadmin only).
 
-    BODY is a JSON string with fields to update.
+    BODY is a JSON string with fields to update. Fields omitted from the body
+    are left unchanged; pass an explicit ``null`` to clear a nullable field.
     """
     from ai.backend.common.dto.manager.v2.runtime_variant.request import UpdateRuntimeVariantInput
 
@@ -168,17 +169,13 @@ def update(variant_id: uuid.UUID, body: str) -> None:
         click.echo(f"Invalid JSON: {e}", err=True)
         sys.exit(1)
 
+    data["id"] = str(variant_id)
+    input_dto = _build_dto(UpdateRuntimeVariantInput, data)
+
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.runtime_variant.update(
-                variant_id,
-                UpdateRuntimeVariantInput(
-                    id=variant_id,
-                    name=data.get("name"),
-                    description=data.get("description"),
-                ),
-            )
+            result = await registry.runtime_variant.update(variant_id, input_dto)
             print_result(result)
         finally:
             await registry.close()

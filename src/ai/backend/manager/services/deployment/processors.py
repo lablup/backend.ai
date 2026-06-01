@@ -78,6 +78,10 @@ from ai.backend.manager.services.deployment.actions.get_deployment_by_id import 
     GetDeploymentByIdAction,
     GetDeploymentByIdActionResult,
 )
+from ai.backend.manager.services.deployment.actions.get_legacy_deployment_by_id import (
+    GetLegacyDeploymentByIdAction,
+    GetLegacyDeploymentByIdActionResult,
+)
 from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
@@ -102,6 +106,10 @@ from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions
     RefreshDeploymentRevisionsAction,
     RefreshDeploymentRevisionsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.replace_deployment_options import (
+    ReplaceDeploymentOptionsAction,
+    ReplaceDeploymentOptionsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
@@ -119,6 +127,10 @@ from ai.backend.manager.services.deployment.actions.search_deployments import (
 from ai.backend.manager.services.deployment.actions.search_deployments_in_project import (
     SearchDeploymentsInProjectAction,
     SearchDeploymentsInProjectActionResult,
+)
+from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
+    SearchLegacyDeploymentsAction,
+    SearchLegacyDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
@@ -148,15 +160,25 @@ class DeploymentProcessors(AbstractProcessorPackage):
     update_deployment: SingleEntityActionProcessor[
         UpdateDeploymentAction, UpdateDeploymentActionResult
     ]
+    replace_deployment_options: SingleEntityActionProcessor[
+        ReplaceDeploymentOptionsAction, ReplaceDeploymentOptionsActionResult
+    ]
     destroy_deployment: SingleEntityActionProcessor[
         DestroyDeploymentAction, DestroyDeploymentActionResult
     ]
     search_deployments: ActionProcessor[SearchDeploymentsAction, SearchDeploymentsActionResult]
+    # Legacy (REST v1) read variants — full revision. DO NOT USE in new code.
+    search_legacy_deployments: ActionProcessor[
+        SearchLegacyDeploymentsAction, SearchLegacyDeploymentsActionResult
+    ]
     search_deployments_in_project: ActionProcessor[
         SearchDeploymentsInProjectAction, SearchDeploymentsInProjectActionResult
     ]
     get_deployment_by_id: SingleEntityActionProcessor[
         GetDeploymentByIdAction, GetDeploymentByIdActionResult
+    ]
+    get_legacy_deployment_by_id: SingleEntityActionProcessor[
+        GetLegacyDeploymentByIdAction, GetLegacyDeploymentByIdActionResult
     ]
     get_deployment_policy: ActionProcessor[
         GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
@@ -233,10 +255,18 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.update_deployment = SingleEntityActionProcessor(
             service.update_deployment, action_monitors, validators=rbac_single_entity_validators
         )
+        self.replace_deployment_options = SingleEntityActionProcessor(
+            service.replace_deployment_options,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
         self.destroy_deployment = SingleEntityActionProcessor(
             service.destroy_deployment, action_monitors, validators=rbac_single_entity_validators
         )
         self.search_deployments = ActionProcessor(service.search_deployments, action_monitors)
+        self.search_legacy_deployments = ActionProcessor(
+            service.search_legacy_deployments, action_monitors
+        )
         self.search_deployments_in_project = ActionProcessor(
             service.search_deployments_in_project,
             action_monitors,
@@ -244,6 +274,11 @@ class DeploymentProcessors(AbstractProcessorPackage):
         )
         self.get_deployment_by_id = SingleEntityActionProcessor(
             service.get_deployment_by_id, action_monitors, validators=rbac_single_entity_validators
+        )
+        self.get_legacy_deployment_by_id = SingleEntityActionProcessor(
+            service.get_legacy_deployment_by_id,
+            action_monitors,
+            validators=rbac_single_entity_validators,
         )
         self.get_deployment_policy = ActionProcessor(service.get_deployment_policy, action_monitors)
         self.search_deployment_policies = ActionProcessor(
@@ -310,10 +345,13 @@ class DeploymentProcessors(AbstractProcessorPackage):
             CreateDeploymentAction.spec(),
             CreateLegacyDeploymentAction.spec(),
             UpdateDeploymentAction.spec(),
+            ReplaceDeploymentOptionsAction.spec(),
             DestroyDeploymentAction.spec(),
             SearchDeploymentsAction.spec(),
+            SearchLegacyDeploymentsAction.spec(),
             SearchDeploymentsInProjectAction.spec(),
             GetDeploymentByIdAction.spec(),
+            GetLegacyDeploymentByIdAction.spec(),
             GetDeploymentPolicyAction.spec(),
             SearchDeploymentPoliciesAction.spec(),
             UpsertDeploymentPolicyAction.spec(),

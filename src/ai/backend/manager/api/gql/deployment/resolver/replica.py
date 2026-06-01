@@ -91,7 +91,7 @@ async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | No
 
 @gql_subscription(
     BackendAIGQLMeta(added_version="25.16.0", description="Subscribe to replica status changes.")
-)  # type: ignore[misc]
+)
 async def replica_status_changed(
     revision_id: ID,
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:

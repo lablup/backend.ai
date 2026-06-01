@@ -68,6 +68,18 @@ def register_v2_resource_group_routes(
         handler.update_config,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "PUT",
+        "/{name}/default-options",
+        handler.admin_replace_default_deployment_options,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "PUT",
+        "/{name}/default-session-options",
+        handler.admin_replace_default_session_options,
+        middlewares=[superadmin_required],
+    )
     # Allow / Disallow routes
     registry.add(
         "GET",

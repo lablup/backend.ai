@@ -11,7 +11,9 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     SearchRuntimeVariantPresetsInput,
     UpdateRuntimeVariantPresetInput,
 )
-from ai.backend.manager.api.adapters.runtime_variant_preset import RuntimeVariantPresetAdapter
+from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
+    RuntimeVariantPresetAdapter,
+)
 
 
 class PresetIdPathParam(BaseRequestModel):

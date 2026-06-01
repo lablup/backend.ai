@@ -551,7 +551,7 @@ class SessionDBSource:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             session_rows = [row.SessionRow for row in result.rows]
@@ -564,22 +564,6 @@ class SessionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    async def filter_sessions_in_project(
-        self,
-        session_ids: list[SessionId],
-        project_id: uuid.UUID,
-    ) -> list[SessionId]:
-        """Return session IDs that belong to the specified project."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(SessionRow.id).where(
-                sa.and_(
-                    SessionRow.id.in_(session_ids),
-                    SessionRow.group_id == project_id,
-                )
-            )
-            result = await db_sess.execute(query)
-            return [row.id for row in result]
 
     async def search_kernels(
         self,
