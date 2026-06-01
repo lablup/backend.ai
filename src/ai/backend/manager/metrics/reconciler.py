@@ -15,7 +15,7 @@ from ai.backend.common.metrics.safe import (
 )
 
 
-class LifecycleMetricObserver:
+class ReconcilerMetricObserver:
     """Metrics for generic lifecycle stage steps (fetch, execute, apply, post_process)."""
 
     _instance: Self | None = None
@@ -26,18 +26,18 @@ class LifecycleMetricObserver:
 
     def __init__(self) -> None:
         self._step_count = Counter(
-            name="backendai_lifecycle_step_count",
+            name="backendai_reconciler_step_count",
             documentation="Total number of lifecycle stage step executions",
             labelnames=["kind", "handler", "step", "status"],
         )
         self._step_duration_sec = Histogram(
-            name="backendai_lifecycle_step_duration_sec",
+            name="backendai_reconciler_step_duration_sec",
             documentation="Duration of lifecycle stage step executions in seconds",
             labelnames=["kind", "handler", "step", "status"],
             buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0],
         )
         self._processed_count = Counter(
-            name="backendai_lifecycle_processed_count",
+            name="backendai_reconciler_processed_count",
             documentation="Total number of lifecycle entities processed",
             labelnames=["kind", "handler", "result"],
         )
