@@ -18,7 +18,11 @@ from ai.backend.manager.data.session.types import SessionData, SessionListResult
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
+from ai.backend.manager.errors.kernel import (
+    SessionAlreadyExists,
+    SessionNotFound,
+    TooManySessionsMatched,
+)
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
@@ -27,6 +31,7 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
+    TERMINAL_SESSION_STATUSES,
     KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
@@ -35,8 +40,13 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
+    execute_batch_querier,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 from ai.backend.manager.utils import query_userinfo
@@ -44,9 +54,52 @@ from ai.backend.manager.utils import query_userinfo
 
 class SessionDBSource:
     _db: ExtendedAsyncSAEngine
+    _ops: DBOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._ops = DBOpsProvider(db)
+
+    async def resolve_session_id(
+        self,
+        session_name: str,
+        user_id: uuid.UUID,
+    ) -> SessionId:
+        """Resolve a single live session to its ``session_id`` by name within a user scope.
+
+        The ``user_id`` scope spans every keypair access key owned by the user, since the
+        owner is denormalized onto ``SessionRow.user_uuid``. Terminal sessions (ERROR,
+        TERMINATED, CANCELLED) are excluded so a stale namesake does not shadow the live
+        one. This matches the `ix_sessions_unique_name_per_user_nonterminal` partial unique
+        index, which guarantees at most one matching session.
+        """
+        query = sa.select(SessionRow).where(
+            (SessionRow.name == session_name)
+            & (SessionRow.user_uuid == user_id)
+            & (~SessionRow.status.in_(TERMINAL_SESSION_STATUSES))
+        )
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
+        rows: list[SessionRow] = [row.SessionRow for row in result.rows]
+        if not rows:
+            raise SessionNotFound(f"Session (name={session_name}) does not exist for the user.")
+        if len(rows) > 1:
+            # Defensive: the partial unique index should prevent this for non-terminal
+            # sessions, but guard against any data that escaped the constraint.
+            raise TooManySessionsMatched(
+                extra_data={
+                    "matches": [
+                        {
+                            "session_id": row.id,
+                            "session_name": row.name,
+                            "status": row.status,
+                            "created_at": row.created_at,
+                        }
+                        for row in rows
+                    ]
+                }
+            )
+        return rows[0].id
 
     async def get_session_owner(self, session_id: str | SessionId) -> UserData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:

@@ -54,6 +54,20 @@ class SessionRepository:
         return await self._db_source.get_session_owner(session_id)
 
     @session_repository_resilience.apply()
+    async def resolve_session_id(
+        self,
+        session_name: str,
+        user_id: uuid.UUID,
+    ) -> SessionId:
+        """Resolve a live session to its ``session_id`` by ``(session_name, user_id)``.
+
+        The ``user_id`` scope covers sessions created with any of the user's keypair
+        access keys. Raises ``SessionNotFound`` when unresolved and
+        ``TooManySessionsMatched`` when more than one live session shares the name.
+        """
+        return await self._db_source.resolve_session_id(session_name, user_id)
+
+    @session_repository_resilience.apply()
     async def get_session_validated(
         self,
         session_name_or_id: str | SessionId,

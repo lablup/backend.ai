@@ -196,6 +196,10 @@ from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.resolve_session import (
+    ResolveSessionAction,
+    ResolveSessionActionResult,
+)
 from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
@@ -284,6 +288,19 @@ class SessionService:
         self._database_ptask_group = aiotools.PersistentTaskGroup()
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
+
+    async def resolve_session(self, action: ResolveSessionAction) -> ResolveSessionActionResult:
+        """Resolve a live session to its ``session_id`` by ``(session_name, user_id)``.
+
+        Callers go through this resolver before invoking any other session operation, so
+        that downstream lookups can rely solely on ``session_id``. The ``user_id`` scope
+        covers sessions created with any of the user's keypair access keys.
+        """
+        session_id = await self._session_repository.resolve_session_id(
+            action.session_name,
+            action.user_id,
+        )
+        return ResolveSessionActionResult(session_id=session_id)
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name

@@ -28,6 +28,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -398,6 +399,110 @@ class TestSessionRepository:
         assert len(result.items) == 0
         assert result.has_next_page is False
         assert result.has_previous_page is False
+
+    # =========================================================================
+    # Tests - resolve_session_id
+    # =========================================================================
+
+    async def _insert_session(
+        self,
+        db: ExtendedAsyncSAEngine,
+        base: SessionTestData,
+        *,
+        name: str,
+        access_key: AccessKey,
+        status: SessionStatus,
+    ) -> SessionId:
+        """Insert an extra session reusing the prerequisite rows from the fixture."""
+        session_id = SessionId(uuid.uuid4())
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                SessionRow(
+                    id=session_id,
+                    creation_id=session_id.hex,
+                    name=name,
+                    session_type=SessionTypes.INTERACTIVE,
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    domain_name=base.domain_name,
+                    group_id=base.group_id,
+                    user_uuid=base.user_id,
+                    access_key=access_key,
+                    tag=None,
+                    status=status,
+                    status_info=None,
+                    status_data=None,
+                    status_history={},
+                    result=SessionResult.UNDEFINED,
+                    created_at=datetime.now(tzutc()),
+                    terminated_at=None,
+                    starts_at=None,
+                    startup_command=None,
+                    callback_url=None,
+                    occupying_slots=ResourceSlot(),
+                    requested_slots=ResourceSlot(),
+                    vfolder_mounts=[],
+                    environ=None,
+                    bootstrap_script=None,
+                    use_host_network=False,
+                    scaling_group_name="default",
+                )
+            )
+            await db_sess.commit()
+        return session_id
+
+    async def test_resolve_session_id_by_name_and_user(
+        self,
+        repository: SessionRepository,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        resolved = await repository.resolve_session_id("test-session", session_with_kernel.user_id)
+        assert resolved == session_with_kernel.session_id
+
+    async def test_resolve_session_id_not_found(
+        self,
+        repository: SessionRepository,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        # Unknown name, and a name owned by a different user, both raise SessionNotFound.
+        with pytest.raises(SessionNotFound):
+            await repository.resolve_session_id("nonexistent", session_with_kernel.user_id)
+        with pytest.raises(SessionNotFound):
+            await repository.resolve_session_id("test-session", uuid.uuid4())
+
+    async def test_resolve_session_id_ignores_terminal_namesake(
+        self,
+        repository: SessionRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        """A terminal (TERMINATED) session sharing the name must not shadow the live one,
+        even when created under a different access key of the same user."""
+        other_key = AccessKey("OTHERKEY1234567")
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                KeyPairRow(
+                    user_id="test@example.com",
+                    user=session_with_kernel.user_id,
+                    access_key=other_key,
+                    secret_key="other-secret-key",
+                    is_active=True,
+                    is_admin=False,
+                    resource_policy="default-keypair-policy",
+                    rate_limit=1000,
+                )
+            )
+            await db_sess.commit()
+        await self._insert_session(
+            db_with_cleanup,
+            session_with_kernel,
+            name="test-session",
+            access_key=other_key,
+            status=SessionStatus.TERMINATED,
+        )
+
+        resolved = await repository.resolve_session_id("test-session", session_with_kernel.user_id)
+        assert resolved == session_with_kernel.session_id
 
 
 class TestBatchPopulateSessionOccupiedSlots:
