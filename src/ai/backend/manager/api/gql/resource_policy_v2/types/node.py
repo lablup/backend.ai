@@ -112,6 +112,7 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     ):
         from strawberry.relay import PageInfo
 
+        from ai.backend.common.data.filter_specs import StringMatchSpec
         from ai.backend.common.dto.manager.v2.keypair.request import AdminSearchKeypairsInput
         from ai.backend.manager.api.gql.base import encode_cursor
         from ai.backend.manager.api.gql.keypair.types.node import (
@@ -120,14 +121,16 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
             KeyPairGQL,
         )
         from ai.backend.manager.api.gql.utils import check_admin_only
+        from ai.backend.manager.models.keypair.conditions import KeypairConditions
 
         # This node is reachable from non-admin entry points (e.g. myKeypairResourcePolicyV2),
         # but the keypair listing spans all users sharing the policy — restrict to superadmins.
         check_admin_only()
 
-        result = await info.context.adapters.user.gql_admin_search_keypairs_by_resource_policy(
-            resource_policy_name=self.name,
-            input=AdminSearchKeypairsInput(
+        # Scope the search to keypairs assigned to this resource policy. Applied as a
+        # base condition before any user-supplied filters so it cannot be escaped.
+        result = await info.context.adapters.user.gql_admin_search_keypairs(
+            AdminSearchKeypairsInput(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
                 first=first,
@@ -137,6 +140,11 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
                 limit=limit,
                 offset=offset,
             ),
+            base_conditions=[
+                KeypairConditions.by_resource_policy_equals(
+                    StringMatchSpec(self.name, case_insensitive=False, negated=False)
+                )
+            ],
         )
         nodes = [KeyPairGQL.from_pydantic(item) for item in result.items]
         edges = [KeyPairEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
