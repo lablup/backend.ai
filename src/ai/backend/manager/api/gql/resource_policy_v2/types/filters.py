@@ -80,7 +80,10 @@ class KeypairResourcePolicyV2Filter(PydanticInputMixin[KeypairResourcePolicyFilt
     keypair: KeypairResourcePolicyKeypairNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="Filter policies by their assigned keypairs.",
+            description=(
+                "Filter policies by their assigned keypairs. "
+                "A policy matches if at least one of its keypairs satisfies the conditions."
+            ),
         ),
         default=None,
     )
