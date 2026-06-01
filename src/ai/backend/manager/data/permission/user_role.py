@@ -39,3 +39,9 @@ class UserRoleDataWithRole:
     deleted_at: datetime | None
 
     mapped_role_data: RoleData
+
+
+@dataclass(frozen=True)
+class RoleMappingData:
+    user_id: uuid.UUID
+    role_data: RoleData

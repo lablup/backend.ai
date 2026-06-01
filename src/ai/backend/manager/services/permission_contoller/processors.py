@@ -22,6 +22,8 @@ from .actions import (
     CreateRoleActionResult,
     DeleteRoleAction,
     DeleteRoleActionResult,
+    EnsureSystemRoleAction,
+    EnsureSystemRoleActionResult,
     GetRoleDetailAction,
     GetRoleDetailActionResult,
     PurgeRoleAction,
@@ -107,6 +109,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     """Processor package for RBAC permission controller operations."""
 
     create_role: ActionProcessor[CreateRoleAction, CreateRoleActionResult]
+    ensure_system_role: ActionProcessor[EnsureSystemRoleAction, EnsureSystemRoleActionResult]
     update_role: ActionProcessor[UpdateRoleAction, UpdateRoleActionResult]
     delete_role: ActionProcessor[DeleteRoleAction, DeleteRoleActionResult]
     assign_role: ActionProcessor[AssignRoleAction, AssignRoleActionResult]
@@ -179,6 +182,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
         validators: ActionValidators,
     ) -> None:
         self.create_role = ActionProcessor(service.create_role, action_monitors)
+        self.ensure_system_role = ActionProcessor(service.ensure_system_role, action_monitors)
         self.update_role = ActionProcessor(service.update_role, action_monitors)
         self.delete_role = ActionProcessor(service.delete_role, action_monitors)
         self.purge_role = ActionProcessor(service.purge_role, action_monitors)
@@ -256,6 +260,7 @@ class PermissionControllerProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             CreateRoleAction.spec(),
+            EnsureSystemRoleAction.spec(),
             UpdateRoleAction.spec(),
             DeleteRoleAction.spec(),
             PurgeRoleAction.spec(),

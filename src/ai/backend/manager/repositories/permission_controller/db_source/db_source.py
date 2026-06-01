@@ -13,6 +13,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
+    RoleSource,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac_role_invitation import (
@@ -39,6 +40,7 @@ from ai.backend.manager.data.permission.role import (
     BulkUserRoleRevocationInput,
     PermissionResolutionKey,
     ProjectRoleCount,
+    RoleData,
     RoleListResult,
     RolePermissionsUpdateInput,
     RoleRevocationResult,
@@ -58,6 +60,7 @@ from ai.backend.manager.data.permission.types import (
     ScopeListResult,
     ScopeType,
 )
+from ai.backend.manager.data.permission.user_role import RoleMappingData
 from ai.backend.manager.data.role_invitation.types import (
     RoleInvitationData,
     RoleInvitationState,
@@ -106,6 +109,10 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
     UserRoleCreatorSpec,
 )
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    RoleManager,
+    UserSystemRoleSpec,
+)
 from ai.backend.manager.repositories.permission_controller.types import (
     PermissionSearchScope,
     ScopedRoleSearchScope,
@@ -148,9 +155,56 @@ class _PermissionGroupKey:
 
 class PermissionDBSource:
     _db: ExtendedAsyncSAEngine
+    _role_manager: RoleManager
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._role_manager = RoleManager()
+
+    async def ensure_user_system_roles(
+        self, specs: Collection[UserSystemRoleSpec]
+    ) -> list[RoleMappingData]:
+        """Ensure the SYSTEM role(s) for the given scope exist.
+
+        Idempotent: roles already present in the scope (matched by name) are
+        reused; missing ones are created together with their permissions. For
+        the USER scope, the user-to-role mapping is ensured as well.
+        """
+        if not specs:
+            return []
+        async with self._db.begin_session_read_committed() as db_session:
+            existing = await self._existing_user_system_roles(db_session, specs)
+            results: list[RoleMappingData] = []
+            for spec in specs:
+                role = existing.get(spec.user_id)
+                if role is None:
+                    # The user has no SYSTEM role yet: create it and map the
+                    # user to it. Existing mappings are left untouched so the
+                    # operation stays idempotent on repeated calls.
+                    role = await self._role_manager.create_system_role(db_session, spec)
+                    await execute_creator(
+                        db_session,
+                        Creator(spec=UserRoleCreatorSpec(user_id=spec.user_id, role_id=role.id)),
+                    )
+                results.append(RoleMappingData(user_id=spec.user_id, role_data=role))
+            return results
+
+    async def _existing_user_system_roles(
+        self, db_session: SASession, specs: Iterable[UserSystemRoleSpec]
+    ) -> dict[uuid.UUID, RoleData]:
+        stmt = (
+            sa.select(UserRoleRow.user_id, RoleRow)
+            .select_from(UserRoleRow)
+            .join(RoleRow, UserRoleRow.role_id == RoleRow.id)
+            .where(
+                sa.and_(
+                    UserRoleRow.user_id.in_([spec.user_id for spec in specs]),
+                    RoleRow.source == RoleSource.SYSTEM,
+                )
+            )
+        )
+        result = await db_session.execute(stmt)
+        return {row.user_id: row.RoleRow.to_data() for row in result}
 
     @staticmethod
     async def _sync_user_scopes_on_assign(

@@ -49,6 +49,10 @@ from ai.backend.manager.services.permission_contoller.actions.delete_role import
     DeleteRoleAction,
     DeleteRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.ensure_system_role import (
+    EnsureSystemRoleAction,
+    EnsureSystemRoleActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
     GetEntityTypesAction,
     GetEntityTypesActionResult,
@@ -195,6 +199,15 @@ class PermissionControllerService:
         return CreateRoleActionResult(
             data=result,
         )
+
+    async def ensure_system_role(
+        self, action: EnsureSystemRoleAction
+    ) -> EnsureSystemRoleActionResult:
+        """
+        Ensures the SYSTEM role(s) for the given users exist (idempotent).
+        """
+        roles = await self._repository.ensure_user_system_roles(action.specs)
+        return EnsureSystemRoleActionResult(data=roles)
 
     async def create_permission(
         self, action: CreatePermissionAction

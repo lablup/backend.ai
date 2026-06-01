@@ -12,6 +12,7 @@ from .bulk_revoke_role import BulkRevokeRoleAction, BulkRevokeRoleActionResult
 from .check_permission import CheckPermissionAction, CheckPermissionActionResult
 from .create_role import CreateRoleAction, CreateRoleActionResult
 from .delete_role import DeleteRoleAction, DeleteRoleActionResult
+from .ensure_system_role import EnsureSystemRoleAction, EnsureSystemRoleActionResult
 from .get_permission_matrix import GetPermissionMatrixAction, GetPermissionMatrixActionResult
 from .get_role_detail import GetRoleDetailAction, GetRoleDetailActionResult
 from .purge_role import PurgeRoleAction, PurgeRoleActionResult
@@ -61,6 +62,8 @@ __all__ = [
     "CreateRoleActionResult",
     "DeleteRoleAction",
     "DeleteRoleActionResult",
+    "EnsureSystemRoleAction",
+    "EnsureSystemRoleActionResult",
     "GetPermissionMatrixAction",
     "GetPermissionMatrixActionResult",
     "GetRoleDetailAction",

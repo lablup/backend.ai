@@ -50,6 +50,7 @@ from ai.backend.manager.data.permission.types import (
     ScopeListResult,
     ScopeType,
 )
+from ai.backend.manager.data.permission.user_role import RoleMappingData
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -66,6 +67,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
     UserRoleCreatorSpec,
 )
+from ai.backend.manager.repositories.permission_controller.role_manager import UserSystemRoleSpec
 from ai.backend.manager.repositories.permission_controller.types import (
     PermissionSearchScope,
     ScopedRoleSearchScope,
@@ -113,6 +115,17 @@ class PermissionControllerRepository:
         """
         role_row = await self._db_source.create_role(input_data)
         return role_row.to_data()
+
+    @permission_controller_repository_resilience.apply()
+    async def ensure_user_system_roles(
+        self, specs: Collection[UserSystemRoleSpec]
+    ) -> list[RoleMappingData]:
+        """
+        Ensure the SYSTEM role(s) for the given scope exist (idempotent).
+
+        Returns the ensured roles.
+        """
+        return await self._db_source.ensure_user_system_roles(specs)
 
     @permission_controller_repository_resilience.apply()
     async def create_permission(
