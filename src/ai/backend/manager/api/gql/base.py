@@ -266,21 +266,18 @@ class IntFilter(PydanticInputMixin[IntFilterDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description=(
-            "Filter for integer array fields. "
-            "Supports 'all' (column contains all of these values) and "
-            "'any' (column contains any of these values)."
+            "Filter for integer array fields. Supports 'contains' (column contains this "
+            "single value), 'contains_any' (column contains any of these values), and "
+            "'contains_all' (column contains all of these values)."
         ),
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="IntArrayFilter",
 )
 class IntArrayFilter(PydanticInputMixin[ArrayFilterDTO[int]]):
-    all_: list[int] | None = gql_field(
-        description="Column array contains ALL of these values.", name="all", default=None
-    )
-    any_: list[int] | None = gql_field(
-        description="Column array contains ANY of these values.", name="any", default=None
-    )
+    contains: int | None = None
+    contains_any: list[int] | None = None
+    contains_all: list[int] | None = None
 
 
 @gql_pydantic_input(

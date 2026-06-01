@@ -207,20 +207,23 @@ class BaseFilterAdapter:
     def convert_array_filter(
         self,
         array_filter: ArrayFilter[Any],
-        all_factory: Callable[[list[Any]], QueryCondition],
-        any_factory: Callable[[list[Any]], QueryCondition],
+        contains_factory: Callable[[Any], QueryCondition],
+        contains_any_factory: Callable[[list[Any]], QueryCondition],
+        contains_all_factory: Callable[[list[Any]], QueryCondition],
     ) -> QueryCondition | None:
         """Convert an ArrayFilter to a QueryCondition.
 
         Args:
             array_filter: The array filter to convert.
-            all_factory: Factory for "column contains ALL of these values".
-            any_factory: Factory for "column contains ANY of these values".
+            contains_factory: Factory for "column contains this single value".
+            contains_any_factory: Factory for "column contains ANY of these values".
+            contains_all_factory: Factory for "column contains ALL of these values".
 
         Returns:
             QueryCondition if any filter field is set, None otherwise.
         """
         return array_filter.build_query_condition(
-            all_factory=all_factory,
-            any_factory=any_factory,
+            contains_factory=contains_factory,
+            contains_any_factory=contains_any_factory,
+            contains_all_factory=contains_all_factory,
         )

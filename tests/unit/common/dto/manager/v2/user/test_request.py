@@ -504,25 +504,32 @@ class TestUserFilter:
         assert f.container_main_gid is not None
         assert f.container_main_gid.greater_than == 500
 
-    def test_container_gids_all_filter(self) -> None:
-        f = UserFilter.model_validate({"container_gids": {"all": [10, 20]}})
+    def test_container_gids_contains_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"contains": 42}})
         assert f.container_gids is not None
-        assert f.container_gids.all_ == [10, 20]
-        assert f.container_gids.any_ is None
+        assert f.container_gids.contains == 42
+        assert f.container_gids.contains_any is None
+        assert f.container_gids.contains_all is None
 
-    def test_container_gids_any_filter(self) -> None:
-        f = UserFilter.model_validate({"container_gids": {"any": [30]}})
+    def test_container_gids_contains_all_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"contains_all": [10, 20]}})
         assert f.container_gids is not None
-        assert f.container_gids.any_ == [30]
-        assert f.container_gids.all_ is None
+        assert f.container_gids.contains_all == [10, 20]
+        assert f.container_gids.contains_any is None
 
-    def test_container_gids_empty_all_rejected(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            UserFilter.model_validate({"container_gids": {"all": []}})
+    def test_container_gids_contains_any_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"contains_any": [30]}})
+        assert f.container_gids is not None
+        assert f.container_gids.contains_any == [30]
+        assert f.container_gids.contains_all is None
 
-    def test_container_gids_empty_any_rejected(self) -> None:
+    def test_container_gids_empty_contains_all_rejected(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            UserFilter.model_validate({"container_gids": {"any": []}})
+            UserFilter.model_validate({"container_gids": {"contains_all": []}})
+
+    def test_container_gids_empty_contains_any_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UserFilter.model_validate({"container_gids": {"contains_any": []}})
 
 
 class TestUserOrder:

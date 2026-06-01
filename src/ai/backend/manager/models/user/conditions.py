@@ -570,6 +570,17 @@ class UserConditions:
     by_container_main_gid = make_int_conditions(UserRow.container_main_gid)
 
     @staticmethod
+    def by_container_gids_contains(value: int) -> QueryCondition:
+        """Filter rows whose container_gids array contains the given value (PG ``@>``)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.container_gids.bool_op("@>")(
+                sa.cast([value], postgresql.ARRAY(sa.Integer))
+            )
+
+        return inner
+
+    @staticmethod
     def by_container_gids_all(values: list[int]) -> QueryCondition:
         """Filter rows whose container_gids array contains ALL given values (PG ``@>``)."""
 

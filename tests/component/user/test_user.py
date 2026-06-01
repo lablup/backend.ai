@@ -617,7 +617,7 @@ class TestV2UserContainerFilter:
             V2SearchUsersRequest(
                 filter=V2UserFilter(
                     container_gids=ArrayFilter[int].model_validate({
-                        "any": container_gids_any_users.query
+                        "contains_any": container_gids_any_users.query
                     })
                 )
             )
@@ -636,7 +636,7 @@ class TestV2UserContainerFilter:
             V2SearchUsersRequest(
                 filter=V2UserFilter(
                     container_gids=ArrayFilter[int].model_validate({
-                        "all": container_gids_all_users.query
+                        "contains_all": container_gids_all_users.query
                     })
                 )
             )
@@ -651,7 +651,7 @@ class TestV2UserContainerFilter:
         admin_v2_registry: V2ClientRegistry,
         single_gid_users: SingleGidUsers,
     ) -> None:
-        """A single gid matches users via container_main_gid OR container_gids.any."""
+        """A single gid matches users via container_main_gid OR container_gids.contains."""
         gid = single_gid_users.gid
         result = await admin_v2_registry.user.admin_search(
             V2SearchUsersRequest(
@@ -659,7 +659,7 @@ class TestV2UserContainerFilter:
                     OR=[
                         V2UserFilter(container_main_gid=IntFilter(equals=gid)),
                         V2UserFilter(
-                            container_gids=ArrayFilter[int].model_validate({"any": [gid]})
+                            container_gids=ArrayFilter[int].model_validate({"contains": gid})
                         ),
                     ]
                 )

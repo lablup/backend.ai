@@ -1146,8 +1146,9 @@ class UserAdapter(BaseAdapter):
         if filter_req.container_gids is not None:
             condition = self.convert_array_filter(
                 filter_req.container_gids,
-                all_factory=UserConditions.by_container_gids_all,
-                any_factory=UserConditions.by_container_gids_any,
+                contains_factory=UserConditions.by_container_gids_contains,
+                contains_any_factory=UserConditions.by_container_gids_any,
+                contains_all_factory=UserConditions.by_container_gids_all,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -1429,8 +1430,9 @@ class UserAdapter(BaseAdapter):
         if filter_req.container_gids is not None:
             condition = self.convert_array_filter(
                 filter_req.container_gids,
-                all_factory=UserConditions.by_container_gids_all,
-                any_factory=UserConditions.by_container_gids_any,
+                contains_factory=UserConditions.by_container_gids_contains,
+                contains_any_factory=UserConditions.by_container_gids_any,
+                contains_all_factory=UserConditions.by_container_gids_all,
             )
             if condition is not None:
                 conditions.append(condition)
