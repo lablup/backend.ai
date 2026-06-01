@@ -74,6 +74,10 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserByIdAction,
     PurgeUserByIdActionResult,
 )
+from ai.backend.manager.services.user.actions.search_keypairs_by_resource_policy import (
+    SearchKeypairsByResourcePolicyAction,
+    SearchKeypairsByResourcePolicyActionResult,
+)
 from ai.backend.manager.services.user.actions.search_users import (
     SearchUsersAction,
     SearchUsersActionResult,
@@ -130,6 +134,9 @@ class UserProcessors(AbstractProcessorPackage):
     ]
     update_my_keypair: ActionProcessor[UpdateMyKeypairAction, UpdateMyKeypairActionResult]
     search_my_keypairs: ActionProcessor[SearchMyKeypairsAction, SearchMyKeypairsActionResult]
+    search_keypairs_by_resource_policy: ActionProcessor[
+        SearchKeypairsByResourcePolicyAction, SearchKeypairsByResourcePolicyActionResult
+    ]
     # Admin keypair operations
     admin_create_keypair: ActionProcessor[AdminCreateKeypairAction, AdminCreateKeypairActionResult]
     admin_update_keypair: ActionProcessor[AdminUpdateKeypairAction, AdminUpdateKeypairActionResult]
@@ -227,6 +234,9 @@ class UserProcessors(AbstractProcessorPackage):
         )
         self.update_my_keypair = ActionProcessor(user_service.update_my_keypair, action_monitors)
         self.search_my_keypairs = ActionProcessor(user_service.search_my_keypairs, action_monitors)
+        self.search_keypairs_by_resource_policy = ActionProcessor(
+            user_service.search_keypairs_by_resource_policy, action_monitors
+        )
         # Admin keypair operations
         self.admin_create_keypair = ActionProcessor(
             user_service.admin_create_keypair, action_monitors
@@ -277,6 +287,7 @@ class UserProcessors(AbstractProcessorPackage):
             SwitchMyMainAccessKeyAction.spec(),
             UpdateMyKeypairAction.spec(),
             SearchMyKeypairsAction.spec(),
+            SearchKeypairsByResourcePolicyAction.spec(),
             AdminCreateKeypairAction.spec(),
             AdminUpdateKeypairAction.spec(),
             AdminDeleteKeypairAction.spec(),

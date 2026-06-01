@@ -80,6 +80,10 @@ from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserByIdAction,
     PurgeUserByIdActionResult,
 )
+from ai.backend.manager.services.user.actions.search_keypairs_by_resource_policy import (
+    SearchKeypairsByResourcePolicyAction,
+    SearchKeypairsByResourcePolicyActionResult,
+)
 from ai.backend.manager.services.user.actions.search_users import (
     SearchUsersAction,
     SearchUsersActionResult,
@@ -457,6 +461,15 @@ class UserService:
             scope=action.scope, querier=action.querier
         )
         return SearchMyKeypairsActionResult(result=result)
+
+    async def search_keypairs_by_resource_policy(
+        self, action: SearchKeypairsByResourcePolicyAction
+    ) -> SearchKeypairsByResourcePolicyActionResult:
+        """Search keypairs assigned to a keypair resource policy (RBAC-scoped)."""
+        result = await self._user_repository.search_keypairs_by_resource_policy(
+            scope=action.scope, querier=action.querier
+        )
+        return SearchKeypairsByResourcePolicyActionResult(result=result)
 
     # ------------------------------------------------------------------ admin keypair operations
 

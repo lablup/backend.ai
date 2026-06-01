@@ -112,7 +112,6 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
     ):
         from strawberry.relay import PageInfo
 
-        from ai.backend.common.data.filter_specs import StringMatchSpec
         from ai.backend.common.dto.manager.v2.keypair.request import SearchMyKeypairsRequest
         from ai.backend.manager.api.gql.base import encode_cursor
         from ai.backend.manager.api.gql.keypair.types.node import (
@@ -120,13 +119,20 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
             KeyPairEdge,
             KeyPairGQL,
         )
-        from ai.backend.manager.models.keypair.conditions import KeypairConditions
+        from ai.backend.manager.api.gql.utils import check_admin_only
+        from ai.backend.manager.repositories.keypair.types import (
+            KeypairResourcePolicySearchScope,
+        )
 
-        # Scope the search to the current user's keypairs assigned to this resource policy.
-        # search_my_keypairs resolves current_user() internally; the resource-policy scope
-        # is applied as a base condition before any user-supplied filters so it cannot be escaped.
-        result = await info.context.adapters.user.search_my_keypairs(
-            SearchMyKeypairsRequest(
+        # This node is reachable from non-admin entry points (e.g. myKeypairResourcePolicyV2),
+        # but listing keypairs spans all users sharing the policy. The keypair resource policy
+        # entity is not RBAC-protected, so the scope-action RBAC check alone would let a regular
+        # user (who can read their own policy) enumerate everyone's keypairs — gate on superadmin.
+        check_admin_only()
+
+        result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
+            scope=KeypairResourcePolicySearchScope(resource_policy_name=self.name),
+            input=SearchMyKeypairsRequest(
                 filter=filter.to_pydantic() if filter is not None else None,
                 order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
                 first=first,
@@ -136,11 +142,6 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
                 limit=limit,
                 offset=offset,
             ),
-            base_conditions=[
-                KeypairConditions.by_resource_policy_equals(
-                    StringMatchSpec(self.name, case_insensitive=False, negated=False)
-                )
-            ],
         )
         nodes = [KeyPairGQL.from_pydantic(item) for item in result.items]
         edges = [KeyPairEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]

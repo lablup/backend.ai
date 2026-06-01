@@ -112,7 +112,10 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.types import (
+    KeypairResourcePolicySearchScope,
+    UserKeypairSearchScope,
+)
 from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
@@ -150,6 +153,9 @@ from ai.backend.manager.services.user.actions.modify_user import (
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     PurgeUserByIdAction,
+)
+from ai.backend.manager.services.user.actions.search_keypairs_by_resource_policy import (
+    SearchKeypairsByResourcePolicyAction,
 )
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
@@ -658,17 +664,12 @@ class UserAdapter(BaseAdapter):
     async def search_my_keypairs(
         self,
         input: SearchMyKeypairsRequest,
-        base_conditions: Sequence[QueryCondition] | None = None,
     ) -> SearchResult[KeypairNode]:
         """Search keypairs owned by the current user.
 
         Calls current_user() internally — the caller does not need to pass scope.
         Supports both cursor-based and offset-based pagination.
         Used by both GQL and REST layers.
-
-        The optional ``base_conditions`` are applied before any user-supplied
-        filters — e.g. the ``keypairs`` connection on the keypair resource policy
-        node passes a resource-policy scope condition.
         """
         me = current_user()
         if me is None:
@@ -686,10 +687,47 @@ class UserAdapter(BaseAdapter):
             before=input.before,
             limit=input.limit,
             offset=input.offset,
-            base_conditions=base_conditions,
         )
         action_result = await self._processors.user.search_my_keypairs.wait_for_complete(
             SearchMyKeypairsAction(scope=scope, querier=querier)
+        )
+        return SearchResult(
+            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
+            total_count=action_result.result.total_count,
+            has_next_page=action_result.result.has_next_page,
+            has_previous_page=action_result.result.has_previous_page,
+        )
+
+    async def gql_search_keypairs_by_resource_policy(
+        self,
+        scope: KeypairResourcePolicySearchScope,
+        input: SearchMyKeypairsRequest,
+    ) -> SearchResult[KeypairNode]:
+        """Search keypairs assigned to a keypair resource policy (GQL connection).
+
+        Used by the ``keypairs`` connection on the keypair resource policy node.
+        The connection field gates access with ``check_admin_only()`` because the
+        keypair resource policy entity itself is not RBAC-protected; this method
+        runs the RBAC-scoped action so superadmins receive all keypairs governed
+        by the policy.
+        """
+        conditions = self._convert_keypair_filter(input.filter) if input.filter else []
+        orders = self._convert_keypair_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KEYPAIR_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = (
+            await self._processors.user.search_keypairs_by_resource_policy.wait_for_complete(
+                SearchKeypairsByResourcePolicyAction(scope=scope, querier=querier)
+            )
         )
         return SearchResult(
             items=[self._keypair_data_to_node(item) for item in action_result.result.items],
