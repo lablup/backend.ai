@@ -5545,9 +5545,7 @@ input KeypairResourcePolicyV2Filter {
   maxConcurrentSftpSessions: IntFilter = null
   maxPendingSessionCount: IntFilter = null
 
-  """
-  Added in UNRELEASED. Filter policies by their assigned keypairs (e.g., policies linked to keypairs owned by a specific user).
-  """
+  """Added in UNRELEASED. Filter policies by their assigned keypairs."""
   keypair: KeypairResourcePolicyKeypairNestedFilter = null
 }
 

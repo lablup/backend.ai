@@ -285,7 +285,7 @@ class KeypairResourcePolicyKeypairNestedFilter(BaseRequestModel):
     """Nested filter for keypairs attached to a keypair resource policy.
 
     Filters policies that have at least one keypair matching all specified
-    conditions (e.g., keypairs owned by a given user).
+    conditions.
     """
 
     user_id: UUIDFilter | None = Field(
