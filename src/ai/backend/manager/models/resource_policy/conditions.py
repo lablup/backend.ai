@@ -8,6 +8,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.models.condition_utils import make_int_conditions, make_string_in_factory
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import KeyPairResourcePolicyRow, ProjectResourcePolicyRow, UserResourcePolicyRow
@@ -111,6 +112,26 @@ class KeypairResourcePolicyConditions:
     by_max_pending_session_count = make_int_conditions(
         KeyPairResourcePolicyRow.max_pending_session_count
     )
+
+    # ==================== Keypair Nested Filters ====================
+
+    @staticmethod
+    def exists_keypair_combined(keypair_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple keypair conditions into a single EXISTS subquery.
+
+        EXISTS subquery: KeypairResourcePolicy → Keypair
+        (via FK KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name).
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(
+                KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name
+            )
+            for cond in keypair_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
 
     # ==================== Cursor Conditions ====================
 
