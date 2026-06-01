@@ -96,11 +96,16 @@ class BulkRestoreRolePresetsPayload(BaseResponseModel):
 
 
 class BulkPurgeRolePresetsPayload(BaseResponseModel):
-    """Payload for bulk-hard-deleting role presets."""
+    """Payload for bulk-hard-deleting role presets.
+
+    Purge is validated per row (each isolated by a savepoint) so individual presets
+    may fail independently; successes and failures are reported separately. The
+    returned items are snapshots of the rows as they existed just before purge.
+    """
 
     items: list[RolePresetNode] = Field(
         default_factory=list,
-        description="Snapshot of role presets that were purged.",
+        description="Role presets that were purged.",
     )
     failed: list[BulkRolePresetFailureInfo] = Field(
         default_factory=list,
