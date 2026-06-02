@@ -15,8 +15,10 @@ from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import BulkUpdaterResult, Updater
+from ai.backend.manager.repositories.replica_group.types import ReplicaGroupScalingReconcileApply
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupDeploySchedulingView,
+    ReplicaGroupScalingReconcileView,
     ReplicaGroupScalingSchedulingView,
 )
 
@@ -65,8 +67,22 @@ class ReplicaGroupRepository:
         return await self._db_source.search_scaling_scheduling_views(querier)
 
     @replica_group_repository_resilience.apply()
+    async def fetch_scaling_reconcile_views(
+        self,
+        querier: BatchQuerier,
+    ) -> list[ReplicaGroupScalingReconcileView]:
+        return await self._db_source.fetch_scaling_reconcile_views(querier)
+
+    @replica_group_repository_resilience.apply()
     async def update_replica_groups(
         self,
         updaters: Sequence[Updater[ReplicaGroupRow]],
     ) -> BulkUpdaterResult[ReplicaGroupRow]:
         return await self._db_source.update_replica_groups(updaters)
+
+    @replica_group_repository_resilience.apply()
+    async def apply_scaling_reconcile(
+        self,
+        apply: ReplicaGroupScalingReconcileApply,
+    ) -> None:
+        return await self._db_source.apply_scaling_reconcile(apply)
