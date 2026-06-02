@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import uuid
 
-from ai.backend.common.dto.manager.v2.keypair.request import KeypairFilter as KeypairFilterDTO
+from ai.backend.common.dto.manager.v2.keypair.request import (
+    KeypairFilter as KeypairFilterDTO,
+)
 from ai.backend.manager.api.gql.base import UUIDFilter
 from ai.backend.manager.api.gql.keypair.types.filters import (
     KeypairFilterGQL,
