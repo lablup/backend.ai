@@ -1,7 +1,7 @@
 """expand_prometheus_query_presets
 
 Revision ID: 7af18070fdef
-Revises: 0113c63f3261
+Revises: ed42bc179b91
 Create Date: 2026-05-27 00:00:00.000000
 
 # Part of: 26.3.0 (main)
@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "7af18070fdef"
-down_revision = "0113c63f3261"
+down_revision = "ed42bc179b91"
 branch_labels = None
 depends_on = None
 
