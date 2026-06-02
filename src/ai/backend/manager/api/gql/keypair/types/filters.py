@@ -6,9 +6,13 @@ from enum import StrEnum
 from typing import Self
 
 from ai.backend.common.dto.manager.v2.keypair.request import (
-    KeypairFilter,
-    KeypairOrderBy,
-    KeypairUserNestedFilter,
+    KeypairFilter as KeypairFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.keypair.request import (
+    KeypairOrderBy as KeypairOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.keypair.request import (
+    KeypairUserNestedFilter as KeypairUserNestedFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
@@ -36,7 +40,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
     ),
     name="KeypairUserNestedFilter",
 )
-class KeypairUserNestedFilterGQL(PydanticInputMixin[KeypairUserNestedFilter]):
+class KeypairUserNestedFilterGQL(PydanticInputMixin[KeypairUserNestedFilterDTO]):
     """Nested filter for the keypair owner."""
 
     user_id: UUIDFilter | None = None
@@ -53,7 +57,7 @@ class KeypairUserNestedFilterGQL(PydanticInputMixin[KeypairUserNestedFilter]):
     ),
     name="KeypairFilter",
 )
-class KeypairFilterGQL(PydanticInputMixin[KeypairFilter]):
+class KeypairFilterGQL(PydanticInputMixin[KeypairFilterDTO]):
     """Filter for keypair queries."""
 
     is_active: bool | None = None
@@ -105,7 +109,7 @@ class KeypairOrderFieldGQL(StrEnum):
     ),
     name="KeypairOrderBy",
 )
-class KeypairOrderByGQL(PydanticInputMixin[KeypairOrderBy]):
+class KeypairOrderByGQL(PydanticInputMixin[KeypairOrderByDTO]):
     """OrderBy for keypair queries."""
 
     field: KeypairOrderFieldGQL = KeypairOrderFieldGQL.CREATED_AT
