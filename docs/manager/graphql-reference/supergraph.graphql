@@ -231,7 +231,7 @@ type AdminCreateKeypairPayload
   @join__type(graph: STRAWBERRY)
 {
   """The newly created keypair."""
-  keypair: KeyPairGQL!
+  keypair: KeyPairV2!
 
   """The secret key. Only returned at creation time."""
   secretKey: String!
@@ -340,7 +340,7 @@ type AdminUpdateKeypairPayload
   @join__type(graph: STRAWBERRY)
 {
   """The updated keypair."""
-  keypair: KeyPairGQL!
+  keypair: KeyPairV2!
 }
 
 type Agent implements Item
@@ -3105,7 +3105,7 @@ input CreateContainerRegistryInput
 }
 
 """Added in 26.4.2. Input for creating a container registry."""
-input CreateContainerRegistryInputGQL
+input CreateContainerRegistryInputV2
   @join__type(graph: STRAWBERRY)
 {
   """URL of the container registry."""
@@ -3188,7 +3188,7 @@ type CreateContainerRegistryNodeV2
 """
 Added in 26.4.2. Payload for container registry create/update mutations.
 """
-type CreateContainerRegistryPayloadGQL
+type CreateContainerRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
   """Created container registry."""
@@ -3299,7 +3299,7 @@ input CreateDeploymentRevisionPresetInput
 }
 
 """Added in 26.4.2. Create deployment revision preset payload."""
-type CreateDeploymentRevisionPresetPayloadGQL
+type CreateDeploymentRevisionPresetPayload
   @join__type(graph: STRAWBERRY)
 {
   """The created preset."""
@@ -3315,7 +3315,7 @@ type CreateDomain
 }
 
 """Added in 26.4.2. Input for creating a new domain."""
-input CreateDomainInputGQL
+input CreateDomainInput
   @join__type(graph: STRAWBERRY)
 {
   """Domain name. Must be unique across the system."""
@@ -3430,30 +3430,8 @@ type CreateKeyPairResourcePolicy
   resource_policy: KeyPairResourcePolicy
 }
 
-input CreateKeyPairResourcePolicyInput
-  @join__type(graph: GRAPHENE)
-{
-  default_for_unspecified: String!
-  total_resource_slots: JSONString = "{}"
-  max_session_lifetime: Int = 0
-  max_concurrent_sessions: Int!
-  max_concurrent_sftp_sessions: Int = 1
-  max_containers_per_session: Int!
-  idle_timeout: BigInt!
-  allowed_vfolder_hosts: JSONString
-  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
-  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
-  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
-
-  """Added in 24.03.4."""
-  max_pending_session_count: Int
-
-  """Added in 24.03.4."""
-  max_pending_session_resource_slots: JSONString
-}
-
 """Added in 26.4.2. Input for creating a keypair resource policy."""
-input CreateKeypairResourcePolicyInputGQL
+input CreateKeypairResourcePolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Policy name. Must be unique."""
@@ -3490,10 +3468,32 @@ input CreateKeypairResourcePolicyInputGQL
   allowedVfolderHosts: [VFolderHostPermissionEntryInput!]!
 }
 
+input CreateKeyPairResourcePolicyInput
+  @join__type(graph: GRAPHENE)
+{
+  default_for_unspecified: String!
+  total_resource_slots: JSONString = "{}"
+  max_session_lifetime: Int = 0
+  max_concurrent_sessions: Int!
+  max_concurrent_sftp_sessions: Int = 1
+  max_containers_per_session: Int!
+  idle_timeout: BigInt!
+  allowed_vfolder_hosts: JSONString
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
+
+  """Added in 24.03.4."""
+  max_pending_session_count: Int
+
+  """Added in 24.03.4."""
+  max_pending_session_resource_slots: JSONString
+}
+
 """
 Added in 26.4.2. Payload for keypair resource policy create/update mutations.
 """
-type CreateKeypairResourcePolicyPayloadGQL
+type CreateKeypairResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   """Created keypair resource policy."""
@@ -3520,7 +3520,7 @@ type CreateLoginClientTypePayload
 }
 
 """Added in 26.4.2. Create model card payload."""
-type CreateModelCardPayloadGQL
+type CreateModelCardPayload
   @join__type(graph: STRAWBERRY)
 {
   """The created model card."""
@@ -3662,7 +3662,7 @@ input CreatePermissionInput
 }
 
 """Added in 26.4.2. Input for creating a new project."""
-input CreateProjectInputGQL
+input CreateProjectInput
   @join__type(graph: STRAWBERRY)
 {
   """Project name. Must be unique within the domain."""
@@ -3710,7 +3710,7 @@ input CreateProjectResourcePolicyInput
 }
 
 """Added in 26.4.2. Input for creating a project resource policy."""
-input CreateProjectResourcePolicyInputGQL
+input CreateProjectResourcePolicyInputV2
   @join__type(graph: STRAWBERRY)
 {
   """Policy name. Must be unique."""
@@ -3729,7 +3729,7 @@ input CreateProjectResourcePolicyInputGQL
 """
 Added in 26.4.2. Payload for project resource policy create/update mutations.
 """
-type CreateProjectResourcePolicyPayloadGQL
+type CreateProjectResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   """Created project resource policy."""
@@ -3807,7 +3807,7 @@ input CreateResourceGroupInput
 }
 
 """Added in 26.4.2. Payload for resource group creation."""
-type CreateResourceGroupPayloadGQL
+type CreateResourceGroupPayload
   @join__type(graph: STRAWBERRY)
 {
   """Created resource group."""
@@ -3835,7 +3835,7 @@ input CreateResourcePresetInput
 }
 
 """Added in 26.4.2. Payload for resource preset creation."""
-type CreateResourcePresetPayloadGQL
+type CreateResourcePresetPayload
   @join__type(graph: STRAWBERRY)
 {
   """Created resource preset."""
@@ -3924,7 +3924,7 @@ input CreateRuntimeVariantInput
 }
 
 """Added in 26.4.2. Payload for runtime variant creation."""
-type CreateRuntimeVariantPayloadGQL
+type CreateRuntimeVariantPayload
   @join__type(graph: STRAWBERRY)
 {
   """The created runtime variant."""
@@ -3964,7 +3964,7 @@ input CreateRuntimeVariantPresetInput
 }
 
 """Added in 26.4.2. Create preset payload."""
-type CreateRuntimeVariantPresetPayloadGQL
+type CreateRuntimeVariantPresetPayload
   @join__type(graph: STRAWBERRY)
 {
   """The created preset."""
@@ -4069,7 +4069,7 @@ input CreateUserResourcePolicyInput
 }
 
 """Added in 26.4.2. Input for creating a user resource policy."""
-input CreateUserResourcePolicyInputGQL
+input CreateUserResourcePolicyInputV2
   @join__type(graph: STRAWBERRY)
 {
   """Policy name. Must be unique."""
@@ -4096,7 +4096,7 @@ input CreateUserResourcePolicyInputGQL
 """
 Added in 26.4.2. Payload for user resource policy create/update mutations.
 """
-type CreateUserResourcePolicyPayloadGQL
+type CreateUserResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   """Created user resource policy."""
@@ -4500,7 +4500,7 @@ input DelegateImportArtifactsInput
   """
   Added in 26.1.0. Options controlling import behavior such as forcing re-download.
   """
-  options: ImportArtifactsOptionsGQL = null
+  options: ImportArtifactsOptions = null
 }
 
 """
@@ -4635,7 +4635,7 @@ type DeleteContainerRegistryNodeV2
 }
 
 """Added in 26.4.2. Payload for container registry deletion."""
-type DeleteContainerRegistryPayloadGQL
+type DeleteContainerRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted container registry."""
@@ -4666,7 +4666,7 @@ type DeleteDeploymentPayload
 }
 
 """Added in 26.4.2. Delete deployment revision preset payload."""
-type DeleteDeploymentRevisionPresetPayloadGQL
+type DeleteDeploymentRevisionPresetPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted preset."""
@@ -4699,7 +4699,7 @@ type DeleteDomainConfigPayload
 }
 
 """Added in 26.4.2. Payload for domain deletion mutation."""
-type DeleteDomainPayloadGQL
+type DeleteDomainPayload
   @join__type(graph: STRAWBERRY)
 {
   """Whether the deletion was successful."""
@@ -4773,7 +4773,7 @@ type DeleteKeyPairResourcePolicy
 }
 
 """Added in 26.4.2. Payload for keypair resource policy deletion."""
-type DeleteKeypairResourcePolicyPayloadGQL
+type DeleteKeypairResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   """Name of the deleted keypair resource policy."""
@@ -4789,7 +4789,7 @@ type DeleteLoginClientTypePayload
 }
 
 """Added in 26.4.2. Delete model card payload."""
-type DeleteModelCardPayloadGQL
+type DeleteModelCardPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted model card."""
@@ -4875,7 +4875,7 @@ type DeletePermissionPayload
 }
 
 """Added in 26.4.2. Payload for project deletion mutation."""
-type DeleteProjectPayloadGQL
+type DeleteProjectPayload
   @join__type(graph: STRAWBERRY)
 {
   """Whether the deletion was successful."""
@@ -4890,7 +4890,7 @@ type DeleteProjectResourcePolicy
 }
 
 """Added in 26.4.2. Payload for project resource policy deletion."""
-type DeleteProjectResourcePolicyPayloadGQL
+type DeleteProjectResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   """Name of the deleted project resource policy."""
@@ -4921,7 +4921,7 @@ type DeleteReservoirRegistryPayload
 }
 
 """Added in 26.4.2. Payload for resource group deletion."""
-type DeleteResourceGroupPayloadGQL
+type DeleteResourceGroupPayload
   @join__type(graph: STRAWBERRY)
 {
   """Name of the deleted resource group."""
@@ -4936,7 +4936,7 @@ type DeleteResourcePreset
 }
 
 """Added in 26.4.2. Payload for resource preset deletion."""
-type DeleteResourcePresetPayloadGQL
+type DeleteResourcePresetPayload
   @join__type(graph: STRAWBERRY)
 {
   """UUID of the deleted resource preset."""
@@ -4959,7 +4959,7 @@ type DeleteRolePayload
 }
 
 """Added in 26.4.2. Payload for runtime variant deletion."""
-type DeleteRuntimeVariantPayloadGQL
+type DeleteRuntimeVariantPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted runtime variant."""
@@ -4967,7 +4967,7 @@ type DeleteRuntimeVariantPayloadGQL
 }
 
 """Added in 26.4.2. Delete preset payload."""
-type DeleteRuntimeVariantPresetPayloadGQL
+type DeleteRuntimeVariantPresetPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted preset."""
@@ -4983,7 +4983,7 @@ input DeleteRuntimeVariantsInput
 }
 
 """Added in 26.4.2. Payload for bulk runtime variant deletion."""
-type DeleteRuntimeVariantsPayloadGQL
+type DeleteRuntimeVariantsPayload
   @join__type(graph: STRAWBERRY)
 {
   """Number of runtime variants successfully deleted."""
@@ -5037,7 +5037,7 @@ type DeleteUserResourcePolicy
 }
 
 """Added in 26.4.2. Payload for user resource policy deletion."""
-type DeleteUserResourcePolicyPayloadGQL
+type DeleteUserResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   """Name of the deleted user resource policy."""
@@ -5130,14 +5130,14 @@ input DeploymentFilter
 }
 
 """Added in UNRELEASED. Deployment handler-options policy response."""
-type DeploymentHandlerOptionsInfoGQL
+type DeploymentHandlerOptionsInfo
   @join__type(graph: STRAWBERRY)
 {
   """Fallback per-handler policy."""
-  default: HandlerOptionsInfoGQL!
+  default: HandlerOptionsInfo!
 
   """Per-handler overrides."""
-  byHandler: [HandlerOptionsEntryInfoGQL!]!
+  byHandler: [HandlerOptionsEntryInfo!]!
 }
 
 """Added in UNRELEASED. Deployment handler-options policy input."""
@@ -5235,11 +5235,11 @@ enum DeploymentHistoryOrderField
 }
 
 """Added in UNRELEASED. Deployment options payload response."""
-type DeploymentOptionsInfoGQL
+type DeploymentOptionsInfo
   @join__type(graph: STRAWBERRY)
 {
   """Handler-keyed scheduler policy (timeout + retry)."""
-  handlerOptions: DeploymentHandlerOptionsInfoGQL!
+  handlerOptions: DeploymentHandlerOptionsInfo!
 }
 
 """Added in UNRELEASED. Deployment options payload input."""
@@ -5490,7 +5490,7 @@ input DeploymentStatusFilter
 """
 Added in 25.19.0. Represents the deployment strategy configuration that determines how updates are rolled out to replicas (e.g., rolling update, blue-green).
 """
-type DeploymentStrategyGQL
+type DeploymentStrategy
   @join__type(graph: STRAWBERRY)
 {
   type: DeploymentStrategyType!
@@ -5930,7 +5930,7 @@ type DomainNode implements Node
 }
 
 """Added in 26.4.2. Payload for domain mutation responses."""
-type DomainPayloadGQL
+type DomainPayload
   @join__type(graph: STRAWBERRY)
 {
   """The domain entity."""
@@ -6793,7 +6793,7 @@ input ExtraMountInput
 """
 Added in 25.19.0. An extra virtual folder mount attached to a model revision.
 """
-type ExtraVFolderMountInfoGQL
+type ExtraVFolderMountInfo
   @join__type(graph: STRAWBERRY)
 {
   """The vfolder of this entity."""
@@ -7085,7 +7085,7 @@ scalar GroupPermissionField
 """
 Added in UNRELEASED. A single (handler_name, options) entry response for deployment handler options.
 """
-type HandlerOptionsEntryInfoGQL
+type HandlerOptionsEntryInfo
   @join__type(graph: STRAWBERRY)
 {
   """Phase timeout in seconds; `null` means unbounded for this entry."""
@@ -7114,7 +7114,7 @@ input HandlerOptionsEntryInput
 """
 Added in UNRELEASED. Per-handler scheduler policy snapshot for deployment handler options.
 """
-type HandlerOptionsInfoGQL
+type HandlerOptionsInfo
   @join__type(graph: STRAWBERRY)
 {
   """Phase timeout in seconds; `null` means unbounded for this entry."""
@@ -7375,7 +7375,7 @@ type ImageV2 implements Node
   lastUsed: DateTime
 
   """Added in 26.2.0. Aliases for this image."""
-  aliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection
+  aliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection
 }
 
 """
@@ -7437,7 +7437,7 @@ input ImageV2AliasFilter
 """
 Added in 26.2.0. Specifies the field and direction for ordering image aliases in queries.
 """
-input ImageV2AliasOrderByGQL
+input ImageV2AliasOrderBy
   @join__type(graph: STRAWBERRY)
 {
   field: ImageV2AliasOrderField!
@@ -7561,7 +7561,7 @@ type ImageV2MetadataInfo
 """
 Added in 26.2.0. Specifies the field and direction for ordering images in queries.
 """
-input ImageV2OrderByGQL
+input ImageV2OrderBy
   @join__type(graph: STRAWBERRY)
 {
   field: ImageV2OrderField!
@@ -7683,7 +7683,7 @@ input ImportArtifactsInput
   """
   Added in 26.1.0. Options controlling import behavior such as forcing re-download.
   """
-  options: ImportArtifactsOptionsGQL = null
+  options: ImportArtifactsOptions = null
 }
 
 """
@@ -7691,7 +7691,7 @@ Added in 24.09.0. Options for importing artifact revisions.
 
 Controls import behavior such as forcing re-download regardless of digest freshness.
 """
-input ImportArtifactsOptionsGQL
+input ImportArtifactsOptions
   @join__type(graph: STRAWBERRY)
 {
   """Force re-download regardless of digest freshness check."""
@@ -7769,7 +7769,7 @@ type IssueMyKeypairPayload
   @join__type(graph: STRAWBERRY)
 {
   """The newly created keypair."""
-  keypair: KeyPairGQL!
+  keypair: KeyPairV2!
 
   """
   The newly generated secret key. This value is only returned at creation time.
@@ -8241,7 +8241,7 @@ type KeyPairConnection
   pageInfo: PageInfo!
 
   """Contains the nodes in this connection"""
-  edges: [KeyPairGQLEdge!]!
+  edges: [KeyPairV2Edge!]!
 
   """Total number of keypair records matching the query criteria."""
   count: Int!
@@ -8262,64 +8262,6 @@ input KeypairFilter
   AND: [KeypairFilter!] = null
   OR: [KeypairFilter!] = null
   NOT: [KeypairFilter!] = null
-}
-
-"""
-Added in 26.4.2. Keypair entity representing an API access key. The access_key field serves as the unique identifier. Secret key and private SSH key are excluded for security reasons.
-"""
-type KeyPairGQL implements Node
-  @join__implements(graph: STRAWBERRY, interface: "Node")
-  @join__type(graph: STRAWBERRY)
-{
-  """The Globally Unique ID of this object"""
-  id: ID!
-
-  """The access key string."""
-  accessKey: String!
-
-  """Whether the keypair is currently active."""
-  isActive: Boolean
-
-  """Whether the keypair has admin privileges."""
-  isAdmin: Boolean
-
-  """Timestamp when the keypair was created."""
-  createdAt: DateTime
-
-  """Timestamp when the keypair was last modified."""
-  modifiedAt: DateTime
-
-  """Timestamp when the keypair was last used for an API call."""
-  lastUsed: DateTime
-
-  """API rate limit (requests per minute)."""
-  rateLimit: Int!
-
-  """Total number of API queries made with this keypair."""
-  numQueries: Int!
-
-  """Name of the resource policy assigned to this keypair."""
-  resourcePolicy: String!
-
-  """The SSH public key associated with this keypair."""
-  sshPublicKey: String
-
-  """UUID of the user who owns this keypair."""
-  userId: UUID!
-
-  """Added in 26.4.3. The user who owns this keypair."""
-  user: UserV2
-}
-
-"""An edge in a connection."""
-type KeyPairGQLEdge
-  @join__type(graph: STRAWBERRY)
-{
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: KeyPairGQL!
 }
 
 input KeyPairInput
@@ -8527,6 +8469,64 @@ enum KeypairResourcePolicyV2OrderField
   IDLE_TIMEOUT @join__enumValue(graph: STRAWBERRY)
   MAX_CONCURRENT_SFTP_SESSIONS @join__enumValue(graph: STRAWBERRY)
   MAX_PENDING_SESSION_COUNT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.4.2. Keypair entity representing an API access key. The access_key field serves as the unique identifier. Secret key and private SSH key are excluded for security reasons.
+"""
+type KeyPairV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The access key string."""
+  accessKey: String!
+
+  """Whether the keypair is currently active."""
+  isActive: Boolean
+
+  """Whether the keypair has admin privileges."""
+  isAdmin: Boolean
+
+  """Timestamp when the keypair was created."""
+  createdAt: DateTime
+
+  """Timestamp when the keypair was last modified."""
+  modifiedAt: DateTime
+
+  """Timestamp when the keypair was last used for an API call."""
+  lastUsed: DateTime
+
+  """API rate limit (requests per minute)."""
+  rateLimit: Int!
+
+  """Total number of API queries made with this keypair."""
+  numQueries: Int!
+
+  """Name of the resource policy assigned to this keypair."""
+  resourcePolicy: String!
+
+  """The SSH public key associated with this keypair."""
+  sshPublicKey: String
+
+  """UUID of the user who owns this keypair."""
+  userId: UUID!
+
+  """Added in 26.4.3. The user who owns this keypair."""
+  user: UserV2
+}
+
+"""An edge in a connection."""
+type KeyPairV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KeyPairV2!
 }
 
 type KVPair
@@ -9351,10 +9351,10 @@ type ModelDeployment implements Node
   networkAccess: ModelDeploymentNetworkAccess!
   currentRevisionId: ID
   deployingRevisionId: ID
-  defaultDeploymentStrategy: DeploymentStrategyGQL!
+  defaultDeploymentStrategy: DeploymentStrategy!
   replicaState: ReplicaState!
   createdUserId: ID!
-  options: DeploymentOptionsInfoGQL!
+  options: DeploymentOptionsInfo!
 
   """
   Added in UNRELEASED. Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle). ``SCALING`` while the replica reconciler is adjusting replica count; ``STABLE`` once holding at the desired count.
@@ -9755,7 +9755,7 @@ type ModelRevision implements Node
   modelDefinition: ModelDefinition
 
   """Additional volume folder mounts."""
-  extraMounts: [ExtraVFolderMountInfoGQL!]!
+  extraMounts: [ExtraVFolderMountInfo!]!
 
   """
   Added in UNRELEASED. ID of the deployment-level preset that produced this revision. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
@@ -10911,13 +10911,13 @@ type Mutation
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new container registry (admin only)."""
-  adminCreateContainerRegistryV2(input: CreateContainerRegistryInputGQL!): CreateContainerRegistryPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateContainerRegistryV2(input: CreateContainerRegistryInputV2!): CreateContainerRegistryPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a container registry (admin only)."""
-  adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInputGQL!): UpdateContainerRegistryPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInput!): UpdateContainerRegistryPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a container registry (admin only)."""
-  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayload @join__field(graph: STRAWBERRY)
 
   """Added in 25.16.0. Create model deployment."""
   createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload @join__field(graph: STRAWBERRY)
@@ -11166,10 +11166,10 @@ type Mutation
   adminUpdateResourceGroup(input: UpdateResourceGroupInput!): UpdateResourceGroupPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new resource group (admin only)."""
-  adminCreateResourceGroupV2(input: CreateResourceGroupInput!): CreateResourceGroupPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateResourceGroupV2(input: CreateResourceGroupInput!): CreateResourceGroupPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a resource group (admin only)."""
-  adminDeleteResourceGroupV2(name: String!): DeleteResourceGroupPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteResourceGroupV2(name: String!): DeleteResourceGroupPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Update allowed resource groups for a domain (admin only).
@@ -11209,42 +11209,42 @@ type Mutation
   """
   Added in 26.4.2. Create a new domain (admin only). Requires superadmin privileges.
   """
-  adminCreateDomainV2(input: CreateDomainInputGQL!): DomainPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateDomainV2(input: CreateDomainInput!): DomainPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Update a domain (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateDomainV2(domainName: String!, input: UpdateDomainInputGQL!): DomainPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateDomainV2(domainName: String!, input: UpdateDomainInput!): DomainPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Soft-delete a domain (admin only). Requires superadmin privileges.
   """
-  adminDeleteDomainV2(domainName: String!): DeleteDomainPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteDomainV2(domainName: String!): DeleteDomainPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.
   """
-  adminPurgeDomainV2(domainName: String!): PurgeDomainPayloadGQL @join__field(graph: STRAWBERRY)
+  adminPurgeDomainV2(domainName: String!): PurgeDomainPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Create a new project (admin only). Requires superadmin privileges.
   """
-  adminCreateProjectV2(input: CreateProjectInputGQL!): ProjectPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateProjectV2(input: CreateProjectInput!): ProjectPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Update a project (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInputGQL!): ProjectPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInput!): ProjectPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Soft-delete a project (admin only). Requires superadmin privileges.
   """
-  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Permanently purge a project and all associated data (admin only). Requires superadmin privileges.
   """
-  adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayloadGQL @join__field(graph: STRAWBERRY)
+  adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Unassign users from a project. RBAC validates project admin permission.
@@ -11429,46 +11429,46 @@ type Mutation
   adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new keypair resource policy (admin only)."""
-  adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInputGQL!): CreateKeypairResourcePolicyPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInput!): CreateKeypairResourcePolicyPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Update a keypair resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateKeypairResourcePolicyV2(name: String!, input: UpdateKeypairResourcePolicyInputGQL!): UpdateKeypairResourcePolicyPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateKeypairResourcePolicyV2(name: String!, input: UpdateKeypairResourcePolicyInput!): UpdateKeypairResourcePolicyPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a keypair resource policy (admin only)."""
-  adminDeleteKeypairResourcePolicyV2(name: String!): DeleteKeypairResourcePolicyPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteKeypairResourcePolicyV2(name: String!): DeleteKeypairResourcePolicyPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new user resource policy (admin only)."""
-  adminCreateUserResourcePolicyV2(input: CreateUserResourcePolicyInputGQL!): CreateUserResourcePolicyPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateUserResourcePolicyV2(input: CreateUserResourcePolicyInputV2!): CreateUserResourcePolicyPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Update a user resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateUserResourcePolicyV2(name: String!, input: UpdateUserResourcePolicyInputGQL!): UpdateUserResourcePolicyPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateUserResourcePolicyV2(name: String!, input: UpdateUserResourcePolicyInput!): UpdateUserResourcePolicyPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a user resource policy (admin only)."""
-  adminDeleteUserResourcePolicyV2(name: String!): DeleteUserResourcePolicyPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteUserResourcePolicyV2(name: String!): DeleteUserResourcePolicyPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new project resource policy (admin only)."""
-  adminCreateProjectResourcePolicyV2(input: CreateProjectResourcePolicyInputGQL!): CreateProjectResourcePolicyPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateProjectResourcePolicyV2(input: CreateProjectResourcePolicyInputV2!): CreateProjectResourcePolicyPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Update a project resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateProjectResourcePolicyV2(name: String!, input: UpdateProjectResourcePolicyInputGQL!): UpdateProjectResourcePolicyPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateProjectResourcePolicyV2(name: String!, input: UpdateProjectResourcePolicyInput!): UpdateProjectResourcePolicyPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a project resource policy (admin only)."""
-  adminDeleteProjectResourcePolicyV2(name: String!): DeleteProjectResourcePolicyPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteProjectResourcePolicyV2(name: String!): DeleteProjectResourcePolicyPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new resource preset (admin only)."""
-  adminCreateResourcePresetV2(input: CreateResourcePresetV2Input!): CreateResourcePresetPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateResourcePresetV2(input: CreateResourcePresetV2Input!): CreateResourcePresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a resource preset (admin only)."""
-  adminUpdateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a resource preset (admin only)."""
-  adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new login client type (super admin only)."""
   adminCreateLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload @join__field(graph: STRAWBERRY)
@@ -11480,43 +11480,43 @@ type Mutation
   adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new runtime variant (superadmin only)."""
-  adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a runtime variant (superadmin only)."""
-  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a runtime variant (superadmin only)."""
-  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
-  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a runtime variant preset (superadmin only)."""
-  adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a runtime variant preset (superadmin only)."""
-  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a runtime variant preset (superadmin only)."""
-  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a deployment revision preset (admin only)."""
-  adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a deployment revision preset (admin only)."""
-  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a deployment revision preset (admin only)."""
-  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a model card (admin only)."""
-  adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL @join__field(graph: STRAWBERRY)
+  adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Update a model card (admin only)."""
-  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL @join__field(graph: STRAWBERRY)
+  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Delete a model card (admin only)."""
-  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL @join__field(graph: STRAWBERRY)
+  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
@@ -12648,7 +12648,7 @@ type ProjectOrganizationInfo
 }
 
 """Added in 26.4.2. Payload for project mutation responses."""
-type ProjectPayloadGQL
+type ProjectPayload
   @join__type(graph: STRAWBERRY)
 {
   """The project entity."""
@@ -13137,7 +13137,7 @@ type PurgeDomain
 }
 
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""
-type PurgeDomainPayloadGQL
+type PurgeDomainPayload
   @join__type(graph: STRAWBERRY)
 {
   """Whether the purge was successful."""
@@ -13204,7 +13204,7 @@ type PurgeImagesPayload
 }
 
 """Added in 26.4.2. Payload for project permanent deletion mutation."""
-type PurgeProjectPayloadGQL
+type PurgeProjectPayload
   @join__type(graph: STRAWBERRY)
 {
   """Whether the purge was successful."""
@@ -13881,7 +13881,7 @@ type Query
   """
   Added in 26.2.0. Query images with optional filtering, ordering, and pagination (admin only). Returns container images available in the system. Images are container specifications that define runtime environments for compute sessions. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.
   """
-  adminImagesV2(filter: ImageV2Filter = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)
+  adminImagesV2(filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
@@ -13947,7 +13947,7 @@ type Query
   """
   Added in 26.2.0. Query image aliases with optional filtering, ordering, and pagination. Returns image aliases that provide alternative names for container images. Use filters to search by alias string. Supports both cursor-based and offset-based pagination.
   """
-  adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection @join__field(graph: STRAWBERRY)
+  adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.
@@ -14010,7 +14010,7 @@ type Query
   """
   Added in 26.4.2. Get a single keypair by access key (admin only). Requires superadmin privileges.
   """
-  adminKeypairV2(accessKey: String!): KeyPairGQL @join__field(graph: STRAWBERRY)
+  adminKeypairV2(accessKey: String!): KeyPairV2 @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. List all keypairs with filtering and pagination (admin only). Requires superadmin privileges.
@@ -14093,12 +14093,12 @@ type Query
   """
   Added in 26.2.0. Query images within a specific container registry with optional filtering, ordering, and pagination. Returns container images that belong to the specified registry. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.
   """
-  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageV2Filter = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)
+  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Query image aliases within a specific image with optional filtering, ordering, and pagination. Returns image aliases that belong to the specified image. Supports both cursor-based and offset-based pagination.
   """
-  imageScopedAliases(scope: ImageV2Scope!, filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection @join__field(graph: STRAWBERRY)
+  imageScopedAliases(scope: ImageV2Scope!, filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Get scheduling history for a specific session."""
   sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection @join__field(graph: STRAWBERRY)
@@ -14756,7 +14756,7 @@ type ReplaceResourceGroupDefaultDeploymentOptionsPayload
   resourceGroupName: String!
 
   """The newly persisted ``default_deployment_options`` surface."""
-  defaultDeploymentOptions: DeploymentOptionsInfoGQL!
+  defaultDeploymentOptions: DeploymentOptionsInfo!
 }
 
 """
@@ -15061,7 +15061,7 @@ type ResourceGroup implements Node
   """
   Added in UNRELEASED. Default deployment options (timeouts, etc.) snapshot-copied onto each new deployment created in this resource group.
   """
-  defaultDeploymentOptions: DeploymentOptionsInfoGQL!
+  defaultDeploymentOptions: DeploymentOptionsInfo!
 
   """
   Added in UNRELEASED. Default session options used as the fallback layer for the scheduling controller's options resolver at session enqueue time.
@@ -18180,7 +18180,7 @@ type UpdateAutoScalingRulePayload
 """
 Added in 26.4.2. Input for updating a container registry. All fields optional except id.
 """
-input UpdateContainerRegistryInputGQL
+input UpdateContainerRegistryInput
   @join__type(graph: STRAWBERRY)
 {
   """ID of the registry to update."""
@@ -18215,7 +18215,7 @@ input UpdateContainerRegistryInputGQL
 }
 
 """Added in 26.4.2. Payload for container registry update mutation."""
-type UpdateContainerRegistryPayloadGQL
+type UpdateContainerRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
   """Updated container registry."""
@@ -18359,7 +18359,7 @@ input UpdateDeploymentRevisionPresetInput
 }
 
 """Added in 26.4.2. Update deployment revision preset payload."""
-type UpdateDeploymentRevisionPresetPayloadGQL
+type UpdateDeploymentRevisionPresetPayload
   @join__type(graph: STRAWBERRY)
 {
   """The updated preset."""
@@ -18369,7 +18369,7 @@ type UpdateDeploymentRevisionPresetPayloadGQL
 """
 Added in 26.4.2. Input for updating domain information. All fields optional.
 """
-input UpdateDomainInputGQL
+input UpdateDomainInput
   @join__type(graph: STRAWBERRY)
 {
   """New domain name."""
@@ -18409,7 +18409,7 @@ type UpdateHuggingFaceRegistryPayload
 """
 Added in 26.4.2. Input for updating a keypair resource policy. All fields optional.
 """
-input UpdateKeypairResourcePolicyInputGQL
+input UpdateKeypairResourcePolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Updated default for unspecified."""
@@ -18444,7 +18444,7 @@ input UpdateKeypairResourcePolicyInputGQL
 }
 
 """Added in 26.4.2. Payload for keypair resource policy update mutation."""
-type UpdateKeypairResourcePolicyPayloadGQL
+type UpdateKeypairResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   """Updated keypair resource policy."""
@@ -18473,7 +18473,7 @@ type UpdateLoginClientTypePayload
 }
 
 """Added in 26.4.2. Update model card payload."""
-type UpdateModelCardPayloadGQL
+type UpdateModelCardPayload
   @join__type(graph: STRAWBERRY)
 {
   """The updated model card."""
@@ -18574,7 +18574,7 @@ type UpdateMyKeypairPayload
   @join__type(graph: STRAWBERRY)
 {
   """The updated keypair."""
-  keypair: KeyPairGQL!
+  keypair: KeyPairV2!
 }
 
 """Added in 24.09.0. Input for updating a notification channel"""
@@ -18650,7 +18650,7 @@ input UpdatePermissionInput
 """
 Added in 26.4.2. Input for updating project information. All fields optional.
 """
-input UpdateProjectInputGQL
+input UpdateProjectInput
   @join__type(graph: STRAWBERRY)
 {
   """New project name."""
@@ -18672,7 +18672,7 @@ input UpdateProjectInputGQL
 """
 Added in 26.4.2. Input for updating a project resource policy. All fields optional.
 """
-input UpdateProjectResourcePolicyInputGQL
+input UpdateProjectResourcePolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Updated max vfolder count."""
@@ -18686,7 +18686,7 @@ input UpdateProjectResourcePolicyInputGQL
 }
 
 """Added in 26.4.2. Payload for project resource policy update mutation."""
-type UpdateProjectResourcePolicyPayloadGQL
+type UpdateProjectResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   """Updated project resource policy."""
@@ -18805,7 +18805,7 @@ type UpdateResourceGroupPayload
 }
 
 """Added in 26.4.2. Payload for resource preset update."""
-type UpdateResourcePresetPayloadGQL
+type UpdateResourcePresetPayload
   @join__type(graph: STRAWBERRY)
 {
   """Updated resource preset."""
@@ -18878,7 +18878,7 @@ input UpdateRuntimeVariantInput
 }
 
 """Added in 26.4.2. Payload for runtime variant update."""
-type UpdateRuntimeVariantPayloadGQL
+type UpdateRuntimeVariantPayload
   @join__type(graph: STRAWBERRY)
 {
   """The updated runtime variant."""
@@ -18915,7 +18915,7 @@ input UpdateRuntimeVariantPresetInput
 }
 
 """Added in 26.4.2. Update preset payload."""
-type UpdateRuntimeVariantPresetPayloadGQL
+type UpdateRuntimeVariantPresetPayload
   @join__type(graph: STRAWBERRY)
 {
   """The updated preset."""
@@ -18925,7 +18925,7 @@ type UpdateRuntimeVariantPresetPayloadGQL
 """
 Added in 26.4.2. Input for updating a user resource policy. All fields optional.
 """
-input UpdateUserResourcePolicyInputGQL
+input UpdateUserResourcePolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Updated max vfolder count."""
@@ -18947,7 +18947,7 @@ input UpdateUserResourcePolicyInputGQL
 }
 
 """Added in 26.4.2. Payload for user resource policy update mutation."""
-type UpdateUserResourcePolicyPayloadGQL
+type UpdateUserResourcePolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   """Updated user resource policy."""

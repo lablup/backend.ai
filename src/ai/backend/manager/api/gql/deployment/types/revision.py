@@ -304,6 +304,7 @@ class ModelMountConfig:
         description="An extra virtual folder mount attached to a model revision.",
     ),
     model=ExtraVFolderMountGQLDTO,
+    name="ExtraVFolderMountInfo",
 )
 class ExtraVFolderMountInfoGQL:
     vfolder_id: ID

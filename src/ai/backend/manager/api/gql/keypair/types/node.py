@@ -34,7 +34,7 @@ if TYPE_CHECKING:
             "Secret key and private SSH key are excluded for security reasons."
         ),
     ),
-    name="KeyPairGQL",
+    name="KeyPairV2",
 )
 class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     """Keypair entity accessible via Relay Node interface."""

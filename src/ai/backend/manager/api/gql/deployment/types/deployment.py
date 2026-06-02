@@ -201,6 +201,7 @@ ScalingStateGQL: type[ScalingState] = gql_enum(
         description="Represents the deployment strategy configuration that determines how updates are rolled out to replicas (e.g., rolling update, blue-green).",
     ),
     model=DeploymentStrategyInfoDTO,
+    name="DeploymentStrategy",
 )
 class DeploymentStrategyGQL:
     type: DeploymentStrategyTypeGQL

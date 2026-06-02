@@ -487,6 +487,7 @@ class ImageV2OrderFieldGQL(StrEnum):
         description="Specifies the field and direction for ordering images in queries.",
         added_version="26.2.0",
     ),
+    name="ImageV2OrderBy",
 )
 class ImageV2OrderByGQL(PydanticInputMixin[ImageOrderByInputDTO], GQLOrderBy):
     field: ImageV2OrderFieldGQL
@@ -550,6 +551,7 @@ class ImageV2AliasOrderFieldGQL(StrEnum):
         description="Specifies the field and direction for ordering image aliases in queries.",
         added_version="26.2.0",
     ),
+    name="ImageV2AliasOrderBy",
 )
 class ImageV2AliasOrderByGQL(PydanticInputMixin[ImageAliasOrderByInputDTO], GQLOrderBy):
     field: ImageV2AliasOrderFieldGQL

@@ -48,7 +48,8 @@ UNSET = None
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for creating a new project.",
-    )
+    ),
+    name="CreateProjectInput",
 )
 class CreateProjectInputGQL(PydanticInputMixin[CreateProjectInputDTO]):
     """Input for creating a new project."""
@@ -68,7 +69,8 @@ class CreateProjectInputGQL(PydanticInputMixin[CreateProjectInputDTO]):
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for updating project information. All fields optional.",
-    )
+    ),
+    name="UpdateProjectInput",
 )
 class UpdateProjectInputGQL(PydanticInputMixin[UpdateProjectInputDTO]):
     """Input for updating project information."""
@@ -91,6 +93,7 @@ class UpdateProjectInputGQL(PydanticInputMixin[UpdateProjectInputDTO]):
         description="Payload for project mutation responses.",
     ),
     model=ProjectPayloadDTO,
+    name="ProjectPayload",
 )
 class ProjectPayloadGQL(PydanticOutputMixin[ProjectPayloadDTO]):
     """Payload for project create/update mutations."""
@@ -104,6 +107,7 @@ class ProjectPayloadGQL(PydanticOutputMixin[ProjectPayloadDTO]):
         description="Payload for project deletion mutation.",
     ),
     model=DeleteProjectPayloadDTO,
+    name="DeleteProjectPayload",
 )
 class DeleteProjectPayloadGQL(PydanticOutputMixin[DeleteProjectPayloadDTO]):
     """Payload for project soft-delete."""
@@ -117,6 +121,7 @@ class DeleteProjectPayloadGQL(PydanticOutputMixin[DeleteProjectPayloadDTO]):
         description="Payload for project permanent deletion mutation.",
     ),
     model=PurgeProjectPayloadDTO,
+    name="PurgeProjectPayload",
 )
 class PurgeProjectPayloadGQL(PydanticOutputMixin[PurgeProjectPayloadDTO]):
     """Payload for project permanent purge."""
