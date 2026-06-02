@@ -50,7 +50,11 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.rbac.types import (
     OperationTypeFilterGQL,
     OperationTypeGQL,
@@ -174,7 +178,9 @@ class RolePermissionPresetOrderByGQL(PydanticInputMixin[RolePermissionPresetOrde
     model=BulkRolePermissionPresetFailureInfoDTO,
     name="BulkRolePermissionPresetFailureInfo",
 )
-class BulkRolePermissionPresetFailureInfoGQL:
+class BulkRolePermissionPresetFailureInfoGQL(
+    PydanticOutputMixin[BulkRolePermissionPresetFailureInfoDTO]
+):
     permission_preset_id: UUID = gql_field(
         description="Permission entry ID that the operation failed on."
     )
@@ -189,7 +195,9 @@ class BulkRolePermissionPresetFailureInfoGQL:
     model=BulkAddRolePermissionPresetFailureInfoDTO,
     name="BulkAddRolePermissionPresetFailureInfo",
 )
-class BulkAddRolePermissionPresetFailureInfoGQL:
+class BulkAddRolePermissionPresetFailureInfoGQL(
+    PydanticOutputMixin[BulkAddRolePermissionPresetFailureInfoDTO]
+):
     entity_type: RBACElementTypeGQL = gql_field(
         description="Entity type of the permission entry that failed."
     )
@@ -207,7 +215,9 @@ class BulkAddRolePermissionPresetFailureInfoGQL:
     model=BulkAddRolePermissionPresetsPayloadDTO,
     name="BulkAddRolePermissionPresetsPayload",
 )
-class BulkAddRolePermissionPresetsPayloadGQL:
+class BulkAddRolePermissionPresetsPayloadGQL(
+    PydanticOutputMixin[BulkAddRolePermissionPresetsPayloadDTO]
+):
     items: list[RolePermissionPresetGQL] = gql_field(
         description="Permission entries that were added."
     )
@@ -224,7 +234,9 @@ class BulkAddRolePermissionPresetsPayloadGQL:
     model=BulkRemoveRolePermissionPresetsPayloadDTO,
     name="BulkRemoveRolePermissionPresetsPayload",
 )
-class BulkRemoveRolePermissionPresetsPayloadGQL:
+class BulkRemoveRolePermissionPresetsPayloadGQL(
+    PydanticOutputMixin[BulkRemoveRolePermissionPresetsPayloadDTO]
+):
     items: list[RolePermissionPresetGQL] = gql_field(
         description="Permission entries that were removed."
     )
