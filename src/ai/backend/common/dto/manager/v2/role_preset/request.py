@@ -55,6 +55,7 @@ class UpdateRolePresetInput(BaseRequestModel):
     and cannot be mutated here.
     """
 
+    role_preset_id: RolePresetID = Field(description="ID of the role preset to update.")
     name: str | None = Field(default=None, min_length=1, max_length=64, description="Updated name.")
     auto_assign: bool | None = Field(
         default=None,

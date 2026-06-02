@@ -53,9 +53,7 @@ class RolePresetAdapter(BaseAdapter):
         """Search role presets with filtering and pagination."""
         raise NotImplementedError
 
-    async def update(
-        self, role_preset_id: RolePresetID, input: UpdateRolePresetInput
-    ) -> UpdateRolePresetPayload:
+    async def update(self, input: UpdateRolePresetInput) -> UpdateRolePresetPayload:
         """Update an existing role preset's metadata."""
         raise NotImplementedError
 
