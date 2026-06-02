@@ -11557,7 +11557,7 @@ type Mutation
   """
   Added in UNRELEASED. Update an existing role preset's metadata (admin only).
   """
-  adminUpdateRolePreset(id: ID!, input: UpdateRolePresetInput!): UpdateRolePresetPayload @join__field(graph: STRAWBERRY)
+  adminUpdateRolePreset(input: UpdateRolePresetInput!): UpdateRolePresetPayload @join__field(graph: STRAWBERRY)
 
   """Added in UNRELEASED. Bulk-soft-delete role presets (admin only)."""
   adminDeleteRolePresets(input: BulkDeleteRolePresetsInput!): BulkDeleteRolePresetsPayload @join__field(graph: STRAWBERRY)
@@ -19299,6 +19299,9 @@ Added in UNRELEASED. Input for updating a role preset's metadata. Permission ent
 input UpdateRolePresetInput
   @join__type(graph: STRAWBERRY)
 {
+  """Role preset UUID to update."""
+  rolePresetId: ID!
+
   """Updated name."""
   name: String
 

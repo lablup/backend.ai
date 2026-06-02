@@ -7434,7 +7434,7 @@ type Mutation {
   """
   Added in UNRELEASED. Update an existing role preset's metadata (admin only).
   """
-  adminUpdateRolePreset(id: ID!, input: UpdateRolePresetInput!): UpdateRolePresetPayload
+  adminUpdateRolePreset(input: UpdateRolePresetInput!): UpdateRolePresetPayload
 
   """Added in UNRELEASED. Bulk-soft-delete role presets (admin only)."""
   adminDeleteRolePresets(input: BulkDeleteRolePresetsInput!): BulkDeleteRolePresetsPayload
@@ -13431,6 +13431,9 @@ input UpdateRoleInput {
 Added in UNRELEASED. Input for updating a role preset's metadata. Permission entries are managed via the dedicated add/remove mutations; the `deleted` flag via delete/restore mutations.
 """
 input UpdateRolePresetInput {
+  """Role preset UUID to update."""
+  rolePresetId: ID!
+
   """Updated name."""
   name: String
 
