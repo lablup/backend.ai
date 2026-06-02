@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import ArrayFilter, IntFilter, StringFilter
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -31,6 +32,12 @@ from ai.backend.common.dto.manager.user import (
     UserRole,
     UserStatus,
 )
+from ai.backend.common.dto.manager.v2.user.request import (
+    SearchUsersRequest as V2SearchUsersRequest,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    UserFilter as V2UserFilter,
+)
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
@@ -43,7 +50,12 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.user import users
 from ai.backend.testutils.fixtures import DomainFixtureData
 
-from .conftest import UserFactory
+from .conftest import (
+    ArrayMatchUsers,
+    ScalarMatchUsers,
+    SingleGidUsers,
+    UserFactory,
+)
 
 
 class TestUserCreate:
@@ -554,3 +566,107 @@ class TestUserBulkOperations:
     async def test_failure_index_tracking(self) -> None:
         """Failure index tracking -> each failure has correct index and error message."""
         pytest.fail("Not implemented")
+
+
+class TestV2UserContainerFilter:
+    """Container UID/GID filtering via POST /v2/users/search (v2 API).
+
+    Seeds users with distinct container_uid / container_main_gid / container_gids and
+    asserts the search narrows results. This is the only layer that validates the
+    PostgreSQL array operators (``@>`` / ``&&``) for container_gids against real rows.
+    """
+
+    async def test_filter_by_container_uid(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        container_uid_users: ScalarMatchUsers,
+    ) -> None:
+        result = await admin_v2_registry.user.admin_search(
+            V2SearchUsersRequest(
+                filter=V2UserFilter(container_uid=IntFilter(equals=container_uid_users.value))
+            )
+        )
+
+        ids = {item.id for item in result.items}
+        assert container_uid_users.matching.user.id in ids
+        assert container_uid_users.other.user.id not in ids
+
+    async def test_filter_by_container_main_gid(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        container_main_gid_users: ScalarMatchUsers,
+    ) -> None:
+        result = await admin_v2_registry.user.admin_search(
+            V2SearchUsersRequest(
+                filter=V2UserFilter(
+                    container_main_gid=IntFilter(equals=container_main_gid_users.value)
+                )
+            )
+        )
+
+        ids = {item.id for item in result.items}
+        assert container_main_gid_users.matching.user.id in ids
+        assert container_main_gid_users.other.user.id not in ids
+
+    async def test_filter_container_gids_any(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        container_gids_any_users: ArrayMatchUsers,
+    ) -> None:
+        result = await admin_v2_registry.user.admin_search(
+            V2SearchUsersRequest(
+                filter=V2UserFilter(
+                    container_gids=ArrayFilter[int].model_validate({
+                        "contains_any": container_gids_any_users.query
+                    })
+                )
+            )
+        )
+
+        ids = {item.id for item in result.items}
+        assert container_gids_any_users.matching.user.id in ids
+        assert container_gids_any_users.other.user.id not in ids
+
+    async def test_filter_container_gids_all(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        container_gids_all_users: ArrayMatchUsers,
+    ) -> None:
+        result = await admin_v2_registry.user.admin_search(
+            V2SearchUsersRequest(
+                filter=V2UserFilter(
+                    container_gids=ArrayFilter[int].model_validate({
+                        "contains_all": container_gids_all_users.query
+                    })
+                )
+            )
+        )
+
+        ids = {item.id for item in result.items}
+        assert container_gids_all_users.matching.user.id in ids
+        assert container_gids_all_users.other.user.id not in ids
+
+    async def test_filter_single_gid_across_main_gid_and_gids(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        single_gid_users: SingleGidUsers,
+    ) -> None:
+        """A single gid matches users via container_main_gid OR container_gids.contains."""
+        gid = single_gid_users.gid
+        result = await admin_v2_registry.user.admin_search(
+            V2SearchUsersRequest(
+                filter=V2UserFilter(
+                    OR=[
+                        V2UserFilter(container_main_gid=IntFilter(equals=gid)),
+                        V2UserFilter(
+                            container_gids=ArrayFilter[int].model_validate({"contains": gid})
+                        ),
+                    ]
+                )
+            )
+        )
+
+        ids = {item.id for item in result.items}
+        assert single_gid_users.via_main_gid.user.id in ids
+        assert single_gid_users.via_gids.user.id in ids
+        assert single_gid_users.unrelated.user.id not in ids

@@ -11,9 +11,11 @@ from uuid import UUID
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     BackendAISchema,
     CIStrEnum,
     ClusterMode,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -191,6 +193,22 @@ class SessionData:
 
     # Loaded from relationship
     service_ports: str | None
+
+
+@dataclass(frozen=True)
+class SessionRoutingInfo:
+    """Minimal session data needed to start an app service in a session.
+
+    Carries the session metadata (for the action result) together with the main
+    kernel's routing fields, so the repository never exposes a SessionRow to callers.
+    """
+
+    session: SessionData
+    main_kernel_id: KernelId
+    agent_id: AgentId | None
+    kernel_host: str | None
+    agent_addr: str | None
+    service_ports: list[dict[str, Any]]
 
 
 @dataclass

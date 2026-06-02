@@ -1625,16 +1625,14 @@ class AgentRegistry:
 
     async def start_service(
         self,
-        session: SessionRow,
+        main_kernel_id: KernelId,
+        agent_id: AgentId,
         service: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         async with handle_session_exception("execute"):
-            agent_id = session.main_kernel.agent
-            if agent_id is None:
-                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
-            async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
-                return await client.start_service(session.main_kernel.id, service, opts)
+            async with self._agent_client_pool.acquire(agent_id) as client:
+                return await client.start_service(main_kernel_id, service, opts)
 
     async def shutdown_service(
         self,
@@ -1718,13 +1716,6 @@ class AgentRegistry:
             async with self._agent_client_pool.acquire(AgentId(kernel.agent)) as client:
                 reply = await client.get_logs(kernel.id)
             return reply["logs"]
-
-    async def increment_session_usage(
-        self,
-        session: SessionRow,
-    ) -> None:
-        # noop for performance reasons
-        pass
 
     async def sync_agent_kernel_registry(self, agent_id: AgentId) -> None:
         """

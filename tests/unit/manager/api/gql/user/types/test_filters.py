@@ -228,6 +228,52 @@ class TestUserFilterGQLWithNestedFilters:
         assert dto.project.is_active is None
 
 
+class TestUserFilterGQLAdditionalFields:
+    """Tests for UserFilterGQL.to_pydantic() with the additional filterable fields."""
+
+    def test_string_fields_propagate_to_pydantic(self) -> None:
+        f = UserFilterGQL(
+            full_name=StringFilter(contains="alice"),
+            description=StringFilter(i_contains="research"),
+            status_info=StringFilter(equals="active"),
+            resource_policy=StringFilter(equals="default"),
+        )
+        dto = f.to_pydantic()
+        assert isinstance(dto, UserFilterDTO)
+        assert dto.full_name is not None
+        assert dto.full_name.contains == "alice"
+        assert dto.description is not None
+        assert dto.description.i_contains == "research"
+        assert dto.status_info is not None
+        assert dto.status_info.equals == "active"
+        assert dto.resource_policy is not None
+        assert dto.resource_policy.equals == "default"
+
+    def test_boolean_fields_propagate_to_pydantic(self) -> None:
+        f = UserFilterGQL(
+            need_password_change=True,
+            totp_activated=False,
+            sudo_session_enabled=True,
+        )
+        dto = f.to_pydantic()
+        assert isinstance(dto, UserFilterDTO)
+        assert dto.need_password_change is True
+        assert dto.totp_activated is False
+        assert dto.sudo_session_enabled is True
+
+    def test_additional_fields_default_to_none(self) -> None:
+        f = UserFilterGQL(username=StringFilter(contains="admin"))
+        dto = f.to_pydantic()
+        assert isinstance(dto, UserFilterDTO)
+        assert dto.full_name is None
+        assert dto.description is None
+        assert dto.status_info is None
+        assert dto.resource_policy is None
+        assert dto.need_password_change is None
+        assert dto.totp_activated is None
+        assert dto.sudo_session_enabled is None
+
+
 class TestUserOrderByGQLNewFields:
     """Tests for UserOrderByGQL.to_pydantic() with DOMAIN_NAME and PROJECT_NAME order fields."""
 

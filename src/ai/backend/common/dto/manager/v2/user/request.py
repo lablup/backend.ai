@@ -11,7 +11,13 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    ArrayFilter,
+    DateTimeFilter,
+    IntFilter,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.common.dto.manager.v2.user.types import (
     OrderDirection,
     UserDomainFilter,
@@ -299,12 +305,36 @@ class UserFilter(BaseRequestModel):
     uuid: UUIDFilter | None = Field(default=None, description="Filter by user UUID.")
     username: StringFilter | None = Field(default=None, description="Filter by username.")
     email: StringFilter | None = Field(default=None, description="Filter by email.")
+    full_name: StringFilter | None = Field(default=None, description="Filter by full name.")
+    description: StringFilter | None = Field(default=None, description="Filter by description.")
     status: UserStatusFilter | None = Field(default=None, description="Filter by account status.")
+    status_info: StringFilter | None = Field(
+        default=None, description="Filter by status info detail."
+    )
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name.")
     integration_name: StringFilter | None = Field(
         default=None, description="Filter by external integration identifier."
     )
+    resource_policy: StringFilter | None = Field(
+        default=None, description="Filter by user resource policy name."
+    )
     role: UserRoleFilter | None = Field(default=None, description="Filter by user role.")
+    need_password_change: bool | None = Field(
+        default=None, description="Filter by whether a password change is required."
+    )
+    totp_activated: bool | None = Field(
+        default=None, description="Filter by whether TOTP two-factor auth is activated."
+    )
+    sudo_session_enabled: bool | None = Field(
+        default=None, description="Filter by whether sudo sessions are enabled."
+    )
+    container_uid: IntFilter | None = Field(default=None, description="Filter by container UID.")
+    container_main_gid: IntFilter | None = Field(
+        default=None, description="Filter by container main GID."
+    )
+    container_gids: ArrayFilter[int] | None = Field(
+        default=None, description="Filter by container supplementary GIDs."
+    )
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter by creation timestamp."
     )

@@ -17,9 +17,11 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.exception import InvalidAPIParameters, UnknownImageReference
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AbuseReport,
     AccessKey,
+    AgentId,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -34,7 +36,11 @@ from ai.backend.manager.api.rest.session.handler import (
     _route_legacy_uuid_mounts,
 )
 from ai.backend.manager.api.utils import undefined
-from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.data.session.types import (
+    SessionData,
+    SessionRoutingInfo,
+    SessionStatus,
+)
 from ai.backend.manager.data.user.types import SessionOwnerContext
 from ai.backend.manager.errors.common import ServiceUnavailable
 from ai.backend.manager.errors.image import UnknownImageReferenceError
@@ -293,6 +299,24 @@ def _make_mock_session(
         session_id, access_key, user_id, group_id, session_type=session_type
     )
     return session
+
+
+def _make_routing_info(
+    session: MagicMock,
+    kernel_id: KernelId,
+    service_ports: list[dict[str, Any]],
+    *,
+    agent_id: str | None = "i-agent",
+) -> SessionRoutingInfo:
+    """Build a SessionRoutingInfo for start_service tests from a mock session."""
+    return SessionRoutingInfo(
+        session=session,
+        main_kernel_id=kernel_id,
+        agent_id=AgentId(agent_id) if agent_id is not None else None,
+        kernel_host=session.main_kernel.kernel_host,
+        agent_addr=session.main_kernel.agent_addr,
+        service_ports=service_ports,
+    )
 
 
 # ==================== CommitSession Tests ====================
@@ -1931,17 +1955,19 @@ class TestStartService:
         mock_session = _make_mock_session(
             sample_session_id, sample_access_key, sample_user_id, sample_group_id, sample_kernel_id
         )
-        mock_session.main_kernel.service_ports = [
-            {
-                "name": "jupyter",
-                "host_ports": [8888],
-                "container_ports": [8888],
-                "is_inference": False,
-            },
-        ]
-        mock_session_repository.get_session_with_routing_minimal = AsyncMock(
-            return_value=mock_session
+        info = _make_routing_info(
+            mock_session,
+            sample_kernel_id,
+            [
+                {
+                    "name": "jupyter",
+                    "host_ports": [8888],
+                    "container_ports": [8888],
+                    "is_inference": False,
+                },
+            ],
         )
+        mock_session_repository.get_session_with_routing_minimal = AsyncMock(return_value=info)
         mock_session_repository.get_scaling_group_wsproxy_addr = AsyncMock(
             return_value="http://wsproxy:10200"
         )
@@ -1958,8 +1984,7 @@ class TestStartService:
         mock_resp.json = AsyncMock(return_value={"token": "test-token-xyz"})
 
         action = StartServiceAction(
-            session_name="test-session",
-            access_key=sample_access_key,
+            session_id=SessionID(sample_session_id),
             service="jupyter",
             login_session_token="login-token",
             port=None,
@@ -1995,17 +2020,19 @@ class TestStartService:
         mock_session = _make_mock_session(
             sample_session_id, sample_access_key, sample_user_id, sample_group_id, sample_kernel_id
         )
-        mock_session.main_kernel.service_ports = [
-            {
-                "name": "jupyter",
-                "host_ports": [8888],
-                "container_ports": [8888],
-                "is_inference": False,
-            },
-        ]
-        mock_session_repository.get_session_with_routing_minimal = AsyncMock(
-            return_value=mock_session
+        info = _make_routing_info(
+            mock_session,
+            sample_kernel_id,
+            [
+                {
+                    "name": "jupyter",
+                    "host_ports": [8888],
+                    "container_ports": [8888],
+                    "is_inference": False,
+                },
+            ],
         )
+        mock_session_repository.get_session_with_routing_minimal = AsyncMock(return_value=info)
         mock_session_repository.get_scaling_group_wsproxy_addr = AsyncMock(
             return_value="http://wsproxy:10200"
         )
@@ -2017,8 +2044,7 @@ class TestStartService:
         mock_appproxy_client_pool.load_client.return_value = mock_client
 
         action = StartServiceAction(
-            session_name="test-session",
-            access_key=sample_access_key,
+            session_id=SessionID(sample_session_id),
             service="nonexistent-service",
             login_session_token="login-token",
             port=None,
@@ -2043,13 +2069,11 @@ class TestStartService:
             sample_session_id, sample_access_key, sample_user_id, sample_group_id, sample_kernel_id
         )
         mock_session.scaling_group_name = None
-        mock_session_repository.get_session_with_routing_minimal = AsyncMock(
-            return_value=mock_session
-        )
+        info = _make_routing_info(mock_session, sample_kernel_id, [])
+        mock_session_repository.get_session_with_routing_minimal = AsyncMock(return_value=info)
 
         action = StartServiceAction(
-            session_name="test-session",
-            access_key=sample_access_key,
+            session_id=SessionID(sample_session_id),
             service="jupyter",
             login_session_token="login-token",
             port=None,
@@ -2074,17 +2098,19 @@ class TestStartService:
         mock_session = _make_mock_session(
             sample_session_id, sample_access_key, sample_user_id, sample_group_id, sample_kernel_id
         )
-        mock_session.main_kernel.service_ports = [
-            {
-                "name": "inference-app",
-                "host_ports": [8080],
-                "container_ports": [8080],
-                "is_inference": True,
-            },
-        ]
-        mock_session_repository.get_session_with_routing_minimal = AsyncMock(
-            return_value=mock_session
+        info = _make_routing_info(
+            mock_session,
+            sample_kernel_id,
+            [
+                {
+                    "name": "inference-app",
+                    "host_ports": [8080],
+                    "container_ports": [8080],
+                    "is_inference": True,
+                },
+            ],
         )
+        mock_session_repository.get_session_with_routing_minimal = AsyncMock(return_value=info)
         mock_session_repository.get_scaling_group_wsproxy_addr = AsyncMock(
             return_value="http://wsproxy:10200"
         )
@@ -2096,8 +2122,7 @@ class TestStartService:
         mock_appproxy_client_pool.load_client.return_value = mock_client
 
         action = StartServiceAction(
-            session_name="test-session",
-            access_key=sample_access_key,
+            session_id=SessionID(sample_session_id),
             service="inference-app",
             login_session_token="login-token",
             port=None,

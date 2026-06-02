@@ -21,6 +21,7 @@ from sqlalchemy.orm import aliased, selectinload
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
@@ -91,6 +92,7 @@ from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import (
     DeploymentHasNoTargetRevision,
     DeploymentRevisionNotFound,
+    NoActiveKeypairForDeployment,
     UserNotFoundInDeployment,
 )
 from ai.backend.manager.errors.resource import (
@@ -204,6 +206,14 @@ class EndpointWithRoutesRawData:
 
     endpoint_row: EndpointRow
     route_rows: list[RoutingRow]
+
+
+@dataclass(frozen=True)
+class _DeploymentUserResolution:
+    """Pairs a deployment user with the active keypair chosen for it."""
+
+    user: UserRow
+    access_key: AccessKey
 
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -2060,6 +2070,44 @@ class DeploymentDBSource:
             )
             await db_sess.execute(query)
 
+    async def _resolve_user_and_active_access_key(
+        self,
+        db_sess: SASession,
+        user_uuid: uuid.UUID,
+    ) -> _DeploymentUserResolution:
+        # Pick a deterministic, currently-active keypair for the given user.
+        # Preference order: main_access_key match, then latest created_at,
+        # then access_key lexicographic order as a final stable tie-break.
+        is_main_access_key = sa.case(
+            (UserRow.main_access_key == keypairs.c.access_key, 1),
+            else_=0,
+        )
+        active_stmt = (
+            sa.select(UserRow, keypairs.c.access_key)
+            .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
+            .where(UserRow.uuid == user_uuid)
+            .where(keypairs.c.is_active.is_(True))
+            .order_by(
+                is_main_access_key.desc(),
+                keypairs.c.created_at.desc(),
+                keypairs.c.access_key.asc(),
+            )
+            .limit(1)
+        )
+        row = (await db_sess.execute(active_stmt)).first()
+        if row is not None:
+            return _DeploymentUserResolution(
+                user=row.UserRow,
+                access_key=AccessKey(row.access_key),
+            )
+        # No active keypair — distinguish a missing user from an inactive-only user.
+        user_row = (
+            await db_sess.execute(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+        ).scalar_one_or_none()
+        if user_row is None:
+            raise UserNotFoundInDeployment(f"{user_uuid} not found")
+        raise NoActiveKeypairForDeployment(f"{user_uuid} has no active keypair")
+
     async def fetch_deployment_context(
         self,
         deployment_info: DeploymentInfo,
@@ -2076,47 +2124,33 @@ class DeploymentDBSource:
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             # Fetch created user info
-            created_user_query = (
-                sa.select(UserRow, keypairs.c.access_key)
-                .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
-                .where(UserRow.uuid == deployment_info.metadata.created_user)
+            created = await self._resolve_user_and_active_access_key(
+                db_sess,
+                deployment_info.metadata.created_user,
             )
-            created_user_result = await db_sess.execute(created_user_query)
-            created_user_row = created_user_result.first()
-            if not created_user_row:
-                raise UserNotFoundInDeployment(
-                    f"Created user {deployment_info.metadata.created_user} not found"
-                )
 
             # Fetch session owner info if different
             if deployment_info.metadata.session_owner != deployment_info.metadata.created_user:
-                session_owner_query = (
-                    sa.select(UserRow, keypairs.c.access_key)
-                    .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
-                    .where(UserRow.uuid == deployment_info.metadata.session_owner)
+                session_owner_resolution = await self._resolve_user_and_active_access_key(
+                    db_sess,
+                    deployment_info.metadata.session_owner,
                 )
-                session_owner_result = await db_sess.execute(session_owner_query)
-                session_owner_row = session_owner_result.first()
-                if not session_owner_row:
-                    raise UserNotFoundInDeployment(
-                        f"Session owner {deployment_info.metadata.session_owner} not found"
-                    )
             else:
-                session_owner_row = created_user_row
+                session_owner_resolution = created
 
             # Use query_userinfo_from_session to get group_id and resource_policy
             # This also validates domain, group access permissions
             user_info = await query_userinfo_from_session(
                 db_sess,
-                created_user_row.UserRow.uuid,
-                AccessKey(created_user_row.access_key),
-                created_user_row.UserRow.role,
-                created_user_row.UserRow.domain_name,
+                created.user.uuid,
+                created.access_key,
+                created.user.role or UserRole.USER,
+                created.user.domain_name or deployment_info.metadata.domain,
                 None,  # No keypair_resource_policy
                 deployment_info.metadata.domain,
                 deployment_info.metadata.project,
-                query_on_behalf_of=AccessKey(session_owner_row.access_key)
-                if session_owner_row != created_user_row
+                query_on_behalf_of=session_owner_resolution.access_key
+                if session_owner_resolution.user.uuid != created.user.uuid
                 else None,
             )
             group_id = user_info.group_id
@@ -2168,23 +2202,24 @@ class DeploymentDBSource:
                 )
 
             # Build DeploymentContext
+            session_owner_user = session_owner_resolution.user
             return DeploymentContext(
                 created_user=UserContext(
-                    uuid=created_user_row.UserRow.uuid,
-                    access_key=AccessKey(created_user_row.access_key),
-                    role=str(created_user_row.UserRow.role),
-                    sudo_session_enabled=created_user_row.UserRow.sudo_session_enabled or False,
+                    uuid=created.user.uuid,
+                    access_key=created.access_key,
+                    role=str(created.user.role),
+                    sudo_session_enabled=created.user.sudo_session_enabled or False,
                 ),
                 session_owner=UserContext(
-                    uuid=session_owner_row.UserRow.uuid,
-                    access_key=AccessKey(session_owner_row.access_key),
-                    role=str(session_owner_row.UserRow.role),
-                    sudo_session_enabled=session_owner_row.UserRow.sudo_session_enabled or False,
+                    uuid=session_owner_user.uuid,
+                    access_key=session_owner_resolution.access_key,
+                    role=str(session_owner_user.role),
+                    sudo_session_enabled=session_owner_user.sudo_session_enabled or False,
                 ),
                 container_user=ContainerUserContext(
-                    uid=session_owner_row.UserRow.container_uid,
-                    main_gid=session_owner_row.UserRow.container_main_gid,
-                    supplementary_gids=session_owner_row.UserRow.container_gids or [],
+                    uid=session_owner_user.container_uid,
+                    main_gid=session_owner_user.container_main_gid,
+                    supplementary_gids=session_owner_user.container_gids or [],
                 ),
                 group_id=group_id,
                 resource_policy=dict(resource_policy),
