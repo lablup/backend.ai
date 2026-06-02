@@ -11,6 +11,7 @@ from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
 )
+from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -50,3 +51,12 @@ class RolePermissionPresetRow(Base):  # type: ignore[misc]
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
+
+    def to_data(self) -> RolePermissionPresetData:
+        return RolePermissionPresetData(
+            id=self.id,
+            role_preset_id=self.role_preset_id,
+            entity_type=self.entity_type,
+            operation=self.operation,
+            created_at=self.created_at,
+        )
