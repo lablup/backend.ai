@@ -47,7 +47,7 @@ services:
       - "9187:9187"
 
   backendai-half-redis:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     restart: unless-stopped
     networks:
       - half
@@ -56,10 +56,10 @@ services:
     volumes:
       - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
     command: >
-      redis-server
+      valkey-server
       --appendonly yes
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
       interval: 5s
       timeout: 3s
       retries: 10
