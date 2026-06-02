@@ -25,8 +25,8 @@ class TestModelDeploymentStatusLegacyAliases:
             ("DESTROYING", ModelDeploymentStatus.STOPPING),
             ("destroyed", ModelDeploymentStatus.STOPPED),
             ("DESTROYED", ModelDeploymentStatus.STOPPED),
-            ("created", ModelDeploymentStatus.READY),
-            ("CREATED", ModelDeploymentStatus.READY),
+            ("created", ModelDeploymentStatus.PENDING),
+            ("CREATED", ModelDeploymentStatus.PENDING),
         ],
     )
     def test_lifecycle_value_resolves_to_v2_status(

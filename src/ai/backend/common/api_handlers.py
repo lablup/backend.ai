@@ -19,13 +19,14 @@ from typing import (
 from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 from multidict import CIMultiDictProxy, MultiMapping
-from pydantic import BaseModel, ConfigDict, RootModel
+from pydantic import ConfigDict, RootModel
 from pydantic_core._pydantic_core import ValidationError
 
-from ai.backend.common.types import StreamReader
+from ai.backend.common.types import BackendAISchema, StreamReader
 from ai.backend.logging import BraceStyleAdapter
 
 from .exception import (
+    BackendAISchemaValidationFailed,
     InvalidAPIHandlerDefinition,
     InvalidAPIParameters,
     MalformedRequestBody,
@@ -45,21 +46,21 @@ class Sentinel(enum.Enum):
 SENTINEL = Sentinel.TOKEN
 
 
-class BaseRequestModel(BaseModel):
+class BaseRequestModel(BackendAISchema):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
 
 
-class BaseFieldModel(BaseModel):
+class BaseFieldModel(BackendAISchema):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         validate_by_name=True,
     )
 
 
-class BaseResponseModel(BaseModel):
+class BaseResponseModel(BackendAISchema):
     pass
 
 
@@ -83,7 +84,9 @@ def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
     def wrapped(*args: Any, **kwargs: Any) -> T:
         try:
             return func(*args, **kwargs)
-        except ValidationError as e:
+        except (BackendAISchemaValidationFailed, ValidationError) as e:
+            # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+            # skip the ``BackendAISchema`` auto-conversion override.
             raise InvalidAPIParameters(repr(e)) from e
 
     return wrapped
@@ -177,7 +180,7 @@ class PathParam[TRequestModel: BaseRequestModel]:
         return self
 
 
-class MiddlewareParam(ABC, BaseModel):
+class MiddlewareParam(ABC, BackendAISchema):
     @classmethod
     @abstractmethod
     async def from_request(cls, request: web.Request) -> Self:
@@ -268,7 +271,9 @@ async def extract_param_value(request: web.Request, input_param_type: Any) -> _P
             f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
         )
 
-    except ValidationError as e:
+    except (BackendAISchemaValidationFailed, ValidationError) as e:
+        # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+        # skip the ``BackendAISchema`` auto-conversion override.
         raise InvalidAPIParameters(str(e)) from e
 
 

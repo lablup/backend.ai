@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import yarl
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
-from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft
+from ai.backend.common.config import ModelDefinition, ModelDefinitionDraft, ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -28,7 +28,7 @@ from ai.backend.common.identifier.deployment_revision import DeploymentRevisionI
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
+from ai.backend.manager.data.session.options import HandlerOptions
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 from ai.backend.common.types import (
     AutoScalingMetricSource,
+    BackendAISchema,
     ClusterMode,
     MountInfoEntry,
     MountPermission,
@@ -51,7 +52,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 
 
-class DeploymentConfig(BaseModel):
+class DeploymentConfig(BackendAISchema):
     """``deployment-config.yaml`` payload after repository-side resolution.
 
     The raw yaml carries ``image`` + ``architecture`` strings; the repository
@@ -63,6 +64,17 @@ class DeploymentConfig(BaseModel):
     resource_slots: dict[str, Any] | None = None
     resource_opts: dict[str, Any] | None = None
     environ: dict[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class FetchedModelDefinition:
+    """Model definition draft with the vfolder path it was read from.
+
+    ``path`` is the matched candidate path inside the model vfolder.
+    """
+
+    path: str
+    model_definition: ModelDefinitionDraft
 
 
 class RouteStatus(enum.Enum):
@@ -108,6 +120,7 @@ class RouteHandlerCategory(enum.StrEnum):
 
     LIFECYCLE = "lifecycle"
     HEALTH = "health"
+    SYNC = "sync"
 
 
 class DeploymentHandlerCategory(enum.StrEnum):
@@ -146,6 +159,20 @@ class RouteTrafficStatus(enum.StrEnum):
 
     ACTIVE = "active"
     INACTIVE = "inactive"
+
+
+class RouteSubStatus(enum.StrEnum):
+    """Sub-status for routes in the PROVISIONING lifecycle stage.
+
+    Tracks fine-grained progress within the provisioning pipeline:
+    - PENDING: session has been enqueued, waiting for scheduler
+    - STARTING: session is running, waiting for replica host/port
+    - WARMING_UP: replica is up, waiting for health check to pass
+    """
+
+    PENDING = "pending"
+    STARTING = "starting"
+    WARMING_UP = "warming_up"
 
 
 # ========== Status Transition Types (BEP-1030) ==========
@@ -249,26 +276,31 @@ class DeploymentTargetStatuses:
 
 @dataclass(frozen=True)
 class RouteTargetStatuses:
-    """Target statuses for route handler filtering (lifecycle x health)."""
+    """Target statuses for route handler filtering.
 
-    lifecycle: list[RouteStatus]
-    health: list[RouteHealthStatus]
+    Each axis is optional — ``None`` skips that predicate entirely.
+    Pass a non-empty list to restrict to specific values on that axis.
+    """
+
+    lifecycle: list[RouteStatus] | None = None
+    health: list[RouteHealthStatus] | None = None
+    traffic: list[RouteTrafficStatus] | None = None
+    sub_status: list[RouteSubStatus] | None = None
 
 
 @dataclass(frozen=True)
 class RouteTransitionTarget:
-    """Target state for a route transition (lifecycle + health)."""
+    """Target state for a route transition."""
 
     status: RouteStatus | None = None
     health_status: RouteHealthStatus | None = None
+    sub_status: RouteSubStatus | None = None
+    traffic_status: RouteTrafficStatus | None = None
 
 
 @dataclass(frozen=True)
 class RouteStatusTransitions:
     """Status transitions for route handlers.
-
-    Route handlers have success/failure/stale outcomes (no expired/give_up).
-    Each outcome can change lifecycle status, health status, or both.
 
     Attributes:
         success: Target state when handler succeeds, None means no change
@@ -325,24 +357,30 @@ class MountInfo:
     the override directly. Resolved to a concrete ``MountInfoEntry``
     (non-nullable ``mount_perm``) before persisting so the stored row
     becomes an immutable permission snapshot.
+
+    ``subpath`` is the path within the vfolder to mount. ``None`` means
+    the vfolder root.
     """
 
     vfolder_id: VFolderUUID
     mount_destination: str | None = None
     mount_perm: MountPermission | None = None
+    subpath: str | None = None
 
 
 @dataclass
 class MountMetadata:
-    # Non-nullable by design. ``MountMetadata`` is only constructed inside
-    # scheduling / deployment-building paths where a real model vfolder is
-    # guaranteed — callers must raise before reaching here when the vfolder
-    # is missing (SET NULL state on the persisted row is represented by
-    # ``ModelMountConfigData.vfolder_id``, not here).
+    # Write-path metadata for the model vfolder. ``AddRevisionInput`` requires
+    # ``model_mount_config`` so the caller always supplies ``model_vfolder_id``;
+    # the underlying ``deployment_revisions.model`` column stays nullable to
+    # represent post-hoc SET NULL on vfolder deletion, but no write path
+    # constructs this dataclass with ``None``.
     model_vfolder_id: VFolderUUID
     model_definition_path: str | None
     model_mount_destination: str
     extra_mounts: list[MountInfoEntry]
+    # Subpath within the model vfolder. ``None`` means the vfolder root.
+    vfolder_subpath: str | None = None
 
 
 @dataclass
@@ -357,31 +395,52 @@ class ReplicaSpec:
         return self.replica_count
 
 
-class ConfiguredModel(BaseModel):
+@dataclass
+class ReplicaData:
+    replica_count: int
+    desired_replica_count: int | None
+
+    @property
+    def target_replica_count(self) -> int:
+        if self.desired_replica_count is not None:
+            return self.desired_replica_count
+        return self.replica_count
+
+
+class ConfiguredModel(BackendAISchema):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-class DeploymentTimeouts(ConfiguredModel):
-    """Handler-keyed timeout thresholds in seconds.
+class DeploymentHandlerOptions(ConfiguredModel):
+    """Handler-keyed deployment scheduler policy.
 
-    Resolution order for a given ``handler_name``:
-    1. ``by_handler[handler_name]`` if the key is present (value may be
-       ``None`` to explicitly disable the timeout for that handler).
+    Mirrors ``SessionHandlerOptions``. Resolution order for a given
+    ``handler_name``:
+    1. ``by_handler[handler_name]`` if present.
     2. ``default`` otherwise.
 
-    ``None`` at either layer means "no timeout — handler may run
-    indefinitely." Constructing ``DeploymentTimeouts()`` with no args
-    yields a fully unbounded policy; the project's baseline policy
-    lives on the scaling group's ``default_deployment_options``.
+    Each ``HandlerOptions`` field falls back to ``default``'s value
+    when the per-handler override leaves it ``None``. The
+    ``HandlerOptions`` field defaults (timeout=None, max_retry_count=5)
+    flow through here so a freshly-constructed
+    ``DeploymentHandlerOptions()`` keeps the legacy retry budget.
     """
 
-    default: int | None = None
-    by_handler: dict[str, int | None] = Field(default_factory=dict)
+    default: HandlerOptions = Field(default_factory=HandlerOptions)
+    by_handler: dict[str, HandlerOptions] = Field(default_factory=dict)
 
-    def resolve(self, handler_name: str) -> int | None:
-        if handler_name in self.by_handler:
-            return self.by_handler[handler_name]
-        return self.default
+    def resolve(self, handler_name: str) -> HandlerOptions:
+        override = self.by_handler.get(handler_name)
+        if override is None:
+            return self.default
+        return HandlerOptions(
+            timeout=override.timeout if override.timeout is not None else self.default.timeout,
+            max_retry_count=(
+                override.max_retry_count
+                if override.max_retry_count is not None
+                else self.default.max_retry_count
+            ),
+        )
 
 
 class DeploymentOptions(ConfiguredModel):
@@ -394,7 +453,7 @@ class DeploymentOptions(ConfiguredModel):
     existing deployments.
     """
 
-    timeouts: DeploymentTimeouts = Field(default_factory=DeploymentTimeouts)
+    handler_options: DeploymentHandlerOptions = Field(default_factory=DeploymentHandlerOptions)
 
 
 class ResourceSpec(ConfiguredModel):
@@ -432,6 +491,11 @@ class ModelRevisionSpec(ConfiguredModel):
     execution: ExecutionSpec
     model_definition: ModelDefinition | None = None
     preset_values: list[PresetValueSpec] = Field(default_factory=list)
+    # Original deployment-level preset selection used to build this revision.
+    # ``None`` for legacy rows and revisions created without a preset; the
+    # materialised effects still live on ``preset_values`` and the resolved
+    # configuration columns.
+    revision_preset_id: DeploymentPresetID | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -458,12 +522,11 @@ class ModelRevisionSpecDraft(ConfiguredModel):
         """Project this legacy spec draft onto a ``RevisionDraft`` layer.
 
         ``image_id`` is resolved upstream from the spec's ``image_identifier``
-        (canonical + architecture) via the repository; mount-identifying
-        fields live on ``MountMetadata`` and are passed alongside into
-        ``add_revision`` rather than through the draft chain.
+        (canonical + architecture) via the repository.
         """
         return RevisionDraft(
             image_id=image_id,
+            mounts=self.mounts,
             resource_slots=self.resource_spec.resource_slots,
             resource_opts=self.resource_spec.resource_opts,
             cluster_mode=self.resource_spec.cluster_mode,
@@ -495,6 +558,8 @@ class RevisionDraft:
     # (see ``deployment_revisions.image`` SET NULL FK) — downstream
     # resolvers must treat the latter as non-deployable.
     image_id: ImageID | None = None
+    # Mount
+    mounts: MountMetadata | None = None
     # Resource
     resource_slots: Mapping[str, Any] | None = None
     resource_opts: Mapping[str, Any] | None = None
@@ -517,6 +582,7 @@ class RevisionDraft:
         """Return a new draft with ``other`` layered on top of ``self``."""
         return RevisionDraft(
             image_id=other.image_id if other.image_id is not None else self.image_id,
+            mounts=_merge_mounts(self.mounts, other.mounts),
             resource_slots=_merge_mappings(self.resource_slots, other.resource_slots),
             resource_opts=_merge_mappings(self.resource_opts, other.resource_opts),
             cluster_mode=other.cluster_mode
@@ -547,7 +613,7 @@ class RevisionDraft:
             else (list(self.preset_values) if self.preset_values is not None else None),
         )
 
-    def to_model_revision_spec(self, mounts: MountMetadata) -> ModelRevisionSpec:
+    def to_model_revision_spec(self) -> ModelRevisionSpec:
         """Project the merged draft into a final ``ModelRevisionSpec``.
 
         Validates that the merge chain produced an ``image_id`` and a
@@ -558,6 +624,8 @@ class RevisionDraft:
         """
         if self.image_id is None:
             raise InvalidAPIParameters("image_id is required to build a revision")
+        if self.mounts is None:
+            raise InvalidAPIParameters("mounts are required to build a revision")
         if self.runtime_variant_id is None:
             raise InvalidAPIParameters("runtime_variant_id is required to build a revision")
         return ModelRevisionSpec(
@@ -568,7 +636,7 @@ class RevisionDraft:
                 resource_slots=self.resource_slots or {},
                 resource_opts=self.resource_opts,
             ),
-            mounts=mounts,
+            mounts=self.mounts,
             execution=ExecutionSpec(
                 startup_command=self.startup_command,
                 bootstrap_script=self.bootstrap_script,
@@ -581,6 +649,31 @@ class RevisionDraft:
                 self.model_definition.to_resolved() if self.model_definition is not None else None
             ),
         )
+
+
+def _merge_mounts(
+    lower: MountMetadata | None,
+    upper: MountMetadata | None,
+) -> MountMetadata | None:
+    if upper is None:
+        return lower
+    if lower is None:
+        return MountMetadata(
+            model_vfolder_id=upper.model_vfolder_id,
+            model_definition_path=upper.model_definition_path,
+            model_mount_destination=upper.model_mount_destination,
+            extra_mounts=list(upper.extra_mounts),
+            vfolder_subpath=upper.vfolder_subpath,
+        )
+    return MountMetadata(
+        model_vfolder_id=upper.model_vfolder_id,
+        model_definition_path=upper.model_definition_path
+        if upper.model_definition_path
+        else lower.model_definition_path,
+        model_mount_destination=upper.model_mount_destination,
+        extra_mounts=list(upper.extra_mounts),
+        vfolder_subpath=upper.vfolder_subpath if upper.vfolder_subpath else lower.vfolder_subpath,
+    )
 
 
 def _merge_mappings(
@@ -628,23 +721,6 @@ class LegacyRevisionCreateReadBundle:
 
 
 @dataclass(frozen=True)
-class LegacyRevisionModifyReadBundle:
-    """DB reads for legacy model-serving modify.
-
-    ``base`` is the latest revision (highest ``revision_number``) already
-    attached to the endpoint, returned as the raw ``ModelRevisionData``. The
-    reader projects it into a merge-layer draft; v2 ``add_revision`` never
-    loads this because v2 treats each revision as a fresh full input rather
-    than a delta.
-    """
-
-    variant: RuntimeVariantData
-    preset: DeploymentRevisionPresetData | None
-    preset_resource_slots: list[ResourceSlotEntryData] | None
-    base: ModelRevisionData
-
-
-@dataclass(frozen=True)
 class DeploymentRevisionReadBundle:
     """DB reads for v2 deployment ``add_revision`` (typed ids, no base)."""
 
@@ -662,54 +738,32 @@ class DeploymentNetworkSpec:
 
 
 @dataclass
+class DeploymentNetworkData:
+    open_to_public: bool
+    access_token_ids: list[UUID] | None
+    url: str | None
+    preferred_domain_name: str | None
+
+
+@dataclass
 class DeploymentInfo:
     id: DeploymentID
     metadata: DeploymentMetadata
     state: DeploymentState
-    replica_spec: ReplicaSpec
-    network: DeploymentNetworkSpec
-    model_revisions: list[ModelRevisionSpec]
+    replica: ReplicaData
+    network: DeploymentNetworkData
     options: DeploymentOptions
+    # Revision ids, always populated cheaply from the replica groups (no
+    # revision-row load). The modern (v2) read path fills only these.
     current_revision_id: DeploymentRevisionID | None = None
-    policy: DeploymentPolicyData | None = None
     deploying_revision_id: DeploymentRevisionID | None = None
+    # Full revision data, populated only by the legacy (REST v1) / engine
+    # read paths that eagerly load the revision rows. ``None`` on the modern
+    # read path even when ``current_revision_id`` is set.
+    current_revision: ModelRevisionData | None = None
+    policy: DeploymentPolicyData | None = None
+    deploying_revision: ModelRevisionData | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
-
-    def resolve_revision_spec(self, revision_id: DeploymentRevisionID) -> ModelRevisionSpec:
-        """Find a ModelRevisionSpec by revision_id from model_revisions.
-
-        Raises:
-            DeploymentRevisionNotFound: If the revision is not found.
-        """
-        for revision in self.model_revisions:
-            if revision.revision_id == revision_id:
-                return revision
-        raise DeploymentRevisionNotFound(
-            f"Revision {revision_id} not found in model_revisions of deployment {self.id}"
-        )
-
-    def is_transition_timed_out(
-        self,
-        started_at: datetime | None,
-        handler_name: str,
-        current_dbtime: datetime,
-    ) -> bool:
-        """Check whether the handler has exceeded its configured timeout
-        against this deployment's persisted :class:`DeploymentOptions`.
-
-        ``options.timeouts.resolve(handler_name)`` yields the allowed
-        seconds; ``None`` means unbounded. ``started_at`` ``None`` also
-        means "never started" so the answer is always ``False``. Both
-        timestamps originate from PostgreSQL ``timestamptz`` columns
-        and therefore share the same tzinfo — no conversion needed.
-        """
-        if started_at is None:
-            return False
-        timeout = self.options.timeouts.resolve(handler_name)
-        if timeout is None:
-            return False
-        elapsed = (current_dbtime - started_at).total_seconds()
-        return elapsed > timeout
 
 
 @dataclass(frozen=True)
@@ -768,12 +822,6 @@ class DeploymentWithHistory:
 
 
 @dataclass
-class DeploymentSessionSpec:
-    id: UUID
-    metadata: DeploymentMetadata
-
-
-@dataclass
 class ScaleOutDecision:
     deployment_info: DeploymentInfo
     new_replica_count: int
@@ -801,6 +849,7 @@ class RouteInfo:
     created_at: datetime
     revision_id: UUID
     traffic_status: RouteTrafficStatus
+    health_check: ModelHealthCheck | None
     error_data: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -864,6 +913,9 @@ class ModelReplicaData:
     readiness_status: ReadinessStatus
     liveness_status: LivenessStatus
     activeness_status: ActivenessStatus
+    status: RouteStatus
+    traffic_status: RouteTrafficStatus
+    health_status: RouteHealthStatus
     detail: dict[str, Any]
     created_at: datetime
 
@@ -893,36 +945,90 @@ class ModelMountConfigData:
     vfolder_id: VFolderUUID | None
     mount_destination: str | None
     definition_path: str
+    # Same type used for row storage, ``MountMetadata.extra_mounts``, and
+    # this data-layer projection — keeps ``mount_perm`` visible end-to-end
+    # so modify flows can carry it over without information loss.
+    extra_mounts: list[MountInfoEntry]
+    # Subpath within the model vfolder. ``None`` means the vfolder root.
+    subpath: str | None = None
+
+
+@dataclass
+class ExecutionData:
+    """Container-execution overrides frozen on the persisted revision:
+    what command runs in the model container, what setup script runs
+    before it, and where deployment lifecycle events get POSTed.
+
+    Sibling of ``ModelRuntimeConfigData`` (runtime variant / environ /
+    inference runtime knobs); kept separate so the schedulers and draft
+    builders can pass these straight to the kernel spec without picking
+    them out of the runtime config bag.
+    """
+
+    # Replaces the image ``CMD`` when starting the model container.
+    # ``None`` keeps whatever the image baked in.
+    startup_command: str | None
+    # Shell script run once at container startup, before
+    # ``startup_command``. ``None`` for revisions that do no extra setup.
+    bootstrap_script: str | None
+    # Webhook the manager POSTs to on deployment lifecycle events
+    # (provisioning, ready, failure, …); ``None`` disables callbacks.
+    callback_url: yarl.URL | None
+
+
+@dataclass
+class PresetAttributionData:
+    """The deployment-level preset that produced this revision and the
+    materialised values it expanded into.
+
+    ``preset_id is None`` means the revision was created without a
+    preset (legacy rows or fully ad-hoc creations); the resolver still
+    populates the ``values`` list — possibly empty — from the
+    ``deployment_revisions.preset_values`` JSONB column either way.
+    """
+
+    preset_id: DeploymentPresetID | None
+    values: list[PresetValueData]
 
 
 @dataclass
 class ModelRevisionData:
-    id: UUID
-    name: str
+    # Identity
+    id: DeploymentRevisionID
+    deployment_id: DeploymentID
+    revision_number: int
+    created_at: datetime
+    # Image — ``image_id is None`` signals the backing image row has
+    # been deleted (SET NULL FK); the revision is kept for history but
+    # cannot be redeployed.
+    image_id: ImageID | None
+    # Resource
     cluster_config: ClusterConfigData
     resource_config: ResourceConfigData
+    # Runtime + execution
     model_runtime_config: ModelRuntimeConfigData
+    execution: ExecutionData
+    # Mount
     model_mount_config: ModelMountConfigData
-    created_at: datetime
-    # ``image_id is None`` signals the backing image row has been deleted
-    # (SET NULL FK); the revision is kept for history but cannot be
-    # redeployed.
-    image_id: ImageID | None
+    # Preset attribution
+    preset: PresetAttributionData
+    # Model definition (resolved against the model vfolder at
+    # persistence time; ``None`` if the source had none).
     model_definition: ModelDefinition | None = None
-    # Same type used for row storage, ``MountMetadata.extra_mounts``, and
-    # this data-layer projection — keeps ``mount_perm`` visible end-to-end
-    # so modify flows can carry it over without information loss.
-    extra_vfolder_mounts: list[MountInfoEntry] = field(default_factory=list)
 
     def to_draft(self) -> RevisionDraft:
         """Project this persisted revision onto a ``RevisionDraft`` layer.
 
         Used as the base (lowest-priority-below-request) layer on the legacy
         modify path so untouched fields survive when the user submits a partial
-        override. Fields that do not live on ``ModelRevisionData``
-        (``startup_command``, ``bootstrap_script``, ``callback_url``) remain
-        ``None`` — the reader pipeline resolves them from preset /
-        ``deployment-config.yaml`` / ``model-definition.yaml`` / user override.
+        override. Every write-time field on ``ModelRevisionData`` —
+        ``image_id``, ``cluster_config`` / ``resource_config``,
+        ``model_runtime_config`` (runtime variant + environ +
+        inference_runtime_config), ``execution`` (startup_command /
+        bootstrap_script / callback_url), and ``model_definition`` —
+        flows back into the draft as the baseline; preset /
+        ``deployment-config.yaml`` / ``model-definition.yaml`` / user
+        request layers then override on top via ``merge_revision_drafts``.
         """
         environ = self.model_runtime_config.environ
         resource_slots = dict(self.resource_config.resource_slot) or None
@@ -934,12 +1040,26 @@ class ModelRevisionData:
         )
         return RevisionDraft(
             image_id=self.image_id,
+            mounts=(
+                MountMetadata(
+                    model_vfolder_id=self.model_mount_config.vfolder_id,
+                    model_definition_path=self.model_mount_config.definition_path or None,
+                    model_mount_destination=self.model_mount_config.mount_destination or "/models",
+                    extra_mounts=list(self.model_mount_config.extra_mounts),
+                    vfolder_subpath=self.model_mount_config.subpath,
+                )
+                if self.model_mount_config.vfolder_id is not None
+                else None
+            ),
             resource_slots=resource_slots,
             resource_opts=resource_opts,
             cluster_mode=self.cluster_config.mode,
             cluster_size=self.cluster_config.size,
+            startup_command=self.execution.startup_command,
+            bootstrap_script=self.execution.bootstrap_script,
             environ={k: str(v) for k, v in environ.items()} if environ else None,
             runtime_variant_id=self.model_runtime_config.runtime_variant_id,
+            callback_url=self.execution.callback_url,
             inference_runtime_config=self.model_runtime_config.inference_runtime_config,
             model_definition=model_definition_draft,
         )
@@ -952,6 +1072,7 @@ class ModelDeploymentMetadataInfo:
     tags: list[str]
     project_id: UUID
     domain_name: str
+    resource_group_name: str
     created_at: datetime
     updated_at: datetime
 
@@ -964,10 +1085,18 @@ class ReplicaStateData:
 
 @dataclass
 class ModelDeploymentData:
+    """Modern (v2 / GraphQL) deployment projection.
+
+    Carries revisions as ids only (``current_revision_id`` /
+    ``deploying_revision_id``); the full revision is resolved on demand by
+    the GraphQL DataLoader. The REST v1 surface, which embeds the full
+    revision, uses :class:`LegacyDeploymentData` instead.
+    """
+
     id: DeploymentID
     metadata: ModelDeploymentMetadataInfo
-    network_access: DeploymentNetworkSpec
-    revision: ModelRevisionData | None
+    network_access: DeploymentNetworkData
+    current_revision_id: DeploymentRevisionID | None
     deploying_revision_id: DeploymentRevisionID | None
     revision_history_ids: list[DeploymentRevisionID]
     scaling_rule_ids: list[UUID]
@@ -981,6 +1110,27 @@ class ModelDeploymentData:
     scaling_state: ScalingState
     policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
+
+
+@dataclass
+class LegacyDeploymentData:
+    """Legacy v1 deployment projection — DO NOT USE in new code.
+
+    Backs the REST v1 ``DeploymentDTO`` response only, which embeds the full
+    current ``revision``. v2 / GraphQL use :class:`ModelDeploymentData`
+    (revision ids only). Built independently from ``DeploymentInfo``; it is
+    never converted to or from :class:`ModelDeploymentData`.
+    """
+
+    id: DeploymentID
+    metadata: ModelDeploymentMetadataInfo
+    network_access: DeploymentNetworkData
+    revision: ModelRevisionData | None
+    replica_state: ReplicaStateData
+    default_deployment_strategy: DeploymentStrategy
+    created_user_id: UUID
+    policy: DeploymentPolicyData | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
 
 
@@ -1071,21 +1221,18 @@ class DeploymentHistoryData:
 
 @dataclass
 class RouteHistoryData:
-    """Domain model for route history.
-
-    from_status/to_status contain the relevant status for the category:
-    - category=lifecycle: lifecycle status values (provisioning, running, etc.)
-    - category=health: health status values (healthy, unhealthy, etc.)
-    """
+    """Domain model for route history."""
 
     id: UUID
     route_id: UUID
     deployment_id: UUID
 
-    category: str  # RouteHandlerCategory value
+    category: RouteHandlerCategory
     phase: str  # RouteLifecycleType value
     from_status: str | None
     to_status: str | None
+    from_sub_status: str | None
+    to_sub_status: str | None
 
     result: SchedulingResult
     error_code: str | None

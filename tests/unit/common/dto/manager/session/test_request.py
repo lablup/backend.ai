@@ -36,6 +36,7 @@ from ai.backend.common.dto.manager.session.request import (
     SyncAgentRegistryRequest,
     TransitSessionStatusRequest,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import ClusterMode, SessionTypes
 
 
@@ -76,12 +77,12 @@ class TestCreateFromTemplateRequest:
         assert req.reuse is False
 
     def test_priority_bounds(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateFromTemplateRequest.model_validate({
                 "template_id": str(uuid4()),
                 "priority": SESSION_PRIORITY_MIN - 1,
             })
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateFromTemplateRequest.model_validate({
                 "template_id": str(uuid4()),
                 "priority": SESSION_PRIORITY_MAX + 1,
@@ -142,7 +143,7 @@ class TestCreateFromParamsRequest:
         assert req.domain == "default"
 
     def test_missing_required_fields(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateFromParamsRequest.model_validate({})
 
     def test_all_aliases(self) -> None:
@@ -250,9 +251,9 @@ class TestStartServiceRequest:
     def test_port_range(self) -> None:
         req = StartServiceRequest.model_validate({"app": "x", "port": 8080})
         assert req.port == 8080
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StartServiceRequest.model_validate({"app": "x", "port": 80})
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StartServiceRequest.model_validate({"app": "x", "port": 70000})
 
 
@@ -274,7 +275,7 @@ class TestSyncAgentRegistryRequest:
         assert req.agent == "agent-001"
 
     def test_missing(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SyncAgentRegistryRequest.model_validate({})
 
 
@@ -321,7 +322,7 @@ class TestConvertSessionToImageRequest:
         assert req.image_visibility == CustomizedImageVisibilityScope.USER
 
     def test_invalid_image_name(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ConvertSessionToImageRequest.model_validate({
                 "image_name": "invalid name!",
             })

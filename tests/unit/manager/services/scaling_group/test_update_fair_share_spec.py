@@ -6,12 +6,14 @@ Tests resource weight validation and capacity-based filtering.
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot, SessionTypes, SlotQuantity
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.scaling_group.types import (
@@ -66,6 +68,7 @@ def _create_scaling_group(
         route_cleanup_target_statuses=[],
     )
     return ScalingGroupData(
+        id=ResourceGroupID(uuid.uuid4()),
         name="default",
         status=ScalingGroupStatus(is_active=True, is_public=True),
         metadata=ScalingGroupMetadata(description="Test", created_at=datetime.now(tz=UTC)),

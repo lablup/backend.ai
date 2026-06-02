@@ -12,11 +12,13 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentHistoryData,
     DeploymentHistoryListResult,
+    RouteHandlerCategory,
     RouteHistoryData,
     RouteHistoryListResult,
 )
@@ -112,10 +114,12 @@ def _make_route_history() -> RouteHistoryData:
         id=uuid4(),
         route_id=uuid4(),
         deployment_id=uuid4(),
-        category="lifecycle",
+        category=RouteHandlerCategory.LIFECYCLE,
         phase="CREATING",
         from_status=None,
         to_status=None,
+        from_sub_status=None,
+        to_sub_status=None,
         result=SchedulingResult.SUCCESS,
         error_code=None,
         message="ok",
@@ -279,7 +283,7 @@ class TestSearchRouteScopedHistoryAction:
         mock_repository: MagicMock,
         querier: BatchQuerier,
     ) -> None:
-        route_id = uuid4()
+        route_id = ReplicaID(uuid4())
         history_item = _make_route_history()
         mock_repository.search_route_scoped_history.return_value = RouteHistoryListResult(
             items=[history_item],

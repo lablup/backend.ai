@@ -123,6 +123,10 @@ from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
+    ResolveIdsByNamesAction,
+    ResolveIdsByNamesActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
@@ -234,6 +238,28 @@ class VFolderService:
         """
         data = await self._vfolder_repository.batch_load_by_ids(action.ids)
         return BatchLoadVFoldersByIdsActionResult(data=data)
+
+    async def resolve_vfolder_ids_by_names(
+        self, action: ResolveIdsByNamesAction
+    ) -> ResolveIdsByNamesActionResult:
+        """Resolve a batch of vfolder names into their UUIDs in one query.
+
+        No access checking — used by session-creation paths that still
+        accept vfolder names in ``creation_config["mounts"]`` to convert
+        them into ids before the real session-create action runs. The
+        downstream action validates the user's access against the
+        resolved ids.
+
+        Raises ``VFolderNotFound`` if any requested name has no matching
+        row, with the missing names attached as ``extra_data``.
+        """
+        name_to_id = await self._vfolder_repository.resolve_vfolder_ids_by_names(
+            action.vfolder_names
+        )
+        missing = [name for name in action.vfolder_names if name not in name_to_id]
+        if missing:
+            raise VFolderNotFound(extra_data=missing)
+        return ResolveIdsByNamesActionResult(name_to_id=name_to_id)
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role
@@ -674,7 +700,12 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        result = await self._vfolder_repository.delete_vfolders_forever(
+            [action.vfolder_uuid],
+            cascade_model_card=action.cascade_model_card,
+        )
+        if result.failures:
+            raise result.failures[0].exception
         await self._remove_vfolder_from_storage(vfolder_data)
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -694,7 +725,9 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        result = await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        if result.failures:
+            raise result.failures[0].exception
         await self._remove_vfolder_from_storage(vfolder_data)
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -1794,7 +1827,12 @@ class VFolderService:
         return DeleteVFolderV2ActionResult(vfolder_id=action.vfolder_id)
 
     async def purge_v2(self, action: PurgeVFolderV2Action) -> PurgeVFolderV2ActionResult:
-        """Permanently purge a vfolder by ID. RBAC enforced at processor level."""
+        """Permanently purge a vfolder by ID. RBAC enforced at processor level.
+
+        Rejects the request when any model card still references the vfolder
+        unless ``action.cascade_model_card`` is True, in which case the linked
+        model card row(s) are removed atomically alongside the vfolder data.
+        """
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
@@ -1807,7 +1845,12 @@ class VFolderService:
             user_uuid=me.user_id,
         )
 
-        await self._vfolder_repository.delete_vfolders_forever([action.vfolder_id])
+        result = await self._vfolder_repository.delete_vfolders_forever(
+            [action.vfolder_id],
+            cascade_model_card=action.cascade_model_card,
+        )
+        if result.failures:
+            raise result.failures[0].exception
         await self._remove_vfolder_from_storage(vfolder_data)
         return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_id)
 

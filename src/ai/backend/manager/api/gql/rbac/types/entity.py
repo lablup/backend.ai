@@ -34,7 +34,10 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
-from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import (
+    RBACElementTypeFilterGQL,
+    RBACElementTypeGQL,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 # ==================== Enums ====================
@@ -147,7 +150,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     name="EntityFilter",
 )
 class EntityFilter(PydanticInputMixin[EntityFilterDTO], GQLFilter):
-    entity_type: RBACElementTypeGQL | None = None
+    entity_type: RBACElementTypeFilterGQL | None = None
     entity_id: StringFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None

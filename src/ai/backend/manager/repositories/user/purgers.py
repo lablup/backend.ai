@@ -6,12 +6,14 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityBatchPurgerSpec
 
 
 @dataclass
@@ -59,14 +61,18 @@ class UserGroupAssociationBatchPurgerSpec(BatchPurgerSpec[AssocGroupUserRow]):
 
 
 @dataclass
-class UserBatchPurgerSpec(BatchPurgerSpec[UserRow]):
-    """PurgerSpec for deleting a user."""
+class UserBatchPurgerSpec(RBACEntityBatchPurgerSpec[UserRow]):
+    """PurgerSpec for deleting a user with RBAC scope/permission cleanup."""
 
     user_uuid: UUID
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[UserRow]]:
         return sa.select(UserRow).where(UserRow.uuid == self.user_uuid)
+
+    @override
+    def element_type(self) -> RBACElementType:
+        return RBACElementType.USER
 
 
 def create_user_error_log_purger(user_uuid: UUID) -> BatchPurger[ErrorLogRow]:

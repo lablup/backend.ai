@@ -17,8 +17,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.types import AccessKey
-from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
 from ai.backend.manager.repositories.scheduler.types.session import (
     TerminatingSessionData,
 )
@@ -119,14 +117,7 @@ class TestScheduleSessionsLifecycleHandler:
         first_session = pending_sessions_multiple[0]
         mock_repository.get_scheduling_data.return_value = MagicMock()
         mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
-            scheduled_sessions=[
-                ScheduledSessionData(
-                    session_id=first_session.session_info.identity.id,
-                    creation_id=first_session.session_info.identity.creation_id,
-                    access_key=AccessKey(first_session.session_info.metadata.access_key),
-                    reason="scheduled-successfully",
-                )
-            ]
+            scheduled_session_ids=[first_session.session_info.identity.id]
         )
 
         # Act
@@ -157,7 +148,9 @@ class TestScheduleSessionsLifecycleHandler:
         """
         # Arrange - No sessions scheduled
         mock_repository.get_scheduling_data.return_value = MagicMock()
-        mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(scheduled_sessions=[])
+        mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
+            scheduled_session_ids=[]
+        )
 
         # Act
         result = await handler.execute("default", pending_sessions_multiple)

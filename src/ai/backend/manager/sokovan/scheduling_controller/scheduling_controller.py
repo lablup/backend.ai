@@ -28,7 +28,7 @@ from ai.backend.manager.repositories.scheduler import (
     MarkTerminatingResult,
     SchedulerRepository,
 )
-from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 
 from .preparers import (
@@ -48,8 +48,11 @@ from .validators import (
     ConcurrentSessionLimitRule,
     ContainerLimitRule,
     DotfileVFolderConflictRule,
+    ImageSlotTypeRule,
     InferenceModelFolderRule,
     MountNameValidationRule,
+    RequestedSlotTypeRule,
+    RequiredResourceSlotRule,
     ResourceLimitRule,
     ServicePortRule,
     SessionSpecValidationContext,
@@ -125,6 +128,9 @@ class SchedulingController:
         self._spec_validator = SessionSpecValidator([
             ConcurrentSessionLimitRule(),
             ContainerLimitRule(),
+            ImageSlotTypeRule(),
+            RequestedSlotTypeRule(),
+            RequiredResourceSlotRule(),
             ResourceLimitRule(),
             ServicePortRule(),
             MountNameValidationRule(),
@@ -161,9 +167,6 @@ class SchedulingController:
         allowed_vfolder_types = list(
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
-        known_slot_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
-        )
 
         with self._metric_observer.measure_phase(
             "scheduling_controller", rg_name, "spec_fetch_contexts"
@@ -186,7 +189,8 @@ class SchedulingController:
         val_ctx = SessionSpecValidationContext(
             keypair_resource_policy=fetched.keypair_resource_policy,
             image_infos=fetched.image_infos,
-            known_slot_types=known_slot_types,
+            known_slot_types=fetched.known_slot_types,
+            slot_type_policy=fetched.slot_type_policy,
             dotfile_data=fetched.dotfile_data,
             active_session_count=fetched.active_session_count,
         )

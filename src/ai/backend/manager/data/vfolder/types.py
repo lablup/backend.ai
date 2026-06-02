@@ -182,6 +182,7 @@ class VFolderData:
     cur_size: int
     created_at: datetime
     last_used: datetime | None
+    updated_at: datetime
     creator: str | None
     creator_id: uuid.UUID | None
     unmanaged_path: str | None
@@ -213,6 +214,7 @@ class VFolderInvitationData:
     id: uuid.UUID
     vfolder: uuid.UUID
     inviter: str  # email
+    inviter_username: str | None
     invitee: str  # email
     permission: VFolderMountPermission
     created_at: datetime

@@ -6,7 +6,11 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
@@ -179,6 +183,26 @@ class KeypairConditions:
             else:
                 cond = KeyPairRow.resource_policy.like(f"%{value}")
             if negated:
+                return sa.not_(cond)
+            return cond
+
+        return inner
+
+    @staticmethod
+    def by_user_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            cond: sa.sql.expression.ColumnElement[bool] = KeyPairRow.user == spec.value
+            if spec.negated:
+                return sa.not_(cond)
+            return cond
+
+        return inner
+
+    @staticmethod
+    def by_user_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            cond: sa.sql.expression.ColumnElement[bool] = KeyPairRow.user.in_(spec.values)
+            if spec.negated:
                 return sa.not_(cond)
             return cond
 

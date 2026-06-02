@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Final
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -14,6 +15,7 @@ from ai.backend.manager.actions.action import (
     BaseActionTriggerMeta,
     ProcessResult,
 )
+from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
@@ -157,3 +159,36 @@ async def test_processor_exception() -> None:
 
     with pytest.raises(MockException):
         await processor.wait_for_complete(action)
+
+
+class TestAuditLogMonitorExclusionAtSetupTime:
+    @pytest.fixture
+    def mock_audit_log_repository(self) -> MagicMock:
+        repo = MagicMock()
+        repo.create = AsyncMock(return_value=None)
+        return repo
+
+    @pytest.fixture
+    def audit_log_monitor(self, mock_audit_log_repository: MagicMock) -> AuditLogMonitor:
+        return AuditLogMonitor(repository=mock_audit_log_repository)
+
+    @pytest.fixture
+    def mock_action(self) -> MockAction:
+        return MockAction(id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE)
+
+    async def test_audit_log_monitor_excluded_when_filtered_from_monitor_list(
+        self,
+        audit_log_monitor: AuditLogMonitor,
+        mock_audit_log_repository: MagicMock,
+        mock_action: MockAction,
+    ) -> None:
+        monitors_without_audit_log = [
+            monitor for monitor in [audit_log_monitor] if not isinstance(monitor, AuditLogMonitor)
+        ]
+        processor = ActionProcessor[MockAction, MockActionResult](
+            func=mock_action_processor_func, monitors=monitors_without_audit_log
+        )
+
+        await processor.wait_for_complete(mock_action)
+
+        mock_audit_log_repository.create.assert_not_called()

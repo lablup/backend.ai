@@ -38,6 +38,7 @@ class AgentResourceData:
     agent_id: str
     slot_name: str
     capacity: Decimal
+    reserved: Decimal
     used: Decimal
 
 

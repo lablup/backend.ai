@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     MetricLabelEntry,
     ModifyQueryDefinitionInput,
     ModifyQueryDefinitionOptionsInput,
+    PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
     SearchQueryDefinitionsInput,
@@ -25,6 +26,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     OrderDirection,
     QueryDefinitionOrderField,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed, InvalidMetricPresetTemplate
 
 _SAMPLE_UUID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
@@ -89,7 +91,7 @@ class TestCreateQueryDefinitionInput:
             assert inp.time_window == tw
 
     def test_invalid_time_window_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionInput(
                 name="test",
                 metric_name="metric",
@@ -99,7 +101,7 @@ class TestCreateQueryDefinitionInput:
             )
 
     def test_blank_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionInput(
                 name="",
                 metric_name="metric",
@@ -108,7 +110,7 @@ class TestCreateQueryDefinitionInput:
             )
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionInput(
                 name="   ",
                 metric_name="metric",
@@ -135,7 +137,7 @@ class TestCreateQueryDefinitionInput:
         assert len(inp.name) == 256
 
     def test_name_exceeds_max_length_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionInput(
                 name="x" * 257,
                 metric_name="metric",
@@ -144,7 +146,7 @@ class TestCreateQueryDefinitionInput:
             )
 
     def test_missing_options_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateQueryDefinitionInput.model_validate({
                 "name": "test",
                 "metric_name": "metric",
@@ -163,6 +165,24 @@ class TestCreateQueryDefinitionInput:
         restored = CreateQueryDefinitionInput.model_validate_json(json_str)
         assert restored.name == "cpu_usage"
         assert restored.time_window == "5m"
+
+    def test_unsupported_template_var_in_query_template_raises(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
+            CreateQueryDefinitionInput(
+                name="test",
+                metric_name="metric",
+                query_template='rate(metric{mode!="idle"}[$__rate_interval])',
+                options=_make_create_options(),
+            )
+
+    def test_malformed_query_template_raises(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate):
+            CreateQueryDefinitionInput(
+                name="test",
+                metric_name="metric",
+                query_template="metric{",
+                options=_make_create_options(),
+            )
 
 
 class TestModifyQueryDefinitionOptionsInput:
@@ -206,19 +226,19 @@ class TestModifyQueryDefinitionInput:
         assert inp.time_window == "15m"
 
     def test_time_window_invalid_format_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ModifyQueryDefinitionInput(time_window="invalid")
 
     def test_time_window_invalid_unit_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ModifyQueryDefinitionInput(time_window="5x")
 
     def test_blank_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ModifyQueryDefinitionInput(name="")
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ModifyQueryDefinitionInput(name="   ")
 
     def test_name_none_is_valid(self) -> None:
@@ -237,6 +257,20 @@ class TestModifyQueryDefinitionInput:
         assert inp.name == "new_name"
         assert inp.metric_name == "new_metric"
         assert inp.query_template is None
+
+    def test_query_template_none_skips_validation(self) -> None:
+        inp = ModifyQueryDefinitionInput(query_template=None)
+        assert inp.query_template is None
+
+    def test_unsupported_template_var_in_query_template_raises(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
+            ModifyQueryDefinitionInput(
+                query_template='rate(metric{mode!="idle"}[$__rate_interval])',
+            )
+
+    def test_malformed_query_template_raises(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate):
+            ModifyQueryDefinitionInput(query_template="metric{")
 
     def test_round_trip_serialization(self) -> None:
         inp = ModifyQueryDefinitionInput(
@@ -257,7 +291,7 @@ class TestDeleteQueryDefinitionInput:
         assert inp.id == _SAMPLE_UUID
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteQueryDefinitionInput.model_validate({})
 
     def test_round_trip_serialization(self) -> None:
@@ -326,15 +360,15 @@ class TestSearchQueryDefinitionsInput:
         assert inp.limit == 1000
 
     def test_limit_exceeds_max_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchQueryDefinitionsInput(limit=1001)
 
     def test_limit_below_min_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchQueryDefinitionsInput(limit=0)
 
     def test_offset_negative_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchQueryDefinitionsInput(offset=-1)
 
     def test_with_order(self) -> None:
@@ -393,7 +427,7 @@ class TestExecuteQueryDefinitionInput:
         assert inp.time_window == "5m"
 
     def test_invalid_time_window_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ExecuteQueryDefinitionInput(time_window="bad_format")
 
     def test_with_options(self) -> None:
@@ -407,3 +441,15 @@ class TestExecuteQueryDefinitionInput:
         json_str = inp.model_dump_json()
         restored = ExecuteQueryDefinitionInput.model_validate_json(json_str)
         assert restored.time_window == "1h"
+
+
+class TestPreviewQueryDefinitionInput:
+    """Tests for PreviewQueryDefinitionInput field validation."""
+
+    def test_rejects_empty_template(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="empty"):
+            PreviewQueryDefinitionInput(query_template="")
+
+    def test_rejects_foreign_var(self) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="Unsupported"):
+            PreviewQueryDefinitionInput(query_template="rate(metric[$range])")

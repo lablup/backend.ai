@@ -5,10 +5,11 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "NumberFormatDTO",
@@ -19,14 +20,14 @@ __all__ = (
 )
 
 
-class NumberFormatDTO(BaseModel):
+class NumberFormatDTO(BackendAISchema):
     """DTO for number format data."""
 
     binary: bool = Field(description="Whether to use binary (1024-based) units")
     round_length: int = Field(description="Number of decimal places to round to")
 
 
-class ResourceSlotTypeDTO(BaseModel):
+class ResourceSlotTypeDTO(BackendAISchema):
     """DTO for resource slot type data."""
 
     slot_name: str = Field(description="Unique slot name identifier")

@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
+    RouteSubStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.models.routing import RoutingRow
@@ -114,6 +115,13 @@ class RouteConditions:
     def by_traffic_status_not_in(statuses: Collection[RouteTrafficStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoutingRow.traffic_status.not_in(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_sub_statuses(sub_statuses: list[RouteSubStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.sub_status.in_(sub_statuses)
 
         return inner
 

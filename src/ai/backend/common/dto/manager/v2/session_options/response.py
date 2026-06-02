@@ -22,31 +22,36 @@ from ai.backend.common.dto.manager.v2.session_options.types import (
 from ai.backend.common.identifier.image import ImageID
 
 
-class HandlerTimeoutEntryInfo(BaseResponseModel):
-    """A single ``(handler_name, timeout_sec)`` entry."""
+class HandlerOptionsInfo(BaseResponseModel):
+    """Per-handler scheduler policy snapshot (no handler name)."""
+
+    timeout_sec: int | None = Field(
+        description=("Phase timeout in seconds; `null` means unbounded for this entry."),
+    )
+    max_retry_count: int | None = Field(
+        description=(
+            "Per-phase retry budget; `null` means the retry limit is "
+            "disabled (`give_up` never fires for this handler)."
+        ),
+    )
+
+
+class HandlerOptionsEntryInfo(HandlerOptionsInfo):
+    """A single ``(handler_name, options)`` entry."""
 
     handler_name: str = Field(
         description=("Handler identifier matching `SessionLifecycleHandler.name()`."),
     )
-    timeout_sec: int | None = Field(
-        description=(
-            "Timeout in seconds; `null` means this handler is unbounded "
-            "regardless of the `default` timeout."
-        ),
+
+
+class SessionHandlerOptionsInfo(BaseResponseModel):
+    """Handler-keyed scheduler policy snapshot."""
+
+    default: HandlerOptionsInfo = Field(
+        description=("Fallback per-handler policy applied to handlers not listed in `by_handler`."),
     )
-
-
-class SessionTimeoutsInfo(BaseResponseModel):
-    """Handler-keyed timeout policy snapshot."""
-
-    default: int | None = Field(
-        description=(
-            "Fallback timeout in seconds applied to handlers not "
-            "listed in `by_handler`; `null` means unbounded."
-        ),
-    )
-    by_handler: list[HandlerTimeoutEntryInfo] = Field(
-        description="Per-handler timeout overrides.",
+    by_handler: list[HandlerOptionsEntryInfo] = Field(
+        description="Per-handler overrides.",
     )
 
 
@@ -139,8 +144,8 @@ class DefaultSessionOptionsInfo(BaseResponseModel):
             "group does not pre-configure one."
         ),
     )
-    timeouts: SessionTimeoutsInfo = Field(
-        description="Default timeout policy.",
+    handler_options: SessionHandlerOptionsInfo = Field(
+        description="Default handler-keyed scheduler policy (timeout + retry).",
     )
     agent_selection_policy: AgentSelectionPolicyEnum = Field(
         description="Default agent selection policy.",

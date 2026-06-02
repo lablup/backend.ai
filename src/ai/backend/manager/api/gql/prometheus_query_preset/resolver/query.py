@@ -10,6 +10,7 @@ from strawberry.relay import PageInfo
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     SearchQueryDefinitionsInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -17,6 +18,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     ExecuteQueryDefinitionOptionsInput,
+    PreviewQueryDefinitionInputGQL,
     QueryDefinitionConnection,
     QueryDefinitionEdge,
     QueryDefinitionFilter,
@@ -26,6 +28,7 @@ from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     QueryTimeRangeInput,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 
 
 @gql_root_field(
@@ -96,7 +99,7 @@ async def prometheus_query_preset_result(
     time_range: QueryTimeRangeInput | None = None,
     options: ExecuteQueryDefinitionOptionsInput | None = None,
     time_window: str | None = None,
-) -> QueryDefinitionResultGQL:
+) -> QueryDefinitionResultGQL | None:
     dto = await info.context.adapters.prometheus_query_preset.execute_preset(
         preset_id=UUID(id),
         options=options.to_pydantic() if options is not None else None,
@@ -104,4 +107,19 @@ async def prometheus_query_preset_result(
         time_range=time_range.to_pydantic() if time_range is not None else None,
     )
 
+    return QueryDefinitionResultGQL.from_pydantic(dto)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Preview a prometheus query template before saving it as a preset (admin only).",
+    )
+)  # type: ignore[misc]
+async def admin_preview_prometheus_query_preset(
+    info: Info[StrawberryGQLContext],
+    input: PreviewQueryDefinitionInputGQL,
+) -> QueryDefinitionResultGQL | None:
+    check_admin_only()
+    dto = await info.context.adapters.prometheus_query_preset.admin_preview(input.to_pydantic())
     return QueryDefinitionResultGQL.from_pydantic(dto)

@@ -15,12 +15,14 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
+    DeleteModelCardOptions,
     ModelCardFilter,
     ModelCardOrder,
     SearchModelCardsInput,
 )
 from ai.backend.common.dto.manager.v2.model_card.response import SearchModelCardsPayload
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderField
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
@@ -29,11 +31,13 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
 )
 from ai.backend.manager.api.gql.model_card._preset_helpers import build_preset_connection
 from ai.backend.manager.api.gql.model_card.types import (
+    BulkDeleteModelCardsV2InputGQL,
+    BulkDeleteModelCardsV2PayloadGQL,
+    BulkDeleteModelCardV2ErrorGQL,
     CreateModelCardInputGQL,
     CreateModelCardPayloadGQL,
+    DeleteModelCardOptionsGQL,
     DeleteModelCardPayloadGQL,
-    DeleteModelCardsInputGQL,
-    DeleteModelCardsPayloadGQL,
     DeployModelCardInputGQL,
     DeployModelCardPayloadGQL,
     ModelCardAvailablePresetsScopeGQL,
@@ -120,7 +124,7 @@ async def model_card_v2(
 async def admin_create_model_card_v2(
     info: Info[StrawberryGQLContext],
     input: CreateModelCardInputGQL,
-) -> CreateModelCardPayloadGQL:
+) -> CreateModelCardPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.model_card.create(dto)
@@ -136,7 +140,7 @@ async def admin_create_model_card_v2(
 async def admin_update_model_card_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateModelCardInputGQL,
-) -> UpdateModelCardPayloadGQL:
+) -> UpdateModelCardPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.model_card.update(dto)
@@ -152,36 +156,37 @@ async def admin_update_model_card_v2(
 async def admin_delete_model_card_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteModelCardPayloadGQL:
+    options: DeleteModelCardOptionsGQL | None = None,
+) -> DeleteModelCardPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.model_card.delete(id)
+    options_dto = options.to_pydantic() if options is not None else DeleteModelCardOptions()
+    payload = await info.context.adapters.model_card.delete(id, options=options_dto)
     return DeleteModelCardPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version="26.4.2",
-        description="Delete multiple model cards (admin only).",
-    )
+        added_version=NEXT_RELEASE_VERSION,
+        description="Bulk-delete model cards (admin only) with per-card partial-failure reporting.",
+    ),
 )
-async def admin_delete_model_cards_v2(
+async def admin_bulk_delete_model_cards_v2(
     info: Info[StrawberryGQLContext],
-    input: DeleteModelCardsInputGQL,
-) -> DeleteModelCardsPayloadGQL:
-    """Delete multiple model cards.
-
-    Args:
-        info: Strawberry GraphQL context.
-        input: Input containing list of model card UUIDs to delete.
-
-    Returns:
-        DeleteModelCardsPayloadGQL with count of deleted model cards.
-    """
+    input: BulkDeleteModelCardsV2InputGQL,
+) -> BulkDeleteModelCardsV2PayloadGQL | None:
     check_admin_only()
     ctx = info.context
     dto = input.to_pydantic()
-    payload = await ctx.adapters.model_card.bulk_delete(dto)
-    return DeleteModelCardsPayloadGQL.from_pydantic(payload)
+    payload = await ctx.adapters.model_card.admin_bulk_delete(
+        dto, dto.options or DeleteModelCardOptions()
+    )
+    return BulkDeleteModelCardsV2PayloadGQL(
+        successes=list(payload.successes),
+        failed=[
+            BulkDeleteModelCardV2ErrorGQL(card_id=error.card_id, message=error.message)
+            for error in payload.failed
+        ],
+    )
 
 
 @gql_mutation(
@@ -193,7 +198,7 @@ async def admin_delete_model_cards_v2(
 async def scan_project_model_cards_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
-) -> ScanProjectModelCardsPayloadGQL:
+) -> ScanProjectModelCardsPayloadGQL | None:
     payload = await info.context.adapters.model_card.scan_project(project_id)
     return ScanProjectModelCardsPayloadGQL.from_pydantic(payload)
 
@@ -208,7 +213,7 @@ async def deploy_model_card_v2(
     info: Info[StrawberryGQLContext],
     card_id: UUID,
     input: DeployModelCardInputGQL,
-) -> DeployModelCardPayloadGQL:
+) -> DeployModelCardPayloadGQL | None:
     payload = await info.context.adapters.model_card.deploy(card_id, input.to_pydantic())
     return DeployModelCardPayloadGQL.from_pydantic(payload)
 

@@ -90,9 +90,9 @@ class TestOrchestrationComposer:
         mock_sokovan_dep.stage_name = "sokovan-orchestrator"
         mock_leader_dep.stage_name = "leader-election"
 
-        mock_idle_checker_dep.gen_health_checkers.return_value = None
-        mock_sokovan_dep.gen_health_checkers.return_value = None
-        mock_leader_dep.gen_health_checkers.return_value = None
+        for dep in (mock_idle_checker_dep, mock_sokovan_dep, mock_leader_dep):
+            dep.gen_liveness_checker.return_value = None
+            dep.gen_readiness_checker.return_value = None
 
         def make_provide(name: str, result: MagicMock) -> object:
             @asynccontextmanager

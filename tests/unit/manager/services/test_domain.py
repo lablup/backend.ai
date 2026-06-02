@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermission, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.resource import (
@@ -88,6 +89,7 @@ class TestCreateDomain:
     @pytest.fixture
     def sample_domain_data(self) -> DomainData:
         return DomainData(
+            id=DomainID(uuid4()),
             name="test-create-domain",
             description="Test domain",
             is_active=True,
@@ -103,6 +105,7 @@ class TestCreateDomain:
     @pytest.fixture
     def complex_resource_domain_data(self) -> DomainData:
         return DomainData(
+            id=DomainID(uuid4()),
             name="test-complex-resources",
             description="Test domain with complex resource slots",
             is_active=True,
@@ -270,6 +273,7 @@ class TestModifyDomain:
     @pytest.fixture
     def modified_domain_data(self) -> DomainData:
         return DomainData(
+            id=DomainID(uuid4()),
             name="test-modify-domain",
             description="Domain Description Modified",
             is_active=True,
@@ -285,6 +289,7 @@ class TestModifyDomain:
     @pytest.fixture
     def deactivated_domain_data(self) -> DomainData:
         return DomainData(
+            id=DomainID(uuid4()),
             name="test-domain",
             description="Test domain",
             is_active=False,
@@ -300,6 +305,7 @@ class TestModifyDomain:
     @pytest.fixture
     def nullified_domain_data(self) -> DomainData:
         return DomainData(
+            id=DomainID(uuid4()),
             name="test-nullify-domain",
             description=None,
             is_active=True,
@@ -629,6 +635,7 @@ class TestCreateDomainNode:
     @pytest.fixture
     def sample_domain_node_data(self) -> DomainData:
         return DomainData(
+            id=DomainID(uuid4()),
             name="test-domain-node",
             description="Test domain node",
             is_active=True,
@@ -760,6 +767,7 @@ class TestModifyDomainNode:
     @pytest.fixture
     def modified_domain_node_data(self) -> DomainData:
         return DomainData(
+            id=DomainID(uuid4()),
             name="test-domain-node",
             description="Modified description",
             is_active=True,
@@ -775,6 +783,7 @@ class TestModifyDomainNode:
     @pytest.fixture
     def sample_domain_data(self) -> DomainData:
         return DomainData(
+            id=DomainID(uuid4()),
             name="test-domain",
             description="Test domain",
             is_active=True,

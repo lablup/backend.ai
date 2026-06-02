@@ -237,9 +237,13 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
     def _convert_filter(self, filter_: RuntimeVariantPresetFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if filter_.runtime_variant_id is not None:
-            conditions.append(
-                RuntimeVariantPresetConditions.by_runtime_variant_id(filter_.runtime_variant_id)
+            cond = self.convert_uuid_filter(
+                filter_.runtime_variant_id,
+                equals_factory=RuntimeVariantPresetConditions.by_runtime_variant_id_equals,
+                in_factory=RuntimeVariantPresetConditions.by_runtime_variant_id_in,
             )
+            if cond is not None:
+                conditions.append(cond)
         if filter_.name:
             cond = self.convert_string_filter(
                 filter_.name,

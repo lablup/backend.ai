@@ -48,7 +48,7 @@ from .artifact import (
     update_artifact,
 )
 from .artifact_registry import default_artifact_registry
-from .audit_log import admin_audit_logs_v2
+from .audit_log import admin_audit_logs_v2, scoped_audit_logs_v2
 from .background_task import background_task_events
 from .container_registry import (
     admin_container_registries_v2,
@@ -186,9 +186,9 @@ from .login_session import (
     my_revoke_login_session,
 )
 from .model_card import (
+    admin_bulk_delete_model_cards_v2,
     admin_create_model_card_v2,
     admin_delete_model_card_v2,
-    admin_delete_model_cards_v2,
     admin_model_cards_v2,
     admin_update_model_card_v2,
     deploy_model_card_v2,
@@ -251,6 +251,7 @@ from .prometheus_query_preset import (
     admin_delete_prometheus_query_preset,
     admin_delete_prometheus_query_preset_category,
     admin_modify_prometheus_query_preset,
+    admin_preview_prometheus_query_preset,
     prometheus_query_preset,
     prometheus_query_preset_categories,
     prometheus_query_preset_category,
@@ -362,6 +363,17 @@ from .resource_usage import (
     project_usage_buckets,
     user_usage_buckets,
 )
+from .role_preset import (
+    admin_bulk_add_role_preset_permissions,
+    admin_bulk_remove_role_preset_permissions,
+    admin_create_role_preset,
+    admin_delete_role_presets,
+    admin_purge_role_presets,
+    admin_restore_role_presets,
+    admin_role_preset,
+    admin_role_presets,
+    admin_update_role_preset,
+)
 from .runtime_variant import (
     admin_create_runtime_variant,
     admin_delete_runtime_variant,
@@ -398,7 +410,7 @@ from .session.resolver import (
     enqueue_session,
     project_sessions_v2,
     session_v2,
-    terminate_project_sessions_v2,
+    terminate_sessions_v2,
 )
 from .storage_host import my_storage_host_permissions
 from .storage_namespace import (
@@ -513,6 +525,7 @@ class Query:
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
+    scoped_audit_logs_v2 = scoped_audit_logs_v2
     admin_container_registries_v2 = admin_container_registries_v2
     admin_login_sessions_v2 = admin_login_sessions_v2
     admin_login_history_v2 = admin_login_history_v2
@@ -528,9 +541,13 @@ class Query:
     prometheus_query_preset = prometheus_query_preset
     prometheus_query_presets = prometheus_query_presets
     prometheus_query_preset_result = prometheus_query_preset_result
+    admin_preview_prometheus_query_preset = admin_preview_prometheus_query_preset
     # Prometheus Query Preset Category APIs (read available to any authenticated user)
     prometheus_query_preset_category = prometheus_query_preset_category
     prometheus_query_preset_categories = prometheus_query_preset_categories
+    # Role Preset Admin APIs
+    admin_role_preset = admin_role_preset
+    admin_role_presets = admin_role_presets
     # RBAC Admin APIs
     admin_role = admin_role
     admin_roles = admin_roles
@@ -816,6 +833,14 @@ class Mutation:
     # Prometheus Query Preset Category - Admin APIs
     admin_create_prometheus_query_preset_category = admin_create_prometheus_query_preset_category
     admin_delete_prometheus_query_preset_category = admin_delete_prometheus_query_preset_category
+    # Role Preset - Admin APIs
+    admin_create_role_preset = admin_create_role_preset
+    admin_update_role_preset = admin_update_role_preset
+    admin_delete_role_presets = admin_delete_role_presets
+    admin_restore_role_presets = admin_restore_role_presets
+    admin_purge_role_presets = admin_purge_role_presets
+    admin_bulk_add_role_preset_permissions = admin_bulk_add_role_preset_permissions
+    admin_bulk_remove_role_preset_permissions = admin_bulk_remove_role_preset_permissions
     # RBAC Admin APIs
     admin_create_role = admin_create_role
     admin_update_role = admin_update_role
@@ -871,7 +896,7 @@ class Mutation:
     admin_create_model_card_v2 = admin_create_model_card_v2
     admin_update_model_card_v2 = admin_update_model_card_v2
     admin_delete_model_card_v2 = admin_delete_model_card_v2
-    admin_delete_model_cards_v2 = admin_delete_model_cards_v2
+    admin_bulk_delete_model_cards_v2 = admin_bulk_delete_model_cards_v2
     scan_project_model_cards_v2 = scan_project_model_cards_v2
     deploy_model_card_v2 = deploy_model_card_v2
     # VFolder V2 mutations
@@ -892,7 +917,7 @@ class Mutation:
     vfolder_create_download_session_v2 = vfolder_create_download_session_v2
     # Session V2 mutations
     enqueue_session = enqueue_session
-    terminate_project_sessions_v2 = terminate_project_sessions_v2
+    terminate_sessions_v2 = terminate_sessions_v2
 
 
 @strawberry.type

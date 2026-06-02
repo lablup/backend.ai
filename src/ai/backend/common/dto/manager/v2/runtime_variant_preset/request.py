@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
@@ -104,7 +104,7 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
 
 class RuntimeVariantPresetFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
-    runtime_variant_id: UUID | None = Field(default=None)
+    runtime_variant_id: UUIDFilter | None = Field(default=None)
     AND: list[RuntimeVariantPresetFilter] | None = Field(default=None)
     OR: list[RuntimeVariantPresetFilter] | None = Field(default=None)
     NOT: list[RuntimeVariantPresetFilter] | None = Field(default=None)

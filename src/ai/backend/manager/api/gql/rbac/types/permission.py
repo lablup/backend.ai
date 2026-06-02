@@ -74,9 +74,12 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    OperationTypeFilter as OperationTypeFilterDTO,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -89,7 +92,10 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
-from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import (
+    RBACElementTypeFilterGQL,
+    RBACElementTypeGQL,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -102,6 +108,32 @@ OperationTypeGQL: type[OperationTypeDTO] = gql_enum(
     OperationTypeDTO,
     name="OperationType",
 )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Filter for permission operation columns. Supports equals / in / not_equals / not_in."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="OperationTypeFilter",
+)
+class OperationTypeFilterGQL(PydanticInputMixin[OperationTypeFilterDTO]):
+    equals: OperationTypeGQL | None = gql_field(
+        description="Matches rows with this exact operation.", default=None
+    )
+    in_: list[OperationTypeGQL] | None = gql_field(
+        description="Matches rows whose operation is in this list.",
+        name="in",
+        default=None,
+    )
+    not_equals: OperationTypeGQL | None = gql_field(
+        description="Excludes rows with this exact operation.", default=None
+    )
+    not_in: list[OperationTypeGQL] | None = gql_field(
+        description="Excludes rows whose operation is in this list.", default=None
+    )
 
 
 @gql_enum(BackendAIGQLMeta(added_version="26.3.0", description="Permission ordering field"))
@@ -217,6 +249,9 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.PROJECT_ADMIN_PAGE
                 | RBACElementType.DOMAIN_ADMIN_PAGE
                 | RBACElementType.ROLE_ASSIGNMENT
+                | RBACElementType.VFOLDER_DATA
+                | RBACElementType.SESSION_APP_SERVICE
+                | RBACElementType.USER_EMAIL
             ):
                 return None
 
@@ -232,10 +267,10 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     name="PermissionNestedFilter",
 )
 class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
-    scope_id: str | None = None
-    scope_type: RBACElementTypeGQL | None = None
-    entity_type: RBACElementTypeGQL | None = None
-    operation: OperationTypeGQL | None = None
+    scope_id: StringFilter | None = None
+    scope_type: RBACElementTypeFilterGQL | None = None
+    entity_type: RBACElementTypeFilterGQL | None = None
+    operation: OperationTypeFilterGQL | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -247,9 +282,10 @@ class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
     name="PermissionFilter",
 )
 class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
-    role_id: UUID | None = None
-    scope_type: RBACElementTypeGQL | None = None
-    entity_type: RBACElementTypeGQL | None = None
+    role_id: UUIDFilter | None = None
+    scope_type: RBACElementTypeFilterGQL | None = None
+    scope_id: StringFilter | None = None
+    entity_type: RBACElementTypeFilterGQL | None = None
     created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None

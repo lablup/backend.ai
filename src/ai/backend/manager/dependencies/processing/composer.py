@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -30,6 +29,7 @@ from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators, RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.legacy import (
     LegacyScopeActionRBACValidator,
     LegacySingleEntityActionRBACValidator,
@@ -41,6 +41,7 @@ from ai.backend.manager.actions.validators.rbac.single_entity import (
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
@@ -258,6 +259,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             single_entity=SingleEntityActionRBACValidator(
                 permission_controller_repository, config_provider
             ),
+            bulk=BulkActionRBACValidator(permission_controller_repository, config_provider),
         )
         legacy_rbac_validators = LegacyRBACValidators(
             scope=LegacyScopeActionRBACValidator(permission_controller_repository),

@@ -1,6 +1,8 @@
 import enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 from .df_entry import DFEntry
 from .objective import SimpleObjective
@@ -29,7 +31,7 @@ class ShareLifecycle(enum.StrEnum):
     DELETE_FAILED = "DELETE_FAILED"
 
 
-class ShareObjective(BaseModel):
+class ShareObjective(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     objective: SimpleObjective
@@ -37,7 +39,7 @@ class ShareObjective(BaseModel):
     removable: bool
 
 
-class SimpleShare(BaseModel):
+class SimpleShare(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     uoid: UOID
@@ -45,7 +47,7 @@ class SimpleShare(BaseModel):
     path: str
 
 
-class Share(BaseModel):
+class Share(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     uoid: UOID

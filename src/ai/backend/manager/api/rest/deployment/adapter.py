@@ -61,7 +61,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentPolicyData,
     ExecutionSpec,
-    ModelDeploymentData,
+    LegacyDeploymentData,
     ModelRevisionData,
     MountInfo,
     ReplicaSpec,
@@ -124,10 +124,10 @@ class DeploymentAdapter(BaseFilterAdapter):
 
     def convert_to_dto(
         self,
-        data: ModelDeploymentData,
+        data: LegacyDeploymentData,
         runtime_variant_name: RuntimeVariant,
     ) -> DeploymentDTO:
-        """Convert ModelDeploymentData to DTO.
+        """Convert LegacyDeploymentData to DTO.
 
         ``runtime_variant_name`` is resolved by the caller (REST handler)
         from ``data.revision.model_runtime_config.runtime_variant_id``
@@ -267,7 +267,6 @@ class RevisionAdapter(BaseFilterAdapter):
             raise IncompleteRevisionData(f"Revision {data.id} has incomplete model mount config")
         return RevisionDTO(
             id=data.id,
-            name=data.name,
             cluster_config=ClusterConfigDTO(
                 mode=data.cluster_config.mode,
                 size=data.cluster_config.size,
@@ -455,6 +454,7 @@ def build_revision_creator(
                 vfolder_id=mount.vfolder_id,
                 mount_destination=mount.mount_destination,
                 mount_perm=mount.mount_perm,
+                subpath=mount.subpath,
             )
             for mount in revision_input.extra_mounts
         ]
@@ -464,6 +464,7 @@ def build_revision_creator(
         model_definition_path=revision_input.model_mount_config.definition_path,
         model_mount_destination=revision_input.model_mount_config.mount_destination,
         extra_mounts=extra_mounts,
+        vfolder_subpath=revision_input.model_mount_config.subpath,
     )
 
     execution = ExecutionSpec(
@@ -526,7 +527,7 @@ class CreateDeploymentAdapter:
             name=name,
             domain=request.metadata.domain_name,
             project=request.metadata.project_id,
-            resource_group=request.initial_revision.resource_config.resource_group,
+            resource_group=request.metadata.resource_group_name,
             created_user=user_uuid,
             session_owner=user_uuid,
             created_at=None,

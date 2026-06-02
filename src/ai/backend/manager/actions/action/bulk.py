@@ -1,32 +1,22 @@
 from abc import abstractmethod
-from dataclasses import dataclass
-from typing import Any, TypeVar, override
+from collections.abc import Sequence
+from typing import override
+
+from ai.backend.manager.data.permission.types import RBACElementRef
 
 from .base import BaseAction, BaseActionResult
+from .types import ActionTarget
 
 
-@dataclass
-class BaseBulkAction[T](BaseAction):
-    """Base class for actions operating on a bulk of entities.
+class BaseBulkAction[TTarget: ActionTarget](BaseAction):
+    """Bulk action over a sequence of :class:`ActionTarget`.
 
-    ``entity_ids`` is stored as ``list[str]`` so ``BulkActionValidator``
-    implementations can match against validator verdicts directly. The
-    original ``T``-typed view is exposed via ``typed_entity_ids()``.
-
-    Bulk actions intentionally carry **only** ``entity_ids``. User context
-    (user id, role) flows through ``current_user()``, not the action, so
-    ``BulkActionProcessor`` can reconstruct a filtered action by calling
-    ``type(action)(entity_ids=...)`` directly — no ``__init__`` override or
-    factory hook is required. Subclasses that try to add required fields
-    break that constructor call and will fail fast at runtime, which is
-    intentional.
+    Parametrize the target type to require a richer contract — e.g.
+    ``BaseBulkAction[SearchableActionTarget]`` for a scoped search.
     """
 
-    entity_ids: list[str]
-
     @abstractmethod
-    def typed_entity_ids(self) -> list[T]:
-        """Return ``entity_ids`` converted back to the native ID type ``T``."""
+    def targets(self) -> Sequence[TTarget]:
         raise NotImplementedError
 
 
@@ -36,9 +26,5 @@ class BaseBulkActionResult(BaseActionResult):
         return None
 
     @abstractmethod
-    def entity_ids(self) -> list[str]:
+    def element_refs(self) -> list[RBACElementRef]:
         raise NotImplementedError
-
-
-TBulkAction = TypeVar("TBulkAction", bound=BaseBulkAction[Any])
-TBulkActionResult = TypeVar("TBulkActionResult", bound=BaseBulkActionResult)

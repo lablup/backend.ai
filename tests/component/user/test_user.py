@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import secrets
 import uuid
+from collections.abc import AsyncIterator
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.permission.types import RBACElementType, RelationType
+from ai.backend.common.dto.manager.query import ArrayFilter, IntFilter, StringFilter
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -27,8 +32,30 @@ from ai.backend.common.dto.manager.user import (
     UserRole,
     UserStatus,
 )
+from ai.backend.common.dto.manager.v2.user.request import (
+    SearchUsersRequest as V2SearchUsersRequest,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    UserFilter as V2UserFilter,
+)
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.user import users
+from ai.backend.testutils.fixtures import DomainFixtureData
 
-from .conftest import UserFactory
+from .conftest import (
+    ArrayMatchUsers,
+    ScalarMatchUsers,
+    SingleGidUsers,
+    UserFactory,
+)
 
 
 class TestUserCreate:
@@ -51,7 +78,7 @@ class TestUserCreate:
     async def test_regular_user_cannot_create_user(
         self,
         user_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         resource_policy_fixture: str,
     ) -> None:
         unique = secrets.token_hex(4)
@@ -59,7 +86,7 @@ class TestUserCreate:
             email=f"denied-{unique}@test.local",
             username=f"denied-{unique}",
             password="test-password-1234",
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
             resource_policy=resource_policy_fixture,
         )
         with pytest.raises(PermissionDeniedError):
@@ -343,6 +370,100 @@ class TestUserDelete:
             await user_registry.user.delete(DeleteUserRequest(user_id=target_user.user.id))
 
 
+@pytest.fixture()
+async def user_with_rbac_rows(
+    db_engine: SAEngine,
+    domain_fixture: DomainFixtureData,
+    resource_policy_fixture: str,
+) -> AsyncIterator[tuple[uuid.UUID, str]]:
+    """Insert a user along with the RBAC rows that the create flow would
+    normally generate (a SYSTEM role at the user's scope, two scope-entity
+    associations, and a scope-bound permission). The test then exercises
+    purge against this fully-controlled state.
+    """
+    user_id = uuid.uuid4()
+    scope_id = str(user_id)
+    role_id = uuid.uuid4()
+    unique = secrets.token_hex(4)
+    email = f"rbac-purge-{unique}@test.local"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(users).values(
+                uuid=str(user_id),
+                username=f"rbac-purge-{unique}",
+                email=email,
+                password=PasswordInfo(
+                    password=secrets.token_urlsafe(8),
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=600_000,
+                    salt_size=32,
+                ),
+                need_password_change=False,
+                full_name=f"RBAC Purge {unique}",
+                description="Test user for RBAC purge cleanup",
+                status=UserStatus.ACTIVE,
+                status_info="admin-requested",
+                domain_name=domain_fixture.domain_name,
+                resource_policy=resource_policy_fixture,
+                role=UserRole.USER,
+            )
+        )
+        await conn.execute(
+            sa.insert(RoleRow.__table__).values(
+                id=role_id,
+                name=f"user-{scope_id[:8]}",
+                status=RoleStatus.ACTIVE,
+            )
+        )
+        # Role registered in the user's own scope (the per-user SYSTEM role binding).
+        await conn.execute(
+            sa.insert(AssociationScopesEntitiesRow.__table__).values(
+                scope_type=ScopeType.USER,
+                scope_id=scope_id,
+                entity_type=EntityType.ROLE,
+                entity_id=str(role_id),
+                relation_type=RelationType.AUTO,
+            )
+        )
+        # User registered as an entity in the domain scope.
+        await conn.execute(
+            sa.insert(AssociationScopesEntitiesRow.__table__).values(
+                scope_type=ScopeType.DOMAIN,
+                scope_id=domain_fixture.domain_name,
+                entity_type=EntityType.USER,
+                entity_id=scope_id,
+                relation_type=RelationType.AUTO,
+            )
+        )
+        await conn.execute(
+            sa.insert(PermissionRow.__table__).values(
+                role_id=role_id,
+                scope_type=ScopeType.USER,
+                scope_id=scope_id,
+                entity_type=EntityType.USER,
+                operation=OperationType.READ,
+            )
+        )
+
+    yield user_id, scope_id
+
+    async with db_engine.begin() as conn:
+        # Permissions cascade-delete with the role; explicit delete is a safety net.
+        await conn.execute(
+            PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(
+            AssociationScopesEntitiesRow.__table__.delete().where(
+                sa.or_(
+                    AssociationScopesEntitiesRow.__table__.c.scope_id == scope_id,
+                    AssociationScopesEntitiesRow.__table__.c.entity_id == scope_id,
+                )
+            )
+        )
+        await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+        await conn.execute(users.delete().where(users.c.uuid == str(user_id)))
+
+
 class TestUserPurge:
     async def test_admin_purges_user(
         self,
@@ -363,6 +484,48 @@ class TestUserPurge:
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.user.purge(PurgeUserRequest(user_id=target_user.user.id))
+
+    async def test_admin_purge_cleans_up_rbac_rows(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_with_rbac_rows: tuple[uuid.UUID, str],
+        db_engine: SAEngine,
+    ) -> None:
+        """Purge must remove scope-entity associations and scope-bound permissions
+        for the user, so the per-user SYSTEM role does not end up with dangling
+        scope references that resolve to NULL via GraphQL.
+        """
+        user_id, scope_id = user_with_rbac_rows
+
+        await admin_registry.user.purge(PurgeUserRequest(user_id=user_id))
+
+        async with db_engine.connect() as conn:
+            ase_after = await conn.scalar(
+                sa.select(sa.func.count())
+                .select_from(AssociationScopesEntitiesRow)
+                .where(
+                    sa.or_(
+                        sa.and_(
+                            AssociationScopesEntitiesRow.scope_type == RBACElementType.USER,
+                            AssociationScopesEntitiesRow.scope_id == scope_id,
+                        ),
+                        sa.and_(
+                            AssociationScopesEntitiesRow.entity_type == RBACElementType.USER,
+                            AssociationScopesEntitiesRow.entity_id == scope_id,
+                        ),
+                    )
+                )
+            )
+            permissions_after = await conn.scalar(
+                sa.select(sa.func.count())
+                .select_from(PermissionRow)
+                .where(
+                    PermissionRow.scope_type == RBACElementType.USER,
+                    PermissionRow.scope_id == scope_id,
+                )
+            )
+        assert ase_after == 0, "association_scopes_entities rows should be cleaned up after purge"
+        assert permissions_after == 0, "scope-bound permissions should be cleaned up after purge"
 
 
 class TestUserBulkOperations:
@@ -403,3 +566,107 @@ class TestUserBulkOperations:
     async def test_failure_index_tracking(self) -> None:
         """Failure index tracking -> each failure has correct index and error message."""
         pytest.fail("Not implemented")
+
+
+class TestV2UserContainerFilter:
+    """Container UID/GID filtering via POST /v2/users/search (v2 API).
+
+    Seeds users with distinct container_uid / container_main_gid / container_gids and
+    asserts the search narrows results. This is the only layer that validates the
+    PostgreSQL array operators (``@>`` / ``&&``) for container_gids against real rows.
+    """
+
+    async def test_filter_by_container_uid(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        container_uid_users: ScalarMatchUsers,
+    ) -> None:
+        result = await admin_v2_registry.user.admin_search(
+            V2SearchUsersRequest(
+                filter=V2UserFilter(container_uid=IntFilter(equals=container_uid_users.value))
+            )
+        )
+
+        ids = {item.id for item in result.items}
+        assert container_uid_users.matching.user.id in ids
+        assert container_uid_users.other.user.id not in ids
+
+    async def test_filter_by_container_main_gid(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        container_main_gid_users: ScalarMatchUsers,
+    ) -> None:
+        result = await admin_v2_registry.user.admin_search(
+            V2SearchUsersRequest(
+                filter=V2UserFilter(
+                    container_main_gid=IntFilter(equals=container_main_gid_users.value)
+                )
+            )
+        )
+
+        ids = {item.id for item in result.items}
+        assert container_main_gid_users.matching.user.id in ids
+        assert container_main_gid_users.other.user.id not in ids
+
+    async def test_filter_container_gids_any(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        container_gids_any_users: ArrayMatchUsers,
+    ) -> None:
+        result = await admin_v2_registry.user.admin_search(
+            V2SearchUsersRequest(
+                filter=V2UserFilter(
+                    container_gids=ArrayFilter[int].model_validate({
+                        "contains_any": container_gids_any_users.query
+                    })
+                )
+            )
+        )
+
+        ids = {item.id for item in result.items}
+        assert container_gids_any_users.matching.user.id in ids
+        assert container_gids_any_users.other.user.id not in ids
+
+    async def test_filter_container_gids_all(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        container_gids_all_users: ArrayMatchUsers,
+    ) -> None:
+        result = await admin_v2_registry.user.admin_search(
+            V2SearchUsersRequest(
+                filter=V2UserFilter(
+                    container_gids=ArrayFilter[int].model_validate({
+                        "contains_all": container_gids_all_users.query
+                    })
+                )
+            )
+        )
+
+        ids = {item.id for item in result.items}
+        assert container_gids_all_users.matching.user.id in ids
+        assert container_gids_all_users.other.user.id not in ids
+
+    async def test_filter_single_gid_across_main_gid_and_gids(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        single_gid_users: SingleGidUsers,
+    ) -> None:
+        """A single gid matches users via container_main_gid OR container_gids.contains."""
+        gid = single_gid_users.gid
+        result = await admin_v2_registry.user.admin_search(
+            V2SearchUsersRequest(
+                filter=V2UserFilter(
+                    OR=[
+                        V2UserFilter(container_main_gid=IntFilter(equals=gid)),
+                        V2UserFilter(
+                            container_gids=ArrayFilter[int].model_validate({"contains": gid})
+                        ),
+                    ]
+                )
+            )
+        )
+
+        ids = {item.id for item in result.items}
+        assert single_gid_users.via_main_gid.user.id in ids
+        assert single_gid_users.via_gids.user.id in ids
+        assert single_gid_users.unrelated.user.id not in ids

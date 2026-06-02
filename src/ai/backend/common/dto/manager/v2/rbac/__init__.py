@@ -61,13 +61,15 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     EntityOrderField,
     EntityType,
-    EntityTypeFilter,
+    EntityTypeScope,
     OperationType,
     OperationTypeDTO,
+    OperationTypeFilter,
     OrderDirection,
     PermissionOrderField,
     PermissionSummary,
     RBACElementTypeDTO,
+    RBACElementTypeFilter,
     RoleAssignmentOrderField,
     RoleOrderField,
     RoleSource,
@@ -77,19 +79,22 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusDTO,
     RoleStatusFilter,
     ScopeInputDTO,
+    UUIDScope,
 )
 
 __all__ = (
     # Types
     "EntityOrderField",
     "EntityType",
-    "EntityTypeFilter",
+    "EntityTypeScope",
     "OperationType",
     "OperationTypeDTO",
+    "OperationTypeFilter",
     "OrderDirection",
     "PermissionOrderField",
     "PermissionSummary",
     "RBACElementTypeDTO",
+    "RBACElementTypeFilter",
     "RoleAssignmentOrderField",
     "RoleOrderField",
     "RoleSource",
@@ -99,6 +104,7 @@ __all__ = (
     "RoleStatusDTO",
     "RoleStatusFilter",
     "ScopeInputDTO",
+    "UUIDScope",
     # Input models (request)
     "AdminSearchEntitiesGQLInput",
     "AdminSearchPermissionsGQLInput",

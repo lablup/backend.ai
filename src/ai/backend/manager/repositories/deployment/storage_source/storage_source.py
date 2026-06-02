@@ -1,20 +1,27 @@
 """Storage source implementation for deployment repository."""
 
 from collections.abc import Mapping
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, override
 
 import tomli
-from pydantic import BaseModel, ValidationError
 from ruamel.yaml import YAML
 
 from ai.backend.common.config import ModelDefinitionDraft
-from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import VFolderID
+from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
+from ai.backend.common.types import BackendAISchema, SchemaValidationFailureInfo, VFolderID
+from ai.backend.manager.data.deployment.types import FetchedModelDefinition
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.models.storage import StorageSessionManager
 
 
-class DeploymentConfigInput(BaseModel):
+@dataclass(frozen=True)
+class FetchedConfigFile:
+    filename: str
+    payload: Mapping[str, Any]
+
+
+class DeploymentConfigInput(BackendAISchema):
     """Validated ``deployment-config.yaml`` / ``service-definition.toml`` payload.
 
     Shared shape across the new yaml name and the legacy toml name — storage
@@ -30,6 +37,14 @@ class DeploymentConfigInput(BaseModel):
     resource_slots: dict[str, Any] | None = None
     resource_opts: dict[str, Any] | None = None
     environ: dict[str, str] | None = None
+
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return InvalidAPIParameters(
+            f"Invalid deployment config: {info.summary}",
+            extra_data={"errors": info.errors},
+        )
 
 
 class DeploymentStorageSource:
@@ -53,16 +68,13 @@ class DeploymentStorageSource:
         raw = await self._fetch_config_file_in_candidates(vfolder_location, candidates)
         if raw is None:
             return None
-        try:
-            return DeploymentConfigInput.model_validate(dict(raw))
-        except ValidationError as e:
-            raise InvalidAPIParameters(f"Invalid deployment config: {e}") from e
+        return DeploymentConfigInput.model_validate(dict(raw.payload))
 
     async def fetch_model_definition(
         self,
         vfolder_location: VFolderLocation,
         candidates: list[str],
-    ) -> ModelDefinitionDraft | None:
+    ) -> FetchedModelDefinition | None:
         """Fetch the first existing model-definition file among ``candidates``.
 
         Uses the draft type because user-authored files may supply only a
@@ -73,16 +85,16 @@ class DeploymentStorageSource:
         raw = await self._fetch_config_file_in_candidates(vfolder_location, candidates)
         if raw is None:
             return None
-        try:
-            return ModelDefinitionDraft.model_validate(dict(raw))
-        except ValidationError as e:
-            raise InvalidAPIParameters(f"Invalid model definition: {e}") from e
+        return FetchedModelDefinition(
+            path=raw.filename,
+            model_definition=ModelDefinitionDraft.model_validate(dict(raw.payload)),
+        )
 
     async def _fetch_config_file_in_candidates(
         self,
         vfolder_location: VFolderLocation,
         candidates: list[str],
-    ) -> Mapping[str, Any] | None:
+    ) -> FetchedConfigFile | None:
         """Return the first parsed ``Mapping`` among the candidates.
 
         Candidates are tried in priority order (new name first, legacy
@@ -121,5 +133,5 @@ class DeploymentStorageSource:
                 raise InvalidAPIParameters(
                     f"Invalid config file '{filename}': top-level value must be a mapping."
                 )
-            return loaded
+            return FetchedConfigFile(filename=filename, payload=loaded)
         return None

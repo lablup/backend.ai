@@ -7,6 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -379,6 +380,10 @@ class DomainRepository:
             )
 
     # ==================== V2 Repository Methods ====================
+
+    @domain_repository_resilience.apply()
+    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
+        return await self._db_source.get_domain_id_by_name(name)
 
     @domain_repository_resilience.apply()
     async def get_domain(self, domain_name: str) -> DomainData:

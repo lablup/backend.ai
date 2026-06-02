@@ -334,7 +334,7 @@ async def notification_rule_types() -> list[NotificationRuleTypeGQL] | None:
 )  # type: ignore[misc]
 async def notification_rule_type_schema(
     rule_type: NotificationRuleTypeGQL,
-) -> strawberry.scalars.JSON:
+) -> strawberry.scalars.JSON | None:
     """Return the JSON schema for a given notification rule type."""
     from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 
@@ -353,7 +353,7 @@ async def notification_rule_type_schema(
 )
 async def admin_create_notification_channel(
     input: CreateNotificationChannelInput, info: Info[StrawberryGQLContext]
-) -> CreateNotificationChannelPayload:
+) -> CreateNotificationChannelPayload | None:
     check_admin_only()
     me = current_user()
     if me is None:
@@ -370,7 +370,7 @@ async def admin_create_notification_channel(
 )
 async def create_notification_channel(
     input: CreateNotificationChannelInput, info: Info[StrawberryGQLContext]
-) -> CreateNotificationChannelPayload:
+) -> CreateNotificationChannelPayload | None:
     me = current_user()
     if me is None:
         raise InvalidAuthParameters("User authentication is required")
@@ -387,7 +387,7 @@ async def create_notification_channel(
 )
 async def admin_update_notification_channel(
     input: UpdateNotificationChannelInput, info: Info[StrawberryGQLContext]
-) -> UpdateNotificationChannelPayload:
+) -> UpdateNotificationChannelPayload | None:
     check_admin_only()
     channel_id = uuid.UUID(input.id)
     result = await info.context.adapters.notification.update_channel(
@@ -402,7 +402,7 @@ async def admin_update_notification_channel(
 )
 async def update_notification_channel(
     input: UpdateNotificationChannelInput, info: Info[StrawberryGQLContext]
-) -> UpdateNotificationChannelPayload:
+) -> UpdateNotificationChannelPayload | None:
     channel_id = uuid.UUID(input.id)
     result = await info.context.adapters.notification.update_channel(
         channel_id, input.to_pydantic()
@@ -417,7 +417,7 @@ async def update_notification_channel(
 )
 async def admin_delete_notification_channel(
     input: DeleteNotificationChannelInput, info: Info[StrawberryGQLContext]
-) -> DeleteNotificationChannelPayload:
+) -> DeleteNotificationChannelPayload | None:
     check_admin_only()
     result = await info.context.adapters.notification.delete_channel(input.to_pydantic())
     return DeleteNotificationChannelPayload.from_pydantic(result)
@@ -429,7 +429,7 @@ async def admin_delete_notification_channel(
 )
 async def delete_notification_channel(
     input: DeleteNotificationChannelInput, info: Info[StrawberryGQLContext]
-) -> DeleteNotificationChannelPayload:
+) -> DeleteNotificationChannelPayload | None:
     result = await info.context.adapters.notification.delete_channel(input.to_pydantic())
     return DeleteNotificationChannelPayload.from_pydantic(result)
 
@@ -442,7 +442,7 @@ async def delete_notification_channel(
 )
 async def admin_create_notification_rule(
     input: CreateNotificationRuleInput, info: Info[StrawberryGQLContext]
-) -> CreateNotificationRulePayload:
+) -> CreateNotificationRulePayload | None:
     check_admin_only()
     me = current_user()
     if me is None:
@@ -457,7 +457,7 @@ async def admin_create_notification_rule(
 )
 async def create_notification_rule(
     input: CreateNotificationRuleInput, info: Info[StrawberryGQLContext]
-) -> CreateNotificationRulePayload:
+) -> CreateNotificationRulePayload | None:
     me = current_user()
     if me is None:
         raise InvalidAuthParameters("User authentication is required")
@@ -470,7 +470,7 @@ async def create_notification_rule(
 )
 async def admin_update_notification_rule(
     input: UpdateNotificationRuleInput, info: Info[StrawberryGQLContext]
-) -> UpdateNotificationRulePayload:
+) -> UpdateNotificationRulePayload | None:
     check_admin_only()
     rule_id = uuid.UUID(input.id)
     result = await info.context.adapters.notification.update_rule(rule_id, input.to_pydantic())
@@ -483,7 +483,7 @@ async def admin_update_notification_rule(
 )
 async def update_notification_rule(
     input: UpdateNotificationRuleInput, info: Info[StrawberryGQLContext]
-) -> UpdateNotificationRulePayload:
+) -> UpdateNotificationRulePayload | None:
     rule_id = uuid.UUID(input.id)
     result = await info.context.adapters.notification.update_rule(rule_id, input.to_pydantic())
     return UpdateNotificationRulePayload.from_pydantic(result)
@@ -494,7 +494,7 @@ async def update_notification_rule(
 )
 async def admin_delete_notification_rule(
     input: DeleteNotificationRuleInput, info: Info[StrawberryGQLContext]
-) -> DeleteNotificationRulePayload:
+) -> DeleteNotificationRulePayload | None:
     check_admin_only()
     result = await info.context.adapters.notification.delete_rule(input.to_pydantic())
     return DeleteNotificationRulePayload.from_pydantic(result)
@@ -506,7 +506,7 @@ async def admin_delete_notification_rule(
 )
 async def delete_notification_rule(
     input: DeleteNotificationRuleInput, info: Info[StrawberryGQLContext]
-) -> DeleteNotificationRulePayload:
+) -> DeleteNotificationRulePayload | None:
     result = await info.context.adapters.notification.delete_rule(input.to_pydantic())
     return DeleteNotificationRulePayload.from_pydantic(result)
 
@@ -519,7 +519,7 @@ async def delete_notification_rule(
 )
 async def admin_validate_notification_channel(
     input: ValidateNotificationChannelInput, info: Info[StrawberryGQLContext]
-) -> ValidateNotificationChannelPayload:
+) -> ValidateNotificationChannelPayload | None:
     check_admin_only()
     result = await info.context.adapters.notification.validate_channel(input.to_pydantic())
     return ValidateNotificationChannelPayload.from_pydantic(result)
@@ -531,7 +531,7 @@ async def admin_validate_notification_channel(
 )
 async def validate_notification_channel(
     input: ValidateNotificationChannelInput, info: Info[StrawberryGQLContext]
-) -> ValidateNotificationChannelPayload:
+) -> ValidateNotificationChannelPayload | None:
     result = await info.context.adapters.notification.validate_channel(input.to_pydantic())
     return ValidateNotificationChannelPayload.from_pydantic(result)
 
@@ -543,7 +543,7 @@ async def validate_notification_channel(
 )
 async def admin_validate_notification_rule(
     input: ValidateNotificationRuleInput, info: Info[StrawberryGQLContext]
-) -> ValidateNotificationRulePayload:
+) -> ValidateNotificationRulePayload | None:
     check_admin_only()
     result = await info.context.adapters.notification.validate_rule(input.to_pydantic())
     return ValidateNotificationRulePayload.from_pydantic(result)
@@ -555,6 +555,6 @@ async def admin_validate_notification_rule(
 )
 async def validate_notification_rule(
     input: ValidateNotificationRuleInput, info: Info[StrawberryGQLContext]
-) -> ValidateNotificationRulePayload:
+) -> ValidateNotificationRulePayload | None:
     result = await info.context.adapters.notification.validate_rule(input.to_pydantic())
     return ValidateNotificationRulePayload.from_pydantic(result)

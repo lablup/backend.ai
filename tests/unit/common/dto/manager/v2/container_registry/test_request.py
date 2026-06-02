@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryType
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestAllowedGroupsInput:
@@ -132,7 +133,7 @@ class TestCreateContainerRegistryInputValidationFailures:
     """Tests for CreateContainerRegistryInput validation failures."""
 
     def test_blank_url_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateContainerRegistryInput(
                 url="",
                 registry_name="my-registry",
@@ -140,7 +141,7 @@ class TestCreateContainerRegistryInputValidationFailures:
             )
 
     def test_whitespace_only_url_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateContainerRegistryInput(
                 url="   ",
                 registry_name="my-registry",
@@ -148,7 +149,7 @@ class TestCreateContainerRegistryInputValidationFailures:
             )
 
     def test_blank_registry_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateContainerRegistryInput(
                 url="https://registry.example.com",
                 registry_name="",
@@ -156,7 +157,7 @@ class TestCreateContainerRegistryInputValidationFailures:
             )
 
     def test_whitespace_only_registry_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateContainerRegistryInput(
                 url="https://registry.example.com",
                 registry_name="   ",
@@ -164,21 +165,21 @@ class TestCreateContainerRegistryInputValidationFailures:
             )
 
     def test_missing_url_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateContainerRegistryInput.model_validate({
                 "registry_name": "my-registry",
                 "type": "docker",
             })
 
     def test_missing_registry_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateContainerRegistryInput.model_validate({
                 "url": "https://registry.example.com",
                 "type": "docker",
             })
 
     def test_missing_type_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateContainerRegistryInput.model_validate({
                 "url": "https://registry.example.com",
                 "registry_name": "my-registry",
@@ -245,26 +246,26 @@ class TestUpdateContainerRegistryInputValidationFailures:
 
     def test_blank_url_raises_validation_error(self) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateContainerRegistryInput(id=reg_id, url="")
 
     def test_whitespace_only_url_raises_validation_error(self) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateContainerRegistryInput(id=reg_id, url="   ")
 
     def test_blank_registry_name_raises_validation_error(self) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateContainerRegistryInput(id=reg_id, registry_name="")
 
     def test_whitespace_only_registry_name_raises_validation_error(self) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateContainerRegistryInput(id=reg_id, registry_name="   ")
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateContainerRegistryInput.model_validate({})
 
 
@@ -282,11 +283,11 @@ class TestDeleteContainerRegistryInput:
         assert req.id == reg_id
 
     def test_invalid_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteContainerRegistryInput.model_validate({"id": "not-a-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteContainerRegistryInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:

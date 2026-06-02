@@ -19,11 +19,11 @@ from ai.backend.client.cli.v2.helpers import (
 
 
 def _build_dto(dto_cls: type, data: dict[str, Any]) -> Any:
-    from pydantic import ValidationError
+    from ai.backend.common.exception import BackendAISchemaValidationFailed
 
     try:
-        return dto_cls(**data)
-    except ValidationError as e:
+        return dto_cls.model_validate(data)
+    except BackendAISchemaValidationFailed as e:
         click.echo("Validation error:", err=True)
         for err in e.errors():
             field = ".".join(str(loc) for loc in err["loc"])
@@ -81,12 +81,12 @@ def search(
     else:
         filter_dto: ModelCardFilter | None = None
         if name_contains is not None or domain_name is not None or project_id is not None:
-            from ai.backend.common.dto.manager.query import StringFilter
+            from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
             filter_dto = ModelCardFilter(
                 name=StringFilter(contains=name_contains) if name_contains is not None else None,
-                domain_name=domain_name,
-                project_id=project_id,
+                domain_name=StringFilter(equals=domain_name) if domain_name is not None else None,
+                project_id=UUIDFilter(equals=project_id) if project_id is not None else None,
             )
         orders = (
             parse_order_options(order_by, ModelCardOrderField, ModelCardOrder) if order_by else None
@@ -199,15 +199,15 @@ def delete(card_id: uuid.UUID) -> None:
 @model_card.command(name="bulk-delete")
 @click.argument("ids", nargs=-1, required=True, type=click.UUID)
 def bulk_delete(ids: tuple[uuid.UUID, ...]) -> None:
-    """Delete multiple model cards by ID."""
-    from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardsInput
+    """Delete multiple model cards by ID, returning per-card success/failure details."""
+    from ai.backend.common.dto.manager.v2.model_card.request import BulkDeleteModelCardsInput
 
-    input_dto = DeleteModelCardsInput(ids=list(ids))
+    input_dto = BulkDeleteModelCardsInput(ids=list(ids))
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.model_card.bulk_delete(input_dto)
+            result = await registry.model_card.admin_bulk_delete(input_dto)
             print_result(result)
         finally:
             await registry.close()

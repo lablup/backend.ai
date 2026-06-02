@@ -34,7 +34,7 @@ from .types import (
 )  # type: ignore[misc]
 async def my_keypair_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
-) -> KeypairResourceAllocationPayloadGQL:
+) -> KeypairResourceAllocationPayloadGQL | None:
     payload = await info.context.adapters.resource_allocation.my_keypair_usage_for_current_user()
     return KeypairResourceAllocationPayloadGQL.from_pydantic(payload)
 
@@ -48,7 +48,7 @@ async def my_keypair_resource_allocation_v2(
 async def project_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
-) -> ProjectResourceAllocationPayloadGQL:
+) -> ProjectResourceAllocationPayloadGQL | None:
     payload = await info.context.adapters.resource_allocation.project_usage(
         project_id=project_id,
     )
@@ -64,7 +64,7 @@ async def project_resource_allocation_v2(
 async def admin_domain_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
-) -> DomainResourceAllocationPayloadGQL:
+) -> DomainResourceAllocationPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_allocation.admin_domain_usage(
         domain_name=domain_name,
@@ -81,7 +81,7 @@ async def admin_domain_resource_allocation_v2(
 async def resource_group_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
     resource_group_name: str,
-) -> ResourceGroupResourceAllocationPayloadGQL:
+) -> ResourceGroupResourceAllocationPayloadGQL | None:
     payload = await info.context.adapters.resource_allocation.resource_group_usage(
         rg_name=resource_group_name,
     )
@@ -97,7 +97,7 @@ async def resource_group_resource_allocation_v2(
 async def effective_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
     input: EffectiveResourceAllocationInputGQL,
-) -> EffectiveResourceAllocationPayloadGQL:
+) -> EffectiveResourceAllocationPayloadGQL | None:
     payload = await info.context.adapters.resource_allocation.effective_allocation_for_current_user(
         input=input.to_pydantic(),
     )
@@ -113,7 +113,7 @@ async def effective_resource_allocation_v2(
 async def admin_effective_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
     input: AdminEffectiveResourceAllocationInputGQL,
-) -> EffectiveResourceAllocationPayloadGQL:
+) -> EffectiveResourceAllocationPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_allocation.admin_effective_allocation_resolved(
         input=input.to_pydantic(),
@@ -130,7 +130,7 @@ async def admin_effective_resource_allocation_v2(
 async def check_preset_availability_v2(
     info: Info[StrawberryGQLContext],
     input: CheckPresetAvailabilityInputGQL,
-) -> CheckPresetAvailabilityPayloadGQL:
+) -> CheckPresetAvailabilityPayloadGQL | None:
     payload = (
         await info.context.adapters.resource_allocation.check_preset_availability_for_current_user(
             input=input.to_pydantic(),

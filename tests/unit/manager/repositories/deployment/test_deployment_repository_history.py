@@ -13,6 +13,8 @@ import sqlalchemy as sa
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import RouteHandlerCategory, RouteStatus
@@ -53,6 +55,7 @@ from ai.backend.manager.repositories.scheduling_history.creators import (
     DeploymentHistoryCreatorSpec,
     RouteHistoryCreatorSpec,
 )
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
@@ -207,7 +210,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
                 status=ImageStatus.ALIVE,
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
             await db_sess.commit()
 
@@ -391,7 +394,6 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.PENDING,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -622,7 +624,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
                 status=ImageStatus.ALIVE,
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
             await db_sess.commit()
 
@@ -806,7 +808,6 @@ class TestUpdateRouteStatusBulkWithHistory:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.READY,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -871,7 +872,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         """Status update and history are created in the same transaction."""
         batch_updaters = [
             BatchUpdater(
-                spec=RouteBatchUpdaterSpec(status=RouteStatus.RUNNING),
+                spec=RouteBatchUpdaterSpec(status=OptionalState.update(RouteStatus.RUNNING)),
                 conditions=[
                     RouteConditions.by_ids([test_provisioning_route_id]),
                     RouteConditions.by_statuses([RouteStatus.PROVISIONING]),
@@ -880,7 +881,7 @@ class TestUpdateRouteStatusBulkWithHistory:
         ]
         history_specs = [
             RouteHistoryCreatorSpec(
-                route_id=test_provisioning_route_id,
+                route_id=ReplicaID(test_provisioning_route_id),
                 deployment_id=test_endpoint_id,
                 category=RouteHandlerCategory.LIFECYCLE,
                 phase="provisioning",
@@ -1096,7 +1097,7 @@ class TestDeploymentHistoryMergeLogic:
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
                 status=ImageStatus.ALIVE,
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
 
             # Create endpoint
@@ -1113,7 +1114,6 @@ class TestDeploymentHistoryMergeLogic:
                     url="http://test.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.PENDING,
-                    current_revision=uuid.uuid4(),
                 )
             )
 
@@ -1412,7 +1412,7 @@ class TestRouteHistoryMergeLogic:
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
                 status=ImageStatus.ALIVE,
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
 
             # Create endpoint
@@ -1429,7 +1429,6 @@ class TestRouteHistoryMergeLogic:
                     url="http://test.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.READY,
-                    current_revision=uuid.uuid4(),
                 )
             )
 
@@ -1455,8 +1454,8 @@ class TestRouteHistoryMergeLogic:
                     route_id=route_id,
                     deployment_id=endpoint_id,
                     phase="provisioning",
-                    from_status=str(RouteStatus.PROVISIONING.value),
-                    to_status=str(RouteStatus.PROVISIONING.value),
+                    from_status=RouteStatus.PROVISIONING.value,
+                    to_status=RouteStatus.PROVISIONING.value,
                     result=str(SchedulingResult.FAILURE),
                     error_code="SESSION_CREATION_FAILED",
                     message="Session creation failed",
@@ -1499,13 +1498,13 @@ class TestRouteHistoryMergeLogic:
 
         batch_updaters = [
             BatchUpdater(
-                spec=RouteBatchUpdaterSpec(status=RouteStatus.PROVISIONING),
+                spec=RouteBatchUpdaterSpec(status=OptionalState.update(RouteStatus.PROVISIONING)),
                 conditions=[RouteConditions.by_ids([route_id])],
             )
         ]
         history_specs = [
             RouteHistoryCreatorSpec(
-                route_id=route_id,
+                route_id=ReplicaID(route_id),
                 deployment_id=endpoint_id,
                 category=RouteHandlerCategory.LIFECYCLE,
                 phase="provisioning",  # Same
@@ -1542,13 +1541,13 @@ class TestRouteHistoryMergeLogic:
 
         batch_updaters = [
             BatchUpdater(
-                spec=RouteBatchUpdaterSpec(status=RouteStatus.RUNNING),
+                spec=RouteBatchUpdaterSpec(status=OptionalState.update(RouteStatus.RUNNING)),
                 conditions=[RouteConditions.by_ids([route_id])],
             )
         ]
         history_specs = [
             RouteHistoryCreatorSpec(
-                route_id=route_id,
+                route_id=ReplicaID(route_id),
                 deployment_id=endpoint_id,
                 category=RouteHandlerCategory.LIFECYCLE,
                 phase="provisioning",  # Same
@@ -1575,7 +1574,7 @@ class TestRouteHistoryMergeLogic:
 
             # Should be 2 records
             assert len(histories) == 2
-            assert histories[0].to_status == str(RouteStatus.PROVISIONING.value)
+            assert histories[0].to_status == RouteStatus.PROVISIONING.value
             assert histories[0].attempts == 1
-            assert histories[1].to_status == str(RouteStatus.RUNNING.value)
+            assert histories[1].to_status == RouteStatus.RUNNING.value
             assert histories[1].attempts == 1

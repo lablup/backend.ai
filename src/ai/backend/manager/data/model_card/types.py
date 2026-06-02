@@ -42,6 +42,22 @@ class ModelCardData:
 
 
 @dataclass(frozen=True)
+class BulkModelCardDeleteFailure:
+    """Error info for a single failed model card delete inside a bulk operation."""
+
+    card_id: UUID
+    message: str
+
+
+@dataclass(frozen=True)
+class BulkModelCardDeleteResultData:
+    """Result of bulk model card delete operation, with partial-failure support."""
+
+    successes: list[UUID]
+    failures: list[BulkModelCardDeleteFailure]
+
+
+@dataclass(frozen=True)
 class VFolderScanData:
     """Minimal vfolder data needed for model card scan."""
 

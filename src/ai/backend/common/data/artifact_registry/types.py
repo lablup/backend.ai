@@ -4,12 +4,13 @@ import uuid
 from collections.abc import Mapping
 from typing import Any, Self
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.types import BackendAISchema
 
 
-class ArtifactRegistryStatefulData(BaseModel):
+class ArtifactRegistryStatefulData(BackendAISchema):
     """Base class for artifact registry stateful data."""
 
     @classmethod

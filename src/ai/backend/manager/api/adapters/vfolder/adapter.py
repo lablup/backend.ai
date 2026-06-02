@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     ListFilesInput,
     MkdirInput,
     MoveFileInput,
+    PurgeVFolderInput,
     SearchVFoldersInput,
     VFolderFilter,
     VFolderOrder,
@@ -29,6 +30,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload,
     BulkPurgeVFoldersPayload,
+    BulkPurgeVFolderV2Error,
     CloneVFolderPayload,
     CreateDownloadSessionPayload,
     CreateUploadSessionPayload,
@@ -54,7 +56,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
-from ai.backend.common.exception import UnreachableError
+from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.types import BinarySize, VFolderUsageMode
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -433,9 +435,12 @@ class VFolderAdapter(BaseAdapter):
         await self._processors.vfolder.restore_vfolder_from_trash.wait_for_complete(action)
         return RestoreVFolderPayload(id=vfolder_id)
 
-    async def purge(self, vfolder_id: UUID) -> PurgeVFolderPayload:
-        """Permanently delete a vfolder. RBAC enforced."""
-        action = PurgeVFolderV2Action(vfolder_id=vfolder_id)
+    async def purge(self, vfolder_id: UUID, input: PurgeVFolderInput) -> PurgeVFolderPayload:
+        """Permanently delete a vfolder, optionally cascading linked model cards."""
+        action = PurgeVFolderV2Action(
+            vfolder_id=vfolder_id,
+            cascade_model_card=input.options.cascade_model_card,
+        )
         await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return PurgeVFolderPayload(id=vfolder_id)
 
@@ -526,11 +531,25 @@ class VFolderAdapter(BaseAdapter):
         return BulkDeleteVFoldersPayload(deleted_count=len(input.ids))
 
     async def bulk_purge(self, input: BulkPurgeVFoldersInput) -> BulkPurgeVFoldersPayload:
-        """Permanently purge multiple vfolders."""
+        """Permanently purge multiple vfolders, optionally cascading linked model cards.
+
+        Each vfolder is processed independently; per-id failures are collected
+        into ``failed`` rather than aborting the whole batch.
+        """
+        purged_count = 0
+        failed: list[BulkPurgeVFolderV2Error] = []
         for vfolder_id in input.ids:
-            action = PurgeVFolderV2Action(vfolder_id=vfolder_id)
-            await self._processors.vfolder.purge_v2.wait_for_complete(action)
-        return BulkPurgeVFoldersPayload(purged_count=len(input.ids))
+            action = PurgeVFolderV2Action(
+                vfolder_id=vfolder_id,
+                cascade_model_card=input.options.cascade_model_card,
+            )
+            try:
+                await self._processors.vfolder.purge_v2.wait_for_complete(action)
+            except BackendAIError as e:
+                failed.append(BulkPurgeVFolderV2Error(vfolder_id=vfolder_id, message=str(e)))
+                continue
+            purged_count += 1
+        return BulkPurgeVFoldersPayload(purged_count=purged_count, failed=failed)
 
     async def list_files(self, vfolder_id: UUID, input: ListFilesInput) -> ListFilesPayload:
         """List files in a vfolder."""

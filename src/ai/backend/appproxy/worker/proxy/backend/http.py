@@ -9,7 +9,6 @@ from functools import partial
 from typing import Any, Final, override
 
 import aiohttp
-import aiotools
 from aiohttp import ClientConnectorError, web
 from multidict import CIMultiDict
 from yarl import URL
@@ -21,9 +20,11 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.common.cron import LocalCron
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseBackend, HttpRequest
+from .last_access_marker import LastAccessMarkerTask
 from .pool import RoutePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -289,9 +290,6 @@ class HTTPBackend(BaseBackend):
                 log.debug("setting stop event")
                 stop_event.set()
 
-        async def _last_access_marker_task(_interval: float) -> None:
-            await self.mark_last_used_time(route)
-
         route = await self._pool.select()
         log.trace(
             "Proxying {} {} WS Request to {}:{}",
@@ -312,7 +310,8 @@ class HTTPBackend(BaseBackend):
         metrics.proxy.observe_upstream_ws_connection_start()
         start = time.monotonic()
 
-        marker_task = aiotools.create_timer(_last_access_marker_task, 1.5)
+        marker_cron = LocalCron([LastAccessMarkerTask(self, route)])
+        await marker_cron.start()
         await self.increase_request_counter()
 
         try:
@@ -328,8 +327,7 @@ class HTTPBackend(BaseBackend):
                         log.debug("created tasks, now waiting until one of two tasks end")
                         await stop_event.wait()
                 finally:
-                    marker_task.cancel()
-                    await marker_task
+                    await marker_cron.stop()
                     if not downstream_ws.closed:
                         await downstream_ws.close()
                     if not upstream_ws.closed:

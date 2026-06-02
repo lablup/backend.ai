@@ -114,7 +114,7 @@ class TestAttachAdditionalNetworks:
         connect_mock = AsyncMock(
             side_effect=DockerError(
                 HTTPStatus.FORBIDDEN,
-                {"message": "endpoint with name kernel.x already exists in network bridge"},
+                "endpoint with name kernel.x already exists in network bridge",
             )
         )
         network = MagicMock()
@@ -133,7 +133,7 @@ class TestAttachAdditionalNetworks:
         connect_mock = AsyncMock(
             side_effect=DockerError(
                 HTTPStatus.NOT_FOUND,
-                {"message": "network not found"},
+                "network not found",
             )
         )
         network = MagicMock()
@@ -169,7 +169,7 @@ class TestAttachAdditionalNetworks:
         connect_mock = AsyncMock(
             side_effect=DockerError(
                 HTTPStatus.FORBIDDEN,
-                {"message": "permission denied"},
+                "permission denied",
             )
         )
         network = MagicMock()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import hashlib
 import importlib.resources
 import json
 import os
@@ -222,6 +223,39 @@ class Context(metaclass=ABCMeta):
                     content = pattern.sub(replacement, content)
         path.write_text(content)
 
+    def _telemetry_active(self) -> bool:
+        """Resolve the tri-state telemetry flag. ``None`` means use the install
+        mode default (ON for SOURCE/develop, OFF for PACKAGE)."""
+        if self.install_variable.enable_telemetry is not None:
+            return self.install_variable.enable_telemetry
+        return self.install_info.type == InstallType.SOURCE
+
+    def _enabled_observability_sections(self) -> tuple[str, ...]:
+        """Component config sections whose ``enabled = false`` should be flipped
+        to ``true`` based on the active observability/telemetry flags."""
+        if self.install_variable.enable_observability:
+            return ("pyroscope", "otel")
+        if self._telemetry_active():
+            return ("otel",)
+        return ()
+
+    def enable_observability_in_toml(self, path: Path) -> None:
+        """Flip ``enabled = false`` to ``enabled = true`` for the relevant
+        observability sections of a component config (``[otel]`` always when
+        either observability or telemetry is on; ``[pyroscope]`` only when full
+        observability is requested). No-op when neither flag is active."""
+        sections = self._enabled_observability_sections()
+        if not sections:
+            return
+        content = path.read_text()
+        for section in sections:
+            section_pat = re.compile(
+                rf"(\[{section}\][^\[]*?)^enabled\s*=\s*false",
+                re.MULTILINE | re.DOTALL,
+            )
+            content = section_pat.sub(r"\1enabled = true", content, count=1)
+        path.write_text(content)
+
     async def run_manager_cli(self, cmdargs: Sequence[str]) -> None:
         if self.install_info.type == InstallType.SOURCE:
             # Develop mode: use ./backend.ai from current directory
@@ -401,7 +435,12 @@ class Context(metaclass=ABCMeta):
             await wget(url, dst_supergraph)
             self.log_header(f"Downloaded supergraph.graphql -> {dst_supergraph}")
 
-        dst_compose_path = self.copy_config("docker-compose.yml")
+        # Copy from install package as docker-compose.yml, then rename to
+        # docker-compose.halfstack.current.yml so the file name matches the convention
+        # used by other dev scripts (start-dev.sh, refresh-graphql-gateway.sh, etc.).
+        src_compose_path = self.copy_config("docker-compose.yml")
+        dst_compose_path = src_compose_path.with_name("docker-compose.halfstack.current.yml")
+        src_compose_path.rename(dst_compose_path)
         self.copy_config("prometheus.yaml")
         self.copy_config("grafana-dashboards")
         self.copy_config("grafana-provisioning")
@@ -427,12 +466,22 @@ class Context(metaclass=ABCMeta):
             ],
         )
         sudo = " ".join(self.docker_sudo)
+        profile_args_list: list[str] = []
+        if self.install_variable.enable_observability:
+            # observability profile is a superset of telemetry; no need to add both.
+            profile_args_list.append("--profile observability")
+        elif self._telemetry_active():
+            profile_args_list.append("--profile telemetry")
+        if self.install_variable.enable_storage:
+            profile_args_list.append("--profile storage")
+        profile_args = " ".join(profile_args_list)
+        compose_file_arg = "-f docker-compose.halfstack.current.yml"
         await self.run_shell(
             f"""
-        {sudo} docker compose pull && \\
-        {sudo} docker compose up -d --wait backendai-half-db && \\
-        {sudo} docker compose up -d --wait && \\
-        {sudo} docker compose ps
+        {sudo} docker compose {compose_file_arg} {profile_args} pull && \\
+        {sudo} docker compose {compose_file_arg} {profile_args} up -d --wait backendai-half-db && \\
+        {sudo} docker compose {compose_file_arg} {profile_args} up -d --wait && \\
+        {sudo} docker compose {compose_file_arg} {profile_args} ps
         """,
             cwd=self.install_info.base_path,
         )
@@ -622,6 +671,7 @@ class Context(metaclass=ABCMeta):
                 'endpoint = "http://127.0.0.1:4317"',
                 f'endpoint = "{self.install_variable.otel_endpoint}"',
             )
+        self.enable_observability_in_toml(toml_path)
 
     async def configure_agent(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -687,6 +737,7 @@ class Context(metaclass=ABCMeta):
                 'endpoint = "http://127.0.0.1:4317"',
                 f'endpoint = "{self.install_variable.otel_endpoint}"',
             )
+        self.enable_observability_in_toml(toml_path)
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -765,6 +816,7 @@ class Context(metaclass=ABCMeta):
                 'endpoint = "http://127.0.0.1:4317"',
                 f'endpoint = "{self.install_variable.otel_endpoint}"',
             )
+        self.enable_observability_in_toml(toml_path)
 
     async def configure_webserver(self) -> None:
         conf_path = self.copy_config("webserver.conf")
@@ -834,6 +886,7 @@ class Context(metaclass=ABCMeta):
                 'endpoint = "http://127.0.0.1:4317"',
                 f'endpoint = "{self.install_variable.otel_endpoint}"',
             )
+        self.enable_observability_in_toml(conf_path)
 
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
@@ -1118,6 +1171,8 @@ class Context(metaclass=ABCMeta):
                     'endpoint = "http://127.0.0.1:4317"',
                     f'endpoint = "{self.install_variable.otel_endpoint}"',
                 )
+        for conf in (coord_conf, worker_conf):
+            self.enable_observability_in_toml(conf)
 
     async def configure_appproxy_fixture(self) -> None:
         self.log_header("Updating manager scaling_groups to point to appproxy coordinator...")
@@ -1236,10 +1291,36 @@ class Context(metaclass=ABCMeta):
         base_path = self.install_info.base_path
         harbor_dir = base_path / "harbor"
         harbor_data_dir = base_path / "var" / "harbor"
-        harbor_dir.mkdir(parents=True, exist_ok=True)
         harbor_data_dir.mkdir(parents=True, exist_ok=True)
 
+        if service.harbor_admin_password == "Harbor12345":
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]WARNING: using the well-known default Harbor admin "
+                    "password 'Harbor12345'. Override with --harbor-admin-password "
+                    "for anything beyond a throwaway dev box.[/]"
+                )
+            )
+
+        # If a previous Harbor install has containers running, refusing to
+        # re-prepare under them prevents desync between the on-disk compose
+        # project and the running state (and avoids accidentally tearing
+        # down a Harbor that this run did not start).
+        if (
+            harbor_dir / "docker-compose.yml"
+        ).exists() and await self._harbor_compose_has_running_containers(harbor_dir):
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]Existing Harbor containers detected — leaving the "
+                    "current installation in place. Run [bold]./dev harbor stop[/] "
+                    "and re-run the installer to refresh the configuration.[/]"
+                )
+            )
+            await self._register_local_harbor_registry()
+            return
+
         download_uri = self.install_variable.harbor_download_uri
+        expected_sha256 = self.install_variable.harbor_download_sha256
         archive_path = base_path / Path(download_uri).name
 
         # 1) Download the Harbor offline installer archive if not already present.
@@ -1260,7 +1341,38 @@ class Context(metaclass=ABCMeta):
                 )
             )
 
-        # 2) Extract the archive into a temporary directory and rsync into harbor_dir.
+        # 2) Verify the archive against a pinned SHA-256 when one is configured.
+        #    Upstream Harbor publishes only MD5 sums, so the digest must be
+        #    provided by the operator (--harbor-download-sha256). When unset
+        #    we skip the check and surface a one-line warning rather than
+        #    silently trusting the download.
+        if expected_sha256:
+            self.log_header("Verifying Harbor archive SHA-256...")
+            actual_sha256 = await self._sha256_file(archive_path)
+            if actual_sha256.lower() != expected_sha256.lower():
+                raise RuntimeError(
+                    f"Harbor archive SHA-256 mismatch: expected {expected_sha256}, "
+                    f"got {actual_sha256}. Refusing to extract a potentially "
+                    f"tampered archive at {archive_path}."
+                )
+            self.log.write(Text.from_markup(f"[green]SHA-256 OK[/] [dim]({actual_sha256})[/]"))
+        else:
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]No --harbor-download-sha256 supplied; skipping "
+                    "archive integrity check. Pass an expected digest to enable "
+                    "verification.[/]"
+                )
+            )
+
+        # 3) Replace the installer directory atomically so that scripts/configs
+        #    from a previous (possibly different-version) archive do not linger.
+        #    data_volume lives at <base_path>/var/harbor and is outside
+        #    harbor_dir, so wiping harbor_dir does not touch persistent data.
+        if harbor_dir.exists():
+            shutil.rmtree(harbor_dir)
+        harbor_dir.mkdir(parents=True, exist_ok=True)
+
         self.log_header("Extracting Harbor installer archive...")
         with tempfile.TemporaryDirectory(prefix="bai-harbor-") as extract_root:
             extract_path = Path(extract_root)
@@ -1278,16 +1390,14 @@ class Context(metaclass=ABCMeta):
                 raise RuntimeError(
                     f"Harbor archive did not contain a top-level 'harbor/' directory: {archive_path}"
                 )
-            # Copy everything into our harbor_dir (overwriting previous contents,
-            # but preserving generated docker-compose.yml if idempotent re-run).
             for child in extracted_harbor_dir.iterdir():
                 dest = harbor_dir / child.name
                 if child.is_dir():
-                    shutil.copytree(child, dest, dirs_exist_ok=True)
+                    shutil.copytree(child, dest)
                 else:
                     shutil.copy2(child, dest)
 
-        # 3) Load Harbor's bundled ``harbor.yml.tmpl`` using ruamel.yaml
+        # 4) Load Harbor's bundled ``harbor.yml.tmpl`` using ruamel.yaml
         #    (round-trip mode) so we can modify only the fields we care about
         #    while preserving comments and structure — mirroring the tomlkit
         #    pattern used for other service configs.
@@ -1314,40 +1424,44 @@ class Context(metaclass=ABCMeta):
         with (harbor_dir / "harbor.yml").open("w", encoding="utf-8") as fp:
             yaml.dump(harbor_config, fp)
 
-        # 4) Run Harbor's install.sh to generate docker-compose.yml and config
-        #    files. The script is idempotent-ish: if docker-compose.yml already
-        #    exists we still re-run it so that config changes take effect, but
-        #    we do NOT start containers here. Lifecycle is managed via
-        #    ``./dev harbor start|stop``.
-        self.log_header("Running Harbor prepare script (install.sh)...")
-        install_script = harbor_dir / "install.sh"
-        if not install_script.exists():
+        # 5) Load the bundled service images (``harbor.<version>.tar.gz``)
+        #    so the prepare container — and any later ``./dev harbor start`` —
+        #    can run without an internet round-trip.
+        image_tarballs = sorted(harbor_dir.glob("harbor.*.tar.gz"))
+        if image_tarballs:
+            self.log_header("Loading bundled Harbor images into docker...")
+            for image_tarball in image_tarballs:
+                exit_code = await self.run_exec(
+                    [*self.docker_sudo, "docker", "load", "-i", str(image_tarball)],
+                    cwd=harbor_dir,
+                )
+                if exit_code != 0:
+                    raise RuntimeError(
+                        f"docker load failed for {image_tarball.name} (exit {exit_code})."
+                    )
+
+        # 6) Run Harbor's ``prepare`` script directly to generate
+        #    docker-compose.yml and supporting service configs. We deliberately
+        #    avoid ``install.sh`` because it also runs ``docker compose up`` —
+        #    we manage Harbor's lifecycle via ``./dev harbor start|stop``, and
+        #    bringing containers up here would force a ``docker compose down``
+        #    that could tear down a Harbor someone else started.
+        self.log_header("Running Harbor prepare script...")
+        prepare_script = harbor_dir / "prepare"
+        if not prepare_script.exists():
             raise RuntimeError(
-                f"Harbor install.sh not found at {install_script}; archive may be corrupt."
+                f"Harbor prepare script not found at {prepare_script}; archive may be corrupt."
             )
-        # ``install.sh`` internally invokes ``prepare`` which generates
-        # docker-compose.yml and all service config files. We want the prepare
-        # step but not the ``docker compose up``; instead of parsing install.sh
-        # we run it and then immediately ``docker compose down`` to leave the
-        # config on disk without leaving containers running.
         exit_code = await self.run_exec(
-            ["bash", "install.sh"],
+            ["bash", "prepare"],
             cwd=harbor_dir,
         )
         if exit_code != 0:
             raise RuntimeError(
-                f"Harbor install.sh failed (exit {exit_code}); check the log above for details."
-            )
-        exit_code = await self.run_exec(
-            ["docker", "compose", "down", "--remove-orphans"],
-            cwd=harbor_dir,
-        )
-        if exit_code != 0:
-            raise RuntimeError(
-                f"Failed to stop Harbor containers after install (docker compose down exit {exit_code})."
+                f"Harbor prepare failed (exit {exit_code}); check the log above for details."
             )
 
-        # 5) Register the local Harbor as a Backend.AI container registry so
+        # 7) Register the local Harbor as a Backend.AI container registry so
         #    images can be scanned/pulled from it without an extra manual step.
         await self._register_local_harbor_registry()
 
@@ -1358,6 +1472,36 @@ class Context(metaclass=ABCMeta):
                 f"[bold]http://{service.harbor_hostname}:{service.harbor_http_port}[/]"
             )
         )
+
+    async def _harbor_compose_has_running_containers(self, harbor_dir: Path) -> bool:
+        """Return True if ``docker compose ps -q`` in ``harbor_dir`` lists any
+        container IDs. Used to detect a previously-installed Harbor that is
+        currently up, so the installer can refuse to re-prepare under it."""
+        proc = await asyncio.create_subprocess_exec(
+            *self.docker_sudo,
+            "docker",
+            "compose",
+            "ps",
+            "-q",
+            cwd=str(harbor_dir),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        return proc.returncode == 0 and bool(stdout.strip())
+
+    @staticmethod
+    async def _sha256_file(path: Path) -> str:
+        """Compute the SHA-256 of ``path`` off the event loop."""
+
+        def _digest() -> str:
+            h = hashlib.sha256()
+            with path.open("rb") as fp:
+                for chunk in iter(lambda: fp.read(1024 * 1024), b""):
+                    h.update(chunk)
+            return h.hexdigest()
+
+        return await asyncio.to_thread(_digest)
 
     async def _register_local_harbor_registry(self) -> None:
         """

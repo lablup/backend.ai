@@ -8,11 +8,12 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.user.types import UserRole, UserStatus
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AdminSearchUsersPayload",
@@ -41,7 +42,7 @@ __all__ = (
 )
 
 
-class UserBasicInfo(BaseModel):
+class UserBasicInfo(BackendAISchema):
     """Basic user profile information."""
 
     username: str | None = Field(
@@ -65,7 +66,7 @@ class UserBasicInfo(BaseModel):
     )
 
 
-class UserStatusInfo(BaseModel):
+class UserStatusInfo(BackendAISchema):
     """User account status information."""
 
     status: UserStatus = Field(
@@ -84,7 +85,7 @@ class UserStatusInfo(BaseModel):
     )
 
 
-class UserOrganizationInfo(BaseModel):
+class UserOrganizationInfo(BackendAISchema):
     """User's organizational context and permissions."""
 
     domain_name: str | None = Field(
@@ -104,7 +105,7 @@ class UserOrganizationInfo(BaseModel):
     )
 
 
-class UserSecurityInfo(BaseModel):
+class UserSecurityInfo(BackendAISchema):
     """User security settings and authentication configuration."""
 
     allowed_client_ip: list[str] | None = Field(
@@ -128,7 +129,7 @@ class UserSecurityInfo(BaseModel):
     )
 
 
-class UserContainerSettings(BaseModel):
+class UserContainerSettings(BackendAISchema):
     """Container execution settings for the user."""
 
     container_uid: int | None = Field(
@@ -145,7 +146,7 @@ class UserContainerSettings(BaseModel):
     )
 
 
-class EntityTimestamps(BaseModel):
+class EntityTimestamps(BackendAISchema):
     """Common timestamp fields for entity lifecycle tracking."""
 
     created_at: datetime | None = Field(

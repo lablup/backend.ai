@@ -35,7 +35,7 @@ from typing import Any
 from uuid import UUID
 
 import yarl
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.image import ImageID
@@ -45,6 +45,7 @@ from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    BackendAISchema,
     ClusterMode,
     MountInfoEntry,
     ResourceSlotEntry,
@@ -56,12 +57,12 @@ from ai.backend.manager.data.session.options import (
     FailurePolicy,
     InternalDataExtras,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.models.network import NetworkType
 
 
-class _DraftBaseModel(BaseModel):
+class _DraftBaseModel(BackendAISchema):
     """Base for draft sub-models.
 
     Matches the spec's ``_SpecBaseModel`` configuration so
@@ -149,7 +150,7 @@ class SessionOptionsDraft(_DraftBaseModel):
     cluster_size: int | None = None
     scheduling_target: SchedulingTargetDraft = Field(default_factory=SchedulingTargetDraft)
     kernel_groups: tuple[KernelGroupDraft, ...] | None = None
-    timeouts: SessionTimeouts | None = None
+    handler_options: SessionHandlerOptions | None = None
 
 
 class SessionIdentityDraft(_DraftBaseModel):

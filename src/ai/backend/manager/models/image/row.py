@@ -319,8 +319,8 @@ class ImageRow(Base):  # type: ignore[misc]
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[ImageID] = mapped_column(
+        "id", GUID(ImageID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String, nullable=False, index=True)
     project: Mapped[str | None] = mapped_column("project", sa.String, nullable=True)
@@ -334,7 +334,13 @@ class ImageRow(Base):  # type: ignore[misc]
     )
     tag: Mapped[str | None] = mapped_column("tag", sa.TEXT, nullable=True)
     registry: Mapped[str] = mapped_column("registry", sa.String, nullable=False, index=True)
-    registry_id: Mapped[UUID] = mapped_column("registry_id", GUID, nullable=False, index=True)
+    registry_id: Mapped[UUID] = mapped_column(
+        "registry_id",
+        GUID,
+        sa.ForeignKey("container_registries.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     architecture: Mapped[str] = mapped_column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )
@@ -887,7 +893,7 @@ class ImageRow(Base):  # type: ignore[misc]
     def to_dataclass(self) -> ImageData:
         _, ptag_set = self.image_ref.tag_set
         return ImageData(
-            id=ImageID(self.id),
+            id=self.id,
             name=ImageCanonical(self.name),
             project=self.project,
             image=self.image,
@@ -917,7 +923,7 @@ class ImageRow(Base):  # type: ignore[misc]
     def to_detailed_dataclass(self) -> ImageDataWithDetails:
         version, ptag_set = self.image_ref.tag_set
         return ImageDataWithDetails(
-            id=ImageID(self.id),
+            id=self.id,
             name=ImageCanonical(self.image),
             namespace=self.image,
             base_image_name=self.image_ref.name,
@@ -1020,8 +1026,8 @@ class ImageAliasRow(Base):  # type: ignore[misc]
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     alias: Mapped[str | None] = mapped_column("alias", sa.String, unique=True, index=True)
-    image_id: Mapped[UUID] = mapped_column(
-        "image", GUID, sa.ForeignKey("images.id"), nullable=False
+    image_id: Mapped[ImageID] = mapped_column(
+        "image", GUID(ImageID), sa.ForeignKey("images.id", ondelete="CASCADE"), nullable=False
     )
     image: Mapped[ImageRow] = relationship("ImageRow", back_populates="aliases")
 

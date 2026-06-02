@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, cast
 
 import glide
 from pydantic import (
-    BaseModel,
     Field,
 )
 
 from ai.backend.common import msgpack
+from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ def _get_connection_status_key(node_id: str, pid: int) -> str:
     return f"{MANAGER_STATUS_KEY}.{node_id}:{pid}"
 
 
-class SQLAlchemyConnectionInfo(BaseModel):
+class SQLAlchemyConnectionInfo(BackendAISchema):
     pool_type: str = Field(
         description=f"Connection pool type of SQLAlchemy engine. One of {_sqlalchemy_pool_type_names}.",
     )
@@ -63,7 +63,7 @@ class SQLAlchemyConnectionInfo(BaseModel):
         return self.num_checkedout_cxn + self.num_checkedin_cxn
 
 
-class RedisObjectConnectionInfo(BaseModel):
+class RedisObjectConnectionInfo(BackendAISchema):
     name: str
     num_connections: int | None = Field(
         description="The number of connections in Redis Client's connection pool."
@@ -75,7 +75,7 @@ class RedisObjectConnectionInfo(BaseModel):
     )
 
 
-class ConnectionInfoOfProcess(BaseModel):
+class ConnectionInfoOfProcess(BackendAISchema):
     node_id: str = Field(description="Specified Manager ID or hostname.")
     pid: int = Field(description="Process ID.")
     sqlalchemy_info: SQLAlchemyConnectionInfo

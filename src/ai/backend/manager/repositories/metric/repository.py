@@ -1,9 +1,6 @@
-import asyncio
 import logging
 from collections.abc import Sequence
 
-from ai.backend.common.clients.prometheus.client import PrometheusClient
-from ai.backend.common.clients.prometheus.types import MetricValue
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.exception import (
     BackendAIError,
@@ -16,14 +13,11 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.prometheus.fixed_query_builder import FixedQueryBuilder
-from ai.backend.manager.data.metric.types import (
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
-    ContainerMetricResponseInfo,
     ContainerMetricResult,
     KernelLiveStatBatchResult,
-    KernelMetricValuesByKernel,
-    MetricResultValue,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -47,25 +41,17 @@ metric_repository_resilience = Resilience(
 class MetricRepository:
     _db: ExtendedAsyncSAEngine
     _prometheus_client: PrometheusClient
-    _fixed_query_builder: FixedQueryBuilder
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         prometheus_client: PrometheusClient,
-        fixed_query_builder: FixedQueryBuilder,
     ) -> None:
         self._db = db
         self._prometheus_client = prometheus_client
-        self._fixed_query_builder = fixed_query_builder
 
     async def query_container_metric_metadata(self) -> list[str]:
-        query = self._fixed_query_builder.get_container_metric_metadata_query()
-        result = await self._prometheus_client.query_label_values(
-            label_name=query.label_name,
-            metric_match=query.metric_match,
-        )
-        return result.data
+        return await self._prometheus_client.fetch_available_container_metric_names()
 
     async def query_container_metric(
         self,
@@ -73,40 +59,17 @@ class MetricRepository:
         label: ContainerMetricOptionalLabel,
         time_range: QueryTimeRange,
     ) -> list[ContainerMetricResult]:
-        query = self._fixed_query_builder.get_container_metric_query(metric_name, label)
-        response = await self._prometheus_client.query_range(query, time_range)
-        return [
-            ContainerMetricResult(
-                metric=ContainerMetricResponseInfo.from_metric_response_info(m.metric),
-                values=[MetricResultValue(*value) for value in m.values],
-            )
-            for m in response.data.result
-        ]
+        return await self._prometheus_client.fetch_container_metric(metric_name, label, time_range)
 
     async def query_container_live_stats(
         self,
         kernel_ids: Sequence[KernelId],
     ) -> KernelLiveStatBatchResult:
-        """Query Prometheus for live stats of the given kernels."""
+        """Query metric backend for live stats of the given kernels."""
         if not kernel_ids:
             return KernelLiveStatBatchResult.empty(kernel_ids)
         try:
-            values_by_kernel = await self._query_container_live_stats(kernel_ids)
-        except (PrometheusConnectionError, FailedToGetMetric):
-            log.warning("Failed to query Prometheus for kernel live stats, returning empty results")
+            return await self._prometheus_client.fetch_container_live_stats(kernel_ids)
+        except (PrometheusConnectionError, FailedToGetMetric) as e:
+            log.warning("Failed to query metrics for kernel live stats: {!r}", e)
             return KernelLiveStatBatchResult.empty(kernel_ids)
-        return KernelLiveStatBatchResult.from_metric_values(kernel_ids, values_by_kernel)
-
-    async def _query_container_live_stats(
-        self,
-        kernel_ids: Sequence[KernelId],
-    ) -> dict[KernelId, list[MetricValue]]:
-        queries = self._fixed_query_builder.get_container_live_stat_queries(kernel_ids)
-        gauge_response, diff_response, rate_response = await asyncio.gather(
-            *(self._prometheus_client.query_instant(preset) for preset in queries.to_list())
-        )
-        gauge = KernelMetricValuesByKernel.from_prometheus_response(gauge_response)
-        diff = KernelMetricValuesByKernel.from_prometheus_response(diff_response)
-        rate = KernelMetricValuesByKernel.from_prometheus_response(rate_response)
-        merged = gauge.merged_with(diff).merged_with(rate)
-        return merged.values_by_kernel

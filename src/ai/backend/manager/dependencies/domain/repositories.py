@@ -5,19 +5,20 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 
 from .base import DomainDependency
 
 if TYPE_CHECKING:
-    from ai.backend.common.clients.prometheus.client import PrometheusClient
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
     from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
         ValkeyScheduleClient,
     )
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+    from ai.backend.manager.clients.prometheus.client import PrometheusClient
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.models.storage import StorageSessionManager
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -63,6 +64,7 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
         repositories = Repositories.create(
             args=RepositoryArgs(
                 db=setup_input.db,
+                ops_provider=DBOpsProvider(setup_input.db),
                 storage_manager=setup_input.storage_manager,
                 config_provider=setup_input.config_provider,
                 valkey_stat_client=setup_input.valkey_stat,

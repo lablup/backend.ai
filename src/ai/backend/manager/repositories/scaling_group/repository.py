@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -88,6 +88,10 @@ class ScalingGroupRepository:
     ) -> ScalingGroupListResult:
         """Searches scaling groups with total count."""
         return await self._db_source.search_scaling_groups(querier=querier)
+
+    @scaling_group_repository_resilience.apply()
+    async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
+        return await self._db_source.get_resource_group_id_by_name(name)
 
     @scaling_group_repository_resilience.apply()
     async def get_scaling_group_by_name(

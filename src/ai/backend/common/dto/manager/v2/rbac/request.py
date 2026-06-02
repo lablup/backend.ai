@@ -12,7 +12,9 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
 from .types import (
+    OperationTypeFilter,
     OrderDirection,
+    RBACElementTypeFilter,
     RoleSource,
     RoleSourceFilter,
     RoleStatus,
@@ -49,6 +51,7 @@ __all__ = (
     "RoleOrderBy",
     "UpdatePermissionInput",
     "UpdateRoleInput",
+    "UserNestedFilter",
 )
 
 
@@ -199,12 +202,25 @@ class ReplaceRolePermissionsInput(BaseRequestModel):
     )
 
 
+class UserNestedFilter(BaseRequestModel):
+    """Filter roles by their user assignments."""
+
+    user_id: UUIDFilter | None = None
+    AND: list[UserNestedFilter] | None = None
+    OR: list[UserNestedFilter] | None = None
+    NOT: list[UserNestedFilter] | None = None
+
+
+UserNestedFilter.model_rebuild()
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
+    assigned_user: UserNestedFilter | None = None
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -230,10 +246,10 @@ RoleNestedFilter.model_rebuild()
 class PermissionNestedFilter(BaseRequestModel):
     """Nested filter for permissions within a role assignment."""
 
-    scope_id: str | None = None
-    scope_type: str | None = None
-    entity_type: str | None = None
-    operation: str | None = None
+    scope_id: StringFilter | None = None
+    scope_type: RBACElementTypeFilter | None = None
+    entity_type: RBACElementTypeFilter | None = None
+    operation: OperationTypeFilter | None = None
     AND: list[PermissionNestedFilter] | None = None
     OR: list[PermissionNestedFilter] | None = None
     NOT: list[PermissionNestedFilter] | None = None
@@ -261,7 +277,7 @@ RoleAssignmentFilter.model_rebuild()
 class EntityFilter(BaseRequestModel):
     """Filter for entity associations."""
 
-    entity_type: str | None = None
+    entity_type: RBACElementTypeFilter | None = None
     entity_id: StringFilter | None = None
     AND: list[EntityFilter] | None = None
     OR: list[EntityFilter] | None = None
@@ -274,9 +290,10 @@ EntityFilter.model_rebuild()
 class PermissionFilter(BaseRequestModel):
     """Filter for scoped permissions."""
 
-    role_id: UUID | None = None
-    scope_type: str | None = None
-    entity_type: str | None = None
+    role_id: UUIDFilter | None = None
+    scope_type: RBACElementTypeFilter | None = None
+    scope_id: StringFilter | None = None
+    entity_type: RBACElementTypeFilter | None = None
     created_at: DateTimeFilter | None = None
     AND: list[PermissionFilter] | None = None
     OR: list[PermissionFilter] | None = None

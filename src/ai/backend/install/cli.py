@@ -133,8 +133,12 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     "--harbor-admin-password",
     type=str,
     default="Harbor12345",
-    show_default=True,
-    help="Initial admin password for the local Harbor instance.",
+    show_default=False,
+    help=(
+        "Initial admin password for the local Harbor instance. WARNING: "
+        "if omitted, a well-known default value is used — override it for "
+        "anything beyond a throwaway dev box."
+    ),
 )
 @click.option(
     "--harbor-download-uri",
@@ -145,6 +149,49 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     ),
     show_default=False,
     help="Harbor offline installer archive URL to download.",
+)
+@click.option(
+    "--harbor-download-sha256",
+    type=str,
+    default=None,
+    help=(
+        "Expected SHA-256 of the downloaded Harbor archive. When set, the "
+        "installer verifies the downloaded file against this digest and "
+        "aborts on mismatch. When unset, no integrity check is performed."
+    ),
+)
+@click.option(
+    "--enable-observability",
+    is_flag=True,
+    default=False,
+    help=(
+        "Bring up the halfstack 'observability' Compose profile (Prometheus,"
+        " Grafana, OTel collector, Loki, Tempo, Pyroscope, exporters) and enable"
+        " Pyroscope / OTel in component configs."
+    ),
+)
+@click.option(
+    "--enable-storage",
+    is_flag=True,
+    default=False,
+    help="Bring up the halfstack 'storage' Compose profile (MinIO).",
+)
+@click.option(
+    "--enable-telemetry",
+    "enable_telemetry",
+    flag_value="on",
+    default=None,
+    help=(
+        "Bring up the halfstack 'telemetry' Compose profile (OTel collector"
+        " + Loki) and enable [otel] in component configs. Default ON in"
+        " DEVELOP install mode, OFF in PACKAGE install mode."
+    ),
+)
+@click.option(
+    "--disable-telemetry",
+    "enable_telemetry",
+    flag_value="off",
+    help="Force the 'telemetry' profile OFF (overrides DEVELOP mode default).",
 )
 @click.version_option(version=__version__)
 @click.pass_context
@@ -169,6 +216,10 @@ def main(
     harbor_http_port: int,
     harbor_admin_password: str,
     harbor_download_uri: str,
+    harbor_download_sha256: str | None,
+    enable_observability: bool,
+    enable_storage: bool,
+    enable_telemetry: str | None,
     accelerator: str,
 ) -> None:
     """The installer"""
@@ -205,6 +256,10 @@ def main(
         harbor_http_port=harbor_http_port,
         harbor_admin_password=harbor_admin_password,
         harbor_download_uri=harbor_download_uri,
+        harbor_download_sha256=harbor_download_sha256,
+        enable_observability=enable_observability,
+        enable_storage=enable_storage,
+        enable_telemetry=(None if enable_telemetry is None else (enable_telemetry == "on")),
     )
     app = InstallerApp(args)
     app.run(headless=headless)

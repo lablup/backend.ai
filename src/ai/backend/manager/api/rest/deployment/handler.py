@@ -44,10 +44,11 @@ from ai.backend.common.dto.manager.deployment import (
 )
 from ai.backend.common.dto.manager.deployment.response import DeploymentDTO, RevisionDTO
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
-from ai.backend.manager.data.deployment.types import ModelDeploymentData, ModelRevisionData
+from ai.backend.manager.data.deployment.types import LegacyDeploymentData, ModelRevisionData
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as ManagerRouteTrafficStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -69,8 +70,8 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_dep
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
 )
-from ai.backend.manager.services.deployment.actions.get_deployment_by_id import (
-    GetDeploymentByIdAction,
+from ai.backend.manager.services.deployment.actions.get_legacy_deployment_by_id import (
+    GetLegacyDeploymentByIdAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
@@ -88,8 +89,8 @@ from ai.backend.manager.services.deployment.actions.route import (
     SearchRoutesAction,
     UpdateRouteTrafficStatusAction,
 )
-from ai.backend.manager.services.deployment.actions.search_deployments import (
-    SearchDeploymentsAction,
+from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
+    SearchLegacyDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentAction,
@@ -151,7 +152,7 @@ class DeploymentAPIHandler:
         )
         return RuntimeVariant(variant_node.name)
 
-    async def _deployment_dto(self, data: ModelDeploymentData) -> DeploymentDTO:
+    async def _deployment_dto(self, data: LegacyDeploymentData) -> DeploymentDTO:
         """Render a deployment DTO with runtime-variant name pre-resolved.
 
         ``DeploymentAdapter.convert_to_dto`` expects the caller to provide
@@ -164,6 +165,16 @@ class DeploymentAPIHandler:
         else:
             variant_name = await self._resolve_revision_variant_name(data.revision)
         return self._deployment_adapter.convert_to_dto(data, variant_name)
+
+    async def _legacy_deployment_dto(self, deployment_id: DeploymentID) -> DeploymentDTO:
+        """Fetch a deployment via the legacy (full-revision) read path and render
+        its DTO. The REST v1 response embeds the full current revision, which the
+        modern (v2) read path does not load.
+        """
+        result = await self._deployment.get_legacy_deployment_by_id.wait_for_complete(
+            GetLegacyDeploymentByIdAction(deployment_id=deployment_id)
+        )
+        return await self._deployment_dto(result.data)
 
     # Deployment Endpoints
 
@@ -187,8 +198,10 @@ class DeploymentAPIHandler:
             CreateDeploymentAction(creator=creator, auto_activate=True)
         )
 
-        # Build response
-        resp = CreateDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
+        # Build response (re-read via the legacy full-revision path for v1)
+        resp = CreateDeploymentResponse(
+            deployment=await self._legacy_deployment_dto(DeploymentID(action_result.data.id))
+        )
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
     async def search_deployments(
@@ -199,9 +212,9 @@ class DeploymentAPIHandler:
         # Build querier using adapter
         querier = self._deployment_adapter.build_querier(body.parsed)
 
-        # Call service action
-        action_result = await self._deployment.search_deployments.wait_for_complete(
-            SearchDeploymentsAction(querier=querier)
+        # Call service action (legacy full-revision read path for v1)
+        action_result = await self._deployment.search_legacy_deployments.wait_for_complete(
+            SearchLegacyDeploymentsAction(querier=querier)
         )
 
         # Build response
@@ -221,13 +234,10 @@ class DeploymentAPIHandler:
         path: PathParam[DeploymentPathParam],
     ) -> APIResponse:
         """Get a specific deployment."""
-        # Call service action - raises EndpointNotFound if not found
-        action_result = await self._deployment.get_deployment_by_id.wait_for_complete(
-            GetDeploymentByIdAction(deployment_id=path.parsed.deployment_id)
+        # Legacy full-revision read path for v1; raises EndpointNotFound if absent
+        resp = GetDeploymentResponse(
+            deployment=await self._legacy_deployment_dto(DeploymentID(path.parsed.deployment_id))
         )
-
-        # Build response
-        resp = GetDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def update_deployment(
@@ -263,8 +273,10 @@ class DeploymentAPIHandler:
             UpdateDeploymentAction(updater=updater)
         )
 
-        # Build response
-        resp = UpdateDeploymentResponse(deployment=await self._deployment_dto(action_result.data))
+        # Build response (re-read via the legacy full-revision path for v1)
+        resp = UpdateDeploymentResponse(
+            deployment=await self._legacy_deployment_dto(DeploymentID(action_result.data.id))
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def destroy_deployment(
@@ -302,7 +314,7 @@ class DeploymentAPIHandler:
         # Call service action
         action_result = await self._deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(
-                model_deployment_id=path.parsed.deployment_id,
+                model_deployment_id=DeploymentID(path.parsed.deployment_id),
                 adder=revision_creator,
                 auto_activate=body.parsed.options.auto_activate,
             )
@@ -349,7 +361,7 @@ class DeploymentAPIHandler:
         """Get a specific revision."""
         # Call service action - raises DeploymentRevisionNotFound if not found
         action_result = await self._deployment.get_revision_by_id.wait_for_complete(
-            GetRevisionByIdAction(revision_id=path.parsed.revision_id)
+            GetRevisionByIdAction(revision_id=DeploymentRevisionID(path.parsed.revision_id))
         )
 
         # Build response
@@ -364,8 +376,8 @@ class DeploymentAPIHandler:
         # Call service action
         await self._deployment.activate_revision.wait_for_complete(
             ActivateRevisionAction(
-                deployment_id=path.parsed.deployment_id,
-                revision_id=path.parsed.revision_id,
+                deployment_id=DeploymentID(path.parsed.deployment_id),
+                revision_id=DeploymentRevisionID(path.parsed.revision_id),
             )
         )
 

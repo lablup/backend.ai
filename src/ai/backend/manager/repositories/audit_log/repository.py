@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from ai.backend.common.exception import BackendAIError
@@ -9,7 +10,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogListResult
 from ai.backend.manager.models.audit_log import AuditLogRow
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, SearchScope
 
 from .db_source import AuditLogDBSource
 
@@ -52,3 +53,12 @@ class AuditLogRepository:
     ) -> AuditLogListResult:
         """Search audit logs with querier pattern."""
         return await self._db_source.search(querier=querier)
+
+    @audit_log_repository_resilience.apply()
+    async def scoped_search(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> AuditLogListResult:
+        """Search audit logs whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
+        return await self._db_source.scoped_search(querier=querier, scopes=scopes)

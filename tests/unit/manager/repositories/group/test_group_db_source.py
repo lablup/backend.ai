@@ -16,9 +16,11 @@ from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.errors.resource import ProjectHasActiveEndpointsError
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -89,12 +91,14 @@ class TestGroupDBSourceDeleteEndpoints:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
                 RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -258,7 +262,6 @@ class TestGroupDBSourceDeleteEndpoints:
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)
@@ -319,7 +322,6 @@ class TestGroupDBSourceDeleteEndpoints:
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
 
@@ -397,7 +399,6 @@ class TestGroupDBSourceDeleteEndpoints:
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
             await session.commit()
@@ -446,7 +447,6 @@ class TestGroupDBSourceDeleteEndpoints:
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)

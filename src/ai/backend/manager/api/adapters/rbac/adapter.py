@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
@@ -28,9 +28,11 @@ from ai.backend.common.dto.manager.rbac import (
 from ai.backend.common.dto.manager.rbac.response import PaginationInfo
 from ai.backend.common.dto.manager.v2.rbac import (
     AssociationScopesEntitiesNode,
+    BulkAddRolePermissionFailureInfo,
     BulkAddRolePermissionsPayload,
     BulkAssignRoleFailureInfo,
     BulkAssignRoleResultPayload,
+    BulkRemoveRolePermissionFailureInfo,
     BulkRemoveRolePermissionsPayload,
     BulkRevokeRoleFailureInfo,
     BulkRevokeRoleResultPayload,
@@ -42,6 +44,7 @@ from ai.backend.common.dto.manager.v2.rbac import (
     OperationInfo,
     PermissionNode,
     PurgeRolePayload,
+    ReplaceRolePermissionFailureInfo,
     ReplaceRolePermissionsPayload,
     RoleAssignmentNode,
     RoleNode,
@@ -115,9 +118,14 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    UserNestedFilter as UserNestedFilterDTO,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
+    OperationTypeFilter,
     RBACElementTypeDTO,
+    RBACElementTypeFilter,
     RoleSourceDTO,
     RoleStatusDTO,
 )
@@ -165,6 +173,9 @@ from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
     BulkRoleAssignmentResultData,
+    BulkRolePermissionAddResultData,
+    BulkRolePermissionRemoveResultData,
+    BulkRolePermissionReplaceResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
     RoleData,
@@ -178,6 +189,7 @@ from ai.backend.manager.data.permission.status import RoleStatus as InternalRole
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData, RoleInvitationState
+from ai.backend.manager.errors.permission import ReplaceRolePermissionRoleIdMismatch
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -185,7 +197,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
     EntityScopeConditions,
-    PermissionConditions,
     RoleConditions,
     ScopedPermissionConditions,
 )
@@ -232,8 +243,14 @@ from ai.backend.manager.repositories.role_invitation.types import (
     RoleInvitationSearchScope,
 )
 from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
+from ai.backend.manager.services.permission_contoller.actions.bulk_add_role_permissions import (
+    BulkAddRolePermissionsAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
     BulkAssignRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_remove_role_permissions import (
+    BulkRemoveRolePermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
     BulkRevokeRoleAction,
@@ -251,6 +268,9 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
     DeletePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
+from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
+    ReplaceRolePermissionsAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
     SearchElementAssociationsAction,
@@ -1038,37 +1058,95 @@ class RBACAdapter(BaseAdapter):
         self,
         input: BulkAddRolePermissionsInputDTO,
     ) -> BulkAddRolePermissionsPayload:
-        """Bulk-insert scoped permission rows across one or more roles.
-
-        TODO(BA-5906): wire to ``permission_controller.bulk_add_role_permissions``
-        processor once the BA-5906 PR (bulk repository / service / action) is merged.
-        Until then, this raises NotImplementedError so the route is reachable but
-        explicit about the missing dependency.
-        """
-        raise NotImplementedError("bulk_add_role_permissions adapter wiring is pending BA-5906")
+        """Bulk-insert scoped permission rows across one or more roles."""
+        specs = [self._permission_creator_spec(entry) for entry in input.permissions]
+        action_result = await self._processors.permission_controller.bulk_add_role_permissions.wait_for_complete(
+            BulkAddRolePermissionsAction(creator=BulkCreator(specs=specs))
+        )
+        result: BulkRolePermissionAddResultData = action_result.data
+        return BulkAddRolePermissionsPayload(
+            items=[self._permission_data_to_node(item) for item in result.successes],
+            failed=[
+                BulkAddRolePermissionFailureInfo(
+                    role_id=f.role_id,
+                    scope_type=f.scope_type.value,
+                    scope_id=f.scope_id,
+                    entity_type=f.entity_type.value,
+                    operation=f.operation.value,
+                    message=f.message,
+                )
+                for f in result.failures
+            ],
+        )
 
     async def bulk_remove_role_permissions(
         self,
         input: BulkRemoveRolePermissionsInputDTO,
     ) -> BulkRemoveRolePermissionsPayload:
-        """Bulk-delete permission rows by primary key.
-
-        TODO(BA-5906): wire to ``permission_controller.bulk_remove_role_permissions``
-        processor once the BA-5906 PR is merged.
-        """
-        raise NotImplementedError("bulk_remove_role_permissions adapter wiring is pending BA-5906")
+        """Bulk-delete permission rows by primary key."""
+        purgers: list[Purger[PermissionRow]] = [
+            Purger(row_class=PermissionRow, pk_value=pid) for pid in input.permission_ids
+        ]
+        action_result = await self._processors.permission_controller.bulk_remove_role_permissions.wait_for_complete(
+            BulkRemoveRolePermissionsAction(purgers=purgers)
+        )
+        result: BulkRolePermissionRemoveResultData = action_result.data
+        return BulkRemoveRolePermissionsPayload(
+            items=[self._permission_data_to_node(item) for item in result.successes],
+            failed=[
+                BulkRemoveRolePermissionFailureInfo(
+                    permission_id=f.permission_id,
+                    message=f.message,
+                )
+                for f in result.failures
+            ],
+        )
 
     async def replace_role_permissions(
         self,
         input: ReplaceRolePermissionsInputDTO,
     ) -> ReplaceRolePermissionsPayload:
-        """Replace one role's entire scoped-permission set.
+        """Replace one role's entire scoped-permission set."""
+        for entry in input.permissions:
+            if entry.role_id != input.role_id:
+                raise ReplaceRolePermissionRoleIdMismatch(
+                    f"entry role_id {entry.role_id} does not match request role_id {input.role_id}",
+                )
+        specs = [self._permission_creator_spec(entry) for entry in input.permissions]
+        action_result = (
+            await self._processors.permission_controller.replace_role_permissions.wait_for_complete(
+                ReplaceRolePermissionsAction(
+                    role_id=input.role_id,
+                    creator=BulkCreator(specs=specs),
+                )
+            )
+        )
+        result: BulkRolePermissionReplaceResultData = action_result.data
+        return ReplaceRolePermissionsPayload(
+            items=[self._permission_data_to_node(item) for item in result.successes],
+            failed=[
+                ReplaceRolePermissionFailureInfo(
+                    role_id=f.role_id,
+                    scope_type=f.scope_type.value,
+                    scope_id=f.scope_id,
+                    entity_type=f.entity_type.value,
+                    operation=f.operation.value,
+                    message=f.message,
+                )
+                for f in result.failures
+            ],
+        )
 
-        TODO(BA-5906): wire to ``permission_controller.replace_role_permissions``
-        processor once the BA-5906 PR is merged. The adapter must also validate
-        that every entry's ``role_id`` matches ``input.role_id``.
-        """
-        raise NotImplementedError("replace_role_permissions adapter wiring is pending BA-5906")
+    def _permission_creator_spec(self, entry: CreatePermissionInputDTO) -> PermissionCreatorSpec:
+        scope_type = RBACElementType(entry.scope_type)
+        self._validate_scope_id(scope_type, entry.scope_id)
+        return PermissionCreatorSpec(
+            role_id=entry.role_id,
+            scope_type=scope_type,
+            scope_id=entry.scope_id,
+            entity_type=RBACElementType(entry.entity_type),
+            operation=InternalOperationType(entry.operation),
+        )
 
     async def bulk_revoke_role(self, input: BulkRevokeRoleInputDTO) -> BulkRevokeRoleResultPayload:
         """Bulk-revoke a role from multiple users."""
@@ -1147,17 +1225,99 @@ class RBACAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ helpers (GQL layer)
 
+    @staticmethod
+    def _convert_rbac_element_type_filter(
+        f: RBACElementTypeFilter,
+        *,
+        equals_factory: Callable[[RBACElementType], QueryCondition],
+        not_equals_factory: Callable[[RBACElementType], QueryCondition],
+        in_factory: Callable[[Collection[RBACElementType]], QueryCondition],
+        not_in_factory: Callable[[Collection[RBACElementType]], QueryCondition],
+    ) -> list[QueryCondition]:
+        """Translate an ``RBACElementTypeFilter`` (equals / in / not_equals / not_in)
+        into the matching ``QueryCondition`` instances using factory callables.
+
+        Each factory accepts ``RBACElementType`` values (the internal enum), so
+        DTO values are converted via ``RBACElementType(value.value)`` before being
+        passed in. Returns an empty list when no filter field is set.
+        """
+        conditions: list[QueryCondition] = []
+        if f.equals is not None:
+            conditions.append(equals_factory(RBACElementType(f.equals.value)))
+        if f.not_equals is not None:
+            conditions.append(not_equals_factory(RBACElementType(f.not_equals.value)))
+        if f.in_:
+            conditions.append(in_factory([RBACElementType(v.value) for v in f.in_]))
+        if f.not_in:
+            conditions.append(not_in_factory([RBACElementType(v.value) for v in f.not_in]))
+        return conditions
+
+    @staticmethod
+    def _convert_operation_type_filter(
+        f: OperationTypeFilter,
+        *,
+        equals_factory: Callable[[InternalOperationType], QueryCondition],
+        not_equals_factory: Callable[[InternalOperationType], QueryCondition],
+        in_factory: Callable[[Collection[InternalOperationType]], QueryCondition],
+        not_in_factory: Callable[[Collection[InternalOperationType]], QueryCondition],
+    ) -> list[QueryCondition]:
+        """Translate an ``OperationTypeFilter`` (equals / in / not_equals / not_in)
+        into ``QueryCondition`` instances using factory callables.
+
+        DTO values are converted to the internal ``OperationType`` enum before
+        being passed to the factories.
+        """
+        conditions: list[QueryCondition] = []
+        if f.equals is not None:
+            conditions.append(equals_factory(InternalOperationType(f.equals.value)))
+        if f.not_equals is not None:
+            conditions.append(not_equals_factory(InternalOperationType(f.not_equals.value)))
+        if f.in_:
+            conditions.append(in_factory([InternalOperationType(v.value) for v in f.in_]))
+        if f.not_in:
+            conditions.append(not_in_factory([InternalOperationType(v.value) for v in f.not_in]))
+        return conditions
+
     def _convert_permission_filter(self, f: PermissionFilterDTO) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.role_id is not None:
-            conditions.append(ScopedPermissionConditions.by_role_id(f.role_id))
-        if f.scope_type is not None:
-            conditions.append(
-                ScopedPermissionConditions.by_scope_type(RBACElementType(f.scope_type))
+            condition = self.convert_uuid_filter(
+                f.role_id,
+                equals_factory=ScopedPermissionConditions.by_role_id_equals,
+                in_factory=ScopedPermissionConditions.by_role_id_in,
             )
+            if condition is not None:
+                conditions.append(condition)
+        if f.scope_type is not None:
+            conditions.extend(
+                self._convert_rbac_element_type_filter(
+                    f.scope_type,
+                    equals_factory=ScopedPermissionConditions.by_scope_type_equals,
+                    not_equals_factory=ScopedPermissionConditions.by_scope_type_not_equals,
+                    in_factory=ScopedPermissionConditions.by_scope_type_in,
+                    not_in_factory=ScopedPermissionConditions.by_scope_type_not_in,
+                )
+            )
+        if f.scope_id is not None:
+            condition = self.convert_string_filter(
+                f.scope_id,
+                contains_factory=ScopedPermissionConditions.by_scope_id_contains,
+                equals_factory=ScopedPermissionConditions.by_scope_id_equals,
+                starts_with_factory=ScopedPermissionConditions.by_scope_id_starts_with,
+                ends_with_factory=ScopedPermissionConditions.by_scope_id_ends_with,
+                in_factory=ScopedPermissionConditions.by_scope_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.entity_type is not None:
-            conditions.append(
-                ScopedPermissionConditions.by_entity_type(RBACElementType(f.entity_type))
+            conditions.extend(
+                self._convert_rbac_element_type_filter(
+                    f.entity_type,
+                    equals_factory=ScopedPermissionConditions.by_entity_type_equals,
+                    not_equals_factory=ScopedPermissionConditions.by_entity_type_not_equals,
+                    in_factory=ScopedPermissionConditions.by_entity_type_in,
+                    not_in_factory=ScopedPermissionConditions.by_entity_type_not_in,
+                )
             )
         if f.created_at is not None:
             cond = f.created_at.build_query_condition(
@@ -1242,6 +1402,8 @@ class RBACAdapter(BaseAdapter):
                 conditions.append(
                     RoleConditions.by_status_not_in([InternalRoleStatus(s) for s in st.not_in])
                 )
+        if f.assigned_user is not None:
+            conditions.extend(self._convert_user_nested_filter(f.assigned_user))
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_role_filter_gql(sub))
@@ -1255,6 +1417,36 @@ class RBACAdapter(BaseAdapter):
             not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
                 not_conditions.extend(self._convert_role_filter_gql(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+        return conditions
+
+    def _convert_user_nested_filter(self, f: UserNestedFilterDTO) -> list[QueryCondition]:
+        raw_conditions: list[QueryCondition] = []
+        if f.user_id is not None:
+            condition = self.convert_uuid_filter(
+                f.user_id,
+                equals_factory=AssignedUserConditions.by_user_id_equals,
+                in_factory=AssignedUserConditions.by_user_id_in,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
+        conditions: list[QueryCondition] = []
+        if raw_conditions:
+            conditions.append(RoleConditions.by_assigned_user_id(raw_conditions))
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_user_nested_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_user_nested_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_user_nested_filter(sub))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
@@ -1346,16 +1538,46 @@ class RBACAdapter(BaseAdapter):
     ) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
         if f.scope_id is not None:
-            raw_conditions.append(PermissionConditions.by_scope_id(f.scope_id))
+            condition = self.convert_string_filter(
+                f.scope_id,
+                contains_factory=ScopedPermissionConditions.by_scope_id_contains,
+                equals_factory=ScopedPermissionConditions.by_scope_id_equals,
+                starts_with_factory=ScopedPermissionConditions.by_scope_id_starts_with,
+                ends_with_factory=ScopedPermissionConditions.by_scope_id_ends_with,
+                in_factory=ScopedPermissionConditions.by_scope_id_in,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
         if f.scope_type is not None:
-            scope_type = RBACElementType(f.scope_type).to_scope_type()
-            raw_conditions.append(PermissionConditions.by_scope_types([scope_type]))
+            raw_conditions.extend(
+                self._convert_rbac_element_type_filter(
+                    f.scope_type,
+                    equals_factory=ScopedPermissionConditions.by_scope_type_equals,
+                    not_equals_factory=ScopedPermissionConditions.by_scope_type_not_equals,
+                    in_factory=ScopedPermissionConditions.by_scope_type_in,
+                    not_in_factory=ScopedPermissionConditions.by_scope_type_not_in,
+                )
+            )
         if f.entity_type is not None:
-            entity_type = RBACElementType(f.entity_type).to_entity_type()
-            raw_conditions.append(PermissionConditions.by_entity_types([entity_type]))
+            raw_conditions.extend(
+                self._convert_rbac_element_type_filter(
+                    f.entity_type,
+                    equals_factory=ScopedPermissionConditions.by_entity_type_equals,
+                    not_equals_factory=ScopedPermissionConditions.by_entity_type_not_equals,
+                    in_factory=ScopedPermissionConditions.by_entity_type_in,
+                    not_in_factory=ScopedPermissionConditions.by_entity_type_not_in,
+                )
+            )
         if f.operation is not None:
-            operation = InternalOperationType(f.operation)
-            raw_conditions.append(PermissionConditions.by_operations([operation]))
+            raw_conditions.extend(
+                self._convert_operation_type_filter(
+                    f.operation,
+                    equals_factory=ScopedPermissionConditions.by_operation_equals,
+                    not_equals_factory=ScopedPermissionConditions.by_operation_not_equals,
+                    in_factory=ScopedPermissionConditions.by_operation_in,
+                    not_in_factory=ScopedPermissionConditions.by_operation_not_in,
+                )
+            )
         conditions: list[QueryCondition] = []
         if raw_conditions:
             conditions.append(AssignedUserConditions.exists_permission_combined(raw_conditions))
@@ -1445,7 +1667,15 @@ class RBACAdapter(BaseAdapter):
     def _convert_entity_filter(self, f: EntityFilterDTO) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.entity_type is not None:
-            conditions.append(EntityScopeConditions.by_entity_type(RBACElementType(f.entity_type)))
+            conditions.extend(
+                self._convert_rbac_element_type_filter(
+                    f.entity_type,
+                    equals_factory=EntityScopeConditions.by_entity_type_equals,
+                    not_equals_factory=EntityScopeConditions.by_entity_type_not_equals,
+                    in_factory=EntityScopeConditions.by_entity_type_in,
+                    not_in_factory=EntityScopeConditions.by_entity_type_not_in,
+                )
+            )
         if f.entity_id is not None:
             condition = self.convert_string_filter(
                 f.entity_id,

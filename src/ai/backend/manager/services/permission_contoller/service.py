@@ -2,7 +2,7 @@ import logging
 from collections.abc import Sequence
 from typing import cast
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac import (
     BaseRBACAction,
@@ -11,7 +11,6 @@ from ai.backend.manager.actions.action.rbac import (
 )
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import (
-    EffectivePermissionsInput,
     UserRoleRevocationData,
 )
 from ai.backend.manager.repositories.group.repository import GroupRepository
@@ -154,6 +153,18 @@ from ai.backend.manager.services.permission_contoller.actions.update_role_permis
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# Grant operations are declared in the RBAC action registry as placeholders for a future
+# entity-delegation feature, but no executable action can request them yet
+# (``ActionOperationType`` has no GRANT member). Exclude them from the permission matrix so
+# it only exposes (scope, entity, operation) combinations that are actually enforced.
+_GRANT_OPERATIONS: frozenset[OperationType] = frozenset({
+    OperationType.GRANT_ALL,
+    OperationType.GRANT_READ,
+    OperationType.GRANT_UPDATE,
+    OperationType.GRANT_SOFT_DELETE,
+    OperationType.GRANT_HARD_DELETE,
+})
 
 
 class PermissionControllerService:
@@ -405,14 +416,17 @@ class PermissionControllerService:
         Build the RBAC permission matrix: scope -> entity -> action_name -> permission.
 
         Reads ``permission_scope()`` from each registered RBAC action to produce
-        the full (scope, entity, operation) mapping.
+        the (scope, entity, operation) mapping. Grant operations are skipped because
+        they are not yet enforceable at runtime (see ``_GRANT_OPERATIONS``).
         """
         result: dict[
             RBACElementType, dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]]
         ] = {}
         for action_cls in self._rbac_action_registry:
-            scope = action_cls.permission_scope()
             perm = action_cls.required_permission()
+            if perm.operation in _GRANT_OPERATIONS:
+                continue
+            scope = action_cls.permission_scope()
             entity_map = result.setdefault(scope, {})
             actions = entity_map.setdefault(perm.element_type, {})
             actions[action_cls.action_name()] = perm
@@ -421,20 +435,14 @@ class PermissionControllerService:
     async def resolve_effective_permissions(
         self, action: ResolveEffectivePermissionsAction
     ) -> ResolveEffectivePermissionsActionResult:
-        """Resolve the set of permitted operations per entity for a given user.
+        """Resolve the set of permitted operations across a collection of per-target keys.
 
         Traverses the scope chain and evaluates all role/permission assignments
-        to return all operations the user is authorized to perform on each entity.
+        to return all operations the user is authorized to perform on each
+        target key.
         """
-        result = await self._repository.resolve_effective_permissions(
-            EffectivePermissionsInput(
-                user_id=action.user_id,
-                target_element_type=action.target_element_type,
-                target_entity_ids=action.target_entity_ids,
-                permission_entity_type=action.permission_entity_type,
-            )
-        )
-        return ResolveEffectivePermissionsActionResult(permissions=result.permissions)
+        permissions = await self._repository.resolve_effective_permissions(action.keys)
+        return ResolveEffectivePermissionsActionResult(permissions=permissions)
 
     async def create_role_invitation(
         self, action: CreateRoleInvitationServiceAction

@@ -10,6 +10,7 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.api.gql.base import StringFilter
 from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
@@ -90,7 +91,7 @@ class ModelRevisionFilterOptions:
     """Filtering options for model revisions."""
 
     name: StringFilter | None = None
-    deployment_id: UUID | None = None
+    deployment_id: DeploymentID | None = None
     id: UUID | None = None
     ids_in: list[UUID] | None = None
 

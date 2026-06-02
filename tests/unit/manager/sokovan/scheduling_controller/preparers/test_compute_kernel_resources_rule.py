@@ -77,7 +77,7 @@ class TestComputeKernelResourcesRule:
     async def test_fills_intrinsic_slots_from_image_min(
         self, rule: ComputeKernelResourcesRule
     ) -> None:
-        """Zero/missing cpu and mem fall back to image minimums."""
+        """Zero/missing cpu and mem fall back to image minimums (with shmem added to mem)."""
         image_id = ImageID(uuid.uuid4())
         draft = _draft(
             KernelGroupDraft(
@@ -86,14 +86,56 @@ class TestComputeKernelResourcesRule:
                 execution_spec=KernelExecutionSpecDraft(image_id=image_id),
             ),
         )
-        ctx = _context({image_id: _image(image_id, cpu_min="2", mem_min="512m")})
+        ctx = _context({
+            image_id: _image(
+                image_id,
+                cpu_min="2",
+                mem_min="512m",
+                labels={"ai.backend.resource.preferred.shmem": "64m"},
+            )
+        })
         result = await rule.prepare(draft, ctx)
 
         assert result.options.kernel_groups is not None
         resources = result.options.kernel_groups[0].execution_spec.resources
         resource_map = {entry.resource_type: Decimal(entry.quantity) for entry in resources}
         assert resource_map["cpu"] == Decimal("2")
-        assert resource_map["mem"] >= Decimal("512") * Decimal(1024 * 1024)
+        # mem must include shmem so the result clears ResourceLimitRule's
+        # `mem >= image_min_mem + shmem` check.
+        expected_mem = Decimal(512 * 1024 * 1024) + Decimal(64 * 1024 * 1024)
+        assert resource_map["mem"] == expected_mem
+
+    async def test_default_fill_passes_validator_minimum(
+        self, rule: ComputeKernelResourcesRule
+    ) -> None:
+        """Default-filled mem must satisfy `image_min + shmem`."""
+        image_id = ImageID(uuid.uuid4())
+        draft = _draft(
+            KernelGroupDraft(
+                role="main",
+                replica_count=1,
+                execution_spec=KernelExecutionSpecDraft(image_id=image_id),
+            ),
+        )
+        ctx = _context({
+            image_id: _image(
+                image_id,
+                mem_min="256m",
+                labels={"ai.backend.resource.preferred.shmem": "64m"},
+            )
+        })
+        result = await rule.prepare(draft, ctx)
+
+        assert result.options.kernel_groups is not None
+        exec_spec = result.options.kernel_groups[0].execution_spec
+        resource_map = {
+            entry.resource_type: Decimal(entry.quantity) for entry in exec_spec.resources
+        }
+        assert exec_spec.resource_opts is not None
+        shmem = exec_spec.resource_opts.shmem
+        assert shmem is not None
+        image_min_mem = Decimal(256 * 1024 * 1024)
+        assert resource_map["mem"] >= image_min_mem + Decimal(int(shmem))
 
     async def test_preserves_caller_slot_values(self, rule: ComputeKernelResourcesRule) -> None:
         """Caller-set cpu / mem slots win over image minimums."""

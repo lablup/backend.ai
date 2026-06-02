@@ -158,6 +158,7 @@ class TestGetModelServiceInfo:
             repository=mock_repositories.repository,
             deployment_repository=mock_deployment_repository,
             runtime_variant_repository=mock_runtime_variant_repository,
+            scheduler_repository=MagicMock(),
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
             route_controller=mock_route_controller,

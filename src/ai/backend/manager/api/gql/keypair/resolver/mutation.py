@@ -48,7 +48,7 @@ def _get_current_user_id() -> UUID:
 )
 async def issue_my_keypair(
     info: Info[StrawberryGQLContext],
-) -> IssueMyKeypairPayloadGQL:
+) -> IssueMyKeypairPayloadGQL | None:
     user_id = _get_current_user_id()
     payload = await info.context.adapters.user.issue_my_keypair(user_id)
     return IssueMyKeypairPayloadGQL.from_pydantic(payload)
@@ -63,7 +63,7 @@ async def issue_my_keypair(
 async def revoke_my_keypair(
     info: Info[StrawberryGQLContext],
     input: RevokeMyKeypairInputGQL,
-) -> RevokeMyKeypairPayloadGQL:
+) -> RevokeMyKeypairPayloadGQL | None:
     user_id = _get_current_user_id()
     payload = await info.context.adapters.user.revoke_my_keypair(user_id, input.access_key)
     return RevokeMyKeypairPayloadGQL.from_pydantic(payload)
@@ -78,7 +78,7 @@ async def revoke_my_keypair(
 async def update_my_keypair(
     info: Info[StrawberryGQLContext],
     input: UpdateMyKeypairInputGQL,
-) -> UpdateMyKeypairPayloadGQL:
+) -> UpdateMyKeypairPayloadGQL | None:
     user_id = _get_current_user_id()
     payload = await info.context.adapters.user.update_my_keypair(
         user_id, input.access_key, input.is_active
@@ -95,7 +95,7 @@ async def update_my_keypair(
 async def switch_my_main_access_key(
     info: Info[StrawberryGQLContext],
     input: SwitchMyMainAccessKeyInputGQL,
-) -> SwitchMyMainAccessKeyPayloadGQL:
+) -> SwitchMyMainAccessKeyPayloadGQL | None:
     user_id = _get_current_user_id()
     payload = await info.context.adapters.user.switch_my_main_access_key(user_id, input.access_key)
     return SwitchMyMainAccessKeyPayloadGQL.from_pydantic(payload)
@@ -113,7 +113,7 @@ async def switch_my_main_access_key(
 async def admin_create_keypair_v2(
     info: Info[StrawberryGQLContext],
     input: AdminCreateKeypairInputGQL,
-) -> AdminCreateKeypairPayloadGQL:
+) -> AdminCreateKeypairPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.user.admin_create_keypair(input.to_pydantic())
     return AdminCreateKeypairPayloadGQL.from_pydantic(payload)
@@ -128,7 +128,7 @@ async def admin_create_keypair_v2(
 async def admin_update_keypair_v2(
     info: Info[StrawberryGQLContext],
     input: AdminUpdateKeypairInputGQL,
-) -> AdminUpdateKeypairPayloadGQL:
+) -> AdminUpdateKeypairPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.user.admin_update_keypair(input.to_pydantic())
     return AdminUpdateKeypairPayloadGQL.from_pydantic(payload)
@@ -143,7 +143,7 @@ async def admin_update_keypair_v2(
 async def admin_delete_keypair_v2(
     info: Info[StrawberryGQLContext],
     access_key: str,
-) -> AdminDeleteKeypairPayloadGQL:
+) -> AdminDeleteKeypairPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.user.admin_delete_keypair(access_key)
     return AdminDeleteKeypairPayloadGQL.from_pydantic(payload)
@@ -161,7 +161,7 @@ async def admin_delete_keypair_v2(
 async def admin_register_ssh_keypair_v2(
     info: Info[StrawberryGQLContext],
     input: AdminRegisterSSHKeypairInputGQL,
-) -> AdminRegisterSSHKeypairPayloadGQL:
+) -> AdminRegisterSSHKeypairPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.user.admin_register_ssh_keypair(input.to_pydantic())
     return AdminRegisterSSHKeypairPayloadGQL.from_pydantic(payload)
@@ -176,7 +176,7 @@ async def admin_register_ssh_keypair_v2(
 async def admin_delete_ssh_keypair_v2(
     info: Info[StrawberryGQLContext],
     access_key: str,
-) -> AdminDeleteSSHKeypairPayloadGQL:
+) -> AdminDeleteSSHKeypairPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.user.admin_delete_ssh_keypair(access_key)
     return AdminDeleteSSHKeypairPayloadGQL.from_pydantic(payload)

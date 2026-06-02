@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import OperationType
@@ -11,6 +13,7 @@ from ai.backend.manager.data.permission.types import OperationType
 def _make_domain_data() -> DomainData:
     now = datetime.now(tz=UTC)
     return DomainData(
+        id=DomainID(uuid.uuid4()),
         name="default",
         description=None,
         is_active=True,

@@ -31,7 +31,6 @@ import trafaret as t
 from aiotools import TaskGroupError
 from dateutil.relativedelta import relativedelta
 from pydantic import (
-    BaseModel,
     Field,
     GetCoreSchemaHandler,
 )
@@ -60,6 +59,7 @@ from ai.backend.common.events.event_types.session.anycast import (
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.types import (
     AccessKey,
+    BackendAISchema,
     BinarySize,
     ResourceSlot,
     SessionExecutionStatus,
@@ -511,7 +511,8 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         )
 
         log.info(
-            f"NewUserGracePeriodChecker: default period = {_grace_period} seconds",
+            "NewUserGracePeriodChecker: default period = {} seconds",
+            _grace_period,
         )
 
     async def get_extra_info(
@@ -694,7 +695,7 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
             await self._update_timeout(session_id)
 
     async def _disable_timeout(self, session_id: SessionId) -> None:
-        log.debug(f"NetworkTimeoutIdleChecker._disable_timeout({session_id})")
+        log.debug("NetworkTimeoutIdleChecker._disable_timeout({})", session_id)
         await self._redis_live.store_live_data(
             f"session.{session_id}.last_access",
             "0",
@@ -702,7 +703,7 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
         )
 
     async def _update_timeout(self, session_id: SessionId) -> None:
-        log.debug(f"NetworkTimeoutIdleChecker._update_timeout({session_id})")
+        log.debug("NetworkTimeoutIdleChecker._update_timeout({})", session_id)
         timestamp = await self._redis_live.get_server_time()
         await self._redis_live.store_live_data(
             f"session.{session_id}.last_access",
@@ -874,7 +875,7 @@ def _get_resource_name_from_metric_key(name: str) -> str:
     return name
 
 
-class ResourceThresholdValue(BaseModel):
+class ResourceThresholdValue(BackendAISchema):
     average: Annotated[
         int | float | Decimal | None,
         Field(
@@ -987,9 +988,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
             f"{k}({threshold.average})," for k, threshold in self.resource_thresholds.items()
         ])
         log.info(
-            f"UtilizationIdleChecker(%): {thresholds_log} "
-            f'thresholds-check-operator("{self.thresholds_check_operator}"), '
-            f"time-window({self.time_window.total_seconds()}s)"
+            'UtilizationIdleChecker(%): {} thresholds-check-operator("{}"), time-window({}s)',
+            thresholds_log,
+            self.thresholds_check_operator,
+            self.time_window.total_seconds(),
         )
 
     @classmethod
@@ -1232,7 +1234,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 raw_live_stat = await self._valkey_stat_client.get_kernel_statistics(str(kernel_id))
                 if raw_live_stat is None:
                     log.warning(
-                        f"Utilization data not found or failed to fetch utilization data. Skip idle check (k:{kernel_id})"
+                        "Utilization data not found or failed to fetch utilization data. Skip idle check (k:{})",
+                        kernel_id,
                     )
                     continue
                 live_stat = raw_live_stat

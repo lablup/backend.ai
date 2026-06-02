@@ -128,6 +128,7 @@ __all__ = (
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
     "DEAD_SESSION_STATUSES",
+    "TERMINAL_SESSION_STATUSES",
     "PRIVATE_SESSION_TYPES",
     "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "KernelLoadingStrategy",
@@ -156,6 +157,16 @@ LEADING_SESSION_STATUSES = tuple(
 DEAD_SESSION_STATUSES = frozenset([
     SessionStatus.CANCELLED,
     SessionStatus.TERMINATED,
+])
+
+# Statuses treated as terminal for session-name reuse. Mirrors the
+# `ix_sessions_unique_name_per_user_nonterminal` partial unique index predicate
+# (`status NOT IN ('ERROR', 'TERMINATED', 'CANCELLED')`), which guarantees at most
+# one non-terminal session per (name, user_uuid).
+TERMINAL_SESSION_STATUSES = frozenset([
+    SessionStatus.ERROR,
+    SessionStatus.TERMINATED,
+    SessionStatus.CANCELLED,
 ])
 
 # statuses to consider when calculating current resource usage
@@ -553,7 +564,7 @@ class SessionRow(Base):  # type: ignore[misc]
     #         // an ISO 8601 formatted timestamp of the last attempt
     #     "failed_predicates": [
     #       { "name": "concurrency", "msg": "You cannot run more than 30 concurrent sessions." },
-    #           // see the manager.scheduler.predicates module for possible messages
+    #           // see the sokovan scheduler validator modules for possible messages
     #       ...
     #     ],
     #     "passed_predicates": [ {"name": "reserved_time"}, ... ],  // names only
@@ -856,6 +867,7 @@ class SessionRow(Base):  # type: ignore[misc]
                 network_type=self.network_type,
                 network_id=self.network_id,
             ),
+            handler_options=self.options.handler_options,
         )
 
     @property

@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.types import DeploymentOptions
@@ -118,6 +118,14 @@ class ScalingGroupDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == name)
+            resource_group_id = await db_sess.scalar(query)
+            if resource_group_id is None:
+                raise ScalingGroupNotFound(name)
+            return resource_group_id
 
     async def get_scaling_group_by_name(
         self,

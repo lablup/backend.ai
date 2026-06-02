@@ -15,7 +15,7 @@ from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController

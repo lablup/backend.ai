@@ -3,12 +3,12 @@ import logging
 import socket
 from typing import Any, Final, override
 
-import aiotools
-
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.common.cron import LocalCron
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseBackend
+from .last_access_marker import LastAccessMarkerTask
 from .pool import RoutePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -73,9 +73,6 @@ class TCPBackend(BaseBackend):
                 log.debug("setting stop event")
                 stop_event.set()
 
-        async def _last_access_marker_task(_interval: float) -> None:
-            await self.mark_last_used_time(route)
-
         route = await self._pool.select()
         log.debug(
             "Proxying TCP Request to {}:{}",
@@ -83,7 +80,8 @@ class TCPBackend(BaseBackend):
             route.kernel_port,
         )
 
-        marker_task = aiotools.create_timer(_last_access_marker_task, 1.5)
+        marker_cron = LocalCron([LastAccessMarkerTask(self, route)])
+        await marker_cron.start()
         await self.increase_request_counter()
 
         try:
@@ -111,8 +109,7 @@ class TCPBackend(BaseBackend):
         finally:
             log.debug("tasks ended")
             metrics.proxy.observe_upstream_tcp_traffic_chunk(total_bytes)
-            marker_task.cancel()
-            await marker_task
+            await marker_cron.stop()
             down_writer.close()
             await down_writer.wait_closed()
         log.debug("TCP connection closed")

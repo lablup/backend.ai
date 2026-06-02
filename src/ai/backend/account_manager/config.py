@@ -12,7 +12,6 @@ from typing import Annotated, Any
 
 import click
 from pydantic import (
-    BaseModel,
     ConfigDict,
     Field,
     GetCoreSchemaHandler,
@@ -23,6 +22,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
+from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import LogLevel
 
 from .types import EventLoopType
@@ -46,7 +46,7 @@ class TransactionIsolationLevel(enum.StrEnum):
     SERIALIZABLE = "SERIALIZABLE"
 
 
-class BaseSchema(BaseModel):
+class BaseSchema(BackendAISchema):
     model_config = ConfigDict(
         validate_by_name=True,
         from_attributes=True,

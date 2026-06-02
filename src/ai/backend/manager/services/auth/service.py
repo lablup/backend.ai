@@ -77,6 +77,10 @@ from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
     ResolveAccessKeyScopeResult,
 )
+from ai.backend.manager.services.auth.actions.resolve_user_id_by_access_key import (
+    ResolveUserIDByAccessKeyAction,
+    ResolveUserIDByAccessKeyResult,
+)
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     ResolveUserScopeAction,
     ResolveUserScopeResult,
@@ -757,6 +761,12 @@ class AuthService:
             requester_access_key=requester_ak,
             owner_access_key=owner_ak,
         )
+
+    async def resolve_user_id_by_access_key(
+        self, action: ResolveUserIDByAccessKeyAction
+    ) -> ResolveUserIDByAccessKeyResult:
+        user_id = await self._auth_repository.get_user_id_by_access_key(action.access_key)
+        return ResolveUserIDByAccessKeyResult(user_id=user_id)
 
     async def resolve_user_scope(self, action: ResolveUserScopeAction) -> ResolveUserScopeResult:
         if action.owner_user_email is None:

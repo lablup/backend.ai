@@ -62,10 +62,12 @@ def search(
 
     filter_dto: RuntimeVariantPresetFilter | None = None
     if runtime_variant_id is not None or name_contains is not None:
-        from ai.backend.common.dto.manager.query import StringFilter
+        from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
         filter_dto = RuntimeVariantPresetFilter(
-            runtime_variant_id=runtime_variant_id,
+            runtime_variant_id=UUIDFilter(equals=runtime_variant_id)
+            if runtime_variant_id is not None
+            else None,
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
         )
     orders = (

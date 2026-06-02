@@ -53,7 +53,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
-from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, SlotTypePolicy
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -68,7 +68,7 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     DefaultSessionOptions,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.common import RejectedByHook
@@ -139,7 +139,7 @@ def draft(image_id: ImageID) -> SessionSpecDraft:
                     ),
                 ),
             ),
-            timeouts=SessionTimeouts(),
+            handler_options=SessionHandlerOptions(),
         ),
     )
 
@@ -208,6 +208,13 @@ def _fetch_bundle(image_id: ImageID) -> SessionSpecContextFetch:
         vfolder_mounts_by_role={"main": (_vfolder_mount(),)},
         dotfile_data=DotfileBundle(),
         keypair_resource_policy=_keypair_policy(),
+        known_slot_types={
+            SlotName("cpu"): SlotTypes.COUNT,
+            SlotName("mem"): SlotTypes.BYTES,
+        },
+        slot_type_policy=SlotTypePolicy(
+            enabled=frozenset({SlotName("cpu"), SlotName("mem")}),
+        ),
     )
 
 

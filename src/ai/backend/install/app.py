@@ -534,6 +534,10 @@ class ModeMenu(Static):
             harbor_http_port=args.harbor_http_port,
             harbor_admin_password=args.harbor_admin_password,
             harbor_download_uri=args.harbor_download_uri,
+            harbor_download_sha256=args.harbor_download_sha256,
+            enable_observability=args.enable_observability,
+            enable_storage=args.enable_storage,
+            enable_telemetry=args.enable_telemetry,
         )
 
     def compose(self) -> ComposeResult:

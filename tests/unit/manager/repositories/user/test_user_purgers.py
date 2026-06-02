@@ -51,6 +51,7 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_vfolder_permission_purger,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -212,22 +213,13 @@ class TestUserPurgersIntegration:
             yield database_connection
 
     @pytest.fixture
-    async def sample_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+    async def sample_domain(
+        self,
+        domain_factory: DomainFactory,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
         """Create a test domain."""
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        async with db_with_cleanup.begin_session() as session:
-            domain = DomainRow(
-                name=domain_name,
-                description=f"Test domain {domain_name}",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-                dotfiles=b"",
-                integration_id=None,
-            )
-            session.add(domain)
-        return domain_name
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def user_resource_policy(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
@@ -281,7 +273,7 @@ class TestUserPurgersIntegration:
     async def sample_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
     ) -> UserRow:
@@ -298,7 +290,7 @@ class TestUserPurgersIntegration:
                 description="Test Description",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
             )
@@ -362,7 +354,7 @@ class TestUserPurgersIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user: UserRow,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         project_resource_policy: str,
     ) -> list[AssocGroupUserRow]:
         """Create test groups and associations for the user."""
@@ -374,7 +366,7 @@ class TestUserPurgersIntegration:
                     name=f"test-group-{uuid.uuid4().hex[:8]}",
                     description="Test group",
                     is_active=True,
-                    domain_name=sample_domain,
+                    domain_name=sample_domain.domain_name,
                     total_resource_slots=ResourceSlot(),
                     allowed_vfolder_hosts={},
                     integration_id=None,
@@ -397,7 +389,7 @@ class TestUserPurgersIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user: UserRow,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
     ) -> list[VFolderPermissionRow]:
         """Create test vfolder and permissions for the user."""
         permissions: list[VFolderPermissionRow] = []
@@ -406,7 +398,7 @@ class TestUserPurgersIntegration:
             vfolder = VFolderRow(
                 id=vfolder_id,
                 host="local",
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 quota_scope_id=QuotaScopeID(QuotaScopeType.USER, sample_user.uuid),
                 name=f"test-vfolder-{uuid.uuid4().hex[:8]}",
                 usage_mode=VFolderUsageMode.GENERAL,

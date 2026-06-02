@@ -22,15 +22,22 @@ from uuid import UUID, uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.clients.valkey_client.valkey_schedule import RouteHealthRecord
+from ai.backend.common.clients.valkey_client.valkey_schedule import (
+    ReplicaHealthStatus as ValkeyReplicaHealthStatus,
+)
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkUpdateRoutesResponse,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import UpdatedRoutesItem
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -191,7 +198,7 @@ class TestCheckRouteHealth:
     """Tests for check_route_health functionality.
 
     Verifies the executor correctly checks route health via Valkey
-    using RouteHealthRecord-based classification.
+    using RouteHealthStatus TTL-based classification.
     """
 
     async def test_healthy_route_in_successes(
@@ -202,34 +209,23 @@ class TestCheckRouteHealth:
     ) -> None:
         """RH-001: Healthy route is in successes.
 
-        Given: Route with healthy RouteHealthRecord in Valkey
+        Given: Route with RouteHealthStatus(healthy=True) in Valkey
         When: Check route health
         Then: Route in successes list
         """
-        # Arrange
-        route_id_str = str(healthy_route.route_id)
-        current_time = 1000
-        record = RouteHealthRecord(
-            route_id=route_id_str,
-            created_at=900,
-            initial_delay_until=930,
-            health_path="/health",
-            inference_port=8000,
-            replica_host="10.0.0.1",
-            agent_healthy=True,
-            agent_last_check=current_time - 5,
+        status = ValkeyReplicaHealthStatus(
+            replica_id=healthy_route.route_id,
+            healthy=True,
+            last_check=995,
         )
-        mock_valkey_schedule.get_route_health_records_batch.return_value = {
-            route_id_str: record,
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {
+            healthy_route.route_id: status,
         }
-        mock_valkey_schedule.get_redis_time.return_value = current_time
 
         entity_ids = [healthy_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
             result = await route_executor.check_route_health([healthy_route])
 
-        # Assert
         assert len(result.successes) == 1
         assert len(result.errors) == 0
         assert len(result.stale) == 0
@@ -242,34 +238,23 @@ class TestCheckRouteHealth:
     ) -> None:
         """RH-002: Unhealthy route is in errors.
 
-        Given: Route with unhealthy RouteHealthRecord in Valkey
+        Given: Route with RouteHealthStatus(healthy=False) in Valkey
         When: Check route health
         Then: Route in errors list
         """
-        # Arrange
-        route_id_str = str(healthy_route.route_id)
-        current_time = 1000
-        record = RouteHealthRecord(
-            route_id=route_id_str,
-            created_at=900,
-            initial_delay_until=930,
-            health_path="/health",
-            inference_port=8000,
-            replica_host="10.0.0.1",
-            agent_healthy=False,
-            agent_last_check=current_time - 5,
+        status = ValkeyReplicaHealthStatus(
+            replica_id=healthy_route.route_id,
+            healthy=False,
+            last_check=995,
         )
-        mock_valkey_schedule.get_route_health_records_batch.return_value = {
-            route_id_str: record,
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {
+            healthy_route.route_id: status,
         }
-        mock_valkey_schedule.get_redis_time.return_value = current_time
 
         entity_ids = [healthy_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
             result = await route_executor.check_route_health([healthy_route])
 
-        # Assert
         assert len(result.successes) == 0
         assert len(result.errors) == 1
         assert len(result.stale) == 0
@@ -280,36 +265,18 @@ class TestCheckRouteHealth:
         mock_valkey_schedule: AsyncMock,
         healthy_route: RouteData,
     ) -> None:
-        """RH-003: Stale route is in stale list.
+        """RH-003: Route with expired TTL (no key) is in stale list.
 
-        Given: Route with stale RouteHealthRecord in Valkey (old last_check)
+        Given: Route whose RouteHealthStatus TTL has expired (key absent)
         When: Check route health
-        Then: Route in stale list
+        Then: Route in stale list (DEGRADED)
         """
-        # Arrange
-        route_id_str = str(healthy_route.route_id)
-        current_time = 1000
-        record = RouteHealthRecord(
-            route_id=route_id_str,
-            created_at=100,
-            initial_delay_until=130,
-            health_path="/health",
-            inference_port=8000,
-            replica_host="10.0.0.1",
-            agent_healthy=True,
-            agent_last_check=100,  # Very old check, stale
-        )
-        mock_valkey_schedule.get_route_health_records_batch.return_value = {
-            route_id_str: record,
-        }
-        mock_valkey_schedule.get_redis_time.return_value = current_time
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {}
 
         entity_ids = [healthy_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
             result = await route_executor.check_route_health([healthy_route])
 
-        # Assert
         assert len(result.successes) == 0
         assert len(result.errors) == 0
         assert len(result.stale) == 1
@@ -322,20 +289,16 @@ class TestCheckRouteHealth:
     ) -> None:
         """RH-004: Missing health data is treated as stale.
 
-        Given: Route with no RouteHealthRecord in Valkey
+        Given: Route with no RouteHealthStatus in Valkey
         When: Check route health
         Then: Route in stale list
         """
-        # Arrange - Empty records response
-        mock_valkey_schedule.get_route_health_records_batch.return_value = {}
-        mock_valkey_schedule.get_redis_time.return_value = 1000
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {}
 
         entity_ids = [healthy_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
             result = await route_executor.check_route_health([healthy_route])
 
-        # Assert
         assert len(result.successes) == 0
         assert len(result.errors) == 0
         assert len(result.stale) == 1
@@ -486,12 +449,15 @@ class TestCleanupRoutesByConfig:
         Then: Route in successes (marked for cleanup)
         """
         # Arrange
+        current_revision_mock = MagicMock()
+        current_revision_mock.id = unhealthy_route.revision_id
+
         deployment = MagicMock()
         deployment.id = unhealthy_route.deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
-        deployment.current_revision_id = unhealthy_route.revision_id
-        deployment.deploying_revision_id = None
+        deployment.current_revision = current_revision_mock
+        deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -519,12 +485,15 @@ class TestCleanupRoutesByConfig:
         Then: Route not in successes
         """
         # Arrange
+        current_revision_mock = MagicMock()
+        current_revision_mock.id = healthy_route.revision_id
+
         deployment = MagicMock()
         deployment.id = healthy_route.deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
-        deployment.current_revision_id = healthy_route.revision_id
-        deployment.deploying_revision_id = None
+        deployment.current_revision = current_revision_mock
+        deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -574,7 +543,7 @@ class TestCleanupRoutesByConfig:
         current_revision_id = DeploymentRevisionID(uuid4())
         deploying_revision_id = DeploymentRevisionID(uuid4())
         orphan_route = RouteData(
-            route_id=uuid4(),
+            route_id=ReplicaID(uuid4()),
             deployment_id=deployment_id,
             session_id=SessionId(uuid4()),
             status=RouteStatus.RUNNING,
@@ -582,14 +551,21 @@ class TestCleanupRoutesByConfig:
             traffic_ratio=1.0,
             created_at=datetime.now(tzutc()),
             revision_id=DeploymentRevisionID(uuid4()),  # neither current nor deploying
+            traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
+
+        current_revision_mock = MagicMock()
+        current_revision_mock.id = current_revision_id
+        deploying_revision_mock = MagicMock()
+        deploying_revision_mock.id = deploying_revision_id
 
         deployment = MagicMock()
         deployment.id = deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
-        deployment.current_revision_id = current_revision_id
-        deployment.deploying_revision_id = deploying_revision_id
+        deployment.current_revision = current_revision_mock
+        deployment.deploying_revision = deploying_revision_mock
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -617,7 +593,7 @@ class TestCleanupRoutesByConfig:
         deployment_id = DeploymentID(uuid4())
         deploying_revision_id = DeploymentRevisionID(uuid4())
         provisioning_route = RouteData(
-            route_id=uuid4(),
+            route_id=ReplicaID(uuid4()),
             deployment_id=deployment_id,
             session_id=None,
             status=RouteStatus.PROVISIONING,
@@ -625,14 +601,19 @@ class TestCleanupRoutesByConfig:
             traffic_ratio=1.0,
             created_at=datetime.now(tzutc()),
             revision_id=deploying_revision_id,
+            traffic_status=RouteTrafficStatus.INACTIVE,
+            health_check=None,
         )
+
+        deploying_revision_mock = MagicMock()
+        deploying_revision_mock.id = deploying_revision_id
 
         deployment = MagicMock()
         deployment.id = deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
-        deployment.current_revision_id = None
-        deployment.deploying_revision_id = deploying_revision_id
+        deployment.current_revision = None
+        deployment.deploying_revision = deploying_revision_mock
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -660,7 +641,7 @@ class TestCleanupRoutesByConfig:
         """
         deployment_id = DeploymentID(uuid4())
         bootstrap_route = RouteData(
-            route_id=uuid4(),
+            route_id=ReplicaID(uuid4()),
             deployment_id=deployment_id,
             session_id=SessionId(uuid4()),
             status=RouteStatus.RUNNING,
@@ -668,14 +649,16 @@ class TestCleanupRoutesByConfig:
             traffic_ratio=1.0,
             created_at=datetime.now(tzutc()),
             revision_id=DeploymentRevisionID(uuid4()),
+            traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
 
         deployment = MagicMock()
         deployment.id = deployment_id
         deployment.metadata = MagicMock()
         deployment.metadata.resource_group = "default"
-        deployment.current_revision_id = None
-        deployment.deploying_revision_id = None
+        deployment.current_revision = None
+        deployment.deploying_revision = None
         mock_deployment_repo.get_deployments_by_ids.return_value = [deployment]
         mock_deployment_repo.get_scaling_group_cleanup_configs.return_value = {
             "default": cleanup_config_unhealthy_only
@@ -913,7 +896,7 @@ class TestSyncServiceDiscovery:
 
 def _route_for_endpoint(endpoint_id: DeploymentID) -> RouteData:
     return RouteData(
-        route_id=uuid4(),
+        route_id=ReplicaID(uuid4()),
         deployment_id=endpoint_id,
         session_id=SessionId(uuid4()),
         status=RouteStatus.RUNNING,
@@ -921,6 +904,8 @@ def _route_for_endpoint(endpoint_id: DeploymentID) -> RouteData:
         traffic_ratio=1.0,
         revision_id=DeploymentRevisionID(uuid4()),
         created_at=datetime.now(tzutc()),
+        traffic_status=RouteTrafficStatus.ACTIVE,
+        health_check=None,
     )
 
 

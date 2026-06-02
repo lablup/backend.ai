@@ -33,7 +33,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 async def admin_create_project_v2(
     info: Info[StrawberryGQLContext],
     input: CreateProjectInputGQL,
-) -> ProjectPayloadGQL:
+) -> ProjectPayloadGQL | None:
     """Create a new project."""
     check_admin_only()
     ctx = info.context
@@ -51,7 +51,7 @@ async def admin_update_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
     input: UpdateProjectInputGQL,
-) -> ProjectPayloadGQL:
+) -> ProjectPayloadGQL | None:
     """Update a project."""
     check_admin_only()
     ctx = info.context
@@ -68,7 +68,7 @@ async def admin_update_project_v2(
 async def admin_delete_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
-) -> DeleteProjectPayloadGQL:
+) -> DeleteProjectPayloadGQL | None:
     """Soft-delete a project."""
     check_admin_only()
     ctx = info.context
@@ -85,7 +85,7 @@ async def admin_delete_project_v2(
 async def admin_purge_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
-) -> PurgeProjectPayloadGQL:
+) -> PurgeProjectPayloadGQL | None:
     """Permanently purge a project."""
     check_admin_only()
     ctx = info.context
@@ -103,7 +103,7 @@ async def unassign_users_from_project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
     input: UnassignUsersFromProjectInputGQL,
-) -> UnassignUsersFromProjectPayloadGQL:
+) -> UnassignUsersFromProjectPayloadGQL | None:
     """Unassign users from a project."""
     ctx = info.context
     payload = await ctx.adapters.project.unassign_users(project_id, input.to_pydantic())

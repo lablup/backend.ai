@@ -5,11 +5,11 @@ import enum
 from datetime import datetime
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from rich.console import ConsoleRenderable, RichCast
 from rich.text import Text
 
-from ai.backend.common.types import HostPortPair
+from ai.backend.common.types import BackendAISchema, HostPortPair
 
 from . import __version__
 
@@ -79,6 +79,10 @@ class CliArgs:
         "https://github.com/goharbor/harbor/releases/download/"
         "v2.11.0/harbor-offline-installer-v2.11.0.tgz"
     )
+    harbor_download_sha256: str | None = None
+    enable_observability: bool = False
+    enable_storage: bool = False
+    enable_telemetry: bool | None = None  # None = auto (ON in DEVELOP, OFF in PACKAGE)
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -94,12 +98,12 @@ class PrerequisiteError(RichCast, Exception):
         return Text.from_markup(text)
 
 
-class LocalImageSource(BaseModel):
+class LocalImageSource(BackendAISchema):
     ref: str
     file: Path
 
 
-class DistInfo(BaseModel):
+class DistInfo(BackendAISchema):
     version: str = __version__
     package_source: PackageSource = PackageSource.GITHUB_RELEASE
     package_dir: Path = Field(default_factory=Path.cwd)
@@ -117,7 +121,7 @@ class Accelerator(enum.StrEnum):
     ROCM_MOCK = "rocm_mock"
 
 
-class InstallInfo(BaseModel):
+class InstallInfo(BackendAISchema):
     version: str
     type: InstallType
     last_updated: datetime
@@ -234,6 +238,10 @@ class InstallVariable:
         "https://github.com/goharbor/harbor/releases/download/"
         "v2.11.0/harbor-offline-installer-v2.11.0.tgz"
     )
+    harbor_download_sha256: str | None = None
+    enable_observability: bool = False
+    enable_storage: bool = False
+    enable_telemetry: bool | None = None
 
     @property
     def apphub_address(self) -> str:

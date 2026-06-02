@@ -12,12 +12,21 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+)
 from ai.backend.common.data.permission.types import EntityType, OperationType
+from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.conditions import RoleConditions
+from ai.backend.manager.models.rbac_models.conditions import (
+    AssignedUserConditions,
+    RoleConditions,
+)
 from ai.backend.manager.models.rbac_models.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -26,7 +35,7 @@ from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -166,6 +175,131 @@ class TestSearchRoles:
         assert role_ids == expected_role_ids, (
             f"Failed to order roles by created_at: got {[r.created_at for r in result.items]}, expected {[r.created_at for r in created_roles]}"
         )
+
+    @pytest.fixture
+    async def roles_assigned_to_users(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        created_roles: list[CreatedRole],
+    ) -> tuple[uuid.UUID, uuid.UUID, list[CreatedRole]]:
+        """Create two users and assign the first role to the first user only.
+
+        Returns ``(assigned_user_id, unassigned_user_id, created_roles)``.
+        """
+        assigned_user_id = uuid.uuid4()
+        unassigned_user_id = uuid.uuid4()
+
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+        password_info = PasswordInfo(
+            password="dummy",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=600_000,
+            salt_size=32,
+        )
+
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="domain for by_assigned_user_id test",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+
+            for user_id, suffix in [
+                (assigned_user_id, "assigned"),
+                (unassigned_user_id, "unassigned"),
+            ]:
+                db_sess.add(
+                    UserRow(
+                        uuid=user_id,
+                        username=f"{suffix}-{user_id.hex[:8]}",
+                        email=f"{suffix}-{user_id.hex[:8]}@example.com",
+                        password=password_info,
+                        need_password_change=False,
+                        status=UserStatus.ACTIVE,
+                        status_info="active",
+                        domain_name=domain_name,
+                        role=UserRole.USER,
+                        resource_policy=policy_name,
+                    )
+                )
+            await db_sess.flush()
+
+            db_sess.add(
+                UserRoleRow(
+                    user_id=assigned_user_id,
+                    role_id=created_roles[0].role_id,
+                )
+            )
+            await db_sess.flush()
+
+        return assigned_user_id, unassigned_user_id, created_roles
+
+    async def test_by_assigned_user_id_returns_only_assigned_roles(
+        self,
+        repository: PermissionControllerRepository,
+        roles_assigned_to_users: tuple[uuid.UUID, uuid.UUID, list[CreatedRole]],
+    ) -> None:
+        """``RoleConditions.by_assigned_user_id`` should restrict results
+        to roles assigned to the given user via the correlated EXISTS subquery."""
+        assigned_user_id, _, created_roles = roles_assigned_to_users
+
+        querier = BatchQuerier(
+            conditions=[
+                RoleConditions.by_assigned_user_id([
+                    AssignedUserConditions.by_user_id_equals(
+                        UUIDEqualMatchSpec(value=assigned_user_id, negated=False)
+                    )
+                ]),
+            ],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await repository.search_roles(querier)
+
+        assert result.total_count == 1
+        assert [item.id for item in result.items] == [created_roles[0].role_id]
+
+    async def test_by_assigned_user_id_returns_empty_for_unassigned_user(
+        self,
+        repository: PermissionControllerRepository,
+        roles_assigned_to_users: tuple[uuid.UUID, uuid.UUID, list[CreatedRole]],
+    ) -> None:
+        """A user with no assignments should yield no roles."""
+        _, unassigned_user_id, _ = roles_assigned_to_users
+
+        querier = BatchQuerier(
+            conditions=[
+                RoleConditions.by_assigned_user_id([
+                    AssignedUserConditions.by_user_id_equals(
+                        UUIDEqualMatchSpec(value=unassigned_user_id, negated=False)
+                    )
+                ]),
+            ],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await repository.search_roles(querier)
+
+        assert result.total_count == 0
+        assert result.items == []
 
 
 class TestSearchRolesTotalCountNotInflated:

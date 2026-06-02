@@ -7,12 +7,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     # Nested types
@@ -38,7 +39,7 @@ __all__ = (
 # ---------------------------------------------------------------------------
 
 
-class DelegateeTargetInput(BaseModel):
+class DelegateeTargetInput(BackendAISchema):
     """Target reservoir for delegation operations."""
 
     delegatee_reservoir_id: UUID = Field(description="ID of the delegatee reservoir")

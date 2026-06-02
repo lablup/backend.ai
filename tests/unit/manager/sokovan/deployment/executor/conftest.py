@@ -13,17 +13,19 @@ from dateutil.tz import tzutc
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
-    ModelRevisionSpec,
-    ReplicaSpec,
+    ModelRevisionData,
+    ReplicaData,
     RouteHealthStatus,
     RouteStatus,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -134,7 +136,7 @@ def _create_deployment_info(
     rev_id = uuid4()
     revision = MagicMock() if has_revision else None
     if revision is not None:
-        revision.revision_id = rev_id
+        revision.id = rev_id
 
     return DeploymentInfo(
         id=DeploymentID(dep_id),
@@ -153,17 +155,18 @@ def _create_deployment_info(
             scaling_state=ScalingState.STABLE,
             retry_count=0,
         ),
-        replica_spec=ReplicaSpec(
+        replica=ReplicaData(
             replica_count=replica_count,
             desired_replica_count=desired_replica_count,
         ),
-        network=DeploymentNetworkSpec(
+        network=DeploymentNetworkData(
             open_to_public=False,
+            access_token_ids=None,
             url=None,
+            preferred_domain_name=None,
         ),
-        model_revisions=[cast(ModelRevisionSpec, revision)] if has_revision else [],
-        current_revision_id=DeploymentRevisionID(rev_id) if has_revision else None,
         options=DeploymentOptions(),
+        current_revision=cast(ModelRevisionData, revision) if has_revision else None,
     )
 
 
@@ -175,7 +178,7 @@ def _create_route_data(
 ) -> RouteData:
     """Create RouteData for tests."""
     return RouteData(
-        route_id=route_id or uuid4(),
+        route_id=ReplicaID(route_id) if route_id is not None else ReplicaID(uuid4()),
         deployment_id=DeploymentID(endpoint_id or uuid4()),
         session_id=None,
         status=status,
@@ -183,6 +186,8 @@ def _create_route_data(
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
         revision_id=DeploymentRevisionID(uuid4()),
+        traffic_status=RouteTrafficStatus.INACTIVE,
+        health_check=None,
     )
 
 

@@ -247,94 +247,6 @@
     ],
     "permissions": [
         {
-            "id": "c90a7514-68f2-40c0-88f9-159dce6856cd",
-            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "grant:all"
-        },
-        {
-            "id": "6dc1c67d-bc50-4778-936e-0630dfb83a8a",
-            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "read"
-        },
-        {
-            "id": "1d3ed696-904f-4af2-a326-5e35ecc71695",
-            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "hard-delete"
-        },
-        {
-            "id": "c1109646-9d08-4ccb-acc6-9438830c2fff",
-            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "grant:read"
-        },
-        {
-            "id": "6540be54-c760-4fee-bc5a-ec72ef50ea49",
-            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "grant:hard-delete"
-        },
-        {
-            "id": "b057323f-9f91-4d3d-9bdd-70883672f8b0",
-            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "grant:soft-delete"
-        },
-        {
-            "id": "9639fa62-3751-48e1-8454-86319a945832",
-            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "update"
-        },
-        {
-            "id": "4f5c7bf1-45dc-4ac5-8866-0c472147af09",
-            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "soft-delete"
-        },
-        {
-            "id": "7b0b5bfe-aae9-4887-9fa7-a78ba9243883",
-            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "grant:update"
-        },
-        {
-            "id": "831b4e1c-427a-4ea9-b882-7753d1daa721",
-            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "create"
-        },
-        {
-            "id": "5e983bd3-77cb-4271-9629-3b311b9f43d9",
-            "role_id": "02d084f3-49e1-4fcb-bc62-e9d06637e60d",
-            "scope_type": "global",
-            "scope_id": "",
-            "entity_type": "user",
-            "operation": "read"
-        },
-        {
             "id": "064b0ba0-93bd-4f69-a5e9-80db199586a7",
             "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
             "scope_type": "user",
@@ -5917,6 +5829,206 @@
             "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "entity_type": "model_card",
             "operation": "hard-delete"
+        },
+        {
+            "id": "42928b17-47a8-5104-9d31-777876b73e17",
+            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
+            "scope_type": "user",
+            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "entity_type": "vfolder:data",
+            "operation": "create"
+        },
+        {
+            "id": "298d7a45-7241-5b05-8704-4c49085b49c2",
+            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
+            "scope_type": "user",
+            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "entity_type": "vfolder:data",
+            "operation": "read"
+        },
+        {
+            "id": "f1c340e5-730d-58e9-af76-30f14db63c70",
+            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
+            "scope_type": "user",
+            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "entity_type": "vfolder:data",
+            "operation": "update"
+        },
+        {
+            "id": "258a9bae-2932-52ae-b93a-81240f0ad50b",
+            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
+            "scope_type": "user",
+            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "entity_type": "vfolder:data",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "a29a386e-4552-52d5-9f28-d1cf7d2e757b",
+            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
+            "scope_type": "user",
+            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "entity_type": "vfolder:data",
+            "operation": "create"
+        },
+        {
+            "id": "fdb1b976-e998-5767-998a-4889d7b03bb3",
+            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
+            "scope_type": "user",
+            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "entity_type": "vfolder:data",
+            "operation": "read"
+        },
+        {
+            "id": "082685f6-b886-5bfd-8d61-462325ae63b9",
+            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
+            "scope_type": "user",
+            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "entity_type": "vfolder:data",
+            "operation": "update"
+        },
+        {
+            "id": "26f01d75-8ff9-5093-aae4-bd9606d71c37",
+            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
+            "scope_type": "user",
+            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "entity_type": "vfolder:data",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "8a9a1171-99f4-5e6f-9eea-cf475bb63578",
+            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
+            "scope_type": "user",
+            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "entity_type": "vfolder:data",
+            "operation": "create"
+        },
+        {
+            "id": "38e9d60b-b7ab-5237-a098-7b6d1be2bc13",
+            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
+            "scope_type": "user",
+            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "entity_type": "vfolder:data",
+            "operation": "read"
+        },
+        {
+            "id": "4a370c27-02f3-5628-a4a7-03427f60a00d",
+            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
+            "scope_type": "user",
+            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "entity_type": "vfolder:data",
+            "operation": "update"
+        },
+        {
+            "id": "70a25037-e38a-5625-9bdf-f11882848093",
+            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
+            "scope_type": "user",
+            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "entity_type": "vfolder:data",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "48351095-c95f-5d26-a33e-cbe5236660e8",
+            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
+            "scope_type": "user",
+            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "entity_type": "vfolder:data",
+            "operation": "create"
+        },
+        {
+            "id": "0f38fd3b-138c-5192-8089-40210da1a137",
+            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
+            "scope_type": "user",
+            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "entity_type": "vfolder:data",
+            "operation": "read"
+        },
+        {
+            "id": "de08c1e4-c29e-5e64-91ce-0f797bf4a0d9",
+            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
+            "scope_type": "user",
+            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "entity_type": "vfolder:data",
+            "operation": "update"
+        },
+        {
+            "id": "b51c9fd6-77a0-5db3-a011-b005b005bab8",
+            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
+            "scope_type": "user",
+            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "entity_type": "vfolder:data",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "924a0737-208e-56ee-a408-d5761e0afd05",
+            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
+            "scope_type": "user",
+            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "entity_type": "vfolder:data",
+            "operation": "create"
+        },
+        {
+            "id": "8f24e0d6-f716-5248-8822-e9bd50bc60ed",
+            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
+            "scope_type": "user",
+            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "entity_type": "vfolder:data",
+            "operation": "read"
+        },
+        {
+            "id": "ebae171c-3bdc-5007-944d-9ef3c11b1436",
+            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
+            "scope_type": "user",
+            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "entity_type": "vfolder:data",
+            "operation": "update"
+        },
+        {
+            "id": "e0d7b8de-9335-5efa-951c-3da25007b8dc",
+            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
+            "scope_type": "user",
+            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "entity_type": "vfolder:data",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "444a9916-e4be-5659-b9b8-23229d134236",
+            "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
+            "scope_type": "user",
+            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "entity_type": "session:app_service",
+            "operation": "read"
+        },
+        {
+            "id": "1a0a057e-2225-54c8-b1e0-2973d025b621",
+            "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
+            "scope_type": "user",
+            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "entity_type": "session:app_service",
+            "operation": "read"
+        },
+        {
+            "id": "2505e7eb-95ea-5c29-816f-82fea3eceb54",
+            "role_id": "72293d83-1849-4bb5-a555-80e561515428",
+            "scope_type": "user",
+            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "entity_type": "session:app_service",
+            "operation": "read"
+        },
+        {
+            "id": "a1a9a02f-3a48-5e88-8765-ad778a02ba3d",
+            "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
+            "scope_type": "user",
+            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "entity_type": "session:app_service",
+            "operation": "read"
+        },
+        {
+            "id": "8daeb1ab-977d-5612-86f9-c43607379f3b",
+            "role_id": "fe53e90e-f619-43d8-99c8-574487485bab",
+            "scope_type": "user",
+            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "entity_type": "session:app_service",
+            "operation": "read"
         }
     ],
     "association_scopes_entities": [

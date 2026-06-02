@@ -1,7 +1,9 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 
-class QueryTimeRange(BaseModel):
+class QueryTimeRange(BackendAISchema):
     """Time range parameters for a Prometheus query."""
 
     start: str

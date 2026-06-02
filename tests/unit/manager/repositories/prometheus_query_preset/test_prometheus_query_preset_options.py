@@ -7,10 +7,12 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
@@ -99,7 +101,10 @@ class TestPrometheusQueryPresetOptions:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> PrometheusQueryPresetRepository:
-        return PrometheusQueryPresetRepository(db=db_with_cleanup)
+        return PrometheusQueryPresetRepository(
+            db=db_with_cleanup,
+            prometheus_client=MagicMock(spec=PrometheusClient),
+        )
 
     async def _seed_presets(
         self,

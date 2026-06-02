@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 from .base import PostProcessor, PostProcessorContext
 

@@ -2,8 +2,8 @@ from typing import Any
 
 import jwt
 import jwt.exceptions
-from pydantic import BaseModel
 
+from ai.backend.common.types import BackendAISchema
 from ai.backend.common.utils import nmget
 
 from .exception import ExpiredSToken, InvalidSToken
@@ -11,7 +11,7 @@ from .exception import ExpiredSToken, InvalidSToken
 KEYPAIR_PLUGIN_CONFIG_KEY = "plugins.webapp.keypair_auth"
 
 
-class STokenData(BaseModel):
+class STokenData(BackendAISchema):
     access_key: str
     secret_key: str
 

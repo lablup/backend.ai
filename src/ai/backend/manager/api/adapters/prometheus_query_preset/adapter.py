@@ -7,10 +7,12 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
+from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
+    PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
     QueryTimeRangeInputDTO,
@@ -53,6 +55,8 @@ from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     Updater,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.repositories.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreatorSpec,
@@ -66,6 +70,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
     ExecutePresetAction,
     GetPresetAction,
     ModifyPresetAction,
+    PreviewPresetAction,
     SearchPresetsAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
@@ -159,6 +164,15 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
 
         return ModifyQueryDefinitionPayload(item=self._data_to_dto(action_result.preset))
 
+    async def admin_preview(self, input: PreviewQueryDefinitionInput) -> QueryDefinitionResultInfo:
+        """Preview a prometheus query template (admin only)."""
+        action_result = (
+            await self._processors.prometheus_query_preset.preview_preset.wait_for_complete(
+                PreviewPresetAction(query_template=input.query_template)
+            )
+        )
+        return self._prometheus_response_to_result_info(action_result.response)
+
     async def execute_preset(
         self,
         preset_id: UUID,
@@ -192,7 +206,13 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
                 )
             )
         )
-        response = action_result.response
+        return self._prometheus_response_to_result_info(action_result.response)
+
+    def _prometheus_response_to_result_info(
+        self,
+        response: PrometheusResponse,
+    ) -> QueryDefinitionResultInfo:
+        """Convert a raw Prometheus response into the manager-layer DTO."""
         return QueryDefinitionResultInfo(
             status=response.status,
             result_type=response.data.result_type,
@@ -258,7 +278,31 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
                 conditions.append(condition)
 
         if filter.category_id is not None:
-            conditions.append(PrometheusQueryPresetConditions.by_category_id(filter.category_id))
+            condition = self.convert_uuid_filter(
+                filter.category_id,
+                equals_factory=PrometheusQueryPresetConditions.by_category_id_equals,
+                in_factory=PrometheusQueryPresetConditions.by_category_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+
+        if filter.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_sub_conditions.extend(self._convert_filter(sub_filter))
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        if filter.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_sub_conditions.extend(self._convert_filter(sub_filter))
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
 
         return conditions
 

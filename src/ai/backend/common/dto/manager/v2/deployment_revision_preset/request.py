@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import ModelDefinition
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     EnvironmentVariableEntryInput,
     OrderDirection,
@@ -42,8 +42,8 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     resource_opts: list[ResourceOptsEntryDTO] | None = Field(
         default=None, description="Additional resource options."
     )
-    cluster_mode: str | None = Field(default=None, max_length=16, description="Cluster mode.")
-    cluster_size: int | None = Field(default=None, ge=1, description="Cluster size.")
+    cluster_mode: str = Field(max_length=16, description="Cluster mode.")
+    cluster_size: int = Field(ge=1, description="Cluster size.")
     startup_command: str | None = Field(default=None, description="Startup command.")
     bootstrap_script: str | None = Field(default=None, description="Bootstrap script.")
     environ: list[EnvironmentVariableEntryInput] | None = Field(
@@ -56,8 +56,7 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
         default=None,
         description="Default open_to_public for deployments created from this preset.",
     )
-    replica_count: int | None = Field(
-        default=None,
+    replica_count: int = Field(
         ge=0,
         description="Default replica count for deployments created from this preset.",
     )
@@ -66,8 +65,7 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
         ge=0,
         description="Default revision history limit for deployments created from this preset.",
     )
-    deployment_strategy: DeploymentStrategyInput | None = Field(
-        default=None,
+    deployment_strategy: DeploymentStrategyInput = Field(
         description="Default deployment strategy (rolling or blue-green) for "
         "deployments created from this preset.",
     )
@@ -95,8 +93,9 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
 
 
 class DeploymentRevisionPresetFilter(BaseRequestModel):
+    id: UUIDFilter | None = Field(default=None, description="Filter by preset ID.")
     name: StringFilter | None = Field(default=None)
-    runtime_variant_id: RuntimeVariantID | None = Field(default=None)
+    runtime_variant_id: UUIDFilter | None = Field(default=None)
     AND: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     OR: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     NOT: list[DeploymentRevisionPresetFilter] | None = Field(default=None)

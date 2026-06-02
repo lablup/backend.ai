@@ -57,6 +57,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    UserNestedFilter as UserNestedFilterDTO,
+)
 from ai.backend.common.dto.manager.v2.rbac.response import (
     BulkAssignRoleFailureInfo as BulkAssignRoleFailureInfoDTO,
 )
@@ -88,6 +91,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -194,10 +198,13 @@ class RoleGQL(PydanticNodeMixin[Any]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        PermissionConnection,
-        strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
-    ]:
+    ) -> (
+        Annotated[
+            PermissionConnection,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+        ]
+        | None
+    ):
         from ai.backend.manager.api.gql.rbac.types.permission import (
             PermissionConnection,
             PermissionEdge,
@@ -206,7 +213,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         )
 
         # Add role_id filter to scope permissions to this role
-        role_filter = PermissionFilter(role_id=UUID(self.id))
+        role_filter = PermissionFilter(role_id=UUIDFilter(equals=UUID(self.id)))
         if filter is not None:
             # Merge with user-provided filter
             combined_filter = PermissionFilter(
@@ -264,7 +271,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> RoleAssignmentConnection:
+    ) -> RoleAssignmentConnection | None:
         # Add role_id filter to scope assignments to this role
         role_filter = RoleAssignmentFilter(role_id=UUIDFilter(equals=UUID(self.id)))
         if filter is not None:
@@ -338,10 +345,13 @@ class RoleGQL(PydanticNodeMixin[Any]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        EntityConnection,
-        strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
-    ]:
+    ) -> (
+        Annotated[
+            EntityConnection,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.entity"),
+        ]
+        | None
+    ):
         from ai.backend.manager.api.gql.rbac.types.entity import (
             EntityConnection,
             EntityEdge,
@@ -497,6 +507,21 @@ class RoleStatusFilterGQL(PydanticInputMixin[RoleStatusFilterDTO]):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter roles by their user assignments.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RoleUserNestedFilter",
+)
+class RoleUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO]):
+    user_id: UUIDFilter | None = None
+
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for roles", added_version="26.3.0"),
     name="RoleFilter",
 )
@@ -504,6 +529,7 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
     name: StringFilter | None = None
     source: RoleSourceFilterGQL | None = None
     status: RoleStatusFilterGQL | None = None
+    assigned_user: RoleUserNestedFilterGQL | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

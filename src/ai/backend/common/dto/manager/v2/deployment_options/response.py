@@ -5,29 +5,26 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.session_options import (
+    HandlerOptionsEntryInfo,
+    HandlerOptionsInfo,
+)
 
 
-class HandlerTimeoutEntryInfo(BaseResponseModel):
-    """A single ``(handler_name, timeout_sec)`` entry."""
+class DeploymentHandlerOptionsInfo(BaseResponseModel):
+    """Handler-keyed scheduler policy snapshot for deployments."""
 
-    handler_name: str = Field(description="Handler identifier.")
-    timeout_sec: int | None = Field(
-        description="Timeout in seconds; null means this handler is unbounded."
+    default: HandlerOptionsInfo = Field(
+        description="Fallback per-handler policy.",
     )
-
-
-class DeploymentTimeoutsInfo(BaseResponseModel):
-    """Handler-keyed timeout policy."""
-
-    default: int | None = Field(
-        description="Fallback timeout in seconds; null means unbounded.",
-    )
-    by_handler: list[HandlerTimeoutEntryInfo] = Field(
-        description="Per-handler timeout overrides.",
+    by_handler: list[HandlerOptionsEntryInfo] = Field(
+        description="Per-handler overrides.",
     )
 
 
 class DeploymentOptionsInfo(BaseResponseModel):
     """Per-deployment (or per-resource-group default) options payload."""
 
-    timeouts: DeploymentTimeoutsInfo = Field(description="Handler timeout policy.")
+    handler_options: DeploymentHandlerOptionsInfo = Field(
+        description="Handler-keyed scheduler policy (timeout + retry).",
+    )

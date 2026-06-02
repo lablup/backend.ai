@@ -14,6 +14,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -29,7 +30,6 @@ from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
     EndpointAutoScalingRuleData,
-    EndpointAutoScalingRuleListResult,
     EndpointData,
     EndpointTokenData,
     ModelServiceValidationContext,
@@ -187,7 +187,10 @@ class ModelServingRepository:
                     selectinload(EndpointRow.routings),
                     selectinload(EndpointRow.session_owner_row),
                     selectinload(EndpointRow.created_user_row),
-                    selectinload(EndpointRow.revisions).selectinload(
+                    selectinload(EndpointRow.current_revision_row).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                    selectinload(EndpointRow.deploying_revision_row).selectinload(
                         DeploymentRevisionRow.image_row
                     ),
                 )
@@ -826,7 +829,7 @@ class ModelServingRepository:
                     endpoint_row.resource_group,
                     AccessKey(session_owner.main_access_key),
                     endpoint_row.domain,
-                    endpoint_row.project,
+                    ProjectID(endpoint_row.project),
                 )
 
                 await db_session.commit()
@@ -858,31 +861,6 @@ class ModelServingRepository:
             raise
 
     @model_serving_repository_resilience.apply()
-    async def search_auto_scaling_rules(
-        self,
-        querier: BatchQuerier,
-    ) -> EndpointAutoScalingRuleListResult:
-        """
-        Search auto scaling rules.
-        Access control conditions should be injected into querier.conditions by the caller.
-        """
-        async with self._db.begin_readonly_session() as session:
-            query = sa.select(EndpointAutoScalingRuleRow).join(
-                EndpointRow, EndpointAutoScalingRuleRow.endpoint == EndpointRow.id
-            )
-
-            result = await execute_batch_querier(session, query, querier)
-
-            items = [row.EndpointAutoScalingRuleRow.to_data() for row in result.rows]
-
-            return EndpointAutoScalingRuleListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    @model_serving_repository_resilience.apply()
     async def search_services_paginated(
         self,
         session_owner_id: uuid.UUID,
@@ -899,7 +877,7 @@ class ModelServingRepository:
                 .where(EndpointRow.session_owner == session_owner_id)
                 .where(EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
                 .options(selectinload(EndpointRow.routings))
-                .options(selectinload(EndpointRow.revisions))
+                .options(selectinload(EndpointRow.current_revision_row))
             )
 
             result = await execute_batch_querier(session, query, querier)

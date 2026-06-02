@@ -8,7 +8,6 @@ from collections.abc import (
 )
 from datetime import datetime
 from decimal import Decimal
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -18,10 +17,7 @@ from typing import (
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
-import trafaret as t
 import yarl
-from ruamel.yaml import YAML
-from ruamel.yaml.error import YAMLError
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import (
@@ -33,9 +29,10 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from ai.backend.common.config import model_definition_iv
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
     AccessKey,
@@ -66,13 +63,14 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
+    DeploymentPolicyData,
     DeploymentState,
     DeploymentSummaryData,
     ModelDeploymentAutoScalingRuleData,
-    ModelRevisionSpec,
-    ReplicaSpec,
+    ModelRevisionData,
+    ReplicaData,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -83,7 +81,6 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound, ServiceUnavailable
-from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -104,6 +101,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
     from ai.backend.manager.models.routing import RoutingRow
     from ai.backend.manager.models.user import UserRow
 
@@ -129,6 +127,32 @@ def _get_endpoint_revisions_join_condition() -> Any:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
     return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
+
+
+def _get_primary_replica_group_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+
+    return foreign(EndpointRow.primary_replica_group_id) == ReplicaGroupRow.id
+
+
+def _get_target_replica_group_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+
+    return foreign(EndpointRow.target_replica_group_id) == ReplicaGroupRow.id
+
+
+def _get_current_revision_secondaryjoin() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+
+    return foreign(ReplicaGroupRow.current_revision_id) == DeploymentRevisionRow.id
+
+
+def _get_deploying_revision_secondaryjoin() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+
+    return foreign(ReplicaGroupRow.target_revision_id) == DeploymentRevisionRow.id
 
 
 def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
@@ -165,17 +189,6 @@ class EndpointRow(Base):  # type: ignore[misc]
     __tablename__ = "endpoints"
 
     __table_args__ = (
-        sa.Index(
-            "ix_endpoints_unique_name_when_active",
-            "name",
-            "domain",
-            "project",
-            unique=True,
-            postgresql_where=sa.column("lifecycle_stage").notin_([
-                EndpointLifecycle.DESTROYING.value,
-                EndpointLifecycle.DESTROYED.value,
-            ]),
-        ),
         sa.Index(
             "ix_endpoints_lifecycle_sub_step",
             "lifecycle_stage",
@@ -247,12 +260,21 @@ class EndpointRow(Base):  # type: ignore[misc]
         nullable=True,
     )
 
-    # Revision management columns
-    current_revision: Mapped[DeploymentRevisionID | None] = mapped_column(
-        "current_revision", GUID(DeploymentRevisionID), nullable=True
+    # Revision pointers live on the replica groups (see
+    # ``primary_replica_group_id`` / ``target_replica_group_id`` below): the
+    # current revision is the primary group's ``current_revision_id`` and the
+    # deploying revision is the target group's ``target_revision_id``.
+
+    # Replica group references (no FK; mirrors ``RoutingRow.revision`` and
+    # avoids a circular FK with ``replica_groups.deployment_id``).
+    # ``primary_replica_group_id`` is the group serving traffic;
+    # ``target_replica_group_id`` is the group being rolled out (``NULL``
+    # in the steady state).
+    primary_replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
+        "primary_replica_group_id", GUID(ReplicaGroupID), nullable=True
     )
-    deploying_revision: Mapped[DeploymentRevisionID | None] = mapped_column(
-        "deploying_revision", GUID(DeploymentRevisionID), nullable=True
+    target_replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
+        "target_replica_group_id", GUID(ReplicaGroupID), nullable=True
     )
     sub_step: Mapped[DeploymentLifecycleSubStep | None] = mapped_column(
         "sub_step",
@@ -301,6 +323,40 @@ class EndpointRow(Base):  # type: ignore[misc]
         "DeploymentRevisionRow",
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_revisions_join_condition,
+        order_by="DeploymentRevisionRow.revision_number.desc()",
+    )
+    primary_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
+        "ReplicaGroupRow",
+        primaryjoin=_get_primary_replica_group_join_condition,
+        viewonly=True,
+        uselist=False,
+    )
+    target_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
+        "ReplicaGroupRow",
+        primaryjoin=_get_target_replica_group_join_condition,
+        viewonly=True,
+        uselist=False,
+    )
+    # Sourced from the replica groups: the current revision is the primary
+    # group's ``current_revision_id`` and the deploying revision is the
+    # target group's ``target_revision_id`` (``None`` when no rollout is in
+    # progress). Joined through ``replica_groups`` so existing consumers
+    # (``to_deployment_info`` and the ``selectinload`` paths) are unchanged.
+    current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        secondary="replica_groups",
+        primaryjoin=_get_primary_replica_group_join_condition,
+        secondaryjoin=_get_current_revision_secondaryjoin,
+        viewonly=True,
+        uselist=False,
+    )
+    deploying_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        secondary="replica_groups",
+        primaryjoin=_get_target_replica_group_join_condition,
+        secondaryjoin=_get_deploying_revision_secondaryjoin,
+        viewonly=True,
+        uselist=False,
     )
 
     auto_scaling_policy: Mapped[DeploymentAutoScalingPolicyRow | None] = relationship(
@@ -347,7 +403,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -392,7 +457,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -437,7 +511,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -464,13 +547,19 @@ class EndpointRow(Base):  # type: ignore[misc]
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> Sequence[Self]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+        from ai.backend.manager.models.replica_group import ReplicaGroupRow
 
-        # Join through current revision to find endpoints by model
+        # Join through the primary replica group's current revision to find
+        # endpoints by model.
         query = (
             sa.select(EndpointRow)
             .join(
+                ReplicaGroupRow,
+                EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+            )
+            .join(
                 DeploymentRevisionRow,
-                EndpointRow.current_revision == DeploymentRevisionRow.id,
+                ReplicaGroupRow.current_revision_id == DeploymentRevisionRow.id,
             )
             .where(
                 EndpointRow.lifecycle_stage.in_(status_filter)
@@ -488,7 +577,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -570,38 +668,45 @@ class EndpointRow(Base):  # type: ignore[misc]
         for session_row in session_rows:
             session_row.delegate_ownership(target_user_uuid, target_access_key)
 
-    def _find_current_revision(self) -> DeploymentRevisionRow | None:
-        """Find the current revision row from eagerly loaded revisions.
+    @property
+    def current_revision_id(self) -> DeploymentRevisionID | None:
+        """Active revision id, sourced from the primary replica group.
 
-        Requires revisions to be eagerly loaded via selectinload.
-
-        Raises:
-            RuntimeError: If revisions are not loaded (programming error).
+        Requires ``primary_replica_group_row`` to be eagerly loaded.
         """
-        if not self.current_revision:
-            return None
-        for rev in self.revisions:
-            if rev.id == self.current_revision:
-                return rev
-        return None
+        group = self.primary_replica_group_row
+        return group.current_revision_id if group is not None else None
+
+    @property
+    def deploying_revision_id(self) -> DeploymentRevisionID | None:
+        """Revision being rolled out, sourced from the target replica group's
+        ``target_revision_id`` (``None`` when no rollout is in progress).
+
+        Requires ``target_replica_group_row`` to be eagerly loaded.
+        """
+        group = self.target_replica_group_row
+        return group.target_revision_id if group is not None else None
+
+    def _find_current_revision(self) -> DeploymentRevisionRow | None:
+        """Active revision row, sourced from the primary replica group.
+
+        Requires ``current_revision_row`` to be eagerly loaded.
+        """
+        return self.current_revision_row
 
     def _find_active_revision(self) -> DeploymentRevisionRow | None:
         """Return the revision representing the deployment's active spec.
 
-        Falls back to ``deploying_revision`` when ``current_revision`` is
-        unset (e.g. during the initial DEPLOYING phase before strategy
-        completion). Used by display/serialization paths that should reflect
-        the spec being deployed rather than rendering empty fields.
+        Falls back to the deploying revision (the target group's
+        ``target_revision_id``) when the current revision is unset (e.g.
+        during the initial DEPLOYING phase before strategy completion).
+        Used by display/serialization paths that should reflect the spec
+        being deployed rather than rendering empty fields.
+
+        Requires ``current_revision_row`` and ``deploying_revision_row`` to
+        be eagerly loaded.
         """
-        current = self._find_current_revision()
-        if current is not None:
-            return current
-        if not self.deploying_revision:
-            return None
-        for rev in self.revisions:
-            if rev.id == self.deploying_revision:
-                return rev
-        return None
+        return self.current_revision_row or self.deploying_revision_row
 
     def to_summary_data(self) -> DeploymentSummaryData:
         return DeploymentSummaryData(
@@ -616,8 +721,8 @@ class EndpointRow(Base):  # type: ignore[misc]
             tag=self.tag,
             open_to_public=self.open_to_public or False,
             url=self.url,
-            current_revision=self.current_revision,
-            deploying_revision=self.deploying_revision,
+            current_revision=self.current_revision_id,
+            deploying_revision=self.deploying_revision_id,
             replicas=self.replicas,
             desired_replicas=self.desired_replicas,
             created_at=self.created_at,
@@ -737,25 +842,47 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
 
     def to_deployment_info(self) -> DeploymentInfo:
-        """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
-        policy_data = None
-        if self.deployment_policy is not None:
-            policy_data = self.deployment_policy.to_data()
+        """Full DeploymentInfo including the resolved current/deploying revision
+        rows. Requires the revision-row relationships to be eagerly loaded
+        (legacy REST v1 / engine read paths). The revision ids are derived from
+        those rows, so no separate replica-group load is needed.
+        """
+        current_row = self.current_revision_row
+        deploying_row = self.deploying_revision_row
+        return self._build_deployment_info(
+            current_revision_id=DeploymentRevisionID(current_row.id) if current_row else None,
+            deploying_revision_id=DeploymentRevisionID(deploying_row.id) if deploying_row else None,
+            current_revision=current_row.to_data() if current_row else None,
+            deploying_revision=deploying_row.to_data() if deploying_row else None,
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+        )
 
-        model_revisions: list[ModelRevisionSpec] = []
-        for rev_row in self.revisions:
-            if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
-                model_revisions.append(rev_row.to_model_revision_spec())
+    def to_modern_deployment_info(self) -> DeploymentInfo:
+        """Lightweight DeploymentInfo carrying only the revision *ids* (sourced
+        from the replica groups), without loading the full revision rows. Used
+        by the modern (v2) read path, which only needs the ids. Requires the
+        replica-group relationships to be eagerly loaded.
+        """
+        return self._build_deployment_info(
+            current_revision_id=self.current_revision_id,
+            deploying_revision_id=self.deploying_revision_id,
+            current_revision=None,
+            deploying_revision=None,
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+        )
 
-        info = self._to_deployment_info_with_revisions(model_revisions)
-        info.policy = policy_data
-        return info
-
-    def _to_deployment_info_with_revisions(
+    def _build_deployment_info(
         self,
-        model_revisions: list[ModelRevisionSpec],
+        current_revision_id: DeploymentRevisionID | None,
+        deploying_revision_id: DeploymentRevisionID | None,
+        current_revision: ModelRevisionData | None,
+        deploying_revision: ModelRevisionData | None,
+        policy: DeploymentPolicyData | None = None,
     ) -> DeploymentInfo:
-        """Build DeploymentInfo with pre-built model_revisions dict."""
+        """Build DeploymentInfo. The revision *ids* and the full
+        ``current_revision`` / ``deploying_revision`` data are supplied by the
+        caller (the full data is ``None`` on the modern read path).
+        """
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(
@@ -774,20 +901,23 @@ class EndpointRow(Base):  # type: ignore[misc]
                 scaling_state=self.scaling_state,
                 retry_count=self.retries,
             ),
-            replica_spec=ReplicaSpec(
+            replica=ReplicaData(
                 replica_count=self.replicas,
                 desired_replica_count=self.desired_replicas,
             ),
-            network=DeploymentNetworkSpec(
+            network=DeploymentNetworkData(
                 open_to_public=self.open_to_public if self.open_to_public is not None else False,
+                access_token_ids=None,
                 url=self.url,
+                preferred_domain_name=None,
             ),
-            model_revisions=list(model_revisions),
             options=self.options,
-            current_revision_id=self.current_revision,
-            deploying_revision_id=self.deploying_revision,
+            current_revision_id=current_revision_id,
+            deploying_revision_id=deploying_revision_id,
+            current_revision=current_revision,
+            deploying_revision=deploying_revision,
             sub_step=self.sub_step,
-            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+            policy=policy,
         )
 
 
@@ -1123,7 +1253,7 @@ class ModelServiceHelper:
         scaling_group: str,
         owner_access_key: AccessKey,
         target_domain: str,
-        target_project: str | UUID,
+        target_project: str | ProjectID,
     ) -> str:
         """
         Wrapper of `registry.check_scaling_group()` with additional guards flavored for
@@ -1187,6 +1317,7 @@ class ModelServiceHelper:
                 dst_path=options.mount_destination,
                 options=VFolderMountOptions(
                     permission=options.permission,
+                    subpath=options.subpath,
                 ),
             )
             for folder_id, options in extra_mounts.items()
@@ -1228,96 +1359,3 @@ class ModelServiceHelper:
             relpath,
         )
         return cast(dict[str, Any], result)
-
-    @staticmethod
-    async def validate_model_definition_file_exists(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        suggested_path: str | None,
-    ) -> str:
-        """
-        Checks if model definition file exists in target model VFolder. Returns path to resolved model definition filename.
-        Since model service counts both `model-definition.yml` and `model-definition.yaml` as valid definition file name, this function ensures
-        at least one model definition file exists under the target VFolder and returns the matched filename.
-        """
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
-
-        if suggested_path:
-            path = Path(suggested_path)
-            storage_reply = await ModelServiceHelper._listdir(
-                storage_manager, proxy_name, volume_name, vfid, path.parent.as_posix()
-            )
-            for item in storage_reply["items"]:
-                if item["name"] == path.name:
-                    return suggested_path
-            else:
-                raise InvalidAPIParameters(
-                    f"Model definition YAML file {suggested_path} not found inside the model storage"
-                )
-        else:
-            storage_reply = await ModelServiceHelper._listdir(
-                storage_manager, proxy_name, volume_name, vfid, "."
-            )
-            model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
-            for item in storage_reply["items"]:
-                if item["name"] in model_definition_candidates:
-                    result: str = item["name"]
-                    return result
-            else:
-                raise InvalidAPIParameters(
-                    'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
-                )
-
-    @staticmethod
-    async def _read_model_definition(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        model_definition_filename: str,
-    ) -> dict[str, Any]:
-        """
-        Reads specified model definition file from target VFolder and returns
-        """
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
-        manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
-        chunks = await manager_facing_client.fetch_file_content(
-            volume_name,
-            str(vfid),
-            f"./{model_definition_filename}",
-        )
-        model_definition_yaml = chunks.decode("utf-8")
-        yaml = YAML()
-        result: dict[str, Any] = yaml.load(model_definition_yaml)
-        return result
-
-    @staticmethod
-    async def validate_model_definition(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        model_definition_path: str,
-    ) -> dict[str, Any]:
-        """
-        Checks if model definition YAML exists and is syntactically perfect.
-        Returns validated model definition configuration.
-        """
-        raw_model_definition = await ModelServiceHelper._read_model_definition(
-            storage_manager,
-            folder_host,
-            vfid,
-            model_definition_path,
-        )
-
-        try:
-            model_definition = model_definition_iv.check(raw_model_definition)
-            if model_definition is None:
-                raise DataTransformationFailed("Model definition validation returned None")
-            result: dict[str, Any] = model_definition
-            return result
-        except t.DataError as e:
-            raise InvalidAPIParameters(
-                f"Failed to validate model definition from VFolder (ID {vfid.folder_id}): {e}",
-            ) from e
-        except YAMLError as e:
-            raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e

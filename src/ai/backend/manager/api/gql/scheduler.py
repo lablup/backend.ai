@@ -77,7 +77,7 @@ class SchedulingBroadcastEventPayloadGQL:
     @gql_field(
         description="The session ID associated with the replica. This can be null right after replica creation."
     )  # type: ignore[misc]
-    async def session(self, info: Info[StrawberryGQLContext]) -> Session:
+    async def session(self, info: Info[StrawberryGQLContext]) -> Session | None:
         session_global_id = to_global_id(
             ComputeSessionNode, self.session_id, is_target_graphene_object=True
         )
@@ -117,7 +117,7 @@ async def scheduling_events_by_session(
     try:
         session_uuid = SessionId(uuid.UUID(session_id))
     except (ValueError, AttributeError) as e:
-        log.warning(f"Invalid session ID format: {session_id}")
+        log.warning("Invalid session ID format: {}", session_id)
         raise InvalidSessionId(f"Invalid session ID format: {session_id}") from e
 
     event_hub = info.context.event_hub
@@ -133,7 +133,7 @@ async def scheduling_events_by_session(
                 try:
                     status_dto = SchedulingStatusDTO(event.status_transition)
                 except ValueError:
-                    log.warning(f"Unknown status transition: {event.status_transition}")
+                    log.warning("Unknown status transition: {}", event.status_transition)
                     status_dto = SchedulingStatusDTO.ERROR
                 dto = SchedulingBroadcastEventPayloadNode(
                     session_id=str(event.session_id),

@@ -7,7 +7,14 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
 )
@@ -66,7 +73,7 @@ class TestSelectorIntegration:
     ) -> None:
         """Test that different strategies make different choices for the same scenario."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -109,7 +116,7 @@ class TestSelectorIntegration:
         """Test strategy differences with mixed resource types."""
         # Request only CPU/memory (explicitly no GPU/TPU)
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -155,7 +162,7 @@ class TestSelectorIntegration:
     ) -> None:
         """Test selector performance with many agents."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -220,7 +227,7 @@ class TestSelectorIntegration:
         )
 
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )

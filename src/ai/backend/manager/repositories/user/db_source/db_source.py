@@ -102,6 +102,10 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityBatchPurger,
+    execute_rbac_entity_batch_purger,
+)
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
@@ -114,15 +118,18 @@ from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updat
 from ai.backend.manager.repositories.group.creators import ProjectUserMembershipCreatorSpec
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
-from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.types import (
+    KeypairResourcePolicyKeypairSearchScope,
+    UserKeypairSearchScope,
+)
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.purgers import (
+    UserBatchPurgerSpec,
     create_user_error_log_purger,
     create_user_group_association_purger,
     create_user_keypair_purger,
-    create_user_purger,
     create_user_vfolder_permission_purger,
 )
 from ai.backend.manager.repositories.user.types import (
@@ -632,8 +639,12 @@ class UserDBSource:
             await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
             await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
 
-            # Finally delete the user
-            await execute_batch_purger(session, create_user_purger(user_uuid))
+            # Finally delete the user itself with RBAC scope/permission cleanup
+            # to avoid dangling association_scopes_entities and permission rows.
+            await execute_rbac_entity_batch_purger(
+                session,
+                RBACEntityBatchPurger(spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1),
+            )
 
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
         """Completely purge user and all associated data by UUID."""
@@ -644,8 +655,12 @@ class UserDBSource:
             await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
             await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
 
-            # Finally delete the user
-            await execute_batch_purger(session, create_user_purger(user_uuid))
+            # Finally delete the user itself with RBAC scope/permission cleanup
+            # to avoid dangling association_scopes_entities and permission rows.
+            await execute_rbac_entity_batch_purger(
+                session,
+                RBACEntityBatchPurger(spec=UserBatchPurgerSpec(user_uuid=user_uuid), batch_size=1),
+            )
 
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
         """Check if user's vfolders are mounted to active kernels."""
@@ -1295,7 +1310,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(UserRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
@@ -1335,7 +1350,7 @@ class UserDBSource:
                     ),
                 )
             )
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
@@ -1363,7 +1378,7 @@ class UserDBSource:
                     UserRow.uuid == UserRoleRow.user_id,
                 )
             )
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
 
             items = [row.UserRow.to_data() for row in result.rows]
             return UserSearchResult(
@@ -1524,7 +1539,32 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(KeyPairRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
+            items = [row.KeyPairRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_keypairs_by_resource_policy(
+        self,
+        scope: KeypairResourcePolicyKeypairSearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[KeyPairData]:
+        """Search keypairs assigned to a keypair resource policy.
+
+        Args:
+            scope: Search scope containing the resource policy name to filter by.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            SearchResult with matching keypairs and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(KeyPairRow)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
             items = [row.KeyPairRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,

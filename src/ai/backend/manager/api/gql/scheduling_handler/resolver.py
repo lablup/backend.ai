@@ -17,13 +17,13 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         description=(
             "List all registered deployment scheduling handlers (superadmin only). "
             "The returned ``name`` values are valid keys for "
-            "``DeploymentOptions.timeouts.by_handler``."
+            "``DeploymentOptions.handler_options.by_handler``."
         ),
     )
 )  # type: ignore[misc]
 async def scheduling_handlers(
     info: Info[StrawberryGQLContext],
-) -> list[SchedulingHandlerNodeGQL]:
+) -> list[SchedulingHandlerNodeGQL] | None:
     """Return every registered deployment scheduling handler."""
     check_admin_only()
     payload = await info.context.adapters.scheduling_handler.list_scheduling_handlers()

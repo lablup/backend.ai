@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.model_deployment.types import (
@@ -21,7 +21,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.types import BackendAISchema, ClusterMode, RuntimeVariant
 
 __all__ = (
     # DTOs
@@ -57,7 +57,7 @@ __all__ = (
 )
 
 
-class NetworkConfigDTO(BaseModel):
+class NetworkConfigDTO(BackendAISchema):
     """Network configuration for deployment."""
 
     open_to_public: bool = Field(description="Whether the deployment is public")
@@ -65,27 +65,27 @@ class NetworkConfigDTO(BaseModel):
     preferred_domain_name: str | None = Field(default=None, description="Preferred domain name")
 
 
-class ClusterConfigDTO(BaseModel):
+class ClusterConfigDTO(BackendAISchema):
     """Cluster configuration for revision."""
 
     mode: ClusterMode = Field(description="Cluster mode")
     size: int = Field(description="Cluster size")
 
 
-class ResourceConfigDTO(BaseModel):
+class ResourceConfigDTO(BackendAISchema):
     """Resource configuration for revision."""
 
     resource_group_name: str = Field(description="Resource group name")
     resource_slot: dict[str, Any] = Field(description="Resource slot allocation")
 
 
-class ModelRuntimeConfigDTO(BaseModel):
+class ModelRuntimeConfigDTO(BackendAISchema):
     """Model runtime configuration for revision."""
 
     runtime_variant: RuntimeVariant = Field(description="Runtime variant")
 
 
-class ModelMountConfigDTO(BaseModel):
+class ModelMountConfigDTO(BackendAISchema):
     """Model mount configuration for revision."""
 
     # ``vfolder_id`` is null when the referenced vfolder has been deleted
@@ -96,18 +96,17 @@ class ModelMountConfigDTO(BaseModel):
     definition_path: str = Field(description="Model definition path")
 
 
-class ReplicaStateDTO(BaseModel):
+class ReplicaStateDTO(BackendAISchema):
     """Replica state information."""
 
     desired_replica_count: int = Field(description="Desired number of replicas")
     replica_ids: list[UUID] = Field(description="IDs of current replicas")
 
 
-class RevisionDTO(BaseModel):
+class RevisionDTO(BackendAISchema):
     """DTO for model revision data."""
 
     id: UUID = Field(description="Revision ID")
-    name: str = Field(description="Revision name")
     cluster_config: ClusterConfigDTO = Field(description="Cluster configuration")
     resource_config: ResourceConfigDTO = Field(description="Resource configuration")
     model_runtime_config: ModelRuntimeConfigDTO = Field(description="Model runtime configuration")
@@ -119,7 +118,7 @@ class RevisionDTO(BaseModel):
     image_id: ImageID | None = Field(description="Image ID")
 
 
-class DeploymentDTO(BaseModel):
+class DeploymentDTO(BackendAISchema):
     """DTO for deployment data."""
 
     id: UUID = Field(description="Deployment ID")
@@ -209,7 +208,7 @@ class DeactivateRevisionResponse(BaseResponseModel):
     success: bool = Field(description="Whether the revision was deactivated")
 
 
-class RouteDTO(BaseModel):
+class RouteDTO(BackendAISchema):
     """DTO for route data."""
 
     id: UUID = Field(description="Route ID")
@@ -223,7 +222,7 @@ class RouteDTO(BaseModel):
     error_data: dict[str, Any] = Field(default_factory=dict, description="Error data if any")
 
 
-class CursorPaginationInfo(BaseModel):
+class CursorPaginationInfo(BackendAISchema):
     """Cursor-based pagination information."""
 
     total_count: int = Field(description="Total number of items")
@@ -247,7 +246,7 @@ class UpdateRouteTrafficStatusResponse(BaseResponseModel):
 # ========== Deployment Policy DTOs ==========
 
 
-class DeploymentPolicyDTO(BaseModel):
+class DeploymentPolicyDTO(BackendAISchema):
     """DTO representing the rollout policy for a deployment.
 
     Controls how new revisions are promoted to production traffic,

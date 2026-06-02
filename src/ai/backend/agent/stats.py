@@ -649,7 +649,7 @@ class StatContext:
                 ]
                 if len(slot_names_with_same_prefix_as_metric_key) == 1:
                     slot_name = slot_names_with_same_prefix_as_metric_key[0]
-                    log.info(f"Found slot name {slot_name} with same prefix as {metric_key}")
+                    log.info("Found slot name {} with same prefix as {}", slot_name, metric_key)
                     return resource_scaling_factors[slot_name]
                 raise ValueError(
                     f"Plugin defines more than 1 device slots {slot_names}, "

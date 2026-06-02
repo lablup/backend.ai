@@ -7,9 +7,9 @@ Strawberry-compatible types.
 
 Type names are prefixed with ``DefaultSession`` where they describe the
 resource-group default layer and ``Session*`` for the per-session
-stored view — so that the deployment-side analogues
-(``HandlerTimeoutEntry*``, ``DeploymentTimeouts*``, ...) can keep their
-existing names without conflict.
+stored view — so the deployment-side analogues
+(``DeploymentHandlerOptions*``, ...) can keep their existing names
+without conflict.
 """
 
 from __future__ import annotations
@@ -21,16 +21,18 @@ from ai.backend.common.dto.manager.v2.session_options import (
     DefaultSessionOptionsInfo,
     DefaultSessionOptionsInput,
     FailurePolicyEnum,
-    HandlerTimeoutEntryInfo,
-    HandlerTimeoutEntryInput,
+    HandlerOptionsEntryInfo,
+    HandlerOptionsEntryInput,
+    HandlerOptionsInfo,
+    HandlerOptionsInput,
     KernelExecutionSpecInfo,
     KernelExecutionSpecInput,
     KernelGroupInfo,
     KernelGroupInput,
     ResourceOptsInfo,
     ResourceOptsInput,
-    SessionTimeoutsInfo,
-    SessionTimeoutsInput,
+    SessionHandlerOptionsInfo,
+    SessionHandlerOptionsInput,
 )
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
@@ -72,59 +74,86 @@ AgentSelectionPolicyGQL = gql_enum(
 
 
 # ---------------------------------------------------------------------------
-# Handler timeouts (distinct from the deployment-side entry so both
-# sides can coexist in one schema).
+# Handler options (timeout + max_retry_count). Distinct from the
+# deployment-side entry so both sides can coexist in one schema.
 # ---------------------------------------------------------------------------
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A single (handler_name, timeout_sec) entry for session timeouts.",
+        description="Per-handler scheduler policy fields for session handler options.",
     ),
-    name="DefaultSessionHandlerTimeoutEntryInput",
+    name="DefaultSessionHandlerOptionsInput",
 )
-class DefaultSessionHandlerTimeoutEntryInputGQL(PydanticInputMixin[HandlerTimeoutEntryInput]):
-    handler_name: str
+class DefaultSessionHandlerOptionsInputGQL(PydanticInputMixin[HandlerOptionsInput]):
     timeout_sec: int | None = None
+    max_retry_count: int | None = None
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A single (handler_name, timeout_sec) entry response for session timeouts.",
+        description="Per-handler scheduler policy snapshot for session handler options.",
     ),
-    model=HandlerTimeoutEntryInfo,
-    name="DefaultSessionHandlerTimeoutEntryInfo",
+    model=HandlerOptionsInfo,
+    name="DefaultSessionHandlerOptionsInfo",
 )
-class DefaultSessionHandlerTimeoutEntryInfoGQL:
-    handler_name: str
+class DefaultSessionHandlerOptionsInfoGQL:
     timeout_sec: int | None
+    max_retry_count: int | None
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Session timeout policy input (handler-keyed).",
+        description="A single (handler_name, options) entry for session handler options.",
     ),
-    name="DefaultSessionTimeoutsInput",
+    name="DefaultSessionHandlerOptionsEntryInput",
 )
-class DefaultSessionTimeoutsInputGQL(PydanticInputMixin[SessionTimeoutsInput]):
-    default: int | None = None
-    by_handler: list[DefaultSessionHandlerTimeoutEntryInputGQL] | None = None
+class DefaultSessionHandlerOptionsEntryInputGQL(PydanticInputMixin[HandlerOptionsEntryInput]):
+    handler_name: str
+    timeout_sec: int | None = None
+    max_retry_count: int | None = None
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Session timeout policy response.",
+        description="A single (handler_name, options) entry response for session handler options.",
     ),
-    model=SessionTimeoutsInfo,
-    name="DefaultSessionTimeoutsInfo",
+    model=HandlerOptionsEntryInfo,
+    name="DefaultSessionHandlerOptionsEntryInfo",
 )
-class DefaultSessionTimeoutsInfoGQL:
-    default: int | None
-    by_handler: list[DefaultSessionHandlerTimeoutEntryInfoGQL]
+class DefaultSessionHandlerOptionsEntryInfoGQL:
+    handler_name: str
+    timeout_sec: int | None
+    max_retry_count: int | None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Session handler-options input (timeout + retry, handler-keyed).",
+    ),
+    name="DefaultSessionHandlerOptionsPolicyInput",
+)
+class DefaultSessionHandlerOptionsPolicyInputGQL(PydanticInputMixin[SessionHandlerOptionsInput]):
+    default: DefaultSessionHandlerOptionsInputGQL | None = None
+    by_handler: list[DefaultSessionHandlerOptionsEntryInputGQL] | None = None
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Session handler-options policy response.",
+    ),
+    model=SessionHandlerOptionsInfo,
+    name="DefaultSessionHandlerOptionsPolicyInfo",
+)
+class DefaultSessionHandlerOptionsPolicyInfoGQL:
+    default: DefaultSessionHandlerOptionsInfoGQL
+    by_handler: list[DefaultSessionHandlerOptionsEntryInfoGQL]
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +291,7 @@ class DefaultSessionOptionsInputGQL(PydanticInputMixin[DefaultSessionOptionsInpu
     cluster_mode: str | None = None
     default_failure_policy: FailurePolicyGQL | None = None
     default_kernel_execution_spec: DefaultSessionKernelExecutionSpecInputGQL | None = None
-    timeouts: DefaultSessionTimeoutsInputGQL | None = None
+    handler_options: DefaultSessionHandlerOptionsPolicyInputGQL | None = None
     agent_selection_policy: AgentSelectionPolicyGQL | None = None
 
 
@@ -280,5 +309,5 @@ class DefaultSessionOptionsInfoGQL:
     cluster_mode: str
     default_failure_policy: FailurePolicyGQL
     default_kernel_execution_spec: DefaultSessionKernelExecutionSpecInfoGQL | None
-    timeouts: DefaultSessionTimeoutsInfoGQL
+    handler_options: DefaultSessionHandlerOptionsPolicyInfoGQL
     agent_selection_policy: AgentSelectionPolicyGQL

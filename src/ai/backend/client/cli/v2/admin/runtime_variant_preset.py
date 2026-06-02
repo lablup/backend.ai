@@ -19,11 +19,11 @@ from ai.backend.client.cli.v2.helpers import (
 
 
 def _build_dto(dto_cls: type, data: dict[str, Any]) -> Any:
-    from pydantic import ValidationError
+    from ai.backend.common.exception import BackendAISchemaValidationFailed
 
     try:
-        return dto_cls(**data)
-    except ValidationError as e:
+        return dto_cls.model_validate(data)
+    except BackendAISchemaValidationFailed as e:
         click.echo("Validation error:", err=True)
         for err in e.errors():
             field = ".".join(str(loc) for loc in err["loc"])
@@ -81,10 +81,12 @@ def search(
     else:
         filter_dto: RuntimeVariantPresetFilter | None = None
         if runtime_variant_id is not None or name_contains is not None:
-            from ai.backend.common.dto.manager.query import StringFilter
+            from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
             filter_dto = RuntimeVariantPresetFilter(
-                runtime_variant_id=runtime_variant_id,
+                runtime_variant_id=UUIDFilter(equals=runtime_variant_id)
+                if runtime_variant_id is not None
+                else None,
                 name=StringFilter(contains=name_contains) if name_contains is not None else None,
             )
         orders = (

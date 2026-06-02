@@ -6,9 +6,10 @@ from typing import Any
 import aiohttp_cors
 import yarl
 from aiohttp import web
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.common.types import BackendAISchema
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
 from ai.backend.manager.plugin.webapp import WebappPlugin
 
@@ -21,7 +22,7 @@ from .utils import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class LoginRequestData(BaseModel):
+class LoginRequestData(BackendAISchema):
     access_key: str
     secret_key: str
 

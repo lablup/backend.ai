@@ -47,7 +47,6 @@ from ai.backend.common.dto.manager.v2.session.request import (
     SessionOrder,
     ShutdownSessionServiceInput,
     StartSessionServiceInput,
-    TerminateSessionsInProjectInput,
     TerminateSessionsInput,
     UpdateSessionInput,
 )
@@ -66,6 +65,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     UpdateSessionPayload,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
@@ -140,9 +140,6 @@ from ai.backend.manager.services.session.actions.shutdown_service import Shutdow
 from ai.backend.manager.services.session.actions.start_service import StartServiceAction
 from ai.backend.manager.services.session.actions.terminate_sessions import (
     TerminateSessionsAction,
-)
-from ai.backend.manager.services.session.actions.terminate_sessions_in_project import (
-    TerminateSessionsInProjectAction,
 )
 
 
@@ -251,6 +248,7 @@ class SessionAdapter(BaseAdapter):
                     vfolder_id=VFolderUUID(m.vfolder_id),
                     mount_destination=m.mount_path,
                     mount_perm=(MountPermission(m.permission) if m.permission else None),
+                    subpath=m.subpath,
                 )
                 for m in input.mounts
             ]
@@ -816,39 +814,18 @@ class SessionAdapter(BaseAdapter):
             skipped=result.skipped,
         )
 
-    async def terminate_in_project(
-        self, input: TerminateSessionsInProjectInput
-    ) -> TerminateSessionsPayload:
-        """Terminate one or more sessions within a project scope."""
-        action = TerminateSessionsInProjectAction(
-            project_id=input.project_id,
-            session_ids=[SessionId(sid) for sid in input.session_ids],
-            forced=input.forced,
-        )
-        result = await self._processors.session.terminate_sessions_in_project.wait_for_complete(
-            action
-        )
-        return TerminateSessionsPayload(
-            cancelled=result.cancelled,
-            terminating=result.terminating,
-            force_terminated=result.force_terminated,
-            skipped=result.skipped,
-        )
-
     # -------------------------------------------------------------------------
     # Service management
     # -------------------------------------------------------------------------
 
     async def start_service(
         self,
-        session_id: UUID,
+        session_id: SessionID,
         input: StartSessionServiceInput,
-        access_key: str,
     ) -> StartSessionServicePayload:
         """Start an app service in a session."""
         action = StartServiceAction(
-            session_name=str(session_id),
-            access_key=AccessKey(access_key),
+            session_id=session_id,
             service=input.service,
             login_session_token=input.login_session_token,
             port=input.port,

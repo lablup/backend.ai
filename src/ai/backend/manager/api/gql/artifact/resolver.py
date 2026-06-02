@@ -232,7 +232,7 @@ async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Artifac
 )
 async def scan_artifacts(
     input: ScanArtifactsInput, info: Info[StrawberryGQLContext]
-) -> ScanArtifactsPayload:
+) -> ScanArtifactsPayload | None:
     if input.limit > ARTIFACT_MAX_SCAN_LIMIT:
         raise ArtifactScanLimitExceededError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
 
@@ -268,7 +268,7 @@ async def scan_artifacts(
 )
 async def import_artifacts(
     input: ImportArtifactsInput, info: Info[StrawberryGQLContext]
-) -> ImportArtifactsPayload:
+) -> ImportArtifactsPayload | None:
     imported_artifacts = []
     tasks = []
     vfolder_id = UUID(input.vfolder_id) if input.vfolder_id else None
@@ -319,7 +319,7 @@ async def import_artifacts(
 )
 async def delegate_scan_artifacts(
     input: DelegateScanArtifactsInput, info: Info[StrawberryGQLContext]
-) -> DelegateScanArtifactsPayload:
+) -> DelegateScanArtifactsPayload | None:
     if input.limit > ARTIFACT_MAX_SCAN_LIMIT:
         raise ArtifactScanLimitExceededError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
 
@@ -358,7 +358,7 @@ async def delegate_scan_artifacts(
 )
 async def delegate_import_artifacts(
     input: DelegateImportArtifactsInput, info: Info[StrawberryGQLContext]
-) -> DelegateImportArtifactsPayload:
+) -> DelegateImportArtifactsPayload | None:
     tasks = []
 
     options = input.options or ImportArtifactsOptionsGQL()
@@ -416,7 +416,7 @@ async def delegate_import_artifacts(
 )
 async def update_artifact(
     input: UpdateArtifactInput, info: Info[StrawberryGQLContext]
-) -> UpdateArtifactPayload:
+) -> UpdateArtifactPayload | None:
     pydantic_input = UpdateArtifactInputDTO(
         readonly=input.readonly if input.readonly is not UNSET else None,
         description=input.description if input.description is not UNSET else SENTINEL,
@@ -448,7 +448,7 @@ async def update_artifact(
 )
 async def cleanup_artifact_revisions(
     input: CleanupArtifactRevisionsInput, info: Info[StrawberryGQLContext]
-) -> CleanupArtifactRevisionsPayload:
+) -> CleanupArtifactRevisionsPayload | None:
     cleaned_artifact_revisions: list[ArtifactRevision] = []
     # TODO: Refactor with asyncio.gather()
     pydantic_input = input.to_pydantic()
@@ -483,7 +483,7 @@ async def cleanup_artifact_revisions(
 )
 async def delete_artifacts(
     input: DeleteArtifactsInput, info: Info[StrawberryGQLContext]
-) -> DeleteArtifactsPayload:
+) -> DeleteArtifactsPayload | None:
     pydantic_input = input.to_pydantic()
     payload = await info.context.adapters.artifact.delete(pydantic_input)
 
@@ -510,7 +510,7 @@ async def delete_artifacts(
 )
 async def restore_artifacts(
     input: RestoreArtifactsInput, info: Info[StrawberryGQLContext]
-) -> RestoreArtifactsPayload:
+) -> RestoreArtifactsPayload | None:
     artifact_node_list = await info.context.adapters.artifact.restore(
         artifact_ids=[UUID(id) for id in input.artifact_ids],
     )
@@ -538,7 +538,7 @@ async def restore_artifacts(
 )
 async def cancel_import_artifact(
     input: CancelArtifactInput, info: Info[StrawberryGQLContext]
-) -> CancelImportArtifactPayload:
+) -> CancelImportArtifactPayload | None:
     # TODO: Cancel actual import bgtask
     pydantic_input = input.to_pydantic()
     revision_node = await info.context.adapters.artifact.cancel_import(
@@ -558,7 +558,7 @@ async def cancel_import_artifact(
 )
 async def approve_artifact_revision(
     input: ApproveArtifactInput, info: Info[StrawberryGQLContext]
-) -> ApproveArtifactPayload:
+) -> ApproveArtifactPayload | None:
     revision_node = await info.context.adapters.artifact.approve_revision(
         UUID(input.artifact_revision_id)
     )
@@ -573,7 +573,7 @@ async def approve_artifact_revision(
 )
 async def reject_artifact_revision(
     input: RejectArtifactInput, info: Info[StrawberryGQLContext]
-) -> RejectArtifactPayload:
+) -> RejectArtifactPayload | None:
     revision_node = await info.context.adapters.artifact.reject_revision(
         UUID(input.artifact_revision_id)
     )
@@ -588,7 +588,7 @@ async def reject_artifact_revision(
 )
 async def scan_artifact_models(
     input: ScanArtifactModelsInput, info: Info[StrawberryGQLContext]
-) -> ScanArtifactModelsPayload:
+) -> ScanArtifactModelsPayload | None:
     results = await info.context.adapters.artifact.retrieve_models(
         models=[m.to_pydantic() for m in input.models],
         registry_id=input.registry_id,

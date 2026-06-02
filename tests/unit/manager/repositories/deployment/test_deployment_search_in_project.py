@@ -12,6 +12,7 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentSummarySearchResult
@@ -23,6 +24,7 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
 )
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -86,6 +88,7 @@ class TestEndpointSearchInProject:
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
                 RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -214,7 +217,7 @@ class TestEndpointSearchInProject:
                 labels={},
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1g"}},
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
             await db_sess.flush()
 
@@ -232,7 +235,6 @@ class TestEndpointSearchInProject:
                         project=project_a_id,
                         resource_group=sgroup_name,
                         lifecycle_stage=EndpointLifecycle.CREATED,
-                        current_revision=uuid.uuid4(),
                         replicas=1,
                     )
                 )
@@ -250,7 +252,6 @@ class TestEndpointSearchInProject:
                     project=project_b_id,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.CREATED,
-                    current_revision=uuid.uuid4(),
                     replicas=1,
                 )
             )

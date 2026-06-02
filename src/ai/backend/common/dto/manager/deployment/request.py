@@ -21,6 +21,7 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.dto.manager.query import IntFilter, StringFilter
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, MountPermission, RuntimeVariant
 
@@ -183,6 +184,7 @@ class DeploymentMetadataInput(BaseRequestModel):
 
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
+    resource_group_name: ResourceGroupName = Field(description="Resource group name")
     name: str | None = Field(default=None, description="Deployment name")
     tags: list[str] | None = Field(default=None, description="Tags for the deployment")
 
@@ -224,7 +226,6 @@ class ClusterConfigInput(BaseRequestModel):
 class ResourceConfigInput(BaseRequestModel):
     """Resource configuration input."""
 
-    resource_group: str = Field(description="Resource group name")
     resource_slots: Mapping[str, Any] = Field(
         description='Resource slots (e.g., {"cpu": "1", "mem": "1073741824"})'
     )
@@ -238,7 +239,20 @@ class ModelMountConfigInput(BaseRequestModel):
 
     vfolder_id: VFolderUUID = Field(description="Model vfolder ID")
     mount_destination: str = Field(default="/models", description="Mount destination path")
-    definition_path: str = Field(description="Model definition file path within vfolder")
+    definition_path: str | None = Field(
+        default=None,
+        description=(
+            "Optional model definition file path within vfolder. "
+            "When omitted, the server auto-detects `model-definition.yaml` or "
+            "`model-definition.yml`."
+        ),
+    )
+    subpath: str | None = Field(
+        default=None,
+        description=(
+            "Subpath within the model vfolder to mount. ``null`` (default) mounts the vfolder root."
+        ),
+    )
 
 
 class ModelRuntimeConfigInput(BaseRequestModel):
@@ -266,12 +280,17 @@ class ExtraVFolderMountInput(BaseRequestModel):
             "regardless of what the vfolder grants."
         ),
     )
+    subpath: str | None = Field(
+        default=None,
+        description=(
+            "Subpath within the vfolder to mount. ``null`` (default) mounts the vfolder root."
+        ),
+    )
 
 
 class RevisionInput(BaseRequestModel):
     """Revision input for creating a new revision."""
 
-    name: str | None = Field(default=None, description="Revision name")
     cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
     resource_config: ResourceConfigInput = Field(description="Resource configuration")
     image: ImageInput = Field(description="Container image")

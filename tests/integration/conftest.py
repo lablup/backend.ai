@@ -29,6 +29,7 @@ from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dependencies import DependencyBuilderStack
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
@@ -544,9 +545,9 @@ async def resource_policy_fixture(
 async def scaling_group_fixture(
     db_engine: SAEngine,
     domain_fixture: str,
-) -> AsyncIterator[str]:
+) -> AsyncIterator[ResourceGroupName]:
     """Insert a scaling group and its domain association; yield the name."""
-    sgroup_name = f"sgroup-{secrets.token_hex(6)}"
+    sgroup_name = ResourceGroupName(f"sgroup-{secrets.token_hex(6)}")
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(scaling_groups).values(

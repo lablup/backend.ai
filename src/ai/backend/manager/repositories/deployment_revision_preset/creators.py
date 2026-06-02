@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -17,19 +18,29 @@ from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
-from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
+def _parse_quantity(value: str) -> Decimal:
+    try:
+        return Decimal(value)
+    except InvalidOperation:
+        return Decimal(BinarySize.from_str(value))
+
+
 @dataclass
-class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRow]):
+class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRevisionPresetRow]):
+    """Preset creator whose rank is assigned by the ops layer (next-value) at execution.
+
+    ``build_row`` receives the computed next rank as its dependency.
+    """
+
     runtime_variant_id: RuntimeVariantID
     name: str
     description: str | None
-    rank: int
     image_id: ImageID
     model_definition: ModelDefinition | None
-    resource_slots: list[ResourceSlotEntryData]
     resource_opts: list[ResourceOptsEntry]
     cluster_mode: str
     cluster_size: int
@@ -37,11 +48,11 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
     bootstrap_script: str | None
     environ: dict[str, str]
     preset_values: list[PresetValueEntry]
+    replica_count: int
+    deployment_strategy: DeploymentStrategy
+    deployment_strategy_spec: dict[str, Any]
     open_to_public: bool | None = None
-    replica_count: int | None = None
     revision_history_limit: int | None = None
-    deployment_strategy: DeploymentStrategy | None = None
-    deployment_strategy_spec: dict[str, Any] | None = None
 
     @property
     @override
@@ -56,38 +67,46 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
         )
 
     @override
-    def build_row(self) -> DeploymentRevisionPresetRow:
-        row = DeploymentRevisionPresetRow()
-        row.runtime_variant = self.runtime_variant_id
-        row.name = self.name
-        row.description = self.description
-        row.rank = self.rank
-        row.image_id = self.image_id
-        row.model_definition = self.model_definition
-        row.resource_opts = self.resource_opts
-        row.cluster_mode = self.cluster_mode
-        row.cluster_size = self.cluster_size
-        row.startup_command = self.startup_command
-        row.bootstrap_script = self.bootstrap_script
-        row.environ = self.environ
-        row.preset_values = self.preset_values
-        row.open_to_public = self.open_to_public
-        row.replica_count = self.replica_count
-        row.revision_history_limit = self.revision_history_limit
-        row.deployment_strategy = self.deployment_strategy
-        row.deployment_strategy_spec = self.deployment_strategy_spec
-        row.resource_slot_rows = [
-            PresetResourceSlotRow(
-                slot_name=entry.resource_type,
-                quantity=self._parse_quantity(entry.quantity),
-            )
-            for entry in self.resource_slots
-        ]
-        return row
+    def build_row(self, next_rank: int) -> DeploymentRevisionPresetRow:
+        return DeploymentRevisionPresetRow(
+            runtime_variant=self.runtime_variant_id,
+            name=self.name,
+            description=self.description,
+            rank=next_rank,
+            image_id=self.image_id,
+            model_definition=self.model_definition,
+            resource_opts=self.resource_opts,
+            cluster_mode=self.cluster_mode,
+            cluster_size=self.cluster_size,
+            startup_command=self.startup_command,
+            bootstrap_script=self.bootstrap_script,
+            environ=self.environ,
+            preset_values=self.preset_values,
+            open_to_public=self.open_to_public,
+            replica_count=self.replica_count,
+            revision_history_limit=self.revision_history_limit,
+            deployment_strategy=self.deployment_strategy,
+            deployment_strategy_spec=self.deployment_strategy_spec,
+        )
 
-    @staticmethod
-    def _parse_quantity(value: str) -> Decimal:
-        try:
-            return Decimal(value)
-        except InvalidOperation:
-            return Decimal(BinarySize.from_str(value))
+
+@dataclass(frozen=True)
+class PresetSlotDependency:
+    """Dependency value for creating preset resource slots: the owning preset's id."""
+
+    preset_id: uuid.UUID
+
+
+@dataclass
+class PresetResourceSlotDependentCreatorSpec(
+    DependentCreatorSpec[PresetSlotDependency, PresetResourceSlotRow]
+):
+    entry: ResourceSlotEntryData
+
+    @override
+    def build_row(self, dependency: PresetSlotDependency) -> PresetResourceSlotRow:
+        return PresetResourceSlotRow(
+            preset_id=dependency.preset_id,
+            slot_name=self.entry.resource_type,
+            quantity=_parse_quantity(self.entry.quantity),
+        )

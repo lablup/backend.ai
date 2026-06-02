@@ -14,6 +14,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import SessionId
 
 __all__ = (
     "AdminSearchSessionsPayload",
@@ -237,16 +238,16 @@ class AdminSearchSessionsPayload(BaseResponseModel):
 class TerminateSessionsPayload(BaseResponseModel):
     """Payload for session termination with per-session outcome."""
 
-    cancelled: list[UUID] = Field(
+    cancelled: list[SessionId] = Field(
         default_factory=list, description="Sessions cancelled from PENDING."
     )
-    terminating: list[UUID] = Field(
+    terminating: list[SessionId] = Field(
         default_factory=list, description="Sessions marked TERMINATING."
     )
-    force_terminated: list[UUID] = Field(
+    force_terminated: list[SessionId] = Field(
         default_factory=list, description="Sessions force-terminated."
     )
-    skipped: list[UUID] = Field(
+    skipped: list[SessionId] = Field(
         default_factory=list, description="Sessions already terminated or not found."
     )
 

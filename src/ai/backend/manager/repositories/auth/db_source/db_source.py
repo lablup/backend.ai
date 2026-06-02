@@ -12,15 +12,18 @@ import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.exception import BackendAIError, UserNotFound
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.auth import (
+    AccessKeyNotFound,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
@@ -291,6 +294,15 @@ class AuthDBSource:
             if row is None:
                 raise ValueError("Unknown owner access key")
             return row.domain_name, row.role
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_id_by_access_key(self, access_key: AccessKey) -> UserID:
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(KeyPairRow.user).where(KeyPairRow.access_key == access_key)
+            user_id = await db_session.scalar(query)
+            if user_id is None:
+                raise AccessKeyNotFound("Unknown access key")
+            return UserID(user_id)
 
     @auth_db_source_resilience.apply()
     async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
@@ -664,7 +676,7 @@ class AuthDBSource:
         """Search all login sessions without scope restriction (admin only)."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginSessionRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=None)
+            result = await execute_batch_querier(db_session, query, querier)
             items = [row.LoginSessionRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,
@@ -682,7 +694,7 @@ class AuthDBSource:
         """Search login sessions within a given scope."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginSessionRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
             items = [row.LoginSessionRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,
@@ -757,7 +769,7 @@ class AuthDBSource:
         """Search all login history without scope restriction (admin only)."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginHistoryRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=None)
+            result = await execute_batch_querier(db_session, query, querier)
             items = [row.LoginHistoryRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,
@@ -775,7 +787,7 @@ class AuthDBSource:
         """Search login history within a given scope."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginHistoryRow)
-            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            result = await execute_batch_querier(db_session, query, querier, scopes=[scope])
             items = [row.LoginHistoryRow.to_data() for row in result.rows]
             return SearchResult(
                 items=items,

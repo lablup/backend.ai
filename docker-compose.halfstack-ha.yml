@@ -76,6 +76,25 @@ services:
     depends_on:
       - backendai-half-redis-node03
 
+  backendai-half-node-exporter:
+    image: prom/node-exporter:v1.9.1
+    profiles: ["observability"]
+    restart: unless-stopped
+    networks:
+      - half
+    pid: host
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/host/root'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+    ports:
+      - "9100:9100"
+
   # Initial master is redis-node01.
   backendai-half-redis-node01:
     image: redis:7.2.11-alpine
@@ -327,7 +346,7 @@ services:
 
   backendai-half-otel-collector:
     image: otel/opentelemetry-collector-contrib:0.126.0
-    profiles: ["observability"]
+    profiles: ["telemetry", "observability"]
     networks:
       - half
     command: ["--config=/etc/otel-collector-config.yaml"]
@@ -339,7 +358,7 @@ services:
 
   backendai-half-loki:
     image: grafana/loki:3.5.0
-    profiles: ["observability"]
+    profiles: ["telemetry", "observability"]
     networks:
       - half
     command: -config.file=/etc/loki/local-config.yaml

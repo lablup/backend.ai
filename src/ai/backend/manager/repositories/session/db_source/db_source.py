@@ -7,18 +7,28 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, noload, selectinload
+from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.types import AccessKey, ImageAlias, SessionId
+from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.types import AccessKey, AgentId, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
-from ai.backend.manager.data.session.types import SessionData, SessionListResult
+from ai.backend.manager.data.session.types import (
+    SessionData,
+    SessionListResult,
+    SessionRoutingInfo,
+)
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
+from ai.backend.manager.errors.kernel import (
+    SessionAlreadyExists,
+    SessionNotFound,
+    TooManySessionsMatched,
+)
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
@@ -27,6 +37,8 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
+    DEAD_SESSION_STATUSES,
+    TERMINAL_SESSION_STATUSES,
     KernelLoadingStrategy,
     SessionDependencyRow,
     SessionRow,
@@ -35,8 +47,13 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
+    execute_batch_querier,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 from ai.backend.manager.utils import query_userinfo
@@ -44,9 +61,52 @@ from ai.backend.manager.utils import query_userinfo
 
 class SessionDBSource:
     _db: ExtendedAsyncSAEngine
+    _ops: DBOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._ops = DBOpsProvider(db)
+
+    async def resolve_session_id(
+        self,
+        session_name: str,
+        user_id: uuid.UUID,
+    ) -> SessionId:
+        """Resolve a single live session to its ``session_id`` by name within a user scope.
+
+        The ``user_id`` scope spans every keypair access key owned by the user, since the
+        owner is denormalized onto ``SessionRow.user_uuid``. Terminal sessions (ERROR,
+        TERMINATED, CANCELLED) are excluded so a stale namesake does not shadow the live
+        one. This matches the `ix_sessions_unique_name_per_user_nonterminal` partial unique
+        index, which guarantees at most one matching session.
+        """
+        query = sa.select(SessionRow).where(
+            (SessionRow.name == session_name)
+            & (SessionRow.user_uuid == user_id)
+            & (~SessionRow.status.in_(TERMINAL_SESSION_STATUSES))
+        )
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
+        rows: list[SessionRow] = [row.SessionRow for row in result.rows]
+        if not rows:
+            raise SessionNotFound(f"Session (name={session_name}) does not exist for the user.")
+        if len(rows) > 1:
+            # Defensive: the partial unique index should prevent this for non-terminal
+            # sessions, but guard against any data that escaped the constraint.
+            raise TooManySessionsMatched(
+                extra_data={
+                    "matches": [
+                        {
+                            "session_id": row.id,
+                            "session_name": row.name,
+                            "status": row.status,
+                            "created_at": row.created_at,
+                        }
+                        for row in rows
+                    ]
+                }
+            )
+        return rows[0].id
 
     async def get_session_owner(self, session_id: str | SessionId) -> UserData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -483,20 +543,43 @@ class SessionDBSource:
 
     async def get_session_with_routing_minimal(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
-    ) -> SessionRow:
-        """Get session with minimal routing information"""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.get_session(
-                db_sess,
-                session_name_or_id,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
-                eager_loading_op=[
-                    selectinload(SessionRow.routing).options(noload("*")),
-                ],
+        session_id: SessionID,
+    ) -> SessionRoutingInfo:
+        """Resolve a live session by ``session_id`` into its routing info.
+
+        This is a pure lookup; session access authorization is the caller's
+        responsibility. Dead (terminated/cancelled) sessions are excluded. Returns a
+        data type rather than a SessionRow so the repository never exposes an ORM row.
+        """
+        query = (
+            sa.select(SessionRow)
+            .where((SessionRow.id == session_id) & (~SessionRow.status.in_(DEAD_SESSION_STATUSES)))
+            .options(
+                noload("*"),
+                selectinload(
+                    SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)
+                ).options(
+                    noload("*"),
+                    selectinload(KernelRow.agent_row).noload("*"),
+                ),
+                joinedload(SessionRow.user),
             )
+        )
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(query, BatchQuerier(pagination=NoPagination()))
+        rows: list[SessionRow] = [row.SessionRow for row in result.rows]
+        if not rows:
+            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+        session_row = rows[0]
+        main_kernel = session_row.main_kernel
+        return SessionRoutingInfo(
+            session=session_row.to_dataclass(),
+            main_kernel_id=main_kernel.id,
+            agent_id=AgentId(main_kernel.agent) if main_kernel.agent is not None else None,
+            kernel_host=main_kernel.kernel_host,
+            agent_addr=main_kernel.agent_addr,
+            service_ports=main_kernel.service_ports or [],
+        )
 
     async def search(
         self,
@@ -551,7 +634,7 @@ class SessionDBSource:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             session_rows = [row.SessionRow for row in result.rows]
@@ -564,22 +647,6 @@ class SessionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    async def filter_sessions_in_project(
-        self,
-        session_ids: list[SessionId],
-        project_id: uuid.UUID,
-    ) -> list[SessionId]:
-        """Return session IDs that belong to the specified project."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(SessionRow.id).where(
-                sa.and_(
-                    SessionRow.id.in_(session_ids),
-                    SessionRow.group_id == project_id,
-                )
-            )
-            result = await db_sess.execute(query)
-            return [row.id for row in result]
 
     async def search_kernels(
         self,

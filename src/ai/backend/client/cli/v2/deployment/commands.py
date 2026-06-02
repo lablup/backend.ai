@@ -117,6 +117,7 @@ def get(deployment_id: str) -> None:
 @click.option("--name", required=True, type=str, help="Deployment name.")
 @click.option("--project-id", required=True, type=str, help="Project (group) UUID.")
 @click.option("--domain-name", default="default", type=str, help="Domain name.")
+@click.option("--resource-group", required=True, type=str, help="Resource group name.")
 @click.option("--replicas", default=0, type=int, help="Number of replicas.")
 @click.option("--open-to-public", default=False, is_flag=True, help="Make publicly accessible.")
 @click.option(
@@ -135,6 +136,7 @@ def create(
     name: str,
     project_id: str,
     domain_name: str,
+    resource_group: str,
     replicas: int,
     open_to_public: bool,
     strategy: str,
@@ -147,25 +149,27 @@ def create(
     from ai.backend.common.data.model_deployment.types import DeploymentStrategy
     from ai.backend.common.dto.manager.v2.deployment.request import (
         CreateDeploymentInput,
-        CreateRevisionInputDTO,
+        CreateRevisionInput,
         DeploymentStrategyInput,
         ModelDeploymentMetadataInput,
         ModelDeploymentNetworkAccessInput,
     )
+    from ai.backend.common.identifier.resource_group import ResourceGroupName
 
-    revision_dto: CreateRevisionInputDTO | None = None
+    revision_dto: CreateRevisionInput | None = None
     if initial_revision is not None:
         if initial_revision.startswith("@"):
             with Path(initial_revision[1:]).open() as f:
                 rev_data = json.load(f)
         else:
             rev_data = json.loads(initial_revision)
-        revision_dto = CreateRevisionInputDTO.model_validate(rev_data)
+        revision_dto = CreateRevisionInput.model_validate(rev_data)
 
     body = CreateDeploymentInput(
         metadata=ModelDeploymentMetadataInput(
             project_id=project_id,
             domain_name=domain_name,
+            resource_group_name=ResourceGroupName(resource_group),
             name=name,
         ),
         network_access=ModelDeploymentNetworkAccessInput(

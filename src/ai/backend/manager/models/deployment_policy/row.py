@@ -7,13 +7,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
@@ -36,7 +37,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class RollingUpdateSpec(BaseModel):
+class RollingUpdateSpec(BackendAISchema):
     """Specification for rolling update deployment strategy.
 
     ``max_surge`` and ``max_unavailable`` are :class:`IntOrPercent` objects.
@@ -84,7 +85,7 @@ class RollingUpdateSpec(BaseModel):
         return math.ceil(result) if round_up else math.floor(result)
 
 
-class BlueGreenSpec(BaseModel):
+class BlueGreenSpec(BackendAISchema):
     """Specification for blue-green deployment strategy."""
 
     auto_promote: bool = False

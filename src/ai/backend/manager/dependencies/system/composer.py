@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
@@ -19,6 +18,7 @@ from ai.backend.common.service_discovery.service_discovery import (
 from ai.backend.common.types import ValkeyProfileTarget
 from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
 from ai.backend.manager.api.rest.types import CORSOptions
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

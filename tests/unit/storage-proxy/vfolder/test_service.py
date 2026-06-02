@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp import web
 
-from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType, VFolderID
+from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType, VFolderID, VolumeID
 from ai.backend.storage.errors import VFolderNotFoundError
 from ai.backend.storage.services.service import VolumeService
 from ai.backend.storage.services.service import log as service_log
@@ -20,6 +20,9 @@ from ai.backend.storage.volumes.types import (
 UUID = uuid.UUID("12345678-1234-5678-1234-567812345678")
 UUID1 = uuid.UUID("12345678-1234-5678-1234-567812345679")
 UUID2 = uuid.UUID("12345678-1234-5678-1234-567812345680")
+VOLUME_ID = VolumeID(UUID)
+VOLUME_ID1 = VolumeID(UUID1)
+VOLUME_ID2 = VolumeID(UUID2)
 
 
 @pytest.fixture
@@ -46,7 +49,7 @@ async def test_get_volume(
 
     mock_volume_pool.get_volume_info.return_value = mock_volume_info
 
-    volume_id = UUID
+    volume_id = VOLUME_ID
     result = await mock_service.get_volume(volume_id)
 
     mock_log.assert_called_once_with(service_log, "get_volume", volume_id)
@@ -108,7 +111,7 @@ async def test_create_quota_scope(
 
     quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
     quota_scope_key = QuotaScopeKey(
-        volume_id=uuid.UUID("12345678-1234-5678-1234-567812345678"),
+        volume_id=VOLUME_ID,
         quota_scope_id=quota_scope_id,
     )
     options = QuotaConfig(limit_bytes=1024 * 1024 * 1024)
@@ -132,7 +135,7 @@ async def test_get_quota_scope(
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
     quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
-    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=quota_scope_id)
+    quota_scope_key = QuotaScopeKey(volume_id=VOLUME_ID, quota_scope_id=quota_scope_id)
 
     result = await mock_service.get_quota_scope(quota_scope_key)
 
@@ -155,7 +158,7 @@ async def test_update_quota_scope(
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
     quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
-    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=quota_scope_id)
+    quota_scope_key = QuotaScopeKey(volume_id=VOLUME_ID, quota_scope_id=quota_scope_id)
     options = QuotaConfig(limit_bytes=2000)
 
     await mock_service.update_quota_scope(quota_scope_key, options)
@@ -180,7 +183,7 @@ async def test_delete_quota_scope(
     mock_volume_pool.get_volume.return_value.__aenter__.return_value = mock_volume
 
     quota_scope_id = QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID)
-    quota_scope_key = QuotaScopeKey(volume_id=UUID, quota_scope_id=quota_scope_id)
+    quota_scope_key = QuotaScopeKey(volume_id=VOLUME_ID, quota_scope_id=quota_scope_id)
 
     await mock_service.delete_quota_scope(quota_scope_key)
 
@@ -203,7 +206,7 @@ async def test_create_vfolder(
         quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID),
         folder_id=UUID,
     )
-    vfolder_key = VFolderKey(volume_id=UUID, vfolder_id=vfolder_id)
+    vfolder_key = VFolderKey(volume_id=VOLUME_ID, vfolder_id=vfolder_id)
 
     await mock_service.create_vfolder(vfolder_key)
 
@@ -228,7 +231,7 @@ async def test_clone_vfolder(
         quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID1),
         folder_id=UUID2,
     )
-    vfolder_key = VFolderKey(volume_id=UUID, vfolder_id=src_vfolder_id)
+    vfolder_key = VFolderKey(volume_id=VOLUME_ID, vfolder_id=src_vfolder_id)
 
     await mock_service.clone_vfolder(vfolder_key, dst_vfolder_id)
 
@@ -260,7 +263,7 @@ async def test_get_vfolder_info(
         quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID),
         folder_id=UUID,
     )
-    vfolder_key = VFolderKey(volume_id=UUID, vfolder_id=vfolder_id)
+    vfolder_key = VFolderKey(volume_id=VOLUME_ID, vfolder_id=vfolder_id)
     subpath = "test_subpath"
 
     result = await mock_service.get_vfolder_info(vfolder_key, subpath)
@@ -291,7 +294,7 @@ async def test_delete_vfolder(
         quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID),
         folder_id=UUID,
     )
-    vfolder_key = VFolderKey(volume_id=UUID, vfolder_id=vfolder_id)
+    vfolder_key = VFolderKey(volume_id=VOLUME_ID, vfolder_id=vfolder_id)
 
     with pytest.raises(web.HTTPGone, match="VFolder not found"):
         await mock_service.delete_vfolder(vfolder_key)

@@ -7,7 +7,12 @@ from __future__ import annotations
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import DateTimeFilter, IntFilter, StringFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    IntFilter,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     OrderDirection,
@@ -276,11 +281,30 @@ class DeleteProjectResourcePolicyInput(BaseRequestModel):
 # ── Filter & Order DTOs ──
 
 
+class KeypairResourcePolicyKeypairNestedFilter(BaseRequestModel):
+    """Nested filter for keypairs attached to a keypair resource policy.
+
+    Filters policies that have at least one keypair matching all specified
+    conditions.
+    """
+
+    user_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the UUID of the keypair owner."
+    )
+
+
 class KeypairResourcePolicyFilter(BaseRequestModel):
     """Filter for keypair resource policy search."""
 
     name: StringFilter | None = Field(default=None, description="Filter by policy name.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
+    keypair: KeypairResourcePolicyKeypairNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Nested filter on keypairs assigned to this policy. "
+            "Matches policies linked to at least one keypair satisfying the conditions."
+        ),
+    )
     max_session_lifetime: IntFilter | None = Field(
         default=None, description="Filter by max session lifetime."
     )

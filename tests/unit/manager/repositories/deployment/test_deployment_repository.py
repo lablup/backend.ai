@@ -6,6 +6,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,9 +19,11 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
-from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -60,6 +63,7 @@ from ai.backend.manager.models.deployment_policy import (
     RollingUpdateSpec,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.group import GroupRow
@@ -72,6 +76,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -116,7 +121,6 @@ from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
-    RevisionStateUpdaterSpec,
     RouteStatusUpdaterSpec,
     RouteUpdaterSpec,
 )
@@ -133,6 +137,34 @@ def create_test_password_info(password: str) -> PasswordInfo:
         rounds=100_000,
         salt_size=32,
     )
+
+
+def attach_primary_replica_group(
+    db_sess: Any,
+    endpoint: EndpointRow,
+    *,
+    current_revision_id: uuid.UUID | None = None,
+    target_revision_id: uuid.UUID | None = None,
+) -> ReplicaGroupRow:
+    """Create the primary replica group for a hand-built endpoint and wire its
+    revision pointers, mirroring what ``create_endpoint`` does at runtime.
+
+    Revision pointers now live on the replica group, so tests that construct
+    ``EndpointRow`` directly must attach a group for the revision-resolution
+    paths to see ``current``/``deploying`` revisions.
+    """
+    group_id = uuid.uuid4()
+    group = ReplicaGroupRow(
+        id=ReplicaGroupID(group_id),
+        deployment_id=endpoint.id,
+        current_revision_id=current_revision_id,
+        target_revision_id=target_revision_id,
+    )
+    db_sess.add(group)
+    endpoint.primary_replica_group_id = ReplicaGroupID(group_id)
+    if target_revision_id is not None:
+        endpoint.target_replica_group_id = ReplicaGroupID(group_id)
+    return group
 
 
 class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
@@ -166,7 +198,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 SessionRow,
                 KernelRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
                 RoutingRow,
@@ -617,7 +651,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 labels={},
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
             # Create runtime_variant for revision FK
             db_sess.add(
@@ -643,9 +677,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.READY,
-                current_revision=revision_id,
             )
             db_sess.add(endpoint)
+            attach_primary_replica_group(db_sess, endpoint, current_revision_id=revision_id)
             await db_sess.flush()
 
             # Create revision for endpoint
@@ -656,6 +690,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 image=image_id,
                 model=None,
                 model_mount_destination="/models",
+                vfolder_subpath=None,
                 resource_group=test_scaling_group_name,
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
@@ -734,7 +769,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         """Test fetching service discovery info for a single route with inference port."""
         kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
 
-        result = await deployment_repository.fetch_route_service_discovery_info({test_route_id})
+        result = await deployment_repository.fetch_route_service_discovery_info({
+            ReplicaID(test_route_id)
+        })
 
         assert len(result) == 1
         info = result[0]
@@ -775,7 +812,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(route)
             await db_sess.flush()
 
-        result = await deployment_repository.fetch_route_service_discovery_info({route_id})
+        result = await deployment_repository.fetch_route_service_discovery_info({
+            ReplicaID(route_id)
+        })
 
         # Should return empty list because kernel has no inference port
         assert len(result) == 0
@@ -794,7 +833,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Test that nonexistent route IDs return empty list."""
-        nonexistent_id = uuid.uuid4()
+        nonexistent_id = ReplicaID(uuid.uuid4())
 
         result = await deployment_repository.fetch_route_service_discovery_info({nonexistent_id})
 
@@ -813,7 +852,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     ) -> None:
         """Test fetching service discovery info for multiple routes."""
         # Create 3 sets of endpoint/session/kernel/route
-        route_ids = set()
+        route_ids: set[ReplicaID] = set()
         endpoint_ids = []
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -846,7 +885,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 labels={},
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
             runtime_variant_id = uuid.uuid4()
             db_sess.add(
@@ -875,9 +914,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     url=f"http://test{i}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.READY,
-                    current_revision=revision_id,
                 )
                 db_sess.add(endpoint)
+                attach_primary_replica_group(db_sess, endpoint, current_revision_id=revision_id)
                 revision = DeploymentRevisionRow(
                     id=revision_id,
                     endpoint=endpoint_id,
@@ -967,7 +1006,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 db_sess.add(kernel)
 
                 # Create route
-                route_id = uuid.uuid4()
+                route_id = ReplicaID(uuid.uuid4())
                 route = RoutingRow(
                     id=route_id,
                     endpoint=endpoint_id,
@@ -1353,17 +1392,22 @@ class TestDeploymentRevisionOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,  # KeyPairRow relationship dependency
                 RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
+                KeyPairRow,  # UserRow.main_access_key FK target
                 GroupRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 ResourceSlotTypeRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
                 AssociationScopesEntitiesRow,  # RBACEntityCreator dependency
                 RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
                 DeploymentPolicyRow,
@@ -1523,13 +1567,25 @@ class TestDeploymentRevisionOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> uuid.UUID:
         """Create test image and return image ID."""
+        registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            registry = ContainerRegistryRow(
+                id=registry_id,
+                url="https://test-registry.example.com",
+                registry_name=f"test-registry-{registry_id.hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+                is_global=True,
+            )
+            db_sess.add(registry)
+            await db_sess.flush()
+
             image = ImageRow(
                 name="test-image:latest",
                 project=str(uuid.uuid4()),
                 image="test-image",
                 registry="docker.io",
-                registry_id=uuid.uuid4(),
+                registry_id=registry_id,
                 architecture="x86_64",
                 is_local=False,
                 config_digest="sha256:abc123",
@@ -1567,9 +1623,9 @@ class TestDeploymentRevisionOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
+            attach_primary_replica_group(db_sess, endpoint)
             await db_sess.commit()
 
         return endpoint_id
@@ -1658,6 +1714,7 @@ class TestDeploymentRevisionOperations:
             cluster_size=1,
             model_vfolder_id=test_vfolder_id,
             model_mount_destination="/models",
+            vfolder_subpath=None,
             model_definition_path=None,
             model_definition=None,
             startup_command=None,
@@ -1702,6 +1759,7 @@ class TestDeploymentRevisionOperations:
                 cluster_size=1,
                 model_vfolder_id=test_vfolder_id,
                 model_mount_destination="/models",
+                vfolder_subpath=None,
                 model_definition_path=None,
                 model_definition=None,
                 startup_command=None,
@@ -1748,6 +1806,7 @@ class TestDeploymentRevisionOperations:
                 cluster_size=1,
                 model_vfolder_id=test_vfolder_id,
                 model_mount_destination="/models",
+                vfolder_subpath=None,
                 model_definition_path=None,
                 model_definition=None,
                 startup_command=None,
@@ -1791,6 +1850,7 @@ class TestDeploymentRevisionOperations:
             cluster_size=1,
             model_vfolder_id=test_vfolder_id,
             model_mount_destination="/models",
+            vfolder_subpath=None,
             model_definition_path=None,
             model_definition=None,
             startup_command=None,
@@ -1816,7 +1876,6 @@ class TestDeploymentRevisionOperations:
         assert result.cluster_config.size == 1
         assert result.resource_config.resource_group_name == test_scaling_group_name
         assert result.model_runtime_config.runtime_variant_id is not None
-        assert result.name == "revision-1"
 
     async def test_get_revision(
         self,
@@ -1827,7 +1886,6 @@ class TestDeploymentRevisionOperations:
         result = await deployment_repository.get_revision(test_revision_data.id)
 
         assert result.id == test_revision_data.id
-        assert result.name == "revision-1"
         assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
 
     async def test_get_revision_not_found(
@@ -1835,7 +1893,7 @@ class TestDeploymentRevisionOperations:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Test that get_revision raises DeploymentRevisionNotFound for nonexistent ID."""
-        nonexistent_id = uuid.uuid4()
+        nonexistent_id = DeploymentRevisionID(uuid.uuid4())
 
         with pytest.raises(DeploymentRevisionNotFound):
             await deployment_repository.get_revision(nonexistent_id)
@@ -1860,6 +1918,60 @@ class TestDeploymentRevisionOperations:
         result = await deployment_repository.get_latest_revision_number(test_endpoint_id)
 
         assert result == 3
+
+    async def test_get_latest_revision_returns_highest_revision_number(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: DeploymentID,
+        test_multiple_revisions: list[ModelRevisionData],
+    ) -> None:
+        """`get_latest_revision` returns the revision with the highest revision_number."""
+        result = await deployment_repository.get_latest_revision(test_endpoint_id)
+
+        expected_latest = test_multiple_revisions[-1]
+        assert result.id == expected_latest.id
+
+    async def test_get_latest_revision_ignores_endpoint_current_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: DeploymentID,
+        test_multiple_revisions: list[ModelRevisionData],
+    ) -> None:
+        """`get_latest_revision` returns the latest revision even when ``current_revision`` points elsewhere.
+
+        This is the legacy ``modify_endpoint`` scenario: a previous revision
+        is still serving (``current_revision`` = v1) while a more recent
+        revision has been created (latest = v3). The base for the next
+        modify must be v3, not v1.
+        """
+        first_revision = test_multiple_revisions[0]
+        latest_revision = test_multiple_revisions[-1]
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            # Current revision now lives on the primary replica group.
+            await db_sess.execute(
+                sa.update(ReplicaGroupRow)
+                .where(ReplicaGroupRow.deployment_id == test_endpoint_id)
+                .values(current_revision_id=first_revision.id)
+            )
+            await db_sess.commit()
+
+        latest = await deployment_repository.get_latest_revision(test_endpoint_id)
+        current = await deployment_repository.get_current_revision(test_endpoint_id)
+
+        assert latest.id == latest_revision.id
+        assert current.id == first_revision.id
+        assert latest.id != current.id
+
+    async def test_get_latest_revision_no_revisions_raises(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        """`get_latest_revision` raises ``DeploymentRevisionNotFound`` when no revisions exist."""
+        with pytest.raises(DeploymentRevisionNotFound):
+            await deployment_repository.get_latest_revision(test_endpoint_id)
 
     async def test_search_revisions_empty(
         self,
@@ -1929,94 +2041,6 @@ class TestDeploymentRevisionOperations:
         assert result.has_next_page is True
         assert result.has_previous_page is True
 
-    async def test_update_endpoint_deploying_revision(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: DeploymentID,
-        test_revision_data: ModelRevisionData,
-    ) -> None:
-        """Test updating endpoint deploying_revision using Updater."""
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                deploying_revision=TriState.update(test_revision_data.id),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-
-        # Verify returned DeploymentInfo
-        assert deployment_info.id == test_endpoint_id
-
-        # Verify database state (deploying_revision is not part of DeploymentInfo)
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one()
-            assert endpoint.deploying_revision == test_revision_data.id
-
-    async def test_update_endpoint_current_revision(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: DeploymentID,
-        test_revision_data: ModelRevisionData,
-    ) -> None:
-        """Test updating endpoint current_revision using Updater."""
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                current_revision=TriState.update(test_revision_data.id),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-
-        # Verify returned DeploymentInfo
-        assert deployment_info.id == test_endpoint_id
-        assert deployment_info.current_revision_id == test_revision_data.id
-
-        # Verify database state
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one()
-            assert endpoint.current_revision == test_revision_data.id
-
-    async def test_update_endpoint_nullify_deploying_revision(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: DeploymentID,
-        test_revision_data: ModelRevisionData,
-    ) -> None:
-        """Test nullifying endpoint deploying_revision using TriState.nullify()."""
-        # First set deploying_revision
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                deploying_revision=TriState.update(test_revision_data.id),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-        assert deployment_info.id == test_endpoint_id
-
-        # Then nullify it
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                deploying_revision=TriState.nullify(),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-        assert deployment_info.id == test_endpoint_id
-
-        # Verify database state (deploying_revision is not part of DeploymentInfo)
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one()
-            assert endpoint.deploying_revision is None
-
     async def test_update_endpoint_returns_updated_deployment_info(
         self,
         deployment_repository: DeploymentRepository,
@@ -2036,9 +2060,6 @@ class TestDeploymentRevisionOperations:
                 replica_spec=ReplicaSpecUpdaterSpec(
                     replica_count=OptionalState.update(new_replica_count),
                 ),
-                revision_state=RevisionStateUpdaterSpec(
-                    current_revision=TriState.update(test_revision_data.id),
-                ),
             ),
             pk_value=test_endpoint_id,
         )
@@ -2047,8 +2068,7 @@ class TestDeploymentRevisionOperations:
         # Verify returned DeploymentInfo contains updated values
         assert deployment_info.id == test_endpoint_id
         assert deployment_info.metadata.name == new_name
-        assert deployment_info.replica_spec.replica_count == new_replica_count
-        assert deployment_info.current_revision_id == test_revision_data.id
+        assert deployment_info.replica.replica_count == new_replica_count
 
         # Verify database state matches returned values
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -2057,7 +2077,6 @@ class TestDeploymentRevisionOperations:
             endpoint = result.scalar_one()
             assert endpoint.name == new_name
             assert endpoint.replicas == new_replica_count
-            assert endpoint.current_revision == test_revision_data.id
 
 
 class TestDeploymentAutoScalingPolicyOperations:
@@ -2083,6 +2102,7 @@ class TestDeploymentAutoScalingPolicyOperations:
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 DeploymentAutoScalingPolicyRow,
             ],
         ):
@@ -2249,7 +2269,6 @@ class TestDeploymentAutoScalingPolicyOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -2459,6 +2478,7 @@ class TestDeploymentPolicyOperations:
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 DeploymentPolicyRow,
             ],
         ):
@@ -2625,7 +2645,6 @@ class TestDeploymentPolicyOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -2796,6 +2815,7 @@ class TestSearchDeploymentPolicies:
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 DeploymentPolicyRow,
             ],
         ):
@@ -2945,7 +2965,6 @@ class TestSearchDeploymentPolicies:
                     url=f"http://test-{eid.hex[:8]}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 db_sess.add(endpoint)
                 endpoint_ids.append(eid)
@@ -3179,6 +3198,7 @@ class TestRouteOperations:
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 AssociationScopesEntitiesRow,
             ],
@@ -3346,7 +3366,6 @@ class TestRouteOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -3386,7 +3405,8 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
-            revision_id=uuid.uuid4(),
+            revision_id=DeploymentRevisionID(uuid.uuid4()),
+            health_check=None,
             traffic_ratio=1.0,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
@@ -3420,7 +3440,8 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
-            revision_id=uuid.uuid4(),
+            revision_id=DeploymentRevisionID(uuid.uuid4()),
+            health_check=None,
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3468,7 +3489,8 @@ class TestRouteOperations:
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
-            revision_id=uuid.uuid4(),
+            revision_id=DeploymentRevisionID(uuid.uuid4()),
+            health_check=None,
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3545,11 +3567,14 @@ class TestDeploymentRepositoryDuplicateName:
                 KeyPairRow,
                 GroupRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 ResourceSlotTypeRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 EndpointTokenRow,
                 RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 DeploymentRevisionResourceSlotRow,
                 AssociationScopesEntitiesRow,
@@ -3574,13 +3599,25 @@ class TestDeploymentRepositoryDuplicateName:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> uuid.UUID:
         """Create test image and return image ID."""
+        registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            registry = ContainerRegistryRow(
+                id=registry_id,
+                url="https://test-registry.example.com",
+                registry_name=f"test-registry-{registry_id.hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+                is_global=True,
+            )
+            db_sess.add(registry)
+            await db_sess.flush()
+
             image = ImageRow(
                 name="test-image:latest",
                 project=str(uuid.uuid4()),
                 image="test-image",
                 registry="docker.io",
-                registry_id=uuid.uuid4(),
+                registry_id=registry_id,
                 architecture="x86_64",
                 is_local=False,
                 config_digest="sha256:abc123",
@@ -3743,37 +3780,6 @@ class TestDeploymentRepositoryDuplicateName:
                 element_type=RBACElementType.PROJECT, element_id=str(group.id)
             ),
         )
-
-    async def test_create_endpoint_raises_when_duplicate_name(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
-        test_image_id: uuid.UUID,
-    ) -> None:
-        """Test that create_endpoint raises DeploymentNameAlreadyExists for duplicate name."""
-        # Create first endpoint with specific name
-        first_creator = self._create_endpoint_creator(
-            name="duplicate-test-endpoint",
-            domain=test_domain,
-            group=test_group,
-            scaling_group=test_scaling_group,
-            image_id=test_image_id,
-        )
-        await deployment_repository.create_endpoint(first_creator)
-
-        # Attempt to create second endpoint with same name should fail
-        second_creator = self._create_endpoint_creator(
-            name="duplicate-test-endpoint",
-            domain=test_domain,
-            group=test_group,
-            scaling_group=test_scaling_group,
-            image_id=test_image_id,
-        )
-
-        with pytest.raises(DeploymentNameAlreadyExists):
-            await deployment_repository.create_endpoint(second_creator)
 
     async def test_create_endpoint_succeeds_with_different_name(
         self,
@@ -3948,7 +3954,7 @@ class TestDeploymentRepositoryDuplicateName:
         the same (name, domain, project) is already in DESTROYING."""
         target_id, _ = coexisting_active_and_destroying_endpoints
 
-        succeeded = await deployment_repository.destroy_endpoint(target_id)
+        succeeded = await deployment_repository.destroy_endpoint(DeploymentID(target_id))
         assert succeeded is True
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -3973,29 +3979,30 @@ class TestDeploymentRepositoryDuplicateName:
         against re-activation; orphan routes from the preempted rollout
         are cleaned up by ``RouteEvictionHandler``'s orphan branch.
         """
-        endpoint_id = uuid.uuid4()
-        previous_deploying = uuid.uuid4()
-        new_deploying = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
+        previous_deploying = DeploymentRevisionID(uuid.uuid4())
+        new_deploying = DeploymentRevisionID(uuid.uuid4())
         user_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                EndpointRow(
-                    id=endpoint_id,
-                    name=f"override-{uuid.uuid4().hex[:8]}",
-                    created_user=user_id,
-                    session_owner=user_id,
-                    domain=test_domain.name,
-                    project=test_group.id,
-                    resource_group=test_scaling_group.name,
-                    replicas=1,
-                    desired_replicas=1,
-                    url=None,
-                    open_to_public=False,
-                    lifecycle_stage=EndpointLifecycle.DEPLOYING,
-                    deploying_revision=previous_deploying,
-                )
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"override-{uuid.uuid4().hex[:8]}",
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.name,
+                project=test_group.id,
+                resource_group=test_scaling_group.name,
+                replicas=1,
+                desired_replicas=1,
+                url=None,
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DEPLOYING,
             )
+            db_sess.add(endpoint)
+            # A previous rollout's deploying revision lives on the primary
+            # group's ``target_revision_id``.
+            attach_primary_replica_group(db_sess, endpoint, target_revision_id=previous_deploying)
             await db_sess.commit()
 
         previous_current, updated = await deployment_repository.set_deploying_revision(
@@ -4008,12 +4015,19 @@ class TestDeploymentRepositoryDuplicateName:
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             row = (
                 await db_sess.execute(
-                    sa.select(EndpointRow.deploying_revision, EndpointRow.lifecycle_stage).where(
-                        EndpointRow.id == endpoint_id
+                    sa.select(
+                        ReplicaGroupRow.target_revision_id,
+                        EndpointRow.lifecycle_stage,
                     )
+                    .select_from(EndpointRow)
+                    .join(
+                        ReplicaGroupRow,
+                        EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+                    )
+                    .where(EndpointRow.id == endpoint_id)
                 )
             ).one()
-            assert row.deploying_revision == new_deploying
+            assert row.target_revision_id == new_deploying
             assert row.lifecycle_stage == EndpointLifecycle.DEPLOYING
 
     async def test_set_deploying_revision_returns_false_for_missing_endpoint(
@@ -4023,7 +4037,7 @@ class TestDeploymentRepositoryDuplicateName:
         """``set_deploying_revision`` returns updated=False when the endpoint id
         does not match any row, instead of raising."""
         previous_current, updated = await deployment_repository.set_deploying_revision(
-            uuid.uuid4(), uuid.uuid4()
+            DeploymentID(uuid.uuid4()), DeploymentRevisionID(uuid.uuid4())
         )
         assert updated is False
         assert previous_current is None

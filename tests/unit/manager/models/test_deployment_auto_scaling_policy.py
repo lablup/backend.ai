@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
@@ -20,12 +21,14 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
 )
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -89,6 +92,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 KeyPairRow,
                 GroupRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 SessionRow,
                 KernelRow,
@@ -96,6 +100,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 EndpointRow,
                 DeploymentPolicyRow,
                 RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 DeploymentAutoScalingPolicyRow,
             ],
@@ -222,13 +227,23 @@ class TestDeploymentAutoScalingPolicyRow:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[ImageRow, None]:
         """Create test image."""
+        registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ContainerRegistryRow(
+                    id=registry_id,
+                    url="https://docker.io",
+                    registry_name=f"reg-{uuid.uuid4().hex[:8]}",
+                    type=ContainerRegistryType.DOCKER,
+                )
+            )
+            await db_sess.flush()
             image = ImageRow(
                 name="test-image:latest",
                 project=str(uuid.uuid4()),
                 image="test-image",
                 registry="docker.io",
-                registry_id=uuid.uuid4(),
+                registry_id=registry_id,
                 architecture="x86_64",
                 is_local=False,
                 config_digest="sha256:abc123",
@@ -286,7 +301,6 @@ class TestDeploymentAutoScalingPolicyRow:
                 resource_group=test_scaling_group.name,
                 url=f"https://test-{uuid.uuid4().hex[:8]}.example.com",
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.flush()

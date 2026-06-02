@@ -43,6 +43,7 @@ from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.dto.manager.session.types import MountOption
 from ai.backend.common.types import ClusterMode
 
 from .args import click_start_option
@@ -196,7 +197,10 @@ def _create_cmd(docs: str | None = None) -> Callable[..., None]:
         envs = prepare_env_arg(env)
         parsed_resources = prepare_resource_arg(resources)
         parsed_resource_opts = prepare_resource_arg(resource_opts)
-        mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
+        mount, mount_map, raw_mount_options = prepare_mount_arg(mount, escape=True)
+        mount_options = {
+            key: MountOption.model_validate(opts) for key, opts in raw_mount_options.items()
+        }
 
         preopen_ports = preopen
         assigned_agent_list = assign_agent

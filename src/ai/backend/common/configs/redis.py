@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from pydantic import AliasChoices, BaseModel, Field, field_serializer, field_validator
+from pydantic import AliasChoices, Field, field_serializer, field_validator
 
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
@@ -10,12 +10,17 @@ from ai.backend.common.meta import (
     ConfigExample,
 )
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import (
+    BackendAISchema,
+    RedisProfileTarget,
+    ValkeyProfileTarget,
+    ValkeyTarget,
+)
 from ai.backend.common.types import RedisHelperConfig as RedisHelperConfigDict
-from ai.backend.common.types import RedisProfileTarget, ValkeyProfileTarget, ValkeyTarget
 from ai.backend.common.types import RedisTarget as _RedisTarget
 
 
-class RedisHelperConfig(BaseModel):
+class RedisHelperConfig(BackendAISchema):
     socket_timeout: Annotated[
         float,
         Field(
@@ -94,7 +99,7 @@ class RedisHelperConfig(BaseModel):
         )
 
 
-class SingleRedisConfig(BaseModel):
+class SingleRedisConfig(BackendAISchema):
     addr: Annotated[
         HostPortPairModel | None,
         Field(default=None),

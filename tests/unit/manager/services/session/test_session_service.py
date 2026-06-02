@@ -16,6 +16,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -58,6 +59,12 @@ from ai.backend.manager.services.session.actions.destroy_session import (
 from ai.backend.manager.services.session.actions.download_files import (
     DownloadFilesAction,
     DownloadFilesActionResult,
+)
+from ai.backend.manager.services.session.actions.enqueue_session import (
+    EnqueueSessionAction,
+    ResourceSlotEntry,
+    SessionResourceSpec,
+    SessionSchedulingSpec,
 )
 from ai.backend.manager.services.session.actions.execute_session import (
     ExecuteSessionAction,
@@ -116,9 +123,7 @@ def mock_session_repository() -> MagicMock:
 @pytest.fixture
 def mock_agent_registry() -> MagicMock:
     """Create mocked agent registry."""
-    mock = MagicMock()
-    mock.increment_session_usage = AsyncMock()
-    return mock
+    return MagicMock()
 
 
 @pytest.fixture
@@ -160,6 +165,12 @@ def mock_scheduling_controller() -> MagicMock:
 
 
 @pytest.fixture
+def mock_scheduler_repository() -> MagicMock:
+    """Create mocked scheduler repository."""
+    return MagicMock()
+
+
+@pytest.fixture
 def mock_appproxy_client_pool() -> MagicMock:
     """Create mocked AppProxy client pool."""
     return MagicMock()
@@ -175,6 +186,7 @@ async def session_service(
     mock_error_monitor: MagicMock,
     mock_idle_checker_host: MagicMock,
     mock_scheduling_controller: MagicMock,
+    mock_scheduler_repository: MagicMock,
     mock_appproxy_client_pool: MagicMock,
 ) -> SessionService:
     """Create SessionService with mocked dependencies."""
@@ -186,6 +198,7 @@ async def session_service(
         error_monitor=mock_error_monitor,
         idle_checker_host=mock_idle_checker_host,
         session_repository=mock_session_repository,
+        scheduler_repository=mock_scheduler_repository,
         scheduling_controller=mock_scheduling_controller,
         appproxy_client_pool=mock_appproxy_client_pool,
         user_repository=MagicMock(),
@@ -686,7 +699,6 @@ class TestComplete:
         assert result.session_data == sample_session_data
         assert result.result == expected_response
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
         mock_agent_registry.get_completions.assert_called_once()
 
     async def test_session_not_found(
@@ -780,7 +792,6 @@ class TestGetSessionInfo:
         assert result.session_info.container_id == "a" * 64
         assert result.session_data == sample_session_data
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_running_session)
 
     async def test_success_with_no_container_id(
         self,
@@ -856,7 +867,6 @@ class TestDownloadFiles:
         assert result.session_data == sample_session_data
         assert result.result is not None
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
         mock_agent_registry.download_file.assert_called_once()
 
     async def test_session_not_found(
@@ -1109,7 +1119,6 @@ class TestUploadFiles:
         assert isinstance(result, UploadFilesActionResult)
         assert result.session_data == sample_session_data
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
 
     async def test_session_not_found(
         self,
@@ -1182,7 +1191,6 @@ class TestExecute:
         assert result.result is not None
         assert result.result["result"]["status"] == "finished"
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
         mock_agent_registry.execute.assert_called_once()
 
     async def test_session_not_found(
@@ -1242,7 +1250,6 @@ class TestInterrupt:
         assert isinstance(result, InterruptSessionActionResult)
         assert result.session_data == sample_session_data
         mock_session_repository.get_session_validated.assert_called_once()
-        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
         mock_agent_registry.interrupt_session.assert_called_once_with(mock_session)
 
     async def test_session_not_found(
@@ -1663,3 +1670,123 @@ class TestSearchKernels:
         assert result.total_count == 25
         assert result.has_next_page is True
         assert result.has_previous_page is True
+
+
+# ==================== EnqueueSession Tests ====================
+
+
+class TestEnqueueSession:
+    """Test cases for SessionService.enqueue_session"""
+
+    @pytest.fixture
+    def sample_image_id(self) -> UUID:
+        return uuid4()
+
+    @pytest.fixture
+    def picked_resource_group(self) -> ResourceGroupName:
+        return ResourceGroupName("auto-picked-rg")
+
+    @pytest.fixture
+    def enqueue_action_without_rg(
+        self,
+        sample_user_id: UUID,
+        sample_access_key: AccessKey,
+        sample_group_id: UUID,
+        sample_image_id: UUID,
+    ) -> EnqueueSessionAction:
+        """Action mirroring `backend.ai session create` without `-q/--scaling-group`."""
+        return EnqueueSessionAction(
+            session_name="test-session",
+            session_type=SessionTypes.INTERACTIVE,
+            image_id=sample_image_id,
+            resource=SessionResourceSpec(
+                entries=[
+                    ResourceSlotEntry(resource_type="cpu", quantity="1"),
+                    ResourceSlotEntry(resource_type="mem", quantity="512m"),
+                ],
+                resource_group=None,
+            ),
+            scheduling=SessionSchedulingSpec(),
+            user_id=sample_user_id,
+            access_key=sample_access_key,
+            domain_name="default",
+            group_id=sample_group_id,
+        )
+
+    @pytest.fixture
+    def enqueue_action_with_rg(
+        self,
+        enqueue_action_without_rg: EnqueueSessionAction,
+    ) -> EnqueueSessionAction:
+        """Same action but with the user supplying an explicit scaling group."""
+        return EnqueueSessionAction(
+            session_name=enqueue_action_without_rg.session_name,
+            session_type=enqueue_action_without_rg.session_type,
+            image_id=enqueue_action_without_rg.image_id,
+            resource=SessionResourceSpec(
+                entries=enqueue_action_without_rg.resource.entries,
+                resource_group="user-picked-rg",
+            ),
+            scheduling=enqueue_action_without_rg.scheduling,
+            user_id=enqueue_action_without_rg.user_id,
+            access_key=enqueue_action_without_rg.access_key,
+            domain_name=enqueue_action_without_rg.domain_name,
+            group_id=enqueue_action_without_rg.group_id,
+        )
+
+    @pytest.fixture
+    def configured_session_service(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        mock_scheduler_repository: MagicMock,
+        sample_session_id: SessionId,
+        sample_session_data: SessionData,
+        picked_resource_group: ResourceGroupName,
+    ) -> SessionService:
+        """Wire async mocks every ``enqueue_session`` exercise needs."""
+        mock_session_repository.resolve_image_by_id = AsyncMock()
+        mock_session_repository.get_session_data_by_id = AsyncMock(return_value=sample_session_data)
+        mock_scheduling_controller.enqueue_session_from_draft = AsyncMock(
+            return_value=sample_session_id
+        )
+        mock_scheduler_repository.pick_default_resource_group = AsyncMock(
+            return_value=picked_resource_group
+        )
+        return session_service
+
+    async def test_auto_picks_default_when_resource_group_omitted(
+        self,
+        configured_session_service: SessionService,
+        mock_scheduler_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        enqueue_action_without_rg: EnqueueSessionAction,
+        picked_resource_group: ResourceGroupName,
+    ) -> None:
+        """BA-5917: when ``action.resource.resource_group`` is None, the
+        service calls ``pick_default_resource_group`` and feeds the
+        picked name onto the draft handed to the controller — restoring
+        the legacy ``ScalingGroupResolver`` behavior.
+        """
+        await configured_session_service.enqueue_session(enqueue_action_without_rg)
+
+        mock_scheduler_repository.pick_default_resource_group.assert_awaited_once()
+        draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
+        assert draft.scope.resource_group_name == picked_resource_group
+
+    async def test_uses_user_supplied_resource_group(
+        self,
+        configured_session_service: SessionService,
+        mock_scheduler_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        enqueue_action_with_rg: EnqueueSessionAction,
+    ) -> None:
+        """When the caller supplies a scaling group, the auto-picker
+        must not run and the draft carries the user-supplied name.
+        """
+        await configured_session_service.enqueue_session(enqueue_action_with_rg)
+
+        mock_scheduler_repository.pick_default_resource_group.assert_not_called()
+        draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
+        assert str(draft.scope.resource_group_name) == "user-picked-rg"

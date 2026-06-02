@@ -11,16 +11,20 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
+from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.image.handler import ImageHandler
 from ai.backend.manager.api.rest.image.registry import register_image_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.api.rest.v2.image.handler import V2ImageHandler
+from ai.backend.manager.api.rest.v2.image.registry import register_v2_image_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -46,29 +50,45 @@ def image_processors(
     mock_scope.validate = AsyncMock()
     mock_single_entity = MagicMock(spec=SingleEntityActionRBACValidator)
     mock_single_entity.validate = AsyncMock()
+    mock_bulk = MagicMock(spec=BulkActionRBACValidator)
+    mock_bulk.validate = AsyncMock()
     validators = ActionValidators(
-        rbac=RBACValidators(scope=mock_scope, single_entity=mock_single_entity),
+        rbac=RBACValidators(scope=mock_scope, single_entity=mock_single_entity, bulk=mock_bulk),
     )
     return ImageProcessors(service=service, action_monitors=[], validators=validators)
+
+
+@pytest.fixture()
+def image_adapter(image_processors: ImageProcessors) -> ImageAdapter:
+    """Build an ImageAdapter wired only with image processors.
+
+    Other adapter call sites in ImageAdapter use ``self._processors.image`` exclusively,
+    so a MagicMock backing object with ``.image`` set to the real ImageProcessors is sufficient.
+    """
+    processors = MagicMock()
+    processors.image = image_processors
+    return ImageAdapter(processors)
 
 
 @pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     image_processors: ImageProcessors,
+    image_adapter: ImageAdapter,
 ) -> list[RouteRegistry]:
-    """Load only the modules required for image-domain tests."""
+    """Load both v1 and v2 image route trees for image-domain tests."""
     image_registry = register_image_routes(ImageHandler(image=image_processors), route_deps)
-    return [
-        register_admin_routes(
-            AdminHandler(
-                gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()
-            ),
-            route_deps,
-            sub_registries=[image_registry],
-            gql_ws_handler=MagicMock(),
-        ),
-    ]
+    admin_registry = register_admin_routes(
+        AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()),
+        route_deps,
+        sub_registries=[image_registry],
+        gql_ws_handler=MagicMock(),
+    )
+    v2_registry = RouteRegistry.create("v2", route_deps.cors_options)
+    v2_registry.add_subregistry(
+        register_v2_image_routes(V2ImageHandler(adapter=image_adapter), route_deps)
+    )
+    return [admin_registry, v2_registry]
 
 
 @pytest.fixture()

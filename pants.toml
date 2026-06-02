@@ -42,10 +42,26 @@ root_patterns = [
     "/tools/pants-plugins",
 ]
 
+[subprocess-environment]
+# Forward optional GitHub auth tokens used by the `science` binary during scie
+# builds. Without these, science calls GitHub anonymously and can hit the per-IP
+# rate limit (the response is HTML, which then surfaces as a checksum failure
+# with `<!DOCTYPE` in the digest). Set either env var to a GitHub PAT in your
+# shell to authenticate scie-jump/ptex/PBS downloads.
+env_vars.add = [
+    "SCIENCE_AUTH_GITHUB_COM_BEARER",
+    "SCIENCE_AUTH_API_GITHUB_COM_BEARER",
+]
+
 [test]
 extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s", "HOME"]
 attempts_default = 3
 timeout_default = 180
+
+[lint]
+# Batch more files per linter invocation to reduce ruff process startup overhead.
+# Default is 128; raising it cuts the number of spawned ruff processes ~8x.
+batch_size = 1024
 
 [python]
 enable_resolves = true

@@ -43,6 +43,7 @@ from ai.backend.common.types import VFolderHostPermission, VFolderHostPermission
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -84,7 +85,7 @@ def _configure_storage_mock(storage_manager: StorageSessionManager) -> AsyncMock
 @pytest.fixture()
 async def no_upload_permission_vfolder(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
     vfolder_factory: VFolderFactory,
 ) -> AsyncIterator[VFolderFixtureData]:
@@ -102,7 +103,7 @@ async def no_upload_permission_vfolder(
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.update(domains)
-            .where(domains.c.name == domain_fixture)
+            .where(domains.c.name == domain_fixture.domain_name)
             .values(allowed_vfolder_hosts=host_perms)
         )
         await conn.execute(
@@ -122,7 +123,7 @@ async def no_upload_permission_vfolder(
 @pytest.fixture()
 async def no_download_permission_vfolder(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
     vfolder_factory: VFolderFactory,
 ) -> AsyncIterator[VFolderFixtureData]:
@@ -135,7 +136,7 @@ async def no_download_permission_vfolder(
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.update(domains)
-            .where(domains.c.name == domain_fixture)
+            .where(domains.c.name == domain_fixture.domain_name)
             .values(allowed_vfolder_hosts=host_perms)
         )
         await conn.execute(

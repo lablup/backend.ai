@@ -1,6 +1,8 @@
 import enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 from .address import IPAddress, QualifiedAddress
 from .capacity import Capacity
@@ -15,7 +17,7 @@ class UsageType(enum.StrEnum):
     OTHER = "OTHER"
 
 
-class LogicalVolume(BaseModel):
+class LogicalVolume(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     uoid: UOID

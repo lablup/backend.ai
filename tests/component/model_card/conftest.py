@@ -21,6 +21,7 @@ from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -64,6 +65,7 @@ from ai.backend.manager.services.permission_contoller.processors import (
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -78,6 +80,7 @@ def _build_validators(
         rbac=RBACValidators(
             scope=ScopeActionRBACValidator(permission_repo, config_provider),
             single_entity=SingleEntityActionRBACValidator(permission_repo, config_provider),
+            bulk=BulkActionRBACValidator(permission_repo, config_provider),
         ),
     )
 
@@ -180,7 +183,7 @@ def server_module_registries(
 @pytest.fixture()
 async def model_store_project_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a MODEL_STORE type project and yield its UUID."""
@@ -192,7 +195,7 @@ async def model_store_project_fixture(
                 name=f"model-store-{secrets.token_hex(6)}",
                 description="Test MODEL_STORE project",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 type=ProjectType.MODEL_STORE,
             )
@@ -208,7 +211,7 @@ async def model_store_project_fixture(
 @pytest.fixture()
 async def second_project_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a second MODEL_STORE project for cross-project isolation tests."""
@@ -220,7 +223,7 @@ async def second_project_fixture(
                 name=f"model-store-b-{secrets.token_hex(6)}",
                 description="Second MODEL_STORE project",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 type=ProjectType.MODEL_STORE,
             )
@@ -236,7 +239,7 @@ async def second_project_fixture(
 @pytest.fixture()
 async def vfolder_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     admin_user_fixture: Any,
 ) -> AsyncIterator[VFolderUUID]:
     """Insert a MODEL-usage vfolder (storage proxy is mocked)."""
@@ -248,7 +251,7 @@ async def vfolder_fixture(
                 id=vfolder_id,
                 name=f"test-model-vfolder-{secrets.token_hex(4)}",
                 host="local",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 quota_scope_id=str(QuotaScopeID(QuotaScopeType.USER, user_uuid)),
                 usage_mode=VFolderUsageMode.MODEL,
                 user=str(user_uuid),

@@ -4,12 +4,11 @@ Tests for container metric queries in MetricRepository.
 
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
@@ -23,13 +22,20 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     PrometheusConnectionError,
 )
-from ai.backend.manager.clients.prometheus.fixed_query_builder import FixedQueryBuilder
-from ai.backend.manager.data.metric.types import (
+from ai.backend.common.types import KernelId
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.fixed_query_builder import (
+    ContainerLiveStatQueryBuilder,
+    ContainerMetricQueryBuilder,
+)
+from ai.backend.manager.clients.prometheus.metric_types import (
+    ContainerLiveStatQueries,
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
+    KernelLiveStatBatchResult,
     MetricType,
-    ValueType,
 )
+from ai.backend.manager.clients.prometheus.types import ValueType
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
@@ -56,49 +62,70 @@ def _make_query_range_response(
 
 
 def _make_metric_repository(
-    mock_prometheus_client: Mock,
+    mock_prometheus_client: PrometheusClient,
     *,
     timewindow: str = "1m",
 ) -> MetricRepository:
-    return MetricRepository(
-        MagicMock(),
-        prometheus_client=mock_prometheus_client,
-        fixed_query_builder=FixedQueryBuilder(timewindow),
+    mock_prometheus_client._container_metric_query_builder = ContainerMetricQueryBuilder(timewindow)
+    mock_prometheus_client._container_live_stat_query_builder = ContainerLiveStatQueryBuilder(
+        timewindow
     )
+    return MetricRepository(
+        db=MagicMock(),
+        prometheus_client=mock_prometheus_client,
+    )
+
+
+def _set_query_label_values(mock_prometheus_client: PrometheusClient, mock: Any) -> None:
+    setattr(mock_prometheus_client, "_query_label_values", mock)
+
+
+def _set_query_range(mock_prometheus_client: PrometheusClient, mock: Any) -> None:
+    setattr(mock_prometheus_client, "_query_range", mock)
 
 
 class TestContainerMetricRepositoryQueries:
     """Characterization tests: verify public interface behavior with PrometheusClient."""
 
     @pytest.fixture
-    def mock_prometheus_client(self) -> Mock:
-        return Mock(spec=PrometheusClient)
+    def mock_prometheus_client(self) -> PrometheusClient:
+        return PrometheusClient(
+            endpoint="http://localhost:9090/api/v1",
+            client_pool=MagicMock(),
+            container_metric_query_builder=ContainerMetricQueryBuilder("1m"),
+            container_live_stat_query_builder=ContainerLiveStatQueryBuilder("1m"),
+        )
 
     @pytest.fixture
-    def metric_repository(self, mock_prometheus_client: Mock) -> MetricRepository:
+    def metric_repository(self, mock_prometheus_client: PrometheusClient) -> MetricRepository:
         return _make_metric_repository(mock_prometheus_client)
 
     # -- query_container_metric_metadata --
 
     @pytest.fixture
-    def mock_label_values_with_metrics(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_label_values = AsyncMock(
-            return_value=LabelValueResponse(
-                status="success",
-                data=[
-                    "container_cpu_percent",
-                    "container_memory_used_bytes",
-                    "container_network_rx_bytes",
-                    "container_network_tx_bytes",
-                ],
-            )
+    def mock_label_values_with_metrics(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_label_values(
+            mock_prometheus_client,
+            AsyncMock(
+                return_value=LabelValueResponse(
+                    status="success",
+                    data=[
+                        "container_cpu_percent",
+                        "container_memory_used_bytes",
+                        "container_network_rx_bytes",
+                        "container_network_tx_bytes",
+                    ],
+                )
+            ),
         )
         return mock_prometheus_client
 
     async def test_query_metadata_returns_metric_names(
         self,
         metric_repository: MetricRepository,
-        mock_label_values_with_metrics: Mock,
+        mock_label_values_with_metrics: PrometheusClient,
     ) -> None:
         result = await metric_repository.query_container_metric_metadata()
 
@@ -107,32 +134,36 @@ class TestContainerMetricRepositoryQueries:
         assert "container_cpu_percent" in result
 
     @pytest.fixture
-    def mock_label_values_empty(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_label_values = AsyncMock(
-            return_value=LabelValueResponse(status="success", data=[])
+    def mock_label_values_empty(self, mock_prometheus_client: PrometheusClient) -> PrometheusClient:
+        _set_query_label_values(
+            mock_prometheus_client,
+            AsyncMock(return_value=LabelValueResponse(status="success", data=[])),
         )
         return mock_prometheus_client
 
     async def test_query_metadata_empty_result(
         self,
         metric_repository: MetricRepository,
-        mock_label_values_empty: Mock,
+        mock_label_values_empty: PrometheusClient,
     ) -> None:
         result = await metric_repository.query_container_metric_metadata()
 
         assert len(result) == 0
 
     @pytest.fixture
-    def mock_label_values_connection_error(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_label_values = AsyncMock(
-            side_effect=PrometheusConnectionError("Connection failed")
+    def mock_label_values_connection_error(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_label_values(
+            mock_prometheus_client,
+            AsyncMock(side_effect=PrometheusConnectionError("Connection failed")),
         )
         return mock_prometheus_client
 
     async def test_query_metadata_propagates_connection_error(
         self,
         metric_repository: MetricRepository,
-        mock_label_values_connection_error: Mock,
+        mock_label_values_connection_error: PrometheusClient,
     ) -> None:
         with pytest.raises(PrometheusConnectionError):
             await metric_repository.query_container_metric_metadata()
@@ -140,25 +171,30 @@ class TestContainerMetricRepositoryQueries:
     # -- query_container_metric: GAUGE (memory) --
 
     @pytest.fixture
-    def mock_query_range_gauge_memory(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_range = AsyncMock(
-            return_value=_make_query_range_response([
-                {
-                    "metric": {
-                        "value_type": "current",
-                        "__name__": "backendai_container_utilization",
-                        "container_metric_name": "container_memory_used_bytes",
-                    },
-                    "values": [(1704067200.0, "1048576"), (1704067260.0, "2097152")],
-                }
-            ])
+    def mock_query_range_gauge_memory(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_range(
+            mock_prometheus_client,
+            AsyncMock(
+                return_value=_make_query_range_response([
+                    {
+                        "metric": {
+                            "value_type": "current",
+                            "__name__": "backendai_container_utilization",
+                            "container_metric_name": "container_memory_used_bytes",
+                        },
+                        "values": [(1704067200.0, "1048576"), (1704067260.0, "2097152")],
+                    }
+                ])
+            ),
         )
         return mock_prometheus_client
 
     async def test_query_metric_gauge_returns_correct_result(
         self,
         metric_repository: MetricRepository,
-        mock_query_range_gauge_memory: Mock,
+        mock_query_range_gauge_memory: PrometheusClient,
     ) -> None:
         result = await metric_repository.query_container_metric(
             metric_name="container_memory_used_bytes",
@@ -176,26 +212,31 @@ class TestContainerMetricRepositoryQueries:
     # -- query_container_metric: RATE (network tx by agent) --
 
     @pytest.fixture
-    def mock_query_range_rate_net_tx(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_range = AsyncMock(
-            return_value=_make_query_range_response([
-                {
-                    "metric": {
-                        "value_type": "current",
-                        "__name__": "backendai_container_utilization",
-                        "container_metric_name": "container_network_tx_bytes",
-                        "agent_id": "agent-1",
-                    },
-                    "values": [(1704067200.0, "1024000"), (1704067500.0, "2048000")],
-                }
-            ])
+    def mock_query_range_rate_net_tx(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_range(
+            mock_prometheus_client,
+            AsyncMock(
+                return_value=_make_query_range_response([
+                    {
+                        "metric": {
+                            "value_type": "current",
+                            "__name__": "backendai_container_utilization",
+                            "container_metric_name": "container_network_tx_bytes",
+                            "agent_id": "agent-1",
+                        },
+                        "values": [(1704067200.0, "1024000"), (1704067500.0, "2048000")],
+                    }
+                ])
+            ),
         )
         return mock_prometheus_client
 
     async def test_query_metric_rate_returns_correct_result(
         self,
         metric_repository: MetricRepository,
-        mock_query_range_rate_net_tx: Mock,
+        mock_query_range_rate_net_tx: PrometheusClient,
     ) -> None:
         result = await metric_repository.query_container_metric(
             metric_name="net_tx",
@@ -213,30 +254,35 @@ class TestContainerMetricRepositoryQueries:
     # -- query_container_metric: DIFF (cpu_util by kernel) --
 
     @pytest.fixture
-    def mock_query_range_diff_cpu_util(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_range = AsyncMock(
-            return_value=_make_query_range_response([
-                {
-                    "metric": {
-                        "value_type": "current",
-                        "__name__": "backendai_container_utilization",
-                        "container_metric_name": "cpu_util",
-                        "kernel_id": "12345678-1234-5678-1234-567812345678",
-                    },
-                    "values": [
-                        (1704067200.0, "10.5"),
-                        (1704067260.0, "12.3"),
-                        (1704067320.0, "15.7"),
-                    ],
-                }
-            ])
+    def mock_query_range_diff_cpu_util(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_range(
+            mock_prometheus_client,
+            AsyncMock(
+                return_value=_make_query_range_response([
+                    {
+                        "metric": {
+                            "value_type": "current",
+                            "__name__": "backendai_container_utilization",
+                            "container_metric_name": "cpu_util",
+                            "kernel_id": "12345678-1234-5678-1234-567812345678",
+                        },
+                        "values": [
+                            (1704067200.0, "10.5"),
+                            (1704067260.0, "12.3"),
+                            (1704067320.0, "15.7"),
+                        ],
+                    }
+                ])
+            ),
         )
         return mock_prometheus_client
 
     async def test_query_metric_diff_returns_correct_result(
         self,
         metric_repository: MetricRepository,
-        mock_query_range_diff_cpu_util: Mock,
+        mock_query_range_diff_cpu_util: PrometheusClient,
     ) -> None:
         result = await metric_repository.query_container_metric(
             metric_name="cpu_util",
@@ -257,26 +303,31 @@ class TestContainerMetricRepositoryQueries:
     # -- query_container_metric: by project --
 
     @pytest.fixture
-    def mock_query_range_by_project(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_range = AsyncMock(
-            return_value=_make_query_range_response([
-                {
-                    "metric": {
-                        "value_type": "current",
-                        "__name__": "backendai_container_utilization",
-                        "container_metric_name": "container_cpu_percent",
-                        "owner_project_id": "87654321-4321-8765-4321-876543218765",
-                    },
-                    "values": [(1704067200.0, "45.2")],
-                }
-            ])
+    def mock_query_range_by_project(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_range(
+            mock_prometheus_client,
+            AsyncMock(
+                return_value=_make_query_range_response([
+                    {
+                        "metric": {
+                            "value_type": "current",
+                            "__name__": "backendai_container_utilization",
+                            "container_metric_name": "container_cpu_percent",
+                            "owner_project_id": "87654321-4321-8765-4321-876543218765",
+                        },
+                        "values": [(1704067200.0, "45.2")],
+                    }
+                ])
+            ),
         )
         return mock_prometheus_client
 
     async def test_query_metric_by_project(
         self,
         metric_repository: MetricRepository,
-        mock_query_range_by_project: Mock,
+        mock_query_range_by_project: PrometheusClient,
     ) -> None:
         result = await metric_repository.query_container_metric(
             metric_name="container_cpu_percent",
@@ -294,26 +345,31 @@ class TestContainerMetricRepositoryQueries:
     # -- query_container_metric: by user --
 
     @pytest.fixture
-    def mock_query_range_by_user(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_range = AsyncMock(
-            return_value=_make_query_range_response([
-                {
-                    "metric": {
-                        "value_type": "current",
-                        "__name__": "backendai_container_utilization",
-                        "container_metric_name": "container_gpu_percent",
-                        "owner_user_id": "11223344-5566-7788-99aa-bbccddeeff00",
-                    },
-                    "values": [(1704067200.0, "80.5")],
-                }
-            ])
+    def mock_query_range_by_user(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_range(
+            mock_prometheus_client,
+            AsyncMock(
+                return_value=_make_query_range_response([
+                    {
+                        "metric": {
+                            "value_type": "current",
+                            "__name__": "backendai_container_utilization",
+                            "container_metric_name": "container_gpu_percent",
+                            "owner_user_id": "11223344-5566-7788-99aa-bbccddeeff00",
+                        },
+                        "values": [(1704067200.0, "80.5")],
+                    }
+                ])
+            ),
         )
         return mock_prometheus_client
 
     async def test_query_metric_by_user(
         self,
         metric_repository: MetricRepository,
-        mock_query_range_by_user: Mock,
+        mock_query_range_by_user: PrometheusClient,
     ) -> None:
         result = await metric_repository.query_container_metric(
             metric_name="container_gpu_percent",
@@ -331,27 +387,32 @@ class TestContainerMetricRepositoryQueries:
     # -- query_container_metric: multiple labels --
 
     @pytest.fixture
-    def mock_query_range_multiple_labels(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_range = AsyncMock(
-            return_value=_make_query_range_response([
-                {
-                    "metric": {
-                        "value_type": "current",
-                        "__name__": "backendai_container_utilization",
-                        "container_metric_name": "container_cpu_percent",
-                        "agent_id": "agent-1",
-                        "kernel_id": "aabbccdd-eeff-0011-2233-445566778899",
-                    },
-                    "values": [(1704067200.0, "25.3")],
-                }
-            ])
+    def mock_query_range_multiple_labels(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_range(
+            mock_prometheus_client,
+            AsyncMock(
+                return_value=_make_query_range_response([
+                    {
+                        "metric": {
+                            "value_type": "current",
+                            "__name__": "backendai_container_utilization",
+                            "container_metric_name": "container_cpu_percent",
+                            "agent_id": "agent-1",
+                            "kernel_id": "aabbccdd-eeff-0011-2233-445566778899",
+                        },
+                        "values": [(1704067200.0, "25.3")],
+                    }
+                ])
+            ),
         )
         return mock_prometheus_client
 
     async def test_query_metric_with_multiple_labels(
         self,
         metric_repository: MetricRepository,
-        mock_query_range_multiple_labels: Mock,
+        mock_query_range_multiple_labels: PrometheusClient,
     ) -> None:
         result = await metric_repository.query_container_metric(
             metric_name="container_cpu_percent",
@@ -371,14 +432,16 @@ class TestContainerMetricRepositoryQueries:
     # -- query_container_metric: empty result --
 
     @pytest.fixture
-    def mock_query_range_empty(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_range = AsyncMock(return_value=_make_query_range_response([]))
+    def mock_query_range_empty(self, mock_prometheus_client: PrometheusClient) -> PrometheusClient:
+        _set_query_range(
+            mock_prometheus_client, AsyncMock(return_value=_make_query_range_response([]))
+        )
         return mock_prometheus_client
 
     async def test_query_metric_empty_result(
         self,
         metric_repository: MetricRepository,
-        mock_query_range_empty: Mock,
+        mock_query_range_empty: PrometheusClient,
     ) -> None:
         result = await metric_repository.query_container_metric(
             metric_name="invalid_metric_name",
@@ -393,16 +456,19 @@ class TestContainerMetricRepositoryQueries:
     # -- query_container_metric: error propagation --
 
     @pytest.fixture
-    def mock_query_range_failed_to_get_metric(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_range = AsyncMock(
-            side_effect=FailedToGetMetric("Bad Request: Invalid query")
+    def mock_query_range_failed_to_get_metric(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_range(
+            mock_prometheus_client,
+            AsyncMock(side_effect=FailedToGetMetric("Bad Request: Invalid query")),
         )
         return mock_prometheus_client
 
     async def test_query_metric_propagates_failed_to_get_metric(
         self,
         metric_repository: MetricRepository,
-        mock_query_range_failed_to_get_metric: Mock,
+        mock_query_range_failed_to_get_metric: PrometheusClient,
     ) -> None:
         with pytest.raises(FailedToGetMetric):
             await metric_repository.query_container_metric(
@@ -414,16 +480,19 @@ class TestContainerMetricRepositoryQueries:
             )
 
     @pytest.fixture
-    def mock_query_range_connection_error(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_range = AsyncMock(
-            side_effect=PrometheusConnectionError("Connection refused")
+    def mock_query_range_connection_error(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_range(
+            mock_prometheus_client,
+            AsyncMock(side_effect=PrometheusConnectionError("Connection refused")),
         )
         return mock_prometheus_client
 
     async def test_query_metric_propagates_connection_error(
         self,
         metric_repository: MetricRepository,
-        mock_query_range_connection_error: Mock,
+        mock_query_range_connection_error: PrometheusClient,
     ) -> None:
         with pytest.raises(PrometheusConnectionError):
             await metric_repository.query_container_metric(
@@ -437,25 +506,30 @@ class TestContainerMetricRepositoryQueries:
     # -- query_container_metric: capacity value type --
 
     @pytest.fixture
-    def mock_query_range_capacity(self, mock_prometheus_client: Mock) -> Mock:
-        mock_prometheus_client.query_range = AsyncMock(
-            return_value=_make_query_range_response([
-                {
-                    "metric": {
-                        "value_type": "capacity",
-                        "__name__": "backendai_container_utilization",
-                        "container_metric_name": "mem",
-                    },
-                    "values": [(1704067200.0, "8589934592")],
-                }
-            ])
+    def mock_query_range_capacity(
+        self, mock_prometheus_client: PrometheusClient
+    ) -> PrometheusClient:
+        _set_query_range(
+            mock_prometheus_client,
+            AsyncMock(
+                return_value=_make_query_range_response([
+                    {
+                        "metric": {
+                            "value_type": "capacity",
+                            "__name__": "backendai_container_utilization",
+                            "container_metric_name": "mem",
+                        },
+                        "values": [(1704067200.0, "8589934592")],
+                    }
+                ])
+            ),
         )
         return mock_prometheus_client
 
     async def test_query_metric_capacity_value_type(
         self,
         metric_repository: MetricRepository,
-        mock_query_range_capacity: Mock,
+        mock_query_range_capacity: PrometheusClient,
     ) -> None:
         result = await metric_repository.query_container_metric(
             metric_name="container_memory_capacity_bytes",
@@ -472,29 +546,31 @@ class TestMetricTypeDetection:
     """Test metric type detection logic."""
 
     @pytest.fixture
-    def fixed_query_builder(self) -> FixedQueryBuilder:
-        return FixedQueryBuilder("1m")
+    def query_builder(self) -> ContainerMetricQueryBuilder:
+        return ContainerMetricQueryBuilder("1m")
 
-    def test_cpu_util_detected_as_diff_type(self, fixed_query_builder: FixedQueryBuilder) -> None:
-        metric_type = fixed_query_builder.get_container_metric_type(
+    def test_cpu_util_detected_as_diff_type(
+        self, query_builder: ContainerMetricQueryBuilder
+    ) -> None:
+        metric_type = query_builder.get_container_metric_type(
             "cpu_util", ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
         )
         assert metric_type == MetricType.DIFF
 
     def test_network_metrics_detected_as_rate_type(
-        self, fixed_query_builder: FixedQueryBuilder
+        self, query_builder: ContainerMetricQueryBuilder
     ) -> None:
         for metric_name in ["net_rx", "net_tx"]:
-            metric_type = fixed_query_builder.get_container_metric_type(
+            metric_type = query_builder.get_container_metric_type(
                 metric_name, ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
             )
             assert metric_type == MetricType.RATE
 
     def test_memory_metrics_detected_as_gauge_type(
-        self, fixed_query_builder: FixedQueryBuilder
+        self, query_builder: ContainerMetricQueryBuilder
     ) -> None:
         for metric_name in ["container_memory_used_bytes", "container_gpu_percent"]:
-            metric_type = fixed_query_builder.get_container_metric_type(
+            metric_type = query_builder.get_container_metric_type(
                 metric_name, ContainerMetricOptionalLabel(value_type=ValueType.CURRENT)
             )
             assert metric_type == MetricType.GAUGE
@@ -559,8 +635,8 @@ class TestTimewindowInitialization:
 
     @pytest.mark.parametrize("timewindow", ["30s", "1m", "5m", "15m", "1h"])
     async def test_timewindow_stored_correctly(self, timewindow: str) -> None:
-        fixed_query_builder = FixedQueryBuilder(timewindow)
-        assert fixed_query_builder._timewindow == timewindow
+        query_builder = ContainerMetricQueryBuilder(timewindow)
+        assert query_builder._timewindow == timewindow
 
     @pytest.mark.parametrize(
         "metric_name,value_type",
@@ -573,10 +649,10 @@ class TestTimewindowInitialization:
     async def test_timewindow_applied_to_query(
         self, metric_name: str, value_type: ValueType
     ) -> None:
-        fixed_query_builder = FixedQueryBuilder("3m")
+        query_builder = ContainerMetricQueryBuilder("3m")
         label = ContainerMetricOptionalLabel(value_type=value_type)
 
-        query = fixed_query_builder.get_container_metric_query(metric_name, label)
+        query = query_builder.get_container_metric_query(metric_name, label)
 
         assert query.window == "3m"
 
@@ -649,7 +725,7 @@ class TestBuiltinQueryProvider:
                     'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"})'
                 ),
             ),
-            # RATE - uses window and interval divisor
+            # RATE - rate() already returns per-second values.
             BuiltinQueryTestCase(
                 id="rate_net_rx_current",
                 metric_name="net_rx",
@@ -657,7 +733,7 @@ class TestBuiltinQueryProvider:
                 timewindow="5m",
                 expected_query=(
                     "sum by (value_type)(rate(backendai_container_utilization"
-                    '{container_metric_name="net_rx",value_type="current"}[5m])) / 5.0'
+                    '{container_metric_name="net_rx",value_type="current"}[5m]))'
                 ),
             ),
             BuiltinQueryTestCase(
@@ -671,7 +747,7 @@ class TestBuiltinQueryProvider:
                 expected_query=(
                     "sum by (user_id,value_type)(rate(backendai_container_utilization"
                     '{container_metric_name="net_tx",value_type="current",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m])) / 5.0'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m]))'
                 ),
             ),
             BuiltinQueryTestCase(
@@ -685,7 +761,7 @@ class TestBuiltinQueryProvider:
                 expected_query=(
                     "sum by (user_id,value_type)(rate(backendai_container_utilization"
                     '{container_metric_name="net_rx",value_type="capacity",'
-                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m])) / 5.0'
+                    'user_id="f38dea23-50fa-42a0-b5ae-338f5f4693f4"}[5m]))'
                 ),
             ),
             # DIFF - uses window but no interval divisor
@@ -732,12 +808,157 @@ class TestBuiltinQueryProvider:
         ids=lambda c: c.id,
     )
     async def test_build_query_renders_expected_promql(self, case: BuiltinQueryTestCase) -> None:
-        fixed_query_builder = FixedQueryBuilder(case.timewindow)
+        query_builder = ContainerMetricQueryBuilder(case.timewindow)
 
-        query = fixed_query_builder.get_container_metric_query(case.metric_name, case.labels)
+        query = query_builder.get_container_metric_query(case.metric_name, case.labels)
         rendered_query = query.render()
 
         assert rendered_query == case.expected_query
+
+
+class TestContainerLiveStatQueries:
+    """Characterization tests for container live stat PromQL."""
+
+    @pytest.fixture()
+    def queries(self) -> ContainerLiveStatQueries:
+        kernel_id = KernelId(UUID("12345678-1234-5678-1234-567812345678"))
+        query_builder = ContainerLiveStatQueryBuilder("5m")
+        return query_builder.get_container_live_stat_queries([kernel_id])
+
+    def test_instant_query_fetches_live_stat_fields(
+        self, queries: ContainerLiveStatQueries
+    ) -> None:
+        rendered = queries.instant.render()
+
+        assert "backendai_container_utilization" in rendered
+        assert "sum by (container_metric_name,kernel_id,value_type)" in rendered
+        assert 'value_type=~"current|capacity"' in rendered
+        assert "pct" not in rendered
+
+    def test_max_query_reads_current_series(self, queries: ContainerLiveStatQueries) -> None:
+        rendered = queries.max.render()
+
+        assert "label_replace" not in rendered
+        assert "max_over_time" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
+        assert 'value_type="current"' in rendered
+        assert "rate(" not in rendered
+        assert "backendai_container_utilization" in rendered
+
+    def test_rate_max_query_reads_rate_series(self, queries: ContainerLiveStatQueries) -> None:
+        rendered = queries.rate_max.render()
+
+        assert "label_replace" not in rendered
+        assert "max_over_time" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
+        assert "rate(" in rendered
+        assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in rendered
+        assert 'value_type="current"' in rendered
+
+    def test_avg_query_reads_current_series(self, queries: ContainerLiveStatQueries) -> None:
+        rendered = queries.avg.render()
+
+        assert "label_replace" not in rendered
+        assert "avg_over_time" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
+        assert 'value_type="current"' in rendered
+        assert "rate(" not in rendered
+        assert "backendai_container_utilization" in rendered
+
+    def test_rate_avg_query_reads_rate_series(self, queries: ContainerLiveStatQueries) -> None:
+        rendered = queries.rate_avg.render()
+
+        assert "label_replace" not in rendered
+        assert "avg_over_time" in rendered
+        assert "sum by (container_metric_name,kernel_id)" in rendered
+        assert "rate(" in rendered
+        assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in rendered
+        assert 'value_type="current"' in rendered
+
+
+class TestKernelLiveStatBatchResultFromLiveStatResponse:
+    @pytest.fixture()
+    def kernel_id(self) -> KernelId:
+        return KernelId(UUID("12345678-1234-5678-1234-567812345678"))
+
+    def test_splits_instant_into_current_and_capacity(
+        self,
+        kernel_id: KernelId,
+    ) -> None:
+        instant = PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(
+                result_type="vector",
+                result=[
+                    MetricResponse(
+                        metric=MetricResponseInfo(
+                            kernel_id=str(kernel_id),
+                            container_metric_name="mem",
+                            value_type="capacity",
+                        ),
+                        values=[(1704067200.0, "8192")],
+                    ),
+                    MetricResponse(
+                        metric=MetricResponseInfo(
+                            kernel_id=str(kernel_id),
+                            container_metric_name="mem",
+                            value_type="current",
+                        ),
+                        values=[(1704067200.0, "1024")],
+                    ),
+                ],
+            ),
+        )
+        empty = PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(result_type="vector", result=[]),
+        )
+        batch = KernelLiveStatBatchResult.from_responses(
+            instant=instant,
+            rate_current=empty,
+            max=empty,
+            rate_max=empty,
+            avg=empty,
+            rate_avg=empty,
+        )
+
+        assert batch.by_kernel[kernel_id].instant_current["mem"] == "1024"
+        assert batch.by_kernel[kernel_id].instant_capacity["mem"] == "8192"
+
+    def test_routes_non_instant_response_into_named_slot(
+        self,
+        kernel_id: KernelId,
+    ) -> None:
+        max_response = PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(
+                result_type="vector",
+                result=[
+                    MetricResponse(
+                        metric=MetricResponseInfo(
+                            kernel_id=str(kernel_id),
+                            container_metric_name="mem",
+                        ),
+                        values=[(1704067200.0, "9001")],
+                    )
+                ],
+            ),
+        )
+        empty = PrometheusResponse(
+            status="success",
+            data=PrometheusQueryData(result_type="vector", result=[]),
+        )
+        batch = KernelLiveStatBatchResult.from_responses(
+            instant=empty,
+            rate_current=empty,
+            max=max_response,
+            rate_max=empty,
+            avg=empty,
+            rate_avg=empty,
+        )
+
+        assert batch.by_kernel[kernel_id].max["mem"] == "9001"
+        assert batch.by_kernel[kernel_id].instant_current == {}
 
 
 class TestMetricResponseInfoParsing:

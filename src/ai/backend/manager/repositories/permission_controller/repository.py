@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import cast
 
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -32,8 +32,7 @@ from ai.backend.manager.data.permission.role import (
     BulkRolePermissionReplaceResultData,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
-    EffectivePermissionsInput,
-    EffectivePermissionsResult,
+    PermissionResolutionKey,
     RoleData,
     RoleDetailData,
     RoleListResult,
@@ -431,25 +430,27 @@ class PermissionControllerRepository:
     async def check_bulk_permission_with_scope_chain(
         self,
         data: BulkPermissionCheckInput,
-    ) -> dict[str, bool]:
+    ) -> Mapping[PermissionResolutionKey, bool]:
         """Batch permission check that traverses the scope chain via AUTO edges.
 
-        Same semantics as check_permission_with_scope_chain but for multiple
-        entities of the same RBACElementType in a single query.
+        Same semantics as check_permission_with_scope_chain but for an
+        arbitrary collection of per-target keys in a single query.
         """
         return await self._db_source.check_bulk_permission_with_scope_chain(data)
 
     @permission_controller_repository_resilience.apply()
     async def resolve_effective_permissions(
         self,
-        data: EffectivePermissionsInput,
-    ) -> EffectivePermissionsResult:
-        """Resolve the set of permitted operations per entity for a given user.
+        keys: Collection[PermissionResolutionKey],
+    ) -> Mapping[PermissionResolutionKey, frozenset[OperationType]]:
+        """Resolve the set of permitted operations per target key.
 
-        For each target entity, traverses the scope chain (AUTO edges) and
-        self-scope permissions to collect all operations the user can perform.
+        Each input key represents one ``(user_id, element_type, entity_id,
+        subject_entity_type)`` combination. For each key, traverses the scope
+        chain (AUTO edges) and self-scope permissions to collect all operations
+        the user can perform.
         """
-        return await self._db_source.resolve_effective_permissions(data)
+        return await self._db_source.resolve_effective_permissions(keys)
 
     # -- role invitation --
 

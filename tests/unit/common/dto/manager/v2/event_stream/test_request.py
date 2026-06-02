@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.event_stream.request import (
     BackgroundTaskEventSubscribeInput,
     SessionEventSubscribeInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestSessionEventSubscribeInput:
@@ -116,11 +117,11 @@ class TestBackgroundTaskEventSubscribeInput:
         assert req.task_id == task_id
 
     def test_invalid_uuid_string_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BackgroundTaskEventSubscribeInput.model_validate({"task_id": "not-a-uuid"})
 
     def test_missing_task_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             BackgroundTaskEventSubscribeInput.model_validate({})
 
     def test_task_id_is_uuid_instance(self) -> None:

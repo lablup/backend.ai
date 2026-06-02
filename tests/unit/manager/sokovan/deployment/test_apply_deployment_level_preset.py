@@ -50,9 +50,9 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
 def _make_preset(
     *,
     open_to_public: bool | None = None,
-    replica_count: int | None = None,
+    replica_count: int = 1,
     revision_history_limit: int | None = None,
-    deployment_strategy: DeploymentStrategy | None = None,
+    deployment_strategy: DeploymentStrategy = DeploymentStrategy.ROLLING,
     deployment_strategy_spec: dict[str, Any] | None = None,
 ) -> DeploymentRevisionPresetData:
     """Build a minimal preset data object with the given deployment-level overrides."""
@@ -75,7 +75,7 @@ def _make_preset(
         replica_count=replica_count,
         revision_history_limit=revision_history_limit,
         deployment_strategy=deployment_strategy,
-        deployment_strategy_spec=deployment_strategy_spec,
+        deployment_strategy_spec=deployment_strategy_spec or {},
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         updated_at=None,
     )
@@ -237,31 +237,26 @@ class TestApplyDeploymentLevelPreset:
         assert resolved.network.open_to_public is False
         assert resolved.policy is explicit_policy
 
-    async def test_partial_preset_falls_back_per_field(
+    async def test_revision_history_limit_falls_back_when_preset_leaves_it_null(
         self,
         deployment_controller: DeploymentController,
         mock_preset_repository: MagicMock,
     ) -> None:
-        """Each preset field falls back to system default independently when null."""
+        """``revision_history_limit`` is the only deployment-level preset field
+        that is still optional; when the preset does not specify it, the
+        system default is used."""
         preset_id = DeploymentPresetID(uuid.uuid4())
         mock_preset_repository.get_by_id = AsyncMock(
             return_value=_make_preset(
                 open_to_public=True,
-                # replica_count, revision_history_limit, deployment_strategy left as None
+                revision_history_limit=None,
             )
         )
         creator = _make_creator(preset_id=preset_id)
 
         resolved = await deployment_controller._apply_deployment_level_preset(creator)
 
-        # Specified by preset.
-        assert resolved.network is not None
-        assert resolved.network.open_to_public is True
-        # Falls back to system defaults.
         assert resolved.metadata.revision_history_limit == 10
-        assert resolved.replica_spec is not None
-        assert resolved.replica_spec.replica_count == 1
-        assert resolved.policy is None
 
     async def test_preset_rolling_strategy_with_int_or_percent_spec(
         self,
@@ -290,17 +285,19 @@ class TestApplyDeploymentLevelPreset:
         assert resolved.policy.strategy_spec.max_surge.count == 3
         assert resolved.policy.strategy_spec.max_unavailable.percent == 0.25
 
-    async def test_preset_strategy_without_spec_uses_default_spec(
+    async def test_preset_strategy_with_empty_spec_uses_default_spec(
         self,
         deployment_controller: DeploymentController,
         mock_preset_repository: MagicMock,
     ) -> None:
-        """When the preset stores strategy without spec, the default spec is built."""
+        """When the preset stores strategy with an empty spec dict, the default
+        spec is built. (``deployment_strategy_spec`` is now ``NOT NULL``; an
+        empty ``{}`` is the contract-level "no overrides" value.)"""
         preset_id = DeploymentPresetID(uuid.uuid4())
         mock_preset_repository.get_by_id = AsyncMock(
             return_value=_make_preset(
                 deployment_strategy=DeploymentStrategy.ROLLING,
-                deployment_strategy_spec=None,
+                deployment_strategy_spec={},
             )
         )
         creator = _make_creator(preset_id=preset_id)

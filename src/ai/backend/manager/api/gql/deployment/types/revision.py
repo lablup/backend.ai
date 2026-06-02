@@ -10,24 +10,9 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.config import (
-    ModelConfig as ModelConfigDTO,
-)
-from ai.backend.common.config import (
-    ModelDefinition as ModelDefinitionDTO,
-)
-from ai.backend.common.config import (
-    ModelHealthCheck as ModelHealthCheckDTO,
-)
-from ai.backend.common.config import (
-    ModelMetadata as ModelMetadataDTO,
-)
-from ai.backend.common.config import (
-    ModelServiceConfig as ModelServiceConfigDTO,
-)
 from ai.backend.common.config import (
     PreStartAction as PreStartActionDTO,
 )
@@ -35,14 +20,16 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput as ActivateRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    AddRevisionGQLInputDTO,
-    CreateRevisionInputDTO,
+    AddRevisionInput as AddRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AddRevisionOptions as AddRevisionOptionsDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ClusterConfigInput as ClusterConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    CreateRevisionInput as CreateRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     EnvironmentVariableEntryInput as EnvironmentVariableEntryInputDTO,
@@ -57,16 +44,28 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ImageInput as ImageInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelConfigInput as ModelConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelDefinitionInput as ModelDefinitionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelHealthCheckInput as ModelHealthCheckInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelMetadataInput as ModelMetadataInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelMountConfigInput as ModelMountConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelRuntimeConfigInput as ModelRuntimeConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    ResourceConfigInput as ResourceConfigInputDTO,
+    ModelServiceConfigInput as ModelServiceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    ResourceGroupInput as ResourceGroupInputDTO,
+    ResourceConfigInput as ResourceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceSlotInput as ResourceSlotInputDTO,
@@ -101,6 +100,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
 )
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
@@ -138,10 +138,9 @@ from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
 
 from .resource_slot import (
-    AllocatedResourceSlotConnection,
-    AllocatedResourceSlotEdge,
+    RESOURCE_SLOTS_FETCH_LIMIT,
     AllocatedResourceSlotFilterGQL,
-    AllocatedResourceSlotNodeGQL,
+    AllocatedResourceSlotGQL,
     AllocatedResourceSlotOrderByGQL,
 )
 
@@ -151,6 +150,7 @@ if TYPE_CHECKING:
 
     from .deployment import ModelDeployment
     from .policy import DeploymentPolicyGQL
+    from .revision_preset import DeploymentRevisionPresetGQL
 
 MountPermission: type[CommonMountPermission] = gql_enum(
     BackendAIGQLMeta(
@@ -221,7 +221,7 @@ class ResourceConfig:
     )
 
     @gql_field(description="The resource group of this entity.")  # type: ignore[misc]
-    def resource_group(self) -> ResourceGroup:
+    def resource_group(self) -> ResourceGroup | None:
         """Resolves the federated ResourceGroup."""
         global_id = to_global_id(
             ScalingGroupNode, self.resource_group_name, is_target_graphene_object=True
@@ -282,9 +282,16 @@ class ModelMountConfig:
     definition_path: str = gql_field(
         description="Path to the model definition file within the mounted folder."
     )
+    subpath: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Subpath within the model vfolder. ``null`` means the vfolder root.",
+        ),
+        default=None,
+    )
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
-    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
+    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
         vfolder_global_id = to_global_id(
             VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
         )
@@ -312,9 +319,16 @@ class ExtraVFolderMountInfoGQL:
             ),
         ),
     )
+    subpath: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Subpath within the vfolder. ``null`` means the vfolder root.",
+        ),
+        default=None,
+    )
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
-    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
+    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
         vfolder_global_id = to_global_id(
             VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
         )
@@ -452,7 +466,16 @@ class ModelDefinitionGQL:
 class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     image_id: ID
     id: NodeID[str]
-    name: str = gql_field(description="The name identifier for this revision.")
+    revision_number: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Per-deployment sequential revision number assigned at "
+                "insert time (UNIQUE per deployment). Use this to surface "
+                "'Revision #N' labels and to order revisions client-side."
+            ),
+        ),
+    )
     cluster_config: ClusterConfig = gql_field(
         description="Cluster configuration for replica distribution."
     )
@@ -473,13 +496,36 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     extra_mounts: list[ExtraVFolderMountInfoGQL] = gql_field(
         description="Additional volume folder mounts."
     )
+    revision_preset_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "ID of the deployment-level preset that produced this "
+                "revision. ``None`` when the revision was created without a "
+                "preset, when the originating preset row has since been "
+                "deleted (SET NULL FK), or for legacy rows that predate "
+                "this field."
+            ),
+        ),
+        default=None,
+    )
+    deployment_id: ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "ID of the parent deployment that owns this revision. "
+                "Exposed alongside the resolved ``deployment`` node so "
+                "clients can navigate without re-fetching."
+            ),
+        ),
+    )
     created_at: datetime = gql_field(description="Timestamp when the revision was created.")
 
     @gql_field(
         description="The image of this entity.",
         deprecation_reason="Use image_v2 instead.",
     )  # type: ignore[misc]
-    async def image(self, info: Info[StrawberryGQLContext]) -> Image:
+    async def image(self, info: Info[StrawberryGQLContext]) -> Image | None:
         image_global_id = to_global_id(
             ImageNode, UUID(str(self.image_id)), is_target_graphene_object=True
         )
@@ -506,6 +552,42 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The deployment-level preset that produced this revision, "
+                "resolved via DataLoader. ``None`` when the revision was "
+                "created without a preset, when the originating preset row "
+                "has since been deleted (SET NULL FK), or for legacy rows "
+                "that predate this field."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def revision_preset(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            DeploymentRevisionPresetGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.revision_preset"),
+        ]
+        | None
+    ):
+        if self.revision_preset_id is None:
+            return None
+        return await info.context.data_loaders.revision_preset_loader.load(self.revision_preset_id)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The parent deployment owning this revision, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def deployment(
+        self, info: Info[StrawberryGQLContext]
+    ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")] | None:
+        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
             added_version="26.4.2",
             description="Resource slot allocations for this revision.",
         )
@@ -515,44 +597,20 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         info: Info[StrawberryGQLContext],
         filter: AllocatedResourceSlotFilterGQL | None = None,
         order_by: list[AllocatedResourceSlotOrderByGQL] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> AllocatedResourceSlotConnection:
+    ) -> list[AllocatedResourceSlotGQL] | None:
         from ai.backend.common.dto.manager.v2.resource_slot.request import (
             SearchAllocatedResourceSlotsInput,
         )
 
-        pydantic_filter = filter.to_pydantic() if filter else None
-        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_revision_resource_slots(
-            revision_id=UUID(str(self.id)),
+            revision_id=DeploymentRevisionID(UUID(str(self.id))),
             input=SearchAllocatedResourceSlotsInput(
-                filter=pydantic_filter,
-                order=pydantic_order,
-                first=first,
-                after=after,
-                last=last,
-                before=before,
-                limit=limit,
-                offset=offset,
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                limit=RESOURCE_SLOTS_FETCH_LIMIT,
             ),
         )
-        nodes = [AllocatedResourceSlotNodeGQL.from_pydantic(item) for item in payload.items]
-        edges = [AllocatedResourceSlotEdge(node=node, cursor=node.slot_name) for node in nodes]
-        return AllocatedResourceSlotConnection(
-            count=payload.total_count,
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=payload.has_next_page,
-                has_previous_page=payload.has_previous_page,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
-        )
+        return [AllocatedResourceSlotGQL.from_pydantic(item) for item in payload.items]
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -672,13 +730,6 @@ class ClusterConfigInput(PydanticInputMixin[ClusterConfigInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="25.19.0"),
-)
-class ResourceGroupInput(PydanticInputMixin[ResourceGroupInputDTO]):
-    name: str
-
-
-@gql_pydantic_input(
     BackendAIGQLMeta(
         description="A collection of compute resource allocations for input.",
         added_version="26.1.0",
@@ -696,7 +747,6 @@ class ResourceSlotInput(PydanticInputMixin[ResourceSlotInputDTO]):
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
 class ResourceConfigInput(PydanticInputMixin[ResourceConfigInputDTO]):
-    resource_group: ResourceGroupInput
     resource_slots: ResourceSlotInput = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.1.0", description="Resources allocated for the deployment."
@@ -751,7 +801,6 @@ class EnvironmentVariablesInputGQL(PydanticInputMixin[EnvironmentVariablesInputD
 )
 class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
     runtime_variant_id: UUID
-    inference_runtime_config: JSON | None = None
     environ: EnvironmentVariablesInputGQL | None = gql_field(
         description="Environment variables for the service.", default=None
     )
@@ -763,7 +812,16 @@ class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
 class ModelMountConfigInput(PydanticInputMixin[ModelMountConfigInputDTO]):
     vfolder_id: ID
     mount_destination: str
-    definition_path: str
+    definition_path: str | None = None
+    subpath: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Subpath within the model vfolder. ``null`` (default) mounts the vfolder root."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
@@ -772,6 +830,13 @@ class ModelMountConfigInput(PydanticInputMixin[ModelMountConfigInputDTO]):
 class ExtraVFolderMountInput(PydanticInputMixin[ExtraVFolderMountInputDTO]):
     vfolder_id: ID
     mount_destination: str | None
+    subpath: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=("Subpath within the vfolder. ``null`` (default) mounts the vfolder root."),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
@@ -795,22 +860,22 @@ class PreStartActionInputGQL(PydanticInputMixin[PreStartActionDTO]):
     ),
     name="ModelHealthCheckInput",
 )
-class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckDTO]):
-    interval: float = gql_field(
-        description="Interval in seconds between health checks.", default=10.0
+class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckInputDTO]):
+    interval: float | None = gql_field(
+        description="Interval in seconds between health checks.", default=None
     )
-    path: str = gql_field(description="Path to check for health status.")
-    max_retries: int = gql_field(
-        description="Maximum number of retries for health check.", default=10
+    path: str | None = gql_field(description="Path to check for health status.", default=None)
+    max_retries: int | None = gql_field(
+        description="Maximum number of retries for health check.", default=None
     )
-    max_wait_time: float = gql_field(
-        description="Maximum time in seconds to wait for a health check response.", default=15.0
+    max_wait_time: float | None = gql_field(
+        description="Maximum time in seconds to wait for a health check response.", default=None
     )
-    expected_status_code: int = gql_field(
-        description="Expected HTTP status code for a healthy response.", default=200
+    expected_status_code: int | None = gql_field(
+        description="Expected HTTP status code for a healthy response.", default=None
     )
-    initial_delay: float = gql_field(
-        description="Initial delay in seconds before the first health check.", default=60.0
+    initial_delay: float | None = gql_field(
+        description="Initial delay in seconds before the first health check.", default=None
     )
 
 
@@ -821,19 +886,18 @@ class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckDTO]):
     ),
     name="ModelServiceConfigInput",
 )
-class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigDTO]):
-    pre_start_actions: list[PreStartActionInputGQL] = gql_field(
+class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO]):
+    pre_start_actions: list[PreStartActionInputGQL] | None = gql_field(
         description="List of pre-start actions to execute before starting the model service.",
-        default=strawberry.UNSET,
+        default=None,
     )
     start_command: list[str] | None = gql_field(
         description="Command to start the model service.", default=None
     )
-    shell: str = gql_field(
-        description="Shell configured for the model service.",
-        default="/bin/bash",
+    shell: str | None = gql_field(
+        description="Shell configured for the model service.", default=None
     )
-    port: int = gql_field(description="Port number for the model service. Must be greater than 1.")
+    port: int | None = gql_field(description="Port number for the model service.", default=None)
     health_check: ModelHealthCheckInputGQL | None = gql_field(
         description="Health check configuration for the model service.", default=None
     )
@@ -846,7 +910,7 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigDTO]):
     ),
     name="ModelMetadataInput",
 )
-class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataDTO]):
+class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataInputDTO]):
     author: str | None = gql_field(description="Author of the model.", default=None)
     title: str | None = gql_field(description="Title of the model.", default=None)
     version: str | None = gql_field(description="Version of the model.", default=None)
@@ -875,9 +939,9 @@ class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataDTO]):
     ),
     name="ModelConfigInput",
 )
-class ModelConfigInputGQL(PydanticInputMixin[ModelConfigDTO]):
-    name: str = gql_field(description="Name of the model.")
-    model_path: str = gql_field(description="Path to the model file.")
+class ModelConfigInputGQL(PydanticInputMixin[ModelConfigInputDTO]):
+    name: str | None = gql_field(description="Name of the model.", default=None)
+    model_path: str | None = gql_field(description="Path to the model file.", default=None)
     service: ModelServiceConfigInputGQL | None = gql_field(
         description="Configuration for the model service.", default=None
     )
@@ -893,9 +957,9 @@ class ModelConfigInputGQL(PydanticInputMixin[ModelConfigDTO]):
     ),
     name="ModelDefinitionInput",
 )
-class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionDTO]):
-    models: list[ModelConfigInputGQL] = gql_field(
-        description="List of models in the model definition."
+class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionInputDTO]):
+    models: list[ModelConfigInputGQL] | None = gql_field(
+        description="List of models in the model definition.", default=None
     )
 
 
@@ -906,7 +970,6 @@ class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionDTO]):
     ),
 )
 class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
-    name: str | None = None
     revision_preset_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",
@@ -949,8 +1012,7 @@ class AddRevisionOptionsGQL(PydanticInputMixin[AddRevisionOptionsDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
-    name: str | None = None
+class AddRevisionInput(PydanticInputMixin[AddRevisionInputDTO]):
     revision_preset_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",
@@ -959,11 +1021,25 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
         default=None,
     )
     deployment_id: ID
-    cluster_config: ClusterConfigInput
-    resource_config: ResourceConfigInput
-    image: ImageInput
-    model_runtime_config: ModelRuntimeConfigInput
-    model_mount_config: ModelMountConfigInput
+    cluster_config: ClusterConfigInput | None = gql_field(
+        description="Cluster configuration",
+        default=None,
+    )
+    resource_config: ResourceConfigInput | None = gql_field(
+        description="Resource configuration",
+        default=None,
+    )
+    image: ImageInput | None = gql_field(
+        description="Container image",
+        default=None,
+    )
+    model_runtime_config: ModelRuntimeConfigInput | None = gql_field(
+        description="Runtime configuration",
+        default=None,
+    )
+    model_mount_config: ModelMountConfigInput = gql_field(
+        description="Model mount configuration",
+    )
     model_definition: ModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.2",

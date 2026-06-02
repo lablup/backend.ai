@@ -8,13 +8,14 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from pydantic import BaseModel
-
 from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
+    BackendAISchema,
     CIStrEnum,
     ClusterMode,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -24,6 +25,7 @@ from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.kernel.types import KernelStatus
+    from ai.backend.manager.data.session.options import SessionHandlerOptions
     from ai.backend.manager.models.network import NetworkType
 
 
@@ -193,6 +195,22 @@ class SessionData:
     service_ports: str | None
 
 
+@dataclass(frozen=True)
+class SessionRoutingInfo:
+    """Minimal session data needed to start an app service in a session.
+
+    Carries the session metadata (for the action result) together with the main
+    kernel's routing fields, so the repository never exposes a SessionRow to callers.
+    """
+
+    session: SessionData
+    main_kernel_id: KernelId
+    agent_id: AgentId | None
+    kernel_host: str | None
+    agent_addr: str | None
+    service_ports: list[dict[str, Any]]
+
+
 @dataclass
 class SessionIdentity:
     id: SessionId
@@ -283,6 +301,11 @@ class SessionInfo:
     lifecycle: SessionLifecycle
     metrics: SessionMetrics
     network: SessionNetwork
+    handler_options: SessionHandlerOptions
+    """Frozen handler-keyed scheduler policy snapshot. Sourced from
+    ``SessionRow.options.handler_options``. Coordinator resolves
+    per-handler timeout / max_retry_count from this field at failure
+    classification time."""
 
 
 # ========== Scheduling History Types ==========
@@ -348,7 +371,7 @@ class PromotionStatusTransitions:
     success: SessionStatus | None = None
 
 
-class SubStepResult(BaseModel):
+class SubStepResult(BackendAISchema):
     """Sub-step result for scheduling history."""
 
     step: str

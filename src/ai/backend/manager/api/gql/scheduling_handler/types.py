@@ -39,7 +39,7 @@ class SchedulingHandlerCategoryGQL(StrEnum):
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Metadata for a single registered deployment scheduling handler. "
-            "Surfaces the stable ``name`` used in ``DeploymentOptions.timeouts.by_handler``."
+            "Surfaces the stable ``name`` used in ``DeploymentOptions.handler_options.by_handler``."
         ),
     ),
     model=SchedulingHandlerNode,

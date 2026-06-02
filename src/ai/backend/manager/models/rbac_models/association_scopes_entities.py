@@ -21,6 +21,7 @@ from ai.backend.manager.models.base import (
 class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
     __tablename__ = "association_scopes_entities"
     __table_args__ = (
+        sa.Index("ix_association_scopes_entities_entity", "entity_type", "entity_id"),
         # constraint
         sa.UniqueConstraint("scope_type", "scope_id", "entity_id", name="uq_scope_id_entity_id"),
     )

@@ -5,17 +5,18 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import sqlalchemy as sa
 
 from ai.backend.manager.models.base import Base
 
 from .integrity import match_integrity_error, parse_integrity_error
-from .types import IntegrityErrorCheck
+from .types import IntegrityErrorCheck, QueryCondition
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
+    from sqlalchemy.orm import InstrumentedAttribute
 
 TRow = TypeVar("TRow", bound=Base)
 
@@ -39,6 +40,37 @@ class CreatorSpec[TRow: Base](ABC):
     @abstractmethod
     def build_row(self) -> TRow:
         """Build ORM row instance to insert.
+
+        Returns:
+            An ORM model instance to be inserted
+        """
+        raise NotImplementedError
+
+
+class DependentCreatorSpec[TDependency, TRow: Base](ABC):
+    """Abstract base class defining a row whose construction depends on a resolved value.
+
+    Unlike CreatorSpec, ``build_row`` receives a dependency value (e.g. a parent row's
+    generated id) that is only known at execution time. The caller (repository) builds
+    the dependency from a prior operation's result and passes it in. Each spec still
+    owns exactly one table's row.
+    """
+
+    @property
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        """Integrity error checks to match after flush.
+
+        Override to declare expected constraint violations and their domain errors.
+        Empty by default (unmatched errors raise RepositoryIntegrityError).
+        """
+        return ()
+
+    @abstractmethod
+    def build_row(self, dependency: TDependency) -> TRow:
+        """Build ORM row instance to insert, using the resolved dependency value.
+
+        Args:
+            dependency: Value resolved from a prior operation (e.g. a parent id).
 
         Returns:
             An ORM model instance to be inserted
@@ -284,3 +316,129 @@ async def execute_bulk_creator_partial[TRow: Base](
                 )
 
     return BulkCreatorResultWithFailures(successes=successes, errors=errors)
+
+
+async def execute_dependent_creator[TDependency, TRow: Base](
+    db_sess: SASession,
+    spec: DependentCreatorSpec[TDependency, TRow],
+    dependency: TDependency,
+) -> CreatorResult[TRow]:
+    """Execute INSERT for a single dependent spec with a resolved dependency.
+
+    The caller builds ``dependency`` from a prior operation's result (e.g. a parent id)
+    and passes it in; the spec's build_row receives it.
+
+    Args:
+        db_sess: Database session (must be writable)
+        spec: Dependent creator spec to insert
+        dependency: The resolved dependency value passed to the spec's build_row
+
+    Returns:
+        CreatorResult containing the created row with generated values
+
+    Note:
+        The caller controls the transaction boundary (commit/rollback).
+    """
+    row = spec.build_row(dependency)
+    db_sess.add(row)
+    try:
+        await db_sess.flush()
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        match_integrity_error(parsed, spec.integrity_error_checks)
+    return CreatorResult(row=row)
+
+
+async def execute_bulk_dependent_creator[TDependency, TRow: Base](
+    db_sess: SASession,
+    specs: Sequence[DependentCreatorSpec[TDependency, TRow]],
+    dependency: TDependency,
+) -> BulkCreatorResult[TRow]:
+    """Execute bulk INSERT for dependent specs sharing one resolved dependency.
+
+    Each spec builds its row from the same dependency value (e.g. a parent id resolved
+    by the caller after creating the parent). All rows are inserted in a single flush.
+
+    Args:
+        db_sess: Database session (must be writable)
+        specs: Dependent creator specs to insert
+        dependency: The resolved dependency value passed to every spec's build_row
+
+    Returns:
+        BulkCreatorResult containing all created rows with generated values
+
+    Note:
+        The caller controls the transaction boundary (commit/rollback).
+    """
+    if not specs:
+        return BulkCreatorResult(rows=[])
+
+    rows = [spec.build_row(dependency) for spec in specs]
+    db_sess.add_all(rows)
+    try:
+        await db_sess.flush()
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        # Use first spec's checks (all specs share the same DependentCreatorSpec subclass)
+        checks = specs[0].integrity_error_checks
+        match_integrity_error(parsed, checks)
+    return BulkCreatorResult(rows=rows)
+
+
+@dataclass(frozen=True)
+class NextValuePolicy:
+    """Describes how to compute the next monotonic value for a column within a scope.
+
+    Used by execute_next_value_creator to assign a sequential value (e.g. a display
+    rank) race-free inside a single write transaction.
+
+    Attributes:
+        column: The integer column whose next value is computed (e.g. Row.rank).
+        scope_condition: WHERE clause limiting the MAX aggregation to a scope.
+        lock_selector: SELECT for the parent row to lock with FOR UPDATE, serializing
+            concurrent inserts within the same scope. The scope is assumed to have at
+            least one lockable parent row.
+        gap: Increment added to the current MAX (and the value used when the scope is empty).
+    """
+
+    column: InstrumentedAttribute[int]
+    scope_condition: QueryCondition
+    lock_selector: sa.sql.Select[Any]
+    gap: int
+
+
+async def execute_next_value_creator[TRow: Base](
+    db_sess: SASession,
+    policy: NextValuePolicy,
+    spec: DependentCreatorSpec[int, TRow],
+) -> CreatorResult[TRow]:
+    """Insert a row with the next monotonic column value, race-free.
+
+    Locks the parent row (FOR UPDATE), reads MAX(column) within the scope, computes the
+    next value, and inserts via the dependent spec — all in the caller's single
+    transaction. The caller MUST run this inside ``write_ops()`` so the lock and insert
+    commit together.
+
+    Args:
+        db_sess: Database session (must be writable)
+        policy: How to compute the next value (column, scope, parent lock, gap)
+        spec: Dependent creator spec whose build_row receives the computed next value
+
+    Returns:
+        CreatorResult containing the created row
+    """
+    await db_sess.execute(policy.lock_selector.with_for_update())
+    max_result = await db_sess.execute(
+        sa.select(sa.func.max(policy.column)).where(policy.scope_condition())
+    )
+    max_value = max_result.scalar_one_or_none()
+    next_value = (max_value + policy.gap) if max_value is not None else policy.gap
+
+    row = spec.build_row(next_value)
+    db_sess.add(row)
+    try:
+        await db_sess.flush()
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        match_integrity_error(parsed, spec.integrity_error_checks)
+    return CreatorResult(row=row)

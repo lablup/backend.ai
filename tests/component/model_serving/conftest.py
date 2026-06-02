@@ -8,6 +8,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -66,6 +67,7 @@ def model_serving_processors(
         repository=ms_repo,
         deployment_repository=deployment_repo,
         runtime_variant_repository=AsyncMock(),
+        scheduler_repository=AsyncMock(),
         deployment_controller=AsyncMock(),
         scheduling_controller=AsyncMock(),
         route_controller=AsyncMock(),
@@ -80,6 +82,7 @@ def model_serving_processors(
                 single_entity=SingleEntityActionRBACValidator(
                     permission_controller_repo, MagicMock()
                 ),
+                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
         ),
     )
@@ -102,6 +105,7 @@ def auto_scaling_processors(
                 single_entity=SingleEntityActionRBACValidator(
                     permission_controller_repo, MagicMock()
                 ),
+                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
         ),
     )
@@ -144,6 +148,7 @@ def deployment_processors(
                 single_entity=SingleEntityActionRBACValidator(
                     permission_controller_repo, MagicMock()
                 ),
+                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
         ),
     )

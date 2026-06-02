@@ -54,6 +54,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.user import UserRole, users
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import AuthUserFixtureData
 
@@ -120,7 +121,7 @@ class _SignupDefaultProjectData:
 @pytest.fixture()
 async def signup_default_project(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[_SignupDefaultProjectData]:
     """Create a project named ``default`` in the test domain so that the
@@ -135,7 +136,7 @@ async def signup_default_project(
                 name="default",
                 description="Default project for signup binding test",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -158,7 +159,7 @@ async def signup_default_project(
 async def expired_password_user(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[_ExpiredPasswordUserData]:
     """Insert a user whose password_changed_at is far in the past."""
@@ -171,7 +172,7 @@ async def expired_password_user(
         secret_key=secrets.token_hex(20),
         password=password,
         email=email,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
     )
     # Set password_changed_at to 200 days ago so it's expired with a 90-day policy
     expired_at = datetime.now(UTC) - timedelta(days=200)
@@ -192,7 +193,7 @@ async def expired_password_user(
                 description=f"Test expired password user {unique_id}",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
                 password_changed_at=expired_at,
@@ -971,7 +972,7 @@ class TestSignup:
     async def test_signup_creates_user_with_keypair(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         resource_policy_fixture: str,
         db_engine: SAEngine,
     ) -> None:
@@ -980,7 +981,7 @@ class TestSignup:
         email = f"signup-{unique}@test.local"
         result = await admin_registry.auth.signup(
             SignupRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 email=email,
                 password=f"SignupP@ss{unique}",
                 username=f"signup-{unique}",
@@ -999,7 +1000,7 @@ class TestSignup:
     async def test_signup_binds_user_to_default_project_via_ase(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         db_engine: SAEngine,
         signup_default_project: _SignupDefaultProjectData,
     ) -> None:
@@ -1013,7 +1014,7 @@ class TestSignup:
 
         result = await admin_registry.auth.signup(
             SignupRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 email=email,
                 password=f"SignupP@ss{unique}",
                 username=f"signup-bind-{unique}",

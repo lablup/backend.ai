@@ -109,6 +109,8 @@ from ai.backend.manager.services.resource_slot.processors import ResourceSlotPro
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
+from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
+from ai.backend.manager.services.role_preset.service import RolePresetService
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 from ai.backend.manager.services.runtime_variant_preset.processors import (
@@ -242,6 +244,7 @@ def create_services(args: ServiceArgs) -> Services:
                 error_monitor=args.error_monitor,
                 idle_checker_host=args.idle_checker_host,
                 session_repository=repositories.session.repository,
+                scheduler_repository=repositories.scheduler.repository,
                 scheduling_controller=args.scheduling_controller,
                 appproxy_client_pool=args.appproxy_client_pool,
                 user_repository=repositories.user.repository,
@@ -275,6 +278,7 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.resource_preset.repository,
         ),
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
+        role_preset=RolePresetService(repositories.role_preset.repository),
         runtime_variant=RuntimeVariantService(
             repositories.runtime_variant.repository,
         ),
@@ -309,6 +313,7 @@ def create_services(args: ServiceArgs) -> Services:
             repository=repositories.model_serving.repository,
             deployment_repository=repositories.deployment.repository,
             runtime_variant_repository=repositories.runtime_variant.repository,
+            scheduler_repository=repositories.scheduler.repository,
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
             route_controller=args.route_controller,
@@ -466,6 +471,7 @@ def create_processors(
             services.resource_preset, action_monitors, validators
         ),
         resource_slot=ResourceSlotProcessors(services.resource_slot, action_monitors, validators),
+        role_preset=RolePresetProcessors(services.role_preset, action_monitors, validators),
         runtime_variant=RuntimeVariantProcessors(
             services.runtime_variant, action_monitors, validators
         ),

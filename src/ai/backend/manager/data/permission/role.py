@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -17,7 +16,6 @@ from .status import RoleStatus
 from .types import (
     EntityType,
     OperationType,
-    RBACElementRef,
     RBACElementType,
     RoleSource,
     ScopeType,
@@ -95,40 +93,33 @@ class BatchEntityPermissionCheckInput:
 
 
 @dataclass(frozen=True)
-class ScopeChainPermissionCheckInput:
-    user_id: uuid.UUID
-    target_element_ref: RBACElementRef
-    operation: OperationType
-    permission_entity_type: EntityType | None
+class PermissionResolutionKey:
+    """Identifies a single (user, element_type, entity) target for permission resolution.
 
+    A bulk permission resolver accepts a sequence of these keys and returns a
+    mapping keyed by the same object, so each result is unambiguously tied to
+    its input target.
 
-@dataclass(frozen=True)
-class EffectivePermissionsInput:
-    """Input for resolving effective permissions per entity for a given user.
-
-    Given a user, an element type, and a list of entity IDs, returns the
-    set of permitted operations per entity by traversing the scope chain
-    and evaluating all role/permission assignments.
+    ``element_type`` controls scope-chain entry; ``subject_entity_type`` controls
+    which ``permission.entity_type`` rows are matched. Callers that want the
+    default mapping pass ``element_type`` itself.
     """
 
     user_id: uuid.UUID
-    target_element_type: RBACElementType
-    target_entity_ids: list[str]
-    permission_entity_type: EntityType | None = None
+    element_type: RBACElementType
+    entity_id: str
+    subject_entity_type: RBACElementType
 
 
 @dataclass(frozen=True)
-class EffectivePermissionsResult:
-    """Mapping from entity ID to the set of operations the user is authorized to perform."""
-
-    permissions: Mapping[str, set[OperationType]]
+class ScopeChainPermissionCheckInput:
+    key: PermissionResolutionKey
+    operation: OperationType
 
 
 @dataclass(frozen=True)
 class BulkPermissionCheckInput:
-    user_id: uuid.UUID
-    target_element_type: RBACElementType
-    target_entity_ids: list[str]
+    keys: list[PermissionResolutionKey]
     operation: OperationType
 
 

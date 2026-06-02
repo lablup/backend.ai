@@ -1,5 +1,6 @@
 """Types for session creation and enqueueing."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
@@ -10,9 +11,12 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import (
     AccessKey,
     SessionId,
+    SlotName,
+    SlotTypes,
     VFolderMount,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
+from ai.backend.manager.data.resource.types import SlotTypePolicy
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 
 
@@ -143,4 +147,6 @@ class SessionSpecContextFetch:
     vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]]
     dotfile_data: DotfileBundle
     keypair_resource_policy: Any | None  # KeyPairResourcePolicyData
+    known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
+    slot_type_policy: SlotTypePolicy = field(default_factory=SlotTypePolicy)
     active_session_count: int = 0

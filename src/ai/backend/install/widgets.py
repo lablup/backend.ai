@@ -97,7 +97,12 @@ class SetupLog(RichLog):
         """
         Block until the user concludes the dialog.
         If the user cancels, the result will be None.
+        In headless mode there is no terminal-attached UI to receive the Enter
+        keypress, so we auto-proceed instead of blocking forever.
         """
+        if self.app.is_headless:
+            self.write(Text.from_markup("\n[dim](headless mode: auto-continuing)[/]\n"))
+            return
         self.write(Text.from_markup("\nPress [bold]Enter[/] to continue...\n"))
         self._continue.clear()
         await self._continue.wait()

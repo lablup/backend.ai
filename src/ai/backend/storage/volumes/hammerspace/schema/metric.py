@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 
-class ClusterMetricRow(BaseModel):
+class ClusterMetricRow(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     time: int  # timestamp
@@ -22,21 +24,21 @@ class ClusterMetricRow(BaseModel):
         )
 
 
-class ValidClusterMetricRow(BaseModel):
+class ValidClusterMetricRow(BackendAISchema):
     time: int  # timestamp
     total: int
     used: int
     free: int
 
 
-class MetricSeries(BaseModel):
+class MetricSeries(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     tags: dict[str, str]
     rows: list[ClusterMetricRow]
 
 
-class Metric(BaseModel):
+class Metric(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     series: list[MetricSeries]

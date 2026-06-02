@@ -285,7 +285,7 @@ class VASTAPIClient:
             VASTInvalidParameterError,
         ) as e:
             log.warning(
-                f"Error occurs during communicating with Vast data API. Login and retry (e:{e!r})"
+                "Error occurs during communicating with Vast data API. Login and retry (e:{!r})", e
             )
             await self._login()
             return await func(
@@ -457,7 +457,7 @@ class VASTAPIClient:
                     )
                     return result
                 case 404:
-                    log.warning(f"Cluster with id {cluster_id} not found in VAST data.")
+                    log.warning("Cluster with id {} not found in VAST data.", cluster_id)
                     return None
                 case _:
                     raise VASTUnknownError(

@@ -4,7 +4,6 @@ Request DTOs for Deployment DTO v2.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -13,7 +12,10 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.config import (
+    ModelDefinitionDraft,
+    PreStartAction,
+)
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     RouteHealthStatus,
@@ -43,6 +45,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTO
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -57,7 +60,6 @@ __all__ = (
     "AccessTokenOrder",
     "ActivateDeploymentInput",
     "ActivateRevisionInput",
-    "AddRevisionGQLInputDTO",
     "AddRevisionInput",
     "AdminSearchDeploymentsInput",
     "AdminSearchRevisionsInput",
@@ -65,7 +67,7 @@ __all__ = (
     "AutoScalingRuleOrder",
     "BlueGreenConfigInput",
     "ClusterConfigInput",
-    "CreateRevisionInputDTO",
+    "CreateRevisionInput",
     "CreateAccessTokenInput",
     "CreateAutoScalingRuleInput",
     "CreateDeploymentInput",
@@ -80,20 +82,23 @@ __all__ = (
     "EnvironmentVariablesInput",
     "ExtraVFolderMountInput",
     "ImageInput",
+    "ModelConfigInput",
+    "ModelDefinitionInput",
     "ModelDeploymentMetadataInput",
     "ModelDeploymentNetworkAccessInput",
+    "ModelHealthCheckInput",
+    "ModelMetadataInput",
     "ModelMountConfigInput",
     "ModelRuntimeConfigInput",
+    "ModelServiceConfigInput",
     "ReplicaFilter",
     "ReplicaOrder",
     "ReplicaStatusFilter",
     "ReplicaTrafficStatusFilter",
     "ResourceConfigInput",
-    "ResourceGroupInput",
     "ResourceSlotEntryInput",
     "ResourceSlotInput",
     "RevisionFilter",
-    "RevisionInput",
     "RevisionOrder",
     "ReplaceDeploymentOptionsGQLInput",
     "ReplaceDeploymentOptionsInput",
@@ -114,6 +119,67 @@ __all__ = (
     "UpdateRouteTrafficStatusInput",
     "UpsertDeploymentPolicyInput",
 )
+
+
+class ModelHealthCheckInput(BaseRequestModel):
+    interval: float | None = None
+    path: str | None = None
+    max_retries: int | None = None
+    max_wait_time: float | None = None
+    expected_status_code: int | None = None
+    initial_delay: float | None = None
+
+
+class ModelMetadataInput(BaseRequestModel):
+    author: str | None = None
+    title: str | None = None
+    version: str | None = None
+    created: str | None = None
+    last_modified: str | None = None
+    description: str | None = None
+    task: str | None = None
+    category: str | None = None
+    architecture: str | None = None
+    framework: list[str] | None = None
+    label: list[str] | None = None
+    license: str | None = None
+    min_resource: dict[str, Any] | None = None
+
+
+class ModelServiceConfigInput(BaseRequestModel):
+    pre_start_actions: list[PreStartAction] | None = None
+    start_command: list[str] | None = None
+    shell: str | None = None
+    port: int | None = None
+    health_check: ModelHealthCheckInput | None = None
+
+
+class ModelConfigInput(BaseRequestModel):
+    name: str | None = None
+    model_path: str | None = None
+    service: ModelServiceConfigInput | None = None
+    metadata: ModelMetadataInput | None = None
+
+
+class ModelDefinitionInput(BaseRequestModel):
+    """All-optional v2 input mirror of :class:`ModelDefinitionDraft`.
+
+    Fields a request omits are filled by lower-priority sources in the
+    revision merge chain (runtime variant baseline, revision preset,
+    vfolder ``model-definition.yaml``, ``model_mount_destination``
+    default). Required-field enforcement happens later in
+    ``ModelDefinitionDraft.to_resolved`` after the merge.
+    """
+
+    models: list[ModelConfigInput] | None = None
+
+    def to_draft(self) -> ModelDefinitionDraft:
+        # ``exclude_unset=True`` keeps the resulting draft's
+        # ``model_fields_set`` aligned with what the caller actually
+        # provided. Without it, every field would appear "explicitly
+        # set" (to ``None``) and clobber lower-priority sources during
+        # the revision merge.
+        return ModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
 
 
 class ClusterConfigInput(BaseRequestModel):
@@ -138,7 +204,6 @@ class ResourceSlotInput(BaseRequestModel):
 class ResourceConfigInput(BaseRequestModel):
     """Resource configuration input for a revision."""
 
-    resource_group: ResourceGroupInput = Field(description="Resource group")
     resource_slots: ResourceSlotInput = Field(description="Resource slot allocations")
     resource_opts: ResourceOptsDTOInput | None = Field(
         default=None, description="Additional resource options"
@@ -189,9 +254,6 @@ class ModelRuntimeConfigInput(BaseRequestModel):
             " RuntimeVariant resolver service before invoking internal flows."
         ),
     )
-    inference_runtime_config: dict[str, Any] | None = Field(
-        default=None, description="Framework-specific inference runtime configuration"
-    )
     environ: EnvironmentVariablesInput | None = Field(
         default=None, description="Environment variables for the service"
     )
@@ -202,7 +264,24 @@ class ModelMountConfigInput(BaseRequestModel):
 
     vfolder_id: VFolderUUID = Field(description="VFolder ID for the model")
     mount_destination: str = Field(description="Mount destination path inside container")
-    definition_path: str = Field(description="Path to model definition file")
+    definition_path: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Optional path to the model definition file within the model vfolder. "
+            "When omitted, the server auto-detects `model-definition.yaml` or "
+            "`model-definition.yml`. Empty string is rejected; omit the field to "
+            "trigger auto-detection."
+        ),
+    )
+    subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the model vfolder to mount. ``null`` (default) mounts the vfolder root."
+            " Empty string is rejected; omit the field to mount the root."
+        ),
+    )
 
 
 class ExtraVFolderMountInput(BaseRequestModel):
@@ -218,12 +297,19 @@ class ExtraVFolderMountInput(BaseRequestModel):
             "regardless of what the vfolder grants."
         ),
     )
+    subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the vfolder to mount. ``null`` (default) mounts the vfolder root."
+            " Empty string is rejected; omit the field to mount the root."
+        ),
+    )
 
 
-class CreateRevisionInputDTO(BaseRequestModel):
+class CreateRevisionInput(BaseRequestModel):
     """Input for a deployment revision (nested structure matching GQL CreateRevisionInput)."""
 
-    name: str | None = Field(default=None, description="Revision name")
     revision_preset_id: DeploymentPresetID | None = Field(
         default=None,
         description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
@@ -233,7 +319,7 @@ class CreateRevisionInputDTO(BaseRequestModel):
     image: ImageInput = Field(description="Container image")
     model_runtime_config: ModelRuntimeConfigInput = Field(description="Runtime configuration")
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
-    model_definition: ModelDefinitionDraft | None = Field(
+    model_definition: ModelDefinitionInput | None = Field(
         default=None,
         description="Model definition to override the default values generated by the server",
     )
@@ -255,21 +341,26 @@ class AddRevisionOptions(BaseRequestModel):
     )
 
 
-class AddRevisionGQLInputDTO(BaseRequestModel):
+class AddRevisionInput(BaseRequestModel):
     """Input for adding a revision. Used by both GQL and REST v2 APIs."""
 
-    name: str | None = Field(default=None, description="Revision name")
     revision_preset_id: DeploymentPresetID | None = Field(
         default=None,
         description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
     )
     deployment_id: UUID = Field(description="Deployment ID")
-    cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
-    resource_config: ResourceConfigInput = Field(description="Resource configuration")
-    image: ImageInput = Field(description="Container image")
-    model_runtime_config: ModelRuntimeConfigInput = Field(description="Runtime configuration")
+    cluster_config: ClusterConfigInput | None = Field(
+        default=None, description="Cluster configuration"
+    )
+    resource_config: ResourceConfigInput | None = Field(
+        default=None, description="Resource configuration"
+    )
+    image: ImageInput | None = Field(default=None, description="Container image")
+    model_runtime_config: ModelRuntimeConfigInput | None = Field(
+        default=None, description="Runtime configuration"
+    )
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
-    model_definition: ModelDefinitionDraft | None = Field(
+    model_definition: ModelDefinitionInput | None = Field(
         default=None,
         description="Model definition to override the default values generated by the server",
     )
@@ -287,6 +378,7 @@ class ModelDeploymentMetadataInput(BaseRequestModel):
 
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
+    resource_group_name: ResourceGroupName = Field(description="Resource group name")
     name: str | None = Field(
         default=None,
         min_length=1,
@@ -371,41 +463,6 @@ class DeploymentStrategyInput(BaseRequestModel):
     )
 
 
-class RevisionInput(BaseRequestModel):
-    """Input for a deployment revision."""
-
-    name: str | None = Field(default=None, description="Revision name")
-    revision_preset_id: DeploymentPresetID | None = Field(
-        default=None,
-        description="DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.",
-    )
-    image_id: UUID = Field(description="Container image ID")
-    cluster_mode: ClusterMode = Field(description="Cluster mode for the revision")
-    cluster_size: int = Field(default=1, ge=1, description="Number of nodes in the cluster")
-    resource_group: str = Field(description="Resource group for allocation")
-    resource_slots: Mapping[str, Any] = Field(description="Resource slot requirements")
-    resource_opts: Mapping[str, Any] | None = Field(
-        default=None, description="Optional resource options"
-    )
-    runtime_variant_id: RuntimeVariantID = Field(description="Runtime variant ID (UUID)")
-    inference_runtime_config: dict[str, Any] | None = Field(
-        default=None, description="Framework-specific inference runtime configuration"
-    )
-    model_vfolder_id: VFolderUUID = Field(description="Model VFolder ID")
-    model_mount_destination: str = Field(
-        default="/models", description="Mount destination for model vfolder"
-    )
-    model_definition_path: str = Field(description="Path to model definition file")
-    model_definition: ModelDefinitionDraft | None = Field(
-        default=None,
-        description="Model definition to override the default values generated by the server",
-    )
-    extra_mounts: list[ExtraVFolderMountInput] | None = Field(
-        default=None, description="Additional vfolder mounts"
-    )
-    environ: Mapping[str, str] | None = Field(default=None, description="Environment variables")
-
-
 class CreateDeploymentInput(BaseRequestModel):
     """Input for creating a deployment."""
 
@@ -417,7 +474,7 @@ class CreateDeploymentInput(BaseRequestModel):
         description="Deployment strategy configuration"
     )
     replica_count: int = Field(ge=0, description="Number of replicas")
-    initial_revision: CreateRevisionInputDTO | None = Field(
+    initial_revision: CreateRevisionInput | None = Field(
         default=None,
         description="Initial revision configuration. If omitted, deployment is created without a revision and must be added later via add_revision.",
     )
@@ -436,9 +493,6 @@ class UpdateDeploymentInput(BaseRequestModel):
     )
     preferred_domain_name: str | None = Field(
         default=None, description="Updated preferred domain name. None means no change."
-    )
-    active_revision_id: UUID | None = Field(
-        default=None, description="ID of the revision to activate. None means no change."
     )
     default_deployment_strategy: DeploymentStrategyInput | None = Field(
         default=None, description="Updated deployment strategy. None means no change."
@@ -472,13 +526,6 @@ class ScaleDeploymentInput(BaseRequestModel):
 
     id: UUID = Field(description="Deployment ID to scale")
     replicas: int = Field(ge=0, description="Target replica count")
-
-
-class AddRevisionInput(BaseRequestModel):
-    """Input for adding a revision to a deployment."""
-
-    deployment_id: UUID = Field(description="Deployment ID")
-    revision: RevisionInput = Field(description="Revision configuration")
 
 
 # ---------------------------------------------------------------------------

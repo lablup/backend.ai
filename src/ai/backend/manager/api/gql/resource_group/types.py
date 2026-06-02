@@ -382,7 +382,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
     )  # type: ignore[misc]
     async def fair_share_spec(
         self, info: Info[StrawberryGQLContext, None]
-    ) -> FairShareScalingGroupSpecGQL:
+    ) -> FairShareScalingGroupSpecGQL | None:
         """Get fair share spec with merged resource weights from capacity."""
         ctx = info.context
         dto = await ctx.adapters.resource_group.get_fair_share_spec(self.name)
@@ -394,7 +394,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
             description="Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.",
         )
     )  # type: ignore[misc]
-    async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL:
+    async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL | None:
         """Get resource information for this resource group."""
         ctx = info.context
         resource_info_dto = await ctx.adapters.resource_group.get_resource_info(self.name)

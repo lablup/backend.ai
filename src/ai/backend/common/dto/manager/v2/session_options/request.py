@@ -34,8 +34,37 @@ from ai.backend.common.dto.manager.v2.session_options.types import (
 from ai.backend.common.identifier.image import ImageID
 
 
-class HandlerTimeoutEntryInput(BaseRequestModel):
-    """A single ``(handler_name, timeout_sec)`` entry.
+class HandlerOptionsInput(BaseRequestModel):
+    """Per-handler scheduler policy fields (no handler name).
+
+    Used as the ``default`` slot inside ``SessionHandlerOptionsInput``.
+    Field-level ``null`` means "no limit" — the corresponding
+    classification simply does not fire (timeout-elapsed or retry-
+    exhausted) on that dimension.
+    """
+
+    timeout_sec: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "Phase timeout in seconds. `null` disables the timeout — "
+            "the phase may run indefinitely."
+        ),
+    )
+    max_retry_count: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Per-phase retry budget. `null` on the wire means "
+            "'no override' and inherits the data-layer default "
+            "(currently `5`); set explicitly to disable the retry "
+            "limit (`give_up` never fires)."
+        ),
+    )
+
+
+class HandlerOptionsEntryInput(HandlerOptionsInput):
+    """A single ``(handler_name, options)`` entry.
 
     Structured as a list entry rather than a dict value so GraphQL and
     typed SDK clients can validate each pair individually. The server
@@ -52,39 +81,27 @@ class HandlerTimeoutEntryInput(BaseRequestModel):
             "for the authoritative list."
         ),
     )
-    timeout_sec: int | None = Field(
-        default=None,
-        ge=1,
-        description=(
-            "Timeout in seconds. `null` explicitly marks this handler "
-            "as unbounded even when a `default` timeout is set."
-        ),
-    )
 
 
-class SessionTimeoutsInput(BaseRequestModel):
-    """Handler-keyed timeout policy for one session.
+class SessionHandlerOptionsInput(BaseRequestModel):
+    """Handler-keyed scheduler policy for one session.
 
-    Resolution per handler name: `by_handler[name]` if present
-    (possibly `null`), otherwise `default`. `null` at both layers means
-    the handler may run indefinitely.
+    Resolution per handler name: `by_handler[name]` if present,
+    otherwise `default`. Within a chosen entry, any field-level `null`
+    falls back to the corresponding field on `default`.
     """
 
-    default: int | None = Field(
-        default=None,
-        ge=1,
+    default: HandlerOptionsInput = Field(
+        default_factory=HandlerOptionsInput,
         description=(
-            "Fallback timeout in seconds applied to any scheduler "
-            "handler not overridden by `by_handler`. `null` means no "
-            "default timeout — handlers run without a deadline."
+            "Fallback per-handler policy applied to any scheduler "
+            "handler not overridden by `by_handler`."
         ),
     )
-    by_handler: list[HandlerTimeoutEntryInput] = Field(
+    by_handler: list[HandlerOptionsEntryInput] = Field(
         default_factory=list,
         description=(
-            "Per-handler overrides. Each entry binds a handler name to "
-            "a timeout (or `null` to force 'no timeout' for that "
-            "handler specifically)."
+            "Per-handler overrides. Each entry binds a handler name to a `HandlerOptions` payload."
         ),
     )
 
@@ -179,9 +196,9 @@ class KernelExecutionSpecInput(BaseRequestModel):
         ge=0,
         description=(
             "BATCH-session soft deadline in seconds for the whole run. "
-            "Independent of `SessionTimeoutsInput.by_handler`, which "
-            "tracks scheduler-loop handlers rather than user payload "
-            "execution."
+            "Independent of `SessionHandlerOptionsInput.by_handler`, "
+            "which tracks scheduler-loop handlers rather than user "
+            "payload execution."
         ),
     )
 
@@ -320,9 +337,9 @@ class SessionOptionsInput(BaseRequestModel):
         default=None,
         description="Scheduler placement constraints.",
     )
-    timeouts: SessionTimeoutsInput | None = Field(
+    handler_options: SessionHandlerOptionsInput | None = Field(
         default=None,
-        description="Handler-keyed timeout policy for this session.",
+        description="Handler-keyed scheduler policy for this session.",
     )
 
 
@@ -366,9 +383,9 @@ class DefaultSessionOptionsInput(BaseRequestModel):
             "does not override them."
         ),
     )
-    timeouts: SessionTimeoutsInput | None = Field(
+    handler_options: SessionHandlerOptionsInput | None = Field(
         default=None,
-        description="Default handler-keyed timeout policy.",
+        description="Default handler-keyed scheduler policy.",
     )
     agent_selection_policy: AgentSelectionPolicyEnum | None = Field(
         default=None,

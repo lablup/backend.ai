@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -12,6 +13,7 @@ from pydantic import HttpUrl
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.session.types import MountOption as MountOptionDTO
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -35,7 +37,6 @@ if TYPE_CHECKING:
 __all__ = [
     "EndpointAccessValidationData",
     "EndpointAutoScalingRuleData",
-    "EndpointAutoScalingRuleListResult",
     "EndpointData",
     "EndpointLifecycle",
     "EndpointTokenData",
@@ -57,6 +58,14 @@ class EndpointAccessValidationData:
 
 @dataclass
 class EndpointData:
+    """Legacy model-serving endpoint projection — DO NOT USE in new code.
+
+    Backs the legacy ``/services`` (model-serving) responses, which flatten
+    the active revision's fields (image, model, resources, mounts, …) onto
+    the endpoint and carry no separate revision object. New deployment code
+    uses ``ModelDeploymentData`` (v2) / ``LegacyDeploymentData`` (REST v1).
+    """
+
     id: uuid.UUID
     name: str
     image: ImageData | None
@@ -142,16 +151,6 @@ class EndpointAutoScalingRuleData:
 
 
 @dataclass
-class EndpointAutoScalingRuleListResult:
-    """Search result with total count for endpoint auto scaling rules."""
-
-    items: list[EndpointAutoScalingRuleData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass
 class UserData:
     uuid: uuid.UUID
     email: str
@@ -198,16 +197,28 @@ class ModelServicePrepareCtx:
 
 @dataclass
 class MountOption:
+    """Per-vfolder extra mount option."""
+
     mount_destination: str | None
     type: MountTypes
     permission: MountPermission | None
+    subpath: str | None = None
+
+    @classmethod
+    def from_dto(cls, dto: MountOptionDTO) -> MountOption:
+        """Convert the wire-level :class:`MountOption` DTO into a data-layer dataclass."""
+        return cls(
+            mount_destination=dto.mount_destination,
+            type=dto.type,
+            permission=dto.permission,
+            subpath=dto.subpath,
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "mount_destination": self.mount_destination,
-            "type": self.type.value,
-            "permission": self.permission.value if self.permission else None,
-        }
+        # ``MountTypes`` / ``MountPermission`` are ``StrEnum``s, so the enum
+        # instances ``dataclasses.asdict`` returns serialise as their string
+        # value under ``json.dumps`` — no manual ``.value`` extraction needed.
+        return dataclasses.asdict(self)
 
 
 @dataclass
@@ -215,13 +226,6 @@ class RouteInfo:
     route_id: uuid.UUID
     session_id: uuid.UUID | None
     traffic_ratio: float
-
-
-@dataclass
-class RouteConnectionInfo:
-    app: str
-    kernel_host: str
-    kernel_port: int
 
 
 @dataclass(frozen=True)
@@ -251,12 +255,14 @@ class ServiceConfig:
     scaling_group: str
     resources: dict[str, str | int | float] | None
     resource_opts: dict[str, str | int | bool] | None
+    vfolder_subpath: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "model": self.model,
             "model_definition_path": self.model_definition_path,
             "model_mount_destination": self.model_mount_destination,
+            "vfolder_subpath": self.vfolder_subpath,
             "extra_mounts": {key: value.to_dict() for key, value in self.extra_mounts.items()},
             "environ": self.environ if self.environ is not None else {},
             "scaling_group": self.scaling_group,
@@ -310,16 +316,6 @@ class ServiceSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-
-@dataclass
-class RequesterCtx:
-    """Deprecated: Use UserData from ai.backend.common.data.user.types instead."""
-
-    is_authorized: bool | None
-    user_id: uuid.UUID
-    user_role: UserRole
-    domain_name: str
 
 
 @dataclass

@@ -27,7 +27,7 @@ from ai.backend.common.types import (
     ResourceSlotEntry,
     SessionTypes,
 )
-from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionSpec
+from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionData
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -42,8 +42,10 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.deployment import RevisionMissingModelVFolder
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 
@@ -64,16 +66,33 @@ class DeploymentSessionDraftBuilder:
         deployment_info: DeploymentInfo,
         context: DeploymentContext,
         route_id: UUID,
-        target_revision: ModelRevisionSpec,
+        target_revision: ModelRevisionData,
     ) -> SessionSpecDraft:
         environ = cls._resolve_environ(deployment_info, target_revision, context)
-        startup_command = cls._resolve_startup_command(target_revision, context)
+        startup_command = target_revision.execution.startup_command
         mounts = cls._resolve_mounts(target_revision)
         resource_entries = cls._resource_entries(target_revision)
         resource_opts = ResourceOpts.model_validate(
-            target_revision.resource_spec.resource_opts or {}
+            dict(target_revision.resource_config.resource_opts) or {}
         )
-        model_definition_payload = cls._model_definition_payload(target_revision)
+        model_definition_payload = cls._model_definition_payload(target_revision, context)
+
+        if target_revision.model_mount_config.vfolder_id is None:
+            raise RevisionMissingModelVFolder(
+                f"Revision {target_revision.id} has no model vfolder; cannot build session draft"
+            )
+        kernel_groups = cls._resolve_kernel_groups(
+            cluster_size=target_revision.cluster_config.size,
+            execution_spec=KernelExecutionSpecDraft(
+                image_id=target_revision.image_id,
+                resources=resource_entries,
+                resource_opts=resource_opts,
+                environ=environ,
+                mounts=mounts,
+                startup_command=startup_command,
+                bootstrap_script=(target_revision.execution.bootstrap_script or None),
+            ),
+        )
 
         return SessionSpecDraft(
             identity=SessionIdentityDraft(
@@ -97,40 +116,52 @@ class DeploymentSessionDraftBuilder:
             options=SessionOptionsDraft(
                 priority=SESSION_PRIORITY_DEFAULT,
                 is_preemptible=False,
-                cluster_mode=target_revision.resource_spec.cluster_mode,
-                cluster_size=target_revision.resource_spec.cluster_size,
+                cluster_mode=target_revision.cluster_config.mode,
+                cluster_size=target_revision.cluster_config.size,
                 scheduling_target=SchedulingTargetDraft(),
-                kernel_groups=(
-                    KernelGroupDraft(
-                        role="main",
-                        replica_count=target_revision.resource_spec.cluster_size,
-                        execution_spec=KernelExecutionSpecDraft(
-                            image_id=target_revision.image_id,
-                            resources=resource_entries,
-                            resource_opts=resource_opts,
-                            environ=environ,
-                            mounts=mounts,
-                            startup_command=startup_command,
-                            bootstrap_script=(target_revision.execution.bootstrap_script or None),
-                        ),
-                    ),
-                ),
-                timeouts=SessionTimeouts(),
+                kernel_groups=kernel_groups,
+                handler_options=SessionHandlerOptions(),
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=context.session_owner.sudo_session_enabled,
-                model_definition_path=target_revision.mounts.model_definition_path,
+                model_definition_path=target_revision.model_mount_config.definition_path,
                 model_definition=model_definition_payload,
             ),
         )
 
     @staticmethod
+    def _resolve_kernel_groups(
+        cluster_size: int,
+        execution_spec: KernelExecutionSpecDraft,
+    ) -> tuple[KernelGroupDraft, ...]:
+        # 1 main + (cluster_size - 1) sub, matching legacy registry Shape (a).
+        groups: tuple[KernelGroupDraft, ...] = (
+            KernelGroupDraft(
+                role=DEFAULT_ROLE,
+                replica_count=1,
+                execution_spec=execution_spec,
+            ),
+        )
+        if cluster_size > 1:
+            groups += (
+                KernelGroupDraft(
+                    role="sub",
+                    replica_count=cluster_size - 1,
+                    execution_spec=execution_spec,
+                ),
+            )
+        return groups
+
+    @staticmethod
     def _resolve_environ(
         deployment_info: DeploymentInfo,
-        target_revision: ModelRevisionSpec,
+        target_revision: ModelRevisionData,
         context: DeploymentContext,
     ) -> dict[str, str]:
-        environ: dict[str, str] = dict(target_revision.execution.environ or {})
+        revision_environ = target_revision.model_runtime_config.environ
+        environ: dict[str, str] = (
+            {k: str(v) for k, v in revision_environ.items()} if revision_environ else {}
+        )
         if "BACKEND_MODEL_NAME" not in environ:
             environ["BACKEND_MODEL_NAME"] = deployment_info.metadata.name
         if context.resolved_presets:
@@ -138,36 +169,32 @@ class DeploymentSessionDraftBuilder:
         return environ
 
     @staticmethod
-    def _resolve_startup_command(
-        target_revision: ModelRevisionSpec,
-        context: DeploymentContext,
-    ) -> str | None:
-        startup_command = target_revision.execution.startup_command
-        if context.resolved_presets and context.resolved_presets.args:
-            args_str = " ".join(context.resolved_presets.args)
-            startup_command = f"{startup_command} {args_str}" if startup_command else args_str
-        return startup_command
-
-    @staticmethod
     def _resolve_mounts(
-        target_revision: ModelRevisionSpec,
+        target_revision: ModelRevisionData,
     ) -> tuple[MountInfoEntry, ...]:
         # Model vfolder is always first (READ_ONLY), extra mounts follow
         # with their frozen permissions already on each entry.
+        if target_revision.model_mount_config.vfolder_id is None:
+            raise RevisionMissingModelVFolder(
+                f"Revision {target_revision.id} has no model vfolder; cannot build mount entries"
+            )
         return (
             MountInfoEntry(
-                vfolder_id=target_revision.mounts.model_vfolder_id,
-                mount_destination=target_revision.mounts.model_mount_destination,
+                vfolder_id=target_revision.model_mount_config.vfolder_id,
+                mount_destination=(
+                    target_revision.model_mount_config.mount_destination or "/models"
+                ),
                 mount_perm=MountPermission.READ_ONLY,
+                subpath=target_revision.model_mount_config.subpath,
             ),
-            *target_revision.mounts.extra_mounts,
+            *target_revision.model_mount_config.extra_mounts,
         )
 
     @staticmethod
     def _resource_entries(
-        target_revision: ModelRevisionSpec,
+        target_revision: ModelRevisionData,
     ) -> tuple[ResourceSlotEntry, ...]:
-        resource_slots = target_revision.resource_spec.resource_slots or {}
+        resource_slots = dict(target_revision.resource_config.resource_slot)
         return tuple(
             ResourceSlotEntry(resource_type=str(k), quantity=str(Decimal(v)))
             for k, v in resource_slots.items()
@@ -176,8 +203,22 @@ class DeploymentSessionDraftBuilder:
 
     @staticmethod
     def _model_definition_payload(
-        target_revision: ModelRevisionSpec,
+        target_revision: ModelRevisionData,
+        context: DeploymentContext,
     ) -> dict[str, Any] | None:
-        if target_revision.model_definition is None:
+        """Materialize ``model_definition`` into the kernel payload.
+
+        ``service.start_command`` is taken as-is from the revision snapshot
+        (the controller has already resolved any ``{model_path}`` placeholder
+        against ``models[0].model_path`` at revision creation time). Preset
+        ARGS are appended as separate argv tokens via
+        :meth:`ModelDefinition.with_args_appended` so the merge stays on
+        typed objects up to the final ``model_dump``.
+        """
+        model_definition = target_revision.model_definition
+        if model_definition is None:
             return None
-        return target_revision.model_definition.model_dump(mode="json")
+        args = (context.resolved_presets.args if context.resolved_presets else None) or []
+        if args:
+            model_definition = model_definition.with_args_appended(args)
+        return model_definition.model_dump(mode="json")

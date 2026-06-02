@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -52,11 +53,16 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.repository import (
+    ForeignKeyViolationError,
+    RepositoryIntegrityError,
+)
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
     InsufficientStoragePermission,
     VFolderDeletionNotAllowed,
     VFolderFilterStatusFailed,
+    VFolderHasLinkedModelCard,
     VFolderInvalidParameter,
     VFolderNotFound,
     VFolderOperationFailed,
@@ -66,6 +72,7 @@ from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -109,7 +116,12 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    IntegrityErrorCheck,
+    execute_batch_querier,
+)
+from ai.backend.manager.repositories.base.integrity import match_integrity_error
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
@@ -129,8 +141,10 @@ from ai.backend.manager.repositories.base.rbac.revoker import (
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
 from ai.backend.manager.repositories.vfolder.types import (
+    BulkVFolderPurgeResult,
     ProjectVFolderSearchScope,
     UserVFolderSearchScope,
+    VFolderPurgeFailure,
 )
 
 vfolder_repository_resilience = Resilience(
@@ -148,6 +162,14 @@ vfolder_repository_resilience = Resilience(
 )
 
 
+@dataclass
+class _VFolderWithLinkedModelCards:
+    """A vfolder row paired with model card rows referencing it."""
+
+    vfolder_row: VFolderRow
+    model_card_rows: list[ModelCardRow]
+
+
 class VfolderRepository:
     _db: ExtendedAsyncSAEngine
 
@@ -156,7 +178,7 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def get_by_id_validated(
-        self, vfolder_id: uuid.UUID, user_id: uuid.UUID, domain_name: str
+        self, vfolder_id: uuid.UUID, user_id: uuid.UUID, domain_name: str | None
     ) -> VFolderData:
         """
         Get a VFolder by ID with ownership/permission validation.
@@ -167,6 +189,9 @@ class VfolderRepository:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
             if not vfolder_row:
                 raise VFolderNotFound()
+
+            if vfolder_row.user == user_id:
+                return self._vfolder_row_to_data(vfolder_row)
 
             # Check access permissions
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
@@ -421,6 +446,29 @@ class VfolderRepository:
             return VFolderListResult(vfolders=vfolder_access_infos)
 
     @vfolder_repository_resilience.apply()
+    async def resolve_vfolder_ids_by_names(self, names: Sequence[str]) -> dict[str, uuid.UUID]:
+        """Look up vfolder UUIDs for a batch of names in a single query.
+
+        Returns only the names that match an existing row; the caller
+        decides what to do with any missing names (typically raise).
+
+        No access scoping or status filtering — callers (e.g. session-create
+        paths) are responsible for validating both user access and lifecycle
+        state of the resolved ids in their own downstream flow.
+        """
+        if not names:
+            return {}
+        async with self._db.begin_readonly_session() as session:
+            rows = (
+                await session.execute(
+                    sa.select(VFolderRow.name, VFolderRow.id).where(
+                        VFolderRow.name.in_(list(names))
+                    )
+                )
+            ).all()
+        return {row.name: cast(uuid.UUID, row.id) for row in rows}
+
+    @vfolder_repository_resilience.apply()
     async def create_vfolder_with_permission(
         self, params: VFolderCreateParams, create_owner_permission: bool = False
     ) -> VFolderData:
@@ -586,6 +634,8 @@ class VfolderRepository:
                 vfolder_row.status = VFolderOperationStatus.DELETE_PENDING
 
             await session.flush()
+            for row in vfolder_rows:
+                await session.refresh(row, attribute_names=["updated_at"])
 
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
 
@@ -603,32 +653,116 @@ class VfolderRepository:
                     vfolder_rows.append(vfolder_row)
 
             await session.flush()
+            for row in vfolder_rows:
+                await session.refresh(row, attribute_names=["updated_at"])
             return [self._vfolder_row_to_data(row) for row in vfolder_rows]
+
+    async def _fetch_vfolders_with_linked_model_cards(
+        self,
+        session: SASession,
+        vfolder_ids: Sequence[uuid.UUID],
+    ) -> list[_VFolderWithLinkedModelCards]:
+        """Fetch vfolder rows together with model card rows that reference them.
+
+        Uses a single LEFT OUTER JOIN. Vfolders with no model card appear
+        once with an empty ``model_card_rows`` list; vfolder IDs not present
+        in the database are skipped.
+        """
+        if not vfolder_ids:
+            return []
+
+        stmt = (
+            sa.select(VFolderRow, ModelCardRow)
+            .outerjoin(ModelCardRow, ModelCardRow.vfolder == VFolderRow.id)
+            .where(VFolderRow.id.in_(vfolder_ids))
+        )
+        rows = (await session.execute(stmt)).all()
+
+        grouped: dict[uuid.UUID, _VFolderWithLinkedModelCards] = {}
+        for vfolder_row, card_row in rows:
+            record = grouped.setdefault(
+                vfolder_row.id,
+                _VFolderWithLinkedModelCards(
+                    vfolder_row=vfolder_row,
+                    model_card_rows=[],
+                ),
+            )
+            if card_row is not None:
+                record.model_card_rows.append(card_row)
+        return list(grouped.values())
 
     @vfolder_repository_resilience.apply()
-    async def delete_vfolders_forever(self, vfolder_ids: list[uuid.UUID]) -> list[VFolderData]:
+    async def delete_vfolders_forever(
+        self,
+        vfolder_ids: list[uuid.UUID],
+        *,
+        cascade_model_card: bool = False,
+    ) -> BulkVFolderPurgeResult:
         """
-        Delete VFolders forever
+        Delete VFolders forever with partial-success semantics.
+
+        Each vfolder is processed independently in the same transaction:
+        a vfolder with linked model card(s) becomes a failure (carrying
+        ``VFolderHasLinkedModelCard``) when ``cascade_model_card`` is False;
+        otherwise the cards are deleted and the vfolder transitions to
+        ``DELETE_ONGOING`` like any other success.
         """
 
+        result = BulkVFolderPurgeResult()
         async with self._db.connect() as db_conn:
             async with self._db.begin_session(db_conn) as db_session:
-                vfolder_rows = []
-                for vfolder_id in vfolder_ids:
-                    vfolder_row = await self._get_vfolder_by_id(db_session, vfolder_id)
-                    if vfolder_row:
-                        vfolder_rows.append(vfolder_row)
-                delete_stmt = (
-                    sa.update(VFolderRow)
-                    .where(VFolderRow.id.in_(vfolder_ids))
-                    .values(status=VFolderOperationStatus.DELETE_ONGOING)
+                records = await self._fetch_vfolders_with_linked_model_cards(
+                    db_session, vfolder_ids
                 )
-                await db_session.execute(delete_stmt)
+                cards_to_delete: list[ModelCardRow] = []
+                succeeded_ids: list[uuid.UUID] = []
+                succeeded_rows: list[VFolderRow] = []
+                for rec in records:
+                    if rec.model_card_rows and not cascade_model_card:
+                        result.failures.append(
+                            VFolderPurgeFailure(
+                                vfolder_id=rec.vfolder_row.id,
+                                exception=VFolderHasLinkedModelCard(
+                                    f"VFolder {rec.vfolder_row.id} is referenced by "
+                                    f"{len(rec.model_card_rows)} model card(s); "
+                                    "delete the model card(s) first or set "
+                                    "cascade_model_card=True."
+                                ),
+                            )
+                        )
+                        continue
+                    cards_to_delete.extend(rec.model_card_rows)
+                    succeeded_ids.append(rec.vfolder_row.id)
+                    succeeded_rows.append(rec.vfolder_row)
 
-            # Delete relation rows
-            await delete_vfolder_relation_rows(db_conn, self._db.begin_session, vfolder_ids)
+                if cards_to_delete:
+                    for card in cards_to_delete:
+                        await db_session.delete(card)
+                    await db_session.flush()
 
-            return [self._vfolder_row_to_data(row) for row in vfolder_rows]
+                if succeeded_ids:
+                    delete_stmt = (
+                        sa.update(VFolderRow)
+                        .where(VFolderRow.id.in_(succeeded_ids))
+                        .values(status=VFolderOperationStatus.DELETE_ONGOING)
+                    )
+                    await db_session.execute(delete_stmt)
+                    # ``onupdate=now()`` on ``updated_at`` expires the
+                    # column on the in-memory rows after the UPDATE;
+                    # explicitly refresh so the subsequent conversion
+                    # does not need a lazy SELECT (which would fail
+                    # outside the greenlet bridge).
+                    for row in succeeded_rows:
+                        await db_session.refresh(row, attribute_names=["updated_at"])
+
+                succeeded_data = [self._vfolder_row_to_data(row) for row in succeeded_rows]
+
+            if succeeded_ids:
+                # Delete relation rows for succeeded vfolders only.
+                await delete_vfolder_relation_rows(db_conn, self._db.begin_session, succeeded_ids)
+
+            result.succeeded = succeeded_data
+            return result
 
     @vfolder_repository_resilience.apply()
     async def purge_vfolder(self, purger: RBACEntityPurger[VFolderRow]) -> VFolderData:
@@ -639,6 +773,7 @@ class VfolderRepository:
         Raises:
             VFolderNotFound: If the vfolder doesn't exist.
             VFolderFilterStatusFailed: If the vfolder status is not purgable.
+            VFolderHasLinkedModelCard: If a model card still references the vfolder.
         """
         vfolder_uuid = cast(uuid.UUID, purger.pk_value)
         async with self._db.begin_session() as session:
@@ -648,7 +783,24 @@ class VfolderRepository:
                 raise VFolderNotFound(extra_data=str(vfolder_uuid))
             if vfolder_row.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
                 raise VFolderFilterStatusFailed
-            await execute_rbac_entity_purger(session, purger)
+            try:
+                await execute_rbac_entity_purger(session, purger)
+            except RepositoryIntegrityError as e:
+                match_integrity_error(
+                    e,
+                    [
+                        IntegrityErrorCheck(
+                            violation_type=ForeignKeyViolationError,
+                            constraint_name="fk_model_cards_vfolder_vfolders",
+                            error=VFolderHasLinkedModelCard(
+                                f"VFolder {vfolder_uuid} cannot be purged: it is "
+                                "still referenced by one or more model card(s). "
+                                "Run delete-forever (with cascade if needed) "
+                                "before purge."
+                            ),
+                        ),
+                    ],
+                )
             return vfolder_row.to_data()
 
     @vfolder_repository_resilience.apply()
@@ -761,23 +913,26 @@ class VfolderRepository:
         Get all invitations for a VFolder.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(VFolderInvitationRow).where(
-                VFolderInvitationRow.vfolder == vfolder_id
+            query = (
+                sa.select(VFolderInvitationRow, UserRow.username)
+                .outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
+                .where(VFolderInvitationRow.vfolder == vfolder_id)
             )
             result = await session.execute(query)
-            invitation_rows = result.scalars().all()
+            rows = result.all()
 
             return [
                 VFolderInvitationData(
                     id=row.id,
                     vfolder=row.vfolder,
                     inviter=row.inviter or "",
+                    inviter_username=inviter_username,
                     invitee=row.invitee,
                     permission=row.permission or VFolderMountPermission.READ_ONLY,
                     created_at=row.created_at or datetime.now(UTC),
                     modified_at=row.modified_at,
                 )
-                for row in invitation_rows
+                for row, inviter_username in rows
             ]
 
     @vfolder_repository_resilience.apply()
@@ -1046,6 +1201,7 @@ class VfolderRepository:
             cur_size=row.cur_size or 0,
             created_at=row.created_at or datetime.now(UTC),
             last_used=row.last_used,
+            updated_at=row.updated_at,
             creator=row.creator,
             creator_id=row.creator_id,
             unmanaged_path=row.unmanaged_path,
@@ -1086,16 +1242,15 @@ class VfolderRepository:
             return (count or 0) > 0
 
     @vfolder_repository_resilience.apply()
-    async def get_user_by_email(self, email: str) -> tuple[uuid.UUID, str] | None:
+    async def get_user_by_email(self, email: str) -> tuple[uuid.UUID, str | None] | None:
         """
         Get user info by email.
         Returns (user_id, domain_name) or None if user not found.
+        domain_name may be None.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
             if not user_row:
-                return None
-            if user_row.domain_name is None:
                 return None
             return user_row.uuid, user_row.domain_name
 
@@ -1195,18 +1350,24 @@ class VfolderRepository:
         Returns VFolderInvitationData or None if not found.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(VFolderInvitationRow).where(
-                (VFolderInvitationRow.id == invitation_id)
-                & (VFolderInvitationRow.state == VFolderInvitationState.PENDING),
+            query = (
+                sa.select(VFolderInvitationRow, UserRow.username)
+                .outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
+                .where(
+                    (VFolderInvitationRow.id == invitation_id)
+                    & (VFolderInvitationRow.state == VFolderInvitationState.PENDING),
+                )
             )
-            invitation_row = await session.scalar(query)
-            if not invitation_row:
+            row = (await session.execute(query)).one_or_none()
+            if not row:
                 return None
+            invitation_row, inviter_username = row
 
             return VFolderInvitationData(
                 id=invitation_row.id,
                 vfolder=invitation_row.vfolder,
                 inviter=invitation_row.inviter or "",
+                inviter_username=inviter_username,
                 invitee=invitation_row.invitee,
                 permission=invitation_row.permission or VFolderMountPermission.READ_ONLY,
                 created_at=invitation_row.created_at or datetime.now(UTC),
@@ -1280,9 +1441,9 @@ class VfolderRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             j = sa.join(
                 VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
-            )
+            ).outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
             query = (
-                sa.select(VFolderInvitationRow)
+                sa.select(VFolderInvitationRow, UserRow.username)
                 .select_from(j)
                 .where(
                     sa.and_(
@@ -1294,15 +1455,16 @@ class VfolderRepository:
                     contains_eager(VFolderInvitationRow.vfolder_row),
                 )
             )
-            result = await session.scalars(query)
-            invitation_rows = list(result.all())
+            result = await session.execute(query)
+            rows = result.all()
 
             results = []
-            for inv_row in invitation_rows:
+            for inv_row, inviter_username in rows:
                 invitation_data = VFolderInvitationData(
                     id=inv_row.id,
                     vfolder=inv_row.vfolder,
                     inviter=inv_row.inviter or "",
+                    inviter_username=inviter_username,
                     invitee=inv_row.invitee,
                     permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
                     created_at=inv_row.created_at or datetime.now(UTC),
@@ -1323,9 +1485,9 @@ class VfolderRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             j = sa.join(
                 VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
-            )
+            ).outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
             query = (
-                sa.select(VFolderInvitationRow)
+                sa.select(VFolderInvitationRow, UserRow.username)
                 .select_from(j)
                 .where(
                     sa.and_(
@@ -1337,15 +1499,16 @@ class VfolderRepository:
                     contains_eager(VFolderInvitationRow.vfolder_row),
                 )
             )
-            result = await session.scalars(query)
-            invitation_rows = list(result.all())
+            result = await session.execute(query)
+            rows = result.all()
 
             results = []
-            for inv_row in invitation_rows:
+            for inv_row, inviter_username in rows:
                 invitation_data = VFolderInvitationData(
                     id=inv_row.id,
                     vfolder=inv_row.vfolder,
                     inviter=inv_row.inviter or "",
+                    inviter_username=inviter_username,
                     invitee=inv_row.invitee,
                     permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
                     created_at=inv_row.created_at or datetime.now(UTC),
@@ -1453,6 +1616,7 @@ class VfolderRepository:
             cur_size=vfolder_dict["cur_size"],
             created_at=vfolder_dict["created_at"],
             last_used=vfolder_dict["last_used"],
+            updated_at=vfolder_dict["updated_at"],
             creator=vfolder_dict["creator"],
             creator_id=vfolder_dict.get("creator_id"),
             unmanaged_path=vfolder_dict["unmanaged_path"],
@@ -2162,7 +2326,7 @@ class VfolderRepository:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             items = [row.VFolderRow.to_data() for row in result.rows]
@@ -2196,7 +2360,7 @@ class VfolderRepository:
                 db_sess,
                 query,
                 querier,
-                scope=scope,
+                scopes=[scope],
             )
 
             items = [row.VFolderRow.to_data() for row in result.rows]

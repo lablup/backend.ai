@@ -19,7 +19,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import SlotName, SlotTypes
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.dotfile.types import DotfileBundle
-from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, SlotTypePolicy
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
 
@@ -57,6 +57,7 @@ class SessionSpecValidationContext:
     keypair_resource_policy: KeyPairResourcePolicyData | None = None
     image_infos: Mapping[ImageID, ImageInfo] = field(default_factory=dict)
     known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
+    slot_type_policy: SlotTypePolicy = field(default_factory=SlotTypePolicy)
     dotfile_data: DotfileBundle = field(default_factory=DotfileBundle)
     active_session_count: int = 0
 
@@ -98,5 +99,5 @@ class SessionSpecValidator:
         context: SessionSpecValidationContext,
     ) -> None:
         for rule in self._rules:
-            log.debug(f"Applying SessionSpec validation rule: {rule.name()}")
+            log.debug("Applying SessionSpec validation rule: {}", rule.name())
             rule.validate(spec, context)

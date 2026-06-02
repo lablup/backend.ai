@@ -20,12 +20,14 @@ from ai.backend.common.data.model_deployment.types import (
     ReadinessStatus,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -36,14 +38,16 @@ from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
+    ExecutionData,
     ModelDeploymentAccessTokenData,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    ReplicaSpec,
+    PresetAttributionData,
+    ReplicaData,
     ResourceConfigData,
     RouteHealthStatus,
     RouteInfo,
@@ -117,6 +121,7 @@ class DeploymentCRUDBaseFixtures:
                 rbac=RBACValidators(
                     scope=MagicMock(spec=ScopeActionRBACValidator),
                     single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                    bulk=MagicMock(spec=BulkActionRBACValidator),
                 ),
             ),
         )
@@ -148,9 +153,10 @@ class DeploymentCRUDBaseFixtures:
                 scaling_state=ScalingState.STABLE,
                 retry_count=0,
             ),
-            replica_spec=ReplicaSpec(replica_count=2),
-            network=DeploymentNetworkSpec(open_to_public=False),
-            model_revisions=[],
+            replica=ReplicaData(replica_count=2, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
             options=DeploymentOptions(),
         )
 
@@ -310,6 +316,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
 
     async def test_existing_replica_returns_data(
@@ -360,6 +367,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.INACTIVE,
+            health_check=None,
         )
         mock_deployment_repository.get_route = AsyncMock(return_value=inactive_route)
 
@@ -387,6 +395,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
         mock_deployment_repository.get_route = AsyncMock(return_value=route)
 
@@ -412,6 +421,7 @@ class TestSearchReplicas(DeploymentCRUDBaseFixtures):
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
             revision_id=uuid.uuid4(),
             traffic_status=RouteTrafficStatus.ACTIVE,
+            health_check=None,
         )
 
     async def test_default_pagination(
@@ -560,7 +570,7 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         """Replica count mismatch triggers CHECK_REPLICA marking."""
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
-        action = SyncReplicaAction(deployment_id=deployment_id)
+        action = SyncReplicaAction(deployment_id=DeploymentID(deployment_id))
         result = await processors.sync_replicas.wait_for_complete(action)
 
         assert result.success is True
@@ -577,7 +587,7 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         """Already synced state still performs marking."""
         mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
 
-        action = SyncReplicaAction(deployment_id=deployment_id)
+        action = SyncReplicaAction(deployment_id=DeploymentID(deployment_id))
         result = await processors.sync_replicas.wait_for_complete(action)
 
         assert result.success is True
@@ -592,8 +602,9 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
     @pytest.fixture
     def revision_data(self) -> ModelRevisionData:
         return ModelRevisionData(
-            id=uuid.uuid4(),
-            name="rev-1",
+            id=DeploymentRevisionID(uuid.uuid4()),
+            deployment_id=DeploymentID(uuid.uuid4()),
+            revision_number=1,
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,
                 size=1,
@@ -609,10 +620,16 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
                 vfolder_id=VFolderUUID(uuid.uuid4()),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
+                extra_mounts=[],
             ),
             image_id=ImageID(uuid.uuid4()),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
-            extra_vfolder_mounts=[],
+            execution=ExecutionData(
+                startup_command=None,
+                bootstrap_script=None,
+                callback_url=None,
+            ),
+            preset=PresetAttributionData(preset_id=None, values=[]),
         )
 
     async def test_existing_revision_returns_data(
@@ -621,18 +638,17 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
         mock_deployment_repository: MagicMock,
         revision_data: ModelRevisionData,
     ) -> None:
-        """Existing revision returns ModelRevisionData with name/cluster_config/resource_config/image_id/extra_vfolder_mounts."""
+        """Existing revision returns ModelRevisionData with cluster_config/resource_config/image_id/extra_mounts."""
         mock_deployment_repository.get_revision = AsyncMock(return_value=revision_data)
 
         action = GetRevisionByIdAction(revision_id=revision_data.id)
         result = await processors.get_revision_by_id.wait_for_complete(action)
 
         assert result.data == revision_data
-        assert result.data.name == "rev-1"
         assert result.data.cluster_config.mode == ClusterMode.SINGLE_NODE
         assert result.data.resource_config.resource_group_name == "default"
         assert result.data.image_id == revision_data.image_id
-        assert result.data.extra_vfolder_mounts == []
+        assert result.data.model_mount_config.extra_mounts == []
         mock_deployment_repository.get_revision.assert_called_once_with(revision_data.id)
 
     async def test_non_existent_revision_raises(
@@ -645,6 +661,6 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
             side_effect=Exception("DeploymentRevisionNotFound")
         )
 
-        action = GetRevisionByIdAction(revision_id=uuid.uuid4())
+        action = GetRevisionByIdAction(revision_id=DeploymentRevisionID(uuid.uuid4()))
         with pytest.raises(Exception, match="DeploymentRevisionNotFound"):
             await processors.get_revision_by_id.wait_for_complete(action)

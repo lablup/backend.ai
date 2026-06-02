@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.fair_share import (
     UpsertProjectFairShareWeightRequest,
     UpsertProjectFairShareWeightResponse,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestProjectFairShareWeights:
@@ -54,7 +55,7 @@ class TestProjectFairShareWeights:
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Upsert project fair share → weight created/updated."""
         weight = Decimal("3.5")
@@ -62,7 +63,7 @@ class TestProjectFairShareWeights:
             resource_group=scaling_group_fixture,
             project_id=group_fixture,
             request=UpsertProjectFairShareWeightRequest(
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 weight=weight,
             ),
         )
@@ -88,7 +89,7 @@ class TestBulkUpsertProjectWeights:
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Bulk upsert success → all weights updated."""
         result = await admin_registry.fair_share.bulk_upsert_project_fair_share_weight(
@@ -97,7 +98,7 @@ class TestBulkUpsertProjectWeights:
                 inputs=[
                     ProjectWeightEntryInput(
                         project_id=group_fixture,
-                        domain_name=domain_fixture,
+                        domain_name=domain_fixture.domain_name,
                         weight=Decimal("6.0"),
                     ),
                 ],
@@ -126,14 +127,14 @@ class TestBulkUpsertProjectWeights:
         admin_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
         group_fixture: uuid.UUID,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Bulk upsert overwrites existing weight."""
         await admin_registry.fair_share.upsert_project_fair_share_weight(
             resource_group=scaling_group_fixture,
             project_id=group_fixture,
             request=UpsertProjectFairShareWeightRequest(
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 weight=Decimal("10.0"),
             ),
         )
@@ -145,7 +146,7 @@ class TestBulkUpsertProjectWeights:
                 inputs=[
                     ProjectWeightEntryInput(
                         project_id=group_fixture,
-                        domain_name=domain_fixture,
+                        domain_name=domain_fixture.domain_name,
                         weight=new_weight,
                     ),
                 ],
@@ -187,20 +188,20 @@ class TestProjectScopeAccessControl:
         self,
         user_registry: BackendAIClientRegistry,
         scaling_group_fixture: str,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         group_fixture: uuid.UUID,
     ) -> None:
         """RG-scoped project access as regular user → 200 (allowed)."""
         get_result = await user_registry.fair_share.rg_get_project_fair_share(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
             project_id=group_fixture,
         )
         assert isinstance(get_result, GetProjectFairShareResponse)
 
         search_result = await user_registry.fair_share.rg_search_project_fair_shares(
             resource_group=scaling_group_fixture,
-            domain_name=domain_fixture,
+            domain_name=domain_fixture.domain_name,
             request=SearchProjectFairSharesRequest(),
         )
         assert isinstance(search_result, SearchProjectFairSharesResponse)

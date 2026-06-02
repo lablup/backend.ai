@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -16,9 +17,11 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -78,6 +81,7 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
 class TestScalingGroupRepositoryDB:
@@ -107,12 +111,14 @@ class TestScalingGroupRepositoryDB:
                 KeyPairRow,
                 ScalingGroupForKeypairsRow,  # depends on ScalingGroupRow and KeyPairRow
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
                 RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
@@ -435,7 +441,6 @@ class TestScalingGroupRepositoryDB:
                     project=test_group_id,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                     session_owner=test_user_uuid,
                     created_user=test_user_uuid,
                 )
@@ -472,20 +477,11 @@ class TestScalingGroupRepositoryDB:
     @pytest.fixture
     async def sample_domain(
         self,
+        domain_factory: DomainFactory,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
+    ) -> DomainFixtureData:
         """Create a sample domain for testing"""
-        domain_name = "test-domain-for-sgroup"
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                name=domain_name,
-                description="Test domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-            )
-            db_sess.add(domain)
-
-        yield domain_name
+        return await domain_factory(db_with_cleanup, name="test-domain-for-sgroup")
 
     @pytest.fixture
     async def sample_scaling_group_for_association(
@@ -791,7 +787,7 @@ class TestScalingGroupRepositoryDB:
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_association: str,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
     ) -> None:
         """Test associating a scaling group with domains"""
         binder = RBACScopeBinder(
@@ -799,7 +795,7 @@ class TestScalingGroupRepositoryDB:
                 RBACScopeBindingPair(
                     spec=ScalingGroupForDomainCreatorSpec(
                         scaling_group=sample_scaling_group_for_association,
-                        domain=sample_domain,
+                        domain=sample_domain.domain_name,
                     ),
                     entity_ref=RBACElementRef(
                         RBACElementType.RESOURCE_GROUP,
@@ -807,7 +803,7 @@ class TestScalingGroupRepositoryDB:
                     ),
                     scope_ref=RBACElementRef(
                         RBACElementType.DOMAIN,
-                        sample_domain,
+                        sample_domain.domain_name,
                     ),
                 )
             ]
@@ -818,7 +814,7 @@ class TestScalingGroupRepositoryDB:
         association_exists = (
             await scaling_group_repository.check_scaling_group_domain_association_exists(
                 scaling_group=sample_scaling_group_for_association,
-                domain=sample_domain,
+                domain=sample_domain.domain_name,
             )
         )
         assert association_exists is True
@@ -828,17 +824,17 @@ class TestScalingGroupRepositoryDB:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_scaling_group_for_association: str,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
     ) -> AsyncGenerator[tuple[str, str], None]:
         """Create a scaling group with a single domain association for testing"""
         async with db_with_cleanup.begin_session() as db_sess:
             association = ScalingGroupForDomainRow(
                 scaling_group=sample_scaling_group_for_association,
-                domain=sample_domain,
+                domain=sample_domain.domain_name,
             )
             db_sess.add(association)
 
-        yield sample_scaling_group_for_association, sample_domain
+        yield sample_scaling_group_for_association, sample_domain.domain_name
 
     # Disassociate with Domain Tests
     async def test_disassociate_scaling_group_with_domains_success(
@@ -866,13 +862,13 @@ class TestScalingGroupRepositoryDB:
         self,
         scaling_group_repository: ScalingGroupRepository,
         sample_scaling_group_for_association: str,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
     ) -> None:
         """Test disassociating a non-existent association (should not raise error)"""
         # Disassociate without prior association should succeed without error
         unbinder = ResourceGroupDomainEntityUnbinder(
             scaling_groups=[sample_scaling_group_for_association],
-            domain=sample_domain,
+            domain=sample_domain.domain_name,
         )
         await scaling_group_repository.disassociate_scaling_group_with_domains(unbinder)
 
@@ -1339,7 +1335,6 @@ class TestScalingGroupRepositoryDB:
                     project=test_group_id,
                     resource_group=sample_scaling_group_for_hierarchy,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                     session_owner=test_user_uuid,
                     created_user=test_user_uuid,
                 )
@@ -1431,3 +1426,24 @@ class TestScalingGroupRepositoryDB:
                 sa.select(RoutingRow).where(RoutingRow.id == route_id)
             )
             assert route_result.scalar_one_or_none() is None
+
+    async def test_get_resource_group_id_by_name_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_groups_small: list[str],
+    ) -> None:
+        target_name = sample_scaling_groups_small[0]
+        resource_group_id = await scaling_group_repository.get_resource_group_id_by_name(
+            ResourceGroupName(target_name)
+        )
+        fetched = await scaling_group_repository.get_scaling_group_by_name(target_name)
+        assert resource_group_id == fetched.id
+
+    async def test_get_resource_group_id_by_name_not_found(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+    ) -> None:
+        with pytest.raises(ScalingGroupNotFound):
+            await scaling_group_repository.get_resource_group_id_by_name(
+                ResourceGroupName("nonexistent-scaling-group")
+            )

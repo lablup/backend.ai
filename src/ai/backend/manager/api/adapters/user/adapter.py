@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.keypair import (
     KeypairNode,
     KeypairOrderBy,
     KeypairOrderField,
+    SearchKeypairsRequest,
     SearchMyKeypairsRequest,
 )
 from ai.backend.common.dto.manager.v2.keypair.request import (
@@ -112,7 +113,10 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.types import (
+    KeypairResourcePolicyKeypairSearchScope,
+    UserKeypairSearchScope,
+)
 from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
@@ -138,6 +142,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminUpdateKeypairAction,
     IssueMyKeypairAction,
     RevokeMyKeypairAction,
+    SearchKeypairsByResourcePolicyAction,
     SearchMyKeypairsAction,
     SwitchMyMainAccessKeyAction,
     UpdateMyKeypairAction,
@@ -692,6 +697,44 @@ class UserAdapter(BaseAdapter):
             has_previous_page=action_result.result.has_previous_page,
         )
 
+    async def gql_search_keypairs_by_resource_policy(
+        self,
+        scope: KeypairResourcePolicyKeypairSearchScope,
+        input: SearchKeypairsRequest,
+    ) -> SearchResult[KeypairNode]:
+        """Search keypairs assigned to a keypair resource policy (GQL connection).
+
+        Used by the ``keypairs`` connection on the keypair resource policy node.
+        The connection field gates access with ``check_admin_only()`` because the
+        keypair resource policy entity itself is not RBAC-protected; this method
+        runs the RBAC-scoped action so superadmins receive all keypairs governed
+        by the policy.
+        """
+        conditions = self._convert_keypair_filter(input.filter) if input.filter else []
+        orders = self._convert_keypair_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KEYPAIR_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = (
+            await self._processors.user.search_keypairs_by_resource_policy.wait_for_complete(
+                SearchKeypairsByResourcePolicyAction(scope=scope, querier=querier)
+            )
+        )
+        return SearchResult(
+            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
+            total_count=action_result.result.total_count,
+            has_next_page=action_result.result.has_next_page,
+            has_previous_page=action_result.result.has_previous_page,
+        )
+
     @staticmethod
     def _keypair_data_to_node(data: KeyPairData) -> KeypairNode:
         """Convert KeyPairData to KeypairNode DTO."""
@@ -1020,8 +1063,95 @@ class UserAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter_req.full_name is not None:
+            condition = self.convert_string_filter(
+                filter_req.full_name,
+                contains_factory=UserConditions.by_full_name_contains,
+                equals_factory=UserConditions.by_full_name_equals,
+                starts_with_factory=UserConditions.by_full_name_starts_with,
+                ends_with_factory=UserConditions.by_full_name_ends_with,
+                in_factory=UserConditions.by_full_name_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.description is not None:
+            condition = self.convert_string_filter(
+                filter_req.description,
+                contains_factory=UserConditions.by_description_contains,
+                equals_factory=UserConditions.by_description_equals,
+                starts_with_factory=UserConditions.by_description_starts_with,
+                ends_with_factory=UserConditions.by_description_ends_with,
+                in_factory=UserConditions.by_description_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.status_info is not None:
+            condition = self.convert_string_filter(
+                filter_req.status_info,
+                contains_factory=UserConditions.by_status_info_contains,
+                equals_factory=UserConditions.by_status_info_equals,
+                starts_with_factory=UserConditions.by_status_info_starts_with,
+                ends_with_factory=UserConditions.by_status_info_ends_with,
+                in_factory=UserConditions.by_status_info_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.resource_policy is not None:
+            condition = self.convert_string_filter(
+                filter_req.resource_policy,
+                contains_factory=UserConditions.by_resource_policy_contains,
+                equals_factory=UserConditions.by_resource_policy_equals,
+                starts_with_factory=UserConditions.by_resource_policy_starts_with,
+                ends_with_factory=UserConditions.by_resource_policy_ends_with,
+                in_factory=UserConditions.by_resource_policy_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter_req.role is not None:
             conditions.extend(self._convert_role_filter(filter_req.role))
+
+        if filter_req.need_password_change is not None:
+            conditions.append(
+                UserConditions.by_need_password_change(filter_req.need_password_change)
+            )
+
+        if filter_req.totp_activated is not None:
+            conditions.append(UserConditions.by_totp_activated(filter_req.totp_activated))
+
+        if filter_req.sudo_session_enabled is not None:
+            conditions.append(
+                UserConditions.by_sudo_session_enabled(filter_req.sudo_session_enabled)
+            )
+
+        if filter_req.container_uid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_uid,
+                UserConditions.by_container_uid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_main_gid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_main_gid,
+                UserConditions.by_container_main_gid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_gids is not None:
+            condition = self.convert_array_filter(
+                filter_req.container_gids,
+                contains_factory=UserConditions.by_container_gids_contains,
+                contains_any_factory=UserConditions.by_container_gids_any,
+                contains_all_factory=UserConditions.by_container_gids_all,
+            )
+            if condition is not None:
+                conditions.append(condition)
 
         if filter_req.created_at is not None:
             condition = filter_req.created_at.build_query_condition(
@@ -1280,6 +1410,32 @@ class UserAdapter(BaseAdapter):
                         UserConditions.by_role_in([UserRole(r.value) for r in role_f.not_in])
                     ])
                 )
+
+        if filter_req.container_uid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_uid,
+                UserConditions.by_container_uid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_main_gid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_main_gid,
+                UserConditions.by_container_main_gid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_gids is not None:
+            condition = self.convert_array_filter(
+                filter_req.container_gids,
+                contains_factory=UserConditions.by_container_gids_contains,
+                contains_any_factory=UserConditions.by_container_gids_any,
+                contains_all_factory=UserConditions.by_container_gids_all,
+            )
+            if condition is not None:
+                conditions.append(condition)
 
         if filter_req.created_at is not None:
             condition = filter_req.created_at.build_query_condition(

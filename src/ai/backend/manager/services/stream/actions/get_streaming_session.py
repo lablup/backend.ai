@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.stream.actions.base import StreamAction
@@ -12,7 +12,7 @@ from ai.backend.manager.services.stream.actions.base import StreamAction
 @dataclass(frozen=True)
 class GetStreamingSessionAction(StreamAction):
     session_name: str
-    access_key: AccessKey
+    user_uuid: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:

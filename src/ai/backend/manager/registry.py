@@ -120,12 +120,13 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
+from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
 
@@ -180,8 +181,9 @@ from .models.utils import (
     execute_with_retry,
     reenter_txn_session,
 )
-from .models.vfolder import verify_vfolder_name
-from .scheduler.types import KernelAgentBinding
+from .models.vfolder import (
+    verify_vfolder_name,
+)
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
@@ -204,6 +206,7 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
     _scheduling_controller: SchedulingController
+    _scheduler_repository: SchedulerRepository
     _event_hub: EventHub
 
     session_creation_tracker: dict[str, asyncio.Event]
@@ -221,10 +224,10 @@ class AgentRegistry:
         :class:`MountInfoEntry` tuples.
 
         Reads UUID-keyed ``mount_ids`` / ``mount_id_map`` / ``mount_options``
-        (modern v1 session-service path). String-keyed ``mounts`` entries
-        (vfolder names) are skipped here — those only appeared on CLI
-        legacy paths and cannot be resolved to ``MountInfoEntry`` without
-        a DB lookup that this builder does not perform.
+        (modern v1 session-service path). Name-keyed ``mounts`` entries
+        are not handled here — :class:`SessionService` resolves those into
+        the UUID-keyed buckets upstream before any code in this module
+        runs.
         """
         mount_ids = creation_config.get("mount_ids") or []
         mount_id_map: Mapping[Any, str] = creation_config.get("mount_id_map") or {}
@@ -246,12 +249,15 @@ class AgentRegistry:
                     perm = MountPermission(raw_perm)
                 except ValueError:
                     perm = None
+            raw_subpath = opts.get("subpath")
+            subpath_value = str(raw_subpath) if raw_subpath is not None else None
             dst_path = mount_id_map.get(vfolder_uuid) or mount_id_map.get(raw_id)
             entries.append(
                 MountInfoEntry(
                     vfolder_id=VFolderUUID(vfolder_uuid),
                     mount_destination=dst_path,
                     mount_perm=perm,
+                    subpath=subpath_value,
                 )
             )
         return tuple(entries)
@@ -290,6 +296,7 @@ class AgentRegistry:
         hook_plugin_ctx: HookPluginContext,
         network_plugin_ctx: NetworkPluginContext,
         scheduling_controller: SchedulingController,
+        scheduler_repository: SchedulerRepository,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
@@ -310,6 +317,7 @@ class AgentRegistry:
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self._scheduling_controller = scheduling_controller
+        self._scheduler_repository = scheduler_repository
         self.debug = debug
         self.rpc_keepalive_timeout = int(config_provider.config.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
@@ -1003,6 +1011,10 @@ class AgentRegistry:
         ]
         creation_config: dict[str, Any] = session_enqueue_configs["creation_config"]
 
+        # Legacy name-keyed ``mounts`` are resolved into UUID-keyed buckets
+        # upstream in ``SessionService`` (via ``VFolderProcessors``), so by
+        # the time control reaches here the config carries only ``mount_ids``
+        # / ``mount_id_map`` / ``mount_options``.
         mount_entries = self._mount_entries_from_creation_config(creation_config)
         resource_entries = self._resource_entries_from_legacy_dict(
             creation_config.get("resources") or {}
@@ -1107,6 +1119,15 @@ class AgentRegistry:
         if not groups_by_role:
             raise InvalidAPIParameters("No kernel groups resolved from the enqueue request.")
 
+        if scaling_group:
+            resource_group_name = ResourceGroupName(scaling_group)
+        else:
+            resource_group_name = await self._scheduler_repository.pick_default_resource_group(
+                access_key=access_key,
+                domain_name=user_scope.domain_name,
+                project_id=ProjectID(user_scope.group_id),
+            )
+
         draft = SessionSpecDraft(
             identity=SessionIdentityDraft(
                 session_id=SessionID(uuid.uuid4()),
@@ -1118,7 +1139,7 @@ class AgentRegistry:
             scope=SessionScopeDraft(
                 domain_name=DomainName(user_scope.domain_name),
                 project_id=ProjectID(user_scope.group_id),
-                resource_group_name=(ResourceGroupName(scaling_group) if scaling_group else None),
+                resource_group_name=resource_group_name,
             ),
             classification=SessionClassificationDraft(
                 session_type=session_type,
@@ -1136,7 +1157,7 @@ class AgentRegistry:
                     designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
                 ),
                 kernel_groups=tuple(groups_by_role.values()),
-                timeouts=SessionTimeouts(),
+                handler_options=SessionHandlerOptions(),
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=sudo_session_enabled,
@@ -1361,47 +1382,6 @@ class AgentRegistry:
         async with self._agent_client_pool.acquire(verified_agent_id) as client:
             await client.update_scaling_group(scaling_group)
 
-    async def settle_agent_alloc(
-        self,
-        kernel_agent_bindings: Sequence[KernelAgentBinding],
-    ) -> None:
-        """
-        Tries to settle down agent row's occupied_slots with real value. This must be called
-        after kernel creation is completed, to prevent fraction of resource dropped by agent scheduler
-        during kernel creation still being reported as used.
-        """
-
-        keyfunc = lambda item: item.agent_alloc_ctx.agent_id
-        for agent_id, group_iterator in itertools.groupby(
-            sorted(kernel_agent_bindings, key=keyfunc),
-            key=keyfunc,
-        ):
-            actual_allocated_slots = ResourceSlot()
-            requested_slots = ResourceSlot()
-
-            for kernel_agent_binding in group_iterator:
-                # this value must be set while running _post_create_kernel
-                actual_allocated_slot = self._kernel_actual_allocated_resources.get(
-                    kernel_agent_binding.kernel.id
-                )
-                requested_slots += kernel_agent_binding.kernel.requested_slots
-                if actual_allocated_slot is not None:
-                    actual_allocated_slots += ResourceSlot.from_json(actual_allocated_slot)
-                    del self._kernel_actual_allocated_resources[kernel_agent_binding.kernel.id]
-                else:  # something's wrong; just fall back to requested slot value
-                    actual_allocated_slots += kernel_agent_binding.kernel.requested_slots
-
-            # Phase 3 (BA-4308): Legacy JSONB write to agents.occupied_slots removed.
-            # Agent occupied slots are now solely managed by the normalized
-            # agent_resources table.  The agents.occupied_slots JSONB column is
-            # retained for historical audit but no longer written to.
-            if actual_allocated_slots != requested_slots:
-                log.debug(
-                    "agent {} has slot calibration diff (requested != actual); "
-                    "agent_resources table is the source of truth",
-                    agent_id,
-                )
-
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
             access_key_to_concurrency_used: dict[AccessKey, ConcurrencyUsed] = {}
@@ -1551,7 +1531,7 @@ class AgentRegistry:
                                 await client.destroy_local_network(network_ref_name)
                         except Exception:
                             log.exception(
-                                f"Failed to destroy the agent-local network {network_ref_name}"
+                                "Failed to destroy the agent-local network {}", network_ref_name
                             )
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
@@ -1565,7 +1545,7 @@ class AgentRegistry:
                 try:
                     await network_plugin.destroy_network(network_ref_name)
                 except Exception:
-                    log.exception(f"Failed to destroy the overlay network {network_ref_name}")
+                    log.exception("Failed to destroy the overlay network {}", network_ref_name)
             else:
                 pass
 
@@ -1645,16 +1625,14 @@ class AgentRegistry:
 
     async def start_service(
         self,
-        session: SessionRow,
+        main_kernel_id: KernelId,
+        agent_id: AgentId,
         service: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         async with handle_session_exception("execute"):
-            agent_id = session.main_kernel.agent
-            if agent_id is None:
-                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
-            async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
-                return await client.start_service(session.main_kernel.id, service, opts)
+            async with self._agent_client_pool.acquire(agent_id) as client:
+                return await client.start_service(main_kernel_id, service, opts)
 
     async def shutdown_service(
         self,
@@ -1739,45 +1717,6 @@ class AgentRegistry:
                 reply = await client.get_logs(kernel.id)
             return reply["logs"]
 
-    async def increment_session_usage(
-        self,
-        session: SessionRow,
-    ) -> None:
-        # noop for performance reasons
-        pass
-
-    async def sync_kernel_stats(
-        self,
-        kernel_ids: Sequence[KernelId],
-    ) -> None:
-        per_kernel_updates = {}
-        log.debug("sync_kernel_stats(k:{!r})", kernel_ids)
-        for kernel_id in kernel_ids:
-            raw_kernel_id = str(kernel_id)
-            kern_stat = await self.valkey_stat.get_kernel_statistics(raw_kernel_id)
-            if kern_stat is None:
-                log.warning("sync_kernel_stats(k:{}): no statistics updates", kernel_id)
-                continue
-            per_kernel_updates[kernel_id] = kern_stat
-
-        async def _update() -> None:
-            async with self.db.begin() as conn:
-                update_query = (
-                    sa.update(kernels)
-                    .where(kernels.c.id == sa.bindparam("kernel_id"))
-                    .values({kernels.c.last_stat: sa.bindparam("last_stat")})
-                )
-                params = []
-                for kernel_id, updates in per_kernel_updates.items():
-                    params.append({
-                        "kernel_id": kernel_id,
-                        "last_stat": updates,
-                    })
-                await conn.execute(update_query, params)
-
-        if per_kernel_updates:
-            await execute_with_retry(_update)
-
     async def sync_agent_kernel_registry(self, agent_id: AgentId) -> None:
         """
         Fetch agent data and status of related kernel data from DB.
@@ -1807,38 +1746,6 @@ class AgentRegistry:
                     (kernel.id, kernel.session_id) for kernel in grouped_kernels
                 ])
             return
-
-    async def _free_kernel_resources(
-        self,
-        kernel_id: uuid.UUID,
-        agent_id: str,
-    ) -> int:
-        """Free normalized resource allocations and decrement agent_resources.used."""
-        ar = AgentResourceRow.__table__
-        async with self.db.begin_session() as db_sess:
-            released = (
-                await db_sess.execute(
-                    sa.update(ResourceAllocationRow)
-                    .where(
-                        ResourceAllocationRow.kernel_id == kernel_id,
-                        ResourceAllocationRow.free_at.is_(None),
-                    )
-                    .values(free_at=sa.func.now())
-                    .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
-                )
-            ).all()
-            if not released:
-                return 0
-            for r in released:
-                if r.used is None:
-                    continue
-                new_used = sa.func.greatest(ar.c.used - r.used, 0)
-                await db_sess.execute(
-                    sa.update(ar)
-                    .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
-                    .values(used=new_used)
-                )
-            return len(released)
 
     async def _get_user_email(
         self,
@@ -2079,7 +1986,7 @@ async def check_scaling_group(
     session_type: SessionTypes,
     access_key: AccessKey,
     domain_name: str,
-    group_id: uuid.UUID | str,
+    group_id: ProjectID | str,
     public_sgroup_only: bool = False,
 ) -> str:
     # Check scaling group availability if scaling_group parameter is given.

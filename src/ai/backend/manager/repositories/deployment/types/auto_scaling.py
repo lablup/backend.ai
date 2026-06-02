@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -16,7 +17,7 @@ class AutoScalingRuleData:
     """Data structure for auto-scaling rule."""
 
     rule_id: uuid.UUID
-    endpoint_id: uuid.UUID
+    endpoint_id: DeploymentID
     metric_source: AutoScalingMetricSource
     metric_name: str
     threshold: Decimal

@@ -658,7 +658,7 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ArtifactRevisionConnection:
+    ) -> ArtifactRevisionConnection | None:
         pydantic_filter = filter.to_pydantic() if filter is not None else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
 
@@ -762,7 +762,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
         return cast(list[Self | None], results)
 
     @gql_field(description="The artifact of this entity.")  # type: ignore[misc]
-    async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
+    async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact | None:
         revision_node = await info.context.adapters.artifact.get_revision(uuid.UUID(self.id))
         artifact_node = await info.context.adapters.artifact.get(revision_node.artifact_id)
 

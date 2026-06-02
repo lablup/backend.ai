@@ -7,6 +7,9 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.deployment_revision_preset.creators import (
+    PresetResourceSlotDependentCreatorSpec,
+)
 from ai.backend.manager.services.deployment_revision_preset.actions.base import (
     DeploymentRevisionPresetAction,
 )
@@ -16,6 +19,7 @@ from ai.backend.manager.services.deployment_revision_preset.actions.base import 
 class UpdateDeploymentRevisionPresetAction(DeploymentRevisionPresetAction):
     id: UUID
     updater: Updater[DeploymentRevisionPresetRow]
+    resource_slot_specs: list[PresetResourceSlotDependentCreatorSpec] | None
 
     @override
     def entity_id(self) -> str | None:

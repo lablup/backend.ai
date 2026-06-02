@@ -71,7 +71,7 @@ from ai.backend.manager.types import OptionalState, TriState
 async def admin_create_user_v2(
     info: Info[StrawberryGQLContext],
     input: CreateUserInputGQL,
-) -> CreateUserPayloadGQL:
+) -> CreateUserPayloadGQL | None:
     """Create a new user.
 
     Args:
@@ -98,7 +98,7 @@ async def admin_create_user_v2(
 async def admin_bulk_create_users_v2(
     info: Info[StrawberryGQLContext],
     input: BulkCreateUserV2InputGQL,
-) -> BulkCreateUsersV2PayloadGQL:
+) -> BulkCreateUsersV2PayloadGQL | None:
     """Create multiple users in bulk with individual specifications.
 
     Args:
@@ -164,7 +164,7 @@ async def admin_update_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
     input: UpdateUserV2InputGQL,
-) -> UpdateUserPayloadGQL:
+) -> UpdateUserPayloadGQL | None:
     """Update a user's information.
 
     Args:
@@ -192,7 +192,7 @@ async def admin_update_user_v2(
 async def admin_bulk_update_users_v2(
     info: Info[StrawberryGQLContext],
     input: BulkUpdateUserV2InputGQL,
-) -> BulkUpdateUsersV2PayloadGQL:
+) -> BulkUpdateUsersV2PayloadGQL | None:
     """Update multiple users in bulk with individual specifications.
 
     Args:
@@ -321,7 +321,7 @@ async def admin_bulk_update_users_v2(
 async def update_user_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateUserV2InputGQL,
-) -> UpdateUserPayloadGQL:
+) -> UpdateUserPayloadGQL | None:
     """Update the current user's own information.
 
     Args:
@@ -353,7 +353,7 @@ async def update_user_v2(
 async def admin_delete_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-) -> DeleteUserPayloadGQL:
+) -> DeleteUserPayloadGQL | None:
     """Soft-delete a single user.
 
     Args:
@@ -380,7 +380,7 @@ async def admin_delete_user_v2(
 async def admin_delete_users_v2(
     info: Info[StrawberryGQLContext],
     input: DeleteUsersInputGQL,
-) -> DeleteUsersPayloadGQL:
+) -> DeleteUsersPayloadGQL | None:
     """Soft-delete multiple users.
 
     Args:
@@ -412,7 +412,7 @@ async def admin_delete_users_v2(
 async def admin_purge_user_v2(
     info: Info[StrawberryGQLContext],
     input: PurgeUserInputGQL,
-) -> PurgeUserPayloadGQL:
+) -> PurgeUserPayloadGQL | None:
     """Permanently delete a single user.
 
     Args:
@@ -451,7 +451,7 @@ async def admin_purge_user_v2(
 async def admin_bulk_purge_users_v2(
     info: Info[StrawberryGQLContext],
     input: BulkPurgeUsersV2InputGQL,
-) -> BulkPurgeUsersV2PayloadGQL:
+) -> BulkPurgeUsersV2PayloadGQL | None:
     """Permanently delete multiple users in bulk.
 
     Args:
@@ -511,7 +511,7 @@ async def admin_bulk_purge_users_v2(
 async def update_my_allowed_client_ip(
     info: Info[StrawberryGQLContext],
     input: UpdateMyAllowedClientIPInputGQL,
-) -> UpdateMyAllowedClientIPPayloadGQL:
+) -> UpdateMyAllowedClientIPPayloadGQL | None:
     """Update the current user's allowed client IP addresses."""
     me = current_user()
     if me is None:

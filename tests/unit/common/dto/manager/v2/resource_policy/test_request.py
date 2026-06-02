@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UpdateUserResourcePolicyInput,
 )
 from ai.backend.common.dto.manager.v2.resource_policy.types import DefaultForUnspecified
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateKeypairResourcePolicyInput:
@@ -91,7 +92,7 @@ class TestCreateKeypairResourcePolicyInput:
         assert req.name == "default"
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateKeypairResourcePolicyInput(
                 name="",
                 default_for_unspecified=DefaultForUnspecified.LIMITED,
@@ -105,7 +106,7 @@ class TestCreateKeypairResourcePolicyInput:
             )
 
     def test_name_exceeding_max_length_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateKeypairResourcePolicyInput(
                 name="a" * 257,
                 default_for_unspecified=DefaultForUnspecified.LIMITED,
@@ -179,7 +180,7 @@ class TestDeleteKeypairResourcePolicyInput:
         assert req.name == "default"
 
     def test_missing_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteKeypairResourcePolicyInput.model_validate({})
 
 
@@ -209,7 +210,7 @@ class TestCreateUserResourcePolicyInput:
         assert req.name == "user-policy"
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateUserResourcePolicyInput(
                 name="",
                 max_vfolder_count=10,
@@ -262,7 +263,7 @@ class TestDeleteUserResourcePolicyInput:
         assert req.name == "user-policy"
 
     def test_missing_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteUserResourcePolicyInput.model_validate({})
 
 
@@ -290,7 +291,7 @@ class TestCreateProjectResourcePolicyInput:
         assert req.name == "project-policy"
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateProjectResourcePolicyInput(
                 name="",
                 max_vfolder_count=20,
@@ -340,5 +341,5 @@ class TestDeleteProjectResourcePolicyInput:
         assert req.name == "project-policy"
 
     def test_missing_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteProjectResourcePolicyInput.model_validate({})

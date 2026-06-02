@@ -40,7 +40,7 @@ from ai.backend.manager.data.session.draft import (
 )
 from ai.backend.manager.data.session.options import (
     DefaultSessionOptions,
-    SessionTimeouts,
+    SessionHandlerOptions,
 )
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
 from ai.backend.manager.models.network import NetworkType
@@ -133,7 +133,7 @@ def complete_draft(image_id: ImageID, minimal_kernel_group: KernelGroupDraft) ->
             cluster_mode=ClusterMode.SINGLE_NODE,
             cluster_size=1,
             kernel_groups=(minimal_kernel_group,),
-            timeouts=SessionTimeouts(),
+            handler_options=SessionHandlerOptions(),
         ),
         kernel_specs=(
             KernelSpecDraft(
@@ -256,7 +256,7 @@ class TestFinalization:
         assert "options.cluster_mode" in missing
         assert "options.cluster_size" in missing
         assert "options.kernel_groups" in missing
-        assert "options.timeouts" in missing
+        assert "options.handler_options" in missing
 
     async def test_complete_draft_projects_to_session_spec(
         self,

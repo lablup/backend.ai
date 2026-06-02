@@ -19,6 +19,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -71,6 +72,7 @@ class TestSearchInProjectMembership:
                 KeyPairRow,
                 GroupRow,
                 AgentRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 SessionRow,

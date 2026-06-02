@@ -42,6 +42,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.revision import (  # pants: no-infer-dep
         ModelRevision,
     )
+    from ai.backend.manager.api.gql.deployment.types.revision_preset import (  # pants: no-infer-dep
+        DeploymentRevisionPresetGQL,
+    )
     from ai.backend.manager.api.gql.deployment.types.route import Route  # pants: no-infer-dep
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.huggingface_registry import (  # pants: no-infer-dep
@@ -378,6 +381,38 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_revisions_by_ids(ids)
             return [MRev.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def revision_preset_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, DeploymentRevisionPresetGQL | None]:
+        adapter = self._adapters.deployment_revision_preset
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[DeploymentRevisionPresetGQL | None]:
+            from ai.backend.common.dto.manager.query import UUIDFilter
+            from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (  # pants: no-infer-dep
+                DeploymentRevisionPresetFilter,
+                SearchDeploymentRevisionPresetsInput,
+            )
+            from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (  # pants: no-infer-dep
+                DeploymentRevisionPresetNode,
+            )
+            from ai.backend.manager.api.gql.deployment.types.revision_preset import (  # pants: no-infer-dep
+                DeploymentRevisionPresetGQL as DRP,
+            )
+
+            payload = await adapter.search(
+                SearchDeploymentRevisionPresetsInput(
+                    filter=DeploymentRevisionPresetFilter(id=UUIDFilter(in_=list(ids))),
+                    limit=len(ids),
+                )
+            )
+            node_map: dict[uuid.UUID, DeploymentRevisionPresetNode] = {
+                item.id: item for item in payload.items
+            }
+            return [DRP.from_pydantic(node) if (node := node_map.get(pid)) else None for pid in ids]
 
         return DataLoader(load_fn=load_fn)
 

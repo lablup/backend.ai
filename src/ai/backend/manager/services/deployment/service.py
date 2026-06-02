@@ -18,9 +18,6 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     MintEndpointTokenRequest,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.types import (
-    ResourceSlot,
-)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.creator import (
@@ -28,26 +25,22 @@ from ai.backend.manager.data.deployment.creator import (
     VFolderMountsCreator,
 )
 from ai.backend.manager.data.deployment.types import (
-    ClusterConfigData,
     DeploymentInfo,
+    ExecutionSpec,
+    LegacyDeploymentData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
-    ModelMountConfigData,
     ModelReplicaData,
     ModelRevisionData,
-    ModelRevisionSpec,
-    ModelRuntimeConfigData,
+    MountInfo,
     ReplicaStateData,
-    ResourceConfigData,
+    ResourceSpec,
     RevisionRefreshResult,
     RouteHealthStatus,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
-)
-from ai.backend.manager.data.deployment_revision_preset.types import (
-    PresetValueData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -140,6 +133,10 @@ from ai.backend.manager.services.deployment.actions.get_deployment_by_id import 
     GetDeploymentByIdAction,
     GetDeploymentByIdActionResult,
 )
+from ai.backend.manager.services.deployment.actions.get_legacy_deployment_by_id import (
+    GetLegacyDeploymentByIdAction,
+    GetLegacyDeploymentByIdActionResult,
+)
 from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
@@ -186,6 +183,10 @@ from ai.backend.manager.services.deployment.actions.search_deployments_in_projec
     SearchDeploymentsInProjectAction,
     SearchDeploymentsInProjectActionResult,
 )
+from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
+    SearchLegacyDeploymentsAction,
+    SearchLegacyDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
     SearchReplicasActionResult,
@@ -213,12 +214,12 @@ def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentSta
     no longer surfaced through ``ModelDeploymentStatus`` — a legacy
     ``lifecycle=SCALING`` row folds into ``READY`` so clients only have to
     consult ``scaling_state`` to decide whether a replica reconcile is in
-    flight.
+    flight. Legacy ``CREATED`` (never-deployed) folds into ``PENDING``.
     """
     match lifecycle:
-        case EndpointLifecycle.PENDING:
+        case EndpointLifecycle.PENDING | EndpointLifecycle.CREATED:
             return ModelDeploymentStatus.PENDING
-        case EndpointLifecycle.CREATED | EndpointLifecycle.READY | EndpointLifecycle.SCALING:
+        case EndpointLifecycle.READY | EndpointLifecycle.SCALING:
             return ModelDeploymentStatus.READY
         case EndpointLifecycle.DEPLOYING:
             return ModelDeploymentStatus.DEPLOYING
@@ -228,50 +229,19 @@ def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentSta
             return ModelDeploymentStatus.STOPPED
 
 
-def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
-    """Convert DeploymentInfo to ModelDeploymentData.
-
-    Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
-    """
-    # Map revision if available
-    revision: ModelRevisionData | None = None
-    if info.model_revisions:
-        rev = info.model_revisions[0]
-        if rev.revision_id is None:
-            raise ValueError(f"ModelRevisionSpec has no revision_id for deployment {info.id}")
-        revision = ModelRevisionData(
-            id=rev.revision_id,
-            # DeploymentInfo no longer carries revision_number, so name the
-            # projected ModelRevisionData by the revision UUID as a stable
-            # stand-in.
-            name=f"revision-{rev.revision_id}",
-            cluster_config=ClusterConfigData(
-                mode=rev.resource_spec.cluster_mode,
-                size=rev.resource_spec.cluster_size,
-            ),
-            resource_config=ResourceConfigData(
-                resource_group_name=info.metadata.resource_group,
-                resource_slot=ResourceSlot.from_json(rev.resource_spec.resource_slots),
-            ),
-            model_mount_config=ModelMountConfigData(
-                vfolder_id=rev.mounts.model_vfolder_id,
-                mount_destination=rev.mounts.model_mount_destination,
-                definition_path=rev.mounts.model_definition_path or "",
-            ),
-            model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant_id=rev.execution.runtime_variant_id,
-                inference_runtime_config=rev.execution.inference_runtime_config or {},
-            ),
-            extra_vfolder_mounts=list(rev.mounts.extra_mounts),
-            image_id=rev.image_id,
-            created_at=info.metadata.created_at or datetime.now(UTC),
-            model_definition=rev.model_definition,
-        )
-
-    desired_count = info.replica_spec.desired_replica_count
+def _deployment_desired_replica_count(info: DeploymentInfo) -> int:
+    desired_count = info.replica.desired_replica_count
     if desired_count is None:
-        desired_count = info.replica_spec.replica_count
+        desired_count = info.replica.replica_count
+    return desired_count
 
+
+def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
+    """Convert DeploymentInfo to the modern (v2 / GraphQL) ModelDeploymentData.
+
+    Uses the revision *ids* only — the modern read path does not load the full
+    revision rows. Note: some fields default as DeploymentInfo lacks the data.
+    """
     return ModelDeploymentData(
         id=info.id,
         metadata=ModelDeploymentMetadataInfo(
@@ -280,22 +250,57 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             tags=[info.metadata.tag] if info.metadata.tag else [],
             project_id=info.metadata.project,
             domain_name=info.metadata.domain,
+            resource_group_name=info.metadata.resource_group,
             created_at=info.metadata.created_at or datetime.now(UTC),
             updated_at=info.metadata.created_at or datetime.now(UTC),
         ),
         network_access=info.network,
-        revision_history_ids=[info.current_revision_id] if info.current_revision_id else [],
-        revision=revision,
+        revision_history_ids=[info.current_revision_id]
+        if info.current_revision_id is not None
+        else [],
+        current_revision_id=info.current_revision_id,
         deploying_revision_id=info.deploying_revision_id,
         scaling_rule_ids=[],  # Not available in DeploymentInfo
         replica_state=ReplicaStateData(
-            desired_replica_count=desired_count,
+            desired_replica_count=_deployment_desired_replica_count(info),
             replica_ids=[],  # Not available in DeploymentInfo
         ),
         default_deployment_strategy=DeploymentStrategy.ROLLING,
         created_user_id=info.metadata.created_user,
         options=info.options,
         scaling_state=info.state.scaling_state,
+        policy=info.policy,
+        sub_step=info.sub_step,
+    )
+
+
+def _convert_deployment_info_to_legacy_data(info: DeploymentInfo) -> LegacyDeploymentData:
+    """Convert DeploymentInfo to the legacy (REST v1) LegacyDeploymentData.
+
+    Built independently from the same ``DeploymentInfo`` — never derived from
+    ``ModelDeploymentData``. Carries the full current ``revision`` that the
+    legacy ``DeploymentDTO`` embeds, so it requires a full (legacy) read.
+    """
+    return LegacyDeploymentData(
+        id=info.id,
+        metadata=ModelDeploymentMetadataInfo(
+            name=info.metadata.name,
+            status=_map_lifecycle_to_status(info.state.lifecycle),
+            tags=[info.metadata.tag] if info.metadata.tag else [],
+            project_id=info.metadata.project,
+            domain_name=info.metadata.domain,
+            resource_group_name=info.metadata.resource_group,
+            created_at=info.metadata.created_at or datetime.now(UTC),
+            updated_at=info.metadata.created_at or datetime.now(UTC),
+        ),
+        network_access=info.network,
+        revision=info.current_revision,
+        replica_state=ReplicaStateData(
+            desired_replica_count=_deployment_desired_replica_count(info),
+            replica_ids=[],  # Not available in DeploymentInfo
+        ),
+        default_deployment_strategy=DeploymentStrategy.ROLLING,
+        created_user_id=info.metadata.created_user,
         policy=info.policy,
         sub_step=info.sub_step,
     )
@@ -349,36 +354,63 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
         readiness_status=readiness,
         liveness_status=liveness,
         activeness_status=_resolve_activeness(route.traffic_status, readiness, liveness),
+        status=route.status,
+        traffic_status=route.traffic_status,
+        health_status=route.health_status,
         detail=route.error_data,
         created_at=route.created_at,
     )
 
 
-def _build_creator_from_revision_spec(spec: ModelRevisionSpec) -> ModelRevisionCreator:
-    """Rebuild a ``ModelRevisionCreator`` from an existing revision's spec.
+def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionCreator:
+    """Rebuild a ``ModelRevisionCreator`` from a persisted revision.
 
-    ``model_definition`` is reset to ``None`` so ``DeploymentController.add_revision``
-    re-resolves it from the vfolder. ``revision_preset_id`` is left ``None`` since
-    it is not persisted on the revision row; the materialized ``preset_values``
-    carry forward the preset effect without requiring re-application.
-    ``extra_mounts`` is left empty because ``add_revision`` does not propagate
-    this field to the new revision spec (see ``DeploymentController.add_revision``).
+    ``model_definition`` is cleared so ``add_revision`` re-resolves it via
+    the merge chain. Mount identity (``extra_mounts``, ``vfolder_subpath``)
+    is copied verbatim — refreshing must not silently drop them.
     """
+    if data.model_mount_config.vfolder_id is None:
+        raise InvalidAPIParameters(
+            f"Revision {data.id} has no model vfolder; cannot rebuild creator"
+        )
     return ModelRevisionCreator(
-        image_id=spec.image_id,
-        resource_spec=spec.resource_spec,
-        mounts=VFolderMountsCreator(
-            model_vfolder_id=spec.mounts.model_vfolder_id,
-            model_definition_path=spec.mounts.model_definition_path,
-            model_mount_destination=spec.mounts.model_mount_destination,
-            extra_mounts=[],
+        image_id=data.image_id,
+        resource_spec=ResourceSpec(
+            cluster_mode=data.cluster_config.mode,
+            cluster_size=data.cluster_config.size,
+            resource_slots=dict(data.resource_config.resource_slot),
+            resource_opts=dict(data.resource_config.resource_opts) or None,
         ),
-        execution=spec.execution,
+        mounts=VFolderMountsCreator(
+            model_vfolder_id=data.model_mount_config.vfolder_id,
+            model_definition_path=data.model_mount_config.definition_path or None,
+            model_mount_destination=data.model_mount_config.mount_destination or "/models",
+            extra_mounts=[
+                MountInfo(
+                    vfolder_id=m.vfolder_id,
+                    mount_destination=m.mount_destination,
+                    mount_perm=m.mount_perm,
+                    subpath=m.subpath,
+                )
+                for m in data.model_mount_config.extra_mounts
+            ],
+            vfolder_subpath=data.model_mount_config.subpath,
+        ),
+        execution=ExecutionSpec(
+            startup_command=data.execution.startup_command,
+            bootstrap_script=data.execution.bootstrap_script,
+            environ=(
+                {k: str(v) for k, v in data.model_runtime_config.environ.items()}
+                if data.model_runtime_config.environ
+                else None
+            ),
+            runtime_variant_id=data.model_runtime_config.runtime_variant_id,
+            callback_url=data.execution.callback_url,
+            inference_runtime_config=data.model_runtime_config.inference_runtime_config,
+        ),
         model_definition=None,
-        revision_preset_id=None,
-        preset_values=[
-            PresetValueData(preset_id=pv.preset_id, value=pv.value) for pv in spec.preset_values
-        ],
+        revision_preset_id=data.preset.preset_id,
+        preset_values=list(data.preset.values),
     )
 
 
@@ -470,7 +502,7 @@ class DeploymentService:
             UpdateDeploymentActionResult: Result containing the updated deployment data
         """
         log.info("Updating deployment with ID: {}", action.updater.pk_value)
-        endpoint_id = cast(UUID, action.updater.pk_value)
+        endpoint_id = DeploymentID(cast(UUID, action.updater.pk_value))
         spec = cast(DeploymentUpdaterSpec, action.updater.spec)
         deployment_info = await self._deployment_controller.update_deployment(endpoint_id, spec)
         return UpdateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
@@ -534,6 +566,21 @@ class DeploymentService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def search_legacy_deployments(
+        self, action: SearchLegacyDeploymentsAction
+    ) -> SearchLegacyDeploymentsActionResult:
+        """Legacy (REST v1) search — full revision per item. DO NOT USE in new
+        code; v2 uses :meth:`search_deployments`.
+        """
+        result = await self._deployment_repository.search_legacy_endpoints(action.querier)
+        deployments = [_convert_deployment_info_to_legacy_data(info) for info in result.items]
+        return SearchLegacyDeploymentsActionResult(
+            data=deployments,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def search_deployments_in_project(
         self, action: SearchDeploymentsInProjectAction
     ) -> SearchDeploymentsInProjectActionResult:
@@ -564,6 +611,19 @@ class DeploymentService:
         """
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
         return GetDeploymentByIdActionResult(data=_convert_deployment_info_to_data(deployment_info))
+
+    async def get_legacy_deployment_by_id(
+        self, action: GetLegacyDeploymentByIdAction
+    ) -> GetLegacyDeploymentByIdActionResult:
+        """Legacy (REST v1) get-by-id — full revision. DO NOT USE in new code;
+        v2 uses :meth:`get_deployment_by_id`.
+        """
+        deployment_info = await self._deployment_repository.get_legacy_endpoint_info(
+            action.deployment_id
+        )
+        return GetLegacyDeploymentByIdActionResult(
+            data=_convert_deployment_info_to_legacy_data(deployment_info)
+        )
 
     async def get_deployment_policy(
         self, action: GetDeploymentPolicyAction
@@ -698,8 +758,8 @@ class DeploymentService:
         failed = 0
         for deployment_id in deployment_ids:
             try:
-                spec = await self._deployment_repository.get_current_revision_spec(deployment_id)
-                creator = _build_creator_from_revision_spec(spec)
+                data = await self._deployment_repository.get_current_revision(deployment_id)
+                creator = _build_creator_from_revision_data(data)
                 new_revision = await self._deployment_controller.add_deployment_revision(
                     deployment_id=deployment_id,
                     revision=creator,

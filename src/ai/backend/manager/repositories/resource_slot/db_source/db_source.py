@@ -177,6 +177,7 @@ class ResourceSlotDBSource:
                     agent_id=row.AgentResourceRow.agent_id,
                     slot_name=row.AgentResourceRow.slot_name,
                     capacity=row.AgentResourceRow.capacity,
+                    reserved=row.AgentResourceRow.reserved,
                     used=row.AgentResourceRow.used,
                 )
                 for row in result.rows

@@ -3,29 +3,21 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from ai.backend.common.clients.prometheus.preset import LabelMatcher, MetricPreset
-from ai.backend.common.clients.prometheus.querier import ContainerMetricQuerier
-from ai.backend.common.clients.prometheus.types import ValueType
-from ai.backend.common.exception import UnreachableError
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     CONTAINER_UTILIZATION_METRIC_NAME,
-    UTILIZATION_METRIC_INTERVAL,
 )
 from ai.backend.common.types import KernelId
-from ai.backend.manager.data.metric.types import (
+from ai.backend.manager.clients.prometheus.metric_types import (
     DIFF_METRICS,
     RATE_METRICS,
     ContainerLiveStatQueries,
     ContainerMetricOptionalLabel,
     MetricType,
 )
-
-_LIVE_STAT_GROUP_BY: Final[frozenset[str]] = frozenset({
-    "kernel_id",
-    "container_metric_name",
-    "value_type",
-})
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
+from ai.backend.manager.clients.prometheus.querier import ContainerMetricQuerier
+from ai.backend.manager.clients.prometheus.types import ValueType
 
 _GAUGE_TEMPLATE: Final[str] = (
     f"sum by ({{group_by}})({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
@@ -33,12 +25,25 @@ _GAUGE_TEMPLATE: Final[str] = (
 _RATE_TEMPLATE: Final[str] = (
     "sum by ({group_by})(rate("
     f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
-    f" / {UTILIZATION_METRIC_INTERVAL}"
 )
 _DIFF_TEMPLATE: Final[str] = (
     "sum by ({group_by})(rate("
     f"{CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}}[{{window}}]))"
 )
+_LIVE_STAT_MAX_TEMPLATE: Final[str] = f"max_over_time(({_GAUGE_TEMPLATE})[{{window}}:])"
+_LIVE_STAT_AVG_TEMPLATE: Final[str] = f"avg_over_time(({_GAUGE_TEMPLATE})[{{window}}:])"
+_LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = f"max_over_time(({_RATE_TEMPLATE})[{{window}}:])"
+_LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = f"avg_over_time(({_RATE_TEMPLATE})[{{window}}:])"
+
+_INSTANT_GROUP_BY: Final[frozenset[str]] = frozenset({
+    "kernel_id",
+    "container_metric_name",
+    "value_type",
+})
+_AGGREGATED_GROUP_BY: Final[frozenset[str]] = frozenset({
+    "kernel_id",
+    "container_metric_name",
+})
 
 
 @dataclass(frozen=True)
@@ -48,10 +53,24 @@ class LabelValuesQuery:
 
 
 def _regex_union(values: Sequence[str]) -> str:
-    return "|".join(re.escape(value) for value in values)
+    return "|".join(re.escape(value).replace(r"\-", "-") for value in values)
 
 
-class FixedQueryBuilder:
+def _value_type_regex(value_types: Sequence[ValueType]) -> str:
+    return _regex_union([value_type.value for value_type in value_types])
+
+
+_LIVE_STAT_RATE_METRIC_REGEX: Final[str] = _regex_union(sorted(RATE_METRICS | DIFF_METRICS))
+_INSTANT_VALUE_TYPE_REGEX: Final[str] = _value_type_regex([
+    ValueType.CURRENT,
+    ValueType.CAPACITY,
+])
+
+
+class ContainerMetricQueryBuilder:
+    """Builds PromQL queries for individual container-metric retrieval
+    (`fetch_available_container_metric_names` / `fetch_container_metric`)."""
+
     _timewindow: str
 
     def __init__(self, timewindow: str) -> None:
@@ -96,54 +115,6 @@ class FixedQueryBuilder:
             window=self._timewindow,
         )
 
-    def get_container_live_stat_queries(
-        self,
-        kernel_ids: Sequence[KernelId],
-    ) -> ContainerLiveStatQueries:
-        return ContainerLiveStatQueries(
-            gauge=self._get_container_live_stat_query(
-                kernel_ids,
-                metric_type=MetricType.GAUGE,
-            ),
-            diff=self._get_container_live_stat_query(
-                kernel_ids,
-                metric_type=MetricType.DIFF,
-                metric_name_filter=DIFF_METRICS,
-                value_type_filter=ValueType.CURRENT,
-            ),
-            rate=self._get_container_live_stat_query(
-                kernel_ids,
-                metric_type=MetricType.RATE,
-                metric_name_filter=RATE_METRICS,
-                value_type_filter=ValueType.CURRENT,
-            ),
-        )
-
-    def _get_container_live_stat_query(
-        self,
-        kernel_ids: Sequence[KernelId],
-        *,
-        metric_type: MetricType,
-        metric_name_filter: frozenset[str] | None = None,
-        value_type_filter: ValueType | None = None,
-    ) -> MetricPreset:
-        labels: dict[str, LabelMatcher] = {
-            "kernel_id": LabelMatcher.regex(_regex_union([str(kid) for kid in kernel_ids]))
-        }
-        if metric_name_filter is not None:
-            labels["container_metric_name"] = LabelMatcher.regex(
-                _regex_union(sorted(metric_name_filter))
-            )
-        if value_type_filter is not None:
-            labels["value_type"] = LabelMatcher.exact(value_type_filter.value)
-
-        return MetricPreset(
-            template=self._get_template(metric_type),
-            labels=labels,
-            group_by=_LIVE_STAT_GROUP_BY,
-            window=self._timewindow,
-        )
-
     def _get_template(self, metric_type: MetricType) -> str:
         match metric_type:
             case MetricType.GAUGE:
@@ -152,5 +123,71 @@ class FixedQueryBuilder:
                 return _RATE_TEMPLATE
             case MetricType.DIFF:
                 return _DIFF_TEMPLATE
-            case _:
-                raise UnreachableError(f"Unknown metric type: {metric_type}")
+
+
+class ContainerLiveStatQueryBuilder:
+    """Builds the per-query PromQL batch backing the legacy `live_stat`
+    payload (`fetch_container_live_stats`)."""
+
+    _timewindow: str
+
+    def __init__(self, timewindow: str) -> None:
+        self._timewindow = timewindow
+
+    def get_container_live_stat_queries(
+        self,
+        kernel_ids: Sequence[KernelId],
+    ) -> ContainerLiveStatQueries:
+        kernel_id_regex = _regex_union([str(kid) for kid in kernel_ids])
+
+        instant_labels = {
+            "kernel_id": LabelMatcher.regex(kernel_id_regex),
+            "value_type": LabelMatcher.regex(_INSTANT_VALUE_TYPE_REGEX),
+        }
+        current_labels = {
+            "kernel_id": LabelMatcher.regex(kernel_id_regex),
+            "value_type": LabelMatcher.exact(ValueType.CURRENT.value),
+        }
+        rate_labels = {
+            "kernel_id": LabelMatcher.regex(kernel_id_regex),
+            "container_metric_name": LabelMatcher.regex(_LIVE_STAT_RATE_METRIC_REGEX),
+            "value_type": LabelMatcher.exact(ValueType.CURRENT.value),
+        }
+
+        return ContainerLiveStatQueries(
+            instant=MetricPreset(
+                template=_GAUGE_TEMPLATE,
+                labels=instant_labels,
+                group_by=_INSTANT_GROUP_BY,
+            ),
+            rate_current=MetricPreset(
+                template=_RATE_TEMPLATE,
+                labels=rate_labels,
+                group_by=_AGGREGATED_GROUP_BY,
+                window=self._timewindow,
+            ),
+            max=MetricPreset(
+                template=_LIVE_STAT_MAX_TEMPLATE,
+                labels=current_labels,
+                group_by=_AGGREGATED_GROUP_BY,
+                window=self._timewindow,
+            ),
+            rate_max=MetricPreset(
+                template=_LIVE_STAT_RATE_MAX_TEMPLATE,
+                labels=rate_labels,
+                group_by=_AGGREGATED_GROUP_BY,
+                window=self._timewindow,
+            ),
+            avg=MetricPreset(
+                template=_LIVE_STAT_AVG_TEMPLATE,
+                labels=current_labels,
+                group_by=_AGGREGATED_GROUP_BY,
+                window=self._timewindow,
+            ),
+            rate_avg=MetricPreset(
+                template=_LIVE_STAT_RATE_AVG_TEMPLATE,
+                labels=rate_labels,
+                group_by=_AGGREGATED_GROUP_BY,
+                window=self._timewindow,
+            ),
+        )

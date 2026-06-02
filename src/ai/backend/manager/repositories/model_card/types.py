@@ -8,6 +8,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
@@ -23,6 +24,7 @@ __all__ = (
     "AvailablePresetsSearchResult",
     "ModelCardSearchResult",
     "ProjectModelCardSearchScope",
+    "VFolderModelCardSearchScope",
 )
 
 
@@ -86,3 +88,26 @@ class ProjectModelCardSearchScope(SearchScope):
                 AssociationScopesEntitiesRow.entity_id == str(self.user_id),
             )
         )
+
+
+@dataclass(frozen=True)
+class VFolderModelCardSearchScope(SearchScope):
+    """Scope for searching model cards backed by a specific VFolder.
+
+    Access is delegated to the parent VFolder resolver — if the caller
+    can resolve the VFolder, they may see model cards backed by it.
+    """
+
+    vfolder_id: VFolderUUID
+
+    def to_condition(self) -> QueryCondition:
+        vfolder_id = self.vfolder_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ModelCardRow.vfolder == vfolder_id
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+        return ()

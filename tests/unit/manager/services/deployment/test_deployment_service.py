@@ -7,6 +7,7 @@ Tests verify service layer business logic using mocked repositories.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
@@ -21,12 +22,14 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
 )
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -41,17 +44,19 @@ from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
     DeploymentOptions,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentState,
+    ExecutionData,
     ExecutionSpec,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    ReplicaSpec,
+    PresetAttributionData,
+    ReplicaData,
     ResourceConfigData,
     ResourceSpec,
 )
@@ -76,7 +81,11 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
     AddModelRevisionAction,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.deployment.service import DeploymentService
+from ai.backend.manager.services.deployment.service import (
+    DeploymentService,
+    _convert_deployment_info_to_data,
+    _convert_deployment_info_to_legacy_data,
+)
 from ai.backend.manager.sokovan.deployment import DeploymentController
 
 
@@ -122,6 +131,7 @@ class DeploymentServiceBaseFixtures:
                 rbac=RBACValidators(
                     scope=MagicMock(spec=ScopeActionRBACValidator),
                     single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                    bulk=MagicMock(spec=BulkActionRBACValidator),
                 ),
             ),
         )
@@ -373,9 +383,10 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 scaling_state=ScalingState.STABLE,
                 retry_count=0,
             ),
-            replica_spec=ReplicaSpec(replica_count=1),
-            network=DeploymentNetworkSpec(open_to_public=False),
-            model_revisions=[],
+            replica=ReplicaData(replica_count=1, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
             options=DeploymentOptions(),
         )
 
@@ -410,8 +421,9 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     @pytest.fixture
     def revision_data(self, image_id: uuid.UUID, model_vfolder_id: uuid.UUID) -> ModelRevisionData:
         return ModelRevisionData(
-            id=uuid.uuid4(),
-            name="rev-1",
+            id=DeploymentRevisionID(uuid.uuid4()),
+            deployment_id=DeploymentID(uuid.uuid4()),
+            revision_number=1,
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,
                 size=1,
@@ -427,8 +439,15 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 vfolder_id=VFolderUUID(model_vfolder_id),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
+                extra_mounts=[],
             ),
             image_id=ImageID(image_id),
+            execution=ExecutionData(
+                startup_command=None,
+                bootstrap_script=None,
+                callback_url=None,
+            ),
+            preset=PresetAttributionData(preset_id=None, values=[]),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
@@ -479,7 +498,9 @@ class TestAddModelRevision(ModelRevisionFixtures):
         mock_deployment_controller.add_deployment_revision = AsyncMock(return_value=revision_data)
 
         action = AddModelRevisionAction(
-            model_deployment_id=deployment_id, adder=revision_creator, auto_activate=False
+            model_deployment_id=DeploymentID(deployment_id),
+            adder=revision_creator,
+            auto_activate=False,
         )
         result = await processors.add_model_revision.wait_for_complete(action)
 
@@ -537,9 +558,10 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
                 scaling_state=ScalingState.STABLE,
                 retry_count=0,
             ),
-            replica_spec=ReplicaSpec(replica_count=1),
-            network=DeploymentNetworkSpec(open_to_public=False),
-            model_revisions=[],
+            replica=ReplicaData(replica_count=1, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
             options=DeploymentOptions(),
         )
 
@@ -622,7 +644,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         """
         action = CreateAccessTokenAction(
             creator=ModelDeploymentAccessTokenCreator(
-                model_deployment_id=deployment_id,
+                model_deployment_id=DeploymentID(deployment_id),
                 expires_at=datetime(2099, 1, 1, tzinfo=UTC),
             ),
         )
@@ -635,3 +657,90 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         creator = cast(RBACEntityCreator[object], repo_call.args[0])
         spec = cast(EndpointTokenCreatorSpec, creator.spec)
         assert spec.token == sample_coordinator_jwt
+
+
+class TestConvertDeploymentInfoToData:
+    """Regression test for ``_convert_deployment_info_to_data`` (BA-5963)."""
+
+    @pytest.fixture
+    def make_revision_data(self) -> Callable[[int], ModelRevisionData]:
+        def make(revision_number: int) -> ModelRevisionData:
+            return ModelRevisionData(
+                id=DeploymentRevisionID(uuid.uuid4()),
+                deployment_id=DeploymentID(uuid.uuid4()),
+                revision_number=revision_number,
+                cluster_config=ClusterConfigData(
+                    mode=ClusterMode.SINGLE_NODE,
+                    size=1,
+                ),
+                resource_config=ResourceConfigData(
+                    resource_group_name="default",
+                    resource_slot=ResourceSlot({"cpu": "1"}),
+                ),
+                model_runtime_config=ModelRuntimeConfigData(
+                    runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
+                ),
+                model_mount_config=ModelMountConfigData(
+                    vfolder_id=VFolderUUID(uuid.uuid4()),
+                    mount_destination="/models",
+                    definition_path="model-definition.yaml",
+                    extra_mounts=[],
+                ),
+                created_at=datetime(2024, 1, 1, tzinfo=UTC),
+                image_id=ImageID(uuid.uuid4()),
+                execution=ExecutionData(
+                    startup_command=None,
+                    bootstrap_script=None,
+                    callback_url=None,
+                ),
+                preset=PresetAttributionData(preset_id=None, values=[]),
+            )
+
+        return make
+
+    def test_current_revision_resolved_by_id_match_not_list_order(
+        self,
+        make_revision_data: Callable[[int], ModelRevisionData],
+    ) -> None:
+        """Pin: revision lookup must use explicit ``current_revision_id``, not list[0]."""
+        deploying_data = make_revision_data(1)
+        current_data = make_revision_data(2)
+
+        deployment_info = DeploymentInfo(
+            id=DeploymentID(uuid.uuid4()),
+            metadata=DeploymentMetadata(
+                name="ba5963-test",
+                domain="default",
+                project=uuid.uuid4(),
+                resource_group="default",
+                created_user=uuid.uuid4(),
+                session_owner=uuid.uuid4(),
+                created_at=datetime(2024, 1, 1, tzinfo=UTC),
+                revision_history_limit=10,
+            ),
+            state=DeploymentState(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                scaling_state=ScalingState.STABLE,
+                retry_count=0,
+            ),
+            replica=ReplicaData(replica_count=1, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
+            options=DeploymentOptions(),
+            current_revision_id=current_data.id,
+            deploying_revision_id=deploying_data.id,
+            current_revision=current_data,
+            deploying_revision=deploying_data,
+        )
+
+        deployment_data = _convert_deployment_info_to_data(deployment_info)
+
+        assert deployment_data.current_revision_id == current_data.id
+        assert deployment_data.deploying_revision_id == deploying_data.id
+        assert deployment_data.current_revision_id != deployment_data.deploying_revision_id
+
+        # The full current revision now lives on the legacy (REST v1) projection.
+        legacy_data = _convert_deployment_info_to_legacy_data(deployment_info)
+        assert legacy_data.revision is not None
+        assert legacy_data.revision.id == current_data.id

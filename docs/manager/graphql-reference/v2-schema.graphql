@@ -109,17 +109,25 @@ enum ActivenessStatus {
 
 """Added in 25.19.0. """
 input AddRevisionInput {
-  name: String = null
-
   """
   Added in 26.4.2. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
   """
   revisionPresetId: UUID = null
   deploymentId: ID!
-  clusterConfig: ClusterConfigInput!
-  resourceConfig: ResourceConfigInput!
-  image: ImageInput!
-  modelRuntimeConfig: ModelRuntimeConfigInput!
+
+  """Cluster configuration"""
+  clusterConfig: ClusterConfigInput = null
+
+  """Resource configuration"""
+  resourceConfig: ResourceConfigInput = null
+
+  """Container image"""
+  image: ImageInput = null
+
+  """Runtime configuration"""
+  modelRuntimeConfig: ModelRuntimeConfigInput = null
+
+  """Model mount configuration"""
   modelMountConfig: ModelMountConfigInput!
 
   """
@@ -499,20 +507,20 @@ type AgentV2 implements Node {
   scalingGroup: String!
 
   """Added in 26.1.0. Load the container count for this agent."""
-  containerCount: Int!
+  containerCount: Int
 
   """
   Added in 26.2.0. List of kernels running on this agent with pagination support.
   """
-  kernels(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection!
+  kernels(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
 
   """
   Added in 26.3.0. List of sessions running on this agent with pagination support.
   """
-  sessions(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
+  sessions(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection
 
   """Added in 26.3.0. Per-slot resource capacity and usage for this agent."""
-  resourceSlots(filter: AgentResourceSlotFilter = null, orderBy: [AgentResourceSlotOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AgentResourceConnection!
+  resourceSlots(filter: AgentResourceSlotFilter = null, orderBy: [AgentResourceSlotOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AgentResourceConnection
 }
 
 """
@@ -537,12 +545,9 @@ type AgentV2Edge {
 }
 
 """
-Added in 26.4.2. Represents a single allocated resource slot entry for a deployment revision or preset.
+Added in 26.4.2. An allocated resource slot entry on a deployment revision or preset.
 """
-type AllocatedResourceSlot implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-
+type AllocatedResourceSlot {
   """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
   slotName: String!
 
@@ -550,40 +555,27 @@ type AllocatedResourceSlot implements Node {
   quantity: Decimal!
 }
 
-"""
-Added in 26.4.2. Connection type for paginated allocated resource slot results.
-"""
-type AllocatedResourceSlotConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [AllocatedResourceSlotEdge!]!
-
-  """Total number of allocated resource slots matching the filter criteria."""
-  count: Int!
-}
-
-"""An edge in a connection."""
-type AllocatedResourceSlotEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: AllocatedResourceSlot!
-}
-
 """Added in 26.4.2. Filter for allocated resource slots."""
 input AllocatedResourceSlotFilter {
+  """Filter by slot name."""
   slotName: StringFilter = null
+
+  """Logical AND of multiple filter conditions."""
   AND: [AllocatedResourceSlotFilter!] = null
+
+  """Logical OR of multiple filter conditions."""
   OR: [AllocatedResourceSlotFilter!] = null
+
+  """Logical NOT of filter conditions."""
   NOT: [AllocatedResourceSlotFilter!] = null
 }
 
 """Added in 26.4.2. Order by specification for allocated resource slots."""
 input AllocatedResourceSlotOrderBy {
+  """Field to order by."""
   field: AllocatedResourceSlotOrderField!
+
+  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -655,7 +647,7 @@ type Artifact implements Node {
   availability: ArtifactAvailability!
 
   """The revisions of this entity."""
-  revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+  revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection
 }
 
 enum ArtifactAvailability {
@@ -819,7 +811,7 @@ type ArtifactRevision implements Node {
   verificationResult: ArtifactVerificationResult
 
   """The artifact of this entity."""
-  artifact: Artifact!
+  artifact: Artifact
 }
 
 """
@@ -1015,6 +1007,7 @@ input AssignRoleInput {
 """Added in 24.09.0. Filter criteria for querying audit logs."""
 input AuditLogFilter {
   entityType: StringFilter = null
+  entityId: StringFilter = null
   operation: StringFilter = null
   status: AuditLogStatusFilter = null
   createdAt: DateTimeFilter = null
@@ -1036,6 +1029,17 @@ enum AuditLogOrderField {
   ENTITY_TYPE
   OPERATION
   STATUS
+}
+
+"""
+Added in UNRELEASED. Scope for the scoped audit log query. All items are OR'd; raises an error if every field is empty.
+"""
+input AuditLogScope {
+  """Entity-tagged scope items."""
+  entity: [EntityTypeScope!] = null
+
+  """Actor UUIDs (matches audit_logs.triggered_by)."""
+  triggeredUser: [UUIDScope!] = null
 }
 
 """Added in 26.3.0. Status of an audit log entry."""
@@ -1286,6 +1290,42 @@ type BulkAddRolePermissionFailureInfo {
 }
 
 """
+Added in UNRELEASED. Failure detail for a single permission entry in a bulk add operation.
+"""
+type BulkAddRolePermissionPresetFailureInfo {
+  """Entity type of the permission entry that failed."""
+  entityType: RBACElementType!
+
+  """Operation of the permission entry that failed."""
+  operation: OperationType!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-adding permission entries to an existing role preset.
+"""
+input BulkAddRolePermissionPresetsInput {
+  """ID of the role preset to add permissions to."""
+  rolePresetId: ID!
+
+  """Permission entries to insert. Duplicates are surfaced as failures."""
+  permissions: [RolePermissionPresetEntryInput!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-adding permission entries to a role preset.
+"""
+type BulkAddRolePermissionPresetsPayload {
+  """Permission entries that were added."""
+  items: [RolePermissionPreset!]!
+
+  """Permission entries that failed to be added (e.g., duplicates)."""
+  failed: [BulkAddRolePermissionPresetFailureInfo!]!
+}
+
+"""
 Added in UNRELEASED. Input for bulk-inserting scoped permissions across one or more roles
 """
 input BulkAddRolePermissionsInput {
@@ -1360,6 +1400,52 @@ type BulkCreateUsersV2Payload {
   failed: [BulkCreateUserV2Error!]!
 }
 
+"""
+Added in UNRELEASED. Error information for a model card that failed during bulk deletion.
+"""
+type BulkDeleteModelCardV2Error {
+  """UUID of the model card that failed to delete."""
+  cardId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in UNRELEASED. Input for bulk-deleting multiple model cards."""
+input BulkDeleteModelCardsV2Input {
+  """List of model card UUIDs to delete."""
+  ids: [UUID!]!
+
+  """Options for the delete operation."""
+  options: DeleteModelCardV2Options = null
+}
+
+"""Added in UNRELEASED. Payload for bulk model card deletion."""
+type BulkDeleteModelCardsV2Payload {
+  """UUIDs of model cards that were successfully deleted."""
+  successes: [UUID!]!
+
+  """List of errors for model cards that failed to delete."""
+  failed: [BulkDeleteModelCardV2Error!]!
+}
+
+"""Added in UNRELEASED. Input for bulk-soft-deleting role presets."""
+input BulkDeleteRolePresetsInput {
+  """Role preset UUIDs to soft-delete."""
+  rolePresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-soft-deleting role presets.
+"""
+type BulkDeleteRolePresetsPayload {
+  """Role presets that were soft-deleted."""
+  items: [RolePreset!]!
+
+  """Role preset IDs that failed to soft-delete."""
+  failed: [BulkRolePresetFailureInfo!]!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input {
   """List of VFolder UUIDs to soft-delete."""
@@ -1370,6 +1456,23 @@ input BulkDeleteVFoldersV2Input {
 type BulkDeleteVFoldersV2Payload {
   """Number of virtual folders successfully soft-deleted."""
   deletedCount: Int!
+}
+
+"""Added in UNRELEASED. Input for bulk-hard-deleting role presets."""
+input BulkPurgeRolePresetsInput {
+  """Role preset UUIDs to purge."""
+  rolePresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-hard-deleting role presets.
+"""
+type BulkPurgeRolePresetsPayload {
+  """Role presets that were purged."""
+  items: [RolePreset!]!
+
+  """Role preset IDs that failed to purge."""
+  failed: [BulkRolePresetFailureInfo!]!
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk purge."""
@@ -1413,17 +1516,36 @@ type BulkPurgeUsersV2Payload {
 }
 
 """
+Added in UNRELEASED. Failure detail for a single vfolder in a bulk purge.
+"""
+type BulkPurgeVFolderV2Error {
+  """UUID of the vfolder that failed to purge."""
+  vfolderId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
 Added in 26.4.2. Input for permanently purging multiple virtual folders.
 """
 input BulkPurgeVFoldersV2Input {
   """List of VFolder UUIDs to purge."""
   ids: [UUID!]!
+
+  """
+  Added in UNRELEASED. Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
+  """
+  options: PurgeVFolderOptionsInput
 }
 
 """Added in 26.4.2. Payload for bulk virtual folder purge."""
 type BulkPurgeVFoldersV2Payload {
   """Number of virtual folders successfully purged."""
   purgedCount: Int!
+
+  """List of errors for vfolders that failed to purge."""
+  failed: [BulkPurgeVFolderV2Error!]!
 }
 
 """
@@ -1435,6 +1557,25 @@ type BulkRemoveRolePermissionFailureInfo {
 
   """Error message describing the failure"""
   message: String!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-removing permission entries from a role preset.
+"""
+input BulkRemoveRolePermissionPresetsInput {
+  """Permission entry row IDs to delete."""
+  permissionPresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-removing permission entries from a role preset.
+"""
+type BulkRemoveRolePermissionPresetsPayload {
+  """Permission entries that were removed."""
+  items: [RolePermissionPreset!]!
+
+  """Permission entry IDs that failed to delete."""
+  failed: [BulkRolePermissionPresetFailureInfo!]!
 }
 
 """
@@ -1451,6 +1592,25 @@ type BulkRemoveRolePermissionsPayload {
 
   """Permission IDs that failed to delete"""
   failed: [BulkRemoveRolePermissionFailureInfo!]!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-restoring soft-deleted role presets.
+"""
+input BulkRestoreRolePresetsInput {
+  """Role preset UUIDs to restore."""
+  rolePresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-restoring soft-deleted role presets.
+"""
+type BulkRestoreRolePresetsPayload {
+  """Role presets that were restored."""
+  items: [RolePreset!]!
+
+  """Role preset IDs that failed to restore."""
+  failed: [BulkRolePresetFailureInfo!]!
 }
 
 """
@@ -1477,6 +1637,28 @@ type BulkRevokeRolePayload {
 
   """Users that failed to be revoked"""
   failed: [BulkRevokeRoleError!]!
+}
+
+"""
+Added in UNRELEASED. Failure detail for a single permission entry in a bulk operation.
+"""
+type BulkRolePermissionPresetFailureInfo {
+  """role_permission_presets row ID that the operation failed on."""
+  permissionPresetId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Failure detail for a single role preset ID in a bulk operation.
+"""
+type BulkRolePresetFailureInfo {
+  """Role preset ID that the operation failed on."""
+  rolePresetId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk update."""
@@ -1968,7 +2150,7 @@ input CreateDeploymentRevisionPresetInput {
   openToPublic: Boolean = null
 
   """Default replica count for deployments created from this preset."""
-  replicaCount: Int = null
+  replicaCount: Int!
 
   """
   Default revision history limit for deployments created from this preset.
@@ -1976,7 +2158,7 @@ input CreateDeploymentRevisionPresetInput {
   revisionHistoryLimit: Int = null
 
   """Default deployment strategy for deployments created from this preset."""
-  deploymentStrategy: PresetDeploymentStrategyInput = null
+  deploymentStrategy: PresetDeploymentStrategyInput!
 
   """Added in UNRELEASED. Container image to run the inference server."""
   imageId: UUID!
@@ -2004,10 +2186,10 @@ input CreateDeploymentRevisionPresetInput {
   """
   Added in UNRELEASED. Deployment topology mode (single-node or multi-node).
   """
-  clusterMode: ClusterMode = null
+  clusterMode: ClusterMode!
 
   """Added in UNRELEASED. Number of worker nodes in the cluster."""
-  clusterSize: Int = null
+  clusterSize: Int!
 
   """
   Added in UNRELEASED. Command to start the inference server process inside the container.
@@ -2391,8 +2573,6 @@ input CreateResourcePresetV2Input {
 Added in 25.19.0. Input for specifying revision configuration within a deployment.
 """
 input CreateRevisionInput {
-  name: String = null
-
   """
   Added in 26.4.2. DeploymentRevisionPreset ID. When specified, preset values are used as defaults and can be overridden by explicitly provided fields.
   """
@@ -2430,6 +2610,29 @@ input CreateRoleInvitationInput {
 type CreateRoleInvitationPayload {
   """List of created role invitations."""
   items: [RoleInvitation!]!
+}
+
+"""Added in UNRELEASED. Input for creating a new role preset."""
+input CreateRolePresetInput {
+  """Role preset name."""
+  name: String!
+
+  """Scope type this preset targets (e.g., domain, project)."""
+  scopeType: RBACElementType!
+
+  """
+  Default value for the `auto_assign` flag on roles instantiated from this preset.
+  """
+  autoAssign: Boolean! = false
+
+  """Permission entries carried by the preset."""
+  permissions: [RolePermissionPresetEntryInput!]!
+}
+
+"""Added in UNRELEASED. Payload returned after creating a role preset."""
+type CreateRolePresetPayload {
+  """Created role preset."""
+  rolePreset: RolePreset!
 }
 
 """Added in 26.4.2. Input for creating a runtime variant."""
@@ -2692,24 +2895,68 @@ input DateTimeFilter {
 scalar Decimal
 
 """
-Added in UNRELEASED. A single (handler_name, timeout_sec) entry response for session timeouts.
+Added in UNRELEASED. A single (handler_name, options) entry response for session handler options.
 """
-type DefaultSessionHandlerTimeoutEntryInfo {
-  """Handler identifier matching `SessionLifecycleHandler.name()`."""
-  handlerName: String!
+type DefaultSessionHandlerOptionsEntryInfo {
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
+  timeoutSec: Int
 
   """
-  Timeout in seconds; `null` means this handler is unbounded regardless of the `default` timeout.
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
   """
-  timeoutSec: Int
+  maxRetryCount: Int
+
+  """Handler identifier matching `SessionLifecycleHandler.name()`."""
+  handlerName: String!
 }
 
 """
-Added in UNRELEASED. A single (handler_name, timeout_sec) entry for session timeouts.
+Added in UNRELEASED. A single (handler_name, options) entry for session handler options.
 """
-input DefaultSessionHandlerTimeoutEntryInput {
+input DefaultSessionHandlerOptionsEntryInput {
   handlerName: String!
   timeoutSec: Int = null
+  maxRetryCount: Int = null
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy snapshot for session handler options.
+"""
+type DefaultSessionHandlerOptionsInfo {
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
+  timeoutSec: Int
+
+  """
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
+  """
+  maxRetryCount: Int
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy fields for session handler options.
+"""
+input DefaultSessionHandlerOptionsInput {
+  timeoutSec: Int = null
+  maxRetryCount: Int = null
+}
+
+"""Added in UNRELEASED. Session handler-options policy response."""
+type DefaultSessionHandlerOptionsPolicyInfo {
+  """
+  Fallback per-handler policy applied to handlers not listed in `by_handler`.
+  """
+  default: DefaultSessionHandlerOptionsInfo!
+
+  """Per-handler overrides."""
+  byHandler: [DefaultSessionHandlerOptionsEntryInfo!]!
+}
+
+"""
+Added in UNRELEASED. Session handler-options input (timeout + retry, handler-keyed).
+"""
+input DefaultSessionHandlerOptionsPolicyInput {
+  default: DefaultSessionHandlerOptionsInput = null
+  byHandler: [DefaultSessionHandlerOptionsEntryInput!] = null
 }
 
 """Added in UNRELEASED. Baseline kernel execution spec response."""
@@ -2770,8 +3017,8 @@ type DefaultSessionOptionsInfo {
   """
   defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInfo
 
-  """Default timeout policy."""
-  timeouts: DefaultSessionTimeoutsInfo!
+  """Default handler-keyed scheduler policy (timeout + retry)."""
+  handlerOptions: DefaultSessionHandlerOptionsPolicyInfo!
 
   """Default agent selection policy."""
   agentSelectionPolicy: SessionAgentSelectionPolicy!
@@ -2786,7 +3033,7 @@ input DefaultSessionOptionsInput {
   clusterMode: String = null
   defaultFailurePolicy: SessionFailurePolicy = null
   defaultKernelExecutionSpec: DefaultSessionKernelExecutionSpecInput = null
-  timeouts: DefaultSessionTimeoutsInput = null
+  handlerOptions: DefaultSessionHandlerOptionsPolicyInput = null
   agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
@@ -2803,23 +3050,6 @@ Added in UNRELEASED. Qualitative resource hints for session-level defaults (shar
 """
 input DefaultSessionResourceOptsInput {
   shmem: BinarySizeInput = null
-}
-
-"""Added in UNRELEASED. Session timeout policy response."""
-type DefaultSessionTimeoutsInfo {
-  """
-  Fallback timeout in seconds applied to handlers not listed in `by_handler`; `null` means unbounded.
-  """
-  default: Int
-
-  """Per-handler timeout overrides."""
-  byHandler: [DefaultSessionHandlerTimeoutEntryInfo!]!
-}
-
-"""Added in UNRELEASED. Session timeout policy input (handler-keyed)."""
-input DefaultSessionTimeoutsInput {
-  default: Int = null
-  byHandler: [DefaultSessionHandlerTimeoutEntryInput!] = null
 }
 
 """
@@ -3030,16 +3260,12 @@ type DeleteModelCardPayloadGQL {
   id: UUID!
 }
 
-"""Added in 26.4.2. Input for deleting multiple model cards."""
-input DeleteModelCardsV2Input {
-  """List of model card UUIDs to delete."""
-  ids: [UUID!]!
-}
-
-"""Added in 26.4.2. Payload for bulk model card deletion."""
-type DeleteModelCardsV2Payload {
-  """Number of model cards successfully deleted."""
-  deletedCount: Int!
+"""Added in UNRELEASED. Options for the model card delete operation."""
+input DeleteModelCardV2Options {
+  """
+  If true, also soft-delete (move to trash) the model VFolder(s) associated with the deleted model card(s).
+  """
+  deleteAssociatedVfolder: Boolean! = false
 }
 
 """Added in 24.09.0. Input for deleting a notification channel"""
@@ -3337,6 +3563,21 @@ input DeploymentFilter {
   NOT: [DeploymentFilter!] = null
 }
 
+"""Added in UNRELEASED. Deployment handler-options policy response."""
+type DeploymentHandlerOptionsInfoGQL {
+  """Fallback per-handler policy."""
+  default: HandlerOptionsInfoGQL!
+
+  """Per-handler overrides."""
+  byHandler: [HandlerOptionsEntryInfoGQL!]!
+}
+
+"""Added in UNRELEASED. Deployment handler-options policy input."""
+input DeploymentHandlerOptionsInput {
+  default: HandlerOptionsInput = null
+  byHandler: [HandlerOptionsEntryInput!] = null
+}
+
 """Added in 26.3.0. Deployment history record."""
 type DeploymentHistory implements Node {
   """The Globally Unique ID of this object"""
@@ -3412,13 +3653,13 @@ enum DeploymentHistoryOrderField {
 
 """Added in UNRELEASED. Deployment options payload response."""
 type DeploymentOptionsInfoGQL {
-  """Handler timeout policy."""
-  timeouts: DeploymentTimeoutsInfoGQL!
+  """Handler-keyed scheduler policy (timeout + retry)."""
+  handlerOptions: DeploymentHandlerOptionsInfoGQL!
 }
 
 """Added in UNRELEASED. Deployment options payload input."""
 input DeploymentOptionsInput {
-  timeouts: DeploymentTimeoutsInput!
+  handlerOptions: DeploymentHandlerOptionsInput!
 }
 
 """Added in 25.19.0. """
@@ -3505,7 +3746,7 @@ type DeploymentRevisionPreset implements Node {
   runtimeVariant: RuntimeVariant
 
   """Added in 26.4.2. Resource slot allocations for this preset."""
-  resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AllocatedResourceSlotConnection!
+  resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null): [AllocatedResourceSlot!]
 }
 
 """Added in 26.4.2. Paginated list of deployment revision presets."""
@@ -3540,11 +3781,14 @@ type DeploymentRevisionPresetEnvironEntry {
 
 """Added in 26.4.2. Filter for deployment revision presets."""
 input DeploymentRevisionPresetFilter {
+  """Added in UNRELEASED. Filter by preset ID."""
+  id: UUIDFilter = null
+
   """Name filter."""
   name: StringFilter = null
 
   """Variant ID filter."""
-  runtimeVariantId: UUID = null
+  runtimeVariantId: UUIDFilter = null
 }
 
 """Added in 26.4.2. Order specification for deployment revision presets."""
@@ -3651,21 +3895,6 @@ Added in 25.19.0. This enum represents the deployment strategy type of a model d
 enum DeploymentStrategyType {
   ROLLING
   BLUE_GREEN
-}
-
-"""Added in UNRELEASED. Deployment timeout policy response."""
-type DeploymentTimeoutsInfoGQL {
-  """Fallback timeout in seconds; null means unbounded."""
-  default: Int
-
-  """Per-handler timeout overrides."""
-  byHandler: [HandlerTimeoutEntryInfoGQL!]!
-}
-
-"""Added in UNRELEASED. Deployment timeout policy input."""
-input DeploymentTimeoutsInput {
-  default: Int = null
-  byHandler: [HandlerTimeoutEntryInput!] = null
 }
 
 """
@@ -3902,17 +4131,17 @@ type DomainUsageBucket implements Node {
   """
   Added in 26.2.0. Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
   """
-  averageDailyUsage: ResourceSlot!
+  averageDailyUsage: ResourceSlot
 
   """
   Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
   """
-  usageCapacityRatio: ResourceSlot!
+  usageCapacityRatio: ResourceSlot
 
   """
   Added in 26.1.0. Project usage buckets belonging to this domain. Returns paginated project-level usage history for all projects in this domain within the same scaling group.
   """
-  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+  projectUsageBuckets(filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection
 }
 
 """
@@ -4033,23 +4262,23 @@ type DomainV2 implements Node @key(fields: "id") {
   """
   Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShare(scope: DomainFairShareScope!): DomainFairShare!
+  fairShare(scope: DomainFairShareScope!): DomainFairShare
 
   """
   Added in 26.4.0. Active resource usage overview for this domain. Returns the currently occupied resource slots and the number of active sessions.
   """
-  activeResourceOverview: ActiveResourceOverview!
+  activeResourceOverview: ActiveResourceOverview
 
   """
   Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
-  usageBuckets(scope: DomainUsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
+  usageBuckets(scope: DomainUsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection
 
   """Projects belonging to this domain."""
-  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
+  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 
   """Users belonging to this domain."""
-  users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 }
 
 """
@@ -4269,7 +4498,7 @@ type EntityConnection {
 
 """Added in 26.3.0. Filter for entity associations"""
 input EntityFilter {
-  entityType: RBACElementType = null
+  entityType: RBACElementTypeFilter = null
   entityId: StringFilter = null
   AND: [EntityFilter!] = null
   OR: [EntityFilter!] = null
@@ -4341,6 +4570,17 @@ type EntityTimestamps {
 }
 
 """
+Added in UNRELEASED. Entity reference parametrized by RBAC element type.
+"""
+input EntityTypeScope {
+  """RBAC element type of the entity."""
+  entityType: RBACElementType!
+
+  """ID of the entity."""
+  entityId: String!
+}
+
+"""
 Added in UNRELEASED. A single environment variable entry with key and value.
 """
 input EnvironEntryInput {
@@ -4395,7 +4635,7 @@ Added in 25.19.0. An extra virtual folder mount attached to a model revision.
 """
 type ExtraVFolderMountInfoGQL {
   """The vfolder of this entity."""
-  vfolder: VirtualFolderNode!
+  vfolder: VirtualFolderNode
   vfolderId: ID!
   mountDestination: String
 
@@ -4403,12 +4643,22 @@ type ExtraVFolderMountInfoGQL {
   The concrete permission snapshot fixed at revision-write time. ``INHERIT`` policies are resolved against the vfolder's current permission at that point, so this value is immutable and does not change when the vfolder's permission later changes. ``None`` when the caller left it unset to inherit the vfolder's stored permission at session-creation time (task #83).
   """
   mountPerm: MountPermission!
+
+  """
+  Added in UNRELEASED. Subpath within the vfolder. ``None`` means the vfolder root.
+  """
+  subpath: String
 }
 
 """Added in 25.19.0. """
 input ExtraVFolderMountInput {
   vfolderId: ID!
   mountDestination: String
+
+  """
+  Added in UNRELEASED. Subpath within the vfolder. ``null`` (default) mounts the vfolder root.
+  """
+  subpath: String = null
 }
 
 """
@@ -4418,7 +4668,7 @@ type FairShareCalculationSnapshot {
   """
   Added in 26.2.0. Average daily decayed resource usage during the lookback period. Calculated as total_decayed_usage divided by lookback duration in days. For each resource type, this represents the average decayed amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
   """
-  averageDailyDecayedUsage: ResourceSlot!
+  averageDailyDecayedUsage: ResourceSlot
 
   """Computed fair share factor (0-1 range)"""
   fairShareFactor: Decimal!
@@ -4521,20 +4771,49 @@ extend type GroupNode @key(fields: "id") {
 }
 
 """
-Added in UNRELEASED. A single (handler_name, timeout_sec) entry response.
+Added in UNRELEASED. A single (handler_name, options) entry response for deployment handler options.
 """
-type HandlerTimeoutEntryInfoGQL {
-  """Handler identifier."""
-  handlerName: String!
-
-  """Timeout in seconds; null means this handler is unbounded."""
+type HandlerOptionsEntryInfoGQL {
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
   timeoutSec: Int
+
+  """
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
+  """
+  maxRetryCount: Int
+
+  """Handler identifier matching `SessionLifecycleHandler.name()`."""
+  handlerName: String!
 }
 
-"""Added in UNRELEASED. A single (handler_name, timeout_sec) entry."""
-input HandlerTimeoutEntryInput {
+"""
+Added in UNRELEASED. A single (handler_name, options) entry for deployment handler options.
+"""
+input HandlerOptionsEntryInput {
   handlerName: String!
   timeoutSec: Int = null
+  maxRetryCount: Int = null
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy snapshot for deployment handler options.
+"""
+type HandlerOptionsInfoGQL {
+  """Phase timeout in seconds; `null` means unbounded for this entry."""
+  timeoutSec: Int
+
+  """
+  Per-phase retry budget; `null` means the retry limit is disabled (`give_up` never fires for this handler).
+  """
+  maxRetryCount: Int
+}
+
+"""
+Added in UNRELEASED. Per-handler scheduler policy fields for deployment handler options.
+"""
+input HandlerOptionsInput {
+  timeoutSec: Int = null
+  maxRetryCount: Int = null
 }
 
 """Added in 25.14.0. HuggingFace registry node."""
@@ -4616,7 +4895,7 @@ type ImageV2 implements Node {
   lastUsed: DateTime
 
   """Added in 26.2.0. Aliases for this image."""
-  aliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection!
+  aliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection
 }
 
 """
@@ -4709,6 +4988,9 @@ input ImageV2Filter {
   status: ImageV2StatusFilter = null
   name: StringFilter = null
   architecture: StringFilter = null
+
+  """Added in UNRELEASED. Filter by image UUID."""
+  id: UUIDFilter = null
 
   """Added in 26.4.0. Filter by container registry ID."""
   registryId: UUIDFilter = null
@@ -4899,6 +5181,15 @@ type ImportArtifactsPayload {
 }
 
 """
+Added in UNRELEASED. Filter for integer array fields. Supports 'contains' (column contains this single value), 'contains_any' (column contains any of these values), and 'contains_all' (column contains all of these values).
+"""
+input IntArrayFilter {
+  contains: Int = null
+  containsAny: [Int!] = null
+  containsAll: [Int!] = null
+}
+
+"""
 Added in 24.09.0. Filter for integer fields supporting equality and comparison operations.
 """
 input IntFilter {
@@ -5046,7 +5337,7 @@ type KernelV2 implements Node {
   session: SessionV2
 
   """Added in 26.3.0. Per-slot resource allocation for this kernel."""
-  resourceAllocations(filter: KernelResourceAllocationFilter = null, orderBy: [KernelResourceAllocationOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ResourceAllocationConnection!
+  resourceAllocations(filter: KernelResourceAllocationFilter = null, orderBy: [KernelResourceAllocationOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ResourceAllocationConnection
 }
 
 """
@@ -5332,6 +5623,13 @@ type KeypairResourceAllocationV2 {
 }
 
 """
+Added in UNRELEASED. Nested filter for keypairs assigned to a keypair resource policy. Filters policies linked to at least one keypair matching all specified conditions.
+"""
+input KeypairResourcePolicyKeypairNestedFilter {
+  userId: UUIDFilter = null
+}
+
+"""
 Added in 26.4.2. Keypair resource policy defining session and storage limits for API keypairs.
 """
 type KeypairResourcePolicyV2 implements Node {
@@ -5375,6 +5673,9 @@ type KeypairResourcePolicyV2 implements Node {
 
   """Allowed vfolder host permissions."""
   allowedVfolderHosts: [VFolderHostPermissionEntry!]!
+
+  """Added in UNRELEASED. Keypairs assigned to this resource policy."""
+  keypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection
 }
 
 """Added in 26.4.2. Paginated connection for keypair resource policies."""
@@ -5408,6 +5709,11 @@ input KeypairResourcePolicyV2Filter {
   idleTimeout: IntFilter = null
   maxConcurrentSftpSessions: IntFilter = null
   maxPendingSessionCount: IntFilter = null
+
+  """
+  Added in UNRELEASED. Filter policies by their assigned keypairs. A policy matches if at least one of its keypairs satisfies the conditions.
+  """
+  keypair: KeypairResourcePolicyKeypairNestedFilter = null
 }
 
 """Added in 26.4.2. Ordering specification for keypair resource policies."""
@@ -5871,10 +6177,10 @@ input ModelCardV2Filter {
   name: StringFilter = null
 
   """Domain filter."""
-  domainName: String = null
+  domainName: StringFilter = null
 
   """Project filter."""
-  projectId: UUID = null
+  projectId: UUIDFilter = null
 
   """
   Filter by the storage host backing the model card's VFolder. Matches via an EXISTS subquery against the VFolder host column.
@@ -5955,10 +6261,10 @@ Added in 26.4.0. Configuration for a single model within a model definition.
 """
 input ModelConfigInput {
   """Name of the model."""
-  name: String!
+  name: String = null
 
   """Path to the model file."""
-  modelPath: String!
+  modelPath: String = null
 
   """Configuration for the model service."""
   service: ModelServiceConfigInput = null
@@ -5980,7 +6286,7 @@ Added in 26.4.0. Model definition containing a list of model configurations.
 """
 input ModelDefinitionInput {
   """List of models in the model definition."""
-  models: [ModelConfigInput!]!
+  models: [ModelConfigInput!] = null
 }
 
 """
@@ -6022,16 +6328,16 @@ type ModelDeployment implements Node {
   deploymentPolicy: DeploymentPolicy
 
   """The revision history of this entity."""
-  revisionHistory(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
+  revisionHistory(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection
 
   """The replicas of this entity."""
-  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
+  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection
 
   """The auto scaling rules of this entity."""
-  autoScalingRules(filter: AutoScalingRuleFilter = null, orderBy: [AutoScalingRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AutoScalingRuleConnection!
+  autoScalingRules(filter: AutoScalingRuleFilter = null, orderBy: [AutoScalingRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AutoScalingRuleConnection
 
   """The access tokens of this entity."""
-  accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
+  accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection
 }
 
 """Added in 25.19.0. Connection for model deployments."""
@@ -6057,8 +6363,13 @@ type ModelDeploymentEdge {
 Added in 25.19.0. Contains metadata information for a model deployment including its name, status, tags, and timestamps. Also provides access to the associated project and domain.
 """
 type ModelDeploymentMetadata {
+  """
+  Added in UNRELEASED. The resource group this deployment runs in, resolved via DataLoader.
+  """
+  resourceGroup: ResourceGroup
+
   """The project of this entity."""
-  project: GroupNode! @deprecated(reason: "Use project_v2 instead.")
+  project: GroupNode @deprecated(reason: "Use project_v2 instead.")
 
   """
   Added in 26.4.3. The project this deployment belongs to, resolved via DataLoader.
@@ -6066,7 +6377,7 @@ type ModelDeploymentMetadata {
   projectV2: ProjectV2
 
   """The domain of this entity."""
-  domain: DomainNode! @deprecated(reason: "Use domain_v2 instead.")
+  domain: DomainNode @deprecated(reason: "Use domain_v2 instead.")
 
   """
   Added in 26.4.3. The domain this deployment belongs to, resolved via DataLoader.
@@ -6077,6 +6388,7 @@ type ModelDeploymentMetadata {
   name: String!
   status: DeploymentStatus!
   tags: [String!]!
+  resourceGroupName: String!
   createdAt: DateTime!
   updatedAt: DateTime!
 }
@@ -6085,6 +6397,7 @@ type ModelDeploymentMetadata {
 input ModelDeploymentMetadataInput {
   projectId: ID!
   domainName: String!
+  resourceGroupName: String!
   name: String = null
   tags: [String!] = null
 }
@@ -6128,22 +6441,22 @@ type ModelHealthCheck {
 """Added in 26.4.0. Health check configuration for a model service."""
 input ModelHealthCheckInput {
   """Interval in seconds between health checks."""
-  interval: Float! = 10
+  interval: Float = null
 
   """Path to check for health status."""
-  path: String!
+  path: String = null
 
   """Maximum number of retries for health check."""
-  maxRetries: Int! = 10
+  maxRetries: Int = null
 
   """Maximum time in seconds to wait for a health check response."""
-  maxWaitTime: Float! = 15
+  maxWaitTime: Float = null
 
   """Expected HTTP status code for a healthy response."""
-  expectedStatusCode: Int! = 200
+  expectedStatusCode: Int = null
 
   """Initial delay in seconds before the first health check."""
-  initialDelay: Float! = 60
+  initialDelay: Float = null
 }
 
 """Added in 26.4.2. Metadata describing a model entry."""
@@ -6237,17 +6550,27 @@ Added in 25.19.0. Configuration for mounting the model data into the inference c
 """
 type ModelMountConfig {
   """The vfolder of this entity."""
-  vfolder: VirtualFolderNode!
+  vfolder: VirtualFolderNode
   vfolderId: ID!
   mountDestination: String!
   definitionPath: String!
+
+  """
+  Added in UNRELEASED. Subpath within the model vfolder. ``None`` means the vfolder root.
+  """
+  subpath: String
 }
 
 """Added in 25.19.0. """
 input ModelMountConfigInput {
   vfolderId: ID!
   mountDestination: String!
-  definitionPath: String!
+  definitionPath: String = null
+
+  """
+  Added in UNRELEASED. Subpath within the model vfolder. ``null`` (default) mounts the vfolder root.
+  """
+  subpath: String = null
 }
 
 """
@@ -6268,6 +6591,17 @@ type ModelReplica implements Node {
   """Whether the replica is actively receiving traffic."""
   activenessStatus: ActivenessStatus!
 
+  """
+  Added in UNRELEASED. Provisioning status of the replica (mirrors the underlying route status).
+  """
+  status: ReplicaStatus!
+
+  """Added in UNRELEASED. Traffic status of the replica."""
+  trafficStatus: TrafficStatus!
+
+  """Added in UNRELEASED. Health check status of the replica."""
+  healthStatus: ReplicaHealthStatus!
+
   """Timestamp when the replica was created."""
   createdAt: DateTime!
 
@@ -6282,7 +6616,7 @@ type ModelReplica implements Node {
   sessionV2: SessionV2
 
   """The revision of this entity."""
-  revision: ModelRevision!
+  revision: ModelRevision
 }
 
 """
@@ -6314,8 +6648,10 @@ type ModelRevision implements Node {
   id: ID!
   imageId: ID!
 
-  """The name identifier for this revision."""
-  name: String!
+  """
+  Added in UNRELEASED. Per-deployment sequential revision number assigned at insert time (UNIQUE per deployment). Use this to surface 'Revision #N' labels and to order revisions client-side.
+  """
+  revisionNumber: Int!
 
   """Cluster configuration for replica distribution."""
   clusterConfig: ClusterConfig!
@@ -6335,19 +6671,39 @@ type ModelRevision implements Node {
   """Additional volume folder mounts."""
   extraMounts: [ExtraVFolderMountInfoGQL!]!
 
+  """
+  Added in UNRELEASED. ID of the deployment-level preset that produced this revision. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
+  """
+  revisionPresetId: UUID
+
+  """
+  Added in UNRELEASED. ID of the parent deployment that owns this revision. Exposed alongside the resolved ``deployment`` node so clients can navigate without re-fetching.
+  """
+  deploymentId: ID!
+
   """Timestamp when the revision was created."""
   createdAt: DateTime!
 
   """The image of this entity."""
-  image: ImageNode! @deprecated(reason: "Use image_v2 instead.")
+  image: ImageNode @deprecated(reason: "Use image_v2 instead.")
 
   """
   Added in 26.4.3. The container image used by this revision, resolved via DataLoader.
   """
   imageV2: ImageV2
 
+  """
+  Added in UNRELEASED. The deployment-level preset that produced this revision, resolved via DataLoader. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
+  """
+  revisionPreset: DeploymentRevisionPreset
+
+  """
+  Added in UNRELEASED. The parent deployment owning this revision, resolved via DataLoader.
+  """
+  deployment: ModelDeployment
+
   """Added in 26.4.2. Resource slot allocations for this revision."""
-  resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AllocatedResourceSlotConnection!
+  resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null): [AllocatedResourceSlot!]
 }
 
 """Added in 25.19.0. Connection for model revisions."""
@@ -6424,7 +6780,6 @@ type ModelRuntimeConfig {
 """Added in 25.19.0. """
 input ModelRuntimeConfigInput {
   runtimeVariantId: UUID!
-  inferenceRuntimeConfig: JSON = null
 
   """Environment variables for the service."""
   environ: EnvironmentVariablesInput = null
@@ -6457,16 +6812,16 @@ input ModelServiceConfigInput {
   """
   List of pre-start actions to execute before starting the model service.
   """
-  preStartActions: [PreStartActionInput!]!
+  preStartActions: [PreStartActionInput!] = null
 
   """Command to start the model service."""
   startCommand: [String!] = null
 
   """Shell configured for the model service."""
-  shell: String! = "/bin/bash"
+  shell: String = null
 
-  """Port number for the model service. Must be greater than 1."""
-  port: Int!
+  """Port number for the model service."""
+  port: Int = null
 
   """Health check configuration for the model service."""
   healthCheck: ModelHealthCheckInput = null
@@ -6558,738 +6913,771 @@ type Mutation {
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
   """
-  scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload!
+  scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload
 
   """
   Added in 25.14.0. Perform detailed scanning of specific models. Unlike the general scan_artifacts operation, this performs immediate detailed scanning of specified models including README content and file sizes. Returns artifact revisions with complete metadata ready for use
   """
-  scanArtifactModels(input: ScanArtifactModelsInput!): ScanArtifactModelsPayload!
+  scanArtifactModels(input: ScanArtifactModelsInput!): ScanArtifactModelsPayload
 
   """
   Added in 25.14.0. Import scanned artifact revisions from external registries. Downloads the actual files for the specified artifact revisions, transitioning them from SCANNED → PULLING → VERIFYING → AVAILABLE status. Returns background tasks that can be monitored for import progress. Once AVAILABLE, artifacts can be used by users in their sessions
   """
-  importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
+  importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload
 
   """
   Added in 25.16.0. Create or update user-level app configuration. The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. These settings will override domain-level settings when configurations are merged for this user. If user_id is not provided, the current user's configuration will be updated. Users can only modify their own configuration, but admins can modify any user's configuration
   """
-  upsertUserAppConfig(input: UpsertUserConfigInput!): UpsertUserConfigPayload!
+  upsertUserAppConfig(input: UpsertUserConfigInput!): UpsertUserConfigPayload
 
   """
   Added in 25.16.0. Delete user-level app configuration. After deletion, the user will still receive domain-level configuration values when configurations are merged, as domain settings remain unaffected. If user_id is not provided, the current user's configuration will be deleted. Users can only delete their own configuration, but admins can delete any user's configuration
   """
-  deleteUserAppConfig(input: DeleteUserConfigInput!): DeleteUserConfigPayload!
+  deleteUserAppConfig(input: DeleteUserConfigInput!): DeleteUserConfigPayload
 
   """
   Added in 25.15.0. Triggers artifact scanning on a remote reservoir registry. This mutation instructs a reservoir-type registry to initiate a scan of artifacts from its associated remote reservoir registry source. The scan process will discover and catalog artifacts available in the remote reservoir, making them accessible through the local reservoir registry. Requirements: - The delegator registry must be of type 'reservoir' - The delegator reservoir registry must have a valid remote registry configuration
   """
-  delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateScanArtifactsPayload!
+  delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateScanArtifactsPayload
 
   """
   Added in 25.15.0. Trigger import of artifact revisions from a remote reservoir registry. This mutation instructs a reservoir-type registry to import specific artifact revisions that were previously discovered during a scan from its remote registry. Note that this operation does not import the artifacts directly into the local registry, but only into the delegator reservoir's storage. Requirements: - The delegator registry must be of type 'reservoir' - The delegator registry must have a valid remote registry configuration
   """
-  delegateImportArtifacts(input: DelegateImportArtifactsInput!): DelegateImportArtifactsPayload!
+  delegateImportArtifacts(input: DelegateImportArtifactsInput!): DelegateImportArtifactsPayload
 
   """
   Added in 25.14.0. Update artifact metadata properties. Modifies artifact metadata such as readonly status and description. This operation does not affect the actual artifact files or revisions
   """
-  updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
+  updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload
 
   """
   Added in 25.15.0. Soft-delete artifacts from the system. Marks artifacts as deleted without permanently removing them. Deleted artifacts can be restored using the restore_artifacts mutation
   """
-  deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload!
+  deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload
 
   """
   Added in 25.15.0. Restore previously deleted artifacts. Reverses the soft-delete operation, making the artifacts available again for use in the system
   """
-  restoreArtifacts(input: RestoreArtifactsInput!): RestoreArtifactsPayload!
+  restoreArtifacts(input: RestoreArtifactsInput!): RestoreArtifactsPayload
 
   """
   Added in 25.14.0. Clean up stored artifact revision data to free storage space. Removes the downloaded files for the specified artifact revisions and transitions them back to SCANNED status. The metadata remains, allowing the artifacts to be re-imported later if needed. Use this operation to manage storage usage by removing unused artifacts
   """
-  cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload!
+  cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload
 
   """
   Added in 25.14.0. Cancel an in-progress artifact import operation. Stops the download process for the specified artifact revision and reverts its status back to SCANNED. The partially downloaded data is cleaned up
   """
-  cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!
+  cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload
 
   """Added in 26.4.2. Create a new container registry (admin only)."""
-  adminCreateContainerRegistryV2(input: CreateContainerRegistryInputGQL!): CreateContainerRegistryPayloadGQL!
+  adminCreateContainerRegistryV2(input: CreateContainerRegistryInputGQL!): CreateContainerRegistryPayloadGQL
 
   """Added in 26.4.2. Update a container registry (admin only)."""
-  adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInputGQL!): UpdateContainerRegistryPayloadGQL!
+  adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInputGQL!): UpdateContainerRegistryPayloadGQL
 
   """Added in 26.4.2. Delete a container registry (admin only)."""
-  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayloadGQL!
+  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayloadGQL
 
   """Added in 25.16.0. Create model deployment."""
-  createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload!
+  createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload
 
   """Added in 25.16.0. Update model deployment."""
-  updateModelDeployment(input: UpdateDeploymentInput!): UpdateDeploymentPayload!
+  updateModelDeployment(input: UpdateDeploymentInput!): UpdateDeploymentPayload
 
   """Added in 25.16.0. Delete model deployment."""
-  deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload!
+  deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload
 
   """
   Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers.
   """
-  syncReplicas(input: SyncReplicaInput!): SyncReplicaPayload!
+  syncReplicas(input: SyncReplicaInput!): SyncReplicaPayload
 
   """Added in 25.16.0. Add model revision."""
-  addModelRevision(input: AddRevisionInput!): AddRevisionPayload!
+  addModelRevision(input: AddRevisionInput!): AddRevisionPayload
 
   """
   Added in 26.4.3. Rebuild and activate a fresh revision for every active deployment (superadmin). Used to repair deployments whose current revision has stale or missing model_definition after backing store migrations.
   """
-  adminRefreshDeploymentRevisions: AdminRefreshDeploymentRevisionsPayload!
+  adminRefreshDeploymentRevisions: AdminRefreshDeploymentRevisionsPayload
 
   """
   Added in 26.4.2. Create or update the deployment policy for a given deployment (upsert semantics). If the deployment already has a policy, it is replaced entirely with the new configuration
   """
-  updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload!
+  updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload
 
   """Added in 26.4.2. Create a new notification channel (admin only)"""
-  adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload!
+  adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload
 
   """Added in 26.4.2. Update a notification channel (admin only)"""
-  adminUpdateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload!
+  adminUpdateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload
 
   """Added in 26.4.2. Delete a notification channel (admin only)"""
-  adminDeleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload!
+  adminDeleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload
 
   """Added in 26.4.2. Validate a notification channel (admin only)"""
-  adminValidateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload!
+  adminValidateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload
 
   """Added in 26.4.2. Create a new notification rule (admin only)"""
-  adminCreateNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload!
+  adminCreateNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload
 
   """Added in 26.4.2. Update a notification rule (admin only)"""
-  adminUpdateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload!
+  adminUpdateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload
 
   """Added in 26.4.2. Delete a notification rule (admin only)"""
-  adminDeleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload!
+  adminDeleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload
 
   """Added in 26.4.2. Validate a notification rule (admin only)"""
-  adminValidateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload!
+  adminValidateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload
 
   """
   Added in 26.2.0. Create or update domain-level app configuration (admin only). The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. All users in this domain will be affected by these settings when their configurations are merged, unless they have user-level configurations that override specific keys
   """
-  adminUpsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload!
+  adminUpsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload
 
   """
   Added in 26.2.0. Delete domain-level app configuration (admin only). All users in this domain may be affected by this deletion. After deletion, users will only receive their user-level configurations when configurations are merged, with no domain-level defaults
   """
-  adminDeleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload!
+  adminDeleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload
 
   """Added in 26.4.2. Create a new notification channel"""
-  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @deprecated(reason: "Use admin_create_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload @deprecated(reason: "Use admin_create_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.4.2. Update a notification channel"""
-  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload! @deprecated(reason: "Use admin_update_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload @deprecated(reason: "Use admin_update_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.4.2. Delete a notification channel"""
-  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload! @deprecated(reason: "Use admin_delete_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload @deprecated(reason: "Use admin_delete_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.4.2. Validate a notification channel"""
-  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload! @deprecated(reason: "Use admin_validate_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload @deprecated(reason: "Use admin_validate_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.4.2. Create a new notification rule"""
-  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload! @deprecated(reason: "Use admin_create_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload @deprecated(reason: "Use admin_create_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.4.2. Update a notification rule"""
-  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload! @deprecated(reason: "Use admin_update_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload @deprecated(reason: "Use admin_update_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.4.2. Delete a notification rule"""
-  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload! @deprecated(reason: "Use admin_delete_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload @deprecated(reason: "Use admin_delete_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 26.4.2. Validate a notification rule"""
-  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload! @deprecated(reason: "Use admin_validate_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload @deprecated(reason: "Use admin_validate_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 25.16.0. Create or update domain-level app configuration. The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. All users in this domain will be affected by these settings when their configurations are merged, unless they have user-level configurations that override specific keys. Requires admin privileges
   """
-  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload! @deprecated(reason: "Use admin_upsert_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload @deprecated(reason: "Use admin_upsert_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 25.16.0. Delete domain-level app configuration. All users in this domain may be affected by this deletion. After deletion, users will only receive their user-level configurations when configurations are merged, with no domain-level defaults. Requires admin privileges
   """
-  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload! @deprecated(reason: "Use admin_delete_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload @deprecated(reason: "Use admin_delete_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """Added in 25.14.0. Create an object storage."""
-  createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
+  createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload
 
   """Added in 25.14.0. Update an object storage."""
-  updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
+  updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload
 
   """Added in 25.16.0. Create auto scaling rule."""
-  createAutoScalingRule(input: CreateAutoScalingRuleInput!): CreateAutoScalingRulePayload!
+  createAutoScalingRule(input: CreateAutoScalingRuleInput!): CreateAutoScalingRulePayload
 
   """Added in 25.16.0. Update auto scaling rule."""
-  updateAutoScalingRule(input: UpdateAutoScalingRuleInput!): UpdateAutoScalingRulePayload!
+  updateAutoScalingRule(input: UpdateAutoScalingRuleInput!): UpdateAutoScalingRulePayload
 
   """Added in 25.16.0. Delete auto scaling rule."""
-  deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload!
+  deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload
 
   """Added in 25.14.0. Delete an object storage."""
-  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
+  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload
 
   """Added in 25.16.0. Create a new VFS storage"""
-  createVFSStorage(input: CreateVFSStorageInput!): CreateVFSStoragePayload!
+  createVFSStorage(input: CreateVFSStorageInput!): CreateVFSStoragePayload
 
   """Added in 25.16.0. Update an existing VFS storage"""
-  updateVFSStorage(input: UpdateVFSStorageInput!): UpdateVFSStoragePayload!
+  updateVFSStorage(input: UpdateVFSStorageInput!): UpdateVFSStoragePayload
 
   """Added in 25.16.0. Delete a VFS storage"""
-  deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload!
+  deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload
 
   """Added in 25.15.0. Registers a new namespace within a storage"""
-  registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload!
+  registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload
 
   """Added in 25.15.0. Unregisters an existing namespace from a storage"""
-  unregisterStorageNamespace(input: UnregisterStorageNamespaceInput!): UnregisterStorageNamespacePayload!
+  unregisterStorageNamespace(input: UnregisterStorageNamespaceInput!): UnregisterStorageNamespacePayload
 
   """Added in 25.14.0. Create huggingface registry."""
-  createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload!
+  createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload
 
   """Added in 25.14.0. Update huggingface registry."""
-  updateHuggingfaceRegistry(input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload!
+  updateHuggingfaceRegistry(input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload
 
   """Added in 25.14.0. Delete huggingface registry."""
-  deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
+  deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload
 
   """Added in 25.14.0. Create reservoir registry."""
-  createReservoirRegistry(input: CreateReservoirRegistryInput!): CreateReservoirRegistryPayload!
+  createReservoirRegistry(input: CreateReservoirRegistryInput!): CreateReservoirRegistryPayload
 
   """Added in 25.14.0. Update reservoir registry."""
-  updateReservoirRegistry(input: UpdateReservoirRegistryInput!): UpdateReservoirRegistryPayload!
+  updateReservoirRegistry(input: UpdateReservoirRegistryInput!): UpdateReservoirRegistryPayload
 
   """Added in 25.14.0. Delete reservoir registry."""
-  deleteReservoirRegistry(input: DeleteReservoirRegistryInput!): DeleteReservoirRegistryPayload!
+  deleteReservoirRegistry(input: DeleteReservoirRegistryInput!): DeleteReservoirRegistryPayload
 
   """Added in 25.14.0. Get a presigned download URL."""
-  getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload!
+  getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload
 
   """Added in 25.14.0. Get a presigned upload URL."""
-  getPresignedUploadUrl(input: GetPresignedUploadURLInput!): GetPresignedUploadURLPayload!
+  getPresignedUploadUrl(input: GetPresignedUploadURLInput!): GetPresignedUploadURLPayload
 
   """
   Added in 25.14.0. Approve an artifact revision for general use. Admin-only operation to approve artifact revisions, typically used in environments with approval workflows for artifact deployment
   """
-  approveArtifactRevision(input: ApproveArtifactInput!): ApproveArtifactPayload!
+  approveArtifactRevision(input: ApproveArtifactInput!): ApproveArtifactPayload
 
   """
   Added in 25.14.0. Reject an artifact revision, preventing its use. Admin-only operation to reject artifact revisions, typically used in environments with approval workflows for artifact deployment
   """
-  rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload!
+  rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload
 
   """Added in 25.16.0. Create access token."""
-  createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload!
+  createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload
 
   """Added in UNRELEASED. Delete access token."""
-  deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload!
+  deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload
 
   """
   Added in 25.19.0. Activate a specific revision to be the current revision
   """
-  activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload!
+  activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload
 
   """Added in 25.19.0. Update the traffic status of a route"""
-  updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload!
+  updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload
 
   """
   Added in 26.2.0. Upsert domain fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload!
+  adminUpsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload
 
   """
   Added in 26.2.0. Upsert project fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload!
+  adminUpsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload
 
   """
   Added in 26.2.0. Upsert user fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload!
+  adminUpsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload
 
   """
   Added in 26.2.0. Bulk upsert domain fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload!
+  adminBulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload
 
   """
   Added in 26.2.0. Bulk upsert project fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload!
+  adminBulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload
 
   """
   Added in 26.2.0. Bulk upsert user fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do
   """
-  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload!
+  adminBulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload
 
   """
   Added in 26.1.0. Upsert domain fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload! @deprecated(reason: "Use admin_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  upsertDomainFairShareWeight(input: UpsertDomainFairShareWeightInput!): UpsertDomainFairShareWeightPayload @deprecated(reason: "Use admin_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Upsert project fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload! @deprecated(reason: "Use admin_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  upsertProjectFairShareWeight(input: UpsertProjectFairShareWeightInput!): UpsertProjectFairShareWeightPayload @deprecated(reason: "Use admin_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does
   """
-  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload! @deprecated(reason: "Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  upsertUserFairShareWeight(input: UpsertUserFairShareWeightInput!): UpsertUserFairShareWeightPayload @deprecated(reason: "Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Bulk upsert domain fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload! @deprecated(reason: "Use admin_bulk_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertDomainFairShareWeight(input: BulkUpsertDomainFairShareWeightInput!): BulkUpsertDomainFairShareWeightPayload @deprecated(reason: "Use admin_bulk_upsert_domain_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Bulk upsert project fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload! @deprecated(reason: "Use admin_bulk_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertProjectFairShareWeight(input: BulkUpsertProjectFairShareWeightInput!): BulkUpsertProjectFairShareWeightPayload @deprecated(reason: "Use admin_bulk_upsert_project_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.1.0. Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do
   """
-  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload! @deprecated(reason: "Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  bulkUpsertUserFairShareWeight(input: BulkUpsertUserFairShareWeightInput!): BulkUpsertUserFairShareWeightPayload @deprecated(reason: "Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.2.0. Update fair share configuration for a resource group (admin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
   """
-  adminUpdateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload!
+  adminUpdateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload
 
   """
   Added in 26.2.0. Update resource group configuration (admin only). Only provided fields are updated; others retain their existing values. Supports all configuration fields except fair_share (use separate mutation).
   """
-  adminUpdateResourceGroup(input: UpdateResourceGroupInput!): UpdateResourceGroupPayload!
+  adminUpdateResourceGroup(input: UpdateResourceGroupInput!): UpdateResourceGroupPayload
 
   """Added in 26.4.2. Create a new resource group (admin only)."""
-  adminCreateResourceGroupV2(input: CreateResourceGroupInput!): CreateResourceGroupPayloadGQL!
+  adminCreateResourceGroupV2(input: CreateResourceGroupInput!): CreateResourceGroupPayloadGQL
 
   """Added in 26.4.2. Delete a resource group (admin only)."""
-  adminDeleteResourceGroupV2(name: String!): DeleteResourceGroupPayloadGQL!
+  adminDeleteResourceGroupV2(name: String!): DeleteResourceGroupPayloadGQL
 
   """
   Added in 26.4.2. Update allowed resource groups for a domain (admin only).
   """
-  adminUpdateAllowedResourceGroupsForDomainV2(input: UpdateAllowedResourceGroupsForDomainInput!): AllowedResourceGroupsPayload!
+  adminUpdateAllowedResourceGroupsForDomainV2(input: UpdateAllowedResourceGroupsForDomainInput!): AllowedResourceGroupsPayload
 
   """
   Added in 26.4.2. Update allowed resource groups for a project (admin only).
   """
-  adminUpdateAllowedResourceGroupsForProjectV2(input: UpdateAllowedResourceGroupsForProjectInput!): AllowedResourceGroupsPayload!
+  adminUpdateAllowedResourceGroupsForProjectV2(input: UpdateAllowedResourceGroupsForProjectInput!): AllowedResourceGroupsPayload
 
   """
   Added in 26.4.2. Update allowed domains for a resource group (admin only).
   """
-  adminUpdateAllowedDomainsForResourceGroupV2(input: UpdateAllowedDomainsForResourceGroupInput!): AllowedDomainsPayload!
+  adminUpdateAllowedDomainsForResourceGroupV2(input: UpdateAllowedDomainsForResourceGroupInput!): AllowedDomainsPayload
 
   """
   Added in 26.4.2. Update allowed projects for a resource group (admin only).
   """
-  adminUpdateAllowedProjectsForResourceGroupV2(input: UpdateAllowedProjectsForResourceGroupInput!): AllowedProjectsPayload!
+  adminUpdateAllowedProjectsForResourceGroupV2(input: UpdateAllowedProjectsForResourceGroupInput!): AllowedProjectsPayload
 
   """
   Added in UNRELEASED. Fully replace a resource group's ``default_deployment_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New deployments created in this resource group snapshot the new default; existing deployments are not affected.
   """
-  replaceResourceGroupDefaultDeploymentOptions(input: ReplaceResourceGroupDefaultDeploymentOptionsInput!): ReplaceResourceGroupDefaultDeploymentOptionsPayload!
+  replaceResourceGroupDefaultDeploymentOptions(input: ReplaceResourceGroupDefaultDeploymentOptionsInput!): ReplaceResourceGroupDefaultDeploymentOptionsPayload
 
   """
   Added in UNRELEASED. Fully replace a resource group's ``default_session_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New sessions created in this resource group consult the new default via the scheduling controller's options resolver at enqueue time; already-enqueued sessions keep the frozen options they were enqueued with.
   """
-  replaceResourceGroupDefaultSessionOptions(input: ReplaceResourceGroupDefaultSessionOptionsInput!): ReplaceResourceGroupDefaultSessionOptionsPayload!
+  replaceResourceGroupDefaultSessionOptions(input: ReplaceResourceGroupDefaultSessionOptionsInput!): ReplaceResourceGroupDefaultSessionOptionsPayload
 
   """
   Added in 26.2.0. Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.
   """
-  updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @deprecated(reason: "Use admin_update_resource_group_fair_share_spec instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
+  updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload @deprecated(reason: "Use admin_update_resource_group_fair_share_spec instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
   Added in 26.4.2. Create a new domain (admin only). Requires superadmin privileges.
   """
-  adminCreateDomainV2(input: CreateDomainInputGQL!): DomainPayloadGQL!
+  adminCreateDomainV2(input: CreateDomainInputGQL!): DomainPayloadGQL
 
   """
   Added in 26.4.2. Update a domain (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateDomainV2(domainName: String!, input: UpdateDomainInputGQL!): DomainPayloadGQL!
+  adminUpdateDomainV2(domainName: String!, input: UpdateDomainInputGQL!): DomainPayloadGQL
 
   """
   Added in 26.4.2. Soft-delete a domain (admin only). Requires superadmin privileges.
   """
-  adminDeleteDomainV2(domainName: String!): DeleteDomainPayloadGQL!
+  adminDeleteDomainV2(domainName: String!): DeleteDomainPayloadGQL
 
   """
   Added in 26.4.2. Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.
   """
-  adminPurgeDomainV2(domainName: String!): PurgeDomainPayloadGQL!
+  adminPurgeDomainV2(domainName: String!): PurgeDomainPayloadGQL
 
   """
   Added in 26.4.2. Create a new project (admin only). Requires superadmin privileges.
   """
-  adminCreateProjectV2(input: CreateProjectInputGQL!): ProjectPayloadGQL!
+  adminCreateProjectV2(input: CreateProjectInputGQL!): ProjectPayloadGQL
 
   """
   Added in 26.4.2. Update a project (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInputGQL!): ProjectPayloadGQL!
+  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInputGQL!): ProjectPayloadGQL
 
   """
   Added in 26.4.2. Soft-delete a project (admin only). Requires superadmin privileges.
   """
-  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayloadGQL!
+  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayloadGQL
 
   """
   Added in 26.4.2. Permanently purge a project and all associated data (admin only). Requires superadmin privileges.
   """
-  adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayloadGQL!
+  adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayloadGQL
 
   """
   Added in 26.4.2. Unassign users from a project. RBAC validates project admin permission.
   """
-  unassignUsersFromProjectV2(projectId: UUID!, input: UnassignUsersFromProjectInput!): UnassignUsersFromProjectPayload!
+  unassignUsersFromProjectV2(projectId: UUID!, input: UnassignUsersFromProjectInput!): UnassignUsersFromProjectPayload
 
   """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user
   """
-  adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload!
+  adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload
 
   """
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications
   """
-  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
+  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload
 
   """
   Added in 26.3.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications
   """
-  adminBulkUpdateUsersV2(input: BulkUpdateUserV2Input!): BulkUpdateUsersV2Payload!
+  adminBulkUpdateUsersV2(input: BulkUpdateUserV2Input!): BulkUpdateUsersV2Payload
 
   """
   Added in 26.3.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated
   """
-  adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload!
+  adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload
 
   """
   Added in 26.2.0. Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role
   """
-  updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload!
+  updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload
 
   """
   Added in 26.2.0. Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data
   """
-  adminDeleteUserV2(userId: UUID!): DeleteUserV2Payload!
+  adminDeleteUserV2(userId: UUID!): DeleteUserV2Payload
 
   """
   Added in 26.2.0. Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data
   """
-  adminDeleteUsersV2(input: DeleteUsersV2Input!): DeleteUsersV2Payload!
+  adminDeleteUsersV2(input: DeleteUsersV2Input!): DeleteUsersV2Payload
 
   """
   Added in 26.2.0. Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted
   """
-  adminPurgeUserV2(input: PurgeUserV2Input!): PurgeUserV2Payload!
+  adminPurgeUserV2(input: PurgeUserV2Input!): PurgeUserV2Payload
 
   """
   Added in 26.3.0. Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted
   """
-  adminBulkPurgeUsersV2(input: BulkPurgeUsersV2Input!): BulkPurgeUsersV2Payload!
+  adminBulkPurgeUsersV2(input: BulkPurgeUsersV2Input!): BulkPurgeUsersV2Payload
 
   """
   Added in 26.4.2. Issue a new keypair for the current user. Settings (resource_policy, rate_limit, is_admin) are inherited from the main keypair. The secret_key is only returned at creation time.
   """
-  issueMyKeypair: IssueMyKeypairPayload!
+  issueMyKeypair: IssueMyKeypairPayload
 
   """
   Added in 26.4.2. Revoke a keypair owned by the current user. The main access key cannot be revoked — switch it first.
   """
-  revokeMyKeypair(input: RevokeMyKeypairInput!): RevokeMyKeypairPayload!
+  revokeMyKeypair(input: RevokeMyKeypairInput!): RevokeMyKeypairPayload
 
   """
   Added in 26.4.2. Switch the main access key for the current user. The target keypair must be active and owned by the user.
   """
-  switchMyMainAccessKey(input: SwitchMyMainAccessKeyInput!): SwitchMyMainAccessKeyPayload!
+  switchMyMainAccessKey(input: SwitchMyMainAccessKeyInput!): SwitchMyMainAccessKeyPayload
 
   """
   Added in 26.4.2. Update a keypair owned by the current user (e.g. toggle active state). The keypair must be owned by the current user.
   """
-  updateMyKeypair(input: UpdateMyKeypairInput!): UpdateMyKeypairPayload!
+  updateMyKeypair(input: UpdateMyKeypairInput!): UpdateMyKeypairPayload
 
   """
   Added in 26.4.2. Admin creates a keypair for a specified user. The secret_key is only returned at creation time.
   """
-  adminCreateKeypairV2(input: AdminCreateKeypairInput!): AdminCreateKeypairPayload!
+  adminCreateKeypairV2(input: AdminCreateKeypairInput!): AdminCreateKeypairPayload
 
   """
   Added in 26.4.2. Admin updates a keypair (e.g. toggle active state, change resource policy).
   """
-  adminUpdateKeypairV2(input: AdminUpdateKeypairInput!): AdminUpdateKeypairPayload!
+  adminUpdateKeypairV2(input: AdminUpdateKeypairInput!): AdminUpdateKeypairPayload
 
   """
   Added in 26.4.2. Admin deletes a keypair by access key. Cannot delete a main access key.
   """
-  adminDeleteKeypairV2(accessKey: String!): AdminDeleteKeypairPayload!
+  adminDeleteKeypairV2(accessKey: String!): AdminDeleteKeypairPayload
 
   """Added in 26.4.2. Admin registers (overwrites) a user's SSH keypair."""
-  adminRegisterSshKeypairV2(input: AdminRegisterSSHKeypairInput!): AdminRegisterSSHKeypairPayload!
+  adminRegisterSshKeypairV2(input: AdminRegisterSSHKeypairInput!): AdminRegisterSSHKeypairPayload
 
   """Added in 26.4.2. Admin clears a user's SSH keypair."""
-  adminDeleteSshKeypairV2(accessKey: String!): AdminDeleteSSHKeypairPayload!
+  adminDeleteSshKeypairV2(accessKey: String!): AdminDeleteSSHKeypairPayload
 
   """Added in 26.4.2. Revoke a login session. (admin only)"""
-  adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload!
+  adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload
 
   """Added in 26.4.2. Revoke a login session owned by the current user."""
-  myRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload!
+  myRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload
 
   """
   Added in 26.4.2. Clear the failed-login rate limit block for a user. (admin only)
   """
-  adminUnblockUser(username: String!): UnblockUserPayload!
+  adminUnblockUser(username: String!): UnblockUserPayload
 
   """
   Added in 26.4.0. Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention)
   """
-  updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload!
+  updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload
 
   """Added in 26.3.0. Create a new query definition (admin only)"""
-  adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload!
+  adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload
 
   """Added in 26.3.0. Modify an existing query definition (admin only)."""
-  adminModifyPrometheusQueryPreset(id: ID!, input: ModifyQueryDefinitionInput!): ModifyQueryDefinitionPayload!
+  adminModifyPrometheusQueryPreset(id: ID!, input: ModifyQueryDefinitionInput!): ModifyQueryDefinitionPayload
 
   """Added in 26.3.0. Delete a query definition (admin only)"""
-  adminDeletePrometheusQueryPreset(id: ID!): DeleteQueryDefinitionPayload!
+  adminDeletePrometheusQueryPreset(id: ID!): DeleteQueryDefinitionPayload
 
   """Added in 26.3.0. Create a new query preset category (admin only)."""
-  adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload!
+  adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload
 
   """Added in 26.3.0. Delete a query preset category (admin only)."""
-  adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload!
+  adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload
+
+  """Added in UNRELEASED. Create a new role preset (admin only)."""
+  adminCreateRolePreset(input: CreateRolePresetInput!): CreateRolePresetPayload
+
+  """
+  Added in UNRELEASED. Update an existing role preset's metadata (admin only).
+  """
+  adminUpdateRolePreset(input: UpdateRolePresetInput!): UpdateRolePresetPayload
+
+  """Added in UNRELEASED. Bulk-soft-delete role presets (admin only)."""
+  adminDeleteRolePresets(input: BulkDeleteRolePresetsInput!): BulkDeleteRolePresetsPayload
+
+  """
+  Added in UNRELEASED. Bulk-restore soft-deleted role presets (admin only).
+  """
+  adminRestoreRolePresets(input: BulkRestoreRolePresetsInput!): BulkRestoreRolePresetsPayload
+
+  """Added in UNRELEASED. Bulk-hard-delete role presets (admin only)."""
+  adminPurgeRolePresets(input: BulkPurgeRolePresetsInput!): BulkPurgeRolePresetsPayload
+
+  """
+  Added in UNRELEASED. Bulk-add permission entries to an existing role preset (admin only).
+  """
+  adminBulkAddRolePresetPermissions(input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload
+
+  """
+  Added in UNRELEASED. Bulk-remove permission entries from a role preset (admin only).
+  """
+  adminBulkRemoveRolePresetPermissions(input: BulkRemoveRolePermissionPresetsInput!): BulkRemoveRolePermissionPresetsPayload
 
   """Added in 26.3.0. Create a new role (admin only)."""
-  adminCreateRole(input: CreateRoleInput!): Role!
+  adminCreateRole(input: CreateRoleInput!): Role
 
   """Added in 26.3.0. Update an existing role (admin only)."""
-  adminUpdateRole(input: UpdateRoleInput!): Role!
+  adminUpdateRole(input: UpdateRoleInput!): Role
 
   """Added in 26.3.0. Soft-delete a role (admin only)."""
-  adminDeleteRole(input: DeleteRoleInput!): DeleteRolePayload!
+  adminDeleteRole(input: DeleteRoleInput!): DeleteRolePayload
 
   """Added in 26.3.0. Permanently remove a role (admin only)."""
-  adminPurgeRole(input: PurgeRoleInput!): PurgeRolePayload!
+  adminPurgeRole(input: PurgeRoleInput!): PurgeRolePayload
 
   """Added in 26.3.0. Create a scoped permission (admin only)."""
-  adminCreatePermission(input: CreatePermissionInput!): Permission!
+  adminCreatePermission(input: CreatePermissionInput!): Permission
 
   """Added in 26.3.0. Update a scoped permission (admin only)."""
-  adminUpdatePermission(input: UpdatePermissionInput!): Permission!
+  adminUpdatePermission(input: UpdatePermissionInput!): Permission
 
   """Added in 26.3.0. Delete a scoped permission (admin only)."""
-  adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload!
+  adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload
 
   """Added in 26.3.0. Assign a role to a user (admin only)."""
-  adminAssignRole(input: AssignRoleInput!): RoleAssignment!
+  adminAssignRole(input: AssignRoleInput!): RoleAssignment
 
   """Added in 26.3.0. Revoke a role from a user (admin only)."""
-  adminRevokeRole(input: RevokeRoleInput!): RoleAssignment!
+  adminRevokeRole(input: RevokeRoleInput!): RoleAssignment
 
   """Added in 26.3.0. Bulk assign a role to multiple users (admin only)."""
-  adminBulkAssignRole(input: BulkAssignRoleInput!): BulkAssignRolePayload!
+  adminBulkAssignRole(input: BulkAssignRoleInput!): BulkAssignRolePayload
 
   """Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."""
-  adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload!
+  adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload
 
   """
   Added in UNRELEASED. Bulk-insert scoped permission rows across one or more roles (admin only).
   """
-  adminBulkAddRolePermissions(input: BulkAddRolePermissionsInput!): BulkAddRolePermissionsPayload!
+  adminBulkAddRolePermissions(input: BulkAddRolePermissionsInput!): BulkAddRolePermissionsPayload
 
   """
   Added in UNRELEASED. Bulk-delete permission rows by primary key (admin only).
   """
-  adminBulkRemoveRolePermissions(input: BulkRemoveRolePermissionsInput!): BulkRemoveRolePermissionsPayload!
+  adminBulkRemoveRolePermissions(input: BulkRemoveRolePermissionsInput!): BulkRemoveRolePermissionsPayload
 
   """
   Added in UNRELEASED. Replace one role's entire scoped-permission set (admin only).
   """
-  adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload!
+  adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload
 
   """Added in UNRELEASED. Create role invitations by email."""
-  createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload!
+  createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload
 
   """Added in UNRELEASED. Accept a pending role invitation."""
-  acceptRoleInvitation(input: AcceptRoleInvitationInput!): RoleInvitation!
+  acceptRoleInvitation(input: AcceptRoleInvitationInput!): RoleInvitation
 
   """Added in UNRELEASED. Reject a pending role invitation."""
-  rejectRoleInvitation(input: RejectRoleInvitationInput!): RoleInvitation!
+  rejectRoleInvitation(input: RejectRoleInvitationInput!): RoleInvitation
 
   """Added in UNRELEASED. Cancel a pending role invitation (admin only)."""
-  adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation!
+  adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation
 
   """Added in 26.4.2. Create a new keypair resource policy (admin only)."""
-  adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInputGQL!): CreateKeypairResourcePolicyPayloadGQL!
+  adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInputGQL!): CreateKeypairResourcePolicyPayloadGQL
 
   """
   Added in 26.4.2. Update a keypair resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateKeypairResourcePolicyV2(name: String!, input: UpdateKeypairResourcePolicyInputGQL!): UpdateKeypairResourcePolicyPayloadGQL!
+  adminUpdateKeypairResourcePolicyV2(name: String!, input: UpdateKeypairResourcePolicyInputGQL!): UpdateKeypairResourcePolicyPayloadGQL
 
   """Added in 26.4.2. Delete a keypair resource policy (admin only)."""
-  adminDeleteKeypairResourcePolicyV2(name: String!): DeleteKeypairResourcePolicyPayloadGQL!
+  adminDeleteKeypairResourcePolicyV2(name: String!): DeleteKeypairResourcePolicyPayloadGQL
 
   """Added in 26.4.2. Create a new user resource policy (admin only)."""
-  adminCreateUserResourcePolicyV2(input: CreateUserResourcePolicyInputGQL!): CreateUserResourcePolicyPayloadGQL!
+  adminCreateUserResourcePolicyV2(input: CreateUserResourcePolicyInputGQL!): CreateUserResourcePolicyPayloadGQL
 
   """
   Added in 26.4.2. Update a user resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateUserResourcePolicyV2(name: String!, input: UpdateUserResourcePolicyInputGQL!): UpdateUserResourcePolicyPayloadGQL!
+  adminUpdateUserResourcePolicyV2(name: String!, input: UpdateUserResourcePolicyInputGQL!): UpdateUserResourcePolicyPayloadGQL
 
   """Added in 26.4.2. Delete a user resource policy (admin only)."""
-  adminDeleteUserResourcePolicyV2(name: String!): DeleteUserResourcePolicyPayloadGQL!
+  adminDeleteUserResourcePolicyV2(name: String!): DeleteUserResourcePolicyPayloadGQL
 
   """Added in 26.4.2. Create a new project resource policy (admin only)."""
-  adminCreateProjectResourcePolicyV2(input: CreateProjectResourcePolicyInputGQL!): CreateProjectResourcePolicyPayloadGQL!
+  adminCreateProjectResourcePolicyV2(input: CreateProjectResourcePolicyInputGQL!): CreateProjectResourcePolicyPayloadGQL
 
   """
   Added in 26.4.2. Update a project resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateProjectResourcePolicyV2(name: String!, input: UpdateProjectResourcePolicyInputGQL!): UpdateProjectResourcePolicyPayloadGQL!
+  adminUpdateProjectResourcePolicyV2(name: String!, input: UpdateProjectResourcePolicyInputGQL!): UpdateProjectResourcePolicyPayloadGQL
 
   """Added in 26.4.2. Delete a project resource policy (admin only)."""
-  adminDeleteProjectResourcePolicyV2(name: String!): DeleteProjectResourcePolicyPayloadGQL!
+  adminDeleteProjectResourcePolicyV2(name: String!): DeleteProjectResourcePolicyPayloadGQL
 
   """Added in 26.4.2. Create a new resource preset (admin only)."""
-  adminCreateResourcePresetV2(input: CreateResourcePresetV2Input!): CreateResourcePresetPayloadGQL!
+  adminCreateResourcePresetV2(input: CreateResourcePresetV2Input!): CreateResourcePresetPayloadGQL
 
   """Added in 26.4.2. Update a resource preset (admin only)."""
-  adminUpdateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayloadGQL!
+  adminUpdateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayloadGQL
 
   """Added in 26.4.2. Delete a resource preset (admin only)."""
-  adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL!
+  adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL
 
   """Added in 26.4.2. Create a new login client type (super admin only)."""
-  adminCreateLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload!
+  adminCreateLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload
 
   """Added in 26.4.2. Update a login client type (super admin only)."""
-  adminUpdateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload!
+  adminUpdateLoginClientType(id: UUID!, input: UpdateLoginClientTypeInput!): UpdateLoginClientTypePayload
 
   """Added in 26.4.2. Delete a login client type (super admin only)."""
-  adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload!
+  adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload
 
   """Added in 26.4.2. Create a new runtime variant (superadmin only)."""
-  adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayloadGQL!
+  adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayloadGQL
 
   """Added in 26.4.2. Update a runtime variant (superadmin only)."""
-  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayloadGQL!
+  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayloadGQL
 
   """Added in 26.4.2. Delete a runtime variant (superadmin only)."""
-  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL!
+  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL
 
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
-  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayloadGQL!
+  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayloadGQL
 
   """Added in 26.4.2. Create a runtime variant preset (superadmin only)."""
-  adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayloadGQL!
+  adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayloadGQL
 
   """Added in 26.4.2. Update a runtime variant preset (superadmin only)."""
-  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayloadGQL!
+  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayloadGQL
 
   """Added in 26.4.2. Delete a runtime variant preset (superadmin only)."""
-  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL!
+  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL
 
   """Added in 26.4.2. Create a deployment revision preset (admin only)."""
-  adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL!
+  adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL
 
   """Added in 26.4.2. Update a deployment revision preset (admin only)."""
-  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL!
+  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL
 
   """Added in 26.4.2. Delete a deployment revision preset (admin only)."""
-  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL!
+  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL
 
   """Added in 26.4.2. Create a model card (admin only)."""
-  adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL!
+  adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL
 
   """Added in 26.4.2. Update a model card (admin only)."""
-  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL!
+  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL
 
   """Added in 26.4.2. Delete a model card (admin only)."""
-  adminDeleteModelCardV2(id: UUID!): DeleteModelCardPayloadGQL!
+  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL
 
-  """Added in 26.4.2. Delete multiple model cards (admin only)."""
-  adminDeleteModelCardsV2(input: DeleteModelCardsV2Input!): DeleteModelCardsV2Payload!
+  """
+  Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
+  """
+  adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload
 
   """
   Added in 26.4.2. Scan a MODEL_STORE project and upsert model cards from vfolder model-definition.yaml files.
   """
-  scanProjectModelCardsV2(projectId: UUID!): ScanProjectModelCardsV2Payload!
+  scanProjectModelCardsV2(projectId: UUID!): ScanProjectModelCardsV2Payload
 
   """
   Added in 26.4.2. Deploy a model card by creating a deployment with a revision preset.
   """
-  deployModelCardV2(cardId: UUID!, input: DeployModelCardV2Input!): DeployModelCardV2Payload!
+  deployModelCardV2(cardId: UUID!, input: DeployModelCardV2Input!): DeployModelCardV2Payload
 
   """Added in 26.4.2. Create a new virtual folder."""
-  createVfolderV2(input: CreateVFolderV2Input!): CreateVFolderV2Payload!
+  createVfolderV2(input: CreateVFolderV2Input!): CreateVFolderV2Payload
 
   """
   Added in UNRELEASED. Create a virtual folder owned by the specified project. Requires project-scoped CREATE permission.
   """
-  createVFolderInProject(projectId: UUID!, input: CreateVFolderInScopeInput!): CreateVFolderV2Payload!
+  createVFolderInProject(projectId: UUID!, input: CreateVFolderInScopeInput!): CreateVFolderV2Payload
 
   """Added in 26.4.2. Soft-delete a virtual folder (move to trash)."""
-  deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload!
+  deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload
 
   """Added in 26.4.2. Permanently purge a virtual folder."""
-  purgeVfolderV2(vfolderId: UUID!): PurgeVFolderV2Payload!
+  purgeVfolderV2(vfolderId: UUID!, options: PurgeVFolderOptionsInput = null): PurgeVFolderV2Payload
 
   """
   Added in UNRELEASED. Restore a trashed virtual folder. RBAC enforced via scope chain.
   """
-  restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload!
+  restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload
 
   """Added in 26.4.2. Deploy a deployment directly from a model VFolder."""
-  deployVfolderV2(vfolderId: UUID!, input: DeployVFolderV2Input!): DeployVFolderV2Payload!
+  deployVfolderV2(vfolderId: UUID!, input: DeployVFolderV2Input!): DeployVFolderV2Payload
 
   """Added in 26.4.2. Soft-delete multiple virtual folders."""
-  bulkDeleteVfoldersV2(input: BulkDeleteVFoldersV2Input!): BulkDeleteVFoldersV2Payload!
+  bulkDeleteVfoldersV2(input: BulkDeleteVFoldersV2Input!): BulkDeleteVFoldersV2Payload
 
   """Added in 26.4.2. Permanently purge multiple virtual folders."""
-  bulkPurgeVfoldersV2(input: BulkPurgeVFoldersV2Input!): BulkPurgeVFoldersV2Payload!
+  bulkPurgeVfoldersV2(input: BulkPurgeVFoldersV2Input!): BulkPurgeVFoldersV2Payload
 
   """Added in 26.4.2. Clone a virtual folder."""
-  cloneVfolderV2(vfolderId: UUID!, input: CloneVFolderV2Input!): CloneVFolderV2Payload!
+  cloneVfolderV2(vfolderId: UUID!, input: CloneVFolderV2Input!): CloneVFolderV2Payload
 
   """Added in 26.4.2. List files in a virtual folder."""
-  vfolderListFilesV2(vfolderId: UUID!, input: ListFilesV2Input!): ListFilesV2Payload!
+  vfolderListFilesV2(vfolderId: UUID!, input: ListFilesV2Input!): ListFilesV2Payload
 
   """Added in 26.4.2. Create directories inside a virtual folder."""
-  vfolderMkdirV2(vfolderId: UUID!, input: MkdirV2Input!): MkdirV2Payload!
+  vfolderMkdirV2(vfolderId: UUID!, input: MkdirV2Input!): MkdirV2Payload
 
   """Added in 26.4.2. Move a file within a virtual folder."""
-  vfolderMoveFileV2(vfolderId: UUID!, input: MoveFileV2Input!): MoveFileV2Payload!
+  vfolderMoveFileV2(vfolderId: UUID!, input: MoveFileV2Input!): MoveFileV2Payload
 
   """Added in 26.4.2. Delete files inside a virtual folder."""
-  vfolderDeleteFilesV2(vfolderId: UUID!, input: DeleteFilesV2Input!): DeleteFilesV2Payload!
+  vfolderDeleteFilesV2(vfolderId: UUID!, input: DeleteFilesV2Input!): DeleteFilesV2Payload
 
   """Added in 26.4.2. Create an upload session for a virtual folder."""
-  vfolderCreateUploadSessionV2(vfolderId: UUID!, input: CreateUploadSessionV2Input!): CreateUploadSessionV2Payload!
+  vfolderCreateUploadSessionV2(vfolderId: UUID!, input: CreateUploadSessionV2Input!): CreateUploadSessionV2Payload
 
   """Added in 26.4.2. Create a download session for a virtual folder."""
-  vfolderCreateDownloadSessionV2(vfolderId: UUID!, input: CreateDownloadSessionV2Input!): CreateDownloadSessionV2Payload!
+  vfolderCreateDownloadSessionV2(vfolderId: UUID!, input: CreateDownloadSessionV2Input!): CreateDownloadSessionV2Payload
 
   """Added in 26.4.2. Enqueue a new compute session."""
-  enqueueSession(input: EnqueueSessionInput!): EnqueueSessionPayload!
+  enqueueSession(input: EnqueueSessionInput!): EnqueueSessionPayload
 
-  """Added in 26.4.2. Terminate sessions within a project scope."""
-  terminateProjectSessionsV2(scope: ProjectSessionV2Scope!, sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload!
+  """
+  Added in UNRELEASED. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  """
+  terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload
 }
 
 """
@@ -7525,7 +7913,7 @@ type ObjectStorage implements Node {
   region: String!
 
   """The namespaces of this entity."""
-  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): StorageNamespaceConnection!
+  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): StorageNamespaceConnection
 }
 
 """
@@ -7575,6 +7963,23 @@ enum OperationType {
   GRANT_UPDATE
   GRANT_SOFT_DELETE
   GRANT_HARD_DELETE
+}
+
+"""
+Added in UNRELEASED. Filter for permission operation columns. Supports equals / in / not_equals / not_in.
+"""
+input OperationTypeFilter {
+  """Matches rows with this exact operation."""
+  equals: OperationType = null
+
+  """Matches rows whose operation is in this list."""
+  in: [OperationType!] = null
+
+  """Excludes rows with this exact operation."""
+  notEquals: OperationType = null
+
+  """Excludes rows whose operation is in this list."""
+  notIn: [OperationType!] = null
 }
 
 """Added in 24.09.0. Sort direction for ordering"""
@@ -7637,9 +8042,10 @@ type PermissionEdge {
 
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
-  roleId: UUID = null
-  scopeType: RBACElementType = null
-  entityType: RBACElementType = null
+  roleId: UUIDFilter = null
+  scopeType: RBACElementTypeFilter = null
+  scopeId: StringFilter = null
+  entityType: RBACElementTypeFilter = null
   createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
@@ -7650,10 +8056,10 @@ input PermissionFilter {
 Added in 26.4.0. Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.
 """
 input PermissionNestedFilter {
-  scopeId: String = null
-  scopeType: RBACElementType = null
-  entityType: RBACElementType = null
-  operation: OperationType = null
+  scopeId: StringFilter = null
+  scopeType: RBACElementTypeFilter = null
+  entityType: RBACElementTypeFilter = null
+  operation: OperationTypeFilter = null
   AND: [PermissionNestedFilter!] = null
   OR: [PermissionNestedFilter!] = null
   NOT: [PermissionNestedFilter!] = null
@@ -7806,10 +8212,8 @@ input PresetDeploymentStrategyInput {
 Added in 26.4.2. Container execution configuration for the deployment, including the inference server image, startup commands, and environment variables.
 """
 type PresetExecutionSpec {
-  """
-  Container image to run the inference server (e.g., 'cr.backend.ai/stable/vllm:latest').
-  """
-  image: String
+  """Container image UUID."""
+  imageId: UUID
 
   """Startup command."""
   startupCommand: String
@@ -7861,6 +8265,14 @@ enum PresetValueType {
   FLOAT
   BOOL
   FLAG
+}
+
+"""
+Added in UNRELEASED. Input for previewing a prometheus query template (admin only).
+"""
+input PreviewQueryDefinitionInput {
+  """PromQL template to validate."""
+  queryTemplate: String!
 }
 
 """
@@ -8259,17 +8671,17 @@ type ProjectUsageBucket implements Node {
   """
   Added in 26.2.0. Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
   """
-  averageDailyUsage: ResourceSlot!
+  averageDailyUsage: ResourceSlot
 
   """
   Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
   """
-  usageCapacityRatio: ResourceSlot!
+  usageCapacityRatio: ResourceSlot
 
   """
   Added in 26.1.0. User usage buckets belonging to this project. Returns paginated user-level usage history for all users in this project within the same scaling group.
   """
-  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+  userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection
 }
 
 """
@@ -8403,23 +8815,23 @@ type ProjectV2 implements Node @key(fields: "id") {
   """
   Fair share record for this project in the specified resource group. Returns the scheduling priority configuration for this project. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShare(scope: ProjectFairShareScope!): ProjectFairShare!
+  fairShare(scope: ProjectFairShareScope!): ProjectFairShare
 
   """
   Added in 26.4.0. Active resource usage overview for this project. Returns the currently occupied resource slots and the number of active sessions.
   """
-  activeResourceOverview: ActiveResourceOverview!
+  activeResourceOverview: ActiveResourceOverview
 
   """
   Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
-  usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
+  usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection
 
   """The domain this project belongs to."""
-  domain: DomainV2!
+  domain: DomainV2
 
   """Users who are members of this project."""
-  users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection!
+  users(filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
 }
 
 """
@@ -8553,10 +8965,20 @@ type PurgeUserV2Payload {
 }
 
 """
+Added in UNRELEASED. Optional behavior flags for vfolder purge operations.
+"""
+input PurgeVFolderOptionsInput {
+  """
+  If true, also delete model card record(s) referencing the vfolder. If false, the request is rejected when any model card still references it.
+  """
+  cascadeModelCard: Boolean! = false
+}
+
+"""
 Added in 26.4.2. Payload returned after permanently purging a virtual folder.
 """
 type PurgeVFolderV2Payload {
-  """ID of the purged virtual folder"""
+  """ID of the purged virtual folder."""
   id: UUID!
 }
 
@@ -8598,7 +9020,7 @@ type Query {
   """
   Added in 25.16.0. Retrieve merged app configuration for the current user. The result combines domain-level and user-level configurations, where user settings override domain settings for the same keys. This query should be used when working with user app configurations to get the actual configuration values that will be applied.
   """
-  mergedAppConfig: AppConfig!
+  mergedAppConfig: AppConfig
 
   """Added in 25.16.0. Get a specific deployment by ID."""
   deployment(id: ID!): ModelDeployment
@@ -8625,7 +9047,7 @@ type Query {
   """
   Added in 26.4.2. Get JSON schema for a notification rule type's message format
   """
-  notificationRuleTypeSchema(ruleType: NotificationRuleType!): JSON!
+  notificationRuleTypeSchema(ruleType: NotificationRuleType!): JSON
 
   """Added in 25.14.0. Get an object storage by ID"""
   objectStorage(id: ID!): ObjectStorage
@@ -8671,32 +9093,32 @@ type Query {
   adminResourceGroupV2(name: String!): ResourceGroup
 
   """
-  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.timeouts.by_handler``.
+  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.handler_options.by_handler``.
   """
-  schedulingHandlers: [SchedulingHandlerNode!]!
+  schedulingHandlers: [SchedulingHandlerNode!]
 
   """
   Added in 26.4.2. Get allowed resource groups for a domain (admin only).
   """
-  adminAllowedResourceGroupsForDomainV2(domainName: String!): AllowedResourceGroupsPayload!
+  adminAllowedResourceGroupsForDomainV2(domainName: String!): AllowedResourceGroupsPayload
 
   """
   Added in 26.4.2. Get allowed resource groups for a project (admin only).
   """
-  adminAllowedResourceGroupsForProjectV2(projectId: UUID!): AllowedResourceGroupsPayload!
+  adminAllowedResourceGroupsForProjectV2(projectId: UUID!): AllowedResourceGroupsPayload
 
   """
   Added in 26.4.2. Get allowed domains for a resource group (admin only).
   """
-  adminAllowedDomainsForResourceGroupV2(resourceGroupName: String!): AllowedDomainsPayload!
+  adminAllowedDomainsForResourceGroupV2(resourceGroupName: String!): AllowedDomainsPayload
 
   """
   Added in 26.4.2. Get allowed projects for a resource group (admin only).
   """
-  adminAllowedProjectsForResourceGroupV2(resourceGroupName: String!): AllowedProjectsPayload!
+  adminAllowedProjectsForResourceGroupV2(resourceGroupName: String!): AllowedProjectsPayload
 
   """Added in 26.3.0. Query service catalog entries. Admin only."""
-  adminServiceCatalogs(filter: ServiceCatalogFilter = null, orderBy: [ServiceCatalogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): [ServiceCatalog!]!
+  adminServiceCatalogs(filter: ServiceCatalogFilter = null, orderBy: [ServiceCatalogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): [ServiceCatalog!]
 
   """Added in 26.4.2. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
@@ -8767,7 +9189,12 @@ type Query {
   """
   Added in 26.3.0. Query audit logs with pagination and filtering. (admin only)
   """
-  adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection!
+  adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection
+
+  """
+  Added in UNRELEASED. Query audit logs within a scope (non-admin accessible, subject to RBAC). All scope items are OR'd; raises an error if every field is empty.
+  """
+  scopedAuditLogsV2(scope: AuditLogScope!, filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection
 
   """
   Added in 26.4.2. List container registries with filtering, ordering, and pagination (admin only).
@@ -8777,22 +9204,22 @@ type Query {
   """
   Added in 26.4.2. Query login sessions with pagination and filtering. (admin only)
   """
-  adminLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection!
+  adminLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection
 
   """
   Added in 26.4.2. Query login history with pagination and filtering. (admin only)
   """
-  adminLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection!
+  adminLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection
 
   """
   Added in 26.3.0. Query sessions with pagination and filtering. (admin only)
   """
-  adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
+  adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection
 
   """
   Added in 26.4.2. List sessions within a specific project. Requires project membership or higher privileges.
   """
-  projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
+  projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection
 
   """
   Added in 26.4.3. Query a single session by ID. Returns an error if not found.
@@ -8813,7 +9240,7 @@ type Query {
   """
   Added in 26.3.0. Returns resource slot types with pagination and filtering.
   """
-  resourceSlotTypes(filter: ResourceSlotTypeFilter = null, orderBy: [ResourceSlotTypeOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceSlotTypeConnection!
+  resourceSlotTypes(filter: ResourceSlotTypeFilter = null, orderBy: [ResourceSlotTypeOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceSlotTypeConnection
 
   """
   Added in 26.2.0. Query image aliases with optional filtering, ordering, and pagination. Returns image aliases that provide alternative names for container images. Use filters to search by alias string. Supports both cursor-based and offset-based pagination.
@@ -8833,7 +9260,12 @@ type Query {
   """
   Added in 26.4.2. Execute a prometheus query preset by ID and return the result. Available to any authenticated user; the underlying preset query is the same regardless of who runs it.
   """
-  prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult!
+  prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult
+
+  """
+  Added in UNRELEASED. Preview a prometheus query template before saving it as a preset (admin only).
+  """
+  adminPreviewPrometheusQueryPreset(input: PreviewQueryDefinitionInput!): QueryDefinitionExecuteResult
 
   """
   Added in 26.4.2. Get a single query preset category by ID. Available to any authenticated user.
@@ -8843,7 +9275,15 @@ type Query {
   """
   Added in 26.4.2. List query preset categories with filtering and pagination. Available to any authenticated user.
   """
-  prometheusQueryPresetCategories(filter: CategoryFilter = null, orderBy: [CategoryOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [QueryPresetCategory!]!
+  prometheusQueryPresetCategories(filter: CategoryFilter = null, orderBy: [CategoryOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [QueryPresetCategory!]
+
+  """Added in UNRELEASED. Get a single role preset by ID (admin only)."""
+  adminRolePreset(id: ID!): RolePreset
+
+  """
+  Added in UNRELEASED. List role presets with filtering and pagination (admin only).
+  """
+  adminRolePresets(filter: RolePresetFilter = null, orderBy: [RolePresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePresetConnection
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role
@@ -8851,27 +9291,27 @@ type Query {
   """
   Added in 26.3.0. List roles with filtering and pagination (admin only).
   """
-  adminRoles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection!
+  adminRoles(filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
 
   """
   Added in 26.3.0. List scoped permissions with filtering and pagination (admin only).
   """
-  adminPermissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection!
+  adminPermissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
   """
   Added in 26.3.0. List role assignments with filtering and pagination (admin only).
   """
-  adminRoleAssignments(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
+  adminRoleAssignments(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
 
   """
   Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
   """
-  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
+  adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection
 
   """
   Added in 26.4.2. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
   """
-  myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection!
+  myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection
 
   """
   Added in 26.4.2. Get a single keypair by access key (admin only). Requires superadmin privileges.
@@ -8881,55 +9321,55 @@ type Query {
   """
   Added in 26.4.2. List all keypairs with filtering and pagination (admin only). Requires superadmin privileges.
   """
-  adminKeypairsV2(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection!
+  adminKeypairsV2(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection
 
   """
   Added in 26.4.2. Get a user's SSH public key (admin only). The private key is never returned.
   """
-  adminSshKeypairV2(accessKey: String!): AdminGetSSHKeypairPayload!
+  adminSshKeypairV2(accessKey: String!): AdminGetSSHKeypairPayload
 
   """
   Added in 26.4.2. Query login sessions of the current user with pagination and filtering.
   """
-  myLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection!
+  myLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection
 
   """
   Added in 26.4.2. Query login history of the current user with pagination and filtering.
   """
-  myLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection!
+  myLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection
 
   """
   Added in 26.3.0. List roles assigned to the current authenticated user.
   """
-  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
+  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
 
   """Added in UNRELEASED. List the current user's role invitations."""
-  myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
+  myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
 
   """Added in UNRELEASED. List role invitations sent by the current user."""
-  mySentRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
+  mySentRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
 
   """
   Added in UNRELEASED. List all role invitations across the system (superadmin only).
   """
-  adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
+  adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
 
   """Added in 26.4.2. List roles registered in a project scope."""
-  projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection!
+  projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
 
   """Added in UNRELEASED. List invitations for a specific role."""
-  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection!
+  roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
-  rbacScopeEntityCombinations: [ScopeEntityCombination!]!
+  rbacScopeEntityCombinations: [ScopeEntityCombination!]
 
   """Added in 26.4.2. List valid RBAC entity-operation combinations."""
-  rbacEntityOperationCombinations: [EntityOperationCombination!]!
+  rbacEntityOperationCombinations: [EntityOperationCombination!]
 
   """
   Added in 26.4.2. List complete RBAC scope-entity-operation combinations (permission matrix).
   """
-  rbacPermissionMatrix: [ScopeEntityOperationCombination!]!
+  rbacPermissionMatrix: [ScopeEntityOperationCombination!]
 
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
@@ -9030,10 +9470,10 @@ type Query {
   """
   Added in 25.16.0. Get configuration JSON Schemas for all inference runtimes.
   """
-  inferenceRuntimeConfigs: JSON!
+  inferenceRuntimeConfigs: JSON @deprecated(reason: "Deprecated since UNRELEASED. Use the runtime_variant resources instead.")
 
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
-  inferenceRuntimeConfig(name: String!): JSON!
+  inferenceRuntimeConfig(name: String!): JSON @deprecated(reason: "Deprecated since UNRELEASED. Use the runtime_variant resources instead.")
 
   """Added in 25.19.0. Get a specific route by ID."""
   route(id: ID!): Route
@@ -9068,7 +9508,7 @@ type Query {
   """
   Added in 26.4.2. Get the current client's IP address as seen by the server. Useful for configuring IP allowlists.
   """
-  myClientIp: MyClientIp!
+  myClientIp: MyClientIp
 
   """
   Added in 26.2.0. Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.
@@ -9152,7 +9592,7 @@ type Query {
   """
   Added in 26.4.2. List storage hosts the current user is allowed to mount, with the union of permissions inherited from domain, project, and keypair resource policies.
   """
-  myStorageHostPermissions: MyStorageHostPermissionsPayload!
+  myStorageHostPermissions: MyStorageHostPermissionsPayload
 
   """Added in 26.4.2. List resource presets (admin only)."""
   adminResourcePresetsV2(filter: ResourcePresetFilter = null, orderBy: [ResourcePresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourcePresetConnection
@@ -9201,45 +9641,45 @@ type Query {
   modelCardAvailablePresets(scope: ModelCardAvailablePresetsScope!, filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection
 
   """Added in 26.4.2. Get my keypair resource allocation (current user)."""
-  myKeypairResourceAllocationV2: KeypairResourceAllocationV2!
+  myKeypairResourceAllocationV2: KeypairResourceAllocationV2
 
   """Added in 26.4.2. Get project resource allocation (project usage)."""
-  projectResourceAllocationV2(projectId: UUID!): ProjectResourceAllocationV2!
+  projectResourceAllocationV2(projectId: UUID!): ProjectResourceAllocationV2
 
   """Added in 26.4.2. Get domain resource allocation (admin only)."""
-  adminDomainResourceAllocationV2(domainName: String!): DomainResourceAllocationV2!
+  adminDomainResourceAllocationV2(domainName: String!): DomainResourceAllocationV2
 
   """Added in 26.4.2. Get resource group resource allocation."""
-  resourceGroupResourceAllocationV2(resourceGroupName: String!): ResourceGroupResourceAllocationV2!
+  resourceGroupResourceAllocationV2(resourceGroupName: String!): ResourceGroupResourceAllocationV2
 
   """
   Added in 26.4.2. Get effective resource allocation for the current user.
   """
-  effectiveResourceAllocationV2(input: EffectiveResourceAllocationV2Input!): EffectiveResourceAllocationV2!
+  effectiveResourceAllocationV2(input: EffectiveResourceAllocationV2Input!): EffectiveResourceAllocationV2
 
   """
   Added in 26.4.2. Get effective resource allocation for a specific user (admin only).
   """
-  adminEffectiveResourceAllocationV2(input: AdminEffectiveResourceAllocationV2Input!): EffectiveResourceAllocationV2!
+  adminEffectiveResourceAllocationV2(input: AdminEffectiveResourceAllocationV2Input!): EffectiveResourceAllocationV2
 
   """
   Added in 26.4.2. Check which resource presets are available for session creation.
   """
-  checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2!
+  checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2
 
   """Added in 26.4.2. Search all virtual folders (superadmin only)."""
-  adminVfoldersV2(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+  adminVfoldersV2(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
 
   """Added in 26.4.2. Get a single virtual folder by ID."""
   vfolderV2(vfolderId: UUID!): VFolder
 
   """Added in 26.4.2. List virtual folders within a specific project."""
-  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+  projectVfolders(projectId: UUID!, filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
 
   """
   Added in 26.4.2. Search virtual folders accessible to the current user with pagination and filtering.
   """
-  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection!
+  myVfolders(filter: VFolderFilter = null, orderBy: [VFolderOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderConnection
 }
 
 """
@@ -9320,6 +9760,24 @@ type QueryDefinitionExecuteResult {
 input QueryDefinitionFilter {
   """Filter by name."""
   name: StringFilter = null
+
+  """Added in UNRELEASED. Filter by category ID."""
+  categoryId: UUIDFilter = null
+
+  """
+  Added in UNRELEASED. Combine multiple filters with AND logic. All conditions must match.
+  """
+  AND: [QueryDefinitionFilter!] = null
+
+  """
+  Added in UNRELEASED. Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [QueryDefinitionFilter!] = null
+
+  """
+  Added in UNRELEASED. Negate the specified filters. Records matching these conditions will be excluded.
+  """
+  NOT: [QueryDefinitionFilter!] = null
 }
 
 """Added in 26.3.0. Single metric result from Prometheus query."""
@@ -9446,7 +9904,27 @@ enum RBACElementType {
   DEPLOYMENT_REVISION
   IMAGE_ALIAS
   ROLE_ASSIGNMENT
+  VFOLDER_DATA
+  SESSION_APP_SERVICE
+  USER_EMAIL
   ARTIFACT_REVISION
+}
+
+"""
+Added in UNRELEASED. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
+"""
+input RBACElementTypeFilter {
+  """Matches rows with this exact element type."""
+  equals: RBACElementType = null
+
+  """Matches rows whose element type is in this list."""
+  in: [RBACElementType!] = null
+
+  """Excludes rows with this exact element type."""
+  notEquals: RBACElementType = null
+
+  """Excludes rows whose element type is in this list."""
+  notIn: [RBACElementType!] = null
 }
 
 """
@@ -9667,6 +10145,16 @@ input ReplicaFilter {
   NOT: [ReplicaFilter!] = null
 }
 
+"""
+Added in UNRELEASED. This enum represents the health check status of a replica.
+"""
+enum ReplicaHealthStatus {
+  NOT_CHECKED
+  HEALTHY
+  UNHEALTHY
+  DEGRADED
+}
+
 """Added in 25.19.0. """
 input ReplicaOrderBy {
   field: ReplicaOrderField!
@@ -9726,7 +10214,7 @@ type ReservoirRegistry implements Node {
   apiVersion: String!
 
   """The remote artifact registries of this entity."""
-  remoteArtifactRegistries: ArtifactRegistryMetaConnection!
+  remoteArtifactRegistries: ArtifactRegistryMetaConnection
 }
 
 """
@@ -9782,15 +10270,13 @@ Added in 25.19.0. Compute resource configuration for the deployment. Specifies C
 """
 type ResourceConfig {
   """The resource group of this entity."""
-  resourceGroup: ScalingGroupNode!
+  resourceGroup: ScalingGroupNode
   resourceGroupName: String!
   resourceOpts: ResourceOpts
 }
 
 """Added in 25.19.0. """
 input ResourceConfigInput {
-  resourceGroup: ResourceGroupInput!
-
   """Added in 26.1.0. Resources allocated for the deployment."""
   resourceSlots: ResourceSlotInput!
 
@@ -9839,12 +10325,12 @@ type ResourceGroup implements Node {
   """
   Added in 26.1.0. Fair share calculation configuration for this resource group. Defines decay parameters and resource weights for fair share factor computation. Resource weights are merged with capacity and include default indicators.
   """
-  fairShareSpec: FairShareScalingGroupSpec!
+  fairShareSpec: FairShareScalingGroupSpec
 
   """
   Added in 26.1.0. Resource usage information for this resource group. Provides aggregated metrics for capacity, used, and free resources. This is a lazy-loaded field that queries agent and kernel data on demand.
   """
-  resourceInfo: ResourceInfo!
+  resourceInfo: ResourceInfo
 }
 
 """Added in 26.2.0. Resource group connection"""
@@ -9881,11 +10367,6 @@ input ResourceGroupFilter {
   AND: [ResourceGroupFilter!] = null
   OR: [ResourceGroupFilter!] = null
   NOT: [ResourceGroupFilter!] = null
-}
-
-"""Added in 25.19.0. """
-input ResourceGroupInput {
-  name: String!
 }
 
 """Added in 26.2.0. Metadata for a resource group."""
@@ -10344,13 +10825,13 @@ type Role implements Node {
   deletedAt: DateTime
 
   """Added in 26.3.0. Permissions associated with this role."""
-  permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection!
+  permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
   """Added in 26.3.0. Users assigned to this role."""
-  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
+  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
 
   """Added in 26.4.2. Scopes this role is registered in."""
-  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
+  scopes(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)."""
@@ -10458,6 +10939,7 @@ input RoleFilter {
   name: StringFilter = null
   source: RoleSourceFilter = null
   status: RoleStatusFilter = null
+  assignedUser: RoleUserNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -10593,6 +11075,207 @@ enum RoleOrderField {
   UPDATED_AT
 }
 
+"""Added in UNRELEASED. A stored permission entry under a role preset."""
+type RolePermissionPreset implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the parent role preset."""
+  rolePresetId: UUID!
+
+  """Entity type the permission applies to."""
+  entityType: RBACElementType!
+
+  """Operation granted by the permission."""
+  operation: OperationType!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+}
+
+"""
+Added in UNRELEASED. Paginated connection for role permission preset entries.
+"""
+type RolePermissionPresetConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RolePermissionPresetEdge!]!
+
+  """Total number of permission entries matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RolePermissionPresetEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RolePermissionPreset!
+}
+
+"""
+Added in UNRELEASED. A single (entity_type, operation) pair carried by a role preset.
+"""
+input RolePermissionPresetEntryInput {
+  """Entity type the permission applies to."""
+  entityType: RBACElementType!
+
+  """Operation granted by the permission."""
+  operation: OperationType!
+}
+
+"""
+Added in UNRELEASED. Filter input for role permission preset entries. Also used as the input for the `permission_presets` field resolver on a role preset (the resolver injects `role_preset_id` from its parent).
+"""
+input RolePermissionPresetFilter {
+  """Filter by parent role preset ID."""
+  rolePresetId: UUIDFilter = null
+
+  """Filter by entity type the permission applies to."""
+  entityType: RBACElementTypeFilter = null
+
+  """Filter by granted operation."""
+  operation: OperationTypeFilter = null
+
+  """Filter by creation timestamp."""
+  createdAt: DateTimeFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [RolePermissionPresetFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [RolePermissionPresetFilter!] = null
+
+  """Negate the specified filters. Matching records are excluded."""
+  NOT: [RolePermissionPresetFilter!] = null
+}
+
+"""
+Added in UNRELEASED. Specifies ordering for role permission preset entries.
+"""
+input RolePermissionPresetOrderBy {
+  """The field to order by."""
+  field: RolePermissionPresetOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering role permission preset entries.
+"""
+enum RolePermissionPresetOrderField {
+  ENTITY_TYPE
+  OPERATION
+  CREATED_AT
+}
+
+"""
+Added in UNRELEASED. Role preset entity implementing the Relay Node pattern.
+"""
+type RolePreset implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Role preset name."""
+  name: String!
+
+  """Scope type this preset targets (e.g., domain, project)."""
+  scopeType: RBACElementType!
+
+  """
+  Default value for the `auto_assign` flag copied onto roles instantiated from this preset.
+  """
+  autoAssign: Boolean!
+
+  """
+  Soft-delete flag. Set by the delete mutation and cleared by the restore mutation; archived rows are excluded from default searches.
+  """
+  deleted: Boolean!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last modification timestamp."""
+  updatedAt: DateTime!
+
+  """Added in UNRELEASED. Permission entries carried by this role preset."""
+  permissionPresets(filter: RolePermissionPresetFilter = null, orderBy: [RolePermissionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePermissionPresetConnection
+}
+
+"""Added in UNRELEASED. Paginated connection for role preset records."""
+type RolePresetConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RolePresetEdge!]!
+
+  """Total number of role preset records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RolePresetEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RolePreset!
+}
+
+"""Added in UNRELEASED. Filter input for querying role presets."""
+input RolePresetFilter {
+  """Filter by name."""
+  name: StringFilter = null
+
+  """Filter by scope type."""
+  scopeType: RBACElementTypeFilter = null
+
+  """Filter by auto-assign flag."""
+  autoAssign: Boolean = null
+
+  """
+  Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to `true` to inspect archived presets.
+  """
+  deleted: Boolean = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [RolePresetFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [RolePresetFilter!] = null
+
+  """Negate the specified filters. Matching records are excluded."""
+  NOT: [RolePresetFilter!] = null
+}
+
+"""Added in UNRELEASED. Specifies ordering for role preset results."""
+input RolePresetOrderBy {
+  """The field to order by."""
+  field: RolePresetOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering role preset results.
+"""
+enum RolePresetOrderField {
+  NAME
+  SCOPE_TYPE
+  CREATED_AT
+  UPDATED_AT
+}
+
 """Added in 26.3.0. Role definition source"""
 enum RoleSource {
   SYSTEM
@@ -10640,6 +11323,14 @@ input RoleStatusFilter {
   notIn: [RoleStatus!] = null
 }
 
+"""Added in UNRELEASED. Filter roles by their user assignments."""
+input RoleUserNestedFilter {
+  userId: UUIDFilter = null
+  AND: [RoleUserNestedFilter!] = null
+  OR: [RoleUserNestedFilter!] = null
+  NOT: [RoleUserNestedFilter!] = null
+}
+
 """
 Added in 25.19.0. Configuration for rolling update strategy. Defaults: max_surge=50%, max_unavailable=0%.
 """
@@ -10677,7 +11368,7 @@ type Route implements Node {
   errorData: JSON
 
   """The deployment this route belongs to."""
-  deployment: ModelDeployment!
+  deployment: ModelDeployment
 
   """
   The session associated with the route. Can be null if the route is still provisioning.
@@ -10977,7 +11668,7 @@ input RuntimeVariantPresetFilter {
   name: StringFilter = null
 
   """Variant ID filter."""
-  runtimeVariantId: UUID = null
+  runtimeVariantId: UUIDFilter = null
 }
 
 """Added in 26.4.2. Order specification."""
@@ -11105,7 +11796,7 @@ type SchedulingBroadcastEventPayload {
   """
   The session ID associated with the replica. This can be null right after replica creation.
   """
-  session: ComputeSessionNode!
+  session: ComputeSessionNode
 
   """UUID of the session being scheduled."""
   sessionId: ID!
@@ -11124,7 +11815,7 @@ enum SchedulingHandlerCategory {
 }
 
 """
-Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.timeouts.by_handler``.
+Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.handler_options.by_handler``.
 """
 type SchedulingHandlerNode {
   """Stable handler key used in deployment timeout maps."""
@@ -11409,6 +12100,11 @@ input SessionMountItemInput {
 
   """Mount permission ('rw' or 'ro')."""
   permission: String = null
+
+  """
+  Added in UNRELEASED. Subpath within the vfolder to mount. Null mounts the vfolder root.
+  """
+  subpath: String = null
 }
 
 """Added in 26.4.2. Additional resource options for session creation."""
@@ -11554,10 +12250,10 @@ type SessionV2 implements Node {
   """
   Added in 26.4.3. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
   """
-  images: ImageV2Connection!
+  images: ImageV2Connection
 
   """Added in 26.3.0. The kernels belonging to this session."""
-  kernels: KernelV2Connection!
+  kernels: KernelV2Connection
 }
 
 """Added in 26.3.0. Connection type for paginated session results."""
@@ -12002,6 +12698,12 @@ input UUIDFilter {
   notIn: [UUID!] = null
 }
 
+"""Added in UNRELEASED. Single-UUID scope item wrapper."""
+input UUIDScope {
+  """UUID value."""
+  value: UUID!
+}
+
 """
 Added in 26.4.2. Error information for a user that failed to be unassigned.
 """
@@ -12193,7 +12895,6 @@ input UpdateDeploymentInput {
   openToPublic: Boolean
   tags: [String!]
   defaultDeploymentStrategy: DeploymentStrategyInput
-  activeRevisionId: ID
   replicaCount: Int
   name: String
   preferredDomainName: String
@@ -12726,6 +13427,28 @@ input UpdateRoleInput {
   status: RoleStatus
 }
 
+"""
+Added in UNRELEASED. Input for updating a role preset's metadata. Permission entries are managed via the dedicated add/remove mutations; the `deleted` flag via delete/restore mutations.
+"""
+input UpdateRolePresetInput {
+  """Role preset UUID to update."""
+  rolePresetId: ID!
+
+  """Updated name."""
+  name: String
+
+  """
+  Updated default value for the `auto_assign` flag of instantiated roles.
+  """
+  autoAssign: Boolean
+}
+
+"""Added in UNRELEASED. Payload returned after updating a role preset."""
+type UpdateRolePresetPayload {
+  """Updated role preset."""
+  rolePreset: RolePreset!
+}
+
 """Added in 25.19.0. Input for updating route traffic status."""
 input UpdateRouteTrafficStatusInput {
   """The ID of the route to update."""
@@ -12749,8 +13472,8 @@ input UpdateRuntimeVariantInput {
   """New name."""
   name: String = null
 
-  """New description."""
-  description: String = null
+  """New description. Set to null to clear."""
+  description: String
 }
 
 """Added in 26.4.2. Payload for runtime variant update."""
@@ -13384,12 +14107,12 @@ type UserUsageBucket implements Node {
   """
   Added in 26.2.0. Average daily resource usage during this period. Calculated as resource_usage divided by bucket duration in days. For each resource type, this represents the average amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
   """
-  averageDailyUsage: ResourceSlot!
+  averageDailyUsage: ResourceSlot
 
   """
   Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
   """
-  usageCapacityRatio: ResourceSlot!
+  usageCapacityRatio: ResourceSlot
 }
 
 """
@@ -13511,18 +14234,18 @@ type UserV2 implements Node @key(fields: "id") {
   """
   Fair share record for this user in the specified resource group and project. Returns the scheduling priority configuration for this user. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
-  fairShare(scope: UserFairShareScope!): UserFairShare!
+  fairShare(scope: UserFairShareScope!): UserFairShare
 
   """
   Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time.
   """
-  usageBuckets(scope: UserUsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection!
+  usageBuckets(scope: UserUsageScope!, filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection
 
   """The domain this user belongs to."""
   domain: DomainV2
 
   """Projects this user is a member of."""
-  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
+  projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection
 }
 
 """
@@ -13595,12 +14318,44 @@ input UserV2Filter {
   uuid: UUIDFilter = null
   username: StringFilter = null
   email: StringFilter = null
+
+  """Added in UNRELEASED. Filter by full name."""
+  fullName: StringFilter = null
+
+  """Added in UNRELEASED. Filter by description."""
+  description: StringFilter = null
   status: UserStatusV2EnumFilter = null
+
+  """Added in UNRELEASED. Filter by status info detail."""
+  statusInfo: StringFilter = null
   domainName: StringFilter = null
 
   """Added in 26.4.2. Filter by external integration identifier."""
   integrationName: StringFilter = null
+
+  """Added in UNRELEASED. Filter by user resource policy name."""
+  resourcePolicy: StringFilter = null
   role: UserRoleV2EnumFilter = null
+
+  """Added in UNRELEASED. Filter by whether a password change is required."""
+  needPasswordChange: Boolean = null
+
+  """
+  Added in UNRELEASED. Filter by whether TOTP two-factor auth is activated.
+  """
+  totpActivated: Boolean = null
+
+  """Added in UNRELEASED. Filter by whether sudo sessions are enabled."""
+  sudoSessionEnabled: Boolean = null
+
+  """Added in UNRELEASED. Filter by container UID."""
+  containerUid: IntFilter = null
+
+  """Added in UNRELEASED. Filter by container main GID."""
+  containerMainGid: IntFilter = null
+
+  """Added in UNRELEASED. Filter by container supplementary GIDs."""
+  containerGids: IntArrayFilter = null
   createdAt: DateTimeFilter = null
   domain: UserDomainNestedFilter = null
   project: UserProjectNestedFilter = null
@@ -13765,6 +14520,9 @@ type VFolder implements Node {
 
   """Path for unmanaged virtual folders."""
   unmanagedPath: String
+
+  """Added in UNRELEASED. Model cards backed by this vfolder."""
+  modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 }
 
 """

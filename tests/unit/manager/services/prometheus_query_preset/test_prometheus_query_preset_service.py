@@ -12,7 +12,6 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     PrometheusQueryData,
@@ -22,6 +21,7 @@ from ai.backend.common.exception import (
     PrometheusQueryPresetInvalidLabel,
     PrometheusQueryPresetNotFound,
 )
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
@@ -39,6 +39,7 @@ from ai.backend.manager.services.prometheus_query_preset.actions import (
     ExecutePresetAction,
     GetPresetAction,
     ModifyPresetAction,
+    PreviewPresetAction,
     SearchPresetsAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.service import (
@@ -238,7 +239,7 @@ class TestPrometheusQueryPresetService:
             status="success",
             data=PrometheusQueryData(result_type="matrix", result=[]),
         )
-        mock_prometheus_client.query_range = AsyncMock(return_value=prometheus_response)
+        mock_prometheus_client.execute_preset = AsyncMock(return_value=prometheus_response)
 
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
@@ -254,7 +255,13 @@ class TestPrometheusQueryPresetService:
 
         assert result.response == prometheus_response
         mock_repository.get_by_id.assert_called_once_with(preset_data.id)
-        mock_prometheus_client.query_range.assert_called_once()
+        mock_prometheus_client.execute_preset.assert_called_once_with(
+            query_template=preset_data.query_template,
+            filter_labels={"kernel_id": "test-kernel"},
+            group_labels=["kernel_id"],
+            time_window="5m",
+            time_range=time_range,
+        )
 
     async def test_execute_preset_invalid_filter_label(
         self,
@@ -315,7 +322,7 @@ class TestPrometheusQueryPresetService:
             status="success",
             data=PrometheusQueryData(result_type="matrix", result=[]),
         )
-        mock_prometheus_client.query_range = AsyncMock(return_value=prometheus_response)
+        mock_prometheus_client.execute_preset = AsyncMock(return_value=prometheus_response)
 
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
@@ -331,8 +338,8 @@ class TestPrometheusQueryPresetService:
 
         assert result.response == prometheus_response
         # Verify the preset was called (the window used is 10m from preset)
-        call_args = mock_prometheus_client.query_range.call_args
-        assert call_args.kwargs["preset"].window == "10m"
+        call_args = mock_prometheus_client.execute_preset.call_args
+        assert call_args.kwargs["time_window"] == "10m"
 
     async def test_execute_preset_window_fallback_to_server_default(
         self,
@@ -349,7 +356,7 @@ class TestPrometheusQueryPresetService:
             status="success",
             data=PrometheusQueryData(result_type="matrix", result=[]),
         )
-        mock_prometheus_client.query_range = AsyncMock(return_value=prometheus_response)
+        mock_prometheus_client.execute_preset = AsyncMock(return_value=prometheus_response)
 
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
@@ -365,8 +372,8 @@ class TestPrometheusQueryPresetService:
 
         assert result.response == prometheus_response
         # Verify the window used is the server default "1m"
-        call_args = mock_prometheus_client.query_range.call_args
-        assert call_args.kwargs["preset"].window == "1m"
+        call_args = mock_prometheus_client.execute_preset.call_args
+        assert call_args.kwargs["time_window"] == "1m"
 
     @pytest.fixture
     def time_range(self) -> QueryTimeRange:
@@ -388,7 +395,7 @@ class TestPrometheusQueryPresetService:
             status="success",
             data=PrometheusQueryData(result_type="matrix", result=[]),
         )
-        mock_prometheus_client.query_range = AsyncMock(return_value=prometheus_response)
+        mock_prometheus_client.execute_preset = AsyncMock(return_value=prometheus_response)
 
         action = ExecutePresetAction(
             preset_id=preset_data.id,
@@ -417,7 +424,7 @@ class TestPrometheusQueryPresetService:
             status="success",
             data=PrometheusQueryData(result_type="vector", result=[]),
         )
-        mock_prometheus_client.query_instant = AsyncMock(return_value=prometheus_response)
+        mock_prometheus_client.execute_preset = AsyncMock(return_value=prometheus_response)
 
         action = ExecutePresetAction(
             preset_id=preset_data.id,
@@ -431,8 +438,9 @@ class TestPrometheusQueryPresetService:
         result = await service.execute_preset(action)
 
         assert result.response == prometheus_response
-        mock_prometheus_client.query_instant.assert_called_once()
-        mock_prometheus_client.query_range.assert_not_called()
+        mock_prometheus_client.execute_preset.assert_called_once()
+        call_args = mock_prometheus_client.execute_preset.call_args
+        assert call_args.kwargs["time_range"] is None
 
     async def test_execute_preset_range_query_does_not_call_instant(
         self,
@@ -448,7 +456,7 @@ class TestPrometheusQueryPresetService:
             status="success",
             data=PrometheusQueryData(result_type="matrix", result=[]),
         )
-        mock_prometheus_client.query_range = AsyncMock(return_value=prometheus_response)
+        mock_prometheus_client.execute_preset = AsyncMock(return_value=prometheus_response)
 
         time_range = QueryTimeRange(start="1704067200", end="1704153600", step="60s")
         action = ExecutePresetAction(
@@ -463,5 +471,29 @@ class TestPrometheusQueryPresetService:
         result = await service.execute_preset(action)
 
         assert result.response == prometheus_response
-        mock_prometheus_client.query_range.assert_called_once()
-        mock_prometheus_client.query_instant.assert_not_called()
+
+        mock_prometheus_client.execute_preset.assert_called_once()
+        call_args = mock_prometheus_client.execute_preset.call_args
+        assert call_args.kwargs["time_range"] == time_range
+
+    async def test_preview_uses_server_default_window(
+        self,
+        service: PrometheusQueryPresetService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """preview_preset must pass the service's default window to the repository."""
+        mock_repository.preview_template = AsyncMock(
+            return_value=PrometheusResponse(
+                status="success",
+                data=PrometheusQueryData(result_type="vector", result=[]),
+            )
+        )
+
+        await service.preview_preset(
+            PreviewPresetAction(query_template="sum(rate(metric{{{labels}}}[{window}]))")
+        )
+
+        mock_repository.preview_template.assert_called_once_with(
+            query_template="sum(rate(metric{{{labels}}}[{window}]))",
+            default_window="1m",
+        )

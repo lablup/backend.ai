@@ -76,6 +76,10 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityBatchPurger,
+    execute_rbac_entity_batch_purger,
+)
 from ai.backend.manager.repositories.base.rbac.scope_binder import (
     RBACScopeBinder,
     RBACScopeBindingPair,
@@ -576,9 +580,11 @@ class GroupDBSource:
             await self._delete_group_kernels(session, group_id)
             await self._delete_group_sessions(session, group_id)
 
-            # Finally delete the group itself
-            result = await execute_batch_purger(
-                session, BatchPurger(spec=GroupBatchPurgerSpec(group_id=group_id), batch_size=1)
+            # Finally delete the group itself with RBAC scope/permission cleanup
+            # to avoid dangling association_scopes_entities and permission rows.
+            result = await execute_rbac_entity_batch_purger(
+                session,
+                RBACEntityBatchPurger(spec=GroupBatchPurgerSpec(group_id=group_id), batch_size=1),
             )
 
             if result.deleted_count > 0:
@@ -992,7 +998,7 @@ class GroupDBSource:
         """
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(GroupRow)
-            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.GroupRow.to_data() for row in result.rows]
 
@@ -1034,7 +1040,7 @@ class GroupDBSource:
                     ),
                 )
             )
-            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.GroupRow.to_data() for row in result.rows]
 

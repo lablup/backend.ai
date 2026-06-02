@@ -78,6 +78,25 @@ services:
     ports:
       - "9121:9121"
 
+  backendai-half-node-exporter:
+    image: prom/node-exporter:v1.9.1
+    profiles: ["observability"]
+    restart: unless-stopped
+    networks:
+      - half
+    pid: host
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/host/root'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+    ports:
+      - "9100:9100"
+
   backendai-half-etcd:
     image: quay.io/coreos/etcd:v3.5.14
     restart: unless-stopped
@@ -152,7 +171,7 @@ services:
 
   backendai-half-otel-collector:
     image: otel/opentelemetry-collector-contrib:0.126.0
-    profiles: ["observability"]
+    profiles: ["telemetry", "observability"]
     restart: unless-stopped
     networks:
       - half
@@ -166,7 +185,7 @@ services:
 
   backendai-half-loki:
     image: grafana/loki:3.5.0
-    profiles: ["observability"]
+    profiles: ["telemetry", "observability"]
     restart: unless-stopped
     networks:
       - half

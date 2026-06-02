@@ -348,6 +348,15 @@ class ImageAdapter(BaseAdapter):
     ) -> list[QueryCondition]:
         conditions: list[QueryCondition] = list(base_conditions) if base_conditions else []
 
+        if filter.id is not None:
+            condition = self.convert_uuid_filter(
+                filter.id,
+                equals_factory=ImageConditions.by_id_equals,
+                in_factory=ImageConditions.by_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter.name is not None:
             condition = self.convert_string_filter(
                 filter.name,
@@ -390,13 +399,13 @@ class ImageAdapter(BaseAdapter):
                 )
 
         if filter.registry_id is not None:
-            rid = filter.registry_id
-            if rid.equals is not None:
-                conditions.append(ImageConditions.by_registry_id(rid.equals))
-            elif rid.in_ is not None:
-                # Multiple registry IDs: combine with OR
-                sub: list[QueryCondition] = [ImageConditions.by_registry_id(r) for r in rid.in_]
-                conditions.append(combine_conditions_or(sub))
+            condition = self.convert_uuid_filter(
+                filter.registry_id,
+                equals_factory=ImageConditions.by_registry_id_equals,
+                in_factory=ImageConditions.by_registry_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
 
         if filter.alias is not None:
             alias_f = filter.alias

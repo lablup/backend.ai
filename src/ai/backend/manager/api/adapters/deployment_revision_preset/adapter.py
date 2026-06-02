@@ -4,9 +4,24 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import (
+    ModelConfig,
+    ModelDefinition,
+    ModelHealthCheck,
+    ModelMetadata,
+    ModelServiceConfig,
+    PreStartAction,
+)
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    ModelConfigInfoDTO,
+    ModelDefinitionInfoDTO,
+    ModelHealthCheckInfoDTO,
+    ModelMetadataInfoDTO,
+    ModelServiceConfigInfoDTO,
+    PreStartActionInfoDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
@@ -68,10 +83,10 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
     combine_conditions_or,
 )
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
     DeploymentRevisionPresetCreatorSpec,
+    PresetResourceSlotDependentCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment_revision_preset.updaters import (
     DeploymentRevisionPresetUpdaterSpec,
@@ -111,6 +126,74 @@ def _preset_resource_slot_pagination_spec() -> PaginationSpec:
         forward_condition_factory=PresetResourceSlotConditions.by_cursor_forward,
         backward_condition_factory=PresetResourceSlotConditions.by_cursor_backward,
         tiebreaker_order=ALLOCATED_SLOT_PRESET_TIEBREAKER,
+    )
+
+
+def _pre_start_action_to_dto(action: PreStartAction) -> PreStartActionInfoDTO:
+    return PreStartActionInfoDTO(action=action.action, args=action.args)
+
+
+def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoDTO:
+    return ModelHealthCheckInfoDTO(
+        interval=check.interval,
+        path=check.path,
+        max_retries=check.max_retries,
+        max_wait_time=check.max_wait_time,
+        expected_status_code=check.expected_status_code,
+        initial_delay=check.initial_delay,
+    )
+
+
+def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
+    return ModelServiceConfigInfoDTO(
+        pre_start_actions=[_pre_start_action_to_dto(a) for a in service.pre_start_actions],
+        start_command=service.start_command,
+        shell=service.shell,
+        port=service.port,
+        health_check=(
+            _model_health_check_to_dto(service.health_check)
+            if service.health_check is not None
+            else None
+        ),
+    )
+
+
+def _model_metadata_to_dto(metadata: ModelMetadata) -> ModelMetadataInfoDTO:
+    return ModelMetadataInfoDTO(
+        author=metadata.author,
+        title=metadata.title,
+        version=metadata.version,
+        created=metadata.created,
+        last_modified=metadata.last_modified,
+        description=metadata.description,
+        task=metadata.task,
+        category=metadata.category,
+        architecture=metadata.architecture,
+        framework=metadata.framework,
+        label=metadata.label,
+        license=metadata.license,
+        min_resource=metadata.min_resource,
+    )
+
+
+def _model_config_to_dto(config: ModelConfig) -> ModelConfigInfoDTO:
+    return ModelConfigInfoDTO(
+        name=config.name,
+        model_path=config.model_path,
+        service=(
+            _model_service_config_to_dto(config.service) if config.service is not None else None
+        ),
+        metadata=(_model_metadata_to_dto(config.metadata) if config.metadata is not None else None),
+    )
+
+
+def _model_definition_to_dto(
+    definition: ModelDefinition | None,
+) -> ModelDefinitionInfoDTO | None:
+    if definition is None:
+        return None
+    return ModelDefinitionInfoDTO(
+        models=[_model_config_to_dto(m) for m in definition.models],
     )
 
 
@@ -162,37 +245,36 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         input: CreateDeploymentRevisionPresetInput,
     ) -> CreateDeploymentRevisionPresetPayload:
         resource_slots = self._convert_resource_slots_input(input.resource_slots)
+        slot_specs = [
+            PresetResourceSlotDependentCreatorSpec(entry=entry) for entry in resource_slots
+        ]
         resource_opts = self._convert_resource_opts_input(input.resource_opts)
         environ = self._convert_environ_input(input.environ)
         preset_values = self._convert_preset_values_input(input.preset_values)
         model_def = input.model_definition
-        strategy, strategy_spec = self._convert_strategy_input(input.deployment_strategy)
+        strategy, strategy_spec = self._convert_required_strategy_input(input.deployment_strategy)
 
-        creator = Creator(
-            spec=DeploymentRevisionPresetCreatorSpec(
-                runtime_variant_id=input.runtime_variant_id,
-                name=input.name,
-                description=input.description,
-                rank=0,
-                image_id=input.image_id,
-                model_definition=model_def,
-                resource_slots=resource_slots,
-                resource_opts=resource_opts,
-                cluster_mode=input.cluster_mode or "single-node",
-                cluster_size=input.cluster_size or 1,
-                startup_command=input.startup_command,
-                bootstrap_script=input.bootstrap_script,
-                environ=environ,
-                preset_values=preset_values,
-                open_to_public=input.open_to_public,
-                replica_count=input.replica_count,
-                revision_history_limit=input.revision_history_limit,
-                deployment_strategy=strategy,
-                deployment_strategy_spec=strategy_spec,
-            )
+        spec = DeploymentRevisionPresetCreatorSpec(
+            runtime_variant_id=input.runtime_variant_id,
+            name=input.name,
+            description=input.description,
+            image_id=input.image_id,
+            model_definition=model_def,
+            resource_opts=resource_opts,
+            cluster_mode=input.cluster_mode,
+            cluster_size=input.cluster_size,
+            startup_command=input.startup_command,
+            bootstrap_script=input.bootstrap_script,
+            environ=environ,
+            preset_values=preset_values,
+            open_to_public=input.open_to_public,
+            replica_count=input.replica_count,
+            revision_history_limit=input.revision_history_limit,
+            deployment_strategy=strategy,
+            deployment_strategy_spec=strategy_spec,
         )
         result = await self._processors.deployment_revision_preset.create.wait_for_complete(
-            CreateDeploymentRevisionPresetAction(creator=creator)
+            CreateDeploymentRevisionPresetAction(creator_spec=spec, resource_slot_specs=slot_specs)
         )
         return CreateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.preset))
 
@@ -200,10 +282,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         self,
         input: UpdateDeploymentRevisionPresetInput,
     ) -> UpdateDeploymentRevisionPresetPayload:
-        resource_slots_state: OptionalState[list[ResourceSlotEntryData]] = (
-            OptionalState.update(self._convert_resource_slots_input(input.resource_slots))
+        slot_specs: list[PresetResourceSlotDependentCreatorSpec] | None = (
+            [
+                PresetResourceSlotDependentCreatorSpec(entry=entry)
+                for entry in self._convert_resource_slots_input(input.resource_slots)
+            ]
             if input.resource_slots is not None
-            else OptionalState.nop()
+            else None
         )
         environ_state: OptionalState[dict[str, str]] = (
             OptionalState.update(self._convert_environ_input(input.environ))
@@ -241,7 +326,6 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 else TriState.update(input.image_id)
             ),
             model_definition=model_def_state,
-            resource_slots=resource_slots_state,
             resource_opts=(
                 OptionalState.update(self._convert_resource_opts_input(input.resource_opts))
                 if input.resource_opts is not None
@@ -283,7 +367,9 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         )
         updater: Updater[DeploymentRevisionPresetRow] = Updater(spec=spec, pk_value=input.id)
         result = await self._processors.deployment_revision_preset.update.wait_for_complete(
-            UpdateDeploymentRevisionPresetAction(id=input.id, updater=updater)
+            UpdateDeploymentRevisionPresetAction(
+                id=input.id, updater=updater, resource_slot_specs=slot_specs
+            )
         )
         return UpdateDeploymentRevisionPresetPayload(preset=self._data_to_node(result.preset))
 
@@ -372,10 +458,22 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
 
     def _convert_filter(self, filter_: DeploymentRevisionPresetFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if filter_.runtime_variant_id is not None:
-            conditions.append(
-                DeploymentRevisionPresetConditions.by_runtime_variant_id(filter_.runtime_variant_id)
+        if filter_.id is not None:
+            cond = self.convert_uuid_filter(
+                filter_.id,
+                equals_factory=DeploymentRevisionPresetConditions.by_id_equals,
+                in_factory=DeploymentRevisionPresetConditions.by_id_in,
             )
+            if cond is not None:
+                conditions.append(cond)
+        if filter_.runtime_variant_id is not None:
+            cond = self.convert_uuid_filter(
+                filter_.runtime_variant_id,
+                equals_factory=DeploymentRevisionPresetConditions.by_runtime_variant_id_equals,
+                in_factory=DeploymentRevisionPresetConditions.by_runtime_variant_id_in,
+            )
+            if cond is not None:
+                conditions.append(cond)
         if filter_.name:
             cond = self.convert_string_filter(
                 filter_.name,
@@ -483,6 +581,23 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 spec_dict = bg.model_dump(mode="json") if bg is not None else {}
                 return DeploymentStrategy.BLUE_GREEN, spec_dict
 
+    def _convert_required_strategy_input(
+        self,
+        strategy_input: DeploymentStrategyInput,
+    ) -> tuple[DeploymentStrategy, dict[str, Any]]:
+        """Convert a non-null DeploymentStrategyInput to (strategy, strategy_spec dict)."""
+        match strategy_input.type:
+            case DeploymentStrategy.ROLLING:
+                rolling = strategy_input.rolling_update
+                spec_dict: dict[str, Any] = (
+                    rolling.model_dump(mode="json") if rolling is not None else {}
+                )
+                return DeploymentStrategy.ROLLING, spec_dict
+            case DeploymentStrategy.BLUE_GREEN:
+                bg = strategy_input.blue_green
+                spec_dict = bg.model_dump(mode="json") if bg is not None else {}
+                return DeploymentStrategy.BLUE_GREEN, spec_dict
+
     @classmethod
     def _convert_strategy_update_state(
         cls,
@@ -549,7 +664,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 deployment_strategy=data.deployment_strategy,
                 deployment_strategy_spec=data.deployment_strategy_spec,
             ),
-            model_definition=data.model_definition,
+            model_definition=_model_definition_to_dto(data.model_definition),
             preset_values=preset_value_entries,
             created_at=data.created_at,
             updated_at=data.updated_at,

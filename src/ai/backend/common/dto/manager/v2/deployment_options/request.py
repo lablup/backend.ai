@@ -5,43 +5,29 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.v2.session_options import (
+    HandlerOptionsEntryInput,
+    HandlerOptionsInput,
+)
 
 
-class HandlerTimeoutEntryInput(BaseRequestModel):
-    """A single ``(handler_name, timeout_sec)`` entry.
-
-    Structured as a list-of-entries rather than a raw map so GraphQL
-    and typed SDK clients can validate each entry individually.
-    """
-
-    handler_name: str = Field(
-        min_length=1,
-        description="Handler identifier (e.g. 'deploying-provisioning').",
-    )
-    timeout_sec: int | None = Field(
-        default=None,
-        ge=1,
-        description="Timeout in seconds. Null means 'no timeout' for this handler.",
-    )
-
-
-class DeploymentTimeoutsInput(BaseRequestModel):
-    """Handler-keyed timeout policy.
+class DeploymentHandlerOptionsInput(BaseRequestModel):
+    """Handler-keyed scheduler policy for deployments.
 
     ``default`` is the fallback applied to any handler not listed in
-    ``by_handler``; leave ``null`` to make the default unbounded.
+    ``by_handler``; field-level ``null`` within either layer means
+    "fall back to global defaults" (unbounded timeout, global retry
+    fallback).
     """
 
-    default: int | None = Field(
-        default=None,
-        ge=1,
-        description="Fallback timeout in seconds; null means unbounded.",
+    default: HandlerOptionsInput = Field(
+        default_factory=HandlerOptionsInput,
+        description="Fallback per-handler policy.",
     )
-    by_handler: list[HandlerTimeoutEntryInput] = Field(
+    by_handler: list[HandlerOptionsEntryInput] = Field(
         default_factory=list,
         description=(
-            "Per-handler timeout overrides. Duplicate handler_name entries are"
-            " rejected by the server."
+            "Per-handler overrides. Duplicate handler_name entries are rejected by the server."
         ),
     )
 
@@ -49,6 +35,6 @@ class DeploymentTimeoutsInput(BaseRequestModel):
 class DeploymentOptionsInput(BaseRequestModel):
     """Per-deployment (or per-resource-group default) options payload."""
 
-    timeouts: DeploymentTimeoutsInput = Field(
-        description="Handler timeout policy.",
+    handler_options: DeploymentHandlerOptionsInput = Field(
+        description="Handler-keyed scheduler policy (timeout + retry).",
     )

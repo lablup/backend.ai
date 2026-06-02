@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
-
-from ai.backend.common.clients.prometheus.types import ValueType
-from ai.backend.manager.data.metric.types import (
+from ai.backend.common.types import BackendAISchema
+from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     ContainerMetricResponseInfo,
     ContainerMetricResult,
     MetricResultValue,
 )
+from ai.backend.manager.clients.prometheus.types import ValueType
 
 __all__ = [
     "ContainerMetricOptionalLabel",
@@ -19,7 +18,7 @@ __all__ = [
 ]
 
 
-class MetricQueryParameter(BaseModel):
+class MetricQueryParameter(BackendAISchema):
     metric_name: str
     value_type: ValueType
     start: str

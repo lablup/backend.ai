@@ -44,8 +44,11 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RollingUpdateConfigInfo,
 )
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    DeploymentHandlerOptionsInfo,
     DeploymentOptionsInfo,
-    DeploymentTimeoutsInfo,
+)
+from ai.backend.common.dto.manager.v2.session_options.response import (
+    HandlerOptionsInfo,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
@@ -85,7 +88,10 @@ def _make_model_runtime_config(**kwargs: object) -> ModelRuntimeConfigInfoDTO:
 
 def _make_deployment_options(**kwargs: object) -> DeploymentOptionsInfo:
     defaults: dict[str, Any] = {
-        "timeouts": DeploymentTimeoutsInfo(default=None, by_handler=[]),
+        "handler_options": DeploymentHandlerOptionsInfo(
+            default=HandlerOptionsInfo(timeout_sec=None, max_retry_count=None),
+            by_handler=[],
+        ),
     }
     defaults.update(kwargs)
     return DeploymentOptionsInfo(**defaults)
@@ -99,6 +105,7 @@ def _make_deployment_metadata(**kwargs: object) -> DeploymentMetadataInfoDTO:
         "name": "test-deployment",
         "status": ModelDeploymentStatus.READY,
         "tags": [],
+        "resource_group_name": "default",
         "created_at": now,
         "updated_at": now,
     }
@@ -136,7 +143,8 @@ def _make_deployment_strategy(**kwargs: object) -> DeploymentStrategyInfoDTO:
 def _make_revision_node(**kwargs: object) -> RevisionNode:
     defaults: dict[str, Any] = {
         "id": uuid.uuid4(),
-        "name": "v1",
+        "deployment_id": uuid.uuid4(),
+        "revision_number": 1,
         "image_id": ImageID(uuid.uuid4()),
         "cluster_config": _make_cluster_config(),
         "resource_config": _make_resource_config(),
@@ -205,10 +213,12 @@ class TestRevisionNode:
 
     def test_creation_with_all_fields(self) -> None:
         revision_id = uuid.uuid4()
+        deployment_id = uuid.uuid4()
         now = datetime.now(tz=UTC)
         node = RevisionNode(
             id=revision_id,
-            name="v1",
+            deployment_id=deployment_id,
+            revision_number=1,
             image_id=ImageID(uuid.uuid4()),
             cluster_config=_make_cluster_config(),
             resource_config=_make_resource_config(),
@@ -217,14 +227,15 @@ class TestRevisionNode:
             extra_mounts=[],
         )
         assert node.id == revision_id
-        assert node.name == "v1"
+        assert node.deployment_id == deployment_id
         assert node.created_at == now
         assert node.extra_mounts == []
 
     def test_extra_mounts_defaults_to_empty_list(self) -> None:
         node = RevisionNode(
             id=uuid.uuid4(),
-            name="v1",
+            deployment_id=uuid.uuid4(),
+            revision_number=1,
             image_id=ImageID(uuid.uuid4()),
             cluster_config=_make_cluster_config(),
             resource_config=_make_resource_config(),
@@ -279,13 +290,11 @@ class TestRevisionNode:
         revision_id = uuid.uuid4()
         node = _make_revision_node(
             id=revision_id,
-            name="v2",
             model_definition={"models": [{"name": "v2-model", "model_path": "/models/v2"}]},
         )
         json_str = node.model_dump_json()
         restored = RevisionNode.model_validate_json(json_str)
         assert restored.id == revision_id
-        assert restored.name == "v2"
         assert restored.model_definition is not None
         assert restored.model_definition.models[0].name == "v2-model"
 
@@ -578,16 +587,14 @@ class TestAddRevisionPayload:
 
     def test_creation_with_revision_node(self) -> None:
         revision_id = uuid.uuid4()
-        rev = _make_revision_node(id=revision_id, name="v2")
+        rev = _make_revision_node(id=revision_id)
         payload = AddRevisionPayload(revision=rev)
         assert payload.revision.id == revision_id
-        assert payload.revision.name == "v2"
 
     def test_round_trip(self) -> None:
         revision_id = uuid.uuid4()
-        rev = _make_revision_node(id=revision_id, name="v2")
+        rev = _make_revision_node(id=revision_id)
         payload = AddRevisionPayload(revision=rev)
         json_str = payload.model_dump_json()
         restored = AddRevisionPayload.model_validate_json(json_str)
         assert restored.revision.id == revision_id
-        assert restored.revision.name == "v2"

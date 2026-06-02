@@ -236,7 +236,7 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
     ) -> CreateNetwork:
         graph_ctx: GraphQueryContext = info.context
         network_config = graph_ctx.config_provider.config.network.inter_container
-        if network_config.enabled:
+        if not network_config.enabled:
             return CreateNetwork(
                 ok=False, msg="Inter-container networking disabled on this cluster", network=None
             )
@@ -274,7 +274,7 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
             network_info = await network_plugin.create_network()
             network_name = network_info.network_id
         except Exception:
-            log.exception(f"Failed to create the inter-container network (plugin: {_driver})")
+            log.exception("Failed to create the inter-container network (plugin: {})", _driver)
             raise
 
         async def _do_mutate() -> CreateNetwork:

@@ -4,7 +4,7 @@ from typing import override
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.types import KernelId
-from ai.backend.manager.data.metric.types import KernelLiveStatBatchResult
+from ai.backend.manager.clients.prometheus.metric_types import KernelLiveStatBatchResult
 from ai.backend.manager.services.metric.actions.base import (
     QueryMetricAction,
     QueryMetricActionResult,

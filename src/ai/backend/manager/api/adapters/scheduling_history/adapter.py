@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     SessionHistoryNode,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import SubStepResultInfo
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
@@ -537,7 +538,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         input: AdminSearchRouteHistoriesInput,
     ) -> AdminSearchRouteHistoriesPayload:
         """Search route histories scoped to a route."""
-        scope = RouteHistorySearchScope(route_id=route_id)
+        scope = RouteHistorySearchScope(route_id=ReplicaID(route_id))
         querier = self._build_route_querier(input)
         action_result = (
             await self._processors.scheduling_history.search_route_scoped_history.wait_for_complete(
@@ -760,6 +761,8 @@ class SchedulingHistoryAdapter(BaseAdapter):
             phase=data.phase,
             from_status=data.from_status,
             to_status=data.to_status,
+            from_sub_status=data.from_sub_status,
+            to_sub_status=data.to_sub_status,
             result=data.result.value,
             error_code=data.error_code,
             message=data.message,

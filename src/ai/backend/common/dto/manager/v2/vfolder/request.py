@@ -42,6 +42,7 @@ __all__ = (
     "MkdirInput",
     "MoveFileInput",
     "PurgeVFolderInput",
+    "PurgeVFolderOptions",
     "RenameFileInput",
     "RestoreVFolderInput",
     "ShareVFolderInput",
@@ -147,10 +148,34 @@ class DeleteVFolderInput(BaseRequestModel):
     id: UUID = Field(description="VFolder ID to delete")
 
 
-class PurgeVFolderInput(BaseRequestModel):
-    """Input for purging a virtual folder."""
+class PurgeVFolderOptions(BaseRequestModel):
+    """Optional behavior flags for vfolder purge operations.
 
-    id: UUID = Field(description="VFolder ID to purge")
+    Wrapped as a nested object so future flags can be added without
+    flattening the input shape further.
+    """
+
+    cascade_model_card: bool = Field(
+        default=False,
+        description=(
+            "If true, also delete model card record(s) referencing the vfolder. "
+            "If false, the request is rejected when any model card still references it."
+        ),
+    )
+
+
+class PurgeVFolderInput(BaseRequestModel):
+    """Input for purging a virtual folder.
+
+    The target vfolder is identified exclusively by the URL path
+    parameter; the body carries only behavior flags so there is no
+    chance of a path/body id mismatch.
+    """
+
+    options: PurgeVFolderOptions = Field(
+        default_factory=PurgeVFolderOptions,
+        description="Optional behavior flags for the purge.",
+    )
 
 
 class BulkDeleteVFoldersInput(BaseRequestModel):
@@ -163,6 +188,10 @@ class BulkPurgeVFoldersInput(BaseRequestModel):
     """Input for permanently purging multiple virtual folders."""
 
     ids: list[UUID] = Field(description="List of VFolder UUIDs to purge.")
+    options: PurgeVFolderOptions = Field(
+        default_factory=PurgeVFolderOptions,
+        description="Optional behavior flags applied to every vfolder in the batch.",
+    )
 
 
 class RestoreVFolderInput(BaseRequestModel):

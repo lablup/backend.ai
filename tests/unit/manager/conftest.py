@@ -3,24 +3,30 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+import uuid
 from collections.abc import Callable, Generator
 from functools import partial
 from pathlib import Path
 from typing import Any
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.lock import FileLock
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
     redis_container,
 )
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -129,3 +135,39 @@ def file_lock_factory(
         return lock
 
     return _make_lock
+
+
+@pytest.fixture
+def domain_factory() -> DomainFactory:
+    """Return an async callable that inserts a domain row and returns its identifiers.
+
+    The factory takes the target SQLAlchemy engine (so each test class can
+    supply its own ``with_tables``-managed engine) along with any keyword
+    overrides for the ``domains`` row. The returned ``DomainFixtureData``
+    exposes both ``domain_name`` and ``domain_id`` so call sites are ready for
+    the upcoming domain PK migration to UUID.
+    """
+
+    async def _create(
+        engine: ExtendedAsyncSAEngine,
+        **overrides: Any,
+    ) -> DomainFixtureData:
+        values: dict[str, Any] = {
+            "name": f"test-domain-{uuid.uuid4().hex[:8]}",
+            "description": "Test domain",
+            "is_active": True,
+            "total_resource_slots": ResourceSlot({}),
+            "allowed_vfolder_hosts": VFolderHostPermissionMap({}),
+            "allowed_docker_registries": [],
+            "dotfiles": b"",
+            "integration_id": None,
+        }
+        values.update(overrides)
+        async with engine.begin() as conn:
+            result = await conn.execute(
+                sa.insert(domains).values(values).returning(domains.c.id, domains.c.name)
+            )
+            row = result.one()
+        return DomainFixtureData(domain_name=row.name, domain_id=row.id)
+
+    return _create
