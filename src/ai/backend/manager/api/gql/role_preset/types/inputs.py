@@ -86,6 +86,7 @@ class CreateRolePresetInputGQL(PydanticInputMixin[CreateRolePresetInputDTO]):
     name="UpdateRolePresetInput",
 )
 class UpdateRolePresetInputGQL(PydanticInputMixin[UpdateRolePresetInputDTO]):
+    role_preset_id: ID = gql_field(description="Role preset UUID to update.")
     name: str | None = gql_field(description="Updated name.", default=UNSET)
     auto_assign: bool | None = gql_field(
         description="Updated default value for the `auto_assign` flag of instantiated roles.",

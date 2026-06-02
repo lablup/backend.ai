@@ -6,7 +6,7 @@ layer happens in a follow-up task.
 
 from __future__ import annotations
 
-from strawberry import ID, Info
+from strawberry import Info
 
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
@@ -55,7 +55,6 @@ async def admin_create_role_preset(
 )
 async def admin_update_role_preset(
     info: Info[StrawberryGQLContext],
-    id: ID,
     input: UpdateRolePresetInputGQL,
 ) -> UpdateRolePresetPayloadGQL | None:
     check_admin_only()
