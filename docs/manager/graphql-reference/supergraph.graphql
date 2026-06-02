@@ -1904,6 +1904,9 @@ Added in UNRELEASED. Input for bulk-adding permission entries to an existing rol
 input BulkAddRolePermissionPresetsInput
   @join__type(graph: STRAWBERRY)
 {
+  """ID of the role preset to add permissions to."""
+  rolePresetId: ID!
+
   """Permission entries to insert. Duplicates are surfaced as failures."""
   permissions: [RolePermissionPresetEntryInput!]!
 }
@@ -11513,7 +11516,7 @@ type Mutation
   """
   Added in UNRELEASED. Bulk-add permission entries to an existing role preset (admin only).
   """
-  adminBulkAddRolePresetPermissions(rolePresetId: ID!, input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload @join__field(graph: STRAWBERRY)
+  adminBulkAddRolePresetPermissions(input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in UNRELEASED. Bulk-remove permission entries from a role preset (admin only).

@@ -1307,6 +1307,9 @@ type BulkAddRolePermissionPresetFailureInfo {
 Added in UNRELEASED. Input for bulk-adding permission entries to an existing role preset.
 """
 input BulkAddRolePermissionPresetsInput {
+  """ID of the role preset to add permissions to."""
+  rolePresetId: ID!
+
   """Permission entries to insert. Duplicates are surfaced as failures."""
   permissions: [RolePermissionPresetEntryInput!]!
 }
@@ -7398,7 +7401,7 @@ type Mutation {
   """
   Added in UNRELEASED. Bulk-add permission entries to an existing role preset (admin only).
   """
-  adminBulkAddRolePresetPermissions(rolePresetId: ID!, input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload
+  adminBulkAddRolePresetPermissions(input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload
 
   """
   Added in UNRELEASED. Bulk-remove permission entries from a role preset (admin only).
