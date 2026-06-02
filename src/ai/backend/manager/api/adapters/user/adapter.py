@@ -54,6 +54,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
 from ai.backend.common.dto.manager.v2.user.response import (
     AdminSearchUsersPayload,
     BulkCreateUsersPayload,
+    BulkCreateUsersWithKeypairPayload,
     BulkCreateUserV2Error,
     BulkPurgeUsersPayload,
     BulkPurgeUserV2Error,
@@ -430,7 +431,11 @@ class UserAdapter(BaseAdapter):
         result = await self._processors.user.create_user.wait_for_complete(
             CreateUserAction(creator=Creator(spec=spec), group_ids=group_ids)
         )
-        return CreateUserPayload(user=self._user_data_to_node(result.data.user))
+        return CreateUserPayload(
+            user=self._user_data_to_node(result.data.user),
+            keypair=self._keypair_data_to_node(result.data.keypair),
+            secret_key=str(result.data.keypair.secret_key),
+        )
 
     async def modify_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
         """Update a user by UUID."""
@@ -570,9 +575,13 @@ class UserAdapter(BaseAdapter):
     # ------------------------------------------------------------------ bulk create/update/purge
 
     async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUsersPayload:
-        """Bulk-create users. Each item's transformation is the caller's responsibility."""
+        """Bulk-create users. Each item's transformation is the caller's responsibility.
+
+        Deprecated: the generated keypairs are not returned. Use
+        :meth:`bulk_create_users_with_keypair` instead.
+        """
         result = await self._processors.user.bulk_create_users.wait_for_complete(action)
-        created_users = [self._user_data_to_node(u) for u in result.data.successes]
+        created_users = [self._user_data_to_node(item.user) for item in result.data.successes]
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
@@ -583,6 +592,33 @@ class UserAdapter(BaseAdapter):
             for error in result.data.failures
         ]
         return BulkCreateUsersPayload(created_users=created_users, failed=failed)
+
+    async def bulk_create_users_with_keypair(
+        self, action: BulkCreateUserAction
+    ) -> BulkCreateUsersWithKeypairPayload:
+        """Bulk-create users, returning each user's generated default keypair.
+
+        The secret key of each keypair is only returned here at creation time.
+        """
+        result = await self._processors.user.bulk_create_users.wait_for_complete(action)
+        created = [
+            CreateUserPayload(
+                user=self._user_data_to_node(item.user),
+                keypair=self._keypair_data_to_node(item.keypair),
+                secret_key=str(item.keypair.secret_key),
+            )
+            for item in result.data.successes
+        ]
+        failed = [
+            BulkCreateUserV2Error(
+                index=error.index,
+                username=cast(UserCreatorSpec, error.spec).username,
+                email=cast(UserCreatorSpec, error.spec).email,
+                message=str(error.exception),
+            )
+            for error in result.data.failures
+        ]
+        return BulkCreateUsersWithKeypairPayload(created=created, failed=failed)
 
     async def bulk_modify_users(self, action: BulkModifyUserAction) -> BulkUpdateUsersPayload:
         """Bulk-modify users. Each item's transformation is the caller's responsibility."""

@@ -9,6 +9,9 @@ from ai.backend.common.dto.manager.v2.user.response import (
     BulkCreateUsersPayload as BulkCreateUsersPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.user.response import (
+    BulkCreateUsersWithKeypairPayload as BulkCreateUsersWithKeypairPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
     BulkCreateUserV2Error as BulkCreateUserV2ErrorDTO,
 )
 from ai.backend.common.dto.manager.v2.user.response import (
@@ -44,11 +47,14 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload as UpdateUserPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.keypair.types.node import KeyPairGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 from .node import UserV2GQL
@@ -68,10 +74,21 @@ class CreateUserPayloadGQL(PydanticOutputMixin[CreateUserPayloadDTO]):
     """Payload for single user creation."""
 
     user: UserV2GQL = gql_field(description="The newly created user.")
-    # Note: keypair field can be added when KeyPairGQL is available
-    # keypair: KeyPairGQL = strawberry.field(
-    #     description="The automatically generated keypair for the user."
-    # )
+    keypair: KeyPairGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The default keypair automatically generated for the user.",
+        )
+    )
+    secret_key: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The secret key of the generated keypair. "
+                "This value is only returned at creation time."
+            ),
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -95,6 +112,7 @@ class BulkCreateUserV2ErrorGQL:
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Payload for bulk user creation mutation.",
+        deprecated_version="26.4.4",
     ),
     model=BulkCreateUsersPayloadDTO,
     name="BulkCreateUsersV2Payload",
@@ -103,6 +121,27 @@ class BulkCreateUsersV2PayloadGQL(PydanticOutputMixin[BulkCreateUsersPayloadDTO]
     """Payload for bulk user creation."""
 
     created_users: list[UserV2GQL] = gql_field(description="List of successfully created users.")
+    failed: list[BulkCreateUserV2ErrorGQL] = gql_field(
+        description="List of errors for users that failed to create."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for bulk user creation, including each user's generated keypair.",
+    ),
+    model=BulkCreateUsersWithKeypairPayloadDTO,
+    name="BulkCreateUsersWithKeypairV2Payload",
+)
+class BulkCreateUsersWithKeypairV2PayloadGQL(
+    PydanticOutputMixin[BulkCreateUsersWithKeypairPayloadDTO]
+):
+    """Payload for bulk user creation, including each user's generated keypair."""
+
+    created: list[CreateUserPayloadGQL] = gql_field(
+        description="List of successfully created users with their generated keypairs."
+    )
     failed: list[BulkCreateUserV2ErrorGQL] = gql_field(
         description="List of errors for users that failed to create."
     )
