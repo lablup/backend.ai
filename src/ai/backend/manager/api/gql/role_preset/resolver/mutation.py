@@ -16,12 +16,18 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.role_preset.types import (
     BulkAddRolePermissionPresetsInputGQL,
     BulkAddRolePermissionPresetsPayloadGQL,
+    BulkDeleteRolePresetsInputGQL,
+    BulkDeleteRolePresetsPayloadGQL,
     BulkPurgeRolePresetsInputGQL,
     BulkPurgeRolePresetsPayloadGQL,
     BulkRemoveRolePermissionPresetsInputGQL,
     BulkRemoveRolePermissionPresetsPayloadGQL,
+    BulkRestoreRolePresetsInputGQL,
+    BulkRestoreRolePresetsPayloadGQL,
     CreateRolePresetInputGQL,
     CreateRolePresetPayloadGQL,
+    UpdateRolePresetInputGQL,
+    UpdateRolePresetPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -37,6 +43,48 @@ async def admin_create_role_preset(
     info: Info[StrawberryGQLContext],
     input: CreateRolePresetInputGQL,
 ) -> CreateRolePresetPayloadGQL | None:
+    check_admin_only()
+    raise NotImplementedError
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update an existing role preset's metadata (admin only).",
+    )
+)
+async def admin_update_role_preset(
+    info: Info[StrawberryGQLContext],
+    input: UpdateRolePresetInputGQL,
+) -> UpdateRolePresetPayloadGQL | None:
+    check_admin_only()
+    raise NotImplementedError
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Bulk-soft-delete role presets (admin only).",
+    )
+)
+async def admin_delete_role_presets(
+    info: Info[StrawberryGQLContext],
+    input: BulkDeleteRolePresetsInputGQL,
+) -> BulkDeleteRolePresetsPayloadGQL | None:
+    check_admin_only()
+    raise NotImplementedError
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Bulk-restore soft-deleted role presets (admin only).",
+    )
+)
+async def admin_restore_role_presets(
+    info: Info[StrawberryGQLContext],
+    input: BulkRestoreRolePresetsInputGQL,
+) -> BulkRestoreRolePresetsPayloadGQL | None:
     check_admin_only()
     raise NotImplementedError
 

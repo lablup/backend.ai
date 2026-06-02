@@ -14,10 +14,19 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry as RolePermissionPresetEntryDTO,
 )
 from ai.backend.common.dto.manager.v2.role_preset.request import (
+    BulkDeleteRolePresetsInput as BulkDeleteRolePresetsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.role_preset.request import (
     BulkPurgeRolePresetsInput as BulkPurgeRolePresetsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.role_preset.request import (
+    BulkRestoreRolePresetsInput as BulkRestoreRolePresetsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.role_preset.request import (
     CreateRolePresetInput as CreateRolePresetInputDTO,
+)
+from ai.backend.common.dto.manager.v2.role_preset.request import (
+    UpdateRolePresetInput as UpdateRolePresetInputDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
@@ -63,8 +72,48 @@ class CreateRolePresetInputGQL(PydanticInputMixin[CreateRolePresetInputDTO]):
     )
     permissions: list[RolePermissionPresetEntryInputGQL] = gql_field(
         description="Permission entries carried by the preset.",
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Input for updating a role preset's metadata. Permission entries are managed via the "
+            "dedicated add/remove mutations; the `deleted` flag via delete/restore mutations."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="UpdateRolePresetInput",
+)
+class UpdateRolePresetInputGQL(PydanticInputMixin[UpdateRolePresetInputDTO]):
+    role_preset_id: ID = gql_field(description="Role preset UUID to update.")
+    name: str | None = gql_field(description="Updated name.", default=UNSET)
+    auto_assign: bool | None = gql_field(
+        description="Updated default value for the `auto_assign` flag of instantiated roles.",
         default=UNSET,
     )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk-soft-deleting role presets.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="BulkDeleteRolePresetsInput",
+)
+class BulkDeleteRolePresetsInputGQL(PydanticInputMixin[BulkDeleteRolePresetsInputDTO]):
+    role_preset_ids: list[ID] = gql_field(description="Role preset UUIDs to soft-delete.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk-restoring soft-deleted role presets.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="BulkRestoreRolePresetsInput",
+)
+class BulkRestoreRolePresetsInputGQL(PydanticInputMixin[BulkRestoreRolePresetsInputDTO]):
+    role_preset_ids: list[ID] = gql_field(description="Role preset UUIDs to restore.")
 
 
 @gql_pydantic_input(

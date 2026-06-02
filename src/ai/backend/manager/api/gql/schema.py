@@ -367,9 +367,12 @@ from .role_preset import (
     admin_bulk_add_role_preset_permissions,
     admin_bulk_remove_role_preset_permissions,
     admin_create_role_preset,
+    admin_delete_role_presets,
     admin_purge_role_presets,
+    admin_restore_role_presets,
     admin_role_preset,
     admin_role_presets,
+    admin_update_role_preset,
 )
 from .runtime_variant import (
     admin_create_runtime_variant,
@@ -832,6 +835,9 @@ class Mutation:
     admin_delete_prometheus_query_preset_category = admin_delete_prometheus_query_preset_category
     # Role Preset - Admin APIs
     admin_create_role_preset = admin_create_role_preset
+    admin_update_role_preset = admin_update_role_preset
+    admin_delete_role_presets = admin_delete_role_presets
+    admin_restore_role_presets = admin_restore_role_presets
     admin_purge_role_presets = admin_purge_role_presets
     admin_bulk_add_role_preset_permissions = admin_bulk_add_role_preset_permissions
     admin_bulk_remove_role_preset_permissions = admin_bulk_remove_role_preset_permissions
