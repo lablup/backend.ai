@@ -1290,6 +1290,42 @@ type BulkAddRolePermissionFailureInfo {
 }
 
 """
+Added in UNRELEASED. Failure detail for a single permission entry in a bulk add operation.
+"""
+type BulkAddRolePermissionPresetFailureInfo {
+  """Entity type of the permission entry that failed."""
+  entityType: RBACElementType!
+
+  """Operation of the permission entry that failed."""
+  operation: OperationType!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-adding permission entries to an existing role preset.
+"""
+input BulkAddRolePermissionPresetsInput {
+  """ID of the role preset to add permissions to."""
+  rolePresetId: ID!
+
+  """Permission entries to insert. Duplicates are surfaced as failures."""
+  permissions: [RolePermissionPresetEntryInput!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-adding permission entries to a role preset.
+"""
+type BulkAddRolePermissionPresetsPayload {
+  """Permission entries that were added."""
+  items: [RolePermissionPreset!]!
+
+  """Permission entries that failed to be added (e.g., duplicates)."""
+  failed: [BulkAddRolePermissionPresetFailureInfo!]!
+}
+
+"""
 Added in UNRELEASED. Input for bulk-inserting scoped permissions across one or more roles
 """
 input BulkAddRolePermissionsInput {
@@ -1405,6 +1441,23 @@ type BulkDeleteVFoldersV2Payload {
   deletedCount: Int!
 }
 
+"""Added in UNRELEASED. Input for bulk-hard-deleting role presets."""
+input BulkPurgeRolePresetsInput {
+  """Role preset UUIDs to purge."""
+  rolePresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-hard-deleting role presets.
+"""
+type BulkPurgeRolePresetsPayload {
+  """Role presets that were purged."""
+  items: [RolePreset!]!
+
+  """Role preset IDs that failed to purge."""
+  failed: [BulkRolePresetFailureInfo!]!
+}
+
 """Added in 26.3.0. Error information for a failed user in bulk purge."""
 type BulkPurgeUserV2Error {
   """UUID of the user that failed to purge."""
@@ -1490,6 +1543,25 @@ type BulkRemoveRolePermissionFailureInfo {
 }
 
 """
+Added in UNRELEASED. Input for bulk-removing permission entries from a role preset.
+"""
+input BulkRemoveRolePermissionPresetsInput {
+  """Permission entry row IDs to delete."""
+  permissionPresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-removing permission entries from a role preset.
+"""
+type BulkRemoveRolePermissionPresetsPayload {
+  """Permission entries that were removed."""
+  items: [RolePermissionPreset!]!
+
+  """Permission entry IDs that failed to delete."""
+  failed: [BulkRolePermissionPresetFailureInfo!]!
+}
+
+"""
 Added in UNRELEASED. Input for bulk-deleting permission rows by primary key
 """
 input BulkRemoveRolePermissionsInput {
@@ -1529,6 +1601,28 @@ type BulkRevokeRolePayload {
 
   """Users that failed to be revoked"""
   failed: [BulkRevokeRoleError!]!
+}
+
+"""
+Added in UNRELEASED. Failure detail for a single permission entry in a bulk operation.
+"""
+type BulkRolePermissionPresetFailureInfo {
+  """role_permission_presets row ID that the operation failed on."""
+  permissionPresetId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Failure detail for a single role preset ID in a bulk operation.
+"""
+type BulkRolePresetFailureInfo {
+  """Role preset ID that the operation failed on."""
+  rolePresetId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk update."""
@@ -2480,6 +2574,29 @@ input CreateRoleInvitationInput {
 type CreateRoleInvitationPayload {
   """List of created role invitations."""
   items: [RoleInvitation!]!
+}
+
+"""Added in UNRELEASED. Input for creating a new role preset."""
+input CreateRolePresetInput {
+  """Role preset name."""
+  name: String!
+
+  """Scope type this preset targets (e.g., domain, project)."""
+  scopeType: RBACElementType!
+
+  """
+  Default value for the `auto_assign` flag on roles instantiated from this preset.
+  """
+  autoAssign: Boolean! = false
+
+  """Permission entries carried by the preset."""
+  permissions: [RolePermissionPresetEntryInput!]!
+}
+
+"""Added in UNRELEASED. Payload returned after creating a role preset."""
+type CreateRolePresetPayload {
+  """Created role preset."""
+  rolePreset: RolePreset!
 }
 
 """Added in 26.4.2. Input for creating a runtime variant."""
@@ -7275,6 +7392,22 @@ type Mutation {
   """Added in 26.3.0. Delete a query preset category (admin only)."""
   adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload
 
+  """Added in UNRELEASED. Create a new role preset (admin only)."""
+  adminCreateRolePreset(input: CreateRolePresetInput!): CreateRolePresetPayload
+
+  """Added in UNRELEASED. Bulk-hard-delete role presets (admin only)."""
+  adminPurgeRolePresets(input: BulkPurgeRolePresetsInput!): BulkPurgeRolePresetsPayload
+
+  """
+  Added in UNRELEASED. Bulk-add permission entries to an existing role preset (admin only).
+  """
+  adminBulkAddRolePresetPermissions(input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload
+
+  """
+  Added in UNRELEASED. Bulk-remove permission entries from a role preset (admin only).
+  """
+  adminBulkRemoveRolePresetPermissions(input: BulkRemoveRolePermissionPresetsInput!): BulkRemoveRolePermissionPresetsPayload
+
   """Added in 26.3.0. Create a new role (admin only)."""
   adminCreateRole(input: CreateRoleInput!): Role
 
@@ -9095,6 +9228,14 @@ type Query {
   """
   prometheusQueryPresetCategories(filter: CategoryFilter = null, orderBy: [CategoryOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [QueryPresetCategory!]
 
+  """Added in UNRELEASED. Get a single role preset by ID (admin only)."""
+  adminRolePreset(id: ID!): RolePreset
+
+  """
+  Added in UNRELEASED. List role presets with filtering and pagination (admin only).
+  """
+  adminRolePresets(filter: RolePresetFilter = null, orderBy: [RolePresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePresetConnection
+
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role
 
@@ -10881,6 +11022,207 @@ input RoleOrderBy {
 """Added in 26.3.0. Role ordering field"""
 enum RoleOrderField {
   NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Added in UNRELEASED. A stored permission entry under a role preset."""
+type RolePermissionPreset implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the parent role preset."""
+  rolePresetId: UUID!
+
+  """Entity type the permission applies to."""
+  entityType: RBACElementType!
+
+  """Operation granted by the permission."""
+  operation: OperationType!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+}
+
+"""
+Added in UNRELEASED. Paginated connection for role permission preset entries.
+"""
+type RolePermissionPresetConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RolePermissionPresetEdge!]!
+
+  """Total number of permission entries matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RolePermissionPresetEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RolePermissionPreset!
+}
+
+"""
+Added in UNRELEASED. A single (entity_type, operation) pair carried by a role preset.
+"""
+input RolePermissionPresetEntryInput {
+  """Entity type the permission applies to."""
+  entityType: RBACElementType!
+
+  """Operation granted by the permission."""
+  operation: OperationType!
+}
+
+"""
+Added in UNRELEASED. Filter input for role permission preset entries. Also used as the input for the `permission_presets` field resolver on a role preset (the resolver injects `role_preset_id` from its parent).
+"""
+input RolePermissionPresetFilter {
+  """Filter by parent role preset ID."""
+  rolePresetId: UUIDFilter = null
+
+  """Filter by entity type the permission applies to."""
+  entityType: RBACElementTypeFilter = null
+
+  """Filter by granted operation."""
+  operation: OperationTypeFilter = null
+
+  """Filter by creation timestamp."""
+  createdAt: DateTimeFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [RolePermissionPresetFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [RolePermissionPresetFilter!] = null
+
+  """Negate the specified filters. Matching records are excluded."""
+  NOT: [RolePermissionPresetFilter!] = null
+}
+
+"""
+Added in UNRELEASED. Specifies ordering for role permission preset entries.
+"""
+input RolePermissionPresetOrderBy {
+  """The field to order by."""
+  field: RolePermissionPresetOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering role permission preset entries.
+"""
+enum RolePermissionPresetOrderField {
+  ENTITY_TYPE
+  OPERATION
+  CREATED_AT
+}
+
+"""
+Added in UNRELEASED. Role preset entity implementing the Relay Node pattern.
+"""
+type RolePreset implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Role preset name."""
+  name: String!
+
+  """Scope type this preset targets (e.g., domain, project)."""
+  scopeType: RBACElementType!
+
+  """
+  Default value for the `auto_assign` flag copied onto roles instantiated from this preset.
+  """
+  autoAssign: Boolean!
+
+  """
+  Soft-delete flag. Set by the delete mutation and cleared by the restore mutation; archived rows are excluded from default searches.
+  """
+  deleted: Boolean!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last modification timestamp."""
+  updatedAt: DateTime!
+
+  """Added in UNRELEASED. Permission entries carried by this role preset."""
+  permissionPresets(filter: RolePermissionPresetFilter = null, orderBy: [RolePermissionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePermissionPresetConnection
+}
+
+"""Added in UNRELEASED. Paginated connection for role preset records."""
+type RolePresetConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RolePresetEdge!]!
+
+  """Total number of role preset records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RolePresetEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RolePreset!
+}
+
+"""Added in UNRELEASED. Filter input for querying role presets."""
+input RolePresetFilter {
+  """Filter by name."""
+  name: StringFilter = null
+
+  """Filter by scope type."""
+  scopeType: RBACElementTypeFilter = null
+
+  """Filter by auto-assign flag."""
+  autoAssign: Boolean = null
+
+  """
+  Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to `true` to inspect archived presets.
+  """
+  deleted: Boolean = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [RolePresetFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [RolePresetFilter!] = null
+
+  """Negate the specified filters. Matching records are excluded."""
+  NOT: [RolePresetFilter!] = null
+}
+
+"""Added in UNRELEASED. Specifies ordering for role preset results."""
+input RolePresetOrderBy {
+  """The field to order by."""
+  field: RolePresetOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering role preset results.
+"""
+enum RolePresetOrderField {
+  NAME
+  SCOPE_TYPE
   CREATED_AT
   UPDATED_AT
 }
