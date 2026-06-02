@@ -11,7 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.keypair.types import KeypairOrderField
 
@@ -25,11 +25,23 @@ __all__ = (
     "AdminUpdateKeypairInput",
     "KeypairFilter",
     "KeypairOrderBy",
+    "KeypairUserNestedFilter",
     "RevokeMyKeypairInput",
     "SearchMyKeypairsRequest",
     "SwitchMyMainAccessKeyInput",
     "UpdateMyKeypairInput",
 )
+
+
+class KeypairUserNestedFilter(BaseRequestModel):
+    """Nested filter for the user that owns a keypair.
+
+    Filters keypairs to those owned by a user matching the specified conditions.
+    """
+
+    user_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the UUID of the keypair owner."
+    )
 
 
 class KeypairFilter(BaseRequestModel):
@@ -39,6 +51,13 @@ class KeypairFilter(BaseRequestModel):
     is_admin: bool | None = None
     access_key: StringFilter | None = None
     resource_policy: StringFilter | None = None
+    user: KeypairUserNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Nested filter on the keypair's owner. "
+            "Matches keypairs owned by a user satisfying the conditions."
+        ),
+    )
     created_at: DateTimeFilter | None = None
     last_used: DateTimeFilter | None = None
 

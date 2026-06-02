@@ -5554,6 +5554,11 @@ input KeypairFilter {
   isAdmin: Boolean = null
   accessKey: StringFilter = null
   resourcePolicy: StringFilter = null
+
+  """
+  Added in UNRELEASED. Filter keypairs by their owner. A keypair matches if its owner satisfies the conditions.
+  """
+  user: KeypairUserNestedFilter = null
   createdAt: DateTimeFilter = null
   lastUsed: DateTimeFilter = null
   AND: [KeypairFilter!] = null
@@ -5701,6 +5706,13 @@ enum KeypairResourcePolicyV2OrderField {
   IDLE_TIMEOUT
   MAX_CONCURRENT_SFTP_SESSIONS
   MAX_PENDING_SESSION_COUNT
+}
+
+"""
+Added in UNRELEASED. Nested filter for the user that owns a keypair. Filters keypairs to those owned by a user matching the specified conditions.
+"""
+input KeypairUserNestedFilter {
+  userId: UUIDFilter = null
 }
 
 """Added in 26.4.2. Input for listing files in a virtual folder."""

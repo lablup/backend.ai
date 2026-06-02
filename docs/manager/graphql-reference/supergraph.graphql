@@ -8396,6 +8396,11 @@ input KeypairFilter
   isAdmin: Boolean = null
   accessKey: StringFilter = null
   resourcePolicy: StringFilter = null
+
+  """
+  Added in UNRELEASED. Filter keypairs by their owner. A keypair matches if its owner satisfies the conditions.
+  """
+  user: KeypairUserNestedFilter = null
   createdAt: DateTimeFilter = null
   lastUsed: DateTimeFilter = null
   AND: [KeypairFilter!] = null
@@ -8666,6 +8671,15 @@ enum KeypairResourcePolicyV2OrderField
   IDLE_TIMEOUT @join__enumValue(graph: STRAWBERRY)
   MAX_CONCURRENT_SFTP_SESSIONS @join__enumValue(graph: STRAWBERRY)
   MAX_PENDING_SESSION_COUNT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in UNRELEASED. Nested filter for the user that owns a keypair. Filters keypairs to those owned by a user matching the specified conditions.
+"""
+input KeypairUserNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  userId: UUIDFilter = null
 }
 
 type KVPair
