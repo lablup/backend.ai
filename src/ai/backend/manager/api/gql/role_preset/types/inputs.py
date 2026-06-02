@@ -88,6 +88,7 @@ class BulkPurgeRolePresetsInputGQL(PydanticInputMixin[BulkPurgeRolePresetsInputD
 class BulkAddRolePermissionPresetsInputGQL(
     PydanticInputMixin[BulkAddRolePermissionPresetsInputDTO]
 ):
+    role_preset_id: ID = gql_field(description="ID of the role preset to add permissions to.")
     permissions: list[RolePermissionPresetEntryInputGQL] = gql_field(
         description="Permission entries to insert. Duplicates are surfaced as failures."
     )
