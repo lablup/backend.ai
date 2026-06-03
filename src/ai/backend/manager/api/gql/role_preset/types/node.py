@@ -4,11 +4,18 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from strawberry import Info
-from strawberry.relay import Connection, Edge, NodeID
+from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
+    RolePermissionPresetFilter,
+    RolePermissionPresetOrder,
+    SearchRolePermissionPresetsInput,
+)
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
+from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -23,7 +30,9 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .permission import (
     RolePermissionPresetConnection,
+    RolePermissionPresetEdge,
     RolePermissionPresetFilterGQL,
+    RolePermissionPresetGQL,
     RolePermissionPresetOrderByGQL,
 )
 
@@ -74,7 +83,40 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
         limit: int | None = None,
         offset: int | None = None,
     ) -> RolePermissionPresetConnection | None:
-        raise NotImplementedError
+        filter_dto: RolePermissionPresetFilter | None = filter.to_pydantic() if filter else None
+        orders_dto: list[RolePermissionPresetOrder] | None = (
+            [o.to_pydantic() for o in order_by] if order_by else None
+        )
+        search_input = SearchRolePermissionPresetsInput(
+            filter=filter_dto,
+            order=orders_dto,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+        result = await info.context.adapters.role_preset.search_permission_presets(
+            RolePresetID(UUID(str(self.id))), search_input
+        )
+        edges = [
+            RolePermissionPresetEdge(
+                node=RolePermissionPresetGQL.from_pydantic(item),
+                cursor=str(item.id),
+            )
+            for item in result.items
+        ]
+        return RolePermissionPresetConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=result.total_count,
+        )
 
 
 RolePresetEdge = Edge[RolePresetGQL]
