@@ -59,6 +59,13 @@ class RoleNode(BaseResponseModel):
     description: str | None = Field(default=None, description="Role description")
     source: RoleSourceDTO = Field(description="Role source")
     status: RoleStatusDTO = Field(description="Role status")
+    auto_assign: bool = Field(
+        default=False,
+        description=(
+            "When true, the role is automatically granted to a user when the user is added "
+            "to a scope this role is registered in."
+        ),
+    )
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
     deleted_at: datetime | None = Field(default=None, description="Deletion timestamp")

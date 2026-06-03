@@ -657,6 +657,7 @@ class RBACAdapter(BaseAdapter):
                 source=InternalRoleSource(input.source.value),
                 status=InternalRoleStatus.ACTIVE,
                 description=input.description,
+                auto_assign=input.auto_assign,
             )
         )
         action_result = await self._processors.permission_controller.create_role.wait_for_complete(
@@ -1719,6 +1720,7 @@ class RBACAdapter(BaseAdapter):
         name: OptionalState[str] = OptionalState.nop()
         status: OptionalState[InternalRoleStatus] = OptionalState.nop()
         description: TriState[str] = TriState.nop()
+        auto_assign: OptionalState[bool] = OptionalState.nop()
 
         if input.name is not None:
             name = OptionalState.update(input.name)
@@ -1729,8 +1731,12 @@ class RBACAdapter(BaseAdapter):
                 description = TriState.nullify()
             else:
                 description = TriState.update(str(input.description))
+        if input.auto_assign is not None:
+            auto_assign = OptionalState.update(input.auto_assign)
 
-        spec = RoleUpdaterSpec(name=name, status=status, description=description)
+        spec = RoleUpdaterSpec(
+            name=name, status=status, description=description, auto_assign=auto_assign
+        )
         return Updater(spec=spec, pk_value=role_id)
 
     @staticmethod
@@ -1741,6 +1747,7 @@ class RBACAdapter(BaseAdapter):
             description=data.description,
             source=RoleSourceDTO(data.source.value),
             status=RoleStatusDTO(data.status.value),
+            auto_assign=data.auto_assign,
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
@@ -1754,6 +1761,7 @@ class RBACAdapter(BaseAdapter):
             description=data.description,
             source=RoleSourceDTO(data.source.value),
             status=RoleStatusDTO(data.status.value),
+            auto_assign=data.auto_assign,
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
