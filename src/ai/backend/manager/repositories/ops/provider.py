@@ -105,7 +105,7 @@ class _RoleScopeAssociationSpec(CreatorSpec[AssociationScopesEntitiesRow]):
 class _ScopePermissionsPurgeSpec(BatchPurgerSpec[PermissionRow]):
     """Select every permission row pinned to a scope, derived from its context.
 
-    Mirrors how :meth:`ScopeWriteOps._build_permission_row_from_preset` stamps
+    Mirrors how :meth:`ScopeWriteOps._collect_role_entries_for_scope_type` stamps
     ``scope_type`` / ``scope_id`` onto each permission at provisioning time.
     """
 
@@ -330,27 +330,6 @@ class ScopeWriteOps:
     def __init__(self, sess: SASession) -> None:
         self._sess = sess
 
-    def _build_role_row_from_preset(self, preset: RolePresetRow) -> RoleRow:
-        """Build a role row as a shallow snapshot of a role preset."""
-        return RoleRow(name=preset.name)
-
-    def _build_permission_row_from_preset(
-        self,
-        preset: RolePermissionPresetRow,
-        scope_context: ScopeContext,
-    ) -> PermissionRow:
-        """Build a permission row from a role_permission_preset entry.
-
-        ``role_id`` is left unset; the orchestrator back-fills it after the
-        owning role row is flushed.
-        """
-        return PermissionRow(
-            scope_type=scope_context.scope_type.to_scope_type(),
-            scope_id=scope_context.scope_id,
-            entity_type=preset.entity_type,
-            operation=preset.operation,
-        )
-
     async def _collect_role_entries_for_scope_type(
         self,
         scope_context: ScopeContext,
@@ -379,11 +358,18 @@ class ScopeWriteOps:
         for preset, permission_preset in rows:
             entry = entries_by_id.setdefault(
                 preset.id,
-                _RoleEntry(role=self._build_role_row_from_preset(preset), permissions=[]),
+                _RoleEntry(role=RoleRow(name=preset.name), permissions=[]),
             )
             if permission_preset is not None:
+                # ``role_id`` is left unset; it is back-filled after the owning
+                # role row is flushed.
                 entry.permissions.append(
-                    self._build_permission_row_from_preset(permission_preset, scope_context)
+                    PermissionRow(
+                        scope_type=scope_context.scope_type.to_scope_type(),
+                        scope_id=scope_context.scope_id,
+                        entity_type=permission_preset.entity_type,
+                        operation=permission_preset.operation,
+                    )
                 )
         return list(entries_by_id.values())
 
