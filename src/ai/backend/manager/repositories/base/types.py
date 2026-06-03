@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 
 if TYPE_CHECKING:
@@ -18,6 +19,18 @@ if TYPE_CHECKING:
 
 # QueryCondition now returns a ColumnElement (whereclause) instead of modifying stmt
 type QueryCondition = Callable[[], sa.sql.expression.ColumnElement[bool]]
+
+
+@dataclass(frozen=True)
+class ScopeContext:
+    """Locator for a scope row.
+
+    Carries the ``(scope_type, scope_id)`` pair used by downstream RBAC tables
+    (``permissions``, ``association_scopes_entities``) to reference the scope.
+    """
+
+    scope_type: RBACElementType
+    scope_id: str
 
 
 T = TypeVar("T")

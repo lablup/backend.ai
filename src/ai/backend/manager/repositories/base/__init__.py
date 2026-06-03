@@ -69,6 +69,7 @@ from .types import (
     IntegrityErrorCheck,
     QueryCondition,
     QueryOrder,
+    ScopeContext,
     SearchScope,
 )
 from .updater import (
@@ -106,6 +107,7 @@ __all__ = [
     "CursorConditionFactory",
     "ExistenceCheck",
     "IntegrityErrorCheck",
+    "ScopeContext",
     "SearchScope",
     # Integrity
     "parse_integrity_error",

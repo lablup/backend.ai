@@ -29,7 +29,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 
 from .purger import BatchPurger, BatchPurgerSpec, Purger, execute_batch_purger, execute_purger
-from .scope_creator import ScopeContext
+from .types import ScopeContext
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession

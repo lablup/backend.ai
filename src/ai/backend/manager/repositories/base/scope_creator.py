@@ -21,7 +21,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType, RelationType
+from ai.backend.common.data.permission.types import EntityType, RelationType
 from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -35,21 +35,10 @@ from ai.backend.manager.models.rbac_models.role_permission_preset import (
 from ai.backend.manager.models.rbac_models.role_preset import RolePresetRow
 
 from .creator import BulkCreator, Creator, CreatorSpec, execute_bulk_creator, execute_creator
+from .types import ScopeContext
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
-
-
-@dataclass(frozen=True)
-class ScopeContext:
-    """Locator for a scope row.
-
-    Carries the ``(scope_type, scope_id)`` pair used by downstream RBAC tables
-    (``permissions``, ``association_scopes_entities``) to reference the scope.
-    """
-
-    scope_type: RBACElementType
-    scope_id: str
 
 
 class ScopeCreatorSpec[TScopeRow: Base](ABC):
