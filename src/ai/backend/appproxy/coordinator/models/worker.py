@@ -219,21 +219,40 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         w.status = status
 
         w.occupied_slots = 0
+        w.available_slots = cls.calculate_available_slots(
+            frontend_mode, port_range=port_range, wildcard_domain=wildcard_domain
+        )
+
+        return w
+
+    @staticmethod
+    def calculate_available_slots(
+        frontend_mode: FrontendMode,
+        *,
+        port_range: tuple[int, int] | None = None,
+        wildcard_domain: str | None = None,
+    ) -> int:
+        """
+        Derives the number of available slots from the frontend configuration.
+
+        This must be re-evaluated whenever the frontend mode or port range changes
+        (e.g. a worker restarts with an updated ``port_range``), otherwise the slot
+        count stays pinned to the value computed at the worker's first registration.
+        """
         match frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
                 if not wildcard_domain:
                     raise MissingFrontendConfigError(
                         "Wildcard domain is required for WILDCARD_DOMAIN frontend mode"
                     )
-                w.available_slots = -1
+                return -1
             case FrontendMode.PORT:
                 if not port_range:
                     raise MissingFrontendConfigError(
                         "Port range is required for PORT frontend mode"
                     )
-                w.available_slots = port_range[1] - port_range[0] + 1
-
-        return w
+                return port_range[1] - port_range[0] + 1
+        raise MissingFrontendConfigError(f"Unsupported frontend mode: {frontend_mode}")
 
     @property
     def use_tls(self) -> bool:
