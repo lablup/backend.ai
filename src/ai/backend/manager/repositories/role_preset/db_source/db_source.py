@@ -17,6 +17,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetBulkAddResult,
     RolePermissionPresetBulkRemoveResult,
+    RolePermissionPresetSearchResult,
     RolePresetBulkPurgeResult,
     RolePresetBulkUpdateResult,
     RolePresetData,
@@ -77,6 +78,20 @@ class RolePresetDBSource:
             result = await r.batch_query_in_global(sa.select(RolePresetRow), querier)
             items = [row.RolePresetRow.to_data() for row in result.rows]
             return RolePresetSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_permission_presets(
+        self,
+        querier: BatchQuerier,
+    ) -> RolePermissionPresetSearchResult:
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(sa.select(RolePermissionPresetRow), querier)
+            items = [row.RolePermissionPresetRow.to_data() for row in result.rows]
+            return RolePermissionPresetSearchResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
