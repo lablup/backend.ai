@@ -63,17 +63,6 @@ from .querier import (
     execute_batch_querier,
     execute_querier,
 )
-from .scope_creator import (
-    ScopeContext,
-    ScopeCreator,
-    ScopeCreatorResult,
-    ScopeCreatorSpec,
-)
-from .scope_purger import (
-    ScopePurger,
-    ScopePurgerResult,
-    ScopePurgerSpec,
-)
 from .types import (
     CursorConditionFactory,
     ExistenceCheck,
@@ -201,15 +190,6 @@ __all__ = [
     "BatchPurger",
     "BatchPurgerResult",
     "execute_batch_purger",
-    # ScopeCreator
-    "ScopeCreatorSpec",
-    "ScopeCreator",
-    "ScopeCreatorResult",
-    "ScopeContext",
-    # ScopePurger
-    "ScopePurgerSpec",
-    "ScopePurger",
-    "ScopePurgerResult",
     # Utils
     "combine_conditions_and",
     "combine_conditions_or",

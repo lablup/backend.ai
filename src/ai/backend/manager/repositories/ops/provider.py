@@ -10,30 +10,16 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import EntityType, RelationType
-from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.errors.repository import EmptySearchScopeError
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.role_permission_preset import (
-    RolePermissionPresetRow,
-)
-from ai.backend.manager.models.rbac_models.role_preset import RolePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchPurgerResult,
-    BatchPurgerSpec,
     BatchQuerier,
     BatchQuerierResult,
     BatchUpdater,
@@ -45,18 +31,12 @@ from ai.backend.manager.repositories.base import (
     BulkUpdaterResult,
     Creator,
     CreatorResult,
-    CreatorSpec,
     DependentCreatorSpec,
     NextValuePolicy,
     Purger,
     PurgerResult,
     Querier,
     QuerierResult,
-    ScopeContext,
-    ScopeCreator,
-    ScopeCreatorResult,
-    ScopePurger,
-    ScopePurgerResult,
     SearchScope,
     Updater,
     UpdaterResult,
@@ -78,86 +58,20 @@ from ai.backend.manager.repositories.base import (
     execute_updater,
     execute_upserter,
 )
+from ai.backend.manager.repositories.base.scope_creator import (
+    ScopeCreator,
+    ScopeCreatorResult,
+    execute_scope_creator,
+)
+from ai.backend.manager.repositories.base.scope_purger import (
+    ScopePurger,
+    ScopePurgerResult,
+    execute_scope_purger,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
-
-
-@dataclass(frozen=True)
-class _RoleScopeAssociationSpec(CreatorSpec[AssociationScopesEntitiesRow]):
-    """Insert the association_scopes_entities row tying a role to its scope."""
-
-    role_id: UUID
-    scope_context: ScopeContext
-
-    def build_row(self) -> AssociationScopesEntitiesRow:
-        return AssociationScopesEntitiesRow(
-            scope_type=self.scope_context.scope_type.to_scope_type(),
-            scope_id=self.scope_context.scope_id,
-            entity_type=EntityType.ROLE,
-            entity_id=str(self.role_id),
-            relation_type=RelationType.AUTO,
-        )
-
-
-@dataclass(frozen=True)
-class _ScopePermissionsPurgeSpec(BatchPurgerSpec[PermissionRow]):
-    """Select every permission row pinned to a scope, derived from its context.
-
-    Mirrors how :meth:`ScopeWriteOps._collect_role_entries_for_scope_type` stamps
-    ``scope_type`` / ``scope_id`` onto each permission at provisioning time.
-    """
-
-    scope_context: ScopeContext
-
-    def build_subquery(self) -> sa.sql.Select[tuple[PermissionRow]]:
-        return sa.select(PermissionRow).where(
-            PermissionRow.scope_type == self.scope_context.scope_type.to_scope_type(),
-            PermissionRow.scope_id == self.scope_context.scope_id,
-        )
-
-
-@dataclass(frozen=True)
-class _ScopeAssociationsPurgeSpec(BatchPurgerSpec[AssociationScopesEntitiesRow]):
-    """Select every association row that references a scope, as scope or as entity.
-
-    Role-to-scope rows reference the scope as the scope side; parent-scope rows
-    (e.g. a project under its domain) reference it as the entity side. Both are
-    OR-combined so a single batched delete drops the whole set.
-    """
-
-    scope_context: ScopeContext
-
-    def build_subquery(self) -> sa.sql.Select[tuple[AssociationScopesEntitiesRow]]:
-        scope_type = self.scope_context.scope_type
-        scope_id = self.scope_context.scope_id
-        return sa.select(AssociationScopesEntitiesRow).where(
-            sa.or_(
-                sa.and_(
-                    AssociationScopesEntitiesRow.scope_type == scope_type.to_scope_type(),
-                    AssociationScopesEntitiesRow.scope_id == scope_id,
-                ),
-                sa.and_(
-                    AssociationScopesEntitiesRow.entity_type == scope_type.to_entity_type(),
-                    AssociationScopesEntitiesRow.entity_id == scope_id,
-                ),
-            )
-        )
-
-
-@dataclass(frozen=True)
-class _RoleEntry:
-    """A role row and its permission rows derived from a role preset.
-
-    Both rows are pre-built (without ``role_id`` on the permissions) by the
-    collector. The orchestrator adds the role row to the session, lets the
-    flush populate ``role.id``, then back-fills that id onto every permission
-    row before adding them.
-    """
-
-    role: RoleRow
-    permissions: list[PermissionRow]
 
 
 class ReadOps:
@@ -305,6 +219,29 @@ class WriteOps(ReadOps):
         """Delete multiple rows individually, isolating each via a savepoint for partial success."""
         return await execute_bulk_purger_partial(self._sess, purgers)
 
+    async def create_scope[TScopeRow: Base](
+        self,
+        creator: ScopeCreator[TScopeRow],
+    ) -> ScopeCreatorResult[TScopeRow]:
+        """Provision a scope row together with its preset-derived roles, permissions,
+        and the scope's association rows, in this single transaction.
+
+        Orchestration lives in :func:`execute_scope_creator`; this method only binds
+        it to the session.
+        """
+        return await execute_scope_creator(self._sess, creator)
+
+    async def purge_scope[TScopeRow: Base](
+        self,
+        purger: ScopePurger[TScopeRow],
+    ) -> ScopePurgerResult[TScopeRow]:
+        """Tear down a scope and the scope-bound RBAC rows it leaves behind.
+
+        Orchestration lives in :func:`execute_scope_purger`; this method only binds
+        it to the session.
+        """
+        return await execute_scope_purger(self._sess, purger)
+
     @asynccontextmanager
     async def savepoint(self) -> AsyncIterator[WriteOps]:
         """Open a nested transaction (savepoint) bound to the same session.
@@ -316,180 +253,11 @@ class WriteOps(ReadOps):
             yield WriteOps(self._sess)
 
 
-class ScopeWriteOps:
-    """Scope lifecycle write operations bound to a single session.
-
-    Owns the scope provisioning / teardown orchestration that touches multiple
-    RBAC tables (role presets, roles, permissions, association_scopes_entities,
-    and the scope row itself). Generic single-table ops live on
-    :class:`WriteOps`; this class is a sibling, not a subclass.
-    """
-
-    _sess: SASession
-
-    def __init__(self, sess: SASession) -> None:
-        self._sess = sess
-
-    async def _collect_role_entries_for_scope_type(
-        self,
-        scope_context: ScopeContext,
-    ) -> list[_RoleEntry]:
-        """Fetch active role presets matching the scope and build the role and
-        permission rows snapshotted from each preset.
-
-        One ``LEFT OUTER JOIN`` between ``role_presets`` and
-        ``role_permission_presets`` is issued; the returned ``(preset,
-        permission_preset_or_None)`` rows are grouped by preset id in Python.
-        """
-        rows = await self._sess.execute(
-            sa.select(RolePresetRow, RolePermissionPresetRow)
-            .select_from(RolePresetRow)
-            .outerjoin(
-                RolePermissionPresetRow,
-                RolePermissionPresetRow.role_preset_id == RolePresetRow.id,
-            )
-            .where(
-                RolePresetRow.scope_type == scope_context.scope_type.to_scope_type(),
-                RolePresetRow.deleted.is_(False),
-            )
-        )
-
-        entries_by_id: dict[RolePresetID, _RoleEntry] = {}
-        for preset, permission_preset in rows:
-            entry = entries_by_id.setdefault(
-                preset.id,
-                _RoleEntry(role=RoleRow(name=preset.name), permissions=[]),
-            )
-            if permission_preset is not None:
-                # ``role_id`` is left unset; it is back-filled after the owning
-                # role row is flushed.
-                entry.permissions.append(
-                    PermissionRow(
-                        scope_type=scope_context.scope_type.to_scope_type(),
-                        scope_id=scope_context.scope_id,
-                        entity_type=permission_preset.entity_type,
-                        operation=permission_preset.operation,
-                    )
-                )
-        return list(entries_by_id.values())
-
-    async def _create_preset_derived_roles_and_permissions(
-        self,
-        role_entries: list[_RoleEntry],
-    ) -> list[RoleRow]:
-        """Persist the pre-built role rows and their permission rows.
-
-        Returned ``role_rows`` order matches ``role_entries``. Permission rows
-        are inserted in the same transaction but are not returned.
-        """
-        if not role_entries:
-            return []
-
-        role_rows = [e.role for e in role_entries]
-        self._sess.add_all(role_rows)
-        await self._sess.flush()
-
-        permission_rows: list[PermissionRow] = []
-        for entry in role_entries:
-            for permission in entry.permissions:
-                permission.role_id = entry.role.id
-                permission_rows.append(permission)
-        if permission_rows:
-            self._sess.add_all(permission_rows)
-            await self._sess.flush()
-        return role_rows
-
-    async def _create_scope_associations(
-        self,
-        role_rows: list[RoleRow],
-        parent_association_specs: Sequence[CreatorSpec[AssociationScopesEntitiesRow]],
-        scope_context: ScopeContext,
-    ) -> None:
-        """Insert the scope's association_scopes_entities rows in one bulk call.
-
-        Bundles two distinct kinds of mapping into a single insert: role-to-scope
-        rows derived from ``role_rows`` and parent-scope mapping rows supplied
-        by the scope creator spec.
-        """
-        role_scope_assoc_specs = [
-            _RoleScopeAssociationSpec(role_id=r.id, scope_context=scope_context) for r in role_rows
-        ]
-        association_specs = role_scope_assoc_specs + list(parent_association_specs)
-        if not association_specs:
-            return
-        await execute_bulk_creator(
-            self._sess,
-            BulkCreator(specs=association_specs),
-        )
-
-    async def create_scope[TScopeRow: Base](
-        self,
-        creator: ScopeCreator[TScopeRow],
-    ) -> ScopeCreatorResult[TScopeRow]:
-        """Provision a scope row together with its preset-derived roles and
-        the scope's association rows.
-
-        For every active role preset (``deleted = false``) matching the new
-        scope's ``scope_type``, a role row, a role-to-scope association row,
-        and one permission row per ``role_permission_presets`` entry are
-        inserted in the same transaction as the scope row itself.
-        """
-        spec = creator.spec
-
-        scope_res = await execute_creator(self._sess, Creator(spec=spec.scope_spec()))
-        scope_context = spec.extract_scope_context(scope_res.row)
-
-        role_entries = await self._collect_role_entries_for_scope_type(scope_context)
-        role_rows = await self._create_preset_derived_roles_and_permissions(role_entries)
-        await self._create_scope_associations(
-            role_rows,
-            spec.parent_association_specs(scope_res.row),
-            scope_context,
-        )
-
-        return ScopeCreatorResult(scope_row=scope_res.row, role_rows=role_rows)
-
-    async def purge_scope[TScopeRow: Base](
-        self,
-        purger: ScopePurger[TScopeRow],
-    ) -> ScopePurgerResult[TScopeRow]:
-        """Tear down a scope and the scope-bound RBAC rows it leaves behind.
-
-        Order: scope-pinned permission rows, then association rows, then the scope
-        row itself. Roles are not touched — role lifecycle is independent of scope
-        lifecycle.
-        """
-        spec = purger.spec
-        sess = self._sess
-        scope_context = spec.scope_context()
-
-        perm_res = await execute_batch_purger(
-            sess,
-            BatchPurger(spec=_ScopePermissionsPurgeSpec(scope_context=scope_context)),
-        )
-
-        assoc_res = await execute_batch_purger(
-            sess,
-            BatchPurger(spec=_ScopeAssociationsPurgeSpec(scope_context=scope_context)),
-        )
-
-        scope_res = await execute_purger(
-            sess,
-            Purger(row_class=spec.scope_row_class(), pk_value=spec.scope_pk_value()),
-        )
-
-        return ScopePurgerResult(
-            scope_row=scope_res.row if scope_res is not None else None,
-            deleted_permission_count=perm_res.deleted_count,
-            deleted_association_count=assoc_res.deleted_count,
-        )
-
-
 class DBOpsProvider:
     """Entry point that isolates the engine and hands out session-bound ops.
 
-    The engine is private; the only surface is ``read_ops()`` / ``write_ops()`` /
-    ``scope_write_ops()``. All three use the READ COMMITTED isolation level.
+    The engine is private; the only surface is ``read_ops()`` / ``write_ops()``.
+    Both use the READ COMMITTED isolation level.
     """
 
     _db: ExtendedAsyncSAEngine
@@ -508,9 +276,3 @@ class DBOpsProvider:
         """Open a read-write transaction and yield read-write ops."""
         async with self._db.begin_session_read_committed() as sess:
             yield WriteOps(sess)
-
-    @asynccontextmanager
-    async def scope_write_ops(self) -> AsyncIterator[ScopeWriteOps]:
-        """Open a read-write transaction and yield the scope lifecycle writer ops."""
-        async with self._db.begin_session_read_committed() as sess:
-            yield ScopeWriteOps(sess)
