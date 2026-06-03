@@ -2822,13 +2822,10 @@ type CreateUserV2Payload {
   """The newly created user."""
   user: UserV2!
 
-  """The default keypair automatically generated for the user."""
-  keypair: KeyPairGQL!
-
   """
-  The secret key of the generated keypair. This value is only returned at creation time.
+  The default keypair automatically generated for the user, including its one-time secret key.
   """
-  secretKey: String!
+  keypair: CreatedKeypairPayload!
 }
 
 """Added in 25.16.0. Input for creating VFS storage"""
@@ -2889,6 +2886,19 @@ input CreateVFolderV2Input {
 type CreateVFolderV2Payload {
   """Created virtual folder"""
   vfolder: VFolder!
+}
+
+"""
+Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
+"""
+type CreatedKeypairPayload {
+  """The newly created keypair."""
+  keypair: KeyPairGQL!
+
+  """
+  The secret key of the generated keypair. Only returned at creation time.
+  """
+  secretKey: String!
 }
 
 """Date (isoformat)"""

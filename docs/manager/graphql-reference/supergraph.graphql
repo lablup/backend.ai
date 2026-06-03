@@ -3477,6 +3477,21 @@ type CreateDeploymentRevisionPresetPayloadGQL
   preset: DeploymentRevisionPreset!
 }
 
+"""
+Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
+"""
+type CreatedKeypairPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The newly created keypair."""
+  keypair: KeyPairGQL!
+
+  """
+  The secret key of the generated keypair. Only returned at creation time.
+  """
+  secretKey: String!
+}
+
 type CreateDomain
   @join__type(graph: GRAPHENE)
 {
@@ -4371,13 +4386,10 @@ type CreateUserV2Payload
   """The newly created user."""
   user: UserV2!
 
-  """The default keypair automatically generated for the user."""
-  keypair: KeyPairGQL!
-
   """
-  The secret key of the generated keypair. This value is only returned at creation time.
+  The default keypair automatically generated for the user, including its one-time secret key.
   """
-  secretKey: String!
+  keypair: CreatedKeypairPayload!
 }
 
 """

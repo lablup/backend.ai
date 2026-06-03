@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import SecretKey
 
 __all__ = (
     "AdminCreateKeypairPayload",
@@ -20,6 +21,7 @@ __all__ = (
     "AdminRegisterSSHKeypairPayload",
     "AdminSearchKeypairsPayload",
     "AdminUpdateKeypairPayload",
+    "CreatedKeypairPayload",
     "IssueMyKeypairPayload",
     "KeypairNode",
     "RevokeMyKeypairPayload",
@@ -55,6 +57,19 @@ class KeypairNode(BaseResponseModel):
         default=None, description="The SSH public key associated with this keypair."
     )
     user_id: uuid.UUID = Field(description="UUID of the user who owns this keypair.")
+
+
+class CreatedKeypairPayload(BaseResponseModel):
+    """A keypair returned at creation time, including its one-time secret key.
+
+    Wraps the keypair read model together with the secret key, which is only
+    available immediately after creation and never returned again.
+    """
+
+    keypair: KeypairNode = Field(description="The newly created keypair.")
+    secret_key: SecretKey = Field(
+        description="The secret key of the generated keypair. Only returned at creation time."
+    )
 
 
 class IssueMyKeypairPayload(BaseResponseModel):

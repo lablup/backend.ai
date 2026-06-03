@@ -12,7 +12,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
-from ai.backend.common.dto.manager.v2.keypair.response import KeypairNode
+from ai.backend.common.dto.manager.v2.keypair.response import CreatedKeypairPayload
 from ai.backend.common.dto.manager.v2.user.types import UserRole, UserStatus
 from ai.backend.common.types import BackendAISchema
 
@@ -283,12 +283,10 @@ class CreateUserPayload(BaseResponseModel):
     """Payload for single user creation mutation."""
 
     user: UserNode = Field(description="The newly created user.")
-    keypair: KeypairNode = Field(
-        description="The default keypair automatically generated for the user."
-    )
-    secret_key: str = Field(
+    keypair: CreatedKeypairPayload = Field(
         description=(
-            "The secret key of the generated keypair. This value is only returned at creation time."
+            "The default keypair automatically generated for the user, "
+            "including its one-time secret key."
         )
     )
 

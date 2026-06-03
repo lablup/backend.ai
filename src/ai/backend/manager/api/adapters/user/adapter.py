@@ -15,6 +15,7 @@ from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair import (
     AdminSearchKeypairsInput,
+    CreatedKeypairPayload,
     KeypairFilter,
     KeypairNode,
     KeypairOrderBy,
@@ -433,8 +434,7 @@ class UserAdapter(BaseAdapter):
         )
         return CreateUserPayload(
             user=self._user_data_to_node(result.data.user),
-            keypair=self._keypair_data_to_node(result.data.keypair),
-            secret_key=str(result.data.keypair.secret_key),
+            keypair=self._keypair_data_to_created_payload(result.data.keypair),
         )
 
     async def modify_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
@@ -604,8 +604,7 @@ class UserAdapter(BaseAdapter):
         created = [
             CreateUserPayload(
                 user=self._user_data_to_node(item.user),
-                keypair=self._keypair_data_to_node(item.keypair),
-                secret_key=str(item.keypair.secret_key),
+                keypair=self._keypair_data_to_created_payload(item.keypair),
             )
             for item in result.data.successes
         ]
@@ -787,6 +786,14 @@ class UserAdapter(BaseAdapter):
             resource_policy=data.resource_policy_name,
             ssh_public_key=data.ssh_public_key,
             user_id=data.user_id,
+        )
+
+    @staticmethod
+    def _keypair_data_to_created_payload(data: KeyPairData) -> CreatedKeypairPayload:
+        """Convert KeyPairData to a CreatedKeypairPayload, including the one-time secret key."""
+        return CreatedKeypairPayload(
+            keypair=UserAdapter._keypair_data_to_node(data),
+            secret_key=data.secret_key,
         )
 
     # ------------------------------------------------------------------ admin keypair operations
