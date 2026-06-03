@@ -64,3 +64,16 @@ class RolePermissionPresetBulkAction(RolePermissionPresetAction):
     @override
     def entity_id(self) -> str | None:
         return None
+
+
+@dataclass
+class RolePermissionPresetScopeAction(RolePermissionPresetAction):
+    """Base for actions scoped to a collection of role permission presets (e.g. search).
+
+    Scope operations query within an RBAC scope rather than acting on one
+    entity, so there is no single entity id to report.
+    """
+
+    @override
+    def entity_id(self) -> str | None:
+        return None

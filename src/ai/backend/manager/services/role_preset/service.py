@@ -38,6 +38,10 @@ from ai.backend.manager.services.role_preset.actions.search import (
     SearchRolePresetsAction,
     SearchRolePresetsActionResult,
 )
+from ai.backend.manager.services.role_preset.actions.search_permission_presets import (
+    SearchRolePermissionPresetsAction,
+    SearchRolePermissionPresetsActionResult,
+)
 from ai.backend.manager.services.role_preset.actions.update import (
     UpdateRolePresetAction,
     UpdateRolePresetActionResult,
@@ -63,6 +67,17 @@ class RolePresetService:
     async def search(self, action: SearchRolePresetsAction) -> SearchRolePresetsActionResult:
         result = await self._repository.search(action.querier)
         return SearchRolePresetsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_permission_presets(
+        self, action: SearchRolePermissionPresetsAction
+    ) -> SearchRolePermissionPresetsActionResult:
+        result = await self._repository.search_permission_presets(action.querier)
+        return SearchRolePermissionPresetsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

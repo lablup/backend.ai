@@ -40,6 +40,10 @@ from ai.backend.manager.services.role_preset.actions.search import (
     SearchRolePresetsAction,
     SearchRolePresetsActionResult,
 )
+from ai.backend.manager.services.role_preset.actions.search_permission_presets import (
+    SearchRolePermissionPresetsAction,
+    SearchRolePermissionPresetsActionResult,
+)
 from ai.backend.manager.services.role_preset.actions.update import (
     UpdateRolePresetAction,
     UpdateRolePresetActionResult,
@@ -51,6 +55,9 @@ class RolePresetProcessors(AbstractProcessorPackage):
     create: ActionProcessor[CreateRolePresetAction, CreateRolePresetActionResult]
     get: ActionProcessor[GetRolePresetAction, GetRolePresetActionResult]
     search: ActionProcessor[SearchRolePresetsAction, SearchRolePresetsActionResult]
+    search_permission_presets: ActionProcessor[
+        SearchRolePermissionPresetsAction, SearchRolePermissionPresetsActionResult
+    ]
     update: ActionProcessor[UpdateRolePresetAction, UpdateRolePresetActionResult]
     bulk_delete: ActionProcessor[BulkDeleteRolePresetsAction, BulkDeleteRolePresetsActionResult]
     bulk_restore: ActionProcessor[BulkRestoreRolePresetsAction, BulkRestoreRolePresetsActionResult]
@@ -72,6 +79,9 @@ class RolePresetProcessors(AbstractProcessorPackage):
         self.create = ActionProcessor(service.create, action_monitors)
         self.get = ActionProcessor(service.get, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
+        self.search_permission_presets = ActionProcessor(
+            service.search_permission_presets, action_monitors
+        )
         self.update = ActionProcessor(service.update, action_monitors)
         self.bulk_delete = ActionProcessor(service.bulk_delete, action_monitors)
         self.bulk_restore = ActionProcessor(service.bulk_restore, action_monitors)
@@ -88,6 +98,7 @@ class RolePresetProcessors(AbstractProcessorPackage):
             CreateRolePresetAction.spec(),
             GetRolePresetAction.spec(),
             SearchRolePresetsAction.spec(),
+            SearchRolePermissionPresetsAction.spec(),
             UpdateRolePresetAction.spec(),
             BulkDeleteRolePresetsAction.spec(),
             BulkRestoreRolePresetsAction.spec(),
