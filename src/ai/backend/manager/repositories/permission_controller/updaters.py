@@ -23,6 +23,7 @@ class RoleUpdaterSpec(UpdaterSpec[RoleRow]):
     source: OptionalState[RoleSource] = field(default_factory=OptionalState.nop)
     status: OptionalState[RoleStatus] = field(default_factory=OptionalState.nop)
     description: TriState[str] = field(default_factory=TriState.nop)
+    auto_assign: OptionalState[bool] = field(default_factory=OptionalState.nop)
 
     @property
     @override
@@ -36,6 +37,7 @@ class RoleUpdaterSpec(UpdaterSpec[RoleRow]):
         self.source.update_dict(to_update, "source")
         self.status.update_dict(to_update, "status")
         self.description.update_dict(to_update, "description")
+        self.auto_assign.update_dict(to_update, "auto_assign")
         return to_update
 
 

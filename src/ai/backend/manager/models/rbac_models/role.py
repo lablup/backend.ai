@@ -110,6 +110,7 @@ class RoleRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
+            auto_assign=self.auto_assign,
             description=self.description,
         )
 
@@ -123,6 +124,7 @@ class RoleRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
+            auto_assign=self.auto_assign,
             description=self.description,
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )
