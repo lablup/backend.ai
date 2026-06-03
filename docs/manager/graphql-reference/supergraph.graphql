@@ -11471,9 +11471,9 @@ type Mutation
   adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications Deprecated since 26.4.4.
+  Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications. Deprecated since 26.4.4.
   """
-  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_bulk_create_users_with_keypair_v2 instead, which also returns each created user's generated keypair and secret key.")
+  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use adminBulkCreateUsersWithKeypairV2 instead, which also returns each created user's generated keypair and secret key.")
 
   """
   Added in UNRELEASED. Create multiple users in bulk (admin only). Requires superadmin privileges. Returns each created user together with its automatically generated keypair and secret key (the secret key is only returned at creation time).

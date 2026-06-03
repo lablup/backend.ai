@@ -135,11 +135,11 @@ def _build_bulk_create_user_action(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="26.2.0",
-        description="Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications",
+        description="Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.",
         deprecated_version="26.4.4",
     ),
     deprecation_reason=(
-        "Use admin_bulk_create_users_with_keypair_v2 instead, which also returns each "
+        "Use adminBulkCreateUsersWithKeypairV2 instead, which also returns each "
         "created user's generated keypair and secret key."
     ),
 )
