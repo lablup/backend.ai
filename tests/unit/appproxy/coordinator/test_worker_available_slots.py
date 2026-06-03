@@ -60,7 +60,7 @@ class TestCalculateAvailableSlots:
 
 
 class TestRefreshAvailableSlots:
-    """Regression tests for BA-6270: available_slots must track port_range on restart."""
+    """Regression tests: available_slots must track port_range on restart."""
 
     @pytest.mark.parametrize(
         ("port_worker", "new_port_range", "expected"),

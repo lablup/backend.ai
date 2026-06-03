@@ -249,7 +249,7 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         raise MissingFrontendConfigError(f"Unsupported frontend mode: {frontend_mode}")
 
     def refresh_available_slots(self) -> None:
-        """Recompute available_slots from the current frontend config (BA-6270)."""
+        """Recompute available_slots from the current frontend config."""
         self.available_slots = self.calculate_available_slots(
             self.frontend_mode,
             port_range=self.port_range,
