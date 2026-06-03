@@ -90,7 +90,7 @@ from ai.backend.storage.errors import (
     StorageProxyError,
     VFolderNotFoundError,
 )
-from ai.backend.storage.services.upload.types import SessionState
+from ai.backend.storage.services.upload.types import TusSessionState
 from ai.backend.storage.types import QuotaConfig, VFolderID
 from ai.backend.storage.utils import check_params, log_manager_api_entry
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
@@ -1197,7 +1197,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
         tus_session_id = TusSessionId(session_id)
         await ctx.valkey_tus_client.set_session_state(
             tus_session_id,
-            SessionState.empty(tus_session_id, int(params["size"])).model_dump_json(),
+            TusSessionState.empty(tus_session_id, int(params["size"])).model_dump_json(),
         )
         token_data = {
             "op": "upload",

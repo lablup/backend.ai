@@ -453,6 +453,23 @@ async def tus_upload_part(request: web.Request) -> web.Response:
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
+# TUS-related request/response headers that the storage-proxy accepts and emits,
+# advertised via Access-Control-{Allow,Expose}-Headers so browser clients can use
+# them across origins.
+#
+# - Tus-Resumable: TUS protocol version (1.0.0). Required on every TUS request
+#   and response — the spec's version-negotiation handshake.
+# - Upload-Length: total declared size of the file in bytes. Set on session
+#   creation; echoed in HEAD responses.
+# - Upload-Metadata: comma-separated key/value pairs (value is base64-encoded
+#   per the spec) carrying user-provided metadata such as filename or content
+#   type. Optional; this implementation does not currently consume it but
+#   surfaces it to clients.
+# - Upload-Offset: byte position from which the next PATCH must continue;
+#   required on PATCH requests and present on HEAD/PATCH responses. The core
+#   resumability primitive of TUS.
+# - Content-Type: PATCH bodies must be `application/offset+octet-stream` per
+#   the TUS spec.
 _TUS_HEADER_LIST = "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
 
 

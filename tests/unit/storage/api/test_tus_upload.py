@@ -34,7 +34,7 @@ from ai.backend.storage.errors import (
     UploadOffsetMismatchError,
 )
 from ai.backend.storage.services.upload.lock import create_tus_lock_factory
-from ai.backend.storage.services.upload.types import SessionState
+from ai.backend.storage.services.upload.types import TusSessionState
 from ai.backend.testutils.bootstrap import redis_container  # noqa: F401
 
 
@@ -166,7 +166,7 @@ async def _register_session_state(
 ) -> None:
     """Mimic ``create_upload_session`` having pre-registered the session in Valkey."""
     sid = TusSessionId(session_id)
-    await valkey.set_session_state(sid, SessionState.empty(sid, total_size).model_dump_json())
+    await valkey.set_session_state(sid, TusSessionState.empty(sid, total_size).model_dump_json())
 
 
 class TestUploadOffsetHeaderValidation:
