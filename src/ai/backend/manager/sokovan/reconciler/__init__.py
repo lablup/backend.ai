@@ -1,12 +1,12 @@
 """Generic, entity-agnostic lifecycle coordination primitives."""
 
 from ai.backend.manager.sokovan.reconciler.base import (
-    BaseReconcilerCategory,
     BaseReconcilerInfo,
     BaseReconcilerKind,
     BaseReconcilerResult,
     BaseReconcilerTargetStatuses,
     ReconcilerApplier,
+    ReconcilerApplyInput,
     ReconcilerHandler,
     ReconcilerSource,
     ReconcilerStage,
@@ -20,7 +20,6 @@ from ai.backend.manager.sokovan.reconciler.coordinator import (
 )
 
 __all__ = [
-    "BaseReconcilerCategory",
     "BaseReconcilerInfo",
     "BaseReconcilerKind",
     "BaseReconcilerResult",
@@ -28,6 +27,7 @@ __all__ = [
     "BaseReconcilerResult",
     "ReconcilerTaskSpec",
     "ReconcilerApplier",
+    "ReconcilerApplyInput",
     "ReconcilerCoordinator",
     "ReconcilerFlag",
     "ReconcilerHandler",

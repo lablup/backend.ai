@@ -2,17 +2,29 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scheduling_history.creators import (
     ReplicaGroupHistoryCreatorSpec,
 )
+
+
+@dataclass
+class ReplicaGroupReconcileTransition:
+    """One group's status change plus the new history row to record it.
+
+    The db_source turns this into the shared ops ``Transition`` (building the match
+    conditions to find the latest prior history); the history creator carries sub_steps.
+    """
+
+    history_spec: ReplicaGroupHistoryCreatorSpec
+    status_updater: Updater[ReplicaGroupRow] | None = None
 
 
 @dataclass
@@ -24,16 +36,33 @@ class RevisionReplicaCount:
 
 
 @dataclass
-class ReplicaGroupScalingReconcileApply:
-    """Everything one scaling-reconcile tick writes, applied in a single transaction.
+class GroupRouteCreateInstruction:
+    """Create ``count`` routes for one group's revision; route context is read at apply time."""
 
-    Route scale-out creators carry their own RBAC scope; ``drain_updater`` flips
-    excess routes to TERMINATING. Group status moves via ``group_updaters``; history
-    is either inserted (``new_history_specs``) or merged (``merge_history_ids``).
+    replica_group_id: ReplicaGroupID
+    deployment_id: DeploymentID
+    revision_id: DeploymentRevisionID
+    count: int
+
+
+@dataclass
+class GroupRouteDrainInstruction:
+    """Drain ``count`` serving routes of one group's revision (RUNNING & ACTIVE -> INACTIVE)."""
+
+    replica_group_id: ReplicaGroupID
+    revision_id: DeploymentRevisionID
+    count: int
+
+
+@dataclass
+class ReplicaGroupScalingReconcileApply:
+    """One scaling-reconcile tick's writes, applied in a single transaction.
+
+    Domain changes are counts (route creation context is read, drain targets are
+    selected, at apply time); ``transitions`` carry each group's status + history
+    (with sub_steps), applied via the shared sokovan ``apply_transition`` op.
     """
 
-    scale_out_creators: Sequence[RBACEntityCreator[RoutingRow]] = field(default_factory=list)
-    drain_updater: BatchUpdater[RoutingRow] | None = None
-    group_updaters: Sequence[Updater[ReplicaGroupRow]] = field(default_factory=list)
-    new_history_specs: Sequence[ReplicaGroupHistoryCreatorSpec] = field(default_factory=list)
-    merge_history_ids: Sequence[uuid.UUID] = field(default_factory=list)
+    create_instructions: Sequence[GroupRouteCreateInstruction] = field(default_factory=list)
+    drain_instructions: Sequence[GroupRouteDrainInstruction] = field(default_factory=list)
+    transitions: Sequence[ReplicaGroupReconcileTransition] = field(default_factory=list)

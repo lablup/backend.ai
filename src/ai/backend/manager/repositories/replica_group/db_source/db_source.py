@@ -5,37 +5,44 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import (
-    ReplicaGroupHandlerCategory,
-    ReplicaGroupLastHistory,
-    RouteStatus,
-    RouteTrafficStatus,
-)
+from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
+from ai.backend.manager.models.replica_group_history.conditions import (
+    ReplicaGroupHistoryConditions,
+)
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    execute_rbac_entity_creators,
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.updater import BatchUpdater, BulkUpdaterResult, Updater
+from ai.backend.manager.repositories.deployment.creators import (
+    RouteBatchUpdaterSpec,
+    RouteCreatorSpec,
 )
-from ai.backend.manager.repositories.base.updater import (
-    BulkUpdaterResult,
-    Updater,
-    execute_batch_updater,
-    execute_updater,
-)
-from ai.backend.manager.repositories.ops.provider import DBOpsProvider
+from ai.backend.manager.repositories.ops.sokovan.provider import SokovanOpsProvider, Transition
 from ai.backend.manager.repositories.replica_group.types import (
+    GroupRouteCreateInstruction,
+    GroupRouteDrainInstruction,
+    ReplicaGroupReconcileTransition,
     ReplicaGroupScalingReconcileApply,
     RevisionReplicaCount,
 )
+from ai.backend.manager.types import OptionalState
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupDeploySchedulingView,
     ReplicaGroupScalingReconcileView,
@@ -50,11 +57,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ReplicaGroupDBSource:
     _db: ExtendedAsyncSAEngine
-    _ops: DBOpsProvider
+    _ops: SokovanOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-        self._ops = DBOpsProvider(db)
+        self._ops = SokovanOpsProvider(db)
 
     async def search_deploy_scheduling_views(
         self,
@@ -81,9 +88,6 @@ class ReplicaGroupDBSource:
             group_rows: list[ReplicaGroupRow] = [row.ReplicaGroupRow for row in group_result.rows]
             group_ids = [group_row.id for group_row in group_rows]
             counts = await self._count_live_serving_by_revision(db_sess, group_ids)
-            last_histories = await self._last_histories(
-                db_sess, group_ids, ReplicaGroupHandlerCategory.SCALING
-            )
             empty = RevisionReplicaCount(live=0, serving=0)
             views: list[ReplicaGroupScalingReconcileView] = []
             for group_row in group_rows:
@@ -104,13 +108,13 @@ class ReplicaGroupDBSource:
                         deployment_id=group_row.deployment_id,
                         current_revision_id=group_row.current_revision_id,
                         target_revision_id=group_row.target_revision_id,
+                        scaling_status=group_row.scaling_status,
                         desired_current_replica_count=group_row.desired_current_replica_count,
                         desired_target_replica_count=group_row.desired_target_replica_count,
                         current_live_replica_count=current_counts.live,
                         current_serving_replica_count=current_counts.serving,
                         target_live_replica_count=target_counts.live,
                         target_serving_replica_count=target_counts.serving,
-                        last_history=last_histories.get(group_row.id),
                     )
                 )
             return views
@@ -149,40 +153,6 @@ class ReplicaGroupDBSource:
             )
         return counts
 
-    async def _last_histories(
-        self,
-        db_sess: SASession,
-        group_ids: Sequence[ReplicaGroupID],
-        category: ReplicaGroupHandlerCategory,
-    ) -> Mapping[ReplicaGroupID, ReplicaGroupLastHistory]:
-        if not group_ids:
-            return {}
-        query = (
-            sa.select(ReplicaGroupHistoryRow)
-            .where(
-                ReplicaGroupHistoryRow.replica_group_id.in_(group_ids),
-                ReplicaGroupHistoryRow.category == category,
-            )
-            .distinct(ReplicaGroupHistoryRow.replica_group_id)
-            .order_by(
-                ReplicaGroupHistoryRow.replica_group_id,
-                ReplicaGroupHistoryRow.created_at.desc(),
-            )
-        )
-        result = await db_sess.execute(query)
-        return {
-            row.replica_group_id: ReplicaGroupLastHistory(
-                id=row.id,
-                category=row.category,
-                phase=row.phase,
-                attempts=row.attempts,
-                started_at=row.created_at,
-                error_code=row.error_code,
-                to_status=row.to_status,
-            )
-            for row in result.scalars().all()
-        }
-
     async def update_replica_groups(
         self,
         updaters: Sequence[Updater[ReplicaGroupRow]],
@@ -194,19 +164,134 @@ class ReplicaGroupDBSource:
         self,
         apply: ReplicaGroupScalingReconcileApply,
     ) -> None:
-        async with self._db.begin_session_read_committed() as db_sess:
-            if apply.scale_out_creators:
-                await execute_rbac_entity_creators(db_sess, apply.scale_out_creators)
-            if apply.drain_updater is not None:
-                await execute_batch_updater(db_sess, apply.drain_updater)
-            for updater in apply.group_updaters:
-                await execute_updater(db_sess, updater)
-            if apply.merge_history_ids:
-                await db_sess.execute(
-                    sa.update(ReplicaGroupHistoryRow)
-                    .where(ReplicaGroupHistoryRow.id.in_(apply.merge_history_ids))
-                    .values(attempts=ReplicaGroupHistoryRow.attempts + 1)
+        async with self._db.begin_readonly_session_read_committed() as read_sess:
+            creators = await self._build_route_creators(read_sess, apply.create_instructions)
+            drain_updater = await self._build_drain_updater(read_sess, apply.drain_instructions)
+        async with self._ops.write_ops() as w:
+            if creators:
+                await w.bulk_create_scoped(creators)
+            if drain_updater is not None:
+                await w.batch_update(drain_updater)
+            await w.bulk_apply_transitions([
+                self._to_ops_transition(transition) for transition in apply.transitions
+            ])
+
+    def _to_ops_transition(
+        self,
+        transition: ReplicaGroupReconcileTransition,
+    ) -> Transition[ReplicaGroupRow, ReplicaGroupHistoryRow]:
+        spec = transition.history_spec
+        return Transition(
+            new_history=Creator(spec=spec),
+            match_conditions=[
+                ReplicaGroupHistoryConditions.by_replica_group_ids([spec.replica_group_id]),
+                ReplicaGroupHistoryConditions.by_category(spec.category),
+            ],
+            status_updater=transition.status_updater,
+        )
+
+    async def _build_route_creators(
+        self,
+        db_sess: SASession,
+        instructions: Sequence[GroupRouteCreateInstruction],
+    ) -> list[RBACEntityCreator[RoutingRow]]:
+        if not instructions:
+            return []
+        deployment_ids = {instruction.deployment_id for instruction in instructions}
+        revision_ids = {instruction.revision_id for instruction in instructions}
+        metadata = await self._deployment_route_metadata(db_sess, deployment_ids)
+        health_checks = await self._revision_health_checks(db_sess, revision_ids)
+        creators: list[RBACEntityCreator[RoutingRow]] = []
+        for instruction in instructions:
+            session_owner_id, domain, project_id = metadata[instruction.deployment_id]
+            health_check = health_checks.get(instruction.revision_id)
+            for _ in range(instruction.count):
+                spec = RouteCreatorSpec(
+                    deployment_id=instruction.deployment_id,
+                    session_owner_id=session_owner_id,
+                    domain=domain,
+                    project_id=project_id,
+                    revision_id=instruction.revision_id,
+                    health_check=health_check,
+                    replica_group_id=instruction.replica_group_id,
+                    traffic_status=RouteTrafficStatus.INACTIVE,
                 )
-            if apply.new_history_specs:
-                db_sess.add_all([spec.build_row() for spec in apply.new_history_specs])
-                await db_sess.flush()
+                creators.append(
+                    RBACEntityCreator(
+                        spec=spec,
+                        element_type=RBACElementType.ROUTING,
+                        scope_ref=RBACElementRef(
+                            element_type=RBACElementType.MODEL_DEPLOYMENT,
+                            element_id=str(instruction.deployment_id),
+                        ),
+                    )
+                )
+        return creators
+
+    async def _build_drain_updater(
+        self,
+        db_sess: SASession,
+        drain_instructions: Sequence[GroupRouteDrainInstruction],
+    ) -> BatchUpdater[RoutingRow] | None:
+        route_ids: list[UUID] = []
+        for drain in drain_instructions:
+            if drain.count <= 0:
+                continue
+            query = (
+                sa.select(RoutingRow.id)
+                .where(
+                    RoutingRow.replica_group_id == drain.replica_group_id,
+                    RoutingRow.revision == drain.revision_id,
+                    RoutingRow.status == RouteStatus.RUNNING,
+                    RoutingRow.traffic_status == RouteTrafficStatus.ACTIVE,
+                )
+                .order_by(RoutingRow.created_at.desc())
+                .limit(drain.count)
+            )
+            result = await db_sess.execute(query)
+            route_ids.extend(result.scalars().all())
+        if not route_ids:
+            return None
+        return BatchUpdater(
+            spec=RouteBatchUpdaterSpec(
+                traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE)
+            ),
+            conditions=[RouteConditions.by_ids(route_ids)],
+        )
+
+    async def _deployment_route_metadata(
+        self,
+        db_sess: SASession,
+        deployment_ids: set[DeploymentID],
+    ) -> Mapping[DeploymentID, tuple[UUID, str, UUID]]:
+        if not deployment_ids:
+            return {}
+        query = sa.select(
+            EndpointRow.id,
+            EndpointRow.session_owner,
+            EndpointRow.domain,
+            EndpointRow.project,
+        ).where(EndpointRow.id.in_(deployment_ids))
+        result = await db_sess.execute(query)
+        return {
+            DeploymentID(row.id): (row.session_owner, row.domain, row.project) for row in result
+        }
+
+    async def _revision_health_checks(
+        self,
+        db_sess: SASession,
+        revision_ids: set[DeploymentRevisionID],
+    ) -> Mapping[DeploymentRevisionID, ModelHealthCheck | None]:
+        if not revision_ids:
+            return {}
+        query = sa.select(
+            DeploymentRevisionRow.id,
+            DeploymentRevisionRow.model_definition,
+        ).where(DeploymentRevisionRow.id.in_(revision_ids))
+        result = await db_sess.execute(query)
+        return {
+            DeploymentRevisionID(revision_id): (
+                model_definition.health_check_config() if model_definition is not None else None
+            )
+            for revision_id, model_definition in result.all()
+        }

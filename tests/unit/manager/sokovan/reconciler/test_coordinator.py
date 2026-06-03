@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import cast
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
@@ -9,14 +10,15 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.metrics.reconciler import ReconcilerMetricObserver
 from ai.backend.manager.sokovan.reconciler import (
-    BaseReconcilerCategory,
     BaseReconcilerInfo,
     BaseReconcilerKind,
     BaseReconcilerResult,
     BaseReconcilerTargetStatuses,
     ReconcilerApplier,
+    ReconcilerApplyInput,
     ReconcilerCoordinator,
     ReconcilerFlag,
     ReconcilerHandler,
@@ -24,7 +26,6 @@ from ai.backend.manager.sokovan.reconciler import (
     ReconcilerStage,
     ReconcilerStageMetadata,
 )
-from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.types import DistributedLockFactory
 
 
@@ -34,6 +35,10 @@ class FakeCategory(BaseReconcilerCategory):
 
 class FakeKind(BaseReconcilerKind):
     DEFAULT = "fake-kind"
+
+
+class FakeStatus(StrEnum):
+    DEFAULT = "default"
 
 
 @dataclass(frozen=True)
@@ -91,15 +96,17 @@ class FakeHandler(ReconcilerHandler[FakeInfo, FakeResult]):
         self._call_log.events.append("post_process")
 
 
-class FakeApplier(ReconcilerApplier[FakeInfo, FakeResult]):
+class FakeApplier(
+    ReconcilerApplier[FakeInfo, FakeResult, FakeCategory, FakeKind, FakeTargetStatuses, FakeStatus]
+):
     def __init__(self, call_log: CallLog) -> None:
         self._call_log = call_log
 
     async def apply(
         self,
-        info: FakeInfo,
-        result: FakeResult,
-        records: Mapping[UUID, ExecutionRecord],
+        apply_input: ReconcilerApplyInput[
+            FakeInfo, FakeResult, FakeCategory, FakeKind, FakeTargetStatuses, FakeStatus
+        ],
     ) -> None:
         self._call_log.events.append("apply")
 
@@ -112,13 +119,17 @@ class FakeFlag(ReconcilerFlag):
         return self._needed
 
 
-def _make_metadata() -> ReconcilerStageMetadata[FakeCategory, FakeKind, FakeTargetStatuses]:
+def _make_metadata() -> ReconcilerStageMetadata[
+    FakeCategory, FakeKind, FakeTargetStatuses, FakeStatus
+]:
     return ReconcilerStageMetadata(
         category=FakeCategory.DEFAULT,
         kind=FakeKind.DEFAULT,
         target_statuses=FakeTargetStatuses(),
         name="fake",
+        phase="fake",
         lock_id=None,
+        transitions={},
     )
 
 
@@ -127,13 +138,13 @@ def _make_coordinator(
     info: FakeInfo,
     needed: bool = True,
 ) -> ReconcilerCoordinator:
-    stage: ReconcilerStage[FakeInfo, FakeResult, FakeCategory, FakeTargetStatuses, FakeKind] = (
-        ReconcilerStage(
-            handler=FakeHandler(call_log, FakeResult(processed=len(info.entity_ids()))),
-            source=FakeSource(call_log, info),
-            applier=FakeApplier(call_log),
-            metadata=_make_metadata(),
-        )
+    stage: ReconcilerStage[
+        FakeInfo, FakeResult, FakeCategory, FakeTargetStatuses, FakeKind, FakeStatus
+    ] = ReconcilerStage(
+        handler=FakeHandler(call_log, FakeResult(processed=len(info.entity_ids()))),
+        source=FakeSource(call_log, info),
+        applier=FakeApplier(call_log),
+        metadata=_make_metadata(),
     )
     return ReconcilerCoordinator(
         stages={"fake": stage},

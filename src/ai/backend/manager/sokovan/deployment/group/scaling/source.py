@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
-from ai.backend.manager.sokovan.deployment.group.categories import GroupReconcileCategory
 from ai.backend.manager.sokovan.deployment.group.scaling.types import (
     GroupScalingReconcileInfo,
     GroupScalingTargetStatuses,
@@ -16,7 +16,7 @@ from ai.backend.manager.sokovan.reconciler.base import ReconcilerSource
 class GroupScalingSource(
     ReconcilerSource[
         GroupScalingReconcileInfo,
-        GroupReconcileCategory,
+        ReplicaGroupHandlerCategory,
         GroupScalingTargetStatuses,
     ]
 ):
@@ -27,7 +27,7 @@ class GroupScalingSource(
 
     async def fetch_reconcile_info(
         self,
-        category: GroupReconcileCategory,
+        category: ReplicaGroupHandlerCategory,
         target_statuses: GroupScalingTargetStatuses,
     ) -> GroupScalingReconcileInfo:
         querier = BatchQuerier(

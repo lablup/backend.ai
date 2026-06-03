@@ -8,7 +8,6 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
-    ReplicaGroupLastHistory,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
@@ -39,15 +38,15 @@ class ReplicaGroupScalingSchedulingView:
 
 @dataclass
 class ReplicaGroupScalingReconcileView:
-    """Scaling-reconcile decision slice for one group: desired vs actual replica
-    counts (split by revision), the revision pointers, and the last scaling history
-    row (for the merge-vs-insert decision). Route-creation context is read later,
-    at apply time."""
+    """Scaling-reconcile decision slice for one group: desired vs actual replica counts
+    (split by revision) and the revision pointers. Route-creation context and the prior
+    history (for merge) are read later, at apply time."""
 
     group_id: ReplicaGroupID
     deployment_id: DeploymentID
     current_revision_id: DeploymentRevisionID | None
     target_revision_id: DeploymentRevisionID | None
+    scaling_status: ReplicaGroupScalingStatus
     desired_current_replica_count: int
     desired_target_replica_count: int
     # live = warming (PROVISIONING) or serving (RUNNING & ACTIVE); decides "create more".
@@ -56,4 +55,3 @@ class ReplicaGroupScalingReconcileView:
     current_serving_replica_count: int
     target_live_replica_count: int
     target_serving_replica_count: int
-    last_history: ReplicaGroupLastHistory | None

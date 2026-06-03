@@ -29,6 +29,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.data.session.options import HandlerOptions
 
 if TYPE_CHECKING:
@@ -193,8 +194,8 @@ class ReplicaGroupScalingStatus(enum.StrEnum):
     STABLE = "stable"
 
 
-class ReplicaGroupHandlerCategory(enum.StrEnum):
-    """Category of replica-group handler for history separation."""
+class ReplicaGroupHandlerCategory(BaseReconcilerCategory):
+    """Category of replica-group handler for history separation; also the reconcile-stage category."""
 
     SCALING = "scaling"
     LIFECYCLE = "lifecycle"
@@ -822,19 +823,6 @@ class DeploymentLastHistory:
     """
 
     id: UUID
-    phase: str
-    attempts: int
-    started_at: datetime
-    error_code: str | None
-    to_status: str | None
-
-
-@dataclass(frozen=True)
-class ReplicaGroupLastHistory:
-    """Most recent ``replica_group_history`` row snapshot for one group and category."""
-
-    id: UUID
-    category: ReplicaGroupHandlerCategory
     phase: str
     attempts: int
     started_at: datetime

@@ -9,6 +9,8 @@ from enum import StrEnum
 from uuid import UUID
 
 from ai.backend.common.events.types import AbstractAnycastEvent
+from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
+from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.metrics.reconciler import ReconcilerMetricObserver
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
@@ -36,10 +38,6 @@ class BaseReconcilerResult(ABC):
     def failed_count(self) -> int:
         """Number of entities that failed processing."""
         raise NotImplementedError
-
-
-class BaseReconcilerCategory(StrEnum):
-    pass
 
 
 class BaseReconcilerTargetStatuses(ABC):
@@ -82,36 +80,60 @@ class ReconcilerHandler[
         raise NotImplementedError
 
 
+@dataclass(frozen=True)
+class ReconcilerStageMetadata[
+    Category: BaseReconcilerCategory,
+    Kind: BaseReconcilerKind,
+    TargetStatuses: BaseReconcilerTargetStatuses,
+    Status,
+]:
+    """Stage definition the applier reads from: metrics labeling, fetch scope, history
+    descriptor (category/phase), and the per-result target-status map."""
+
+    category: Category
+    kind: Kind
+    target_statuses: TargetStatuses
+    name: str
+    phase: str
+    lock_id: LockID | None
+    transitions: Mapping[SchedulingResult, Status]
+
+
+@dataclass(frozen=True)
+class ReconcilerApplyInput[
+    Info: BaseReconcilerInfo,
+    Result: BaseReconcilerResult,
+    Category: BaseReconcilerCategory,
+    Kind: BaseReconcilerKind,
+    TargetStatuses: BaseReconcilerTargetStatuses,
+    Status,
+]:
+    """Everything the applier needs for one tick: the fetched info, the handler result,
+    the recorded sub-steps, and the stage metadata (category/phase/transitions)."""
+
+    info: Info
+    result: Result
+    records: Mapping[UUID, ExecutionRecord]
+    metadata: ReconcilerStageMetadata[Category, Kind, TargetStatuses, Status]
+
+
 class ReconcilerApplier[
     Info: BaseReconcilerInfo,
     Result: BaseReconcilerResult,
+    Category: BaseReconcilerCategory,
+    Kind: BaseReconcilerKind,
+    TargetStatuses: BaseReconcilerTargetStatuses,
+    Status,
 ](ABC):
     """Applies scheduling decisions derived from a handler's result."""
 
     @abstractmethod
     async def apply(
         self,
-        info: Info,
-        result: Result,
-        records: Mapping[UUID, ExecutionRecord],
+        apply_input: ReconcilerApplyInput[Info, Result, Category, Kind, TargetStatuses, Status],
     ) -> None:
         """Persist scheduling decisions derived from the handler result."""
         raise NotImplementedError
-
-
-@dataclass(frozen=True)
-class ReconcilerStageMetadata[
-    Category: BaseReconcilerCategory,
-    Kind: BaseReconcilerKind,
-    TargetStatuses: BaseReconcilerTargetStatuses,
-]:
-    """Metadata for a lifecycle stage, used for metrics labeling."""
-
-    category: Category
-    kind: Kind
-    target_statuses: TargetStatuses
-    name: str
-    lock_id: LockID | None
 
 
 class ReconcilerStageRunner(ABC):
@@ -135,20 +157,21 @@ class ReconcilerStage[
     Category: BaseReconcilerCategory,
     TargetStatuses: BaseReconcilerTargetStatuses,
     Kind: BaseReconcilerKind,
+    Status,
 ](ReconcilerStageRunner):
     """One lifecycle stage for scheduling decisions, with injected handler, source, applier, and metadata for metrics and locking."""
 
     _handler: ReconcilerHandler[Info, Result]
     _source: ReconcilerSource[Info, Category, TargetStatuses]
-    _applier: ReconcilerApplier[Info, Result]
-    _metadata: ReconcilerStageMetadata[Category, Kind, TargetStatuses]
+    _applier: ReconcilerApplier[Info, Result, Category, Kind, TargetStatuses, Status]
+    _metadata: ReconcilerStageMetadata[Category, Kind, TargetStatuses, Status]
 
     def __init__(
         self,
         handler: ReconcilerHandler[Info, Result],
         source: ReconcilerSource[Info, Category, TargetStatuses],
-        applier: ReconcilerApplier[Info, Result],
-        metadata: ReconcilerStageMetadata[Category, Kind, TargetStatuses],
+        applier: ReconcilerApplier[Info, Result, Category, Kind, TargetStatuses, Status],
+        metadata: ReconcilerStageMetadata[Category, Kind, TargetStatuses, Status],
     ) -> None:
         self._handler = handler
         self._source = source
@@ -176,7 +199,14 @@ class ReconcilerStage[
             )
             records = pool.build_all_records()
             with metrics.measure(kind, handler_name, "apply_scheduling_decisions"):
-                await self._applier.apply(reconcile_info, result, records)
+                await self._applier.apply(
+                    ReconcilerApplyInput(
+                        info=reconcile_info,
+                        result=result,
+                        records=records,
+                        metadata=self._metadata,
+                    )
+                )
         with metrics.measure(kind, handler_name, "post_process"):
             await self._handler.post_process(result)
 
