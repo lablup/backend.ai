@@ -232,13 +232,7 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         port_range: tuple[int, int] | None = None,
         wildcard_domain: str | None = None,
     ) -> int:
-        """
-        Derives the number of available slots from the frontend configuration.
-
-        This must be re-evaluated whenever the frontend mode or port range changes
-        (e.g. a worker restarts with an updated ``port_range``), otherwise the slot
-        count stays pinned to the value computed at the worker's first registration.
-        """
+        """Number of available slots derived from the frontend configuration."""
         match frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
                 if not wildcard_domain:
@@ -255,13 +249,7 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         raise MissingFrontendConfigError(f"Unsupported frontend mode: {frontend_mode}")
 
     def refresh_available_slots(self) -> None:
-        """
-        Recompute ``available_slots`` from the worker's current frontend
-        configuration. Call this after mutating ``frontend_mode`` / ``port_range``
-        / ``wildcard_domain`` (e.g. when a worker re-registers on restart) so the
-        slot quota tracks the live port range instead of staying pinned to the
-        value computed at the worker's first registration (BA-6270).
-        """
+        """Recompute available_slots from the current frontend config (BA-6270)."""
         self.available_slots = self.calculate_available_slots(
             self.frontend_mode,
             port_range=self.port_range,
