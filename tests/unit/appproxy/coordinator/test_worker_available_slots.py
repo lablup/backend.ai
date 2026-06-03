@@ -9,52 +9,10 @@ from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
 from ai.backend.appproxy.coordinator.models.worker import Worker
 
 
-class TestCalculateAvailableSlots:
-    def test_port_mode_uses_port_range_span(self) -> None:
-        # span is inclusive on both ends: 10501..10800 -> 300 slots
-        assert Worker.calculate_available_slots(FrontendMode.PORT, port_range=(10501, 10800)) == 300
-
-    def test_port_mode_recomputes_when_range_changes(self) -> None:
-        # BA-6270: a restart with a different port_range must yield a new slot count
-        # instead of staying pinned to the value from the first registration.
-        initial = Worker.calculate_available_slots(FrontendMode.PORT, port_range=(10501, 10600))
-        expanded = Worker.calculate_available_slots(FrontendMode.PORT, port_range=(10501, 10800))
-        assert initial == 100
-        assert expanded == 300
-
-    def test_wildcard_mode_is_unlimited(self) -> None:
-        assert (
-            Worker.calculate_available_slots(
-                FrontendMode.WILDCARD_DOMAIN, wildcard_domain="*.example.com"
-            )
-            == -1
-        )
-
-    def test_port_mode_without_range_raises(self) -> None:
-        with pytest.raises(MissingFrontendConfigError):
-            Worker.calculate_available_slots(FrontendMode.PORT)
-
-    def test_wildcard_mode_without_domain_raises(self) -> None:
-        with pytest.raises(MissingFrontendConfigError):
-            Worker.calculate_available_slots(FrontendMode.WILDCARD_DOMAIN)
-
-    def test_create_uses_calculated_slots(self) -> None:
-        worker = Worker.create(
-            uuid.uuid4(),
-            "worker-1",
-            FrontendMode.PORT,
-            ProxyProtocol.HTTP,
-            "127.0.0.1",
-            False,
-            False,
-            10200,
-            [AppMode.INTERACTIVE],
-            port_range=(10501, 10800),
-        )
-        assert worker.available_slots == 300
-
-
-def _make_port_worker(port_range: tuple[int, int]) -> Worker:
+@pytest.fixture
+def port_worker(request: pytest.FixtureRequest) -> Worker:
+    """A PORT-mode worker created with the port_range given via indirect param."""
+    port_range: tuple[int, int] = request.param
     return Worker.create(
         uuid.uuid4(),
         "worker-1",
@@ -69,39 +27,67 @@ def _make_port_worker(port_range: tuple[int, int]) -> Worker:
     )
 
 
+class TestCalculateAvailableSlots:
+    @pytest.mark.parametrize(
+        ("port_range", "expected"),
+        [
+            ((10501, 10800), 300),
+            ((10501, 10600), 100),
+            ((10501, 10501), 1),
+        ],
+    )
+    def test_port_mode_span(self, port_range: tuple[int, int], expected: int) -> None:
+        assert (
+            Worker.calculate_available_slots(FrontendMode.PORT, port_range=port_range) == expected
+        )
+
+    def test_wildcard_mode_is_unlimited(self) -> None:
+        assert (
+            Worker.calculate_available_slots(
+                FrontendMode.WILDCARD_DOMAIN, wildcard_domain="*.example.com"
+            )
+            == -1
+        )
+
+    @pytest.mark.parametrize(
+        "frontend_mode",
+        [FrontendMode.PORT, FrontendMode.WILDCARD_DOMAIN],
+    )
+    def test_missing_config_raises(self, frontend_mode: FrontendMode) -> None:
+        # PORT without port_range / WILDCARD_DOMAIN without wildcard_domain.
+        with pytest.raises(MissingFrontendConfigError):
+            Worker.calculate_available_slots(frontend_mode)
+
+
 class TestRefreshAvailableSlots:
     """Regression tests for BA-6270: available_slots must track port_range on restart."""
 
-    def test_expanding_port_range_increases_slots(self) -> None:
-        worker = _make_port_worker((10501, 10600))
-        assert worker.available_slots == 100
+    @pytest.mark.parametrize(
+        ("port_worker", "new_port_range", "expected"),
+        [
+            ((10501, 10600), (10501, 10800), 300),  # expand
+            ((10501, 10800), (10501, 10600), 100),  # shrink
+            ((10501, 10600), (10501, 10600), 100),  # unchanged
+        ],
+        indirect=["port_worker"],
+    )
+    def test_refresh_after_port_range_change(
+        self, port_worker: Worker, new_port_range: tuple[int, int], expected: int
+    ) -> None:
+        port_worker.port_range = new_port_range
+        port_worker.refresh_available_slots()
+        assert port_worker.available_slots == expected
 
-        worker.port_range = (10501, 10800)
-        worker.refresh_available_slots()
+    @pytest.mark.parametrize("port_worker", [(10501, 10600)], indirect=True)
+    def test_switch_to_wildcard_mode_sets_unlimited(self, port_worker: Worker) -> None:
+        port_worker.frontend_mode = FrontendMode.WILDCARD_DOMAIN
+        port_worker.port_range = None
+        port_worker.wildcard_domain = "*.example.com"
+        port_worker.refresh_available_slots()
+        assert port_worker.available_slots == -1
 
-        assert worker.available_slots == 300
-
-    def test_shrinking_port_range_decreases_slots(self) -> None:
-        worker = _make_port_worker((10501, 10800))
-        assert worker.available_slots == 300
-
-        worker.port_range = (10501, 10600)
-        worker.refresh_available_slots()
-
-        assert worker.available_slots == 100
-
-    def test_switch_to_wildcard_mode_sets_unlimited(self) -> None:
-        worker = _make_port_worker((10501, 10600))
-
-        worker.frontend_mode = FrontendMode.WILDCARD_DOMAIN
-        worker.port_range = None
-        worker.wildcard_domain = "*.example.com"
-        worker.refresh_available_slots()
-
-        assert worker.available_slots == -1
-
-    def test_refresh_without_port_range_raises(self) -> None:
-        worker = _make_port_worker((10501, 10600))
-        worker.port_range = None
+    @pytest.mark.parametrize("port_worker", [(10501, 10600)], indirect=True)
+    def test_refresh_without_port_range_raises(self, port_worker: Worker) -> None:
+        port_worker.port_range = None
         with pytest.raises(MissingFrontendConfigError):
-            worker.refresh_available_slots()
+            port_worker.refresh_available_slots()
