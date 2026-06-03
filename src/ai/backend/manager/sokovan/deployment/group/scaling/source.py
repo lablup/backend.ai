@@ -36,5 +36,7 @@ class GroupScalingSource(
                 ReplicaGroupConditions.by_scaling_statuses(target_statuses.scaling_statuses),
             ],
         )
-        views = await self._replica_group_repository.fetch_scaling_reconcile_views(querier)
-        return GroupScalingReconcileInfo(views=views)
+        fetch = await self._replica_group_repository.fetch_scaling_reconcile_views(
+            querier, category
+        )
+        return GroupScalingReconcileInfo(views=fetch.views, current_time=fetch.now)

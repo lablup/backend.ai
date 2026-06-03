@@ -11,14 +11,17 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import BulkUpdaterResult, Updater
-from ai.backend.manager.repositories.replica_group.types import ReplicaGroupScalingReconcileApply
+from ai.backend.manager.repositories.replica_group.types import (
+    ReplicaGroupScalingReconcileApply,
+    ScalingReconcileFetch,
+)
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupDeploySchedulingView,
-    ReplicaGroupScalingReconcileView,
     ReplicaGroupScalingSchedulingView,
 )
 
@@ -70,8 +73,9 @@ class ReplicaGroupRepository:
     async def fetch_scaling_reconcile_views(
         self,
         querier: BatchQuerier,
-    ) -> list[ReplicaGroupScalingReconcileView]:
-        return await self._db_source.fetch_scaling_reconcile_views(querier)
+        category: ReplicaGroupHandlerCategory,
+    ) -> ScalingReconcileFetch:
+        return await self._db_source.fetch_scaling_reconcile_views(querier, category)
 
     @replica_group_repository_resilience.apply()
     async def update_replica_groups(

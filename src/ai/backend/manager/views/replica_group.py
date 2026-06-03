@@ -11,6 +11,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
+from ai.backend.manager.data.reconciler.types import LastHistory
 
 
 @dataclass
@@ -39,8 +40,8 @@ class ReplicaGroupScalingSchedulingView:
 @dataclass
 class ReplicaGroupScalingReconcileView:
     """Scaling-reconcile decision slice for one group: desired vs actual replica counts
-    (split by revision) and the revision pointers. Route-creation context and the prior
-    history (for merge) are read later, at apply time."""
+    (split by revision), the revision pointers, the current scaling status, and the prior
+    scaling-history descriptor the coordinator uses to classify retries/timeouts."""
 
     group_id: ReplicaGroupID
     deployment_id: DeploymentID
@@ -55,3 +56,5 @@ class ReplicaGroupScalingReconcileView:
     current_serving_replica_count: int
     target_live_replica_count: int
     target_serving_replica_count: int
+    # Latest scaling-history row for this group (None when there is none yet).
+    last_history: LastHistory | None

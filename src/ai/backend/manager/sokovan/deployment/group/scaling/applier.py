@@ -27,17 +27,14 @@ from ai.backend.manager.repositories.scheduling_history.creators import (
 from ai.backend.manager.sokovan.deployment.group.categories import GroupReconcileKind
 from ai.backend.manager.sokovan.deployment.group.scaling.types import (
     GroupScalingDecision,
-    GroupScalingReconcileInfo,
     GroupScalingReconcileResult,
     GroupScalingTargetStatuses,
 )
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerApplier, ReconcilerApplyInput
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
 from ai.backend.manager.types import OptionalState
-from ai.backend.manager.views.replica_group import ReplicaGroupScalingReconcileView
 
 _ScalingApplyInput = ReconcilerApplyInput[
-    GroupScalingReconcileInfo,
     GroupScalingReconcileResult,
     ReplicaGroupHandlerCategory,
     GroupReconcileKind,
@@ -48,7 +45,6 @@ _ScalingApplyInput = ReconcilerApplyInput[
 
 class GroupScalingApplier(
     ReconcilerApplier[
-        GroupScalingReconcileInfo,
         GroupScalingReconcileResult,
         ReplicaGroupHandlerCategory,
         GroupReconcileKind,
@@ -63,10 +59,9 @@ class GroupScalingApplier(
 
     @override
     async def apply(self, apply_input: _ScalingApplyInput) -> None:
-        views_by_group = {view.group_id: view for view in apply_input.info.views}
         transitions = [
-            self._build_transition(decision, views_by_group[decision.replica_group_id], apply_input)
-            for decision in apply_input.result.decisions
+            self._build_transition(decision, apply_input)
+            for decision in apply_input.result.scaling_decisions
         ]
         apply = ReplicaGroupScalingReconcileApply(
             create_instructions=apply_input.result.create_instructions,
@@ -78,12 +73,13 @@ class GroupScalingApplier(
     def _build_transition(
         self,
         decision: GroupScalingDecision,
-        view: ReplicaGroupScalingReconcileView,
         apply_input: _ScalingApplyInput,
     ) -> ReplicaGroupReconcileTransition:
         metadata = apply_input.metadata
+        # The coordinator already classified the handler outcome into the final result.
+        result = apply_input.classified[decision.replica_group_id]
         # No mapped target -> no status change this tick (to_status stays None).
-        target_status = metadata.transitions.get(decision.result)
+        target_status = metadata.transitions.get(result)
         status_updater: Updater[ReplicaGroupRow] | None = None
         to_status: str | None = None
         if target_status is not None:
@@ -100,10 +96,10 @@ class GroupScalingApplier(
                 deployment_id=decision.deployment_id,
                 category=metadata.category,
                 phase=metadata.phase,
-                result=decision.result,
+                result=result,
                 message=decision.message,
                 error_code=decision.error_code,
-                from_status=view.scaling_status.value,
+                from_status=decision.from_status.value,
                 to_status=to_status,
                 sub_steps=extract_sub_steps_for_entity(
                     decision.replica_group_id, apply_input.records

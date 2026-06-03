@@ -5,11 +5,17 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
 from ai.backend.common.events.types import AbstractAnycastEvent
-from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
+from ai.backend.manager.data.reconciler.types import (
+    BaseReconcilerCategory,
+    HandlerOutcome,
+    LastHistory,
+)
+from ai.backend.manager.data.session.options import HandlerOptions
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.metrics.reconciler import ReconcilerMetricObserver
@@ -25,6 +31,31 @@ class BaseReconcilerInfo(ABC):
         """IDs of the entities that drive scheduling decisions."""
         raise NotImplementedError
 
+    @abstractmethod
+    def now(self) -> datetime:
+        """DB-sourced current time read with the fetch (not per-server wall clock)."""
+        raise NotImplementedError
+
+
+class ReconcilerDecision(ABC):
+    """Per-entity handler outcome the coordinator classifies into a final SchedulingResult.
+
+    The handler sets ``outcome`` to SUCCESS/FAILURE/STALE/SKIPPED only; the coordinator
+    refines FAILURE from the prior history (``last_*``) and the stage policy.
+    """
+
+    @abstractmethod
+    def entity_id(self) -> UUID:
+        raise NotImplementedError
+
+    @abstractmethod
+    def outcome(self) -> HandlerOutcome:
+        raise NotImplementedError
+
+    @abstractmethod
+    def last_history(self) -> LastHistory | None:
+        raise NotImplementedError
+
 
 class BaseReconcilerResult(ABC):
     """Marker for scheduling handler results that drive scheduling decisions."""
@@ -37,6 +68,11 @@ class BaseReconcilerResult(ABC):
     @abstractmethod
     def failed_count(self) -> int:
         """Number of entities that failed processing."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def decisions(self) -> Sequence[ReconcilerDecision]:
+        """Per-entity outcomes the coordinator resolves before the applier runs."""
         raise NotImplementedError
 
 
@@ -96,29 +132,29 @@ class ReconcilerStageMetadata[
     name: str
     phase: str
     lock_id: LockID | None
+    policy: HandlerOptions
     transitions: Mapping[SchedulingResult, Status]
 
 
 @dataclass(frozen=True)
 class ReconcilerApplyInput[
-    Info: BaseReconcilerInfo,
     Result: BaseReconcilerResult,
     Category: BaseReconcilerCategory,
     Kind: BaseReconcilerKind,
     TargetStatuses: BaseReconcilerTargetStatuses,
     Status,
 ]:
-    """Everything the applier needs for one tick: the fetched info, the handler result,
-    the recorded sub-steps, and the stage metadata (category/phase/transitions)."""
+    """Everything the applier needs for one tick: the handler result (which carries each
+    decision's own input state), the recorded sub-steps, the coordinator-resolved
+    per-entity results, and the stage metadata (category/phase/transitions)."""
 
-    info: Info
     result: Result
     records: Mapping[UUID, ExecutionRecord]
+    classified: Mapping[UUID, SchedulingResult]
     metadata: ReconcilerStageMetadata[Category, Kind, TargetStatuses, Status]
 
 
 class ReconcilerApplier[
-    Info: BaseReconcilerInfo,
     Result: BaseReconcilerResult,
     Category: BaseReconcilerCategory,
     Kind: BaseReconcilerKind,
@@ -130,7 +166,7 @@ class ReconcilerApplier[
     @abstractmethod
     async def apply(
         self,
-        apply_input: ReconcilerApplyInput[Info, Result, Category, Kind, TargetStatuses, Status],
+        apply_input: ReconcilerApplyInput[Result, Category, Kind, TargetStatuses, Status],
     ) -> None:
         """Persist scheduling decisions derived from the handler result."""
         raise NotImplementedError
@@ -163,14 +199,14 @@ class ReconcilerStage[
 
     _handler: ReconcilerHandler[Info, Result]
     _source: ReconcilerSource[Info, Category, TargetStatuses]
-    _applier: ReconcilerApplier[Info, Result, Category, Kind, TargetStatuses, Status]
+    _applier: ReconcilerApplier[Result, Category, Kind, TargetStatuses, Status]
     _metadata: ReconcilerStageMetadata[Category, Kind, TargetStatuses, Status]
 
     def __init__(
         self,
         handler: ReconcilerHandler[Info, Result],
         source: ReconcilerSource[Info, Category, TargetStatuses],
-        applier: ReconcilerApplier[Info, Result, Category, Kind, TargetStatuses, Status],
+        applier: ReconcilerApplier[Result, Category, Kind, TargetStatuses, Status],
         metadata: ReconcilerStageMetadata[Category, Kind, TargetStatuses, Status],
     ) -> None:
         self._handler = handler
@@ -198,17 +234,50 @@ class ReconcilerStage[
                 kind, handler_name, result.processed_count(), result.failed_count()
             )
             records = pool.build_all_records()
+            with metrics.measure(kind, handler_name, "classify_scheduling_results"):
+                classified = self._classify(result, reconcile_info.now())
             with metrics.measure(kind, handler_name, "apply_scheduling_decisions"):
                 await self._applier.apply(
                     ReconcilerApplyInput(
-                        info=reconcile_info,
                         result=result,
                         records=records,
+                        classified=classified,
                         metadata=self._metadata,
                     )
                 )
         with metrics.measure(kind, handler_name, "post_process"):
             await self._handler.post_process(result)
+
+    def _classify(self, result: Result, now: datetime) -> Mapping[UUID, SchedulingResult]:
+        return {
+            decision.entity_id(): self._classify_outcome(decision, now)
+            for decision in result.decisions()
+        }
+
+    def _classify_outcome(self, decision: ReconcilerDecision, now: datetime) -> SchedulingResult:
+        # Only FAILURE is refined (against prior history, reset on phase change, + policy);
+        # the rest map straight through to their SchedulingResult counterpart.
+        match decision.outcome():
+            case HandlerOutcome.SUCCESS:
+                return SchedulingResult.SUCCESS
+            case HandlerOutcome.STALE:
+                return SchedulingResult.STALE
+            case HandlerOutcome.SKIPPED:
+                return SchedulingResult.SKIPPED
+            case HandlerOutcome.FAILURE:
+                last = decision.last_history()
+                if last is not None and last.phase == self._metadata.phase:
+                    attempts = last.attempts
+                    started_at: datetime | None = last.started_at
+                else:
+                    attempts = 0
+                    started_at = None
+                policy = self._metadata.policy
+                if policy.is_retry_exhausted(attempts):
+                    return SchedulingResult.GIVE_UP
+                if policy.is_timed_out(started_at, now):
+                    return SchedulingResult.EXPIRED
+                return SchedulingResult.NEED_RETRY
 
 
 @dataclass

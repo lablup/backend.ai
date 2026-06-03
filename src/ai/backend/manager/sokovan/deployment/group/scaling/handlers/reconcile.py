@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import override
 from uuid import UUID
 
-from ai.backend.manager.data.session.types import SchedulingResult
+from ai.backend.manager.data.reconciler.types import HandlerOutcome
 from ai.backend.manager.repositories.replica_group.types import (
     GroupRouteCreateInstruction,
     GroupRouteDrainInstruction,
@@ -28,7 +28,7 @@ class GroupScalingReconcileHandler(
     ) -> GroupScalingReconcileResult:
         create_instructions: list[GroupRouteCreateInstruction] = []
         drain_instructions: list[GroupRouteDrainInstruction] = []
-        decisions: list[GroupScalingDecision] = []
+        scaling_decisions: list[GroupScalingDecision] = []
         pool = RecorderContext[UUID].current_pool()
 
         for view in reconcile_info.views:
@@ -83,26 +83,29 @@ class GroupScalingReconcileHandler(
                         view.target_live_replica_count == view.desired_target_replica_count
                         and view.target_serving_replica_count == view.desired_target_replica_count
                     )
-                    # Reconciled to desired -> SUCCESS; still converging -> retry next tick.
+                    # Converged -> SUCCESS; still converging -> FAILURE (the coordinator
+                    # turns FAILURE into retry/give-up/expire from history + policy).
                     if current_matched and target_matched:
-                        result = SchedulingResult.SUCCESS
+                        outcome = HandlerOutcome.SUCCESS
                         message = "replica counts match desired"
                     else:
-                        result = SchedulingResult.NEED_RETRY
+                        outcome = HandlerOutcome.FAILURE
                         message = "reconciling replica counts toward desired"
-            decisions.append(
+            scaling_decisions.append(
                 GroupScalingDecision(
                     replica_group_id=view.group_id,
                     deployment_id=view.deployment_id,
-                    result=result,
+                    handler_outcome=outcome,
                     message=message,
+                    from_status=view.scaling_status,
+                    prior_history=view.last_history,
                 )
             )
 
         return GroupScalingReconcileResult(
             create_instructions=create_instructions,
             drain_instructions=drain_instructions,
-            decisions=decisions,
+            scaling_decisions=scaling_decisions,
             processed=len(reconcile_info.views),
             failed=0,
         )

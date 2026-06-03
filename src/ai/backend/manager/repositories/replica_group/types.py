@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
@@ -13,6 +14,16 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scheduling_history.creators import (
     ReplicaGroupHistoryCreatorSpec,
 )
+from ai.backend.manager.views.replica_group import ReplicaGroupScalingReconcileView
+
+
+@dataclass
+class ScalingReconcileFetch:
+    """One scaling-reconcile fetch: per-group views plus the DB-sourced current time
+    (read in the same session so retry/timeout classification uses a consistent clock)."""
+
+    views: list[ReplicaGroupScalingReconcileView]
+    now: datetime
 
 
 @dataclass

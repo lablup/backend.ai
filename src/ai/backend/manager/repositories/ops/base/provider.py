@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
@@ -75,6 +76,11 @@ class ReadOps:
 
     def __init__(self, sess: SASession) -> None:
         self._sess = sess
+
+    async def current_time(self) -> datetime:
+        """DB-sourced current time, consistent across servers (not a per-server clock)."""
+        result = await self._sess.execute(sa.select(sa.func.now()))
+        return result.scalar_one()
 
     async def query[TRow: Base](self, querier: Querier[TRow]) -> QuerierResult[TRow] | None:
         """Fetch a single row by primary key."""

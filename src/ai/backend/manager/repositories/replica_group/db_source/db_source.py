@@ -15,8 +15,13 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import RouteStatus, RouteTrafficStatus
+from ai.backend.manager.data.deployment.types import (
+    ReplicaGroupHandlerCategory,
+    RouteStatus,
+    RouteTrafficStatus,
+)
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.reconciler.types import LastHistory
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
@@ -41,6 +46,7 @@ from ai.backend.manager.repositories.replica_group.types import (
     ReplicaGroupReconcileTransition,
     ReplicaGroupScalingReconcileApply,
     RevisionReplicaCount,
+    ScalingReconcileFetch,
 )
 from ai.backend.manager.types import OptionalState
 from ai.backend.manager.views.replica_group import (
@@ -82,12 +88,15 @@ class ReplicaGroupDBSource:
     async def fetch_scaling_reconcile_views(
         self,
         querier: BatchQuerier,
-    ) -> list[ReplicaGroupScalingReconcileView]:
+        category: ReplicaGroupHandlerCategory,
+    ) -> ScalingReconcileFetch:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
+            now = (await db_sess.execute(sa.select(sa.func.now()))).scalar_one()
             group_result = await execute_batch_querier(db_sess, sa.select(ReplicaGroupRow), querier)
             group_rows: list[ReplicaGroupRow] = [row.ReplicaGroupRow for row in group_result.rows]
             group_ids = [group_row.id for group_row in group_rows]
             counts = await self._count_live_serving_by_revision(db_sess, group_ids)
+            last_histories = await self._latest_history_by_group(db_sess, group_ids, category)
             empty = RevisionReplicaCount(live=0, serving=0)
             views: list[ReplicaGroupScalingReconcileView] = []
             for group_row in group_rows:
@@ -102,6 +111,16 @@ class ReplicaGroupDBSource:
                     if group_row.target_revision_id is not None
                     else empty
                 )
+                history_row = last_histories.get(group_row.id)
+                last_history = (
+                    LastHistory(
+                        phase=history_row.phase,
+                        attempts=history_row.attempts,
+                        started_at=history_row.created_at,
+                    )
+                    if history_row is not None
+                    else None
+                )
                 views.append(
                     ReplicaGroupScalingReconcileView(
                         group_id=group_row.id,
@@ -115,9 +134,31 @@ class ReplicaGroupDBSource:
                         current_serving_replica_count=current_counts.serving,
                         target_live_replica_count=target_counts.live,
                         target_serving_replica_count=target_counts.serving,
+                        last_history=last_history,
                     )
                 )
-            return views
+            return ScalingReconcileFetch(views=views, now=now)
+
+    async def _latest_history_by_group(
+        self,
+        db_sess: SASession,
+        group_ids: Sequence[ReplicaGroupID],
+        category: ReplicaGroupHandlerCategory,
+    ) -> Mapping[ReplicaGroupID, ReplicaGroupHistoryRow]:
+        if not group_ids:
+            return {}
+        query = (
+            sa.select(ReplicaGroupHistoryRow)
+            .where(ReplicaGroupHistoryConditions.by_replica_group_ids(group_ids)())
+            .where(ReplicaGroupHistoryConditions.by_category(category)())
+            .order_by(
+                ReplicaGroupHistoryRow.replica_group_id,
+                ReplicaGroupHistoryRow.created_at.desc(),
+            )
+            .distinct(ReplicaGroupHistoryRow.replica_group_id)
+        )
+        rows = (await db_sess.execute(query)).scalars().all()
+        return {row.replica_group_id: row for row in rows}
 
     async def _count_live_serving_by_revision(
         self,
