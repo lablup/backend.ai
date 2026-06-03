@@ -68,6 +68,13 @@ class RoleRow(Base):  # type: ignore[misc]
         default=RoleStatus.ACTIVE,
         server_default=RoleStatus.ACTIVE,
     )
+    auto_assign: Mapped[bool] = mapped_column(
+        "auto_assign",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
