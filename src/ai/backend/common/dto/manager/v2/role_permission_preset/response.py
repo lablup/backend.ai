@@ -17,6 +17,7 @@ __all__ = (
     "BulkRemoveRolePermissionPresetsPayload",
     "BulkRolePermissionPresetFailureInfo",
     "RolePermissionPresetNode",
+    "SearchRolePermissionPresetsPayload",
 )
 
 
@@ -30,6 +31,17 @@ class RolePermissionPresetNode(BaseResponseModel):
     )
     operation: OperationTypeDTO = Field(description="Operation granted by the permission.")
     created_at: datetime = Field(description="Creation timestamp.")
+
+
+class SearchRolePermissionPresetsPayload(BaseResponseModel):
+    """Payload for paginated permission-entry search under a role preset."""
+
+    items: list[RolePermissionPresetNode] = Field(
+        description="Permission entry nodes matching the filter."
+    )
+    total_count: int = Field(description="Total number matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
 class BulkRolePermissionPresetFailureInfo(BaseResponseModel):

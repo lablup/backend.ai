@@ -22,6 +22,7 @@ __all__ = (
     "BulkRemoveRolePermissionPresetsInput",
     "RolePermissionPresetFilter",
     "RolePermissionPresetOrder",
+    "SearchRolePermissionPresetsInput",
 )
 
 
@@ -76,3 +77,20 @@ class RolePermissionPresetOrder(BaseRequestModel):
 
     field: RolePermissionPresetOrderField = Field(description="Field to order by.")
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
+
+
+class SearchRolePermissionPresetsInput(BaseRequestModel):
+    """Input for paginated search of the permission entries under a role preset."""
+
+    filter: RolePermissionPresetFilter | None = Field(
+        default=None, description="Filter conditions."
+    )
+    order: list[RolePermissionPresetOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")

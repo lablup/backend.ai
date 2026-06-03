@@ -16,6 +16,8 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     BulkAddRolePermissionPresetsInput,
     BulkRemoveRolePermissionPresetsInput,
     RolePermissionPresetFilter,
+    RolePermissionPresetOrder,
+    SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     BulkAddRolePermissionPresetFailureInfo,
@@ -23,6 +25,10 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     BulkRemoveRolePermissionPresetsPayload,
     BulkRolePermissionPresetFailureInfo,
     RolePermissionPresetNode,
+    SearchRolePermissionPresetsPayload,
+)
+from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
+    RolePermissionPresetOrderField,
 )
 from ai.backend.common.dto.manager.v2.role_preset.request import (
     BulkDeleteRolePresetsInput,
@@ -51,6 +57,12 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
     RolePresetData,
+)
+from ai.backend.manager.models.rbac_models.role_permission_preset.conditions import (
+    RolePermissionPresetConditions,
+)
+from ai.backend.manager.models.rbac_models.role_permission_preset.orders import (
+    RolePermissionPresetOrders,
 )
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
@@ -89,6 +101,9 @@ from ai.backend.manager.services.role_preset.actions.delete import BulkDeleteRol
 from ai.backend.manager.services.role_preset.actions.get import GetRolePresetAction
 from ai.backend.manager.services.role_preset.actions.restore import BulkRestoreRolePresetsAction
 from ai.backend.manager.services.role_preset.actions.search import SearchRolePresetsAction
+from ai.backend.manager.services.role_preset.actions.search_permission_presets import (
+    SearchRolePermissionPresetsAction,
+)
 from ai.backend.manager.services.role_preset.actions.update import UpdateRolePresetAction
 from ai.backend.manager.types import OptionalState
 
@@ -100,6 +115,16 @@ def _role_preset_pagination_spec() -> PaginationSpec:
         forward_condition_factory=RolePresetConditions.by_cursor_forward,
         backward_condition_factory=RolePresetConditions.by_cursor_backward,
         tiebreaker_order=RolePresetRow.id.asc(),
+    )
+
+
+def _role_permission_preset_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=RolePermissionPresetOrders.id(ascending=False),
+        backward_order=RolePermissionPresetOrders.id(ascending=True),
+        forward_condition_factory=RolePermissionPresetConditions.by_cursor_forward,
+        backward_condition_factory=RolePermissionPresetConditions.by_cursor_backward,
+        tiebreaker_order=RolePermissionPresetRow.id.asc(),
     )
 
 
@@ -243,18 +268,43 @@ class RolePresetAdapter(BaseAdapter):
             ],
         )
 
-    async def search_permissions(
-        self, input: RolePermissionPresetFilter
-    ) -> list[RolePermissionPresetNode]:
-        """Resolve the permission entries belonging to a role preset.
+    async def search_permission_presets(
+        self,
+        role_preset_id: RolePresetID,
+        input: SearchRolePermissionPresetsInput,
+    ) -> SearchRolePermissionPresetsPayload:
+        """Search the permission entries belonging to a single role preset.
 
-        Backs the ``permission_presets`` field resolver on ``RolePresetNode``; the caller
-        supplies ``role_preset_id`` via the filter.
-
-        Not yet wired: there is no read-path Processor/Service for permission entries.
-        Adding one is tracked under the Role Preset service layer, not this wire-up.
+        Backs the ``permission_presets`` field resolver on ``RolePresetGQL``. The
+        parent preset id is always enforced as a base condition, so caller-supplied
+        filters can only narrow within that preset, never widen across presets.
         """
-        raise NotImplementedError
+        conditions = self._convert_permission_filter(input.filter) if input.filter else []
+        orders = self._convert_permission_orders(input.order) if input.order else []
+        base_conditions: list[QueryCondition] = [
+            RolePermissionPresetConditions.by_role_preset_id_equals(role_preset_id)
+        ]
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_role_permission_preset_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=base_conditions,
+        )
+        result = await self._processors.role_preset.search_permission_presets.wait_for_complete(
+            SearchRolePermissionPresetsAction(querier=querier)
+        )
+        return SearchRolePermissionPresetsPayload(
+            items=[self._permission_data_to_node(d) for d in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def bulk_add_permissions(
         self,
@@ -358,6 +408,104 @@ class RolePresetAdapter(BaseAdapter):
                     result.append(RolePresetOrders.created_at(ascending))
                 case RolePresetOrderField.UPDATED_AT:
                     result.append(RolePresetOrders.updated_at(ascending))
+        return result
+
+    def _convert_permission_filter(
+        self, filter_: RolePermissionPresetFilter
+    ) -> list[QueryCondition]:
+        # ``role_preset_id`` is intentionally ignored here: the parent preset scope
+        # is enforced as a base condition by the caller, so it cannot be widened.
+        conditions: list[QueryCondition] = []
+        if filter_.entity_type is not None:
+            f = filter_.entity_type
+            if f.equals is not None:
+                conditions.append(
+                    RolePermissionPresetConditions.by_entity_type_equals(
+                        RBACElementType(f.equals.value).to_entity_type()
+                    )
+                )
+            if f.not_equals is not None:
+                conditions.append(
+                    RolePermissionPresetConditions.by_entity_type_not_equals(
+                        RBACElementType(f.not_equals.value).to_entity_type()
+                    )
+                )
+            if f.in_:
+                conditions.append(
+                    RolePermissionPresetConditions.by_entity_type_in([
+                        RBACElementType(v.value).to_entity_type() for v in f.in_
+                    ])
+                )
+            if f.not_in:
+                conditions.append(
+                    RolePermissionPresetConditions.by_entity_type_not_in([
+                        RBACElementType(v.value).to_entity_type() for v in f.not_in
+                    ])
+                )
+        if filter_.operation is not None:
+            f_op = filter_.operation
+            if f_op.equals is not None:
+                conditions.append(
+                    RolePermissionPresetConditions.by_operation_equals(
+                        OperationType(f_op.equals.value)
+                    )
+                )
+            if f_op.not_equals is not None:
+                conditions.append(
+                    RolePermissionPresetConditions.by_operation_not_equals(
+                        OperationType(f_op.not_equals.value)
+                    )
+                )
+            if f_op.in_:
+                conditions.append(
+                    RolePermissionPresetConditions.by_operation_in([
+                        OperationType(v.value) for v in f_op.in_
+                    ])
+                )
+            if f_op.not_in:
+                conditions.append(
+                    RolePermissionPresetConditions.by_operation_not_in([
+                        OperationType(v.value) for v in f_op.not_in
+                    ])
+                )
+        if filter_.created_at is not None:
+            cond = filter_.created_at.build_query_condition(
+                before_factory=RolePermissionPresetConditions.by_created_at_before,
+                after_factory=RolePermissionPresetConditions.by_created_at_after,
+                equals_factory=RolePermissionPresetConditions.by_created_at_equals,
+            )
+            if cond is not None:
+                conditions.append(cond)
+        if filter_.AND:
+            for sub in filter_.AND:
+                conditions.extend(self._convert_permission_filter(sub))
+        if filter_.OR:
+            or_conds: list[QueryCondition] = []
+            for sub in filter_.OR:
+                or_conds.extend(self._convert_permission_filter(sub))
+            if or_conds:
+                conditions.append(combine_conditions_or(or_conds))
+        if filter_.NOT:
+            not_conds: list[QueryCondition] = []
+            for sub in filter_.NOT:
+                not_conds.extend(self._convert_permission_filter(sub))
+            if not_conds:
+                conditions.append(negate_conditions(not_conds))
+        return conditions
+
+    def _convert_permission_orders(
+        self, orders: list[RolePermissionPresetOrder]
+    ) -> list[QueryOrder]:
+        result: list[QueryOrder] = []
+        for order in orders:
+            ascending = order.direction == OrderDirection.ASC
+            match order.field:
+                case RolePermissionPresetOrderField.ENTITY_TYPE:
+                    result.append(RolePermissionPresetOrders.entity_type(ascending))
+                case RolePermissionPresetOrderField.OPERATION:
+                    result.append(RolePermissionPresetOrders.operation(ascending))
+                case RolePermissionPresetOrderField.CREATED_AT:
+                    result.append(RolePermissionPresetOrders.created_at(ascending))
         return result
 
     @staticmethod

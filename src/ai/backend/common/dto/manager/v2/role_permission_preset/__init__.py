@@ -7,12 +7,14 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     BulkRemoveRolePermissionPresetsInput,
     RolePermissionPresetFilter,
     RolePermissionPresetOrder,
+    SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     BulkAddRolePermissionPresetsPayload,
     BulkRemoveRolePermissionPresetsPayload,
     BulkRolePermissionPresetFailureInfo,
     RolePermissionPresetNode,
+    SearchRolePermissionPresetsPayload,
 )
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
@@ -28,9 +30,11 @@ __all__ = (
     "BulkRemoveRolePermissionPresetsInput",
     "RolePermissionPresetFilter",
     "RolePermissionPresetOrder",
+    "SearchRolePermissionPresetsInput",
     # Response DTOs
     "BulkAddRolePermissionPresetsPayload",
     "BulkRemoveRolePermissionPresetsPayload",
     "BulkRolePermissionPresetFailureInfo",
     "RolePermissionPresetNode",
+    "SearchRolePermissionPresetsPayload",
 )
