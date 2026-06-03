@@ -4047,6 +4047,11 @@ input CreateRoleInput
   name: String!
   description: String = null
   source: RoleSource! = CUSTOM
+
+  """
+  Added in UNRELEASED. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  """
+  autoAssign: Boolean! = false
   scopes: [ScopeInput!] = null
 }
 
@@ -16002,6 +16007,11 @@ type Role implements Node
   updatedAt: DateTime!
   deletedAt: DateTime
 
+  """
+  Added in UNRELEASED. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  """
+  autoAssign: Boolean!
+
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
@@ -19291,6 +19301,11 @@ input UpdateRoleInput
   name: String
   description: String
   status: RoleStatus
+
+  """
+  Added in UNRELEASED. Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  """
+  autoAssign: Boolean
 }
 
 """
