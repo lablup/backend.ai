@@ -55,12 +55,29 @@ class TestCreateRoleInputToPydantic:
         assert isinstance(dto, CreateRoleInputDTO)
         assert dto.description is None
 
+    def test_auto_assign_omitted_defaults_to_false(self) -> None:
+        """CreateRoleInput with auto_assign omitted → dto.auto_assign is False."""
+        role_input = CreateRoleInput(name="MyRole")
+
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, CreateRoleInputDTO)
+        assert dto.auto_assign is False
+
+    def test_auto_assign_explicit_true(self) -> None:
+        """CreateRoleInput with auto_assign=True → dto.auto_assign is True."""
+        role_input = CreateRoleInput(name="MyRole", auto_assign=True)
+
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, CreateRoleInputDTO)
+        assert dto.auto_assign is True
+
     def test_all_fields_provided(self) -> None:
         """CreateRoleInput with all fields → dto has matching values."""
         role_input = CreateRoleInput(
             name="Admin",
             description="Admin role",
             source=RoleSourceGQL.SYSTEM,
+            auto_assign=True,
         )
 
         dto = role_input.to_pydantic()
@@ -68,6 +85,7 @@ class TestCreateRoleInputToPydantic:
         assert dto.name == "Admin"
         assert dto.description == "Admin role"
         assert dto.source == RoleSource.SYSTEM
+        assert dto.auto_assign is True
 
 
 class TestUpdateRoleInputToPydantic:
@@ -161,6 +179,39 @@ class TestUpdateRoleInputToPydantic:
         assert isinstance(dto, UpdateRoleInputDTO)
         assert dto.status == RoleStatus.INACTIVE
 
+    def test_auto_assign_with_unset_produces_none_in_dto(self) -> None:
+        """UpdateRoleInput with auto_assign=UNSET → dto.auto_assign is None (no change)."""
+        role_input = UpdateRoleInput(
+            id=uuid.uuid4(),
+            # auto_assign is omitted (UNSET by default)
+        )
+
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.auto_assign is None
+
+    def test_auto_assign_with_true_produces_true_in_dto(self) -> None:
+        """UpdateRoleInput with auto_assign=True → dto.auto_assign is True."""
+        role_input = UpdateRoleInput(
+            id=uuid.uuid4(),
+            auto_assign=True,
+        )
+
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.auto_assign is True
+
+    def test_auto_assign_with_false_produces_false_in_dto(self) -> None:
+        """UpdateRoleInput with auto_assign=False → dto.auto_assign is False."""
+        role_input = UpdateRoleInput(
+            id=uuid.uuid4(),
+            auto_assign=False,
+        )
+
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.auto_assign is False
+
     def test_multiple_fields_with_mixed_values(self) -> None:
         """Multiple fields with different values produce correct DTO."""
         role_input = UpdateRoleInput(
@@ -168,6 +219,7 @@ class TestUpdateRoleInputToPydantic:
             name="updated role",
             description=None,
             status=RoleStatusGQL.ACTIVE,
+            auto_assign=True,
         )
 
         dto = role_input.to_pydantic()
@@ -175,6 +227,7 @@ class TestUpdateRoleInputToPydantic:
         assert dto.name == "updated role"
         assert dto.description is None
         assert dto.status == RoleStatus.ACTIVE
+        assert dto.auto_assign is True
 
     def test_all_fields_unset_produces_all_defaults(self) -> None:
         """When all fields are UNSET, all DTO fields use their defaults."""
@@ -188,6 +241,7 @@ class TestUpdateRoleInputToPydantic:
         assert dto.name is None
         assert dto.description is SENTINEL
         assert dto.status is None
+        assert dto.auto_assign is None
 
     def test_id_is_on_gql_input_not_in_dto(self) -> None:
         """id is a GQL input field used for routing but not included in the DTO."""
