@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -86,6 +86,9 @@ from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.errors.user import UserNotFound
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.deployment.types.replica import ModelReplica
 
 
 @gql_enum(
@@ -319,6 +322,9 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     domain_name: str
     user_id: ID
     project_id: ID
+    replica_id: ID | None = gql_field(
+        description="UUID of the routing replica this session serves (key for the replica resolver).",
+    )
 
     metadata: SessionV2MetadataInfoGQL = gql_field(
         description="Metadata including domain, project, and user information."
@@ -433,6 +439,28 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             ),
             count=payload.total_count,
         )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The model deployment replica this session serves, resolved via DataLoader "
+                "from `replica_id`. Null for non-inference sessions."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def replica(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ModelReplica,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.replica"),
+        ]
+        | None
+    ):
+        if self.replica_id is None:
+            return None
+        return await info.context.data_loaders.replica_loader.load(UUID(str(self.replica_id)))
 
     # TODO: Add `vfolder_mounts` dynamic field (VFolder connection type needed)
 

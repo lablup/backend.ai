@@ -1,0 +1,29 @@
+"""add replica_id to sessions
+
+Revision ID: 169cb5f48658
+Revises: 1a2b3c4d5e6f
+Create Date: 2026-06-04 00:00:00.000000
+
+"""
+
+import sqlalchemy as sa
+from alembic import op
+
+from ai.backend.manager.models.base import GUID
+
+# revision identifiers, used by Alembic.
+revision = "169cb5f48658"
+down_revision = "1a2b3c4d5e6f"
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    op.add_column(
+        "sessions",
+        sa.Column("replica_id", GUID(), nullable=True),
+    )
+
+
+def downgrade() -> None:
+    op.drop_column("sessions", "replica_id")
