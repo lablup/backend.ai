@@ -942,11 +942,9 @@ class UserAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
-        if filter_req.user is not None and filter_req.user.user_id is not None:
-            # The keypair owner (``user`` column) lives directly on the keypair row,
-            # so the nested user filter maps to a plain column condition (no join/EXISTS).
+        if filter_req.user_id is not None:
             condition = self.convert_uuid_filter(
-                filter_req.user.user_id,
+                filter_req.user_id,
                 equals_factory=KeypairConditions.by_user_id_equals,
                 in_factory=KeypairConditions.by_user_id_in,
             )
