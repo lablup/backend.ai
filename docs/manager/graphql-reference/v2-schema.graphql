@@ -6453,7 +6453,7 @@ input ModelHealthCheckInput {
   """
   Whether the route should be health-checked. When false the route activates immediately and the remaining fields are ignored.
   """
-  enable: Boolean = null
+  enable: Boolean! = false
 
   """Interval in seconds between health checks."""
   interval: Float = null
