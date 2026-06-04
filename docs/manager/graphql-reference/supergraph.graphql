@@ -17874,9 +17874,7 @@ type SessionV2 implements Node
   userId: ID!
   projectId: ID!
 
-  """
-  UUID of the routing replica this session serves (key for the replica resolver).
-  """
+  """UUID of the model deployment replica served by this session."""
   replicaId: ID
 
   """Metadata including domain, project, and user information."""
@@ -17915,7 +17913,7 @@ type SessionV2 implements Node
   kernels: KernelV2Connection
 
   """
-  Added in UNRELEASED. The model deployment replica this session serves, resolved via DataLoader from `replica_id`. Null for non-inference sessions.
+  Added in UNRELEASED. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
   """
   replica: ModelReplica
 }
