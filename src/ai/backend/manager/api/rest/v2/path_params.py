@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.identifier.role_preset import RolePresetID
 
 
 class DomainNamePathParam(BaseRequestModel):
@@ -75,6 +76,10 @@ class RuleIdPathParam(BaseRequestModel):
 
 class PresetIdPathParam(BaseRequestModel):
     preset_id: UUID = Field(description="Preset UUID")
+
+
+class RolePresetIdPathParam(BaseRequestModel):
+    role_preset_id: RolePresetID = Field(description="Role preset UUID")
 
 
 class LoginClientTypeIdPathParam(BaseRequestModel):

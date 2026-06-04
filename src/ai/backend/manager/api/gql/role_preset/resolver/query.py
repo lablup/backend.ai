@@ -41,8 +41,6 @@ async def admin_role_preset(
 ) -> RolePresetGQL | None:
     check_admin_only()
     node = await info.context.adapters.role_preset.get(RolePresetID(UUID(str(id))))
-    if node is None:
-        return None
     return RolePresetGQL.from_pydantic(node)
 
 

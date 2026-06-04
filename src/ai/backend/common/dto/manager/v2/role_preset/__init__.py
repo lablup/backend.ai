@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetFilter,
     RolePresetOrder,
     SearchRolePresetsInput,
+    UpdateRolePresetBody,
     UpdateRolePresetInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import (
@@ -35,6 +36,7 @@ __all__ = (
     "RolePresetFilter",
     "RolePresetOrder",
     "SearchRolePresetsInput",
+    "UpdateRolePresetBody",
     "UpdateRolePresetInput",
     # Response DTOs
     "BulkDeleteRolePresetsPayload",

@@ -38,6 +38,7 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetFilter,
     RolePresetOrder,
     SearchRolePresetsInput,
+    UpdateRolePresetBody,
     UpdateRolePresetInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import (
@@ -153,7 +154,7 @@ class RolePresetAdapter(BaseAdapter):
         )
         return CreateRolePresetPayload(role_preset=self._data_to_node(result.preset))
 
-    async def get(self, role_preset_id: RolePresetID) -> RolePresetNode | None:
+    async def get(self, role_preset_id: RolePresetID) -> RolePresetNode:
         """Get a single role preset by ID."""
         result = await self._processors.role_preset.get.wait_for_complete(
             GetRolePresetAction(preset_id=role_preset_id)
@@ -208,6 +209,22 @@ class RolePresetAdapter(BaseAdapter):
             UpdateRolePresetAction(updater=updater)
         )
         return UpdateRolePresetPayload(role_preset=self._data_to_node(result.preset))
+
+    async def update_from_body(
+        self, role_preset_id: RolePresetID, body: UpdateRolePresetBody
+    ) -> UpdateRolePresetPayload:
+        """Update a role preset whose ID is carried separately from the body.
+
+        Used by the REST handler, where the preset ID comes from the URL path
+        while the body only carries the mutable metadata.
+        """
+        return await self.update(
+            UpdateRolePresetInput(
+                role_preset_id=role_preset_id,
+                name=body.name,
+                auto_assign=body.auto_assign,
+            )
+        )
 
     async def bulk_delete(self, input: BulkDeleteRolePresetsInput) -> BulkDeleteRolePresetsPayload:
         """Bulk-soft-delete role presets."""
