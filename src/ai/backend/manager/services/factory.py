@@ -329,6 +329,7 @@ def create_services(args: ServiceArgs) -> Services:
             user_resource_policy_repository=repositories.user_resource_policy.repository,
             user_repository=repositories.user.repository,
             group_repository=repositories.group.repository,
+            ssh_key_validator=args.ssh_key_validator,
         ),
         login_client_type=LoginClientTypeService(
             repository=repositories.auth.login_client_type,

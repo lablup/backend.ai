@@ -146,6 +146,8 @@ __all__ = (
     "ResultSet",
     "RuntimeVariant",
     "SchedulerStatus",
+    "SSHPrivateKey",
+    "SSHPublicKey",
     "SecretKey",
     "Sentinel",
     "ServiceCatalogStatus",
@@ -467,6 +469,9 @@ MetricKey = NewType("MetricKey", str)
 
 AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
+
+SSHPublicKey = NewType("SSHPublicKey", str)
+SSHPrivateKey = NewType("SSHPrivateKey", str)
 
 ClusterRole = NewType("ClusterRole", str)
 
