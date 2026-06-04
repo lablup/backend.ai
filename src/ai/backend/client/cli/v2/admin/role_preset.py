@@ -80,15 +80,40 @@ def create(
 
 @role_preset.command()
 @click.argument("role_preset_id", type=click.UUID)
-def get(role_preset_id: uuid.UUID) -> None:
+@click.option(
+    "-d",
+    "--detail",
+    is_flag=True,
+    default=False,
+    help=(
+        "Also include the preset's permission entries. Only the first page is shown "
+        "(server default, up to 10); use `permission-search` to page through all entries."
+    ),
+)
+def get(role_preset_id: uuid.UUID, detail: bool) -> None:
     """Get a single role preset by ID."""
+    from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
+        SearchRolePermissionPresetsInput,
+    )
     from ai.backend.common.identifier.role_preset import RolePresetID
+
+    preset_id = RolePresetID(role_preset_id)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.role_preset.get(RolePresetID(role_preset_id))
-            print_result(result)
+            node = await registry.role_preset.get(preset_id)
+            if not detail:
+                print_result(node)
+                return
+            permissions = await registry.role_preset.search_permissions(
+                preset_id,
+                SearchRolePermissionPresetsInput(),
+            )
+            print_result({
+                "role_preset": node.model_dump(mode="json"),
+                "permissions": [item.model_dump(mode="json") for item in permissions.items],
+            })
         finally:
             await registry.close()
 
