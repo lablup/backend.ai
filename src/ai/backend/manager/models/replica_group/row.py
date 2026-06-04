@@ -13,9 +13,10 @@ from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
+    ReplicaGroupRolloutSpec,
     ReplicaGroupScalingStatus,
 )
-from ai.backend.manager.models.base import GUID, Base, StrEnumType
+from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupDeploySchedulingView,
     ReplicaGroupScalingSchedulingView,
@@ -132,6 +133,11 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
         nullable=False,
         default=ReplicaGroupScalingStatus.STABLE,
         server_default=ReplicaGroupScalingStatus.STABLE.value,
+    )
+    rollout: Mapped[ReplicaGroupRolloutSpec] = mapped_column(
+        "rollout",
+        PydanticColumn(ReplicaGroupRolloutSpec),
+        nullable=False,
     )
 
     created_at: Mapped[datetime] = mapped_column(

@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentPolicyData
+from ai.backend.manager.data.deployment.types import DeploymentPolicyData, ReplicaGroupRolloutSpec
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
 from ai.backend.manager.models.base import (
     GUID,
@@ -63,6 +63,13 @@ class RollingUpdateSpec(BackendAISchema):
             )
         return self
 
+    def to_rollout_spec(self) -> ReplicaGroupRolloutSpec:
+        """The per-group rollout step: rolling updates surge/drain in place."""
+        return ReplicaGroupRolloutSpec(
+            max_surge=self.max_surge,
+            max_unavailable=self.max_unavailable,
+        )
+
     def resolve_max_surge(self, desired_replicas: int) -> int:
         """Resolve max_surge to an absolute count (rounds up for percentages)."""
         return self._resolve(self.max_surge, desired_replicas, round_up=True)
@@ -90,6 +97,14 @@ class BlueGreenSpec(BackendAISchema):
 
     auto_promote: bool = False
     promote_delay_seconds: int = 0
+
+    def to_rollout_spec(self) -> ReplicaGroupRolloutSpec:
+        """The per-group rollout step: blue-green rolls out via a separate group,
+        so there is no in-place surge."""
+        return ReplicaGroupRolloutSpec(
+            max_surge=IntOrPercent(count=0),
+            max_unavailable=IntOrPercent(count=0),
+        )
 
 
 DeploymentStrategySpec = RollingUpdateSpec | BlueGreenSpec

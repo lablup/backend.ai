@@ -340,6 +340,7 @@ class DeploymentDBSource:
             primary_replica_group = ReplicaGroupRow(
                 deployment_id=endpoint.id,
                 desired_current_replica_count=endpoint.replicas,
+                rollout=policy_creator_spec.strategy_spec.to_rollout_spec(),
             )
             db_sess.add(primary_replica_group)
             await db_sess.flush()

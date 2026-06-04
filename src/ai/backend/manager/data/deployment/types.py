@@ -21,6 +21,7 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
@@ -487,6 +488,14 @@ class DeploymentOptions(ConfiguredModel):
     """
 
     handler_options: DeploymentHandlerOptions = Field(default_factory=DeploymentHandlerOptions)
+
+
+class ReplicaGroupRolloutSpec(ConfiguredModel):
+    """Per-group rollout step config snapshot from the deployment strategy at
+    DEPLOYING_INITIALIZING; bounds how fast routes move toward the group's desired counts."""
+
+    max_surge: IntOrPercent
+    max_unavailable: IntOrPercent
 
 
 class ResourceSpec(ConfiguredModel):
