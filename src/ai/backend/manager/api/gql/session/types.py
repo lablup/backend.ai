@@ -323,7 +323,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     user_id: ID
     project_id: ID
     replica_id: ID | None = gql_field(
-        description="UUID of the routing replica this session serves (key for the replica resolver).",
+        description="UUID of the model deployment replica served by this session.",
     )
 
     metadata: SessionV2MetadataInfoGQL = gql_field(
@@ -444,8 +444,9 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
-                "The model deployment replica this session serves, resolved via DataLoader "
-                "from `replica_id`. Null for non-inference sessions."
+                "The model deployment replica served by this session: a single replica "
+                "instance of a model deployment that runs in this compute session and serves "
+                "inference requests. Null for non-inference sessions."
             ),
         )
     )  # type: ignore[misc]
