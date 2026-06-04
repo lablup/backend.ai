@@ -27,6 +27,8 @@ from ai.backend.appproxy.common.types import (
     SessionConfig,
     Slot,
 )
+from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
+from ai.backend.common.exception import UnreachableError
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import Base, BaseMixin, EnumType, ForeignKeyIDColumn, IDColumn, StrEnumType
@@ -202,15 +204,30 @@ class Worker(Base, BaseMixin):
         w.status = status
 
         w.occupied_slots = 0
-        match frontend_mode:
-            case FrontendMode.WILDCARD_DOMAIN:
-                assert wildcard_domain
-                w.available_slots = -1
-            case FrontendMode.PORT:
-                assert port_range
-                w.available_slots = port_range[1] - port_range[0] + 1
+        w.refresh_available_slots()
 
         return w
+
+    def _calculate_available_slots(self) -> int:
+        """Number of available slots derived from the current frontend configuration."""
+        match self.frontend_mode:
+            case FrontendMode.WILDCARD_DOMAIN:
+                if not self.wildcard_domain:
+                    raise MissingFrontendConfigError(
+                        "Wildcard domain is required for WILDCARD_DOMAIN frontend mode"
+                    )
+                return -1
+            case FrontendMode.PORT:
+                if not self.port_range:
+                    raise MissingFrontendConfigError(
+                        "Port range is required for PORT frontend mode"
+                    )
+                return self.port_range[1] - self.port_range[0] + 1
+        raise UnreachableError(f"Unsupported frontend mode: {self.frontend_mode}")
+
+    def refresh_available_slots(self) -> None:
+        """Recompute available_slots from the current frontend config."""
+        self.available_slots = self._calculate_available_slots()
 
     @property
     def use_tls(self) -> bool:
