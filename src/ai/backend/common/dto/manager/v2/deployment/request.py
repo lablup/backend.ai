@@ -122,7 +122,7 @@ __all__ = (
 
 
 class ModelHealthCheckInput(BaseRequestModel):
-    enable: bool | None = None
+    enable: bool = False
     interval: float | None = None
     path: str | None = None
     max_retries: int | None = None

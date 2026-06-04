@@ -871,12 +871,12 @@ class PreStartActionInputGQL(PydanticInputMixin[PreStartActionDTO]):
     name="ModelHealthCheckInput",
 )
 class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckInputDTO]):
-    enable: bool | None = gql_field(
+    enable: bool = gql_field(
         description=(
             "Whether the route should be health-checked. When false the route activates "
             "immediately and the remaining fields are ignored."
         ),
-        default=None,
+        default=False,
     )
     interval: float | None = gql_field(
         description="Interval in seconds between health checks.", default=None
