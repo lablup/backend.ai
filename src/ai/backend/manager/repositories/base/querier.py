@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import enum
+from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -18,6 +20,7 @@ from .types import ExistenceCheck, QueryCondition, QueryOrder, SearchScope
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
+    from sqlalchemy.orm import InstrumentedAttribute
 
 TRow = TypeVar("TRow", bound=Base)
 
@@ -29,15 +32,19 @@ TRow = TypeVar("TRow", bound=Base)
 
 @dataclass
 class Querier[TRow: Base]:
-    """Single-row query by primary key.
+    """Single-row query by primary key (or an alternate unique column).
 
     Attributes:
         row_class: ORM class for table access and PK detection.
-        pk_value: Primary key value to identify the target row.
+        pk_value: The value identifying the target row, matched against the
+            primary key by default, or against ``lookup_column`` when set.
+        lookup_column: Optional ORM attribute to match on instead of the
+            primary key (e.g. ``RoutingRow.session`` for a 1:1 alternate key).
     """
 
     row_class: type[TRow]
     pk_value: UUID | str | int
+    lookup_column: InstrumentedAttribute[Any] | None = None
 
 
 @dataclass
@@ -71,14 +78,18 @@ async def execute_querier[TRow: Base](
     """
     row_class = querier.row_class
     table = row_class.__table__
-    pk_columns = list(table.primary_key.columns)
 
-    if len(pk_columns) != 1:
-        raise UnsupportedCompositePrimaryKeyError(
-            f"Querier only supports single-column primary keys (table: {table.name})",
-        )
+    if querier.lookup_column is not None:
+        match_column: Any = querier.lookup_column
+    else:
+        pk_columns = list(table.primary_key.columns)
+        if len(pk_columns) != 1:
+            raise UnsupportedCompositePrimaryKeyError(
+                f"Querier only supports single-column primary keys (table: {table.name})",
+            )
+        match_column = pk_columns[0]
 
-    stmt = sa.select(table).where(pk_columns[0] == querier.pk_value)
+    stmt = sa.select(table).where(match_column == querier.pk_value)
 
     result = await db_sess.execute(stmt)
     row_data = result.fetchone()
@@ -88,6 +99,128 @@ async def execute_querier[TRow: Base](
 
     fetched_row: TRow = row_class(**dict(row_data._mapping))
     return QuerierResult(row=fetched_row)
+
+
+# =============================================================================
+# Bulk single-row Querier (many independent by-key lookups)
+# =============================================================================
+
+
+class BulkQuerierFailureReason(enum.StrEnum):
+    """Reason a single querier failed within a bulk execution."""
+
+    NOT_FOUND = "not_found"
+
+
+@dataclass
+class QuerierFailureResult[TRow: Base]:
+    """A single querier that could not be resolved, with the reason why."""
+
+    querier: Querier[TRow]
+    reason: BulkQuerierFailureReason
+
+
+@dataclass
+class BulkQuerierResult[TRow: Base]:
+    """Partitioned outcome of a bulk querier execution.
+
+    ``successes`` and ``failures`` together cover every input querier; both
+    preserve the input order within their own list.
+    """
+
+    successes: list[QuerierResult[TRow]]
+    failures: list[QuerierFailureResult[TRow]]
+
+
+def _resolve_lookup_attr(querier: Querier[Any]) -> InstrumentedAttribute[Any]:
+    """Resolve the ORM attribute a querier matches on (its lookup column, or PK)."""
+    if querier.lookup_column is not None:
+        return querier.lookup_column
+    mapper = sa.inspect(querier.row_class)
+    pk_columns = list(mapper.primary_key)
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            f"Querier only supports single-column primary keys "
+            f"(table: {querier.row_class.__tablename__})",
+        )
+    return getattr(querier.row_class, mapper.get_property_by_column(pk_columns[0]).key)
+
+
+async def execute_bulk_querier[TRow: Base](
+    db_sess: SASession,
+    queriers: Sequence[Querier[TRow]],
+    scopes: Sequence[SearchScope] = (),
+) -> BulkQuerierResult[TRow]:
+    """Execute many single-row queriers as a batch, partitioning the outcome.
+
+    Queriers targeting the same ``row_class`` and lookup column are collapsed
+    into one ``WHERE col IN (...)`` query, so the cost is one round-trip per
+    distinct (row_class, column) group instead of one per querier — the bulk
+    counterpart of :func:`execute_querier`. Each querier is then resolved
+    independently: a matched row yields a ``QuerierResult`` (success), an
+    unmatched one a ``QuerierFailureResult`` with ``NOT_FOUND`` (failure).
+
+    ``scopes`` apply RBAC filtering exactly as in :func:`execute_batch_querier`:
+    each scope contributes its existence checks (aggregated and validated once)
+    and its ``to_condition()``; the conditions form a single OR group AND-merged
+    with every group's ``IN`` predicate. A row filtered out by scope is treated
+    as not found, so its querier lands in ``failures`` — no cross-scope leakage.
+
+    Example:
+        queriers = [
+            Querier(row_class=RoutingRow, pk_value=sid, lookup_column=RoutingRow.session)
+            for sid in session_ids
+        ]
+        result = await execute_bulk_querier(db_sess, queriers, scopes=[owned_scope])
+        rows = [r.row for r in result.successes]  # found, in-scope routes
+        missing = [f.querier.pk_value for f in result.failures]  # absent or out-of-scope
+    """
+    if not queriers:
+        return BulkQuerierResult(successes=[], failures=[])
+
+    or_conditions: list[QueryCondition] = []
+    if scopes:
+        aggregated_checks: list[ExistenceCheck[Any]] = []
+        for scope in scopes:
+            aggregated_checks.extend(scope.existence_checks)
+            or_conditions.append(scope.to_condition())
+        await _validate_scope(db_sess, aggregated_checks)
+
+    # Group queriers by (row_class, lookup attribute) so each group is one IN-query.
+    groups: dict[tuple[type[Base], str], list[Querier[TRow]]] = defaultdict(list)
+    group_attr: dict[tuple[type[Base], str], InstrumentedAttribute[Any]] = {}
+    for querier in queriers:
+        attr = _resolve_lookup_attr(querier)
+        key = (querier.row_class, attr.key)
+        groups[key].append(querier)
+        group_attr[key] = attr
+
+    # One IN-query per group, AND-merged with the OR-combined scope predicate;
+    # map lookup value -> fetched row.
+    found: dict[tuple[type[Base], str], dict[Any, TRow]] = {}
+    for key, group in groups.items():
+        row_class, attr_key = key
+        attr = group_attr[key]
+        values = {querier.pk_value for querier in group}
+        stmt = sa.select(row_class).where(attr.in_(values))
+        if or_conditions:
+            stmt = stmt.where(sa.or_(*(condition() for condition in or_conditions)))
+        result = await db_sess.execute(stmt)
+        found[key] = {getattr(row, attr_key): row for row in result.scalars().all()}
+
+    # Resolve each querier in input order, keeping successes and failures apart.
+    successes: list[QuerierResult[TRow]] = []
+    failures: list[QuerierFailureResult[TRow]] = []
+    for querier in queriers:
+        key = (querier.row_class, _resolve_lookup_attr(querier).key)
+        row = found[key].get(querier.pk_value)
+        if row is None:
+            failures.append(
+                QuerierFailureResult(querier=querier, reason=BulkQuerierFailureReason.NOT_FOUND)
+            )
+        else:
+            successes.append(QuerierResult(row=row))
+    return BulkQuerierResult(successes=successes, failures=failures)
 
 
 # =============================================================================

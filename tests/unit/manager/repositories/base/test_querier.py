@@ -22,13 +22,17 @@ from ai.backend.manager.models.base import Base, IDColumn
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BatchQuerierResult,
+    BulkQuerierFailureReason,
+    BulkQuerierResult,
     ExistenceCheck,
     OffsetPagination,
     Querier,
+    QuerierFailureResult,
     QuerierResult,
     QueryCondition,
     SearchScope,
     execute_batch_querier,
+    execute_bulk_querier,
     execute_querier,
 )
 
@@ -220,6 +224,177 @@ class TestQuerierUUIDPK:
             result = await execute_querier(db_sess, querier)
 
             assert result is None
+
+
+# =============================================================================
+# Bulk single-row Querier Tests
+# =============================================================================
+
+
+class BulkQuerierTestRow(Base):  # type: ignore[misc]
+    """ORM model for bulk querier testing, with an alternate lookup column."""
+
+    __tablename__ = "test_bulk_querier_orm"
+    __table_args__ = {"extend_existing": True}
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    ref = sa.Column(sa.Integer, nullable=True)
+    name = sa.Column(sa.String(50), nullable=False)
+
+
+@dataclass(frozen=True)
+class RefAtLeastScope(SearchScope):
+    """Test scope: keep only rows whose ``ref`` is at least ``minimum``."""
+
+    minimum: int
+
+    def to_condition(self) -> QueryCondition:
+        minimum = self.minimum
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return BulkQuerierTestRow.ref >= minimum
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return []
+
+
+class TestBulkQuerier:
+    """Tests for execute_bulk_querier (many independent by-key lookups)."""
+
+    @pytest.fixture
+    async def bulk_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[BulkQuerierTestRow], None]:
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(c, [BulkQuerierTestRow.__table__])
+            )
+
+        yield BulkQuerierTestRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_bulk_querier_orm CASCADE"))
+
+    @pytest.fixture
+    async def sample_data(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_row_class: type[BulkQuerierTestRow],
+    ) -> AsyncGenerator[list[dict[str, int | str]], None]:
+        # id i, ref = i * 10
+        data: list[dict[str, int | str]] = [
+            {"id": i, "ref": i * 10, "name": f"item-{i}"} for i in range(1, 6)
+        ]
+
+        async with database_connection.begin_session() as db_sess:
+            table = bulk_row_class.__table__
+            await db_sess.execute(table.insert(), data)
+
+        yield data
+
+    async def test_empty_input_returns_empty_partitions(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_row_class: type[BulkQuerierTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """No queriers => empty successes and failures, no query issued."""
+        async with database_connection.begin_session() as db_sess:
+            result = await execute_bulk_querier(db_sess, [])
+
+            assert isinstance(result, BulkQuerierResult)
+            assert result.successes == []
+            assert result.failures == []
+
+    async def test_by_pk_partitions_found_and_missing(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_row_class: type[BulkQuerierTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """Found PKs become successes; missing ones become NOT_FOUND failures."""
+        async with database_connection.begin_session() as db_sess:
+            queriers: list[Querier[BulkQuerierTestRow]] = [
+                Querier(row_class=BulkQuerierTestRow, pk_value=1),
+                Querier(row_class=BulkQuerierTestRow, pk_value=999),
+                Querier(row_class=BulkQuerierTestRow, pk_value=2),
+            ]
+
+            result = await execute_bulk_querier(db_sess, queriers)
+
+            assert [s.row.id for s in result.successes] == [1, 2]
+            assert all(isinstance(s, QuerierResult) for s in result.successes)
+            assert len(result.failures) == 1
+            failure = result.failures[0]
+            assert isinstance(failure, QuerierFailureResult)
+            assert failure.querier.pk_value == 999
+            assert failure.reason is BulkQuerierFailureReason.NOT_FOUND
+
+    async def test_by_pk_preserves_input_order(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_row_class: type[BulkQuerierTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """Successes follow the input querier order, not PK order."""
+        async with database_connection.begin_session() as db_sess:
+            queriers: list[Querier[BulkQuerierTestRow]] = [
+                Querier(row_class=BulkQuerierTestRow, pk_value=pk) for pk in (3, 1, 2)
+            ]
+
+            result = await execute_bulk_querier(db_sess, queriers)
+
+            assert [s.row.id for s in result.successes] == [3, 1, 2]
+
+    async def test_by_lookup_column_matches_alternate_key(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_row_class: type[BulkQuerierTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """lookup_column matches on a non-PK column (the 1:1 alternate key case)."""
+        async with database_connection.begin_session() as db_sess:
+            queriers: list[Querier[BulkQuerierTestRow]] = [
+                Querier(
+                    row_class=BulkQuerierTestRow,
+                    pk_value=ref,
+                    lookup_column=BulkQuerierTestRow.ref,
+                )
+                for ref in (10, 999, 30)
+            ]
+
+            result = await execute_bulk_querier(db_sess, queriers)
+
+            assert [s.row.ref for s in result.successes] == [10, 30]
+            assert [s.row.id for s in result.successes] == [1, 3]
+            assert len(result.failures) == 1
+            assert result.failures[0].querier.pk_value == 999
+
+    async def test_scope_filters_out_of_scope_rows_into_failures(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_row_class: type[BulkQuerierTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """A row that exists but is filtered out by scope lands in failures."""
+        async with database_connection.begin_session() as db_sess:
+            queriers: list[Querier[BulkQuerierTestRow]] = [
+                Querier(row_class=BulkQuerierTestRow, pk_value=pk) for pk in (1, 3, 5)
+            ]
+            # ref = id * 10, so minimum=30 keeps ids 3 and 5, drops id 1 (ref 10).
+            scope = RefAtLeastScope(minimum=30)
+
+            result = await execute_bulk_querier(db_sess, queriers, scopes=[scope])
+
+            assert [s.row.id for s in result.successes] == [3, 5]
+            assert {f.querier.pk_value for f in result.failures} == {1}
+            assert all(
+                f.reason is BulkQuerierFailureReason.NOT_FOUND for f in result.failures
+            )
 
 
 # =============================================================================

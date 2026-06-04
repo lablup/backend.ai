@@ -58,9 +58,13 @@ from .purger import (
 from .querier import (
     BatchQuerier,
     BatchQuerierResult,
+    BulkQuerierFailureReason,
+    BulkQuerierResult,
     Querier,
+    QuerierFailureResult,
     QuerierResult,
     execute_batch_querier,
+    execute_bulk_querier,
     execute_querier,
 )
 from .types import (
@@ -131,6 +135,11 @@ __all__ = [
     "Querier",
     "QuerierResult",
     "execute_querier",
+    # BulkQuerier
+    "BulkQuerierFailureReason",
+    "BulkQuerierResult",
+    "QuerierFailureResult",
+    "execute_bulk_querier",
     # BatchQuerier
     "BatchQuerier",
     "BatchQuerierResult",
