@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, assert_never
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -244,7 +244,7 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
                         "Port range is required for PORT frontend mode"
                     )
                 return port_range[1] - port_range[0] + 1
-        raise MissingFrontendConfigError(f"Unsupported frontend mode: {frontend_mode}")
+        assert_never(frontend_mode)
 
     def refresh_available_slots(self) -> None:
         """Recompute available_slots from the current frontend config."""

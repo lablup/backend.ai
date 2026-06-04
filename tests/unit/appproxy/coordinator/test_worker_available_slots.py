@@ -47,6 +47,12 @@ def port_worker(request: pytest.FixtureRequest) -> Worker:
     return make_port_worker(request.param)
 
 
+class TestCreate:
+    def test_create_initializes_available_slots(self) -> None:
+        worker = make_port_worker(PortRange(start=10501, end=10600))
+        assert worker.available_slots == 100
+
+
 class TestRefreshAvailableSlots:
     """Regression tests: available_slots must track the frontend config on restart."""
 
