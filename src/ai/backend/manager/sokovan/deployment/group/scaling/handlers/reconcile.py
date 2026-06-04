@@ -99,6 +99,7 @@ class GroupScalingReconcileHandler(
                     message=message,
                     from_status=view.scaling_status,
                     prior_history=view.last_history,
+                    handler_options=view.handler_options,
                 )
             )
 

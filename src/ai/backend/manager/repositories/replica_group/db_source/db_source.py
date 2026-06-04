@@ -16,6 +16,7 @@ from ai.backend.common.identifier.deployment_revision import DeploymentRevisionI
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerOptions,
     ReplicaGroupHandlerCategory,
     RouteStatus,
     RouteTrafficStatus,
@@ -97,6 +98,9 @@ class ReplicaGroupDBSource:
             group_ids = [group_row.id for group_row in group_rows]
             counts = await self._count_live_serving_by_revision(db_sess, group_ids)
             last_histories = await self._latest_history_by_group(db_sess, group_ids, category)
+            handler_options = await self._handler_options_by_deployment(
+                db_sess, [group_row.deployment_id for group_row in group_rows]
+            )
             empty = RevisionReplicaCount(live=0, serving=0)
             views: list[ReplicaGroupScalingReconcileView] = []
             for group_row in group_rows:
@@ -135,9 +139,25 @@ class ReplicaGroupDBSource:
                         target_live_replica_count=target_counts.live,
                         target_serving_replica_count=target_counts.serving,
                         last_history=last_history,
+                        handler_options=handler_options.get(
+                            group_row.deployment_id, DeploymentHandlerOptions()
+                        ),
                     )
                 )
             return ScalingReconcileFetch(views=views, now=now)
+
+    async def _handler_options_by_deployment(
+        self,
+        db_sess: SASession,
+        deployment_ids: Sequence[DeploymentID],
+    ) -> Mapping[DeploymentID, DeploymentHandlerOptions]:
+        if not deployment_ids:
+            return {}
+        query = sa.select(EndpointRow.id, EndpointRow.options).where(
+            EndpointRow.id.in_(deployment_ids)
+        )
+        rows = (await db_sess.execute(query)).all()
+        return {row.id: row.options.handler_options for row in rows}
 
     async def _latest_history_by_group(
         self,

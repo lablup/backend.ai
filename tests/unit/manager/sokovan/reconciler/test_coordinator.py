@@ -12,7 +12,6 @@ import pytest
 
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
-from ai.backend.manager.data.session.options import HandlerOptions
 from ai.backend.manager.metrics.reconciler import ReconcilerMetricObserver
 from ai.backend.manager.sokovan.reconciler import (
     BaseReconcilerInfo,
@@ -138,7 +137,6 @@ def _make_metadata() -> ReconcilerStageMetadata[
         name="fake",
         phase="fake",
         lock_id=None,
-        policy=HandlerOptions(),
         transitions={},
     )
 

@@ -15,7 +15,7 @@ from ai.backend.manager.data.reconciler.types import (
     HandlerOutcome,
     LastHistory,
 )
-from ai.backend.manager.data.session.options import HandlerOptions
+from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.metrics.reconciler import ReconcilerMetricObserver
@@ -54,6 +54,11 @@ class ReconcilerDecision(ABC):
 
     @abstractmethod
     def last_history(self) -> LastHistory | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def policy_resolver(self) -> HandlerPolicyResolver:
+        """The entity's handler-keyed policy (from its deployment/session config)."""
         raise NotImplementedError
 
 
@@ -132,7 +137,6 @@ class ReconcilerStageMetadata[
     name: str
     phase: str
     lock_id: LockID | None
-    policy: HandlerOptions
     transitions: Mapping[SchedulingResult, Status]
 
 
@@ -272,7 +276,7 @@ class ReconcilerStage[
                 else:
                     attempts = 0
                     started_at = None
-                policy = self._metadata.policy
+                policy = decision.policy_resolver().resolve(self._metadata.name)
                 if policy.is_retry_exhausted(attempts):
                     return SchedulingResult.GIVE_UP
                 if policy.is_timed_out(started_at, now):
@@ -304,3 +308,12 @@ class ReconcilerTaskSpec:
     @property
     def long_task_name(self) -> str:
         return f"reconcile_process_{self.reconcile_type}"
+
+
+@dataclass(frozen=True)
+class ReconcilerStageRegistration:
+    """One reconcile stage paired with its dispatch key and tick spec, for coordinator wiring."""
+
+    reconcile_type: str
+    stage: ReconcilerStageRunner
+    task_spec: ReconcilerTaskSpec

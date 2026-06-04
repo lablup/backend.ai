@@ -9,8 +9,12 @@ from uuid import UUID
 
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.manager.data.deployment.types import ReplicaGroupScalingStatus
+from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerOptions,
+    ReplicaGroupScalingStatus,
+)
 from ai.backend.manager.data.reconciler.types import HandlerOutcome, LastHistory
+from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.repositories.replica_group.types import (
     GroupRouteCreateInstruction,
     GroupRouteDrainInstruction,
@@ -60,6 +64,7 @@ class GroupScalingDecision(ReconcilerDecision):
     message: str
     from_status: ReplicaGroupScalingStatus
     prior_history: LastHistory | None
+    handler_options: DeploymentHandlerOptions
     error_code: str | None = None
 
     def entity_id(self) -> UUID:
@@ -70,6 +75,9 @@ class GroupScalingDecision(ReconcilerDecision):
 
     def last_history(self) -> LastHistory | None:
         return self.prior_history
+
+    def policy_resolver(self) -> HandlerPolicyResolver:
+        return self.handler_options
 
 
 @dataclass

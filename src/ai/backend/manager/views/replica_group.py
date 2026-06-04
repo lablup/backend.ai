@@ -8,6 +8,7 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerOptions,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
@@ -58,3 +59,5 @@ class ReplicaGroupScalingReconcileView:
     target_serving_replica_count: int
     # Latest scaling-history row for this group (None when there is none yet).
     last_history: LastHistory | None
+    # The group's deployment handler-keyed policy (timeout/retry), resolved at classify time.
+    handler_options: DeploymentHandlerOptions

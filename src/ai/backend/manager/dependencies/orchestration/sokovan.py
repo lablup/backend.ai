@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
+from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
@@ -34,8 +35,6 @@ from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordina
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
-from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
-from ai.backend.manager.sokovan.reconciler.flag import ValkeyReconcilerFlag
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduler.factory import (
     CoordinatorHandlersArgs,
@@ -48,6 +47,7 @@ from ai.backend.manager.sokovan.scheduler.fair_share import (
 )
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
+from ai.backend.manager.sokovan.stages.factory import build_reconciler_coordinator
 from ai.backend.manager.types import DistributedLockFactory
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -60,6 +60,7 @@ class SokovanOrchestratorInput:
     # Scheduler component dependencies
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
+    replica_group_repository: ReplicaGroupRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     config_provider: ManagerConfigProvider
@@ -184,12 +185,12 @@ class SokovanOrchestratorDependency(
             lock_factory=setup_input.distributed_lock_factory,
         )
 
-        # Reconciler coordinator: framework wired with no stages yet (entity stages land later).
-        reconciler_coordinator = ReconcilerCoordinator(
-            stages={},
+        # Reconciler coordinator: sokovan owns its stage assembly (DI just passes deps).
+        reconciler_coordinator, reconciler_task_specs = build_reconciler_coordinator(
+            replica_group_repository=setup_input.replica_group_repository,
+            valkey_schedule=setup_input.valkey_schedule,
             lock_factory=setup_input.distributed_lock_factory,
             config_provider=setup_input.config_provider,
-            flags=ValkeyReconcilerFlag(setup_input.valkey_schedule),
         )
 
         # Create sokovan orchestrator with all coordinators injected
@@ -198,7 +199,7 @@ class SokovanOrchestratorDependency(
             deployment_coordinator=deployment_coordinator,
             route_coordinator=route_coordinator,
             reconciler_coordinator=reconciler_coordinator,
-            reconciler_task_specs=[],
+            reconciler_task_specs=reconciler_task_specs,
         )
 
         log.info("Sokovan orchestrator initialized")
