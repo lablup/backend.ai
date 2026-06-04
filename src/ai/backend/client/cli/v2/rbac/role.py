@@ -216,9 +216,8 @@ def create(name: str, description: str | None, auto_assign: bool) -> None:
 
 
 @role.command()
-@click.argument("role_id", type=str)
+@click.argument("role_id", type=click.UUID)
 @click.option("--name", default=None, help="Updated role name.")
-@click.option("--description", default=None, help="Updated role description.")
 @click.option(
     "--status",
     type=click.Choice(["active", "inactive", "deleted"], case_sensitive=False),
@@ -232,14 +231,12 @@ def create(name: str, description: str | None, auto_assign: bool) -> None:
     help="Update whether this role is automatically granted to users added to its scope.",
 )
 def update(
-    role_id: str,
+    role_id: UUID,
     name: str | None,
-    description: str | None,
     status: str | None,
     auto_assign: bool | None,
 ) -> None:
     """Update an existing role. Only the provided fields are changed."""
-    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.dto.manager.v2.rbac.request import UpdateRoleInput
     from ai.backend.common.dto.manager.v2.rbac.types import RoleStatus
 
@@ -247,10 +244,9 @@ def update(
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.update_role(
-                UUID(role_id),
+                role_id,
                 UpdateRoleInput(
                     name=name,
-                    description=description if description is not None else SENTINEL,
                     status=RoleStatus(status) if status is not None else None,
                     auto_assign=auto_assign,
                 ),
