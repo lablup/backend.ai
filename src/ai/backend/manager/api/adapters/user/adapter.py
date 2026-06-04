@@ -15,7 +15,7 @@ from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair import (
     AdminSearchKeypairsInput,
-    CreatedKeypairPayload,
+    CreateKeypairPayload,
     KeypairFilter,
     KeypairNode,
     KeypairOrderBy,
@@ -789,9 +789,9 @@ class UserAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _keypair_data_to_created_payload(data: KeyPairData) -> CreatedKeypairPayload:
-        """Convert KeyPairData to a CreatedKeypairPayload, including the one-time secret key."""
-        return CreatedKeypairPayload(
+    def _keypair_data_to_created_payload(data: KeyPairData) -> CreateKeypairPayload:
+        """Convert KeyPairData to a CreateKeypairPayload, including the one-time secret key."""
+        return CreateKeypairPayload(
             keypair=UserAdapter._keypair_data_to_node(data),
             secret_key=data.secret_key,
         )

@@ -54,7 +54,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.keypair.types.payloads import CreatedKeypairPayloadGQL
+from ai.backend.manager.api.gql.keypair.types.payloads import CreateKeypairPayloadGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 from .node import UserV2GQL
@@ -74,7 +74,7 @@ class CreateUserPayloadGQL(PydanticOutputMixin[CreateUserPayloadDTO]):
     """Payload for single user creation."""
 
     user: UserV2GQL = gql_field(description="The newly created user.")
-    keypair: CreatedKeypairPayloadGQL = gql_added_field(
+    keypair: CreateKeypairPayloadGQL = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(

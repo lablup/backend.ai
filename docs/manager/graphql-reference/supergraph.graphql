@@ -3480,7 +3480,7 @@ type CreateDeploymentRevisionPresetPayloadGQL
 """
 Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
 """
-type CreatedKeypairPayload
+type CreateKeypairPayload
   @join__type(graph: STRAWBERRY)
 {
   """The newly created keypair."""
@@ -4389,7 +4389,7 @@ type CreateUserV2Payload
   """
   The default keypair automatically generated for the user, including its one-time secret key.
   """
-  keypair: CreatedKeypairPayload!
+  keypair: CreateKeypairPayload!
 }
 
 """

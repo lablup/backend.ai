@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
     AdminUpdateKeypairPayload as AdminUpdateKeypairPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
-    CreatedKeypairPayload as CreatedKeypairPayloadDTO,
+    CreateKeypairPayload as CreateKeypairPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
     IssueMyKeypairPayload as IssueMyKeypairPayloadDTO,
@@ -53,10 +53,10 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
         added_version=NEXT_RELEASE_VERSION,
         description="A keypair returned at creation time, including its one-time secret key.",
     ),
-    model=CreatedKeypairPayloadDTO,
-    name="CreatedKeypairPayload",
+    model=CreateKeypairPayloadDTO,
+    name="CreateKeypairPayload",
 )
-class CreatedKeypairPayloadGQL(PydanticOutputMixin[CreatedKeypairPayloadDTO]):
+class CreateKeypairPayloadGQL(PydanticOutputMixin[CreateKeypairPayloadDTO]):
     keypair: KeyPairGQL = gql_field(description="The newly created keypair.")
     secret_key: str = gql_field(
         description="The secret key of the generated keypair. Only returned at creation time."

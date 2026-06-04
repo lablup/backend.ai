@@ -21,7 +21,7 @@ __all__ = (
     "AdminRegisterSSHKeypairPayload",
     "AdminSearchKeypairsPayload",
     "AdminUpdateKeypairPayload",
-    "CreatedKeypairPayload",
+    "CreateKeypairPayload",
     "IssueMyKeypairPayload",
     "KeypairNode",
     "RevokeMyKeypairPayload",
@@ -59,7 +59,7 @@ class KeypairNode(BaseResponseModel):
     user_id: uuid.UUID = Field(description="UUID of the user who owns this keypair.")
 
 
-class CreatedKeypairPayload(BaseResponseModel):
+class CreateKeypairPayload(BaseResponseModel):
     """A keypair returned at creation time, including its one-time secret key.
 
     Wraps the keypair read model together with the secret key, which is only

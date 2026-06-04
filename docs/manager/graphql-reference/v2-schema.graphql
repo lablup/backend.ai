@@ -2825,7 +2825,7 @@ type CreateUserV2Payload {
   """
   The default keypair automatically generated for the user, including its one-time secret key.
   """
-  keypair: CreatedKeypairPayload!
+  keypair: CreateKeypairPayload!
 }
 
 """Added in 25.16.0. Input for creating VFS storage"""
@@ -2891,7 +2891,7 @@ type CreateVFolderV2Payload {
 """
 Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
 """
-type CreatedKeypairPayload {
+type CreateKeypairPayload {
   """The newly created keypair."""
   keypair: KeyPairGQL!
 
