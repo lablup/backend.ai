@@ -962,11 +962,14 @@ class TestUserRepository:
         assert result.success_count() == 3
         assert result.failure_count() == 0
         assert len(result.successes) == 3
-        # Verify each created user has expected data
-        for user_data in result.successes:
+        # Verify each created user has expected data and a generated keypair
+        for create_result in result.successes:
+            user_data = create_result.user
             assert user_data.domain_name == sample_domain.domain_name
             assert user_data.role == UserRole.USER
             assert user_data.status == UserStatus.ACTIVE
+            assert create_result.keypair.access_key is not None
+            assert create_result.keypair.secret_key is not None
 
     async def test_bulk_create_users_validated_partial_failure(
         self,
@@ -1010,7 +1013,7 @@ class TestUserRepository:
         assert len(result.successes) == 1
         assert len(result.failures) == 1
         # Verify the successful user
-        assert result.successes[0].email == shared_email
+        assert result.successes[0].user.email == shared_email
         # Verify the failure has the correct index
         assert result.failures[0].index == 1
 
@@ -1051,12 +1054,14 @@ class TestUserRepository:
 
         # Now bulk update all 3 users
         update_items: list[UserUpdateSpec] = []
-        for i, user_data in enumerate(create_result.successes):
+        for i, created in enumerate(create_result.successes):
             updater_spec = UserUpdaterSpec(
                 full_name=TriState.update(f"Updated Name {i}"),
                 description=TriState.update(f"Updated Description {i}"),
             )
-            update_items.append(UserUpdateSpec(user_id=user_data.uuid, updater_spec=updater_spec))
+            update_items.append(
+                UserUpdateSpec(user_id=created.user.uuid, updater_spec=updater_spec)
+            )
 
         result = await user_repository.bulk_update_users_validated(update_items)
 
@@ -1102,7 +1107,7 @@ class TestUserRepository:
             UserCreateSpec(creator=Creator(spec=spec), group_ids=None)
         ])
         assert create_result.success_count() == 1
-        real_user = create_result.successes[0]
+        real_user = create_result.successes[0].user
 
         # Build update items: one real user, one non-existent user
         non_existent_user_id = uuid.uuid4()

@@ -180,11 +180,11 @@ class BulkUserCreateResultData:
     """Result of bulk user creation operation.
 
     Attributes:
-        successes: Successfully created users
+        successes: Successfully created users, each with its generated default keypair
         failures: Failed user creation attempts with error info
     """
 
-    successes: list[UserData] = field(default_factory=list)
+    successes: list[UserCreateResultData] = field(default_factory=list)
     failures: list[BulkCreatorError[UserRow]] = field(default_factory=list)
 
     def success_count(self) -> int:

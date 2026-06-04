@@ -269,7 +269,7 @@ class UserDBSource:
         self,
         db_session: SASession,
         item: UserCreateSpec,
-    ) -> UserData:
+    ) -> UserCreateResultData:
         """Create a single user with keypair, group assignments, and role mappings.
 
         This is a helper method used by bulk_create_users_validated to create
@@ -280,7 +280,7 @@ class UserDBSource:
             item: The user creation specification including group assignments.
 
         Returns:
-            The created user data.
+            The created user data together with its generated default keypair.
 
         Raises:
             UserCreationBadRequest: If the domain does not exist.
@@ -360,7 +360,7 @@ class UserDBSource:
         )
         await execute_creator(db_session, user_role_creator)
 
-        return created_user
+        return UserCreateResultData(created_user, kp_data)
 
     async def bulk_create_users_validated(
         self,
@@ -376,7 +376,7 @@ class UserDBSource:
         if not items:
             return BulkUserCreateResultData(successes=[], failures=[])
 
-        successes: list[UserData] = []
+        successes: list[UserCreateResultData] = []
         failures: list[BulkCreatorError[UserRow]] = []
 
         async with self._db.begin_session() as db_session:
@@ -384,10 +384,10 @@ class UserDBSource:
                 spec = cast(UserCreatorSpec, item.creator.spec)
                 try:
                     async with db_session.begin_nested():
-                        created_user = await self._create_single_user_with_keypair_and_groups(
+                        created = await self._create_single_user_with_keypair_and_groups(
                             db_session, item
                         )
-                        successes.append(created_user)
+                        successes.append(created)
                 except Exception as e:
                     log.warning("Failed to create user {}: {}", spec.email, str(e))
                     failures.append(BulkCreatorError(spec=spec, exception=e, index=idx))
