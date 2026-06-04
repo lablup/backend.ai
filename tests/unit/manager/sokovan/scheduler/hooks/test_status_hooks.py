@@ -14,6 +14,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.types import AgentId, ClusterMode, SessionId
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduler.hooks.status import (
     TerminatedHookDependencies,
@@ -176,7 +177,7 @@ class TestTerminatedTransitionHookNetworkCleanup:
     ) -> None:
         config_provider.config.network.inter_container.default_driver = None
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ServerMisconfiguredError):
             await hook.execute(multi_node_session)
 
         network_plugin.destroy_network.assert_not_awaited()

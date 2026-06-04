@@ -19,6 +19,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.resource import AgentNotAllocated
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -183,10 +184,10 @@ class TerminatedTransitionHook(StatusTransitionHook):
                 self._deps.config_provider.config.network.inter_container.default_driver
             )
             if default_driver is None:
-                raise ValueError("No inter-container network driver is configured.")
+                raise ServerMisconfiguredError("No inter-container network driver is configured.")
             if default_driver not in self._deps.network_plugin_ctx.plugins:
                 available = list(self._deps.network_plugin_ctx.plugins.keys())
-                raise KeyError(
+                raise ServerMisconfiguredError(
                     f"Network plugin '{default_driver}' not found. Available plugins: {available}. "
                     f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
                 )
