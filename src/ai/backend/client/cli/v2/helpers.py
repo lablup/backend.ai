@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
+import click
+from pydantic import TypeAdapter, ValidationError
 from yarl import URL
 
 if TYPE_CHECKING:
@@ -154,6 +158,57 @@ def parse_order_options(
             )
         )
     return orders
+
+
+def load_model[T](payload: str, model: type[T]) -> T:
+    """Parse a JSON string or ``@file`` path and validate it against *model*.
+
+    *payload* is either a raw JSON string or ``@<path>`` pointing to a JSON file.
+    *model* is any type usable with Pydantic ``TypeAdapter`` — a model class or a
+    parametrized form such as ``list[Entry]``. Exits with an error message on
+    malformed JSON or validation failure.
+    """
+    if payload.startswith("@"):
+        path = payload[1:]
+        try:
+            raw = Path(path).read_text()
+        except OSError as e:
+            click.echo(f"Cannot read file {path}: {e}", err=True)
+            sys.exit(1)
+    else:
+        raw = payload
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        click.echo(f"Invalid JSON: {e}", err=True)
+        sys.exit(1)
+
+    try:
+        return TypeAdapter(model).validate_python(data)
+    except ValidationError as e:
+        click.echo(f"Invalid input: {e}", err=True)
+        sys.exit(1)
+
+
+def run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
+    """Run an async function, translating SDK errors into clean CLI output.
+
+    On ``BackendAPIError`` the gateway's error detail is printed to stderr and
+    the process exits with code 1, instead of leaking a traceback.
+    """
+    from ai.backend.client.exceptions import BackendAPIError
+
+    try:
+        asyncio.run(coro_fn())
+    except BackendAPIError as e:
+        data = e.args[2] if len(e.args) > 2 else {}
+        title = data.get("title", "") if isinstance(data, dict) else ""
+        msg = data.get("msg", "") if isinstance(data, dict) else ""
+        status = e.args[0] if e.args else "?"
+        detail = title or msg or str(e)
+        click.echo(f"Error ({status}): {detail}", err=True)
+        sys.exit(1)
 
 
 def print_result(data: Any) -> None:
