@@ -281,9 +281,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.deployment_loader.load(
-            UUID(str(self.deployment_id))
-        )
+        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

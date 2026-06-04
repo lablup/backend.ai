@@ -1968,7 +1968,9 @@ class DeploymentDBSource:
                 if cast(CursorResult[Any], result).rowcount > 0:
                     await db_sess.execute(
                         sa.update(SessionRow)
-                        .where(sa.and_(SessionRow.id == session_id, SessionRow.replica_id.is_(None)))
+                        .where(
+                            sa.and_(SessionRow.id == session_id, SessionRow.replica_id.is_(None))
+                        )
                         .values(replica_id=route_id)
                     )
 

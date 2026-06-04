@@ -1,7 +1,7 @@
 """add replica_id to sessions
 
 Revision ID: 169cb5f48658
-Revises: 1a2b3c4d5e6f
+Revises: eb9d9c018e85
 Create Date: 2026-06-04 00:00:00.000000
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "169cb5f48658"
-down_revision = "1a2b3c4d5e6f"
+down_revision = "eb9d9c018e85"
 # Part of: 26.6.0
 branch_labels = None
 depends_on = None
