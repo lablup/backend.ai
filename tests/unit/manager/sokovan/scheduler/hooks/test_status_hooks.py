@@ -8,7 +8,6 @@ of refactors, leaking Docker overlay (MULTI_NODE) and agent-local
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -21,7 +20,6 @@ from ai.backend.manager.sokovan.scheduler.hooks.status import (
     TerminatedHookDependencies,
     TerminatedTransitionHook,
 )
-from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
 
 
 class TestTerminatedTransitionHookNetworkCleanup:
@@ -80,11 +78,6 @@ class TestTerminatedTransitionHookNetworkCleanup:
     @pytest.fixture
     def session_id(self) -> SessionId:
         return SessionId(uuid4())
-
-    @pytest.fixture(autouse=True)
-    def recorder_scope(self, session_id: SessionId) -> Iterator[None]:
-        with SessionRecorderContext.scope("test_terminate", entity_ids=[session_id]):
-            yield
 
     @pytest.fixture
     def network_id(self, request: pytest.FixtureRequest) -> str | None:
