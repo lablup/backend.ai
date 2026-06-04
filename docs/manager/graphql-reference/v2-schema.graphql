@@ -2280,6 +2280,19 @@ type CreateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
+"""
+Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
+"""
+type CreateKeypairPayload {
+  """The newly created keypair."""
+  keypair: KeyPairGQL!
+
+  """
+  The secret key of the generated keypair. Only returned at creation time.
+  """
+  secretKey: String!
+}
+
 """Added in 26.4.2. Input for creating a keypair resource policy."""
 input CreateKeypairResourcePolicyInputGQL {
   """Policy name. Must be unique."""
@@ -2886,19 +2899,6 @@ input CreateVFolderV2Input {
 type CreateVFolderV2Payload {
   """Created virtual folder"""
   vfolder: VFolder!
-}
-
-"""
-Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
-"""
-type CreateKeypairPayload {
-  """The newly created keypair."""
-  keypair: KeyPairGQL!
-
-  """
-  The secret key of the generated keypair. Only returned at creation time.
-  """
-  secretKey: String!
 }
 
 """Date (isoformat)"""

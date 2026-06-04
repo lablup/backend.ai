@@ -3477,21 +3477,6 @@ type CreateDeploymentRevisionPresetPayloadGQL
   preset: DeploymentRevisionPreset!
 }
 
-"""
-Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
-"""
-type CreateKeypairPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """The newly created keypair."""
-  keypair: KeyPairGQL!
-
-  """
-  The secret key of the generated keypair. Only returned at creation time.
-  """
-  secretKey: String!
-}
-
 type CreateDomain
   @join__type(graph: GRAPHENE)
 {
@@ -3606,6 +3591,21 @@ type CreateKeyPair
   ok: Boolean
   msg: String
   keypair: KeyPair
+}
+
+"""
+Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
+"""
+type CreateKeypairPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The newly created keypair."""
+  keypair: KeyPairGQL!
+
+  """
+  The secret key of the generated keypair. Only returned at creation time.
+  """
+  secretKey: String!
 }
 
 type CreateKeyPairResourcePolicy
