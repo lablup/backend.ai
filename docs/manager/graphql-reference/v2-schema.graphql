@@ -12269,6 +12269,11 @@ type SessionV2 implements Node {
   userId: ID!
   projectId: ID!
 
+  """
+  UUID of the routing replica this session serves (key for the replica resolver).
+  """
+  replicaId: ID
+
   """Metadata including domain, project, and user information."""
   metadata: SessionV2MetadataInfo!
 
@@ -12303,6 +12308,11 @@ type SessionV2 implements Node {
 
   """Added in 26.3.0. The kernels belonging to this session."""
   kernels: KernelV2Connection
+
+  """
+  Added in UNRELEASED. The model deployment replica this session serves, resolved via DataLoader from `replica_id`. Null for non-inference sessions.
+  """
+  replica: ModelReplica
 }
 
 """Added in 26.3.0. Connection type for paginated session results."""
