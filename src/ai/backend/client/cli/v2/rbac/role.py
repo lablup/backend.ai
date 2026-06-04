@@ -16,6 +16,7 @@ from ai.backend.client.cli.v2.helpers import (
     load_v2_config,
     parse_order_options,
     print_result,
+    run_async,
 )
 
 if TYPE_CHECKING:
@@ -191,7 +192,13 @@ def get(role_id: str) -> None:
 @role.command()
 @click.option("--name", required=True, help="Role name.")
 @click.option("--description", default=None, help="Role description.")
-def create(name: str, description: str | None) -> None:
+@click.option(
+    "--auto-assign/--no-auto-assign",
+    "auto_assign",
+    default=False,
+    help="Automatically grant this role to users added to a scope it is registered in.",
+)
+def create(name: str, description: str | None, auto_assign: bool) -> None:
     """Create a new role."""
     from ai.backend.common.dto.manager.v2.rbac.request import CreateRoleInput
 
@@ -199,13 +206,60 @@ def create(name: str, description: str | None) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.create_role(
-                CreateRoleInput(name=name, description=description),
+                CreateRoleInput(name=name, description=description, auto_assign=auto_assign),
             )
             print_result(result)
         finally:
             await registry.close()
 
-    asyncio.run(_run())
+    run_async(_run)
+
+
+@role.command()
+@click.argument("role_id", type=str)
+@click.option("--name", default=None, help="Updated role name.")
+@click.option("--description", default=None, help="Updated role description.")
+@click.option(
+    "--status",
+    type=click.Choice(["active", "inactive", "deleted"], case_sensitive=False),
+    default=None,
+    help="Updated role status.",
+)
+@click.option(
+    "--auto-assign/--no-auto-assign",
+    "auto_assign",
+    default=None,
+    help="Update whether this role is automatically granted to users added to its scope.",
+)
+def update(
+    role_id: str,
+    name: str | None,
+    description: str | None,
+    status: str | None,
+    auto_assign: bool | None,
+) -> None:
+    """Update an existing role. Only the provided fields are changed."""
+    from ai.backend.common.api_handlers import SENTINEL
+    from ai.backend.common.dto.manager.v2.rbac.request import UpdateRoleInput
+    from ai.backend.common.dto.manager.v2.rbac.types import RoleStatus
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.rbac.update_role(
+                UUID(role_id),
+                UpdateRoleInput(
+                    name=name,
+                    description=description if description is not None else SENTINEL,
+                    status=RoleStatus(status) if status is not None else None,
+                    auto_assign=auto_assign,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    run_async(_run)
 
 
 @role.command()
