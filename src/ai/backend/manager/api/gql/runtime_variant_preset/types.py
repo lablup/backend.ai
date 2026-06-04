@@ -301,6 +301,7 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.4.2", description="Create preset payload."),
     model=CreatePayloadDTO,
+    name="CreateRuntimeVariantPresetPayload",
 )
 class CreateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
     preset: RuntimeVariantPresetGQL = gql_field(description="The created preset.")
@@ -309,6 +310,7 @@ class CreateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.4.2", description="Update preset payload."),
     model=UpdatePayloadDTO,
+    name="UpdateRuntimeVariantPresetPayload",
 )
 class UpdateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
     preset: RuntimeVariantPresetGQL = gql_field(description="The updated preset.")
@@ -317,6 +319,7 @@ class UpdateRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.4.2", description="Delete preset payload."),
     model=DeletePayloadDTO,
+    name="DeleteRuntimeVariantPresetPayload",
 )
 class DeleteRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted preset.")

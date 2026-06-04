@@ -77,7 +77,8 @@ UNSET = None
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for creating a keypair resource policy.",
-    )
+    ),
+    name="CreateKeypairResourcePolicyInput",
 )
 class CreateKeypairResourcePolicyInputGQL(PydanticInputMixin[CreateKeypairResourcePolicyInputDTO]):
     name: str = gql_field(description="Policy name. Must be unique.")
@@ -109,7 +110,8 @@ class CreateKeypairResourcePolicyInputGQL(PydanticInputMixin[CreateKeypairResour
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for updating a keypair resource policy. All fields optional.",
-    )
+    ),
+    name="UpdateKeypairResourcePolicyInput",
 )
 class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResourcePolicyInputDTO]):
     default_for_unspecified: str | None = gql_field(
@@ -149,7 +151,8 @@ class UpdateKeypairResourcePolicyInputGQL(PydanticInputMixin[UpdateKeypairResour
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for creating a user resource policy.",
-    )
+    ),
+    name="CreateUserResourcePolicyInputV2",
 )
 class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePolicyInputDTO]):
     name: str = gql_field(description="Policy name. Must be unique.")
@@ -181,7 +184,8 @@ class CreateUserResourcePolicyInputGQL(PydanticInputMixin[CreateUserResourcePoli
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for updating a user resource policy. All fields optional.",
-    )
+    ),
+    name="UpdateUserResourcePolicyInput",
 )
 class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePolicyInputDTO]):
     max_vfolder_count: int | None = gql_field(
@@ -217,7 +221,8 @@ class UpdateUserResourcePolicyInputGQL(PydanticInputMixin[UpdateUserResourcePoli
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for creating a project resource policy.",
-    )
+    ),
+    name="CreateProjectResourcePolicyInputV2",
 )
 class CreateProjectResourcePolicyInputGQL(PydanticInputMixin[CreateProjectResourcePolicyInputDTO]):
     name: str = gql_field(description="Policy name. Must be unique.")
@@ -234,7 +239,8 @@ class CreateProjectResourcePolicyInputGQL(PydanticInputMixin[CreateProjectResour
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for updating a project resource policy. All fields optional.",
-    )
+    ),
+    name="UpdateProjectResourcePolicyInput",
 )
 class UpdateProjectResourcePolicyInputGQL(PydanticInputMixin[UpdateProjectResourcePolicyInputDTO]):
     max_vfolder_count: int | None = gql_field(
@@ -257,6 +263,7 @@ class UpdateProjectResourcePolicyInputGQL(PydanticInputMixin[UpdateProjectResour
         description="Payload for keypair resource policy create/update mutations.",
     ),
     model=CreateKeypairResourcePolicyPayloadDTO,
+    name="CreateKeypairResourcePolicyPayload",
 )
 class CreateKeypairResourcePolicyPayloadGQL(
     PydanticOutputMixin[CreateKeypairResourcePolicyPayloadDTO]
@@ -272,6 +279,7 @@ class CreateKeypairResourcePolicyPayloadGQL(
         description="Payload for keypair resource policy update mutation.",
     ),
     model=UpdateKeypairResourcePolicyPayloadDTO,
+    name="UpdateKeypairResourcePolicyPayload",
 )
 class UpdateKeypairResourcePolicyPayloadGQL(
     PydanticOutputMixin[UpdateKeypairResourcePolicyPayloadDTO]
@@ -287,6 +295,7 @@ class UpdateKeypairResourcePolicyPayloadGQL(
         description="Payload for keypair resource policy deletion.",
     ),
     model=DeleteKeypairResourcePolicyPayloadDTO,
+    name="DeleteKeypairResourcePolicyPayload",
 )
 class DeleteKeypairResourcePolicyPayloadGQL(
     PydanticOutputMixin[DeleteKeypairResourcePolicyPayloadDTO]
@@ -300,6 +309,7 @@ class DeleteKeypairResourcePolicyPayloadGQL(
         description="Payload for user resource policy create/update mutations.",
     ),
     model=CreateUserResourcePolicyPayloadDTO,
+    name="CreateUserResourcePolicyPayload",
 )
 class CreateUserResourcePolicyPayloadGQL(PydanticOutputMixin[CreateUserResourcePolicyPayloadDTO]):
     user_resource_policy: UserResourcePolicyV2GQL = gql_field(
@@ -313,6 +323,7 @@ class CreateUserResourcePolicyPayloadGQL(PydanticOutputMixin[CreateUserResourceP
         description="Payload for user resource policy update mutation.",
     ),
     model=UpdateUserResourcePolicyPayloadDTO,
+    name="UpdateUserResourcePolicyPayload",
 )
 class UpdateUserResourcePolicyPayloadGQL(PydanticOutputMixin[UpdateUserResourcePolicyPayloadDTO]):
     user_resource_policy: UserResourcePolicyV2GQL = gql_field(
@@ -326,6 +337,7 @@ class UpdateUserResourcePolicyPayloadGQL(PydanticOutputMixin[UpdateUserResourceP
         description="Payload for user resource policy deletion.",
     ),
     model=DeleteUserResourcePolicyPayloadDTO,
+    name="DeleteUserResourcePolicyPayload",
 )
 class DeleteUserResourcePolicyPayloadGQL(PydanticOutputMixin[DeleteUserResourcePolicyPayloadDTO]):
     name: str = gql_field(description="Name of the deleted policy.")
@@ -337,6 +349,7 @@ class DeleteUserResourcePolicyPayloadGQL(PydanticOutputMixin[DeleteUserResourceP
         description="Payload for project resource policy create/update mutations.",
     ),
     model=CreateProjectResourcePolicyPayloadDTO,
+    name="CreateProjectResourcePolicyPayload",
 )
 class CreateProjectResourcePolicyPayloadGQL(
     PydanticOutputMixin[CreateProjectResourcePolicyPayloadDTO]
@@ -352,6 +365,7 @@ class CreateProjectResourcePolicyPayloadGQL(
         description="Payload for project resource policy update mutation.",
     ),
     model=UpdateProjectResourcePolicyPayloadDTO,
+    name="UpdateProjectResourcePolicyPayload",
 )
 class UpdateProjectResourcePolicyPayloadGQL(
     PydanticOutputMixin[UpdateProjectResourcePolicyPayloadDTO]
@@ -367,6 +381,7 @@ class UpdateProjectResourcePolicyPayloadGQL(
         description="Payload for project resource policy deletion.",
     ),
     model=DeleteProjectResourcePolicyPayloadDTO,
+    name="DeleteProjectResourcePolicyPayload",
 )
 class DeleteProjectResourcePolicyPayloadGQL(
     PydanticOutputMixin[DeleteProjectResourcePolicyPayloadDTO]

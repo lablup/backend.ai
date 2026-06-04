@@ -94,6 +94,7 @@ class DeploymentOptionsInputGQL(PydanticInputMixin[DeploymentOptionsInputDTO]):
         description="Per-handler scheduler policy snapshot for deployment handler options.",
     ),
     model=HandlerOptionsInfoDTO,
+    name="HandlerOptionsInfo",
 )
 class HandlerOptionsInfoGQL:
     timeout_sec: int | None
@@ -106,6 +107,7 @@ class HandlerOptionsInfoGQL:
         description="A single (handler_name, options) entry response for deployment handler options.",
     ),
     model=HandlerOptionsEntryInfoDTO,
+    name="HandlerOptionsEntryInfo",
 )
 class HandlerOptionsEntryInfoGQL:
     handler_name: str
@@ -119,6 +121,7 @@ class HandlerOptionsEntryInfoGQL:
         description="Deployment handler-options policy response.",
     ),
     model=DeploymentHandlerOptionsInfoDTO,
+    name="DeploymentHandlerOptionsInfo",
 )
 class DeploymentHandlerOptionsInfoGQL:
     default: HandlerOptionsInfoGQL
@@ -131,6 +134,7 @@ class DeploymentHandlerOptionsInfoGQL:
         description="Deployment options payload response.",
     ),
     model=DeploymentOptionsInfoDTO,
+    name="DeploymentOptionsInfo",
 )
 class DeploymentOptionsInfoGQL:
     handler_options: DeploymentHandlerOptionsInfoGQL

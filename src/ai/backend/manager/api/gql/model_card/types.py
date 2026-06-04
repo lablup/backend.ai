@@ -464,6 +464,7 @@ class UpdateModelCardInputGQL(PydanticInputMixin[UpdateInputDTO]):
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.4.2", description="Create model card payload."),
     model=CreatePayloadDTO,
+    name="CreateModelCardPayload",
 )
 class CreateModelCardPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
     model_card: ModelCardGQL = gql_field(description="The created model card.")
@@ -472,6 +473,7 @@ class CreateModelCardPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.4.2", description="Update model card payload."),
     model=UpdatePayloadDTO,
+    name="UpdateModelCardPayload",
 )
 class UpdateModelCardPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
     model_card: ModelCardGQL = gql_field(description="The updated model card.")
@@ -480,6 +482,7 @@ class UpdateModelCardPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.4.2", description="Delete model card payload."),
     model=DeletePayloadDTO,
+    name="DeleteModelCardPayload",
 )
 class DeleteModelCardPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted model card.")

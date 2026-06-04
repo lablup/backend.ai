@@ -362,6 +362,7 @@ class ScanArtifactsInput(PydanticInputMixin[ScanArtifactsInputDTO]):
         """),
         added_version="24.09.0",
     ),
+    name="ImportArtifactsOptions",
 )
 class ImportArtifactsOptionsGQL(PydanticInputMixin[ImportArtifactsOptionsInputDTO]):
     force: bool = gql_field(
