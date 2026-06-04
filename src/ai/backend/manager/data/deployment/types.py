@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -496,6 +497,21 @@ class ReplicaGroupRolloutSpec(ConfiguredModel):
 
     max_surge: IntOrPercent
     max_unavailable: IntOrPercent
+
+    def resolve_max_surge(self, total: int) -> int:
+        """Extra target replicas allowed above the goal (rounds up for percentages)."""
+        return self._resolve(self.max_surge, total, round_up=True)
+
+    def resolve_max_unavailable(self, total: int) -> int:
+        """Replicas allowed unavailable below the goal (rounds down for percentages)."""
+        return self._resolve(self.max_unavailable, total, round_up=False)
+
+    @staticmethod
+    def _resolve(value: IntOrPercent, total: int, *, round_up: bool) -> int:
+        if value.count is not None:
+            return value.count
+        result = total * (value.percent or 0.0)
+        return math.ceil(result) if round_up else math.floor(result)
 
 
 class ResourceSpec(ConfiguredModel):

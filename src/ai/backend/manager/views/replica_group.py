@@ -10,6 +10,7 @@ from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
     ReplicaGroupLifecycle,
+    ReplicaGroupRolloutSpec,
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.data.reconciler.types import LastHistory
@@ -60,4 +61,29 @@ class ReplicaGroupScalingReconcileView:
     # Latest scaling-history row for this group (None when there is none yet).
     last_history: LastHistory | None
     # The group's deployment handler-keyed policy (timeout/retry), resolved at classify time.
+    handler_options: DeploymentHandlerOptions
+
+
+@dataclass
+class ReplicaGroupLifecycleReconcileView:
+    """Lifecycle-reconcile decision slice for one group: revision pointers, the current
+    desired counts, the rollout step config, the deployment's desired replica count (the
+    rollout goal), and the prior lifecycle-history descriptor.
+
+    The stage only runs at scaling_status STABLE, so the desired counts are already realized;
+    the rolling/draining handlers step ``desired_*`` toward the goal (bounded by ``rollout``)
+    and the scaling reconcile then fills routes to the new desired counts."""
+
+    group_id: ReplicaGroupID
+    deployment_id: DeploymentID
+    current_revision_id: DeploymentRevisionID | None
+    target_revision_id: DeploymentRevisionID | None
+    lifecycle: ReplicaGroupLifecycle
+    scaling_status: ReplicaGroupScalingStatus
+    desired_current_replica_count: int
+    desired_target_replica_count: int
+    # The rollout goal: the deployment's desired replica count the target revision rolls to.
+    deployment_desired_replica_count: int
+    rollout: ReplicaGroupRolloutSpec
+    last_history: LastHistory | None
     handler_options: DeploymentHandlerOptions

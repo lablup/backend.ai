@@ -17,6 +17,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import BulkUpdaterResult, Updater
 from ai.backend.manager.repositories.replica_group.types import (
+    LifecycleReconcileFetch,
+    ReplicaGroupLifecycleReconcileApply,
     ReplicaGroupScalingReconcileApply,
     ScalingReconcileFetch,
 )
@@ -78,6 +80,14 @@ class ReplicaGroupRepository:
         return await self._db_source.fetch_scaling_reconcile_views(querier, category)
 
     @replica_group_repository_resilience.apply()
+    async def fetch_lifecycle_reconcile_views(
+        self,
+        querier: BatchQuerier,
+        category: ReplicaGroupHandlerCategory,
+    ) -> LifecycleReconcileFetch:
+        return await self._db_source.fetch_lifecycle_reconcile_views(querier, category)
+
+    @replica_group_repository_resilience.apply()
     async def update_replica_groups(
         self,
         updaters: Sequence[Updater[ReplicaGroupRow]],
@@ -90,3 +100,10 @@ class ReplicaGroupRepository:
         apply: ReplicaGroupScalingReconcileApply,
     ) -> None:
         return await self._db_source.apply_scaling_reconcile(apply)
+
+    @replica_group_repository_resilience.apply()
+    async def apply_lifecycle_reconcile(
+        self,
+        apply: ReplicaGroupLifecycleReconcileApply,
+    ) -> None:
+        return await self._db_source.apply_lifecycle_reconcile(apply)

@@ -14,7 +14,10 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scheduling_history.creators import (
     ReplicaGroupHistoryCreatorSpec,
 )
-from ai.backend.manager.views.replica_group import ReplicaGroupScalingReconcileView
+from ai.backend.manager.views.replica_group import (
+    ReplicaGroupLifecycleReconcileView,
+    ReplicaGroupScalingReconcileView,
+)
 
 
 @dataclass
@@ -23,6 +26,14 @@ class ScalingReconcileFetch:
     (read in the same session so retry/timeout classification uses a consistent clock)."""
 
     views: list[ReplicaGroupScalingReconcileView]
+    now: datetime
+
+
+@dataclass
+class LifecycleReconcileFetch:
+    """One lifecycle-reconcile fetch: per-group views plus the DB-sourced current time."""
+
+    views: list[ReplicaGroupLifecycleReconcileView]
     now: datetime
 
 
@@ -76,4 +87,12 @@ class ReplicaGroupScalingReconcileApply:
 
     create_instructions: Sequence[GroupRouteCreateInstruction] = field(default_factory=list)
     drain_instructions: Sequence[GroupRouteDrainInstruction] = field(default_factory=list)
+    transitions: Sequence[ReplicaGroupReconcileTransition] = field(default_factory=list)
+
+
+@dataclass
+class ReplicaGroupLifecycleReconcileApply:
+    """One lifecycle-reconcile tick's writes: each group's next desired counts + lifecycle
+    transition + history (no route create/drain — the scaling reconcile fills routes)."""
+
     transitions: Sequence[ReplicaGroupReconcileTransition] = field(default_factory=list)

@@ -118,6 +118,8 @@ class LockID(enum.IntEnum):
     LOCKID_SOKOVAN_CLEANUP_FORCE_TERMINATED_TIMER = 234  # Timer for force-terminated cleanup
     # Reconciler stage locks
     LOCKID_REPLICA_GROUP_SCALING_RECONCILE = 235  # For replica-group scaling reconcile
+    LOCKID_REPLICA_GROUP_ROLLING_RECONCILE = 236  # For replica-group rolling reconcile
+    LOCKID_REPLICA_GROUP_DRAINING_RECONCILE = 237  # For replica-group draining reconcile
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable

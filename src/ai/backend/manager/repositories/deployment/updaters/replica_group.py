@@ -62,3 +62,30 @@ class ReplicaGroupScalingUpdaterSpec(UpdaterSpec[ReplicaGroupRow]):
         self.desired_target_replica_count.update_dict(values, "desired_target_replica_count")
         self.scaling_status.update_dict(values, "scaling_status")
         return values
+
+
+@dataclass
+class ReplicaGroupLifecycleUpdaterSpec(UpdaterSpec[ReplicaGroupRow]):
+    """Lifecycle-reconcile update: the rolling/draining step writes both axes at once —
+    the next desired counts + scaling status (re-arm scaling) and the lifecycle transition."""
+
+    lifecycle: OptionalState[ReplicaGroupLifecycle] = field(default_factory=OptionalState.nop)
+    desired_current_replica_count: OptionalState[int] = field(default_factory=OptionalState.nop)
+    desired_target_replica_count: OptionalState[int] = field(default_factory=OptionalState.nop)
+    scaling_status: OptionalState[ReplicaGroupScalingStatus] = field(
+        default_factory=OptionalState.nop
+    )
+
+    @property
+    @override
+    def row_class(self) -> type[ReplicaGroupRow]:
+        return ReplicaGroupRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        values: dict[str, Any] = {}
+        self.lifecycle.update_dict(values, "lifecycle")
+        self.desired_current_replica_count.update_dict(values, "desired_current_replica_count")
+        self.desired_target_replica_count.update_dict(values, "desired_target_replica_count")
+        self.scaling_status.update_dict(values, "scaling_status")
+        return values

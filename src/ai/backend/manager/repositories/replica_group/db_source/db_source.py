@@ -44,6 +44,8 @@ from ai.backend.manager.repositories.ops.sokovan.provider import SokovanOpsProvi
 from ai.backend.manager.repositories.replica_group.types import (
     GroupRouteCreateInstruction,
     GroupRouteDrainInstruction,
+    LifecycleReconcileFetch,
+    ReplicaGroupLifecycleReconcileApply,
     ReplicaGroupReconcileTransition,
     ReplicaGroupScalingReconcileApply,
     RevisionReplicaCount,
@@ -52,6 +54,7 @@ from ai.backend.manager.repositories.replica_group.types import (
 from ai.backend.manager.types import OptionalState
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupDeploySchedulingView,
+    ReplicaGroupLifecycleReconcileView,
     ReplicaGroupScalingReconcileView,
     ReplicaGroupScalingSchedulingView,
 )
@@ -115,16 +118,7 @@ class ReplicaGroupDBSource:
                     if group_row.target_revision_id is not None
                     else empty
                 )
-                history_row = last_histories.get(group_row.id)
-                last_history = (
-                    LastHistory(
-                        phase=history_row.phase,
-                        attempts=history_row.attempts,
-                        started_at=history_row.created_at,
-                    )
-                    if history_row is not None
-                    else None
-                )
+                last_history = self._to_last_history(last_histories.get(group_row.id))
                 views.append(
                     ReplicaGroupScalingReconcileView(
                         group_id=group_row.id,
@@ -145,6 +139,62 @@ class ReplicaGroupDBSource:
                     )
                 )
             return ScalingReconcileFetch(views=views, now=now)
+
+    async def fetch_lifecycle_reconcile_views(
+        self,
+        querier: BatchQuerier,
+        category: ReplicaGroupHandlerCategory,
+    ) -> LifecycleReconcileFetch:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            now = (await db_sess.execute(sa.select(sa.func.now()))).scalar_one()
+            group_result = await execute_batch_querier(db_sess, sa.select(ReplicaGroupRow), querier)
+            group_rows: list[ReplicaGroupRow] = [row.ReplicaGroupRow for row in group_result.rows]
+            group_ids = [group_row.id for group_row in group_rows]
+            deployment_ids = [group_row.deployment_id for group_row in group_rows]
+            last_histories = await self._latest_history_by_group(db_sess, group_ids, category)
+            handler_options = await self._handler_options_by_deployment(db_sess, deployment_ids)
+            deployment_desired = await self._replicas_by_deployment(db_sess, deployment_ids)
+            views = [
+                ReplicaGroupLifecycleReconcileView(
+                    group_id=group_row.id,
+                    deployment_id=group_row.deployment_id,
+                    current_revision_id=group_row.current_revision_id,
+                    target_revision_id=group_row.target_revision_id,
+                    lifecycle=group_row.lifecycle,
+                    scaling_status=group_row.scaling_status,
+                    desired_current_replica_count=group_row.desired_current_replica_count,
+                    desired_target_replica_count=group_row.desired_target_replica_count,
+                    deployment_desired_replica_count=deployment_desired.get(
+                        group_row.deployment_id, 0
+                    ),
+                    rollout=group_row.rollout,
+                    last_history=self._to_last_history(last_histories.get(group_row.id)),
+                    handler_options=handler_options.get(
+                        group_row.deployment_id, DeploymentHandlerOptions()
+                    ),
+                )
+                for group_row in group_rows
+            ]
+            return LifecycleReconcileFetch(views=views, now=now)
+
+    @staticmethod
+    def _to_last_history(row: ReplicaGroupHistoryRow | None) -> LastHistory | None:
+        if row is None:
+            return None
+        return LastHistory(phase=row.phase, attempts=row.attempts, started_at=row.created_at)
+
+    async def _replicas_by_deployment(
+        self,
+        db_sess: SASession,
+        deployment_ids: Sequence[DeploymentID],
+    ) -> Mapping[DeploymentID, int]:
+        if not deployment_ids:
+            return {}
+        query = sa.select(EndpointRow.id, EndpointRow.replicas).where(
+            EndpointRow.id.in_(deployment_ids)
+        )
+        rows = (await db_sess.execute(query)).all()
+        return {row.id: row.replicas for row in rows}
 
     async def _handler_options_by_deployment(
         self,
@@ -233,6 +283,15 @@ class ReplicaGroupDBSource:
                 await w.bulk_create_scoped(creators)
             if drain_updater is not None:
                 await w.batch_update(drain_updater)
+            await w.bulk_apply_transitions([
+                self._to_ops_transition(transition) for transition in apply.transitions
+            ])
+
+    async def apply_lifecycle_reconcile(
+        self,
+        apply: ReplicaGroupLifecycleReconcileApply,
+    ) -> None:
+        async with self._ops.write_ops() as w:
             await w.bulk_apply_transitions([
                 self._to_ops_transition(transition) for transition in apply.transitions
             ])
