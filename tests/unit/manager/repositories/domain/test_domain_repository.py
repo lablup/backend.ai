@@ -154,7 +154,6 @@ class TestDomainRepository:
         # Create mock for _role_manager
         mock_role_manager = MagicMock()
         mock_role_manager.create_system_role = AsyncMock(return_value=None)
-        mock_role_manager.create_preset_roles = AsyncMock(return_value=[])
         repo._role_manager = mock_role_manager
 
         return repo

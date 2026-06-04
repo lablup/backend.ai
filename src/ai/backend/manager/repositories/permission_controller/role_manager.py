@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Protocol, cast
@@ -8,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
@@ -133,17 +135,7 @@ class RoleManager:
         return [row.to_data() for row in permission_rows]
 
     async def create_preset_roles(self, db_session: SASession, scope_id: ScopeId) -> list[RoleData]:
-        """Auto-generate roles from active role presets matching the given scope.
-
-        For every active (deleted=false) role preset whose scope_type matches
-        `scope_id`, a new role owned by the scope is created and a shallow snapshot
-        of the preset's permissions is bulk-inserted. The role name is copied from
-        the preset, and `auto_assign` is inherited from the preset. Returns the
-        created roles so the caller can act on the auto_assign ones (e.g. assign
-        them to the principal joining the scope).
-
-        If no active preset matches the scope_type, nothing is created.
-        """
+        """Auto-generate roles from active role presets matching the given scope."""
         preset_rows = (
             await db_session.scalars(
                 sa.select(RolePresetRow).where(
@@ -154,14 +146,45 @@ class RoleManager:
                 )
             )
         ).all()
+        if not preset_rows:
+            return []
+        permission_presets_by_preset = await self._fetch_permission_presets(
+            db_session, [preset.id for preset in preset_rows]
+        )
         created_roles: list[RoleData] = []
         for preset in preset_rows:
-            role = await self._create_preset_role(db_session, scope_id, preset)
+            role = await self._create_preset_role(
+                db_session,
+                scope_id,
+                preset,
+                permission_presets_by_preset.get(preset.id, []),
+            )
             created_roles.append(role)
         return created_roles
 
+    async def _fetch_permission_presets(
+        self,
+        db_session: SASession,
+        preset_ids: list[RolePresetID],
+    ) -> dict[RolePresetID, list[RolePermissionPresetRow]]:
+        permission_preset_rows = (
+            await db_session.scalars(
+                sa.select(RolePermissionPresetRow).where(
+                    RolePermissionPresetRow.role_preset_id.in_(preset_ids)
+                )
+            )
+        ).all()
+        grouped: dict[RolePresetID, list[RolePermissionPresetRow]] = defaultdict(list)
+        for row in permission_preset_rows:
+            grouped[row.role_preset_id].append(row)
+        return grouped
+
     async def _create_preset_role(
-        self, db_session: SASession, scope_id: ScopeId, preset: RolePresetRow
+        self,
+        db_session: SASession,
+        scope_id: ScopeId,
+        preset: RolePresetRow,
+        permission_presets: list[RolePermissionPresetRow],
     ) -> RoleData:
         rbac_creator = RBACEntityCreator(
             spec=RoleCreatorSpec(
@@ -178,23 +201,18 @@ class RoleManager:
         )
         result = await execute_rbac_entity_creator(db_session, rbac_creator)
         role = result.row.to_data()
-        await self._create_preset_permissions(db_session, scope_id, preset.id, role.id)
+        await self._create_preset_permissions(db_session, scope_id, role.id, permission_presets)
         return role
 
     async def _create_preset_permissions(
         self,
         db_session: SASession,
         scope_id: ScopeId,
-        preset_id: uuid.UUID,
         role_id: uuid.UUID,
+        permission_presets: list[RolePermissionPresetRow],
     ) -> None:
-        permission_preset_rows = (
-            await db_session.scalars(
-                sa.select(RolePermissionPresetRow).where(
-                    RolePermissionPresetRow.role_preset_id == preset_id
-                )
-            )
-        ).all()
+        if not permission_presets:
+            return
         permission_rows = [
             PermissionRow.from_input(
                 PermissionCreator(
@@ -205,10 +223,8 @@ class RoleManager:
                     operation=preset_permission.operation,
                 )
             )
-            for preset_permission in permission_preset_rows
+            for preset_permission in permission_presets
         ]
-        if not permission_rows:
-            return
         db_session.add_all(permission_rows)
         await db_session.flush()
 
