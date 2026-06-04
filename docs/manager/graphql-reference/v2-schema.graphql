@@ -2285,7 +2285,7 @@ Added in UNRELEASED. A keypair returned at creation time, including its one-time
 """
 type CreateKeypairPayload {
   """The newly created keypair."""
-  keypair: KeyPairGQL!
+  keypair: KeyPairV2!
 
   """
   The secret key of the generated keypair. Only returned at creation time.
