@@ -157,25 +157,25 @@ class TerminatedTransitionHook(StatusTransitionHook):
         if network.network_type != NetworkType.VOLATILE or network.network_id is None:
             return
         network_id = network.network_id
-        cluster_mode = session.session_info.resource.cluster_mode
+        session_id = session.session_info.identity.id
+        cluster_mode = ClusterMode(session.session_info.resource.cluster_mode)
 
         if cluster_mode == ClusterMode.SINGLE_NODE:
             agent_id = session.main_kernel.resource.agent
             if agent_id is None:
-                session_id = session.session_info.identity.id
                 raise AgentNotAllocated(
                     f"Main kernel has no agent assigned for session {session_id}"
                 )
             async with self._deps.agent_client_pool.acquire(AgentId(agent_id)) as client:
                 try:
                     await client.destroy_local_network(network_id)
-                except Exception as e:
+                except Exception:
                     log.exception(
-                        "Failed to destroy local network on agent for session. Session ID: {}, Network ID: {}, Agent ID: {}. Error: {}",
-                        session.session_info.identity.id,
+                        "Failed to destroy local network on agent for session. "
+                        "Session ID: {}, Network ID: {}, Agent ID: {}",
+                        session_id,
                         network_id,
                         agent_id,
-                        e,
                     )
                     raise
         elif cluster_mode == ClusterMode.MULTI_NODE:
@@ -184,11 +184,21 @@ class TerminatedTransitionHook(StatusTransitionHook):
             )
             if default_driver is None:
                 raise ValueError("No inter-container network driver is configured.")
+            if default_driver not in self._deps.network_plugin_ctx.plugins:
+                available = list(self._deps.network_plugin_ctx.plugins.keys())
+                raise KeyError(
+                    f"Network plugin '{default_driver}' not found. Available plugins: {available}. "
+                    f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
+                )
             network_plugin = self._deps.network_plugin_ctx.plugins[default_driver]
             try:
                 await network_plugin.destroy_network(network_id=network_id)
-            except Exception as e:
+            except Exception:
                 log.exception(
-                    f"Failed to destroy overlay network for session: Session ID: {session.session_info.identity.id}, Network ID: {network_id}, Driver: {default_driver}. Error: {e!s}"
+                    "Failed to destroy overlay network for session. "
+                    "Session ID: {}, Network ID: {}, Driver: {}",
+                    session_id,
+                    network_id,
+                    default_driver,
                 )
                 raise

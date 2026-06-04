@@ -92,7 +92,7 @@ class TestTerminatedTransitionHookNetworkCleanup:
         session.session_info.identity.id = SessionId(uuid4())
         session.session_info.network.network_type = network_type
         session.session_info.network.network_id = network_id
-        session.session_info.resource.cluster_mode = ClusterMode.MULTI_NODE
+        session.session_info.resource.cluster_mode = ClusterMode.MULTI_NODE.name
         session.main_kernel.resource.agent = None
         return session
 
@@ -107,7 +107,7 @@ class TestTerminatedTransitionHookNetworkCleanup:
         session.session_info.identity.id = SessionId(uuid4())
         session.session_info.network.network_type = network_type
         session.session_info.network.network_id = network_id
-        session.session_info.resource.cluster_mode = ClusterMode.SINGLE_NODE
+        session.session_info.resource.cluster_mode = ClusterMode.SINGLE_NODE.name
         session.main_kernel.resource.agent = agent_id
         return session
 
