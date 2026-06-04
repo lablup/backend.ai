@@ -215,7 +215,7 @@ async def update_worker(
             worker.traefik_last_used_marker_path = params.traefik_last_used_marker_path
             # Reflect port_range / frontend_mode changes on restart.
             worker.refresh_available_slots()
-            worker.updated_at = datetime.now(UTC)
+            worker.updated_at = datetime.now(tzutc())
             worker.nodes += 1
             worker.status = WorkerStatus.ALIVE
         except ObjectNotFound:
