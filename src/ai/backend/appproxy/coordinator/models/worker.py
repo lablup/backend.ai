@@ -219,14 +219,12 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         w.status = status
 
         w.occupied_slots = 0
-        w.available_slots = cls.calculate_available_slots(
-            frontend_mode, port_range=port_range, wildcard_domain=wildcard_domain
-        )
+        w.refresh_available_slots()
 
         return w
 
     @staticmethod
-    def calculate_available_slots(
+    def _calculate_available_slots(
         frontend_mode: FrontendMode,
         *,
         port_range: tuple[int, int] | None = None,
@@ -250,7 +248,7 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
 
     def refresh_available_slots(self) -> None:
         """Recompute available_slots from the current frontend config."""
-        self.available_slots = self.calculate_available_slots(
+        self.available_slots = self._calculate_available_slots(
             self.frontend_mode,
             port_range=self.port_range,
             wildcard_domain=self.wildcard_domain,
