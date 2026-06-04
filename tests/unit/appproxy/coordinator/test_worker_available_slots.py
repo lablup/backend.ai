@@ -11,24 +11,15 @@ from ai.backend.appproxy.coordinator.models.worker import Worker
 
 
 @dataclass(frozen=True)
-class PortRange:
-    start: int
-    end: int
-
-    def as_tuple(self) -> tuple[int, int]:
-        return (self.start, self.end)
-
-
-@dataclass(frozen=True)
 class RangeChangeCase:
     """A restart that changes a worker's port_range and the slot count it should yield."""
 
-    initial: PortRange
-    updated: PortRange
+    initial: tuple[int, int]
+    updated: tuple[int, int]
     expected_slots: int
 
 
-def make_port_worker(port_range: PortRange) -> Worker:
+def make_port_worker(port_range: tuple[int, int]) -> Worker:
     """A PORT-mode worker created with the given port_range."""
     return Worker.create(
         uuid.uuid4(),
@@ -40,7 +31,7 @@ def make_port_worker(port_range: PortRange) -> Worker:
         False,
         10200,
         [AppMode.INTERACTIVE],
-        port_range=port_range.as_tuple(),
+        port_range=port_range,
     )
 
 
@@ -56,36 +47,20 @@ class TestRefreshAvailableSlots:
     @pytest.mark.parametrize(
         "case",
         [
-            RangeChangeCase(
-                initial=PortRange(start=10501, end=10600),
-                updated=PortRange(start=10501, end=10800),
-                expected_slots=300,
-            ),
-            RangeChangeCase(
-                initial=PortRange(start=10501, end=10800),
-                updated=PortRange(start=10501, end=10600),
-                expected_slots=100,
-            ),
-            RangeChangeCase(
-                initial=PortRange(start=10501, end=10600),
-                updated=PortRange(start=10501, end=10600),
-                expected_slots=100,
-            ),
-            RangeChangeCase(
-                initial=PortRange(start=10501, end=10501),
-                updated=PortRange(start=10501, end=10501),
-                expected_slots=1,
-            ),
+            RangeChangeCase(initial=(10501, 10600), updated=(10501, 10800), expected_slots=300),
+            RangeChangeCase(initial=(10501, 10800), updated=(10501, 10600), expected_slots=100),
+            RangeChangeCase(initial=(10501, 10600), updated=(10501, 10600), expected_slots=100),
+            RangeChangeCase(initial=(10501, 10501), updated=(10501, 10501), expected_slots=1),
         ],
         ids=["expand", "shrink", "unchanged", "single-port"],
     )
     def test_refresh_after_port_range_change(self, case: RangeChangeCase) -> None:
         worker = make_port_worker(case.initial)
-        worker.port_range = case.updated.as_tuple()
+        worker.port_range = case.updated
         worker.refresh_available_slots()
         assert worker.available_slots == case.expected_slots
 
-    @pytest.mark.parametrize("port_worker", [PortRange(start=10501, end=10600)], indirect=True)
+    @pytest.mark.parametrize("port_worker", [(10501, 10600)], indirect=True)
     def test_switch_to_wildcard_mode_sets_unlimited(self, port_worker: Worker) -> None:
         port_worker.frontend_mode = FrontendMode.WILDCARD_DOMAIN
         port_worker.port_range = None
@@ -93,13 +68,13 @@ class TestRefreshAvailableSlots:
         port_worker.refresh_available_slots()
         assert port_worker.available_slots == -1
 
-    @pytest.mark.parametrize("port_worker", [PortRange(start=10501, end=10600)], indirect=True)
+    @pytest.mark.parametrize("port_worker", [(10501, 10600)], indirect=True)
     def test_refresh_without_port_range_raises(self, port_worker: Worker) -> None:
         port_worker.port_range = None
         with pytest.raises(MissingFrontendConfigError):
             port_worker.refresh_available_slots()
 
-    @pytest.mark.parametrize("port_worker", [PortRange(start=10501, end=10600)], indirect=True)
+    @pytest.mark.parametrize("port_worker", [(10501, 10600)], indirect=True)
     def test_refresh_without_wildcard_domain_raises(self, port_worker: Worker) -> None:
         port_worker.frontend_mode = FrontendMode.WILDCARD_DOMAIN
         port_worker.port_range = None
