@@ -8445,6 +8445,9 @@ input KeypairFilter
   isAdmin: Boolean = null
   accessKey: StringFilter = null
   resourcePolicy: StringFilter = null
+
+  """Added in UNRELEASED. Filter keypairs by the UUID of their owner."""
+  userId: UUIDFilter = null
   createdAt: DateTimeFilter = null
   lastUsed: DateTimeFilter = null
   AND: [KeypairFilter!] = null

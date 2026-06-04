@@ -942,6 +942,15 @@ class UserAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter_req.user_id is not None:
+            condition = self.convert_uuid_filter(
+                filter_req.user_id,
+                equals_factory=KeypairConditions.by_user_id_equals,
+                in_factory=KeypairConditions.by_user_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter_req.created_at is not None:
             condition = filter_req.created_at.build_query_condition(
                 before_factory=KeypairConditions.by_created_at_before,
