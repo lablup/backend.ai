@@ -263,6 +263,10 @@ class UserDBSource:
             )
             await execute_creator(db_session, user_role_creator)
 
+            # Provision roles from active user-scope presets and assign the
+            # auto_assign ones to the new user.
+            await self._role_manager.create_preset_roles_for_user(db_session, created_user.uuid)
+
         return UserCreateResultData(created_user, kp_data)
 
     async def _create_single_user_with_keypair_and_groups(
@@ -359,6 +363,10 @@ class UserDBSource:
             spec=UserRoleCreatorSpec(user_id=created_user.uuid, role_id=role.id)
         )
         await execute_creator(db_session, user_role_creator)
+
+        # Provision roles from active user-scope presets and assign the
+        # auto_assign ones to the new user.
+        await self._role_manager.create_preset_roles_for_user(db_session, created_user.uuid)
 
         return UserCreateResultData(created_user, kp_data)
 

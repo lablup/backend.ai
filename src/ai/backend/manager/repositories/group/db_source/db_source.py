@@ -176,6 +176,8 @@ class GroupDBSource:
             await self._role_manager.create_system_role(
                 db_session, ProjectMemberRoleSpec(project_id=data.id)
             )
+            # Provision roles from active presets matching the project scope.
+            await self._role_manager.create_preset_roles(db_session, data.scope_id())
 
             return data
 

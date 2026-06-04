@@ -92,6 +92,8 @@ class DomainRepository:
 
             data = domain.to_data()
             await self._role_manager.create_system_role(db_session, data)
+            # Provision roles from active presets matching the domain scope.
+            await self._role_manager.create_preset_roles(db_session, data.scope_id())
 
             # Create model-store group for the domain
             await self._create_model_store_group(db_session, spec.name)

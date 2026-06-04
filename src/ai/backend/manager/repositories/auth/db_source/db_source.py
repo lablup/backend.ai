@@ -165,6 +165,10 @@ class AuthDBSource:
             )
             await execute_creator(db_session, user_role_creator)
 
+            # Provision roles from active user-scope presets and assign the
+            # auto_assign ones to the new user.
+            await self._role_manager.create_preset_roles_for_user(db_session, user_row.uuid)
+
             return self._user_row_to_data(user_row)
 
     @auth_db_source_resilience.apply()
