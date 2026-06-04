@@ -30,6 +30,7 @@ from ai.backend.appproxy.common.types import (
     Slot,
 )
 from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
+from ai.backend.common.exception import UnreachableError
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import GUID, Base, BaseMixin, EnumType, StrEnumType
@@ -238,6 +239,7 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
                         "Port range is required for PORT frontend mode"
                     )
                 return self.port_range[1] - self.port_range[0] + 1
+        raise UnreachableError(f"Unsupported frontend mode: {self.frontend_mode}")
 
     def refresh_available_slots(self) -> None:
         """Recompute available_slots from the current frontend config."""
