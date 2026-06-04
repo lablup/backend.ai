@@ -23,6 +23,27 @@ def upgrade() -> None:
         "sessions",
         sa.Column("replica_id", GUID(), nullable=True),
     )
+    # Backfill from the inverse link (routings.session -> sessions.id). A session
+    # serves at most one replica; pick the earliest route deterministically.
+    # Idempotent: only fills rows still NULL.
+    op.execute(
+        sa.text(
+            """
+            UPDATE sessions
+            SET replica_id = (
+                SELECT routings.id
+                FROM routings
+                WHERE routings.session = sessions.id
+                ORDER BY routings.created_at ASC, routings.id ASC
+                LIMIT 1
+            )
+            WHERE sessions.replica_id IS NULL
+              AND EXISTS (
+                SELECT 1 FROM routings WHERE routings.session = sessions.id
+              )
+            """
+        )
+    )
 
 
 def downgrade() -> None:

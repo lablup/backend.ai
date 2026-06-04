@@ -1060,7 +1060,16 @@ class DeploymentDBSource:
                 .values(session=session_id, status=RouteStatus.PROVISIONING)
             )
             result = await db_sess.execute(query)
-            return cast(CursorResult[Any], result).rowcount > 0
+            bound = cast(CursorResult[Any], result).rowcount > 0
+            if bound:
+                # Mirror the binding onto the session (first-bind-wins, matching
+                # the migration backfill): the route (replica) it serves.
+                await db_sess.execute(
+                    sa.update(SessionRow)
+                    .where(sa.and_(SessionRow.id == session_id, SessionRow.replica_id.is_(None)))
+                    .values(replica_id=route_id)
+                )
+            return bound
 
     async def update_route(
         self,
@@ -1974,7 +1983,18 @@ class DeploymentDBSource:
                     .where(sa.and_(RoutingRow.id == route_id, RoutingRow.session.is_(None)))
                     .values(session=session_id)
                 )
-                await db_sess.execute(query)
+                result = await db_sess.execute(query)
+                # Mirror the binding onto the session only when the route was
+                # actually bound this call (the `session IS NULL` guard above
+                # held). The `replica_id IS NULL` guard keeps first-bind-wins,
+                # matching the migration backfill, so a session never flips to a
+                # route serving another.
+                if cast(CursorResult[Any], result).rowcount > 0:
+                    await db_sess.execute(
+                        sa.update(SessionRow)
+                        .where(sa.and_(SessionRow.id == session_id, SessionRow.replica_id.is_(None)))
+                        .values(replica_id=route_id)
+                    )
 
     async def fetch_kernel_connection_info(
         self,
