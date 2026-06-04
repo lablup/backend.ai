@@ -8,6 +8,7 @@ of refactors, leaking Docker overlay (MULTI_NODE) and agent-local
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -20,6 +21,7 @@ from ai.backend.manager.sokovan.scheduler.hooks.status import (
     TerminatedHookDependencies,
     TerminatedTransitionHook,
 )
+from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
 
 
 class TestTerminatedTransitionHookNetworkCleanup:
@@ -76,6 +78,15 @@ class TestTerminatedTransitionHookNetworkCleanup:
         return "agent-1"
 
     @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid4())
+
+    @pytest.fixture(autouse=True)
+    def recorder_scope(self, session_id: SessionId) -> Iterator[None]:
+        with SessionRecorderContext.scope("test_terminate", entity_ids=[session_id]):
+            yield
+
+    @pytest.fixture
     def network_id(self, request: pytest.FixtureRequest) -> str | None:
         value: str | None = getattr(request, "param", "net-123")
         return value
@@ -87,10 +98,13 @@ class TestTerminatedTransitionHookNetworkCleanup:
 
     @pytest.fixture
     def multi_node_session(
-        self, network_type: NetworkType | None, network_id: str | None
+        self,
+        network_type: NetworkType | None,
+        network_id: str | None,
+        session_id: SessionId,
     ) -> MagicMock:
         session = MagicMock()
-        session.session_info.identity.id = SessionId(uuid4())
+        session.session_info.identity.id = session_id
         session.session_info.network.network_type = network_type
         session.session_info.network.network_id = network_id
         session.session_info.resource.cluster_mode = ClusterMode.MULTI_NODE.name
@@ -103,9 +117,10 @@ class TestTerminatedTransitionHookNetworkCleanup:
         network_type: NetworkType | None,
         network_id: str | None,
         agent_id: str,
+        session_id: SessionId,
     ) -> MagicMock:
         session = MagicMock()
-        session.session_info.identity.id = SessionId(uuid4())
+        session.session_info.identity.id = session_id
         session.session_info.network.network_type = network_type
         session.session_info.network.network_id = network_id
         session.session_info.resource.cluster_mode = ClusterMode.SINGLE_NODE.name

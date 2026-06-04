@@ -161,45 +161,58 @@ class TerminatedTransitionHook(StatusTransitionHook):
         session_id = session.session_info.identity.id
         cluster_mode = ClusterMode(session.session_info.resource.cluster_mode)
 
-        if cluster_mode == ClusterMode.SINGLE_NODE:
-            agent_id = session.main_kernel.resource.agent
-            if agent_id is None:
-                raise AgentNotAllocated(
-                    f"Main kernel has no agent assigned for session {session_id}"
-                )
-            async with self._deps.agent_client_pool.acquire(AgentId(agent_id)) as client:
-                try:
-                    await client.destroy_local_network(network_id)
-                except Exception:
-                    log.exception(
-                        "Failed to destroy local network on agent for session. "
-                        "Session ID: {}, Network ID: {}, Agent ID: {}",
-                        session_id,
-                        network_id,
-                        agent_id,
-                    )
-                    raise
-        elif cluster_mode == ClusterMode.MULTI_NODE:
-            default_driver = (
-                self._deps.config_provider.config.network.inter_container.default_driver
-            )
-            if default_driver is None:
-                raise ServerMisconfiguredError("No inter-container network driver is configured.")
-            if default_driver not in self._deps.network_plugin_ctx.plugins:
-                available = list(self._deps.network_plugin_ctx.plugins.keys())
-                raise ServerMisconfiguredError(
-                    f"Network plugin '{default_driver}' not found. Available plugins: {available}. "
-                    f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
-                )
-            network_plugin = self._deps.network_plugin_ctx.plugins[default_driver]
+        pool = RecorderContext[SessionId].current_pool()
+        recorder = pool.recorder(session_id)
+        with recorder.phase(
+            "terminate_cleanup",
+            success_detail="Volatile inter-container network destroyed",
+        ):
+            with recorder.step(
+                "destroy_network",
+                success_detail=f"Destroyed volatile network {network_id}",
+            ):
+                if cluster_mode == ClusterMode.SINGLE_NODE:
+                    await self._destroy_local_network(session, network_id)
+                elif cluster_mode == ClusterMode.MULTI_NODE:
+                    await self._destroy_overlay_network(session_id, network_id)
+
+    async def _destroy_local_network(self, session: SessionWithKernels, network_id: str) -> None:
+        session_id = session.session_info.identity.id
+        agent_id = session.main_kernel.resource.agent
+        if agent_id is None:
+            raise AgentNotAllocated(f"Main kernel has no agent assigned for session {session_id}")
+        async with self._deps.agent_client_pool.acquire(AgentId(agent_id)) as client:
             try:
-                await network_plugin.destroy_network(network_id=network_id)
+                await client.destroy_local_network(network_id)
             except Exception:
                 log.exception(
-                    "Failed to destroy overlay network for session. "
-                    "Session ID: {}, Network ID: {}, Driver: {}",
+                    "Failed to destroy local network on agent for session. "
+                    "Session ID: {}, Network ID: {}, Agent ID: {}",
                     session_id,
                     network_id,
-                    default_driver,
+                    agent_id,
                 )
                 raise
+
+    async def _destroy_overlay_network(self, session_id: SessionId, network_id: str) -> None:
+        default_driver = self._deps.config_provider.config.network.inter_container.default_driver
+        if default_driver is None:
+            raise ServerMisconfiguredError("No inter-container network driver is configured.")
+        if default_driver not in self._deps.network_plugin_ctx.plugins:
+            available = list(self._deps.network_plugin_ctx.plugins.keys())
+            raise ServerMisconfiguredError(
+                f"Network plugin '{default_driver}' not found. Available plugins: {available}. "
+                f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
+            )
+        network_plugin = self._deps.network_plugin_ctx.plugins[default_driver]
+        try:
+            await network_plugin.destroy_network(network_id=network_id)
+        except Exception:
+            log.exception(
+                "Failed to destroy overlay network for session. "
+                "Session ID: {}, Network ID: {}, Driver: {}",
+                session_id,
+                network_id,
+                default_driver,
+            )
+            raise
