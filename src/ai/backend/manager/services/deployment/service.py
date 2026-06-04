@@ -109,6 +109,10 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_aut
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
 )
+from ai.backend.manager.services.deployment.actions.bulk_query_routes import (
+    BulkQueryRoutesAction,
+    BulkQueryRoutesActionResult,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -1079,6 +1083,16 @@ class DeploymentService:
         if route is None:
             return GetReplicaByIdActionResult(data=None)
         return GetReplicaByIdActionResult(data=_convert_route_info_to_replica_data(route))
+
+    async def bulk_query_routes(
+        self, action: BulkQueryRoutesAction
+    ) -> BulkQueryRoutesActionResult:
+        """Resolve many routes at once within the requester's USER scope, as replica data."""
+        routes = await self._deployment_repository.bulk_query_routes(
+            action.queriers, scopes=(action.scope,)
+        )
+        replicas = [_convert_route_info_to_replica_data(route) for route in routes]
+        return BulkQueryRoutesActionResult(data=replicas, _scope_id=action.scope_id())
 
     # ========== Search Operations ==========
 

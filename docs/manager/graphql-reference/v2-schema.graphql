@@ -12254,6 +12254,11 @@ type SessionV2 implements Node {
 
   """Added in 26.3.0. The kernels belonging to this session."""
   kernels: KernelV2Connection
+
+  """
+  Added in UNRELEASED. The model deployment replica served by this session, resolved via DataLoader. Null for non-inference sessions. Follow `replica.revision` or the deployment chain to obtain deployment details.
+  """
+  replica: ModelReplica
 }
 
 """Added in 26.3.0. Connection type for paginated session results."""

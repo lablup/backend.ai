@@ -9,6 +9,7 @@ from .endpoint import (
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
     RouteSessionKernelInfo,
+    UserRouteSearchScope,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "RouteServiceDiscoveryInfo",
     "RouteSessionInfo",
     "RouteSessionKernelInfo",
+    "UserRouteSearchScope",
 ]

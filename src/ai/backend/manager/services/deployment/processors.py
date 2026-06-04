@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, cast, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
@@ -53,6 +54,10 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
+)
+from ai.backend.manager.services.deployment.actions.bulk_query_routes import (
+    BulkQueryRoutesAction,
+    BulkQueryRoutesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
@@ -211,6 +216,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
 
     # Replica operations
     get_replica_by_id: ActionProcessor[GetReplicaByIdAction, GetReplicaByIdActionResult]
+    bulk_query_routes: ScopeActionProcessor[BulkQueryRoutesAction, BulkQueryRoutesActionResult]
     search_replicas: ActionProcessor[SearchReplicasAction, SearchReplicasActionResult]
 
     # Auto-scaling rules
@@ -248,6 +254,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
     ) -> None:
         # Deployment CRUD
         rbac_single_entity_validators = [validators.rbac.single_entity]
+        rbac_scope_validators = [validators.rbac.scope]
         self.create_deployment = ActionProcessor(service.create_deployment, action_monitors)
         self.create_legacy_deployment = ActionProcessor(
             service.create_legacy_deployment, action_monitors
@@ -309,6 +316,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
 
         # Replica operations
         self.get_replica_by_id = ActionProcessor(service.get_replica_by_id, action_monitors)
+        self.bulk_query_routes = ScopeActionProcessor(
+            service.bulk_query_routes, action_monitors, validators=rbac_scope_validators
+        )
         self.search_replicas = ActionProcessor(service.search_replicas, action_monitors)
 
         # Auto-scaling rules
@@ -368,6 +378,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             UpdateRouteTrafficStatusAction.spec(),
             # Replica operations
             GetReplicaByIdAction.spec(),
+            BulkQueryRoutesAction.spec(),
             SearchReplicasAction.spec(),
             # Auto-scaling rules
             CreateAutoScalingRuleAction.spec(),

@@ -433,6 +433,22 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def replica_by_session_loader(
+        self,
+    ) -> DataLoader[SessionId, ModelReplica | None]:
+        adapter = self._adapters.deployment
+
+        async def load_fn(session_ids: list[SessionId]) -> list[ModelReplica | None]:
+            from ai.backend.manager.api.gql.deployment.types.replica import (  # pants: no-infer-dep
+                ModelReplica as MRep,
+            )
+
+            dtos = await adapter.batch_load_replicas_by_session_ids(session_ids)
+            return [MRep.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def container_count_loader(
         self,
     ) -> DataLoader[AgentId, int]:

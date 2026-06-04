@@ -151,7 +151,10 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
+    Querier,
+    SearchScope,
     execute_batch_querier,
+    execute_bulk_querier,
     execute_creator,
 )
 from ai.backend.manager.repositories.base.creator import BulkCreator
@@ -1165,6 +1168,25 @@ class DeploymentDBSource:
             if row is None:
                 return None
             return row.to_route_info()
+
+    async def bulk_query_routes(
+        self,
+        queriers: Sequence[Querier[RoutingRow]],
+        scopes: Sequence[SearchScope] = (),
+    ) -> list[RouteInfo]:
+        """Resolve many routes (replicas) at once from independent by-key queriers.
+
+        Queriers sharing a lookup column collapse into one ``WHERE col IN (...)``
+        query via ``execute_bulk_querier``. ``scopes`` apply RBAC row filtering
+        (AND-merged with the IN predicate). Queriers that match no row — or whose
+        row is filtered out by scope — simply drop out (they land in the bulk
+        result's failures, discarded here).
+        """
+        if not queriers:
+            return []
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            result = await execute_bulk_querier(db_sess, queriers, scopes)
+            return [success.row.to_route_info() for success in result.successes]
 
     async def search_endpoints(
         self,

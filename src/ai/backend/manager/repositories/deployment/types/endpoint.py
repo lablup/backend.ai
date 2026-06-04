@@ -27,6 +27,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.repositories.base.types import ExistenceCheck, QueryCondition, SearchScope
 
 
@@ -144,3 +145,31 @@ class ProjectDeploymentSearchScope(SearchScope):
                 error=ProjectNotFound(str(self.project_id)),
             ),
         ]
+
+
+@dataclass(frozen=True)
+class UserRouteSearchScope(SearchScope):
+    """USER scope for routes owned by a specific user.
+
+    Constrains routes to those whose owning session belongs to ``user_uuid``
+    (``RoutingRow.session_owner == user_uuid``). Mirrors the per-entity
+    ``User*SearchScope`` convention (e.g. ``UserKeypairSearchScope``).
+
+    Existence checks are intentionally empty: this scopes a partial-by-absence
+    batch lookup, so out-of-scope routes drop out via the WHERE predicate
+    rather than raising all-or-nothing.
+    """
+
+    user_uuid: UUID
+
+    def to_condition(self) -> QueryCondition:
+        user_uuid = self.user_uuid
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.session_owner == user_uuid
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return []

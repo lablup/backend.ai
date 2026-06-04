@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -86,6 +86,9 @@ from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.errors.user import UserNotFound
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.deployment.types.replica import ModelReplica
 
 
 @gql_enum(
@@ -432,6 +435,29 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
                 end_cursor=edges[-1].cursor if edges else None,
             ),
             count=payload.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The model deployment replica served by this session, resolved via DataLoader. "
+                "Null for non-inference sessions. Follow `replica.revision` or the deployment "
+                "chain to obtain deployment details."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def replica(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ModelReplica,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.replica"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.replica_by_session_loader.load(
+            SessionId(UUID(str(self.id)))
         )
 
     # TODO: Add `vfolder_mounts` dynamic field (VFolder connection type needed)

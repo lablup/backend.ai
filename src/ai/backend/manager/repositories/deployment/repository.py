@@ -95,7 +95,7 @@ from ai.backend.manager.models.scheduling_history import (
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, Querier, SearchScope
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -1535,6 +1535,23 @@ class DeploymentRepository:
             RouteInfo if found, None otherwise
         """
         return await self._db_source.get_route(route_id)
+
+    @deployment_repository_resilience.apply()
+    async def bulk_query_routes(
+        self,
+        queriers: Sequence[Querier[RoutingRow]],
+        scopes: Sequence[SearchScope] = (),
+    ) -> list[RouteInfo]:
+        """Resolve many routes (replicas) at once from independent by-key queriers.
+
+        Args:
+            queriers: One Querier per route to resolve (by PK or alternate key)
+            scopes: RBAC scopes to constrain which rows are visible
+
+        Returns:
+            A flat list of RouteInfo for the queriers that matched an in-scope row
+        """
+        return await self._db_source.bulk_query_routes(queriers, scopes)
 
     @deployment_repository_resilience.apply()
     async def search_endpoints(

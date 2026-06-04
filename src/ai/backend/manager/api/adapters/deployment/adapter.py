@@ -221,12 +221,16 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
     OffsetPagination,
+    Querier,
     QueryCondition,
     QueryOrder,
     Updater,
     combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
+)
+from ai.backend.manager.repositories.deployment.types import (
+    UserRouteSearchScope,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
@@ -266,6 +270,9 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_aut
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
+)
+from ai.backend.manager.services.deployment.actions.bulk_query_routes import (
+    BulkQueryRoutesAction,
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
@@ -1409,6 +1416,45 @@ class DeploymentAdapter(BaseAdapter):
         )
         replica_map = {data.id: self._replica_data_to_dto(data) for data in action_result.data}
         return [replica_map.get(replica_id) for replica_id in replica_ids]
+
+    async def batch_load_replicas_by_session_ids(
+        self,
+        session_ids: Sequence[uuid.UUID],
+    ) -> list[ReplicaNode | None]:
+        """Batch load replicas by their owning session ID for DataLoader use.
+
+        Builds one by-session ``Querier`` per session (the route -> session link
+        is 1:1) and resolves them all through the generic bulk-route query under
+        the requester's USER scope (RBAC enforced by the scope processor; routes
+        the requester does not own drop out). Returns ReplicaNode DTOs in the
+        same order as the input session_ids list; an absent or out-of-scope
+        session yields None.
+        """
+        if not session_ids:
+            return []
+        user = current_user()
+        if user is None:
+            raise RuntimeError("No authenticated user in context")
+        queriers = [
+            Querier(
+                row_class=RoutingRow,
+                pk_value=session_id,
+                lookup_column=RoutingRow.session,
+            )
+            for session_id in session_ids
+        ]
+        action_result = await self._processors.deployment.bulk_query_routes.wait_for_complete(
+            BulkQueryRoutesAction(
+                queriers=queriers,
+                scope=UserRouteSearchScope(user_uuid=user.user_id),
+            )
+        )
+        replica_map = {
+            data.session_id: self._replica_data_to_dto(data)
+            for data in action_result.data
+            if data.session_id is not None
+        }
+        return [replica_map.get(session_id) for session_id in session_ids]
 
     async def batch_load_routes_by_ids(
         self,
