@@ -1047,30 +1047,6 @@ class DeploymentDBSource:
                 for row in rows
             ]
 
-    async def update_route_session(
-        self,
-        route_id: uuid.UUID,
-        session_id: SessionId,
-    ) -> bool:
-        """Update route with session ID."""
-        async with self._begin_session_read_committed() as db_sess:
-            query = (
-                sa.update(RoutingRow)
-                .where(RoutingRow.id == route_id)
-                .values(session=session_id, status=RouteStatus.PROVISIONING)
-            )
-            result = await db_sess.execute(query)
-            bound = cast(CursorResult[Any], result).rowcount > 0
-            if bound:
-                # Mirror the binding onto the session (first-bind-wins, matching
-                # the migration backfill): the route (replica) it serves.
-                await db_sess.execute(
-                    sa.update(SessionRow)
-                    .where(sa.and_(SessionRow.id == session_id, SessionRow.replica_id.is_(None)))
-                    .values(replica_id=route_id)
-                )
-            return bound
-
     async def update_route(
         self,
         updater: Updater[RoutingRow],
