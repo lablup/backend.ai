@@ -908,6 +908,7 @@ class ModelDeploymentAccessTokenData:
 @dataclass
 class ModelReplicaData:
     id: UUID
+    deployment_id: UUID
     revision_id: UUID
     session_id: UUID | None
     readiness_status: ReadinessStatus

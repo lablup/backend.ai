@@ -349,6 +349,7 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
     liveness = _ROUTE_STATUS_TO_LIVENESS.get(route.status) or LivenessStatus.NOT_CHECKED
     return ModelReplicaData(
         id=route.route_id,
+        deployment_id=route.deployment_id,
         revision_id=route.revision_id or route.deployment_id,
         session_id=route.session_id,
         readiness_status=readiness,
