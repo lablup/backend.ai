@@ -223,36 +223,26 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
 
         return w
 
-    @staticmethod
-    def _calculate_available_slots(
-        frontend_mode: FrontendMode,
-        *,
-        port_range: tuple[int, int] | None = None,
-        wildcard_domain: str | None = None,
-    ) -> int:
-        """Number of available slots derived from the frontend configuration."""
-        match frontend_mode:
+    def _calculate_available_slots(self) -> int:
+        """Number of available slots derived from the current frontend configuration."""
+        match self.frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
-                if not wildcard_domain:
+                if not self.wildcard_domain:
                     raise MissingFrontendConfigError(
                         "Wildcard domain is required for WILDCARD_DOMAIN frontend mode"
                     )
                 return -1
             case FrontendMode.PORT:
-                if not port_range:
+                if not self.port_range:
                     raise MissingFrontendConfigError(
                         "Port range is required for PORT frontend mode"
                     )
-                return port_range[1] - port_range[0] + 1
-        assert_never(frontend_mode)
+                return self.port_range[1] - self.port_range[0] + 1
+        assert_never(self.frontend_mode)
 
     def refresh_available_slots(self) -> None:
         """Recompute available_slots from the current frontend config."""
-        self.available_slots = self._calculate_available_slots(
-            self.frontend_mode,
-            port_range=self.port_range,
-            wildcard_domain=self.wildcard_domain,
-        )
+        self.available_slots = self._calculate_available_slots()
 
     @property
     def use_tls(self) -> bool:
