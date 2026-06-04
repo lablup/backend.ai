@@ -1,16 +1,14 @@
-"""seed custom runtime_variant default_model_definition
+"""seed the custom runtime_variant default model definition
 
-The ``custom`` variant previously held an empty Draft ({"models": null}),
-so a deployment that omitted ``health_check`` in its model-definition.yaml
-fell back to the schema default ``initial_delay`` of 60s — too short for
-large models that take minutes to load, causing premature unhealthy
-routes. Seed a baseline ``health_check`` (path ``/health``,
-``initial_delay`` 1800s) matching the prebuilt variants. The user's
-model-definition.yaml / request still override it field-by-field, so this
-acts purely as a fallback layer. Operator-customised rows are left as-is.
+``ModelHealthCheck`` gained an ``enable`` flag (default ``False``), so health
+checks are now opt-in. The ``custom`` runtime variant shipped with an empty
+definition (``{"models": null}``); seed it with a default model definition whose
+health check is present but disabled, so a custom deployment can opt in later by
+flipping ``enable``. Pre-existing health_check blocks need no backfill: without
+the ``enable`` key they read back as disabled, matching the new opt-in default.
 
 Revision ID: ed42bc179b91
-Revises: 0113c63f3261
+Revises: eb9d9c018e85
 Create Date: 2026-05-29
 
 """
@@ -25,17 +23,18 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "ed42bc179b91"
-down_revision = "0113c63f3261"
+down_revision = "eb9d9c018e85"
 branch_labels = None
 depends_on = None
 
 
-_CUSTOM_DEFINITION_WITH_HEALTH_CHECK: dict[str, Any] = {
+_CUSTOM_DEFINITION: dict[str, Any] = {
     "models": [
         {
             "name": "custom-model",
             "service": {
                 "health_check": {
+                    "enable": False,
                     "path": "/health",
                     "interval": 10.0,
                     "max_retries": 10,
@@ -50,30 +49,26 @@ _EMPTY_DEFINITION: dict[str, Any] = {"models": None}
 
 
 def upgrade() -> None:
-    # Seed only the rows still holding the original empty definition, so an
-    # operator-customised custom variant is left untouched.
-    op.execute(
+    op.get_bind().execute(
         sa.text(
             "UPDATE runtime_variants "
-            "SET default_model_definition = CAST(:custom_definition_with_health_check AS JSONB) "
-            "WHERE name = 'custom' AND default_model_definition = CAST(:empty_definition AS JSONB)"
+            "SET default_model_definition = CAST(:seed AS JSONB) "
+            "WHERE name = 'custom' AND default_model_definition = CAST(:empty AS JSONB)"
         ).bindparams(
-            custom_definition_with_health_check=json.dumps(_CUSTOM_DEFINITION_WITH_HEALTH_CHECK),
-            empty_definition=json.dumps(_EMPTY_DEFINITION),
+            seed=json.dumps(_CUSTOM_DEFINITION),
+            empty=json.dumps(_EMPTY_DEFINITION),
         )
     )
 
 
 def downgrade() -> None:
-    # Revert only the value this migration set; leave later operator edits intact.
-    op.execute(
+    op.get_bind().execute(
         sa.text(
             "UPDATE runtime_variants "
-            "SET default_model_definition = CAST(:empty_definition AS JSONB) "
-            "WHERE name = 'custom' "
-            "AND default_model_definition = CAST(:custom_definition_with_health_check AS JSONB)"
+            "SET default_model_definition = CAST(:empty AS JSONB) "
+            "WHERE name = 'custom' AND default_model_definition = CAST(:seed AS JSONB)"
         ).bindparams(
-            custom_definition_with_health_check=json.dumps(_CUSTOM_DEFINITION_WITH_HEALTH_CHECK),
-            empty_definition=json.dumps(_EMPTY_DEFINITION),
+            seed=json.dumps(_CUSTOM_DEFINITION),
+            empty=json.dumps(_EMPTY_DEFINITION),
         )
     )

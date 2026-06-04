@@ -357,6 +357,16 @@ class PreStartActionGQL:
     name="ModelHealthCheck",
 )
 class ModelHealthCheckGQL:
+    enable: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether the route is health-checked. When false the route activates "
+                "immediately and the remaining fields are ignored."
+            ),
+        ),
+        default=False,
+    )
     interval: float = gql_field(description="Interval in seconds between health checks.")
     path: str = gql_field(description="Path to check for health status.")
     max_retries: int = gql_field(description="Maximum number of retries for health check.")
@@ -861,6 +871,13 @@ class PreStartActionInputGQL(PydanticInputMixin[PreStartActionDTO]):
     name="ModelHealthCheckInput",
 )
 class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckInputDTO]):
+    enable: bool | None = gql_field(
+        description=(
+            "Whether the route should be health-checked. When false the route activates "
+            "immediately and the remaining fields are ignored."
+        ),
+        default=None,
+    )
     interval: float | None = gql_field(
         description="Interval in seconds between health checks.", default=None
     )

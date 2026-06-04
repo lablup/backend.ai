@@ -170,12 +170,21 @@ class PreStartAction(BaseConfigModel):
 
 
 class ModelHealthCheck(BaseConfigModel):
+    enable: bool = Field(
+        default=False,
+        description=(
+            "Whether the route should be health-checked. When false the route "
+            "becomes active immediately and the remaining fields are ignored."
+        ),
+        examples=[False],
+    )
     interval: float = Field(
         default=10.0,
         description="Interval in seconds between health checks.",
         examples=[10.0],
     )
     path: str = Field(
+        default="/health",
         description="Path to check for health status.",
         examples=["/health"],
     )
@@ -351,6 +360,7 @@ def _merge_service_config(
         hb, ho = base.health_check, override.health_check
         hs = ho.model_fields_set
         health_check = ModelHealthCheck.model_construct(
+            enable=_pick(hb.enable, ho.enable, "enable" in hs),
             interval=_pick(hb.interval, ho.interval, "interval" in hs),
             path=_pick(hb.path, ho.path, "path" in hs),
             max_retries=_pick(hb.max_retries, ho.max_retries, "max_retries" in hs),
@@ -441,9 +451,8 @@ class ModelDefinition(BaseConfigModel):
 
     def health_check_config(self) -> ModelHealthCheck | None:
         for model in self.models:
-            if model.service and model.service.health_check:
-                if model.service.health_check is not None:
-                    return model.service.health_check
+            if model.service and model.service.health_check and model.service.health_check.enable:
+                return model.service.health_check
         return None
 
     def with_args_appended(self, args: list[str]) -> ModelDefinition:
@@ -481,6 +490,7 @@ class ModelDefinition(BaseConfigModel):
 
 
 class ModelHealthCheckDraft(BaseConfigModel):
+    enable: bool | None = None
     interval: float | None = None
     path: str | None = None
     max_retries: int | None = None
@@ -491,8 +501,6 @@ class ModelHealthCheckDraft(BaseConfigModel):
     def to_resolved(self) -> ModelHealthCheck:
         # Drop unset (None) fields so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values.
-        # Missing required fields (e.g. ``path``) surface as the strict
-        # type's ``BackendAISchemaValidationFailed`` via ``model_validate``.
         return ModelHealthCheck.model_validate(self.model_dump(exclude_none=True))
 
 
@@ -511,10 +519,9 @@ class ModelServiceConfigDraft(BaseConfigModel):
     def to_resolved(self) -> ModelServiceConfig:
         # Drop unset (None) scalars so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values;
-        # resolve the nested ``health_check`` draft explicitly so its own
-        # required-field check (``path``) fires through its own
-        # ``model_validate``. Missing required fields (e.g. ``port``)
-        # surface as ``BackendAISchemaValidationFailed``.
+        # resolve the nested ``health_check`` draft explicitly. Missing
+        # required fields (e.g. ``port``) surface as
+        # ``BackendAISchemaValidationFailed``.
         payload = self.model_dump(exclude_none=True, exclude={"health_check"})
         payload["health_check"] = self.health_check.to_resolved() if self.health_check else None
         return ModelServiceConfig.model_validate(payload)
@@ -547,6 +554,7 @@ def _merge_health_check_draft(
 ) -> ModelHealthCheckDraft:
     s = override.model_fields_set
     return ModelHealthCheckDraft.model_construct(
+        enable=_pick(base.enable, override.enable, "enable" in s),
         interval=_pick(base.interval, override.interval, "interval" in s),
         path=_pick(base.path, override.path, "path" in s),
         max_retries=_pick(base.max_retries, override.max_retries, "max_retries" in s),
@@ -649,6 +657,34 @@ class ModelDefinitionDraft(BaseConfigModel):
         return ModelDefinition.model_validate({
             "models": [m.to_resolved() for m in (self.models or [])],
         })
+
+    @classmethod
+    def from_file_payload(cls, payload: Mapping[str, Any]) -> ModelDefinitionDraft:
+        """Parse a model-definition file into a draft.
+
+        A declared ``health_check`` block implies opt-in, so ``enable`` is
+        defaulted to ``True`` when unset.
+        """
+        draft = cls.model_validate(dict(payload))
+        if not draft.models:
+            return draft
+        new_models: list[ModelConfigDraft] = []
+        changed = False
+        for model in draft.models:
+            service = model.service
+            if (
+                service is not None
+                and service.health_check is not None
+                and (service.health_check.enable is None)
+            ):
+                new_health_check = service.health_check.model_copy(update={"enable": True})
+                new_service = service.model_copy(update={"health_check": new_health_check})
+                model = model.model_copy(update={"service": new_service})
+                changed = True
+            new_models.append(model)
+        if not changed:
+            return draft
+        return draft.model_copy(update={"models": new_models})
 
 
 def find_config_file(daemon_name: str) -> Path:
