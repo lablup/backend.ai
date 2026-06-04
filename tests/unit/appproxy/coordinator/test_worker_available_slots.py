@@ -45,40 +45,8 @@ def port_worker(request: pytest.FixtureRequest) -> Worker:
     return make_port_worker(request.param)
 
 
-class TestCalculateAvailableSlots:
-    @pytest.mark.parametrize(
-        ("port_range", "expected"),
-        [
-            (PortRange(10501, 10800), 300),
-            (PortRange(10501, 10600), 100),
-            (PortRange(10501, 10501), 1),
-        ],
-    )
-    def test_port_mode_span(self, port_range: PortRange, expected: int) -> None:
-        assert (
-            Worker._calculate_available_slots(FrontendMode.PORT, port_range=port_range) == expected
-        )
-
-    def test_wildcard_mode_is_unlimited(self) -> None:
-        assert (
-            Worker._calculate_available_slots(
-                FrontendMode.WILDCARD_DOMAIN, wildcard_domain="*.example.com"
-            )
-            == -1
-        )
-
-    @pytest.mark.parametrize(
-        "frontend_mode",
-        [FrontendMode.PORT, FrontendMode.WILDCARD_DOMAIN],
-    )
-    def test_missing_config_raises(self, frontend_mode: FrontendMode) -> None:
-        # PORT without port_range / WILDCARD_DOMAIN without wildcard_domain.
-        with pytest.raises(MissingFrontendConfigError):
-            Worker._calculate_available_slots(frontend_mode)
-
-
 class TestRefreshAvailableSlots:
-    """Regression tests: available_slots must track port_range on restart."""
+    """Regression tests: available_slots must track the frontend config on restart."""
 
     @pytest.mark.parametrize(
         "case",
@@ -86,8 +54,9 @@ class TestRefreshAvailableSlots:
             RangeChangeCase(PortRange(10501, 10600), PortRange(10501, 10800), 300),
             RangeChangeCase(PortRange(10501, 10800), PortRange(10501, 10600), 100),
             RangeChangeCase(PortRange(10501, 10600), PortRange(10501, 10600), 100),
+            RangeChangeCase(PortRange(10501, 10501), PortRange(10501, 10501), 1),
         ],
-        ids=["expand", "shrink", "unchanged"],
+        ids=["expand", "shrink", "unchanged", "single-port"],
     )
     def test_refresh_after_port_range_change(self, case: RangeChangeCase) -> None:
         worker = make_port_worker(case.initial)
@@ -106,5 +75,13 @@ class TestRefreshAvailableSlots:
     @pytest.mark.parametrize("port_worker", [PortRange(10501, 10600)], indirect=True)
     def test_refresh_without_port_range_raises(self, port_worker: Worker) -> None:
         port_worker.port_range = None
+        with pytest.raises(MissingFrontendConfigError):
+            port_worker.refresh_available_slots()
+
+    @pytest.mark.parametrize("port_worker", [PortRange(10501, 10600)], indirect=True)
+    def test_refresh_without_wildcard_domain_raises(self, port_worker: Worker) -> None:
+        port_worker.frontend_mode = FrontendMode.WILDCARD_DOMAIN
+        port_worker.port_range = None
+        port_worker.wildcard_domain = None
         with pytest.raises(MissingFrontendConfigError):
             port_worker.refresh_available_slots()
