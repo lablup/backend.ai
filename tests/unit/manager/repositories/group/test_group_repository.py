@@ -152,6 +152,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         db_source = GroupDBSource(db=db_with_cleanup)
         mock_role_manager = MagicMock()
         mock_role_manager.create_system_role = AsyncMock(return_value=None)
+        mock_role_manager.create_preset_roles = AsyncMock(return_value=[])
         db_source._role_manager = mock_role_manager
         return db_source
 
@@ -494,6 +495,7 @@ class TestGroupRepository:
         db_source = GroupDBSource(db=db_with_cleanup)
         mock_role_manager = MagicMock()
         mock_role_manager.create_system_role = AsyncMock(return_value=None)
+        mock_role_manager.create_preset_roles = AsyncMock(return_value=[])
         db_source._role_manager = mock_role_manager
         return db_source
 
