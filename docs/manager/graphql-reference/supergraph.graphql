@@ -9884,6 +9884,7 @@ type ModelReplica implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+  deploymentId: ID!
   sessionId: ID
   revisionId: ID!
 
@@ -9922,6 +9923,9 @@ type ModelReplica implements Node
 
   """The revision of this entity."""
   revision: ModelRevision
+
+  """Added in UNRELEASED. The model deployment this replica belongs to."""
+  deployment: ModelDeployment
 }
 
 """
