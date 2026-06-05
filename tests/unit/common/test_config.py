@@ -13,6 +13,7 @@ from ai.backend.common.config import (
     ModelMetadata,
     ModelServiceConfig,
     _merge_config,
+    _merge_config_draft,
     _merge_definition,
     _merge_metadata,
     _merge_service_config,
@@ -252,6 +253,54 @@ class TestHealthCheckEnable:
         service = normalized.models[0].service
         assert service is not None
         assert service.health_check is None
+
+    def test_file_normalization_null_health_check_becomes_disabled(self) -> None:
+        """An empty ``health_check:`` (null) normalizes to an explicit disabled override."""
+        normalized = ModelDefinitionDraft.from_file_payload({
+            "models": [
+                {"name": "m", "service": {"port": 8080, "health_check": None}},
+            ]
+        })
+        assert normalized.models is not None
+        service = normalized.models[0].service
+        assert service is not None
+        assert service.health_check is not None
+        assert service.health_check.enable is False
+
+    def test_file_normalization_empty_dict_health_check_becomes_disabled(self) -> None:
+        """An empty ``health_check: {}`` block carries no values; disable it like null."""
+        normalized = ModelDefinitionDraft.from_file_payload({
+            "models": [
+                {"name": "m", "service": {"port": 8080, "health_check": {}}},
+            ]
+        })
+        assert normalized.models is not None
+        service = normalized.models[0].service
+        assert service is not None
+        assert service.health_check is not None
+        assert service.health_check.enable is False
+
+    def test_file_normalization_empty_health_check_overrides_enabled_baseline(self) -> None:
+        """An empty ``health_check:`` overlay turns off an enabled baseline (higher priority wins)."""
+        baseline = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "name": "custom-model",
+                    "service": {"health_check": {"enable": True, "path": "/health"}},
+                }
+            ]
+        })
+        overlay = ModelDefinitionDraft.from_file_payload({
+            "models": [
+                {"name": "m", "model_path": "/m", "service": {"port": 8080, "health_check": None}},
+            ]
+        })
+        assert baseline.models is not None and overlay.models is not None
+        merged = _merge_config_draft(baseline.models[0], overlay.models[0])
+        service = merged.to_resolved().service
+        assert service is not None
+        assert service.health_check is not None
+        assert service.health_check.enable is False
 
     def test_merge_override_enables_from_request(self) -> None:
         """A disabled baseline is opted in when a higher-priority draft sets enable=True."""

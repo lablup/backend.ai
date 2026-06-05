@@ -660,31 +660,25 @@ class ModelDefinitionDraft(BaseConfigModel):
 
     @classmethod
     def from_file_payload(cls, payload: Mapping[str, Any]) -> ModelDefinitionDraft:
-        """Parse a model-definition file into a draft.
-
-        A declared ``health_check`` block implies opt-in, so ``enable`` is
-        defaulted to ``True`` when unset.
-        """
-        draft = cls.model_validate(dict(payload))
-        if not draft.models:
-            return draft
-        new_models: list[ModelConfigDraft] = []
-        changed = False
-        for model in draft.models:
-            service = model.service
-            if (
-                service is not None
-                and service.health_check is not None
-                and (service.health_check.enable is None)
-            ):
-                new_health_check = service.health_check.model_copy(update={"enable": True})
-                new_service = service.model_copy(update={"health_check": new_health_check})
-                model = model.model_copy(update={"service": new_service})
-                changed = True
-            new_models.append(model)
-        if not changed:
-            return draft
-        return draft.model_copy(update={"models": new_models})
+        """Parse a model-definition file into a draft, normalizing the ``health_check`` block."""
+        # Dump by field name so the keys below match regardless of snake/kebab input.
+        data = cls.model_validate(dict(payload)).model_dump(exclude_unset=True, by_alias=False)
+        for model in data.get("models") or []:
+            service = model.get("service")
+            if service is None:
+                continue
+            if "health_check" not in service:
+                continue
+            health_check = service["health_check"]
+            # An empty health_check (null or {}) is an explicit opt-out; disable it so it
+            # overrides any enabled baseline instead of inheriting one.
+            if not health_check:
+                service["health_check"] = {"enable": False}
+                continue
+            # A non-empty block opts in; default enable to True when unset.
+            if health_check.get("enable") is None:
+                health_check["enable"] = True
+        return cls.model_validate(data)
 
 
 def find_config_file(daemon_name: str) -> Path:
