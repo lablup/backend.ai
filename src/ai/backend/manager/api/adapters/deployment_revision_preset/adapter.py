@@ -135,6 +135,7 @@ def _pre_start_action_to_dto(action: PreStartAction) -> PreStartActionInfoDTO:
 
 def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoDTO:
     return ModelHealthCheckInfoDTO(
+        enable=check.enable,
         interval=check.interval,
         path=check.path,
         max_retries=check.max_retries,

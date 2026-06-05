@@ -12,6 +12,7 @@
               "start_command": ["vllm", "serve", "{model_path}"],
               "port": 8000,
               "health_check": {
+                "enable": true,
                 "path": "/health",
                 "interval": 10.0,
                 "max_retries": 10,
@@ -33,6 +34,7 @@
             "service": {
               "port": 8000,
               "health_check": {
+                "enable": true,
                 "path": "/v1/health/ready",
                 "interval": 10.0,
                 "max_retries": 10,
@@ -70,6 +72,7 @@
               "start_command": ["text-generation-launcher", "--model-id", "{model_path}"],
               "port": 3000,
               "health_check": {
+                "enable": true,
                 "path": "/info",
                 "interval": 10.0,
                 "max_retries": 10,
@@ -98,6 +101,7 @@
               ],
               "port": 9001,
               "health_check": {
+                "enable": true,
                 "path": "/health",
                 "interval": 10.0,
                 "max_retries": 10,
@@ -120,6 +124,7 @@
               "start_command": ["max", "serve", "--model", "{model_path}"],
               "port": 8000,
               "health_check": {
+                "enable": true,
                 "path": "/health",
                 "interval": 10.0,
                 "max_retries": 10,
@@ -135,7 +140,20 @@
       "description": "Custom (Default)",
       "reads_vfolder_config_files": true,
       "default_model_definition": {
-        "models": null
+        "models": [
+          {
+            "name": "custom-model",
+            "service": {
+              "health_check": {
+                "enable": false,
+                "path": "/health",
+                "interval": 10.0,
+                "max_retries": 10,
+                "initial_delay": 1800.0
+              }
+            }
+          }
+        ]
       }
     }
   ]
