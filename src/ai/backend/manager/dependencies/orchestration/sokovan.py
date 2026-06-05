@@ -140,6 +140,7 @@ class SokovanOrchestratorDependency(
             prometheus_client=setup_input.prometheus_client,
             prometheus_query_preset_repository=setup_input.prometheus_query_preset_repository,
             runtime_variant_repository=setup_input.runtime_variant_repository,
+            replica_group_repository=setup_input.replica_group_repository,
         )
 
         # Create route coordinator

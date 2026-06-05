@@ -291,6 +291,7 @@ def coordinator_with_pending_deployments(
         route_controller=mock_route_controller,
         prometheus_client=MagicMock(),
         prometheus_query_preset_repository=MagicMock(),
+        replica_group_repository=MagicMock(),
     )
     yield coordinator
 
@@ -325,6 +326,7 @@ def coordinator_without_deployments(
         route_controller=mock_route_controller,
         prometheus_client=MagicMock(),
         prometheus_query_preset_repository=MagicMock(),
+        replica_group_repository=MagicMock(),
     )
     yield coordinator
 

@@ -1,17 +1,14 @@
-"""Regression test for BA-5557.
+"""Tests for DeployingProvisioningHandler.
 
-A deployment created without a revision skips check_pending (which normally
-registers the appproxy endpoint).  When ActivateRevision later sets
-deploying_revision_id and transitions the deployment to DEPLOYING,
-execute() must register the endpoint before route provisioning begins.
+PROVISIONING no longer creates routes itself: the group scaling/rolling reconcile fills
+routes and steps counts. This handler only polls the target replica group's lifecycle and
+hands off to PROMOTING once it reaches STABLE.
 """
 
 from __future__ import annotations
 
-import dataclasses
 from datetime import datetime
-from typing import cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -28,90 +25,30 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkData,
     DeploymentOptions,
     DeploymentState,
-    ModelRevisionData,
     ReplicaData,
+    ReplicaGroupLifecycle,
 )
-from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.sokovan.deployment.handlers.deploying_provisioning import (
     DeployingProvisioningHandler,
 )
-from ai.backend.manager.sokovan.deployment.strategy.applier import StrategyApplyResult
-from ai.backend.manager.sokovan.deployment.strategy.types import StrategyEvaluationSummary
-from ai.backend.manager.sokovan.deployment.types import (
-    DeploymentExecutionError,
-    DeploymentExecutionResult,
-    DeploymentWithHistory,
-)
+from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
+from ai.backend.manager.views.replica_group import ReplicaGroupDeploySchedulingView
 
 
 class TestDeployingProvisioningHandler:
-    """Tests for DeployingProvisioningHandler."""
+    """Tests for DeployingProvisioningHandler (wait for the target group to reach STABLE)."""
 
     @pytest.fixture
-    def mock_deployment_repo(self) -> AsyncMock:
-        return AsyncMock()
+    def deploying_revision_id(self) -> DeploymentRevisionID:
+        return DeploymentRevisionID(uuid4())
 
     @pytest.fixture
-    def mock_deployment_executor(self) -> AsyncMock:
-        executor = AsyncMock()
-        executor.register_endpoints_bulk = AsyncMock(
-            side_effect=lambda entries: DeploymentExecutionResult(
-                successes=[dep for dep, _ in entries],
-            )
-        )
-        return executor
-
-    @pytest.fixture
-    def mock_evaluator(self) -> AsyncMock:
-        evaluator = AsyncMock()
-        evaluator.evaluate.return_value = StrategyEvaluationSummary()
-        return evaluator
-
-    @pytest.fixture
-    def mock_applier(self) -> AsyncMock:
-        applier = AsyncMock()
-        applier.apply.return_value = StrategyApplyResult()
-        return applier
-
-    @pytest.fixture
-    def handler(
-        self,
-        mock_deployment_executor: AsyncMock,
-        mock_deployment_repo: AsyncMock,
-        mock_evaluator: AsyncMock,
-        mock_applier: AsyncMock,
-    ) -> DeployingProvisioningHandler:
-        return DeployingProvisioningHandler(
-            deployment_controller=AsyncMock(),
-            route_controller=AsyncMock(),
-            evaluator=mock_evaluator,
-            applier=mock_applier,
-            deployment_executor=mock_deployment_executor,
-            deployment_repo=mock_deployment_repo,
-        )
-
-    @pytest.fixture
-    def proxy_target(self) -> ScalingGroupProxyTarget:
-        return ScalingGroupProxyTarget(
-            addr="http://proxy:8080",
-            api_token="test-token",
-        )
-
-    @pytest.fixture
-    def deployment_created_without_revision(self) -> DeploymentWithHistory:
-        """Deployment created without a revision, then ActivateRevision'd into DEPLOYING.
-
-        current_revision_id is None (no initial revision), deploying_revision_id is set
-        (ActivateRevision assigned it), and url is None (check_pending was skipped).
-        """
-        deploying_rev_id = DeploymentRevisionID(uuid4())
-        revision = MagicMock()
-        revision.id = deploying_rev_id
-
+    def deployment(self, deploying_revision_id: DeploymentRevisionID) -> DeploymentWithHistory:
         return DeploymentWithHistory(
             deployment_info=DeploymentInfo(
-                primary_replica_group_id=ReplicaGroupID(uuid4()),
                 id=DeploymentID(uuid4()),
+                primary_replica_group_id=ReplicaGroupID(uuid4()),
+                deploying_revision_id=deploying_revision_id,
                 metadata=DeploymentMetadata(
                     name="test-deployment",
                     domain="default",
@@ -127,102 +64,119 @@ class TestDeployingProvisioningHandler:
                     scaling_state=ScalingState.STABLE,
                     retry_count=0,
                 ),
-                replica=ReplicaData(
-                    replica_count=1,
-                    desired_replica_count=1,
-                ),
+                replica=ReplicaData(replica_count=1, desired_replica_count=1),
                 network=DeploymentNetworkData(
                     open_to_public=False,
                     access_token_ids=None,
-                    url=None,
+                    url="http://registered/v1",
                     preferred_domain_name=None,
                 ),
-                current_revision=None,
-                deploying_revision=cast(ModelRevisionData, revision),
                 sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
                 options=DeploymentOptions(),
             ),
             last_history=None,
         )
 
-    async def test_registers_endpoint_for_deployment_created_without_revision(
-        self,
-        handler: DeployingProvisioningHandler,
-        mock_deployment_executor: AsyncMock,
-        deployment_created_without_revision: DeploymentWithHistory,
-    ) -> None:
-        """BA-5557: execute() delegates appproxy registration for a deployment
-        that was created without a revision and later ActivateRevision'd."""
-        await handler.execute([deployment_created_without_revision])
+    @pytest.fixture
+    def mock_replica_group_repository(self) -> AsyncMock:
+        return AsyncMock()
 
-        mock_deployment_executor.register_endpoints_bulk.assert_awaited_once()
-        (call_args,) = mock_deployment_executor.register_endpoints_bulk.await_args.args
-        assert len(call_args) == 1
-        dep, revision_id = call_args[0]
-        info = deployment_created_without_revision.deployment_info
-        assert dep is deployment_created_without_revision
-        assert revision_id == info.deploying_revision.id  # type: ignore[union-attr]
-
-    async def test_deployment_already_with_url_is_not_reregistered(
-        self,
-        handler: DeployingProvisioningHandler,
-        mock_deployment_executor: AsyncMock,
-        deployment_created_without_revision: DeploymentWithHistory,
-    ) -> None:
-        """Already-registered deployments must not be re-registered."""
-        info = deployment_created_without_revision.deployment_info
-        info_with_url = dataclasses.replace(
-            info,
-            network=dataclasses.replace(info.network, url="http://already-registered/v1"),
-        )
-        deployment = DeploymentWithHistory(deployment_info=info_with_url, last_history=None)
-
-        await handler.execute([deployment])
-
-        mock_deployment_executor.register_endpoints_bulk.assert_not_awaited()
-
-    async def test_deployment_without_deploying_revision_is_filtered(
-        self,
-        handler: DeployingProvisioningHandler,
-        mock_deployment_executor: AsyncMock,
-        deployment_created_without_revision: DeploymentWithHistory,
-    ) -> None:
-        """Deployments with no deploying_revision_id must be filtered out."""
-        info = deployment_created_without_revision.deployment_info
-        info_no_rev = dataclasses.replace(info, deploying_revision=None)
-        deployment = DeploymentWithHistory(deployment_info=info_no_rev, last_history=None)
-
-        await handler.execute([deployment])
-
-        mock_deployment_executor.register_endpoints_bulk.assert_not_awaited()
-
-    async def test_failed_registration_is_excluded_from_route_provisioning(
-        self,
-        handler: DeployingProvisioningHandler,
-        mock_deployment_executor: AsyncMock,
-        mock_evaluator: AsyncMock,
-        deployment_created_without_revision: DeploymentWithHistory,
-    ) -> None:
-        """Failed registrations must not flow into this tick's route provisioning."""
-        dep_id = deployment_created_without_revision.deployment_info.id
-        mock_deployment_executor.register_endpoints_bulk.side_effect = None
-        mock_deployment_executor.register_endpoints_bulk.return_value = DeploymentExecutionResult(
-            failures=[
-                DeploymentExecutionError(
-                    deployment_info=deployment_created_without_revision,
-                    reason="boom",
-                    error_detail="Failed to register endpoint",
-                )
-            ],
+    @pytest.fixture
+    def handler(self, mock_replica_group_repository: AsyncMock) -> DeployingProvisioningHandler:
+        return DeployingProvisioningHandler(
+            deployment_controller=AsyncMock(),
+            replica_group_repository=mock_replica_group_repository,
         )
 
-        await handler.execute([deployment_created_without_revision])
+    @staticmethod
+    def _target_group(
+        deployment: DeploymentWithHistory,
+        lifecycle: ReplicaGroupLifecycle,
+    ) -> ReplicaGroupDeploySchedulingView:
+        info = deployment.deployment_info
+        assert info.primary_replica_group_id is not None
+        return ReplicaGroupDeploySchedulingView(
+            group_id=info.primary_replica_group_id,
+            deployment_id=info.id,
+            current_revision_id=None,
+            target_revision_id=info.deploying_revision_id,
+            lifecycle=lifecycle,
+            traffic_weight=100,
+        )
 
-        evaluated_infos = mock_evaluator.evaluate.await_args.args[0]
-        assert all(info.id != dep_id for info in evaluated_infos)
+    async def test_target_group_stable_succeeds(
+        self,
+        handler: DeployingProvisioningHandler,
+        mock_replica_group_repository: AsyncMock,
+        deployment: DeploymentWithHistory,
+    ) -> None:
+        mock_replica_group_repository.search_deploy_scheduling_views.return_value = [
+            self._target_group(deployment, ReplicaGroupLifecycle.STABLE)
+        ]
+
+        result = await handler.execute([deployment])
+
+        assert [d.deployment_info.id for d in result.successes] == [deployment.deployment_info.id]
+        assert not result.skipped
+        assert not result.failures
+
+    async def test_target_group_rolling_is_skipped(
+        self,
+        handler: DeployingProvisioningHandler,
+        mock_replica_group_repository: AsyncMock,
+        deployment: DeploymentWithHistory,
+    ) -> None:
+        mock_replica_group_repository.search_deploy_scheduling_views.return_value = [
+            self._target_group(deployment, ReplicaGroupLifecycle.ROLLING)
+        ]
+
+        result = await handler.execute([deployment])
+
+        assert [d.deployment_info.id for d in result.skipped] == [deployment.deployment_info.id]
+        assert not result.successes
+        assert not result.failures
+
+    async def test_target_group_failed_is_failure(
+        self,
+        handler: DeployingProvisioningHandler,
+        mock_replica_group_repository: AsyncMock,
+        deployment: DeploymentWithHistory,
+    ) -> None:
+        mock_replica_group_repository.search_deploy_scheduling_views.return_value = [
+            self._target_group(deployment, ReplicaGroupLifecycle.FAILED)
+        ]
+
+        result = await handler.execute([deployment])
+
+        assert [e.deployment_info.deployment_info.id for e in result.failures] == [
+            deployment.deployment_info.id
+        ]
+        assert not result.successes
+        assert not result.skipped
+
+    async def test_missing_target_group_is_skipped(
+        self,
+        handler: DeployingProvisioningHandler,
+        mock_replica_group_repository: AsyncMock,
+        deployment: DeploymentWithHistory,
+    ) -> None:
+        # INITIALIZING has not stamped the target revision on a group yet.
+        mock_replica_group_repository.search_deploy_scheduling_views.return_value = []
+
+        result = await handler.execute([deployment])
+
+        assert [d.deployment_info.id for d in result.skipped] == [deployment.deployment_info.id]
+        assert not result.successes
+        assert not result.failures
+
+    def test_success_transition_targets_promoting(self) -> None:
+        transitions = DeployingProvisioningHandler.status_transitions()
+
+        assert transitions.success is not None
+        assert transitions.success.lifecycle == EndpointLifecycle.DEPLOYING
+        assert transitions.success.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROMOTING
 
     def test_give_up_transition_targets_rolling_back(self) -> None:
-        """Retry-exhausted deployments must transition to ROLLING_BACK."""
         transitions = DeployingProvisioningHandler.status_transitions()
 
         assert transitions.give_up is not None

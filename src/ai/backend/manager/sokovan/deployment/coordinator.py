@@ -15,7 +15,6 @@ from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.notification import NotificationRuleType
 from ai.backend.common.data.notification.messages import EndpointLifecycleChangedMessage
 from ai.backend.common.events.dispatcher import EventProducer
@@ -38,7 +37,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentTargetStatuses,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
@@ -51,6 +49,7 @@ from ai.backend.manager.repositories.deployment.creators import (
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
+from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
@@ -73,11 +72,6 @@ from .handlers import (
     ReconcileDeploymentHandler,
     ScalingDeploymentHandler,
 )
-from .strategy.applier import StrategyResultApplier
-from .strategy.blue_green import BlueGreenStrategy
-from .strategy.evaluator import DeploymentStrategyEvaluator
-from .strategy.rolling_update import RollingUpdateStrategy
-from .strategy.types import DeploymentStrategyRegistry
 from .types import (
     DeploymentExecutionError,
     DeploymentExecutionResult,
@@ -256,6 +250,7 @@ class DeploymentCoordinator:
         prometheus_client: PrometheusClient,
         prometheus_query_preset_repository: PrometheusQueryPresetRepository,
         runtime_variant_repository: RuntimeVariantRepository,
+        replica_group_repository: ReplicaGroupRepository,
     ) -> None:
         """Initialize the deployment coordinator."""
         self._valkey_schedule = valkey_schedule
@@ -265,6 +260,7 @@ class DeploymentCoordinator:
         self._lock_factory = lock_factory
         self._config_provider = config_provider
         self._route_controller = route_controller
+        self._replica_group_repository = replica_group_repository
 
         # Create deployment executor
         executor = DeploymentExecutor(
@@ -278,19 +274,7 @@ class DeploymentCoordinator:
             runtime_variant_repo=runtime_variant_repository,
         )
 
-        # Create strategy components for deploying handlers
-        strategy_registry = DeploymentStrategyRegistry()
-        strategy_registry.register(
-            DeploymentStrategy.ROLLING, RollingUpdateStrategy, RollingUpdateSpec
-        )
-        strategy_registry.register(DeploymentStrategy.BLUE_GREEN, BlueGreenStrategy, BlueGreenSpec)
-        evaluator = DeploymentStrategyEvaluator(
-            deployment_repo=self._deployment_repository,
-            strategy_registry=strategy_registry,
-        )
-        applier = StrategyResultApplier(deployment_repo=self._deployment_repository)
-
-        self._registry = self._init_handlers(executor, evaluator, applier)
+        self._registry = self._init_handlers(executor)
 
     def registered_handlers(self) -> tuple[DeploymentHandler, ...]:
         """Return the live set of handler instances registered on this coordinator.
@@ -305,8 +289,6 @@ class DeploymentCoordinator:
     def _init_handlers(
         self,
         executor: DeploymentExecutor,
-        evaluator: DeploymentStrategyEvaluator,
-        applier: StrategyResultApplier,
     ) -> HandlerRegistry:
         """Initialize the flat handler registry.
 
@@ -351,11 +333,7 @@ class DeploymentCoordinator:
                 ),
                 DeployingProvisioningHandler(
                     deployment_controller=self._deployment_controller,
-                    route_controller=self._route_controller,
-                    evaluator=evaluator,
-                    applier=applier,
-                    deployment_executor=executor,
-                    deployment_repo=self._deployment_repository,
+                    replica_group_repository=self._replica_group_repository,
                 ),
             ),
             (

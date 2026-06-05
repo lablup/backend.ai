@@ -514,6 +514,43 @@ class ReplicaGroupRolloutSpec(ConfiguredModel):
         return math.ceil(result) if round_up else math.floor(result)
 
 
+@dataclass(frozen=True)
+class RolloutTargetInput:
+    """Resolved group ids the strategy picks the rollout target from (primary for rolling;
+    an existing group carrying the deploying revision, or None to create, for bg/canary)."""
+
+    primary_replica_group_id: ReplicaGroupID | None
+    existing_target_replica_group_id: ReplicaGroupID | None
+
+
+@dataclass(frozen=True)
+class TargetGroupSpec:
+    """The group the deploying revision rolls out into; ``replica_group_id`` None means create."""
+
+    replica_group_id: ReplicaGroupID | None
+    traffic_weight: int
+    rollout: ReplicaGroupRolloutSpec
+
+
+@dataclass(frozen=True)
+class TrafficStepInput:
+    """Current traffic split + timing for one PROMOTING tick (step is relative to current)."""
+
+    target_traffic_weight: int
+    serving_traffic_weight: int
+    last_changed_at: datetime
+    now: datetime
+
+
+@dataclass(frozen=True)
+class TrafficStep:
+    """The next traffic split (target/serving) and whether promotion is complete."""
+
+    target_traffic_weight: int
+    serving_traffic_weight: int
+    completed: bool
+
+
 class ResourceSpec(ConfiguredModel):
     cluster_mode: ClusterMode
     cluster_size: int
