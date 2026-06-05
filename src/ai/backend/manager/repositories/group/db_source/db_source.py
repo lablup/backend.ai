@@ -29,6 +29,7 @@ from ai.backend.manager.data.group.types import (
     UnassignUserFailure,
     UnassignUsersResult,
 )
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
@@ -222,11 +223,9 @@ class GroupDBSource:
         """Add users to a project within an existing session.
 
         Creates the RBAC scope binding (association_scopes_entities) via
-        ``RBACScopeBinder`` and a user-role mapping to the project's member
-        role. Admin roles are intentionally NOT granted here; the modifyGroup
-        add path represents "make this user a project member", not "make this
-        user a project admin". Already-assigned users are filtered out to
-        avoid unique-constraint conflicts.
+        ``RBACScopeBinder`` and maps each new user to every active
+        ``auto_assign`` role bound to the project scope. Already-assigned
+        users are filtered out to avoid unique-constraint conflicts.
         """
         project_domain_subq = (
             sa.select(GroupRow.domain_name).where(GroupRow.id == project_id).scalar_subquery()
@@ -264,38 +263,11 @@ class GroupDBSource:
         ]
         await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=pairs))
 
-        # Locate the project's member role. Two naming conventions coexist:
-        # the runtime name `project-{id8}-member` used by GroupDBSource.create
-        # since BA-5746, and the legacy name `role_project_{id8}_member`
-        # created by alembic migration 430b1631804d for pre-existing projects.
-        runtime_member_name = f"project-{str(project_id)[:8]}-member"
-        legacy_member_name = f"role_project_{str(project_id)[:8]}_member"
-        member_role_id = await session.scalar(
-            sa.select(RoleRow.id)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.cast(AssociationScopesEntitiesRow.entity_id, sa.String)
-                == sa.cast(RoleRow.id, sa.String),
-            )
-            .where(
-                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                AssociationScopesEntitiesRow.scope_id == str(project_id),
-                AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
-                RoleRow.name.in_([runtime_member_name, legacy_member_name]),
-            )
+        await self._role_manager.assign_auto_assign_roles(
+            session,
+            [row.uuid for row in new_user_rows],
+            ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(project_id)),
         )
-        if member_role_id is None:
-            log.warning(
-                "project {} has no member role bound at its scope; "
-                "skipping user-role mapping for modifyGroup add",
-                project_id,
-            )
-            return
-
-        user_role_specs = [
-            UserRoleCreatorSpec(user_id=row.uuid, role_id=member_role_id) for row in new_user_rows
-        ]
-        await execute_bulk_creator(session, BulkCreator(specs=user_role_specs))
 
     async def _remove_users_from_project_in_session(
         self,

@@ -263,6 +263,10 @@ class TestUserRepository:
         """Create a test group with both admin and member roles bound at
         project scope, matching the runtime state produced by
         ``GroupDBSource.create()`` after BA-5746.
+
+        The member role is flagged ``auto_assign=True`` so that joining users
+        are granted it, while the admin role keeps ``auto_assign=False`` so it
+        is never granted on join.
         """
         group_id = uuid.uuid4()
         admin_role_id = uuid.uuid4()
@@ -282,7 +286,13 @@ class TestUserRepository:
             )
             session.add(group)
             session.add(RoleRow(id=admin_role_id, name=f"project-{str(group_id)[:8]}-admin"))
-            session.add(RoleRow(id=member_role_id, name=f"project-{str(group_id)[:8]}-member"))
+            session.add(
+                RoleRow(
+                    id=member_role_id,
+                    name=f"project-{str(group_id)[:8]}-member",
+                    auto_assign=True,
+                )
+            )
             session.add(
                 AssociationScopesEntitiesRow(
                     scope_type=ScopeType.PROJECT,
