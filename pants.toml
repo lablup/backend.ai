@@ -74,8 +74,8 @@ enable_resolves = true
 #   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.13.7"]
+resolver = "uv"
 tailor_pex_binary_targets = false
-pip_version = "25.3"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
