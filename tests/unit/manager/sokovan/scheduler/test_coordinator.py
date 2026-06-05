@@ -1109,11 +1109,12 @@ class TestScheduleCoordinatorPostProcessors:
 
 
 class TestScheduleCoordinatorPromotionRecordOrdering:
-    """Promotion records must be built AFTER hooks run (BA-6273).
+    """Promotion records must be built AFTER hooks run (BA-6282).
 
-    Transition hooks (e.g. TerminatedTransitionHook) record sub-steps into the
-    scope's pool while executing. If the coordinator builds records before the
-    hooks run, those sub-steps are lost from the persisted scheduling history.
+    Transition hooks (e.g. RunningTransitionHook triggering batch execution)
+    record sub-steps into the scope's pool while executing. If the coordinator
+    builds records before the hooks run, those sub-steps are lost from the
+    persisted scheduling history.
     """
 
     @pytest.fixture
@@ -1133,9 +1134,9 @@ class TestScheduleCoordinatorPromotionRecordOrdering:
     @pytest.fixture
     def promotion_spec(self) -> MagicMock:
         spec = MagicMock()
-        spec.success_status = SessionStatus.TERMINATED
-        spec.name = "terminating"
-        spec.reason = "self-terminated"
+        spec.success_status = SessionStatus.RUNNING
+        spec.name = "promote-to-running"
+        spec.reason = "started"
         return spec
 
     async def test_hook_recorded_substep_reaches_apply_transition(
@@ -1144,12 +1145,12 @@ class TestScheduleCoordinatorPromotionRecordOrdering:
         promotion_spec: MagicMock,
         session_id: SessionId,
     ) -> None:
-        # Arrange: hooks record terminate_cleanup into the pool while running,
+        # Arrange: hooks record finalize_start into the pool while running,
         # then report the session as passed (collaborator is mocked, not re-run).
         async def run_hooks(sessions: list[Any], _status: SessionStatus) -> HookExecutionResult:
             recorder = SessionRecorderContext.current_pool().recorder(session_id)
-            with recorder.phase("terminate_cleanup"):
-                with recorder.step("destroy_network"):
+            with recorder.phase("finalize_start"):
+                with recorder.step("trigger_batch_execution"):
                     pass
             return HookExecutionResult(successful_sessions=sessions, full_session_data=[])
 
@@ -1169,6 +1170,6 @@ class TestScheduleCoordinatorPromotionRecordOrdering:
         # Assert: records passed to _apply_transition include the sub-step recorded
         # during hook execution, proving the build happened after hooks ran.
         records = mock_coordinator._apply_transition.await_args.args[4]
-        (cleanup,) = records[session_id].phases
-        assert cleanup.name == "terminate_cleanup"
-        assert [step.name for step in cleanup.steps] == ["destroy_network"]
+        (finalize,) = records[session_id].phases
+        assert finalize.name == "finalize_start"
+        assert [step.name for step in finalize.steps] == ["trigger_batch_execution"]
