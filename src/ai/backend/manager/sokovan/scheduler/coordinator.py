@@ -55,6 +55,7 @@ from ai.backend.manager.sokovan.data import (
     PromotionSpec,
     SessionWithKernels,
 )
+from ai.backend.manager.sokovan.recorder.pool import RecordPool
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
@@ -844,11 +845,8 @@ class ScheduleCoordinator:
                             )
                         )
 
-            # Get recorded steps for history
-            all_records = pool.build_all_records()
-
             # Phase 2: Apply status transitions (includes hook execution)
-            await self._handle_promotion_status_transitions(spec, result, all_records)
+            await self._handle_promotion_status_transitions(spec, result, pool)
 
             # Emit metrics per scaling group
             self._operation_metrics.observe_success(
@@ -869,6 +867,7 @@ class ScheduleCoordinator:
                     )
 
             # Log recorded steps for this scaling group
+            all_records = pool.get_all_records()
             if all_records:
                 log.debug(
                     "Recorded {} sessions with execution records for {} in scaling group {}",
@@ -881,7 +880,7 @@ class ScheduleCoordinator:
         self,
         spec: PromotionSpec,
         result: SessionExecutionResult,
-        records: Mapping[SessionId, ExecutionRecord],
+        pool: RecordPool[SessionId],
     ) -> None:
         """Apply status transitions for promotion spec results.
 
@@ -900,7 +899,7 @@ class ScheduleCoordinator:
         Args:
             spec: The promotion spec that defines the transition
             result: Execution result containing successes
-            records: Mapping of session IDs to their execution records for sub_steps
+            pool: Recorder pool for the scope; records are built after hooks run
         """
         if not result.successes:
             return
@@ -919,6 +918,10 @@ class ScheduleCoordinator:
                 to_status,
             )
             sessions_to_transition = hook_result.successful_sessions
+
+        # Build records only after hooks have run so hook-recorded sub-steps
+        # (e.g. terminate_cleanup) are captured in the persisted history.
+        records = pool.build_all_records()
 
         # Apply status transition for sessions that passed hooks
         if sessions_to_transition:
