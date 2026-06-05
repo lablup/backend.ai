@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.plugin.monitor import ErrorPluginContext
-from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 
@@ -29,6 +29,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.agent import agents
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -161,12 +162,38 @@ def server_module_registries(
 
 
 @pytest.fixture()
+async def agent_fixture(
+    db_engine: SAEngine,
+    scaling_group_fixture: str,
+) -> AsyncIterator[AgentId]:
+    """Insert a test agent record and yield its ID."""
+    agent_id = AgentId(f"i-test-agent-{secrets.token_hex(4)}")
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(agents).values(
+                id=agent_id,
+                region="local",
+                scaling_group=scaling_group_fixture,
+                available_slots=ResourceSlot(),
+                occupied_slots=ResourceSlot(),
+                addr="127.0.0.1:6001",
+                version="test",
+                architecture="x86_64",
+            )
+        )
+    yield agent_id
+    async with db_engine.begin() as conn:
+        await conn.execute(sa.delete(agents).where(agents.c.id == agent_id))
+
+
+@pytest.fixture()
 async def session_seed(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
+    agent_fixture: AgentId,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session + kernel directly in the database.
 
@@ -225,6 +252,7 @@ async def session_seed(
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
                 scaling_group=scaling_group_fixture,
+                agent=agent_fixture,
                 status=KernelStatus.RUNNING,
                 status_info="",
                 occupied_slots=ResourceSlot(),
