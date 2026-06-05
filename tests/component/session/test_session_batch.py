@@ -34,7 +34,6 @@ class TestSessionExecute:
         session_seed: SessionSeedData,
         agent_registry: AsyncMock,
     ) -> None:
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.execute.return_value = {
             "status": "finished",
             "runId": "test-run-id",
@@ -114,7 +113,6 @@ class TestSessionGetLogs:
         agent_registry: AsyncMock,
     ) -> None:
         """Running session fetches logs from agent."""
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.get_logs_from_agent.return_value = "live container log output\n"
 
         result = await admin_registry.session.get_container_logs(
@@ -177,7 +175,6 @@ class TestSessionStartService:
         appproxy_client_pool.load_client.return_value = mock_client
 
         # Mock agent start_service
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.start_service.return_value = {"status": "started"}
 
         # Mock the HTTP POST to wsproxy /v2/conf

@@ -112,9 +112,7 @@ def mock_session_repository() -> MagicMock:
 
 @pytest.fixture
 def mock_agent_registry() -> MagicMock:
-    mock = MagicMock()
-    mock.increment_session_usage = AsyncMock()
-    return mock
+    return MagicMock()
 
 
 @pytest.fixture

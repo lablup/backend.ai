@@ -69,7 +69,6 @@ class TestSessionExecuteQuery:
         agent_registry: AsyncMock,
     ) -> None:
         """S-1: mode='query', code, run_id → ExecuteResponse with result keys."""
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.execute.return_value = {
             "status": "finished",
             "runId": "abc",
@@ -97,7 +96,6 @@ class TestSessionExecuteQuery:
         agent_registry: AsyncMock,
     ) -> None:
         """S-2: run_id=None in v2 mode with non-continue mode — execute still called."""
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.execute.return_value = {
             "status": "finished",
             "runId": None,
@@ -122,7 +120,6 @@ class TestSessionExecuteQuery:
         agent_registry: AsyncMock,
     ) -> None:
         """S-7: code=None → agent called with code='' (empty string)."""
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.execute.return_value = {
             "status": "finished",
             "runId": "abc",
@@ -158,7 +155,6 @@ class TestSessionExecuteModes:
         agent_registry: AsyncMock,
     ) -> None:
         """S-3: mode='batch' → agent_registry.execute called with mode='batch'."""
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.execute.return_value = {
             "status": "finished",
             "runId": "batch-run-1",
@@ -185,7 +181,6 @@ class TestSessionExecuteModes:
         agent_registry: AsyncMock,
     ) -> None:
         """S-6: mode='complete' → get_completions called instead of execute."""
-        agent_registry.increment_session_usage.return_value = None
         mock_completion = MagicMock()
         mock_completion.as_dict.return_value = {"completions": ["os.path", "os.getcwd"]}
         agent_registry.get_completions.return_value = mock_completion
@@ -271,7 +266,6 @@ class TestSessionInterrupt:
         agent_registry: AsyncMock,
     ) -> None:
         """S-8: Interrupt running session → success, agent_registry.interrupt_session called."""
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.interrupt_session.return_value = None
 
         await admin_registry.session.interrupt(session_seed.session_name)
@@ -302,7 +296,6 @@ class TestSessionComplete:
         agent_registry: AsyncMock,
     ) -> None:
         """S-9: code='impo' → CompleteResponse, agent_registry.get_completions called."""
-        agent_registry.increment_session_usage.return_value = None
         mock_completion = MagicMock()
         mock_completion.as_dict.return_value = {"completions": ["import os", "import sys"]}
         agent_registry.get_completions.return_value = mock_completion
@@ -368,7 +361,6 @@ class TestSessionStartService:
         mock_client.fetch_status.return_value = mock_status
         appproxy_client_pool.load_client.return_value = mock_client
 
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.start_service.return_value = {"status": "started"}
 
         mock_session_cls = _make_wsproxy_mock(token="test-token-xyz")
@@ -429,7 +421,6 @@ class TestSessionStartService:
         mock_client.fetch_status.return_value = mock_status
         appproxy_client_pool.load_client.return_value = mock_client
 
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.start_service.return_value = {"status": "started"}
 
         mock_session_cls = _make_wsproxy_mock(token="port-test-token")
@@ -478,7 +469,6 @@ class TestSessionStartService:
         mock_client.fetch_status.return_value = mock_status
         appproxy_client_pool.load_client.return_value = mock_client
 
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.start_service.return_value = {"status": "started"}
 
         mock_session_cls = _make_wsproxy_mock(token="args-test-token")
@@ -497,8 +487,8 @@ class TestSessionStartService:
 
         assert isinstance(result, StartServiceResponse)
         call_args = agent_registry.start_service.call_args
-        # positional args: (session, service, opts)
-        opts = call_args[0][2]
+        # positional args: (main_kernel_id, agent_id, service, opts)
+        opts = call_args[0][3]
         assert "arguments" in opts
         assert "envs" in opts
 
@@ -535,7 +525,6 @@ class TestSessionStartService:
         mock_client.fetch_status.return_value = mock_status
         appproxy_client_pool.load_client.return_value = mock_client
 
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.start_service.return_value = {"status": "started"}
 
         mock_resp = AsyncMock()
@@ -596,7 +585,6 @@ class TestSessionStartService:
         mock_client.fetch_status.return_value = mock_status
         appproxy_client_pool.load_client.return_value = mock_client
 
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.start_service.return_value = {"status": "started"}
 
         mock_session_cls = _make_wsproxy_mock(token="fallback-test-token")
@@ -821,7 +809,6 @@ class TestSessionStartServiceFailures:
         mock_client.fetch_status.return_value = mock_status
         appproxy_client_pool.load_client.return_value = mock_client
 
-        agent_registry.increment_session_usage.return_value = None
         agent_registry.start_service.return_value = {
             "status": "failed",
             "error": "service launch failed",
