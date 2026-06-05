@@ -27,7 +27,6 @@ from ai.backend.manager.api.rest.session.handler import SessionHandler
 from ai.backend.manager.api.rest.session.registry import register_session_routes
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -207,7 +206,6 @@ async def session_seed(
     session_id = SessionId(uuid.uuid4())
     session_name = f"test-session-{unique}"
     kernel_id = uuid.uuid4()
-    agent_id = f"i-test-agent-{unique}"
     now = datetime.now(tzutc())
 
     status_history: dict[str, Any] = {
@@ -216,24 +214,6 @@ async def session_seed(
     }
 
     async with db_engine.begin() as conn:
-        # A RUNNING session has its main kernel allocated to an agent; start_service
-        # (and other agent-bound operations) require it.
-        await conn.execute(
-            sa.insert(AgentRow.__table__).values(
-                id=agent_id,
-                status=AgentStatus.ALIVE,
-                region="local",
-                scaling_group=scaling_group_fixture,
-                schedulable=True,
-                available_slots=ResourceSlot({"cpu": "4", "mem": "8589934592"}),
-                occupied_slots=ResourceSlot(),
-                addr="tcp://127.0.0.1:6011",
-                version="24.12.0",
-                architecture="x86_64",
-                compute_plugins={},
-                auto_terminate_abusing_kernel=False,
-            )
-        )
         await conn.execute(
             sa.insert(SessionRow.__table__).values(
                 id=session_id,
@@ -299,7 +279,6 @@ async def session_seed(
         await conn.execute(
             SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
         )
-        await conn.execute(AgentRow.__table__.delete().where(AgentRow.__table__.c.id == agent_id))
 
 
 @pytest.fixture()
