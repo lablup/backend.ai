@@ -487,8 +487,8 @@ class TestSessionStartService:
 
         assert isinstance(result, StartServiceResponse)
         call_args = agent_registry.start_service.call_args
-        # positional args: (session, service, opts)
-        opts = call_args[0][2]
+        # positional args: (main_kernel_id, agent_id, service, opts)
+        opts = call_args[0][3]
         assert "arguments" in opts
         assert "envs" in opts
 
