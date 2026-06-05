@@ -25,7 +25,11 @@ def upgrade() -> None:
         sa.Column("replica_id", GUID(), nullable=True),
     )
     # Backfill from the inverse link (routings.session -> sessions.id). A session
-    # serves at most one replica; pick the earliest route deterministically.
+    # serves at most one replica; pick the earliest *live* route deterministically.
+    # Only active routes (RouteStatus PROVISIONING / RUNNING) count — a session
+    # whose routes have all terminated/failed is no longer serving a replica, so
+    # it stays NULL rather than pointing at a dead binding. Status is stored as the
+    # enum value (StrEnumType, use_name=False), hence the lowercase literals.
     # Idempotent: only fills rows still NULL.
     op.execute(
         sa.text(
@@ -35,12 +39,15 @@ def upgrade() -> None:
                 SELECT routings.id
                 FROM routings
                 WHERE routings.session = sessions.id
+                  AND routings.status IN ('provisioning', 'running')
                 ORDER BY routings.created_at ASC, routings.id ASC
                 LIMIT 1
             )
             WHERE sessions.replica_id IS NULL
               AND EXISTS (
-                SELECT 1 FROM routings WHERE routings.session = sessions.id
+                SELECT 1 FROM routings
+                WHERE routings.session = sessions.id
+                  AND routings.status IN ('provisioning', 'running')
               )
             """
         )
