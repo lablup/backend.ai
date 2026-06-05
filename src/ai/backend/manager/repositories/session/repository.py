@@ -61,16 +61,20 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def resolve_session_id(
         self,
-        session_name: str,
+        session_name_or_id: str,
         user_id: uuid.UUID,
     ) -> SessionId:
-        """Resolve a live session to its ``session_id`` by ``(session_name, user_id)``.
+        """Infer a session id from ``(session_name_or_id, user_id)`` for legacy callers.
 
-        The ``user_id`` scope covers sessions created with any of the user's keypair
-        access keys. Raises ``SessionNotFound`` when unresolved and
-        ``TooManySessionsMatched`` when more than one live session shares the name.
+        The goal is to derive a usable session id when only a name is known, not to return
+        a validated one — ownership and state checks are the caller's job. A UUID-shaped
+        input is already an id and is returned as-is; otherwise the live session owned by
+        the user with that name is looked up. DO NOT USE FOR NEW DEVELOPMENT.
+
+        Raises ``SessionNotFound`` when a name resolves to no live session and
+        ``TooManySessionsMatched`` when more than one shares the name.
         """
-        return await self._db_source.resolve_session_id(session_name, user_id)
+        return await self._db_source.resolve_session_id(session_name_or_id, user_id)
 
     @session_repository_resilience.apply()
     async def get_session_validated(

@@ -292,6 +292,7 @@ class SessionService:
 
     async def resolve_session(self, action: ResolveSessionAction) -> ResolveSessionActionResult:
         """Resolve a live session to its ``session_id`` by ``(session_name, user_id)``.
+        DO NOT USE THIS FOR NEW DEVELOPMENT. This is only for backward compatibility with existing resolvers.
 
         Callers go through this resolver before invoking any other session operation, so
         that downstream lookups can rely solely on ``session_id``. The ``user_id`` scope
