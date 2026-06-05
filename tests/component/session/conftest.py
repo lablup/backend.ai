@@ -29,7 +29,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.agent import agents
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -170,7 +170,7 @@ async def agent_fixture(
     agent_id = AgentId(f"i-test-agent-{secrets.token_hex(4)}")
     async with db_engine.begin() as conn:
         await conn.execute(
-            sa.insert(agents).values(
+            sa.insert(AgentRow).values(
                 id=agent_id,
                 region="local",
                 scaling_group=scaling_group_fixture,
@@ -183,7 +183,7 @@ async def agent_fixture(
         )
     yield agent_id
     async with db_engine.begin() as conn:
-        await conn.execute(sa.delete(agents).where(agents.c.id == agent_id))
+        await conn.execute(sa.delete(AgentRow).where(AgentRow.id == agent_id))
 
 
 @pytest.fixture()
