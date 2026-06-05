@@ -3,7 +3,6 @@ from .schema import (
     BlueGreenSpec,
     CanarySpec,
     DeploymentStrategySchema,
-    DeploymentStrategySpec,
     RollingUpdateSpec,
 )
 
@@ -12,6 +11,5 @@ __all__ = (
     "CanarySpec",
     "DeploymentPolicyRow",
     "DeploymentStrategySchema",
-    "DeploymentStrategySpec",
     "RollingUpdateSpec",
 )

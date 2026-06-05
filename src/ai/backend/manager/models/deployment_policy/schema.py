@@ -24,7 +24,6 @@ __all__ = (
     "BlueGreenSpec",
     "CanarySpec",
     "DeploymentStrategySchema",
-    "DeploymentStrategySpec",
     "RollingUpdateSpec",
 )
 
@@ -189,6 +188,3 @@ class CanarySpec(DeploymentStrategySchema):
             serving_traffic_weight=100 - next_target,
             completed=next_target >= 100,
         )
-
-
-DeploymentStrategySpec = RollingUpdateSpec | BlueGreenSpec
