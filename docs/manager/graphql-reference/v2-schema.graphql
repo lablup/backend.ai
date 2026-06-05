@@ -1771,7 +1771,7 @@ Added in 25.16.0. Input for creating an access token for a model deployment.
 """
 input CreateAccessTokenInput {
   """The ID of the model deployment for which the access token is created."""
-  modelDeploymentId: ID!
+  deploymentId: ID!
 
   """The expiration timestamp of the access token."""
   expiresAt: DateTime

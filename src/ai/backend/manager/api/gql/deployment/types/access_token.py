@@ -118,7 +118,7 @@ class AccessTokenConnection(Connection[AccessToken]):
     ),
 )
 class CreateAccessTokenInput(PydanticInputMixin[CreateAccessTokenInputDTO]):
-    model_deployment_id: ID = gql_field(
+    deployment_id: ID = gql_field(
         description="The ID of the model deployment for which the access token is created."
     )
     expires_at: datetime | None = gql_field(
