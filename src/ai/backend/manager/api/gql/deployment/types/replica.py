@@ -191,9 +191,14 @@ class ReplicaOrderBy(PydanticInputMixin[ReplicaOrderDTO]):
 )
 class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     id: NodeID[str]
-    deployment_id: ID
     session_id: ID | None
     revision_id: ID
+    deployment_id: ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="ID of the model deployment this replica belongs to.",
+        )
+    )
     readiness_status: ReadinessStatus = gql_field(
         description="Whether the replica has been checked and its health state."
     )

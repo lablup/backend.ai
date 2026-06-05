@@ -9884,9 +9884,13 @@ type ModelReplica implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
-  deploymentId: ID!
   sessionId: ID
   revisionId: ID!
+
+  """
+  Added in UNRELEASED. ID of the model deployment this replica belongs to.
+  """
+  deploymentId: ID!
 
   """Whether the replica has been checked and its health state."""
   readinessStatus: ReadinessStatus!
