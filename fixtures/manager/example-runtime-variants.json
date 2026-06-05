@@ -131,6 +131,33 @@
       }
     },
     {
+      "name": "llama-cpp",
+      "description": "llama.cpp",
+      "reads_vfolder_config_files": false,
+      "default_model_definition": {
+        "models": [
+          {
+            "name": "llamacpp-model",
+            "service": {
+              "start_command": [
+                "sh",
+                "-c",
+                "llama-server -m \"$(ls /models/*.gguf | head -n1)\" \"$@\"",
+                "llama-cpp"
+              ],
+              "port": 8080,
+              "health_check": {
+                "path": "/health",
+                "interval": 10.0,
+                "max_retries": 30,
+                "initial_delay": 60.0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "custom",
       "description": "Custom (Default)",
       "reads_vfolder_config_files": true,
