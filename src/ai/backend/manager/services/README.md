@@ -31,10 +31,9 @@ Services implement 6 standard operations:
 5. **delete** - Delete entity
 6. **purge** - Permanently remove entity
 
-**Batch operations:**
-- `batch_update` - Update multiple entities
-- `batch_delete` - Delete multiple entities
-- `batch_purge` - Permanently remove multiple entities
+**Multi-target operations** — two semantics:
+- **Batch** (`batch_*`): many rows in one SQL statement, **atomic** (all-or-nothing); returns only the affected-row count. e.g. `batch_update`, `batch_delete`, `batch_purge`.
+- **Bulk** (`bulk_*`): rows processed individually, **partial failures allowed** (returns successes + errors). e.g. `bulk_create`, `bulk_upsert`.
 
 **Method naming (no prefix):**
 ```python
