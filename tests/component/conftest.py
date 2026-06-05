@@ -116,6 +116,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -1271,6 +1272,7 @@ def auth_processors(
         user_resource_policy_repository=user_resource_policy_repository,
         user_repository=user_repository,
         group_repository=group_repository,
+        ssh_key_validator=SSHKeyValidator(),
     )
     return AuthProcessors(
         service=service,
