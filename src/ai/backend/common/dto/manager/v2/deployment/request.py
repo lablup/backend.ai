@@ -782,7 +782,7 @@ class SearchDeploymentPoliciesInput(BaseRequestModel):
 class CreateAccessTokenInput(BaseRequestModel):
     """Input for creating an access token."""
 
-    deployment_id: UUID = Field(description="Deployment ID")
+    model_deployment_id: UUID = Field(description="Model deployment ID")
     expires_at: datetime | None = Field(default=None, description="Token expiration timestamp")
 
 
