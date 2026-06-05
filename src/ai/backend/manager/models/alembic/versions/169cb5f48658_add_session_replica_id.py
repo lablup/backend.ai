@@ -30,25 +30,25 @@ def upgrade() -> None:
     # whose routes have all terminated/failed is no longer serving a replica, so
     # it stays NULL rather than pointing at a dead binding. Status is stored as the
     # enum value (StrEnumType, use_name=False), hence the lowercase literals.
-    # Idempotent: only fills rows still NULL.
+    #
+    # Single pass: DISTINCT ON picks one live route per session (earliest by
+    # created_at then id) in one scan + sort, then joins to sessions — cheaper
+    # than a per-row correlated subquery. The column was just added (all NULL),
+    # so the join sets each matched row exactly once; no overwrite guard needed.
     op.execute(
         sa.text(
             """
             UPDATE sessions
-            SET replica_id = (
-                SELECT routings.id
+            SET replica_id = r.id
+            FROM (
+                SELECT DISTINCT ON (routings.session)
+                    routings.session AS session_id,
+                    routings.id
                 FROM routings
-                WHERE routings.session = sessions.id
-                  AND routings.status IN ('provisioning', 'running')
-                ORDER BY routings.created_at ASC, routings.id ASC
-                LIMIT 1
-            )
-            WHERE sessions.replica_id IS NULL
-              AND EXISTS (
-                SELECT 1 FROM routings
-                WHERE routings.session = sessions.id
-                  AND routings.status IN ('provisioning', 'running')
-              )
+                WHERE routings.status IN ('provisioning', 'running')
+                ORDER BY routings.session, routings.created_at ASC, routings.id ASC
+            ) AS r
+            WHERE sessions.id = r.session_id
             """
         )
     )
