@@ -12273,7 +12273,9 @@ type SessionV2 implements Node {
   userId: ID!
   projectId: ID!
 
-  """UUID of the model deployment replica served by this session."""
+  """
+  Added in UNRELEASED. UUID of the model deployment replica served by this session.
+  """
   replicaId: ID
 
   """Metadata including domain, project, and user information."""
