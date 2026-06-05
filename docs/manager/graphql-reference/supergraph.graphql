@@ -2867,7 +2867,7 @@ input CreateAccessTokenInput
   @join__type(graph: STRAWBERRY)
 {
   """The ID of the model deployment for which the access token is created."""
-  deploymentId: ID!
+  modelDeploymentId: ID!
 
   """The expiration timestamp of the access token."""
   expiresAt: DateTime

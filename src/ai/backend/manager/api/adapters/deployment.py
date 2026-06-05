@@ -885,7 +885,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> CreateAccessTokenPayload:
         """Create a new access token for a deployment."""
         creator = ModelDeploymentAccessTokenCreator(
-            model_deployment_id=input.deployment_id,
+            model_deployment_id=input.model_deployment_id,
             expires_at=input.expires_at,
         )
         action_result = await self._processors.deployment.create_access_token.wait_for_complete(
