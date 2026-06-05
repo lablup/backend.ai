@@ -623,11 +623,26 @@ class SessionRow(Base):  # type: ignore[misc]
     """
 
     # The routing replica (RoutingRow.id) this session serves, if any.
-    # Plain reference (no DB FK) to avoid a circular routings<->sessions FK and
-    # the resulting ORM relationship ambiguity; stale ids resolve to null.
-    replica_id: Mapped[UUID | None] = mapped_column("replica_id", GUID, nullable=True)
+    # FK to routings.id with ON DELETE SET NULL: when the replica's route row is
+    # deleted, this auto-clears instead of dangling. This forms an intentional
+    # nullable cycle with routings.session -> sessions.id; `use_alter` lets
+    # create_all() order the two tables, and the routing/session_row relationship
+    # below pins `foreign_keys` so SQLAlchemy can disambiguate the two FK paths.
+    replica_id: Mapped[UUID | None] = mapped_column(
+        "replica_id",
+        GUID,
+        sa.ForeignKey(
+            "routings.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_sessions_replica_id_routings",
+        ),
+        nullable=True,
+    )
 
-    routing: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="session_row")
+    routing: Mapped[list[RoutingRow]] = relationship(
+        "RoutingRow", back_populates="session_row", foreign_keys="RoutingRow.session"
+    )
 
     __table_args__ = (
         # indexing

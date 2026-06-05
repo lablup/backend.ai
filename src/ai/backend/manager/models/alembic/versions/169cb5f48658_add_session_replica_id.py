@@ -52,7 +52,19 @@ def upgrade() -> None:
             """
         )
     )
+    # FK to routings.id with ON DELETE SET NULL so a deleted replica route clears
+    # the pointer instead of leaving a dangling id. Created after the backfill,
+    # which only writes existing (live) route ids, so the constraint validates.
+    op.create_foreign_key(
+        "fk_sessions_replica_id_routings",
+        "sessions",
+        "routings",
+        ["replica_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
 
 
 def downgrade() -> None:
+    op.drop_constraint("fk_sessions_replica_id_routings", "sessions", type_="foreignkey")
     op.drop_column("sessions", "replica_id")
