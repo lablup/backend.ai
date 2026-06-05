@@ -24,17 +24,10 @@ def upgrade() -> None:
         "sessions",
         sa.Column("replica_id", GUID(), nullable=True),
     )
-    # Backfill from the inverse link (routings.session -> sessions.id). A session
-    # serves at most one replica; pick the earliest *live* route deterministically.
-    # Only active routes (RouteStatus PROVISIONING / RUNNING) count — a session
-    # whose routes have all terminated/failed is no longer serving a replica, so
-    # it stays NULL rather than pointing at a dead binding. Status is stored as the
-    # enum value (StrEnumType, use_name=False), hence the lowercase literals.
-    #
-    # Single pass: DISTINCT ON picks one live route per session (earliest by
-    # created_at then id) in one scan + sort, then joins to sessions — cheaper
-    # than a per-row correlated subquery. The column was just added (all NULL),
-    # so the join sets each matched row exactly once; no overwrite guard needed.
+    # Backfill: set replica_id to each session's earliest live route (DISTINCT ON
+    # picks one per session). Only active routes count (RouteStatus provisioning/
+    # running); sessions with no live route stay NULL. Status is stored as the enum
+    # value (StrEnumType, use_name=False), hence the lowercase literals.
     op.execute(
         sa.text(
             """
