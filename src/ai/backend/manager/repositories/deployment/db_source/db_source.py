@@ -1959,20 +1959,28 @@ class DeploymentDBSource:
                     .where(sa.and_(RoutingRow.id == route_id, RoutingRow.session.is_(None)))
                     .values(session=session_id)
                 )
-                result = await db_sess.execute(query)
-                # Mirror the binding onto the session only when the route was
-                # actually bound this call (the `session IS NULL` guard above
-                # held). The `replica_id IS NULL` guard keeps first-bind-wins,
-                # matching the migration backfill, so a session never flips to a
-                # route serving another.
-                if cast(CursorResult[Any], result).rowcount > 0:
-                    await db_sess.execute(
-                        sa.update(SessionRow)
-                        .where(
-                            sa.and_(SessionRow.id == session_id, SessionRow.replica_id.is_(None))
+                await db_sess.execute(query)
+                # Mirror the binding onto the session: point replica_id at the
+                # route it now serves. Self-guarding via EXISTS so it only fires
+                # when this route is actually bound to this session (never a route
+                # serving another), and `replica_id IS NULL` keeps first-bind-wins
+                # to match the migration backfill.
+                await db_sess.execute(
+                    sa.update(SessionRow)
+                    .where(
+                        sa.and_(
+                            SessionRow.id == session_id,
+                            SessionRow.replica_id.is_(None),
+                            sa.exists().where(
+                                sa.and_(
+                                    RoutingRow.id == route_id,
+                                    RoutingRow.session == session_id,
+                                )
+                            ),
                         )
-                        .values(replica_id=route_id)
                     )
+                    .values(replica_id=route_id)
+                )
 
     async def fetch_kernel_connection_info(
         self,

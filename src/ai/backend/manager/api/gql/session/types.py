@@ -322,8 +322,11 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     domain_name: str
     user_id: ID
     project_id: ID
-    replica_id: ID | None = gql_field(
-        description="UUID of the model deployment replica served by this session.",
+    replica_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the model deployment replica served by this session.",
+        )
     )
 
     metadata: SessionV2MetadataInfoGQL = gql_field(
