@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 
 from .hooks.registry import HookRegistry, HookRegistryArgs
@@ -36,11 +37,14 @@ def create_scheduler_components(
     repository: SchedulerRepository,
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
+    network_plugin_ctx: NetworkPluginContext,
 ) -> SchedulerComponents:
     """Create SchedulerComponents with all required dependencies."""
     hook_registry = HookRegistry(
         HookRegistryArgs(
             agent_client_pool=agent_client_pool,
+            network_plugin_ctx=network_plugin_ctx,
+            config_provider=config_provider,
         )
     )
     return SchedulerComponents(
