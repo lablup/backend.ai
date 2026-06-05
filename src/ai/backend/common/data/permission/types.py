@@ -538,3 +538,39 @@ def owner_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
 def member_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
     """Operations granted to a *member* role on the given entity type."""
     return _MEMBER_OPS_OVERRIDES.get(entity_type, _DEFAULT_MEMBER_OPS)
+
+
+# ---------------------------------------------------------------------------
+# Permission cap (ceiling) on scope-entity edges
+#
+# A cap expresses the *maximum* permission assignable through a scope-entity
+# edge, generalizing the binary auto/ref relation into ordered levels. Caps are
+# cumulative ceilings: a higher cap permits a superset of the operations a lower
+# cap permits, so the integer ordering of :class:`PermissionCap` is a faithful
+# proxy for the subset ordering of :func:`cap_operations`. The integer gaps
+# (10/20/30) leave room to insert intermediate levels without renumbering.
+# ---------------------------------------------------------------------------
+
+
+class PermissionCap(enum.IntEnum):
+    READ_ONLY = 10
+    READ_WRITE = 20
+    WRITE_DELETE = 30
+
+
+_READ_WRITE_OPS: frozenset[OperationType] = frozenset({
+    OperationType.CREATE,
+    OperationType.READ,
+    OperationType.UPDATE,
+})
+
+_CAP_OPERATIONS: Mapping[PermissionCap, frozenset[OperationType]] = {
+    PermissionCap.READ_ONLY: _READ_ONLY_OPS,
+    PermissionCap.READ_WRITE: _READ_WRITE_OPS,
+    PermissionCap.WRITE_DELETE: _STANDARD_OPS,
+}
+
+
+def cap_operations(cap: PermissionCap) -> frozenset[OperationType]:
+    """Operations permitted under the given permission cap (ceiling)."""
+    return _CAP_OPERATIONS[cap]

@@ -15,6 +15,7 @@ import pytest
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
+    PermissionCap,
     RBACElementType,
     RelationType,
     RoleSource,
@@ -980,6 +981,7 @@ class TestSearchElementAssociations:
             scope_id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id="test-domain"),
             object_id=ObjectId(entity_type=EntityType.USER, entity_id="user-1"),
             relation_type=RelationType.AUTO,
+            permission=PermissionCap.WRITE_DELETE,
             registered_at=datetime.now(tz=UTC),
         )
         mock_result = SearchResult(

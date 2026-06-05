@@ -316,6 +316,48 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
         return self._enum_cls
 
 
+class IntEnumType[T_IntEnum: enum.IntEnum](TypeDecorator[T_IntEnum]):
+    """
+    Maps a Postgres SMALLINT column with a Python enum.IntEnum type.
+
+    Stores the enum's integer value, preserving the ordinal ordering in the
+    database (e.g. for range comparisons), unlike string-based enum columns.
+    """
+
+    impl = sa.SmallInteger
+    cache_ok = True
+
+    def __init__(self, enum_cls: type[T_IntEnum], **opts: Any) -> None:
+        self._opts = opts
+        super().__init__(**opts)
+        self._enum_cls = enum_cls
+
+    def process_bind_param(
+        self,
+        value: T_IntEnum | None,
+        dialect: Dialect,
+    ) -> int | None:
+        if value is None:
+            return None
+        return int(value.value)
+
+    def process_result_value(
+        self,
+        value: int | None,
+        dialect: Dialect,
+    ) -> T_IntEnum | None:
+        if value is None:
+            return None
+        return self._enum_cls(value)
+
+    def copy(self, **_kw: Any) -> Self:
+        return IntEnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
+
+    @property
+    def python_type(self) -> type[T_IntEnum]:
+        return self._enum_cls
+
+
 class CurvePublicKeyColumn(TypeDecorator[PublicKey]):
     """
     A column type wrapper for string-based Z85-encoded CURVE public key.
