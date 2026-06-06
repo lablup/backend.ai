@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Final, Self
+from typing import Final, NewType, Self
 
 from glide import ConditionalChange, ExpirySet, ExpiryType, Script
 
@@ -39,6 +39,9 @@ valkey_tus_resilience = Resilience(
         ),
     ]
 )
+
+TusSessionId = NewType("TusSessionId", str)
+
 
 _OFFSET_KEY_PREFIX: Final = "tus.upload.offset"
 _LEASE_KEY_PREFIX: Final = "tus.upload.lease"
@@ -88,17 +91,17 @@ class ValkeyTusClient:
         await self._client.disconnect()
 
     @staticmethod
-    def _key(session_id: str) -> str:
+    def _key(session_id: TusSessionId) -> str:
         return f"{_OFFSET_KEY_PREFIX}:{session_id}"
 
     @staticmethod
-    def _lease_key(session_id: str) -> str:
+    def _lease_key(session_id: TusSessionId) -> str:
         return f"{_LEASE_KEY_PREFIX}:{session_id}"
 
     @valkey_tus_resilience.apply()
     async def acquire_session_lease(
         self,
-        session_id: str,
+        session_id: TusSessionId,
         holder_token: str,
         *,
         ttl_seconds: int = _DEFAULT_LEASE_TTL_SECONDS,
@@ -114,7 +117,7 @@ class ValkeyTusClient:
         return result is not None
 
     @valkey_tus_resilience.apply()
-    async def release_session_lease(self, session_id: str, holder_token: str) -> bool:
+    async def release_session_lease(self, session_id: TusSessionId, holder_token: str) -> bool:
         """Compare-and-delete: only release if ``holder_token`` still owns the lease."""
         async with self._client.client() as conn:
             result = await conn.invoke_script(
@@ -127,7 +130,7 @@ class ValkeyTusClient:
     @valkey_tus_resilience.apply()
     async def initialize_offset(
         self,
-        session_id: str,
+        session_id: TusSessionId,
         *,
         ttl_seconds: int = _DEFAULT_TTL_SECONDS,
     ) -> None:
@@ -140,7 +143,7 @@ class ValkeyTusClient:
             )
 
     @valkey_tus_resilience.apply()
-    async def get_offset(self, session_id: str) -> int | None:
+    async def get_offset(self, session_id: TusSessionId) -> int | None:
         async with self._client.client() as conn:
             raw = await conn.get(self._key(session_id))
         if raw is None:
@@ -151,7 +154,7 @@ class ValkeyTusClient:
     @valkey_tus_resilience.apply()
     async def advance_offset(
         self,
-        session_id: str,
+        session_id: TusSessionId,
         length: int,
         *,
         ttl_seconds: int = _DEFAULT_TTL_SECONDS,

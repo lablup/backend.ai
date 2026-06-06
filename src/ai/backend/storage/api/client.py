@@ -70,9 +70,10 @@ if TYPE_CHECKING:
 
     from aiohttp import StreamReader
 
-    from ai.backend.common.clients.valkey_client.valkey_tus import ValkeyTusClient
     from ai.backend.storage.context import RootContext
     from ai.backend.storage.volumes.abc import AbstractVolume
+
+from ai.backend.common.clients.valkey_client.valkey_tus import TusSessionId, ValkeyTusClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -82,9 +83,13 @@ DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 @asynccontextmanager
 async def _session_lease(
-    client: ValkeyTusClient, session_id: str, node_id: str
+    client: ValkeyTusClient, session_id: TusSessionId, node_id: str
 ) -> AsyncIterator[None]:
-    """Acquire-or-409 the per-session write lease, releasing on exit."""
+    """Hold the per-session write lease for the body of the ``async with``.
+
+    Raises :class:`UploadSessionLeaseHeldError` if another replica is already
+    inside the critical section; the lease is always released on exit.
+    """
     holder_token = f"{node_id}:{uuid.uuid4().hex}"
     if not await client.acquire_session_lease(session_id, holder_token):
         raise UploadSessionLeaseHeldError("session is being written by another replica")
@@ -439,7 +444,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 
             await aiofiles.os.makedirs(upload_temp_path.parent, exist_ok=True)
 
-            session_id = token_data["session"]
+            session_id = TusSessionId(token_data["session"])
             async with _session_lease(ctx.valkey_tus_client, session_id, ctx.node_id):
                 actual_offset = await ctx.valkey_tus_client.get_offset(session_id)
                 if actual_offset is None:
@@ -516,7 +521,7 @@ async def prepare_tus_session_headers(
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"
     ctx: RootContext = request.app["ctx"]
-    redis_offset = await ctx.valkey_tus_client.get_offset(token_data["session"])
+    redis_offset = await ctx.valkey_tus_client.get_offset(TusSessionId(token_data["session"]))
     if redis_offset is None:
         # Session was never registered or its TTL elapsed.
         raise UploadSessionNotFoundError
