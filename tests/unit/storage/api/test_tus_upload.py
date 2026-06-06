@@ -34,19 +34,48 @@ class TestTusUploadPartOffsetValidation:
             "relpath": "test-file.txt",
         }
 
+    @pytest.fixture(autouse=True)
+    def _patch_disk_helpers(self) -> Generator[None, None, None]:
+        """Replace the real fsync / commit helpers with no-ops.
+
+        ``tus_upload_part`` drains the request body to a staging file and then
+        ``fsync`` + commits it under the Sokovan lease. None of these paths
+        exist on disk in mocked tests, so we substitute no-op callables. The
+        offset validation logic (which is what these tests cover) executes
+        before the staging commit, so this leaves the assertions intact.
+        """
+        with (
+            patch("ai.backend.storage.api.client._fsync_file"),
+            patch("ai.backend.storage.api.client._commit_staging"),
+        ):
+            yield
+
     def _create_mock_request(
         self,
         tmp_path: Path,
         client_offset: str | None,
+        *,
+        server_offset: int | None = 1024,
     ) -> MagicMock:
         """Create a fully configured mock request."""
         # Mock volume
         volume = MagicMock()
         volume.mangle_vfpath.return_value = tmp_path
 
+        # Mock Valkey TUS offset coordinator (replaces stat()-based offset lookup)
+        valkey_tus_client = AsyncMock()
+        valkey_tus_client.get_offset = AsyncMock(return_value=server_offset)
+        valkey_tus_client.acquire_lock = AsyncMock(return_value=True)
+        valkey_tus_client.release_lock = AsyncMock(return_value=True)
+        valkey_tus_client.advance_offset = AsyncMock(
+            return_value=(server_offset or 0),  # bumped to staged_bytes-aware below
+        )
+
         # Mock context
         ctx = MagicMock()
         ctx.local_config.storage_proxy.secret = "test-secret"
+        ctx.node_id = "test-node"
+        ctx.valkey_tus_client = valkey_tus_client
         ctx.get_volume.return_value.__aenter__ = AsyncMock(return_value=volume)
         ctx.get_volume.return_value.__aexit__ = AsyncMock(return_value=None)
 
@@ -113,7 +142,9 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: Client offset (512) behind server offset (1024)."""
-        request = self._create_mock_request(tmp_path, client_offset="512")
+        request = self._create_mock_request(
+            tmp_path, client_offset="512", server_offset=1024
+        )
 
         with (
             patch("ai.backend.storage.api.client.check_params") as mock_check_params,
@@ -132,7 +163,9 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: Client offset (2048) ahead of server offset (1024)."""
-        request = self._create_mock_request(tmp_path, client_offset="2048")
+        request = self._create_mock_request(
+            tmp_path, client_offset="2048", server_offset=1024
+        )
 
         with (
             patch("ai.backend.storage.api.client.check_params") as mock_check_params,
@@ -151,9 +184,11 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: Client offset matches server offset (both 1024)."""
-        request = self._create_mock_request(tmp_path, client_offset="1024")
+        request = self._create_mock_request(
+            tmp_path, client_offset="1024", server_offset=1024
+        )
 
-        # Create upload temp file
+        # Create upload temp file (for downstream finalization paths)
         upload_parent = tmp_path / ".upload"
         upload_parent.mkdir(parents=True, exist_ok=True)
         temp_file = upload_parent / token_data["session"]
@@ -181,7 +216,9 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: New file upload with zero offset."""
-        request = self._create_mock_request(tmp_path, client_offset="0")
+        request = self._create_mock_request(
+            tmp_path, client_offset="0", server_offset=0
+        )
 
         # Create empty upload temp file
         upload_parent = tmp_path / ".upload"
