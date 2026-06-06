@@ -70,26 +70,26 @@ _DEFAULT_LOCK_TTL_SECONDS: Final = 60
 # Compare-and-delete release. ``DEL`` only if the value still equals the
 # caller-supplied holder token — this prevents a process whose lease has
 # already expired from accidentally deleting the next holder's lease.
-_RELEASE_LOCK_SCRIPT = Script(
-    """
-    local current = redis.call('GET', KEYS[1])
-    if current == ARGV[1] then
-        redis.call('DEL', KEYS[1])
-        return 1
-    else
-        return 0
-    end
-    """
-)
+RELEASE_LOCK_SCRIPT: Final[str] = """
+local current = redis.call('GET', KEYS[1])
+if current == ARGV[1] then
+    redis.call('DEL', KEYS[1])
+    return 1
+else
+    return 0
+end
+"""
 
 
 class ValkeyTusOffsetClient:
     """Tiny Valkey-backed offset coordinator for TUS uploads."""
 
     _client: AbstractValkeyClient
+    _release_lock_script: Script
 
     def __init__(self, client: AbstractValkeyClient) -> None:
         self._client = client
+        self._release_lock_script = Script(RELEASE_LOCK_SCRIPT)
 
     @classmethod
     async def create(
@@ -154,7 +154,7 @@ class ValkeyTusOffsetClient:
         """
         async with self._client.client() as conn:
             result = await conn.invoke_script(
-                _RELEASE_LOCK_SCRIPT,
+                script=self._release_lock_script,
                 keys=[self._lock_key(session_id)],
                 args=[holder_token],
             )
