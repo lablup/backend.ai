@@ -442,7 +442,9 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             async with _session_lease(ctx.valkey_tus_client, session_id, ctx.node_id):
                 actual_offset = await ctx.valkey_tus_client.get_offset(session_id)
                 if actual_offset is None:
-                    raise UploadSessionNotFoundError
+                    raise UploadSessionNotFoundError(
+                        f"Upload session {session_id} is not registered or has expired"
+                    )
                 if client_offset != actual_offset:
                     raise UploadOffsetMismatchError(
                         f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
@@ -502,7 +504,9 @@ async def prepare_tus_session_headers(
     vfpath = volume.mangle_vfpath(token_data["vfid"])
     upload_temp_path = vfpath / ".upload" / token_data["session"]
     if not Path(upload_temp_path).exists():
-        raise UploadSessionNotFoundError
+        raise UploadSessionNotFoundError(
+            f"Upload session {token_data['session']} has no on-disk staging file"
+        )
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
     headers["Access-Control-Allow-Headers"] = (
@@ -517,8 +521,9 @@ async def prepare_tus_session_headers(
     ctx: RootContext = request.app["ctx"]
     redis_offset = await ctx.valkey_tus_client.get_offset(TusSessionId(token_data["session"]))
     if redis_offset is None:
-        # Session was never registered or its TTL elapsed.
-        raise UploadSessionNotFoundError
+        raise UploadSessionNotFoundError(
+            f"Upload session {token_data['session']} is not registered or has expired"
+        )
     headers["Upload-Offset"] = str(redis_offset)
     headers["Upload-Length"] = str(token_data["size"])
     return headers
