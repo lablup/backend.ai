@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from ai.backend.common.data.permission.types import EntityType, OperationType
+from ai.backend.common.entity.types import EntityType as CommonEntityType
+from ai.backend.common.entity.types import ScopeType
 
 
 class OperationStatus(enum.StrEnum):
@@ -50,3 +52,15 @@ class AbstractProcessorPackage(ABC):
     def supported_actions(self) -> list[ActionSpec]:
         """Get the list of action specs that this processors can handle."""
         raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class Entity:
+    id: str
+    type: CommonEntityType
+
+
+@dataclass(frozen=True)
+class Scope:
+    type: ScopeType
+    id: str

@@ -79,7 +79,10 @@ class OperationType(enum.StrEnum):
 
 
 class EntityType(enum.StrEnum):
-    """Deprecated for RBAC: use ``RBACElementType`` instead."""
+    """
+    Deprecated for RBAC: use ``RBACElementType`` instead
+    or use ai.backend.common.entity.types.EntityType for non-RBAC-specific contexts.
+    """
 
     # === RBAC scope/resource types (original 12) ===
     USER = "user"
