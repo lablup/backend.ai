@@ -105,6 +105,7 @@ async def _drain_into_upload_file(
     """Truncate ``upload_temp_path`` to ``start_offset`` and append the body. Returns bytes written."""
     bytes_written = 0
     async with aiofiles.open(upload_temp_path, mode="r+b", opener=_create_if_missing_opener) as f:
+        # Discard any orphan tail bytes left by a prior crashed holder.
         await f.truncate(start_offset)
         await f.seek(start_offset)
         while not content.at_eof():
@@ -119,14 +120,7 @@ async def _drain_into_upload_file(
 
 
 def _create_if_missing_opener(path: str | bytes, flags: int) -> int:
-    """Custom ``open()`` opener that adds ``O_CREAT`` so ``aiofiles.open``
-    in ``r+b`` mode can also create the file on the first PATCH of a fresh
-    upload session.
-
-    The aiofiles AsyncFile wraps Python's builtin ``open(path, mode,
-    opener=...)`` — the opener receives ``(file, flags)`` and must return
-    a file descriptor.
-    """
+    """``open()`` opener that adds ``O_CREAT`` so ``r+b`` can also create the file."""
     return os.open(path, flags | os.O_CREAT, 0o644)
 
 
