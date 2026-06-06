@@ -36,6 +36,7 @@ class RoleData:
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
+    auto_assign: bool = False
     description: str | None = None
 
 
@@ -67,6 +68,7 @@ class RoleDetailData:
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
+    auto_assign: bool = False
     description: str | None = None
 
 

@@ -51,6 +51,14 @@ class RolePresetSearchResult:
 
 
 @dataclass(frozen=True)
+class RolePermissionPresetSearchResult:
+    items: list[RolePermissionPresetData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass(frozen=True)
 class RolePresetBulkPurgeResult:
     successes: list[RolePresetData] = field(default_factory=list)
     failures: list[BulkPurgerError[RolePresetRow]] = field(default_factory=list)

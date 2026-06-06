@@ -33,7 +33,9 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
     NoPagination,
+    OffsetPagination,
 )
+from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.role_preset.creators import (
@@ -75,6 +77,27 @@ async def _count_permissions(
             .where(RolePermissionPresetRow.role_preset_id == preset_id)
         )
         return result.scalar_one()
+
+
+async def _create_preset_with_permissions(
+    repository: RolePresetRepository,
+    name: str,
+    permissions: list[tuple[EntityType, OperationType]],
+) -> RolePresetID:
+    created = await repository.create(
+        RolePresetCreatorSpec(name=name, scope_type=ScopeType.DOMAIN),
+        [
+            RolePermissionPresetDependentCreatorSpec(entity_type=entity_type, operation=operation)
+            for entity_type, operation in permissions
+        ],
+    )
+    return created.id
+
+
+def _by_preset(preset_id: RolePresetID) -> QueryCondition:
+    # The model layer has no role-permission-preset conditions yet, so the
+    # preset-scoping predicate is built inline here.
+    return lambda: RolePermissionPresetRow.role_preset_id == preset_id
 
 
 class TestCreate:
@@ -287,3 +310,96 @@ class TestPermissions:
         assert {perm.id for perm in result.successes} == set(permission_ids)
         assert result.failures == []
         assert await _count_permissions(database_connection, preset.id) == 0
+
+
+class TestSearchPermissionPresets:
+    @pytest.fixture
+    async def preset_with_permissions(self, repository: RolePresetRepository) -> RolePresetID:
+        """A single preset carrying three permission entries with distinct operations."""
+        return await _create_preset_with_permissions(
+            repository,
+            "p1",
+            [
+                (EntityType.VFOLDER, OperationType.CREATE),
+                (EntityType.VFOLDER, OperationType.READ),
+                (EntityType.VFOLDER, OperationType.UPDATE),
+            ],
+        )
+
+    @pytest.fixture
+    async def target_among_other_presets(self, repository: RolePresetRepository) -> RolePresetID:
+        """A target preset (three entries) alongside an unrelated preset (one entry)."""
+        target = await _create_preset_with_permissions(
+            repository,
+            "target",
+            [
+                (EntityType.VFOLDER, OperationType.READ),
+                (EntityType.VFOLDER, OperationType.UPDATE),
+                (EntityType.SESSION, OperationType.READ),
+            ],
+        )
+        await _create_preset_with_permissions(
+            repository, "other", [(EntityType.IMAGE, OperationType.READ)]
+        )
+        return target
+
+    async def test_scopes_to_role_preset(
+        self,
+        repository: RolePresetRepository,
+        target_among_other_presets: RolePresetID,
+    ) -> None:
+        result = await repository.search_permission_presets(
+            BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[_by_preset(target_among_other_presets)],
+            )
+        )
+
+        assert result.total_count == 3
+        assert all(item.role_preset_id == target_among_other_presets for item in result.items)
+
+    @pytest.mark.parametrize(
+        ("limit", "offset", "expected_len", "expected_next", "expected_prev"),
+        [
+            (2, 0, 2, True, False),  # first page of three
+            (2, 2, 1, False, True),  # last page
+            (10, 0, 3, False, False),  # whole set in one page
+        ],
+    )
+    async def test_paginates(
+        self,
+        repository: RolePresetRepository,
+        preset_with_permissions: RolePresetID,
+        limit: int,
+        offset: int,
+        expected_len: int,
+        expected_next: bool,
+        expected_prev: bool,
+    ) -> None:
+        result = await repository.search_permission_presets(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=limit, offset=offset),
+                conditions=[_by_preset(preset_with_permissions)],
+            )
+        )
+
+        assert len(result.items) == expected_len
+        assert result.total_count == 3
+        assert result.has_next_page is expected_next
+        assert result.has_previous_page is expected_prev
+
+    async def test_orders_by_operation(
+        self,
+        repository: RolePresetRepository,
+        preset_with_permissions: RolePresetID,
+    ) -> None:
+        result = await repository.search_permission_presets(
+            BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[_by_preset(preset_with_permissions)],
+                orders=[RolePermissionPresetRow.operation.asc()],
+            )
+        )
+
+        operations = [item.operation for item in result.items]
+        assert operations == sorted(operations, key=lambda op: op.value)

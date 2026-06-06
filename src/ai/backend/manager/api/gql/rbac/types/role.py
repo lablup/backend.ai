@@ -157,6 +157,15 @@ class RoleGQL(PydanticNodeMixin[Any]):
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
+    auto_assign: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "When true, the role is automatically granted to a user when the user is added "
+                "to a scope this role is registered in."
+            ),
+        )
+    )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]
@@ -615,6 +624,16 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     name: str
     description: str | None = None
     source: RoleSourceGQL = RoleSourceGQL.CUSTOM
+    auto_assign: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "When true, the role is automatically granted to a user when the user is added "
+                "to a scope this role is registered in."
+            ),
+        ),
+        default=False,
+    )
     scopes: list[ScopeInputGQL] | None = None
 
 
@@ -626,6 +645,16 @@ class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
     name: str | None = UNSET
     description: str | None = UNSET
     status: RoleStatusGQL | None = UNSET
+    auto_assign: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Updated value for the `auto_assign` flag. When true, the role is automatically "
+                "granted to a user when the user is added to a scope this role is registered in."
+            ),
+        ),
+        default=UNSET,
+    )
 
 
 @gql_pydantic_input(

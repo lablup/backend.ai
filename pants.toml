@@ -30,6 +30,7 @@ pants_ignore = [
     "/wheelhouse/*.whl"
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
+unmatched_build_file_globs = "error"
 
 [anonymous-telemetry]
 enabled = false
@@ -81,6 +82,7 @@ search_path = ["<PYENV>"]
 
 [python-infer]
 use_rust_parser = true
+unowned_dependency_behavior = "error"
 
 # This slows down `generate-lockfiles` severely. Enable only when strictly needed.
 # [python-repos]

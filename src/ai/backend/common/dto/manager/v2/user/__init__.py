@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
 )
 from ai.backend.common.dto.manager.v2.user.response import (
     BulkCreateUsersPayload,
+    BulkCreateUsersWithKeypairPayload,
     BulkCreateUserV2Error,
     BulkPurgeUsersPayload,
     BulkPurgeUserV2Error,
@@ -87,6 +88,7 @@ __all__ = (
     "PurgeUsersPayload",
     "BulkCreateUserV2Error",
     "BulkCreateUsersPayload",
+    "BulkCreateUsersWithKeypairPayload",
     "BulkUpdateUserV2Error",
     "BulkUpdateUsersPayload",
     "BulkPurgeUserV2Error",

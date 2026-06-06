@@ -12,7 +12,12 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import (
+    EntityType,
+    OperationType,
+    RoleSource,
+    ScopeType,
+)
 from ai.backend.common.types import ReadableCIDR, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData
@@ -36,6 +41,10 @@ from ai.backend.manager.models.rbac_models import (
     RoleRow,
     UserRoleRow,
 )
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -100,6 +109,8 @@ class TestUserRepository:
                 RoleRow,  # RBAC role table
                 PermissionRow,
                 AssociationScopesEntitiesRow,  # RBAC scopes-entities association
+                RolePresetRow,  # RBAC role preset
+                RolePermissionPresetRow,  # RBAC role permission preset
                 KeyPairRow,
                 GroupRow,
                 AssocGroupUserRow,  # Association table for users-groups
@@ -252,6 +263,10 @@ class TestUserRepository:
         """Create a test group with both admin and member roles bound at
         project scope, matching the runtime state produced by
         ``GroupDBSource.create()`` after BA-5746.
+
+        The member role is flagged ``auto_assign=True`` so that joining users
+        are granted it, while the admin role keeps ``auto_assign=False`` so it
+        is never granted on join.
         """
         group_id = uuid.uuid4()
         admin_role_id = uuid.uuid4()
@@ -271,7 +286,13 @@ class TestUserRepository:
             )
             session.add(group)
             session.add(RoleRow(id=admin_role_id, name=f"project-{str(group_id)[:8]}-admin"))
-            session.add(RoleRow(id=member_role_id, name=f"project-{str(group_id)[:8]}-member"))
+            session.add(
+                RoleRow(
+                    id=member_role_id,
+                    name=f"project-{str(group_id)[:8]}-member",
+                    auto_assign=True,
+                )
+            )
             session.add(
                 AssociationScopesEntitiesRow(
                     scope_type=ScopeType.PROJECT,
@@ -399,6 +420,94 @@ class TestUserRepository:
         assert result.user.role == spec.role
         assert result.keypair is not None
         assert result.keypair.access_key is not None
+
+    @pytest.fixture
+    async def user_scope_presets(self, db_with_cleanup: ExtendedAsyncSAEngine) -> tuple[str, str]:
+        """Seed two USER-scope presets: one auto_assign, one manual.
+
+        Returns the (auto_assign_name, manual_name) pair.
+        """
+        auto_assign_name = "user-auto"
+        manual_name = "user-manual"
+        async with db_with_cleanup.begin_session() as session:
+            for name, auto_assign in ((auto_assign_name, True), (manual_name, False)):
+                preset = RolePresetRow(
+                    name=name,
+                    scope_type=ScopeType.USER,
+                    auto_assign=auto_assign,
+                    deleted=False,
+                )
+                session.add(preset)
+                await session.flush()
+                session.add(
+                    RolePermissionPresetRow(
+                        role_preset_id=preset.id,
+                        entity_type=EntityType.VFOLDER,
+                        operation=OperationType.READ,
+                    )
+                )
+            await session.commit()
+        return auto_assign_name, manual_name
+
+    async def test_create_user_validated_assigns_auto_assign_preset_role(
+        self,
+        user_repository: UserRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: DomainFixtureData,
+        user_resource_policy: str,
+        default_keypair_resource_policy: str,
+        sample_group_id: str,
+        user_scope_presets: tuple[str, str],
+    ) -> None:
+        """User creation provisions matching user-scope preset roles and maps only
+        the auto_assign ones to the new user."""
+        auto_assign_name, manual_name = user_scope_presets
+        spec = UserCreatorSpec(
+            username=f"presetuser-{uuid.uuid4().hex[:8]}",
+            email=f"presetuser-{uuid.uuid4().hex[:8]}@example.com",
+            password=create_test_password_info("new_password"),
+            need_password_change=False,
+            full_name="Preset User",
+            description="Preset User Description",
+            status=UserStatus.ACTIVE,
+            domain_name=sample_domain.domain_name,
+            role=UserRole.USER,
+            resource_policy=user_resource_policy,
+            allowed_client_ip=None,
+            totp_activated=False,
+            sudo_session_enabled=False,
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+
+        result = await user_repository.create_user_validated(
+            Creator(spec=spec),
+            group_ids=[sample_group_id],
+        )
+        user_uuid = result.user.uuid
+
+        async with db_with_cleanup.begin_session() as session:
+            # Both preset roles are provisioned at the user scope.
+            preset_role_rows = list(
+                await session.scalars(
+                    sa.select(RoleRow).where(RoleRow.name.in_([auto_assign_name, manual_name]))
+                )
+            )
+            assert {row.name for row in preset_role_rows} == {auto_assign_name, manual_name}
+            for row in preset_role_rows:
+                assert row.source == RoleSource.SYSTEM
+
+            # Only the auto_assign preset role is mapped to the new user.
+            mapped_names = set(
+                await session.scalars(
+                    sa.select(RoleRow.name)
+                    .join(UserRoleRow, UserRoleRow.role_id == RoleRow.id)
+                    .where(UserRoleRow.user_id == user_uuid)
+                )
+            )
+            assert auto_assign_name in mapped_names
+            assert manual_name not in mapped_names
 
     async def test_create_user_validated_domain_not_exists(
         self,
@@ -962,11 +1071,14 @@ class TestUserRepository:
         assert result.success_count() == 3
         assert result.failure_count() == 0
         assert len(result.successes) == 3
-        # Verify each created user has expected data
-        for user_data in result.successes:
+        # Verify each created user has expected data and a generated keypair
+        for create_result in result.successes:
+            user_data = create_result.user
             assert user_data.domain_name == sample_domain.domain_name
             assert user_data.role == UserRole.USER
             assert user_data.status == UserStatus.ACTIVE
+            assert create_result.keypair.access_key is not None
+            assert create_result.keypair.secret_key is not None
 
     async def test_bulk_create_users_validated_partial_failure(
         self,
@@ -1010,7 +1122,7 @@ class TestUserRepository:
         assert len(result.successes) == 1
         assert len(result.failures) == 1
         # Verify the successful user
-        assert result.successes[0].email == shared_email
+        assert result.successes[0].user.email == shared_email
         # Verify the failure has the correct index
         assert result.failures[0].index == 1
 
@@ -1051,12 +1163,14 @@ class TestUserRepository:
 
         # Now bulk update all 3 users
         update_items: list[UserUpdateSpec] = []
-        for i, user_data in enumerate(create_result.successes):
+        for i, created in enumerate(create_result.successes):
             updater_spec = UserUpdaterSpec(
                 full_name=TriState.update(f"Updated Name {i}"),
                 description=TriState.update(f"Updated Description {i}"),
             )
-            update_items.append(UserUpdateSpec(user_id=user_data.uuid, updater_spec=updater_spec))
+            update_items.append(
+                UserUpdateSpec(user_id=created.user.uuid, updater_spec=updater_spec)
+            )
 
         result = await user_repository.bulk_update_users_validated(update_items)
 
@@ -1102,7 +1216,7 @@ class TestUserRepository:
             UserCreateSpec(creator=Creator(spec=spec), group_ids=None)
         ])
         assert create_result.success_count() == 1
-        real_user = create_result.successes[0]
+        real_user = create_result.successes[0].user
 
         # Build update items: one real user, one non-existent user
         non_existent_user_id = uuid.uuid4()

@@ -68,6 +68,13 @@ class RoleRow(Base):  # type: ignore[misc]
         default=RoleStatus.ACTIVE,
         server_default=RoleStatus.ACTIVE,
     )
+    auto_assign: Mapped[bool] = mapped_column(
+        "auto_assign",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
@@ -103,6 +110,7 @@ class RoleRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
+            auto_assign=self.auto_assign,
             description=self.description,
         )
 
@@ -116,6 +124,7 @@ class RoleRow(Base):  # type: ignore[misc]
             created_at=self.created_at,
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
+            auto_assign=self.auto_assign,
             description=self.description,
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )

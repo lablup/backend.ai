@@ -39,6 +39,7 @@ class RoleCreatorSpec(CreatorSpec[RoleRow]):
     source: RoleSource
     status: RoleStatus
     description: str | None = None
+    auto_assign: bool = False
 
     @override
     def build_row(self) -> RoleRow:
@@ -47,6 +48,7 @@ class RoleCreatorSpec(CreatorSpec[RoleRow]):
             source=self.source,
             status=self.status,
             description=self.description,
+            auto_assign=self.auto_assign,
         )
 
 

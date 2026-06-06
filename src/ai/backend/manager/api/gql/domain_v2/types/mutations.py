@@ -36,7 +36,8 @@ UNSET = None
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for creating a new domain.",
-    )
+    ),
+    name="CreateDomainInput",
 )
 class CreateDomainInputGQL(PydanticInputMixin[CreateDomainInputDTO]):
     """Input for creating a new domain."""
@@ -56,7 +57,8 @@ class CreateDomainInputGQL(PydanticInputMixin[CreateDomainInputDTO]):
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Input for updating domain information. All fields optional.",
-    )
+    ),
+    name="UpdateDomainInput",
 )
 class UpdateDomainInputGQL(PydanticInputMixin[UpdateDomainInputDTO]):
     """Input for updating domain information."""
@@ -81,6 +83,7 @@ class UpdateDomainInputGQL(PydanticInputMixin[UpdateDomainInputDTO]):
         description="Payload for domain mutation responses.",
     ),
     model=DomainPayloadDTO,
+    name="DomainPayload",
 )
 class DomainPayloadGQL(PydanticOutputMixin[DomainPayloadDTO]):
     """Payload for domain create/update mutations."""
@@ -94,6 +97,7 @@ class DomainPayloadGQL(PydanticOutputMixin[DomainPayloadDTO]):
         description="Payload for domain deletion mutation.",
     ),
     model=DeleteDomainPayloadDTO,
+    name="DeleteDomainPayload",
 )
 class DeleteDomainPayloadGQL(PydanticOutputMixin[DeleteDomainPayloadDTO]):
     """Payload for domain soft-delete."""
@@ -107,6 +111,7 @@ class DeleteDomainPayloadGQL(PydanticOutputMixin[DeleteDomainPayloadDTO]):
         description="Payload for domain permanent deletion mutation.",
     ),
     model=PurgeDomainPayloadDTO,
+    name="PurgeDomainPayload",
 )
 class PurgeDomainPayloadGQL(PydanticOutputMixin[PurgeDomainPayloadDTO]):
     """Payload for domain permanent purge."""

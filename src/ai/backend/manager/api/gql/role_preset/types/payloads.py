@@ -28,6 +28,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 from .node import RolePresetGQL
 
@@ -40,7 +41,7 @@ from .node import RolePresetGQL
     model=CreateRolePresetPayloadDTO,
     name="CreateRolePresetPayload",
 )
-class CreateRolePresetPayloadGQL:
+class CreateRolePresetPayloadGQL(PydanticOutputMixin[CreateRolePresetPayloadDTO]):
     role_preset: RolePresetGQL = gql_field(description="Created role preset.")
 
 
@@ -52,7 +53,7 @@ class CreateRolePresetPayloadGQL:
     model=UpdateRolePresetPayloadDTO,
     name="UpdateRolePresetPayload",
 )
-class UpdateRolePresetPayloadGQL:
+class UpdateRolePresetPayloadGQL(PydanticOutputMixin[UpdateRolePresetPayloadDTO]):
     role_preset: RolePresetGQL = gql_field(description="Updated role preset.")
 
 
@@ -64,7 +65,7 @@ class UpdateRolePresetPayloadGQL:
     model=BulkRolePresetFailureInfoDTO,
     name="BulkRolePresetFailureInfo",
 )
-class BulkRolePresetFailureInfoGQL:
+class BulkRolePresetFailureInfoGQL(PydanticOutputMixin[BulkRolePresetFailureInfoDTO]):
     role_preset_id: UUID = gql_field(description="Role preset ID that the operation failed on.")
     message: str = gql_field(description="Error message describing the failure.")
 
@@ -77,7 +78,7 @@ class BulkRolePresetFailureInfoGQL:
     model=BulkDeleteRolePresetsPayloadDTO,
     name="BulkDeleteRolePresetsPayload",
 )
-class BulkDeleteRolePresetsPayloadGQL:
+class BulkDeleteRolePresetsPayloadGQL(PydanticOutputMixin[BulkDeleteRolePresetsPayloadDTO]):
     items: list[RolePresetGQL] = gql_field(description="Role presets that were soft-deleted.")
     failed: list[BulkRolePresetFailureInfoGQL] = gql_field(
         description="Role preset IDs that failed to soft-delete."
@@ -92,7 +93,7 @@ class BulkDeleteRolePresetsPayloadGQL:
     model=BulkRestoreRolePresetsPayloadDTO,
     name="BulkRestoreRolePresetsPayload",
 )
-class BulkRestoreRolePresetsPayloadGQL:
+class BulkRestoreRolePresetsPayloadGQL(PydanticOutputMixin[BulkRestoreRolePresetsPayloadDTO]):
     items: list[RolePresetGQL] = gql_field(description="Role presets that were restored.")
     failed: list[BulkRolePresetFailureInfoGQL] = gql_field(
         description="Role preset IDs that failed to restore."
@@ -107,7 +108,7 @@ class BulkRestoreRolePresetsPayloadGQL:
     model=BulkPurgeRolePresetsPayloadDTO,
     name="BulkPurgeRolePresetsPayload",
 )
-class BulkPurgeRolePresetsPayloadGQL:
+class BulkPurgeRolePresetsPayloadGQL(PydanticOutputMixin[BulkPurgeRolePresetsPayloadDTO]):
     items: list[RolePresetGQL] = gql_field(description="Role presets that were purged.")
     failed: list[BulkRolePresetFailureInfoGQL] = gql_field(
         description="Role preset IDs that failed to purge."

@@ -11,7 +11,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.keypair.types import KeypairOrderField
 
@@ -39,6 +39,10 @@ class KeypairFilter(BaseRequestModel):
     is_admin: bool | None = None
     access_key: StringFilter | None = None
     resource_policy: StringFilter | None = None
+    user_id: UUIDFilter | None = Field(
+        default=None,
+        description="Filter by the UUID of the keypair owner.",
+    )
     created_at: DateTimeFilter | None = None
     last_used: DateTimeFilter | None = None
 

@@ -620,6 +620,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
         description="Create deployment revision preset payload.",
     ),
     model=CreatePayloadDTO,
+    name="CreateDeploymentRevisionPresetPayload",
 )
 class CreateDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[CreatePayloadDTO]):
     preset: DeploymentRevisionPresetGQL = gql_field(description="The created preset.")
@@ -631,6 +632,7 @@ class CreateDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[CreatePayload
         description="Update deployment revision preset payload.",
     ),
     model=UpdatePayloadDTO,
+    name="UpdateDeploymentRevisionPresetPayload",
 )
 class UpdateDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
     preset: DeploymentRevisionPresetGQL = gql_field(description="The updated preset.")
@@ -642,6 +644,7 @@ class UpdateDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[UpdatePayload
         description="Delete deployment revision preset payload.",
     ),
     model=DeletePayloadDTO,
+    name="DeleteDeploymentRevisionPresetPayload",
 )
 class DeleteDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted preset.")

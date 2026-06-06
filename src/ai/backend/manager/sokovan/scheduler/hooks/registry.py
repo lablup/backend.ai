@@ -10,7 +10,9 @@ from dataclasses import dataclass
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.plugin.network import NetworkPluginContext
 
 from .status import (
     RunningHookDependencies,
@@ -28,6 +30,8 @@ class HookRegistryArgs:
     """Arguments for creating HookRegistry."""
 
     agent_client_pool: AgentClientPool
+    network_plugin_ctx: NetworkPluginContext
+    config_provider: ManagerConfigProvider
 
 
 class HookRegistry:
@@ -52,7 +56,11 @@ class HookRegistry:
         self._status_hooks[SessionStatus.RUNNING] = RunningTransitionHook(running_deps)
 
         # TERMINATED transition hook
-        terminated_deps = TerminatedHookDependencies()
+        terminated_deps = TerminatedHookDependencies(
+            agent_client_pool=args.agent_client_pool,
+            network_plugin_ctx=args.network_plugin_ctx,
+            config_provider=args.config_provider,
+        )
         self._status_hooks[SessionStatus.TERMINATED] = TerminatedTransitionHook(terminated_deps)
 
     def get_hook(self, status: SessionStatus) -> StatusTransitionHook | None:

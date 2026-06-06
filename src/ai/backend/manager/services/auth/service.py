@@ -18,7 +18,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
@@ -43,8 +43,8 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import (
     generate_keypair,
     generate_ssh_keypair,
-    validate_ssh_keypair,
 )
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import (
     INACTIVE_USER_STATUSES,
@@ -146,6 +146,7 @@ class AuthService:
     _user_resource_policy_repository: UserResourcePolicyRepository
     _user_repository: UserRepository
     _group_repository: GroupRepository
+    _ssh_key_validator: SSHKeyValidator
 
     def __init__(
         self,
@@ -156,6 +157,7 @@ class AuthService:
         user_resource_policy_repository: UserResourcePolicyRepository,
         user_repository: UserRepository,
         group_repository: GroupRepository,
+        ssh_key_validator: SSHKeyValidator,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
@@ -164,6 +166,7 @@ class AuthService:
         self._user_resource_policy_repository = user_resource_policy_repository
         self._user_repository = user_repository
         self._group_repository = group_repository
+        self._ssh_key_validator = ssh_key_validator
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
@@ -712,9 +715,7 @@ class AuthService:
     ) -> UploadSSHKeypairActionResult:
         privkey = action.private_key
         pubkey = action.public_key
-        is_valid, err_msg = validate_ssh_keypair(privkey, pubkey)
-        if not is_valid:
-            raise InvalidAPIParameters(err_msg)
+        self._ssh_key_validator.validate(SSHPrivateKey(privkey), SSHPublicKey(pubkey))
 
         await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
 
