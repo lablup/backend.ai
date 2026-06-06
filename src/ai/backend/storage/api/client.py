@@ -402,10 +402,6 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 token_data["session"], holder_token
             )
             if not acquired:
-                # Another replica is mid-PATCH for this session — under
-                # spec-compliant sequential clients this can only mean a
-                # timeout-induced concurrent retry. 409 lets the client
-                # HEAD and re-sync to the canonical offset.
                 raise UploadOffsetMismatchError("session is being written by another replica")
             try:
                 actual_offset = await ctx.valkey_tus_client.get_offset(token_data["session"])
