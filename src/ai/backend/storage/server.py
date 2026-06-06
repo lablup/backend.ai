@@ -648,9 +648,6 @@ async def server_main(
         )
         storage_init_stack.push_async_callback(valkey_artifact_client.close)
 
-        # Create ValkeyTusClient — shared TUS offset coordinator that lets
-        # all storage-proxy replicas agree on the current committed offset
-        # without relying on NFS attribute cache (BA-3974 fix).
         valkey_tus_client = await ValkeyTusClient.create(
             valkey_target=valkey_target,
             db_id=REDIS_TUS_DB,

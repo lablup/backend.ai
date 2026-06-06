@@ -511,9 +511,6 @@ async def prepare_tus_session_headers(
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"
-    # Read the offset from the shared TUS coordinator (BA-3974 fix). Falling
-    # back to ``stat().st_size`` would re-introduce the NFS-attribute-cache
-    # race that this coordinator exists to bypass.
     ctx: RootContext = request.app["ctx"]
     redis_offset = await ctx.valkey_tus_client.get_offset(token_data["session"])
     if redis_offset is None:

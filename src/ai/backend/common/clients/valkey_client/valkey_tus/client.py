@@ -1,4 +1,4 @@
-"""Valkey-backed offset + write-lease coordinator for TUS uploads (BA-3974)."""
+"""Valkey-backed offset + write-lease coordinator for TUS uploads."""
 
 from __future__ import annotations
 
