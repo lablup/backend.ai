@@ -53,6 +53,7 @@ from ai.backend.storage.errors import (
     InvalidAPIParameters,
     UploadOffsetMismatchError,
     UploadSessionLeaseHeldError,
+    UploadSessionNotFoundError,
 )
 from ai.backend.storage.services.file_stream.zip import (
     ZipArchiveStreamReader,
@@ -410,15 +411,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             try:
                 actual_offset = await ctx.valkey_tus_client.get_offset(token_data["session"])
                 if actual_offset is None:
-                    raise web.HTTPNotFound(
-                        body=dump_json_str(
-                            {
-                                "title": "No such upload session",
-                                "type": "https://api.backend.ai/probs/storage/no-such-upload-session",
-                            },
-                        ),
-                        content_type="application/problem+json",
-                    )
+                    raise UploadSessionNotFoundError
                 if client_offset != actual_offset:
                     raise UploadOffsetMismatchError(
                         f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
@@ -495,15 +488,7 @@ async def prepare_tus_session_headers(
     vfpath = volume.mangle_vfpath(token_data["vfid"])
     upload_temp_path = vfpath / ".upload" / token_data["session"]
     if not Path(upload_temp_path).exists():
-        raise web.HTTPNotFound(
-            body=dump_json_str(
-                {
-                    "title": "No such upload session",
-                    "type": "https://api.backend.ai/probs/storage/no-such-upload-session",
-                },
-            ),
-            content_type="application/problem+json",
-        )
+        raise UploadSessionNotFoundError
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
     headers["Access-Control-Allow-Headers"] = (
@@ -519,15 +504,7 @@ async def prepare_tus_session_headers(
     redis_offset = await ctx.valkey_tus_client.get_offset(token_data["session"])
     if redis_offset is None:
         # Session was never registered or its TTL elapsed.
-        raise web.HTTPNotFound(
-            body=dump_json_str(
-                {
-                    "title": "No such upload session",
-                    "type": "https://api.backend.ai/probs/storage/no-such-upload-session",
-                },
-            ),
-            content_type="application/problem+json",
-        )
+        raise UploadSessionNotFoundError
     headers["Upload-Offset"] = str(redis_offset)
     headers["Upload-Length"] = str(token_data["size"])
     return headers
