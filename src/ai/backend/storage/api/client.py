@@ -23,6 +23,7 @@ from typing import (
     cast,
 )
 
+import aiofiles.os
 import aiohttp_cors
 import janus
 import trafaret as t
@@ -440,7 +441,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             # so the offset accounting is independent of NFS attribute
             # cache (the very thing this whole fix exists to escape).
             upload_dir = upload_temp_path.parent
-            await loop.run_in_executor(None, lambda: upload_dir.mkdir(parents=True, exist_ok=True))
+            await aiofiles.os.makedirs(upload_dir, exist_ok=True)
             staging_path = upload_dir / (f"{token_data['session']}.staging.{uuid.uuid4().hex}")
             staged_bytes = 0
             try:
@@ -509,11 +510,9 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 # Always remove the staging file. Crash-leftover stagings are
                 # garbage-collected separately by directory mtime sweeps.
                 try:
-                    await loop.run_in_executor(
-                        None,
-                        staging_path.unlink,
-                        True,  # missing_ok=True
-                    )
+                    await aiofiles.os.remove(staging_path)
+                except FileNotFoundError:
+                    pass
                 except OSError:
                     pass
 
@@ -527,11 +526,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     target_path.parent.mkdir(parents=True, exist_ok=True)
                 upload_temp_path.rename(target_path)
                 try:
-                    loop = asyncio.get_running_loop()
-                    await loop.run_in_executor(
-                        None,
-                        lambda: upload_temp_path.parent.rmdir(),
-                    )
+                    await aiofiles.os.rmdir(upload_temp_path.parent)
                 except OSError:
                     pass
             headers["Upload-Offset"] = str(new_offset)
