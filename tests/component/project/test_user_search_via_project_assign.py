@@ -1,9 +1,4 @@
-"""Component tests for project-scoped user search RBAC (project assign path).
-
-Verifies that user.search_by_project enforces project membership via the
-association_scopes_entities table (BA-5821 migration). Membership is granted
-or revoked through project.assign_users / project.unassign_users SDK calls.
-"""
+"""Component tests for project-scoped user search RBAC (project assign path)."""
 
 from __future__ import annotations
 
@@ -22,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class TestUserSearchViaProjectAssign:
-    """ASE-based project membership gating for user.search_by_project."""
+    """Role/permission-based gating for user.search_by_project."""
 
     async def test_member_finds_self_in_project_search(
         self,
