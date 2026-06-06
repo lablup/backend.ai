@@ -363,6 +363,17 @@ from .resource_usage import (
     project_usage_buckets,
     user_usage_buckets,
 )
+from .role_preset import (
+    admin_bulk_add_role_preset_permissions,
+    admin_bulk_remove_role_preset_permissions,
+    admin_create_role_preset,
+    admin_delete_role_presets,
+    admin_purge_role_presets,
+    admin_restore_role_presets,
+    admin_role_preset,
+    admin_role_presets,
+    admin_update_role_preset,
+)
 from .runtime_variant import (
     admin_create_runtime_variant,
     admin_delete_runtime_variant,
@@ -409,6 +420,7 @@ from .storage_namespace import (
 from .user import (
     # Mutations
     admin_bulk_create_users_v2,
+    admin_bulk_create_users_with_keypair_v2,
     admin_bulk_purge_users_v2,
     admin_bulk_update_users_v2,
     admin_create_user_v2,
@@ -534,6 +546,9 @@ class Query:
     # Prometheus Query Preset Category APIs (read available to any authenticated user)
     prometheus_query_preset_category = prometheus_query_preset_category
     prometheus_query_preset_categories = prometheus_query_preset_categories
+    # Role Preset Admin APIs
+    admin_role_preset = admin_role_preset
+    admin_role_presets = admin_role_presets
     # RBAC Admin APIs
     admin_role = admin_role
     admin_roles = admin_roles
@@ -788,6 +803,7 @@ class Mutation:
     # User V2 APIs
     admin_create_user_v2 = admin_create_user_v2
     admin_bulk_create_users_v2 = admin_bulk_create_users_v2
+    admin_bulk_create_users_with_keypair_v2 = admin_bulk_create_users_with_keypair_v2
     admin_bulk_update_users_v2 = admin_bulk_update_users_v2
     admin_update_user_v2 = admin_update_user_v2
     update_user_v2 = update_user_v2
@@ -819,6 +835,14 @@ class Mutation:
     # Prometheus Query Preset Category - Admin APIs
     admin_create_prometheus_query_preset_category = admin_create_prometheus_query_preset_category
     admin_delete_prometheus_query_preset_category = admin_delete_prometheus_query_preset_category
+    # Role Preset - Admin APIs
+    admin_create_role_preset = admin_create_role_preset
+    admin_update_role_preset = admin_update_role_preset
+    admin_delete_role_presets = admin_delete_role_presets
+    admin_restore_role_presets = admin_restore_role_presets
+    admin_purge_role_presets = admin_purge_role_presets
+    admin_bulk_add_role_preset_permissions = admin_bulk_add_role_preset_permissions
+    admin_bulk_remove_role_preset_permissions = admin_bulk_remove_role_preset_permissions
     # RBAC Admin APIs
     admin_create_role = admin_create_role
     admin_update_role = admin_update_role

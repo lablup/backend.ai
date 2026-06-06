@@ -22,6 +22,7 @@ __all__ = (
     "RolePresetFilter",
     "RolePresetOrder",
     "SearchRolePresetsInput",
+    "UpdateRolePresetBody",
     "UpdateRolePresetInput",
 )
 
@@ -47,12 +48,14 @@ class CreateRolePresetInput(BaseRequestModel):
     )
 
 
-class UpdateRolePresetInput(BaseRequestModel):
-    """Input for updating a role preset's metadata. All fields optional for partial update.
+class UpdateRolePresetBody(BaseRequestModel):
+    """Mutable metadata of a role preset. All fields optional for partial update.
 
-    Permission entries are managed via the dedicated Add/Remove endpoints. The
-    ``deleted`` flag is managed through the dedicated Delete/Restore endpoints
-    and cannot be mutated here.
+    Used directly as the REST request body, where the preset ID is supplied as a
+    URL path segment instead of a body field. ``UpdateRolePresetInput`` extends
+    this with the ID for the GQL/adapter call path. Permission entries are
+    managed via the dedicated Add/Remove endpoints, and the ``deleted`` flag
+    through the dedicated Delete/Restore endpoints.
     """
 
     name: str | None = Field(default=None, min_length=1, max_length=64, description="Updated name.")
@@ -60,6 +63,16 @@ class UpdateRolePresetInput(BaseRequestModel):
         default=None,
         description="Updated default value for the `auto_assign` flag of instantiated roles.",
     )
+
+
+class UpdateRolePresetInput(UpdateRolePresetBody):
+    """Input for updating a role preset's metadata, carrying the target preset ID.
+
+    Extends ``UpdateRolePresetBody`` with ``role_preset_id`` for the GQL mutation
+    and adapter call path.
+    """
+
+    role_preset_id: RolePresetID = Field(description="ID of the role preset to update.")
 
 
 class BulkDeleteRolePresetsInput(BaseRequestModel):

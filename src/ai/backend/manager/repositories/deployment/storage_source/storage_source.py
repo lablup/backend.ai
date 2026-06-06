@@ -87,7 +87,7 @@ class DeploymentStorageSource:
             return None
         return FetchedModelDefinition(
             path=raw.filename,
-            model_definition=ModelDefinitionDraft.model_validate(dict(raw.payload)),
+            model_definition=ModelDefinitionDraft.from_file_payload(raw.payload),
         )
 
     async def _fetch_config_file_in_candidates(

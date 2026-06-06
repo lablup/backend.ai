@@ -181,7 +181,7 @@ Added in 26.4.2. Payload returned after admin creates a keypair. The secret_key 
 """
 type AdminCreateKeypairPayload {
   """The newly created keypair."""
-  keypair: KeyPairGQL!
+  keypair: KeyPairV2!
 
   """The secret key. Only returned at creation time."""
   secretKey: String!
@@ -272,7 +272,7 @@ input AdminUpdateKeypairInput {
 """Added in 26.4.2. Payload returned after admin updates a keypair."""
 type AdminUpdateKeypairPayload {
   """The updated keypair."""
-  keypair: KeyPairGQL!
+  keypair: KeyPairV2!
 }
 
 """Added in 26.1.0. Filter options for querying agents"""
@@ -1290,6 +1290,42 @@ type BulkAddRolePermissionFailureInfo {
 }
 
 """
+Added in UNRELEASED. Failure detail for a single permission entry in a bulk add operation.
+"""
+type BulkAddRolePermissionPresetFailureInfo {
+  """Entity type of the permission entry that failed."""
+  entityType: RBACElementType!
+
+  """Operation of the permission entry that failed."""
+  operation: OperationType!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-adding permission entries to an existing role preset.
+"""
+input BulkAddRolePermissionPresetsInput {
+  """ID of the role preset to add permissions to."""
+  rolePresetId: ID!
+
+  """Permission entries to insert. Duplicates are surfaced as failures."""
+  permissions: [RolePermissionPresetEntryInput!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-adding permission entries to a role preset.
+"""
+type BulkAddRolePermissionPresetsPayload {
+  """Permission entries that were added."""
+  items: [RolePermissionPreset!]!
+
+  """Permission entries that failed to be added (e.g., duplicates)."""
+  failed: [BulkAddRolePermissionPresetFailureInfo!]!
+}
+
+"""
 Added in UNRELEASED. Input for bulk-inserting scoped permissions across one or more roles
 """
 input BulkAddRolePermissionsInput {
@@ -1355,10 +1391,23 @@ input BulkCreateUserV2Input {
   users: [CreateUserV2Input!]!
 }
 
-"""Added in 26.2.0. Payload for bulk user creation mutation."""
+"""
+Added in 26.2.0. Payload for bulk user creation mutation. Deprecated since 26.4.4.
+"""
 type BulkCreateUsersV2Payload {
   """List of successfully created users."""
   createdUsers: [UserV2!]!
+
+  """List of errors for users that failed to create."""
+  failed: [BulkCreateUserV2Error!]!
+}
+
+"""
+Added in UNRELEASED. Payload for bulk user creation, including each user's generated keypair.
+"""
+type BulkCreateUsersWithKeypairV2Payload {
+  """List of successfully created users with their generated keypairs."""
+  created: [CreateUserV2Payload!]!
 
   """List of errors for users that failed to create."""
   failed: [BulkCreateUserV2Error!]!
@@ -1393,6 +1442,23 @@ type BulkDeleteModelCardsV2Payload {
   failed: [BulkDeleteModelCardV2Error!]!
 }
 
+"""Added in UNRELEASED. Input for bulk-soft-deleting role presets."""
+input BulkDeleteRolePresetsInput {
+  """Role preset UUIDs to soft-delete."""
+  rolePresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-soft-deleting role presets.
+"""
+type BulkDeleteRolePresetsPayload {
+  """Role presets that were soft-deleted."""
+  items: [RolePreset!]!
+
+  """Role preset IDs that failed to soft-delete."""
+  failed: [BulkRolePresetFailureInfo!]!
+}
+
 """Added in 26.4.2. Input for soft-deleting multiple virtual folders."""
 input BulkDeleteVFoldersV2Input {
   """List of VFolder UUIDs to soft-delete."""
@@ -1403,6 +1469,23 @@ input BulkDeleteVFoldersV2Input {
 type BulkDeleteVFoldersV2Payload {
   """Number of virtual folders successfully soft-deleted."""
   deletedCount: Int!
+}
+
+"""Added in UNRELEASED. Input for bulk-hard-deleting role presets."""
+input BulkPurgeRolePresetsInput {
+  """Role preset UUIDs to purge."""
+  rolePresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-hard-deleting role presets.
+"""
+type BulkPurgeRolePresetsPayload {
+  """Role presets that were purged."""
+  items: [RolePreset!]!
+
+  """Role preset IDs that failed to purge."""
+  failed: [BulkRolePresetFailureInfo!]!
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk purge."""
@@ -1490,6 +1573,25 @@ type BulkRemoveRolePermissionFailureInfo {
 }
 
 """
+Added in UNRELEASED. Input for bulk-removing permission entries from a role preset.
+"""
+input BulkRemoveRolePermissionPresetsInput {
+  """Permission entry row IDs to delete."""
+  permissionPresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-removing permission entries from a role preset.
+"""
+type BulkRemoveRolePermissionPresetsPayload {
+  """Permission entries that were removed."""
+  items: [RolePermissionPreset!]!
+
+  """Permission entry IDs that failed to delete."""
+  failed: [BulkRolePermissionPresetFailureInfo!]!
+}
+
+"""
 Added in UNRELEASED. Input for bulk-deleting permission rows by primary key
 """
 input BulkRemoveRolePermissionsInput {
@@ -1503,6 +1605,25 @@ type BulkRemoveRolePermissionsPayload {
 
   """Permission IDs that failed to delete"""
   failed: [BulkRemoveRolePermissionFailureInfo!]!
+}
+
+"""
+Added in UNRELEASED. Input for bulk-restoring soft-deleted role presets.
+"""
+input BulkRestoreRolePresetsInput {
+  """Role preset UUIDs to restore."""
+  rolePresetIds: [ID!]!
+}
+
+"""
+Added in UNRELEASED. Payload returned after bulk-restoring soft-deleted role presets.
+"""
+type BulkRestoreRolePresetsPayload {
+  """Role presets that were restored."""
+  items: [RolePreset!]!
+
+  """Role preset IDs that failed to restore."""
+  failed: [BulkRolePresetFailureInfo!]!
 }
 
 """
@@ -1529,6 +1650,28 @@ type BulkRevokeRolePayload {
 
   """Users that failed to be revoked"""
   failed: [BulkRevokeRoleError!]!
+}
+
+"""
+Added in UNRELEASED. Failure detail for a single permission entry in a bulk operation.
+"""
+type BulkRolePermissionPresetFailureInfo {
+  """role_permission_presets row ID that the operation failed on."""
+  permissionPresetId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
+Added in UNRELEASED. Failure detail for a single role preset ID in a bulk operation.
+"""
+type BulkRolePresetFailureInfo {
+  """Role preset ID that the operation failed on."""
+  rolePresetId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk update."""
@@ -1956,7 +2099,7 @@ type CreateCategoryPayload {
 }
 
 """Added in 26.4.2. Input for creating a container registry."""
-input CreateContainerRegistryInputGQL {
+input CreateContainerRegistryInputV2 {
   """URL of the container registry."""
   url: String!
 
@@ -1988,7 +2131,7 @@ input CreateContainerRegistryInputGQL {
 """
 Added in 26.4.2. Payload for container registry create/update mutations.
 """
-type CreateContainerRegistryPayloadGQL {
+type CreateContainerRegistryPayload {
   """Created container registry."""
   registry: ContainerRegistryV2!
 }
@@ -2083,13 +2226,13 @@ input CreateDeploymentRevisionPresetInput {
 }
 
 """Added in 26.4.2. Create deployment revision preset payload."""
-type CreateDeploymentRevisionPresetPayloadGQL {
+type CreateDeploymentRevisionPresetPayload {
   """The created preset."""
   preset: DeploymentRevisionPreset!
 }
 
 """Added in 26.4.2. Input for creating a new domain."""
-input CreateDomainInputGQL {
+input CreateDomainInput {
   """Domain name. Must be unique across the system."""
   name: String!
 
@@ -2137,8 +2280,21 @@ type CreateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
+"""
+Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
+"""
+type CreateKeypairPayload {
+  """The newly created keypair."""
+  keypair: KeyPairV2!
+
+  """
+  The secret key of the generated keypair. Only returned at creation time.
+  """
+  secretKey: String!
+}
+
 """Added in 26.4.2. Input for creating a keypair resource policy."""
-input CreateKeypairResourcePolicyInputGQL {
+input CreateKeypairResourcePolicyInput {
   """Policy name. Must be unique."""
   name: String!
 
@@ -2176,7 +2332,7 @@ input CreateKeypairResourcePolicyInputGQL {
 """
 Added in 26.4.2. Payload for keypair resource policy create/update mutations.
 """
-type CreateKeypairResourcePolicyPayloadGQL {
+type CreateKeypairResourcePolicyPayload {
   """Created keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
 }
@@ -2197,7 +2353,7 @@ type CreateLoginClientTypePayload {
 }
 
 """Added in 26.4.2. Create model card payload."""
-type CreateModelCardPayloadGQL {
+type CreateModelCardPayload {
   """The created model card."""
   modelCard: ModelCardV2!
 }
@@ -2312,7 +2468,7 @@ input CreatePermissionInput {
 }
 
 """Added in 26.4.2. Input for creating a new project."""
-input CreateProjectInputGQL {
+input CreateProjectInput {
   """Project name. Must be unique within the domain."""
   name: String!
 
@@ -2330,7 +2486,7 @@ input CreateProjectInputGQL {
 }
 
 """Added in 26.4.2. Input for creating a project resource policy."""
-input CreateProjectResourcePolicyInputGQL {
+input CreateProjectResourcePolicyInputV2 {
   """Policy name. Must be unique."""
   name: String!
 
@@ -2347,7 +2503,7 @@ input CreateProjectResourcePolicyInputGQL {
 """
 Added in 26.4.2. Payload for project resource policy create/update mutations.
 """
-type CreateProjectResourcePolicyPayloadGQL {
+type CreateProjectResourcePolicyPayload {
   """Created project resource policy."""
   projectResourcePolicy: ProjectResourcePolicyV2!
 }
@@ -2413,13 +2569,13 @@ input CreateResourceGroupInput {
 }
 
 """Added in 26.4.2. Payload for resource group creation."""
-type CreateResourceGroupPayloadGQL {
+type CreateResourceGroupPayload {
   """Created resource group."""
   resourceGroup: ResourceGroup!
 }
 
 """Added in 26.4.2. Payload for resource preset creation."""
-type CreateResourcePresetPayloadGQL {
+type CreateResourcePresetPayload {
   """Created resource preset."""
   resourcePreset: ResourcePresetV2!
 }
@@ -2467,6 +2623,11 @@ input CreateRoleInput {
   name: String!
   description: String = null
   source: RoleSource! = CUSTOM
+
+  """
+  Added in UNRELEASED. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  """
+  autoAssign: Boolean! = false
   scopes: [ScopeInput!] = null
 }
 
@@ -2482,6 +2643,29 @@ type CreateRoleInvitationPayload {
   items: [RoleInvitation!]!
 }
 
+"""Added in UNRELEASED. Input for creating a new role preset."""
+input CreateRolePresetInput {
+  """Role preset name."""
+  name: String!
+
+  """Scope type this preset targets (e.g., domain, project)."""
+  scopeType: RBACElementType!
+
+  """
+  Default value for the `auto_assign` flag on roles instantiated from this preset.
+  """
+  autoAssign: Boolean! = false
+
+  """Permission entries carried by the preset."""
+  permissions: [RolePermissionPresetEntryInput!]!
+}
+
+"""Added in UNRELEASED. Payload returned after creating a role preset."""
+type CreateRolePresetPayload {
+  """Created role preset."""
+  rolePreset: RolePreset!
+}
+
 """Added in 26.4.2. Input for creating a runtime variant."""
 input CreateRuntimeVariantInput {
   """
@@ -2494,7 +2678,7 @@ input CreateRuntimeVariantInput {
 }
 
 """Added in 26.4.2. Payload for runtime variant creation."""
-type CreateRuntimeVariantPayloadGQL {
+type CreateRuntimeVariantPayload {
   """The created runtime variant."""
   runtimeVariant: RuntimeVariant!
 }
@@ -2530,7 +2714,7 @@ input CreateRuntimeVariantPresetInput {
 }
 
 """Added in 26.4.2. Create preset payload."""
-type CreateRuntimeVariantPresetPayloadGQL {
+type CreateRuntimeVariantPresetPayload {
   """The created preset."""
   preset: RuntimeVariantPreset!
 }
@@ -2560,7 +2744,7 @@ type CreateUploadSessionV2Payload {
 }
 
 """Added in 26.4.2. Input for creating a user resource policy."""
-input CreateUserResourcePolicyInputGQL {
+input CreateUserResourcePolicyInputV2 {
   """Policy name. Must be unique."""
   name: String!
 
@@ -2585,7 +2769,7 @@ input CreateUserResourcePolicyInputGQL {
 """
 Added in 26.4.2. Payload for user resource policy create/update mutations.
 """
-type CreateUserResourcePolicyPayloadGQL {
+type CreateUserResourcePolicyPayload {
   """Created user resource policy."""
   userResourcePolicy: UserResourcePolicyV2!
 }
@@ -2650,6 +2834,11 @@ input CreateUserV2Input {
 type CreateUserV2Payload {
   """The newly created user."""
   user: UserV2!
+
+  """
+  The default keypair automatically generated for the user, including its one-time secret key.
+  """
+  keypair: CreateKeypairPayload!
 }
 
 """Added in 25.16.0. Input for creating VFS storage"""
@@ -2920,7 +3109,7 @@ input DelegateImportArtifactsInput {
   """
   Added in 26.1.0. Options controlling import behavior such as forcing re-download.
   """
-  options: ImportArtifactsOptionsGQL = null
+  options: ImportArtifactsOptions = null
 }
 
 """
@@ -3020,7 +3209,7 @@ type DeleteCategoryPayload {
 }
 
 """Added in 26.4.2. Payload for container registry deletion."""
-type DeleteContainerRegistryPayloadGQL {
+type DeleteContainerRegistryPayload {
   """ID of the deleted container registry."""
   id: String!
 }
@@ -3037,7 +3226,7 @@ type DeleteDeploymentPayload {
 }
 
 """Added in 26.4.2. Delete deployment revision preset payload."""
-type DeleteDeploymentRevisionPresetPayloadGQL {
+type DeleteDeploymentRevisionPresetPayload {
   """ID of the deleted preset."""
   id: UUID!
 }
@@ -3056,7 +3245,7 @@ type DeleteDomainConfigPayload {
 }
 
 """Added in 26.4.2. Payload for domain deletion mutation."""
-type DeleteDomainPayloadGQL {
+type DeleteDomainPayload {
   """Whether the deletion was successful."""
   deleted: Boolean!
 }
@@ -3090,7 +3279,7 @@ type DeleteHuggingFaceRegistryPayload {
 }
 
 """Added in 26.4.2. Payload for keypair resource policy deletion."""
-type DeleteKeypairResourcePolicyPayloadGQL {
+type DeleteKeypairResourcePolicyPayload {
   """Name of the deleted keypair resource policy."""
   name: String!
 }
@@ -3102,7 +3291,7 @@ type DeleteLoginClientTypePayload {
 }
 
 """Added in 26.4.2. Delete model card payload."""
-type DeleteModelCardPayloadGQL {
+type DeleteModelCardPayload {
   """ID of the deleted model card."""
   id: UUID!
 }
@@ -3160,13 +3349,13 @@ type DeletePermissionPayload {
 }
 
 """Added in 26.4.2. Payload for project deletion mutation."""
-type DeleteProjectPayloadGQL {
+type DeleteProjectPayload {
   """Whether the deletion was successful."""
   deleted: Boolean!
 }
 
 """Added in 26.4.2. Payload for project resource policy deletion."""
-type DeleteProjectResourcePolicyPayloadGQL {
+type DeleteProjectResourcePolicyPayload {
   """Name of the deleted project resource policy."""
   name: String!
 }
@@ -3189,13 +3378,13 @@ type DeleteReservoirRegistryPayload {
 }
 
 """Added in 26.4.2. Payload for resource group deletion."""
-type DeleteResourceGroupPayloadGQL {
+type DeleteResourceGroupPayload {
   """Name of the deleted resource group."""
   id: String!
 }
 
 """Added in 26.4.2. Payload for resource preset deletion."""
-type DeleteResourcePresetPayloadGQL {
+type DeleteResourcePresetPayload {
   """UUID of the deleted resource preset."""
   id: String!
 }
@@ -3212,13 +3401,13 @@ type DeleteRolePayload {
 }
 
 """Added in 26.4.2. Payload for runtime variant deletion."""
-type DeleteRuntimeVariantPayloadGQL {
+type DeleteRuntimeVariantPayload {
   """ID of the deleted runtime variant."""
   id: UUID!
 }
 
 """Added in 26.4.2. Delete preset payload."""
-type DeleteRuntimeVariantPresetPayloadGQL {
+type DeleteRuntimeVariantPresetPayload {
   """ID of the deleted preset."""
   id: UUID!
 }
@@ -3230,7 +3419,7 @@ input DeleteRuntimeVariantsInput {
 }
 
 """Added in 26.4.2. Payload for bulk runtime variant deletion."""
-type DeleteRuntimeVariantsPayloadGQL {
+type DeleteRuntimeVariantsPayload {
   """Number of runtime variants successfully deleted."""
   deletedCount: Int!
 }
@@ -3252,7 +3441,7 @@ type DeleteUserConfigPayload {
 }
 
 """Added in 26.4.2. Payload for user resource policy deletion."""
-type DeleteUserResourcePolicyPayloadGQL {
+type DeleteUserResourcePolicyPayload {
   """Name of the deleted user resource policy."""
   name: String!
 }
@@ -3411,12 +3600,12 @@ input DeploymentFilter {
 }
 
 """Added in UNRELEASED. Deployment handler-options policy response."""
-type DeploymentHandlerOptionsInfoGQL {
+type DeploymentHandlerOptionsInfo {
   """Fallback per-handler policy."""
-  default: HandlerOptionsInfoGQL!
+  default: HandlerOptionsInfo!
 
   """Per-handler overrides."""
-  byHandler: [HandlerOptionsEntryInfoGQL!]!
+  byHandler: [HandlerOptionsEntryInfo!]!
 }
 
 """Added in UNRELEASED. Deployment handler-options policy input."""
@@ -3499,9 +3688,9 @@ enum DeploymentHistoryOrderField {
 }
 
 """Added in UNRELEASED. Deployment options payload response."""
-type DeploymentOptionsInfoGQL {
+type DeploymentOptionsInfo {
   """Handler-keyed scheduler policy (timeout + retry)."""
-  handlerOptions: DeploymentHandlerOptionsInfoGQL!
+  handlerOptions: DeploymentHandlerOptionsInfo!
 }
 
 """Added in UNRELEASED. Deployment options payload input."""
@@ -3716,7 +3905,7 @@ input DeploymentStatusFilter {
 """
 Added in 25.19.0. Represents the deployment strategy configuration that determines how updates are rolled out to replicas (e.g., rolling update, blue-green).
 """
-type DeploymentStrategyGQL {
+type DeploymentStrategy {
   type: DeploymentStrategyType!
 }
 
@@ -3910,7 +4099,7 @@ extend type DomainNode @key(fields: "id") {
 }
 
 """Added in 26.4.2. Payload for domain mutation responses."""
-type DomainPayloadGQL {
+type DomainPayload {
   """The domain entity."""
   domain: DomainV2!
 }
@@ -4480,7 +4669,7 @@ input ExecuteQueryDefinitionOptionsInput {
 """
 Added in 25.19.0. An extra virtual folder mount attached to a model revision.
 """
-type ExtraVFolderMountInfoGQL {
+type ExtraVFolderMountInfo {
   """The vfolder of this entity."""
   vfolder: VirtualFolderNode
   vfolderId: ID!
@@ -4620,7 +4809,7 @@ extend type GroupNode @key(fields: "id") {
 """
 Added in UNRELEASED. A single (handler_name, options) entry response for deployment handler options.
 """
-type HandlerOptionsEntryInfoGQL {
+type HandlerOptionsEntryInfo {
   """Phase timeout in seconds; `null` means unbounded for this entry."""
   timeoutSec: Int
 
@@ -4645,7 +4834,7 @@ input HandlerOptionsEntryInput {
 """
 Added in UNRELEASED. Per-handler scheduler policy snapshot for deployment handler options.
 """
-type HandlerOptionsInfoGQL {
+type HandlerOptionsInfo {
   """Phase timeout in seconds; `null` means unbounded for this entry."""
   timeoutSec: Int
 
@@ -4742,7 +4931,7 @@ type ImageV2 implements Node {
   lastUsed: DateTime
 
   """Added in 26.2.0. Aliases for this image."""
-  aliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection
+  aliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection
 }
 
 """
@@ -4795,7 +4984,7 @@ input ImageV2AliasFilter {
 """
 Added in 26.2.0. Specifies the field and direction for ordering image aliases in queries.
 """
-input ImageV2AliasOrderByGQL {
+input ImageV2AliasOrderBy {
   field: ImageV2AliasOrderField!
   direction: OrderDirection! = ASC
 }
@@ -4903,7 +5092,7 @@ type ImageV2MetadataInfo {
 """
 Added in 26.2.0. Specifies the field and direction for ordering images in queries.
 """
-input ImageV2OrderByGQL {
+input ImageV2OrderBy {
   field: ImageV2OrderField!
   direction: OrderDirection! = ASC
 }
@@ -5003,7 +5192,7 @@ input ImportArtifactsInput {
   """
   Added in 26.1.0. Options controlling import behavior such as forcing re-download.
   """
-  options: ImportArtifactsOptionsGQL = null
+  options: ImportArtifactsOptions = null
 }
 
 """
@@ -5011,7 +5200,7 @@ Added in 24.09.0. Options for importing artifact revisions.
 
 Controls import behavior such as forcing re-download regardless of digest freshness.
 """
-input ImportArtifactsOptionsGQL {
+input ImportArtifactsOptions {
   """Force re-download regardless of digest freshness check."""
   force: Boolean! = false
 }
@@ -5062,7 +5251,7 @@ Added in 26.2.0. Payload returned after issuing a new keypair. The secret_key is
 """
 type IssueMyKeypairPayload {
   """The newly created keypair."""
-  keypair: KeyPairGQL!
+  keypair: KeyPairV2!
 
   """
   The newly generated secret key. This value is only returned at creation time.
@@ -5370,7 +5559,7 @@ type KeyPairConnection {
   pageInfo: PageInfo!
 
   """Contains the nodes in this connection"""
-  edges: [KeyPairGQLEdge!]!
+  edges: [KeyPairV2Edge!]!
 
   """Total number of keypair records matching the query criteria."""
   count: Int!
@@ -5379,7 +5568,7 @@ type KeyPairConnection {
 """
 Added in 26.4.2. Keypair entity representing an API access key. The access_key field serves as the unique identifier. Secret key and private SSH key are excluded for security reasons.
 """
-type KeyPairGQL implements Node {
+type KeyPairV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
@@ -5421,12 +5610,12 @@ type KeyPairGQL implements Node {
 }
 
 """An edge in a connection."""
-type KeyPairGQLEdge {
+type KeyPairV2Edge {
   """A cursor for use in pagination"""
   cursor: String!
 
   """The item at the end of the edge"""
-  node: KeyPairGQL!
+  node: KeyPairV2!
 }
 
 """
@@ -5437,6 +5626,9 @@ input KeypairFilter {
   isAdmin: Boolean = null
   accessKey: StringFilter = null
   resourcePolicy: StringFilter = null
+
+  """Added in UNRELEASED. Filter keypairs by the UUID of their owner."""
+  userId: UUIDFilter = null
   createdAt: DateTimeFilter = null
   lastUsed: DateTimeFilter = null
   AND: [KeypairFilter!] = null
@@ -6146,10 +6338,10 @@ type ModelDeployment implements Node {
   networkAccess: ModelDeploymentNetworkAccess!
   currentRevisionId: ID
   deployingRevisionId: ID
-  defaultDeploymentStrategy: DeploymentStrategyGQL!
+  defaultDeploymentStrategy: DeploymentStrategy!
   replicaState: ReplicaState!
   createdUserId: ID!
-  options: DeploymentOptionsInfoGQL!
+  options: DeploymentOptionsInfo!
 
   """
   Added in UNRELEASED. Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle). ``SCALING`` while the replica reconciler is adjusting replica count; ``STABLE`` once holding at the desired count.
@@ -6266,6 +6458,11 @@ input ModelDeploymentNetworkAccessInput {
 
 """Added in 26.4.2. Health check configuration for a model service."""
 type ModelHealthCheck {
+  """
+  Whether the route is health-checked. When false the route activates immediately.
+  """
+  enable: Boolean!
+
   """Interval in seconds between health checks."""
   interval: Float!
 
@@ -6287,6 +6484,11 @@ type ModelHealthCheck {
 
 """Added in 26.4.0. Health check configuration for a model service."""
 input ModelHealthCheckInput {
+  """
+  Whether the route should be health-checked. When false the route activates immediately and the remaining fields are ignored.
+  """
+  enable: Boolean! = false
+
   """Interval in seconds between health checks."""
   interval: Float = null
 
@@ -6516,7 +6718,7 @@ type ModelRevision implements Node {
   modelDefinition: ModelDefinition
 
   """Additional volume folder mounts."""
-  extraMounts: [ExtraVFolderMountInfoGQL!]!
+  extraMounts: [ExtraVFolderMountInfo!]!
 
   """
   Added in UNRELEASED. ID of the deployment-level preset that produced this revision. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
@@ -6818,13 +7020,13 @@ type Mutation {
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload
 
   """Added in 26.4.2. Create a new container registry (admin only)."""
-  adminCreateContainerRegistryV2(input: CreateContainerRegistryInputGQL!): CreateContainerRegistryPayloadGQL
+  adminCreateContainerRegistryV2(input: CreateContainerRegistryInputV2!): CreateContainerRegistryPayload
 
   """Added in 26.4.2. Update a container registry (admin only)."""
-  adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInputGQL!): UpdateContainerRegistryPayloadGQL
+  adminUpdateContainerRegistryV2(input: UpdateContainerRegistryInput!): UpdateContainerRegistryPayload
 
   """Added in 26.4.2. Delete a container registry (admin only)."""
-  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayloadGQL
+  adminDeleteContainerRegistryV2(id: String!): DeleteContainerRegistryPayload
 
   """Added in 25.16.0. Create model deployment."""
   createModelDeployment(input: CreateDeploymentInput!): CreateDeploymentPayload
@@ -7073,10 +7275,10 @@ type Mutation {
   adminUpdateResourceGroup(input: UpdateResourceGroupInput!): UpdateResourceGroupPayload
 
   """Added in 26.4.2. Create a new resource group (admin only)."""
-  adminCreateResourceGroupV2(input: CreateResourceGroupInput!): CreateResourceGroupPayloadGQL
+  adminCreateResourceGroupV2(input: CreateResourceGroupInput!): CreateResourceGroupPayload
 
   """Added in 26.4.2. Delete a resource group (admin only)."""
-  adminDeleteResourceGroupV2(name: String!): DeleteResourceGroupPayloadGQL
+  adminDeleteResourceGroupV2(name: String!): DeleteResourceGroupPayload
 
   """
   Added in 26.4.2. Update allowed resource groups for a domain (admin only).
@@ -7116,42 +7318,42 @@ type Mutation {
   """
   Added in 26.4.2. Create a new domain (admin only). Requires superadmin privileges.
   """
-  adminCreateDomainV2(input: CreateDomainInputGQL!): DomainPayloadGQL
+  adminCreateDomainV2(input: CreateDomainInput!): DomainPayload
 
   """
   Added in 26.4.2. Update a domain (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateDomainV2(domainName: String!, input: UpdateDomainInputGQL!): DomainPayloadGQL
+  adminUpdateDomainV2(domainName: String!, input: UpdateDomainInput!): DomainPayload
 
   """
   Added in 26.4.2. Soft-delete a domain (admin only). Requires superadmin privileges.
   """
-  adminDeleteDomainV2(domainName: String!): DeleteDomainPayloadGQL
+  adminDeleteDomainV2(domainName: String!): DeleteDomainPayload
 
   """
   Added in 26.4.2. Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.
   """
-  adminPurgeDomainV2(domainName: String!): PurgeDomainPayloadGQL
+  adminPurgeDomainV2(domainName: String!): PurgeDomainPayload
 
   """
   Added in 26.4.2. Create a new project (admin only). Requires superadmin privileges.
   """
-  adminCreateProjectV2(input: CreateProjectInputGQL!): ProjectPayloadGQL
+  adminCreateProjectV2(input: CreateProjectInput!): ProjectPayload
 
   """
   Added in 26.4.2. Update a project (admin only). Requires superadmin privileges. Only provided fields will be updated.
   """
-  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInputGQL!): ProjectPayloadGQL
+  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInput!): ProjectPayload
 
   """
   Added in 26.4.2. Soft-delete a project (admin only). Requires superadmin privileges.
   """
-  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayloadGQL
+  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayload
 
   """
   Added in 26.4.2. Permanently purge a project and all associated data (admin only). Requires superadmin privileges.
   """
-  adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayloadGQL
+  adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayload
 
   """
   Added in 26.4.2. Unassign users from a project. RBAC validates project admin permission.
@@ -7164,9 +7366,14 @@ type Mutation {
   adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload
 
   """
-  Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications
+  Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications. Deprecated since 26.4.4.
   """
-  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload
+  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload @deprecated(reason: "Use adminBulkCreateUsersWithKeypairV2 instead, which also returns each created user's generated keypair and secret key.")
+
+  """
+  Added in UNRELEASED. Create multiple users in bulk (admin only). Requires superadmin privileges. Returns each created user together with its automatically generated keypair and secret key (the secret key is only returned at creation time).
+  """
+  adminBulkCreateUsersWithKeypairV2(input: BulkCreateUserV2Input!): BulkCreateUsersWithKeypairV2Payload
 
   """
   Added in 26.3.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications
@@ -7275,6 +7482,35 @@ type Mutation {
   """Added in 26.3.0. Delete a query preset category (admin only)."""
   adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload
 
+  """Added in UNRELEASED. Create a new role preset (admin only)."""
+  adminCreateRolePreset(input: CreateRolePresetInput!): CreateRolePresetPayload
+
+  """
+  Added in UNRELEASED. Update an existing role preset's metadata (admin only).
+  """
+  adminUpdateRolePreset(input: UpdateRolePresetInput!): UpdateRolePresetPayload
+
+  """Added in UNRELEASED. Bulk-soft-delete role presets (admin only)."""
+  adminDeleteRolePresets(input: BulkDeleteRolePresetsInput!): BulkDeleteRolePresetsPayload
+
+  """
+  Added in UNRELEASED. Bulk-restore soft-deleted role presets (admin only).
+  """
+  adminRestoreRolePresets(input: BulkRestoreRolePresetsInput!): BulkRestoreRolePresetsPayload
+
+  """Added in UNRELEASED. Bulk-hard-delete role presets (admin only)."""
+  adminPurgeRolePresets(input: BulkPurgeRolePresetsInput!): BulkPurgeRolePresetsPayload
+
+  """
+  Added in UNRELEASED. Bulk-add permission entries to an existing role preset (admin only).
+  """
+  adminBulkAddRolePresetPermissions(input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload
+
+  """
+  Added in UNRELEASED. Bulk-remove permission entries from a role preset (admin only).
+  """
+  adminBulkRemoveRolePresetPermissions(input: BulkRemoveRolePermissionPresetsInput!): BulkRemoveRolePermissionPresetsPayload
+
   """Added in 26.3.0. Create a new role (admin only)."""
   adminCreateRole(input: CreateRoleInput!): Role
 
@@ -7336,46 +7572,46 @@ type Mutation {
   adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation
 
   """Added in 26.4.2. Create a new keypair resource policy (admin only)."""
-  adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInputGQL!): CreateKeypairResourcePolicyPayloadGQL
+  adminCreateKeypairResourcePolicyV2(input: CreateKeypairResourcePolicyInput!): CreateKeypairResourcePolicyPayload
 
   """
   Added in 26.4.2. Update a keypair resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateKeypairResourcePolicyV2(name: String!, input: UpdateKeypairResourcePolicyInputGQL!): UpdateKeypairResourcePolicyPayloadGQL
+  adminUpdateKeypairResourcePolicyV2(name: String!, input: UpdateKeypairResourcePolicyInput!): UpdateKeypairResourcePolicyPayload
 
   """Added in 26.4.2. Delete a keypair resource policy (admin only)."""
-  adminDeleteKeypairResourcePolicyV2(name: String!): DeleteKeypairResourcePolicyPayloadGQL
+  adminDeleteKeypairResourcePolicyV2(name: String!): DeleteKeypairResourcePolicyPayload
 
   """Added in 26.4.2. Create a new user resource policy (admin only)."""
-  adminCreateUserResourcePolicyV2(input: CreateUserResourcePolicyInputGQL!): CreateUserResourcePolicyPayloadGQL
+  adminCreateUserResourcePolicyV2(input: CreateUserResourcePolicyInputV2!): CreateUserResourcePolicyPayload
 
   """
   Added in 26.4.2. Update a user resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateUserResourcePolicyV2(name: String!, input: UpdateUserResourcePolicyInputGQL!): UpdateUserResourcePolicyPayloadGQL
+  adminUpdateUserResourcePolicyV2(name: String!, input: UpdateUserResourcePolicyInput!): UpdateUserResourcePolicyPayload
 
   """Added in 26.4.2. Delete a user resource policy (admin only)."""
-  adminDeleteUserResourcePolicyV2(name: String!): DeleteUserResourcePolicyPayloadGQL
+  adminDeleteUserResourcePolicyV2(name: String!): DeleteUserResourcePolicyPayload
 
   """Added in 26.4.2. Create a new project resource policy (admin only)."""
-  adminCreateProjectResourcePolicyV2(input: CreateProjectResourcePolicyInputGQL!): CreateProjectResourcePolicyPayloadGQL
+  adminCreateProjectResourcePolicyV2(input: CreateProjectResourcePolicyInputV2!): CreateProjectResourcePolicyPayload
 
   """
   Added in 26.4.2. Update a project resource policy (admin only). Only provided fields will be updated.
   """
-  adminUpdateProjectResourcePolicyV2(name: String!, input: UpdateProjectResourcePolicyInputGQL!): UpdateProjectResourcePolicyPayloadGQL
+  adminUpdateProjectResourcePolicyV2(name: String!, input: UpdateProjectResourcePolicyInput!): UpdateProjectResourcePolicyPayload
 
   """Added in 26.4.2. Delete a project resource policy (admin only)."""
-  adminDeleteProjectResourcePolicyV2(name: String!): DeleteProjectResourcePolicyPayloadGQL
+  adminDeleteProjectResourcePolicyV2(name: String!): DeleteProjectResourcePolicyPayload
 
   """Added in 26.4.2. Create a new resource preset (admin only)."""
-  adminCreateResourcePresetV2(input: CreateResourcePresetV2Input!): CreateResourcePresetPayloadGQL
+  adminCreateResourcePresetV2(input: CreateResourcePresetV2Input!): CreateResourcePresetPayload
 
   """Added in 26.4.2. Update a resource preset (admin only)."""
-  adminUpdateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayloadGQL
+  adminUpdateResourcePresetV2(input: UpdateResourcePresetV2Input!): UpdateResourcePresetPayload
 
   """Added in 26.4.2. Delete a resource preset (admin only)."""
-  adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayloadGQL
+  adminDeleteResourcePresetV2(id: UUID!): DeleteResourcePresetPayload
 
   """Added in 26.4.2. Create a new login client type (super admin only)."""
   adminCreateLoginClientType(input: CreateLoginClientTypeInput!): CreateLoginClientTypePayload
@@ -7387,43 +7623,43 @@ type Mutation {
   adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload
 
   """Added in 26.4.2. Create a new runtime variant (superadmin only)."""
-  adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayloadGQL
+  adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload
 
   """Added in 26.4.2. Update a runtime variant (superadmin only)."""
-  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayloadGQL
+  adminUpdateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload
 
   """Added in 26.4.2. Delete a runtime variant (superadmin only)."""
-  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayloadGQL
+  adminDeleteRuntimeVariant(id: UUID!): DeleteRuntimeVariantPayload
 
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
-  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayloadGQL
+  adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload
 
   """Added in 26.4.2. Create a runtime variant preset (superadmin only)."""
-  adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayloadGQL
+  adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayload
 
   """Added in 26.4.2. Update a runtime variant preset (superadmin only)."""
-  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayloadGQL
+  adminUpdateRuntimeVariantPreset(input: UpdateRuntimeVariantPresetInput!): UpdateRuntimeVariantPresetPayload
 
   """Added in 26.4.2. Delete a runtime variant preset (superadmin only)."""
-  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayloadGQL
+  adminDeleteRuntimeVariantPreset(id: UUID!): DeleteRuntimeVariantPresetPayload
 
   """Added in 26.4.2. Create a deployment revision preset (admin only)."""
-  adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayloadGQL
+  adminCreateDeploymentRevisionPreset(input: CreateDeploymentRevisionPresetInput!): CreateDeploymentRevisionPresetPayload
 
   """Added in 26.4.2. Update a deployment revision preset (admin only)."""
-  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayloadGQL
+  adminUpdateDeploymentRevisionPreset(input: UpdateDeploymentRevisionPresetInput!): UpdateDeploymentRevisionPresetPayload
 
   """Added in 26.4.2. Delete a deployment revision preset (admin only)."""
-  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayloadGQL
+  adminDeleteDeploymentRevisionPreset(id: UUID!): DeleteDeploymentRevisionPresetPayload
 
   """Added in 26.4.2. Create a model card (admin only)."""
-  adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayloadGQL
+  adminCreateModelCardV2(input: CreateModelCardV2Input!): CreateModelCardPayload
 
   """Added in 26.4.2. Update a model card (admin only)."""
-  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayloadGQL
+  adminUpdateModelCardV2(input: UpdateModelCardV2Input!): UpdateModelCardPayload
 
   """Added in 26.4.2. Delete a model card (admin only)."""
-  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayloadGQL
+  adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload
 
   """
   Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
@@ -8337,7 +8573,7 @@ type ProjectOrganizationInfo {
 }
 
 """Added in 26.4.2. Payload for project mutation responses."""
-type ProjectPayloadGQL {
+type ProjectPayload {
   """The project entity."""
   project: ProjectV2!
 }
@@ -8732,13 +8968,13 @@ input ProjectWeightInputItem {
 }
 
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""
-type PurgeDomainPayloadGQL {
+type PurgeDomainPayload {
   """Whether the purge was successful."""
   purged: Boolean!
 }
 
 """Added in 26.4.2. Payload for project permanent deletion mutation."""
-type PurgeProjectPayloadGQL {
+type PurgeProjectPayload {
   """Whether the purge was successful."""
   purged: Boolean!
 }
@@ -8997,7 +9233,7 @@ type Query {
   """
   Added in 26.2.0. Query images with optional filtering, ordering, and pagination (admin only). Returns container images available in the system. Images are container specifications that define runtime environments for compute sessions. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.
   """
-  adminImagesV2(filter: ImageV2Filter = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
+  adminImagesV2(filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
 
   """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
@@ -9063,7 +9299,7 @@ type Query {
   """
   Added in 26.2.0. Query image aliases with optional filtering, ordering, and pagination. Returns image aliases that provide alternative names for container images. Use filters to search by alias string. Supports both cursor-based and offset-based pagination.
   """
-  adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
+  adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
   """
   Added in 26.4.2. Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.
@@ -9094,6 +9330,14 @@ type Query {
   Added in 26.4.2. List query preset categories with filtering and pagination. Available to any authenticated user.
   """
   prometheusQueryPresetCategories(filter: CategoryFilter = null, orderBy: [CategoryOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [QueryPresetCategory!]
+
+  """Added in UNRELEASED. Get a single role preset by ID (admin only)."""
+  adminRolePreset(id: ID!): RolePreset
+
+  """
+  Added in UNRELEASED. List role presets with filtering and pagination (admin only).
+  """
+  adminRolePresets(filter: RolePresetFilter = null, orderBy: [RolePresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePresetConnection
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role
@@ -9126,7 +9370,7 @@ type Query {
   """
   Added in 26.4.2. Get a single keypair by access key (admin only). Requires superadmin privileges.
   """
-  adminKeypairV2(accessKey: String!): KeyPairGQL
+  adminKeypairV2(accessKey: String!): KeyPairV2
 
   """
   Added in 26.4.2. List all keypairs with filtering and pagination (admin only). Requires superadmin privileges.
@@ -9209,12 +9453,12 @@ type Query {
   """
   Added in 26.2.0. Query images within a specific container registry with optional filtering, ordering, and pagination. Returns container images that belong to the specified registry. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.
   """
-  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageV2Filter = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
+  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
 
   """
   Added in 26.2.0. Query image aliases within a specific image with optional filtering, ordering, and pagination. Returns image aliases that belong to the specified image. Supports both cursor-based and offset-based pagination.
   """
-  imageScopedAliases(scope: ImageV2Scope!, filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
+  imageScopedAliases(scope: ImageV2Scope!, filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
   """Added in 26.2.0. Get scheduling history for a specific session."""
   sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
@@ -9879,7 +10123,7 @@ type ReplaceResourceGroupDefaultDeploymentOptionsPayload {
   resourceGroupName: String!
 
   """The newly persisted ``default_deployment_options`` surface."""
-  defaultDeploymentOptions: DeploymentOptionsInfoGQL!
+  defaultDeploymentOptions: DeploymentOptionsInfo!
 }
 
 """
@@ -10125,7 +10369,7 @@ type ResourceGroup implements Node {
   """
   Added in UNRELEASED. Default deployment options (timeouts, etc.) snapshot-copied onto each new deployment created in this resource group.
   """
-  defaultDeploymentOptions: DeploymentOptionsInfoGQL!
+  defaultDeploymentOptions: DeploymentOptionsInfo!
 
   """
   Added in UNRELEASED. Default session options used as the fallback layer for the scheduling controller's options resolver at session enqueue time.
@@ -10634,6 +10878,11 @@ type Role implements Node {
   updatedAt: DateTime!
   deletedAt: DateTime
 
+  """
+  Added in UNRELEASED. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  """
+  autoAssign: Boolean!
+
   """Added in 26.3.0. Permissions associated with this role."""
   permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection
 
@@ -10881,6 +11130,207 @@ input RoleOrderBy {
 """Added in 26.3.0. Role ordering field"""
 enum RoleOrderField {
   NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Added in UNRELEASED. A stored permission entry under a role preset."""
+type RolePermissionPreset implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the parent role preset."""
+  rolePresetId: UUID!
+
+  """Entity type the permission applies to."""
+  entityType: RBACElementType!
+
+  """Operation granted by the permission."""
+  operation: OperationType!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+}
+
+"""
+Added in UNRELEASED. Paginated connection for role permission preset entries.
+"""
+type RolePermissionPresetConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RolePermissionPresetEdge!]!
+
+  """Total number of permission entries matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RolePermissionPresetEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RolePermissionPreset!
+}
+
+"""
+Added in UNRELEASED. A single (entity_type, operation) pair carried by a role preset.
+"""
+input RolePermissionPresetEntryInput {
+  """Entity type the permission applies to."""
+  entityType: RBACElementType!
+
+  """Operation granted by the permission."""
+  operation: OperationType!
+}
+
+"""
+Added in UNRELEASED. Filter input for role permission preset entries. Also used as the input for the `permission_presets` field resolver on a role preset (the resolver injects `role_preset_id` from its parent).
+"""
+input RolePermissionPresetFilter {
+  """Filter by parent role preset ID."""
+  rolePresetId: UUIDFilter = null
+
+  """Filter by entity type the permission applies to."""
+  entityType: RBACElementTypeFilter = null
+
+  """Filter by granted operation."""
+  operation: OperationTypeFilter = null
+
+  """Filter by creation timestamp."""
+  createdAt: DateTimeFilter = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [RolePermissionPresetFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [RolePermissionPresetFilter!] = null
+
+  """Negate the specified filters. Matching records are excluded."""
+  NOT: [RolePermissionPresetFilter!] = null
+}
+
+"""
+Added in UNRELEASED. Specifies ordering for role permission preset entries.
+"""
+input RolePermissionPresetOrderBy {
+  """The field to order by."""
+  field: RolePermissionPresetOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering role permission preset entries.
+"""
+enum RolePermissionPresetOrderField {
+  ENTITY_TYPE
+  OPERATION
+  CREATED_AT
+}
+
+"""
+Added in UNRELEASED. Role preset entity implementing the Relay Node pattern.
+"""
+type RolePreset implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Role preset name."""
+  name: String!
+
+  """Scope type this preset targets (e.g., domain, project)."""
+  scopeType: RBACElementType!
+
+  """
+  Default value for the `auto_assign` flag copied onto roles instantiated from this preset.
+  """
+  autoAssign: Boolean!
+
+  """
+  Soft-delete flag. Set by the delete mutation and cleared by the restore mutation; archived rows are excluded from default searches.
+  """
+  deleted: Boolean!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last modification timestamp."""
+  updatedAt: DateTime!
+
+  """Added in UNRELEASED. Permission entries carried by this role preset."""
+  permissionPresets(filter: RolePermissionPresetFilter = null, orderBy: [RolePermissionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePermissionPresetConnection
+}
+
+"""Added in UNRELEASED. Paginated connection for role preset records."""
+type RolePresetConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RolePresetEdge!]!
+
+  """Total number of role preset records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RolePresetEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RolePreset!
+}
+
+"""Added in UNRELEASED. Filter input for querying role presets."""
+input RolePresetFilter {
+  """Filter by name."""
+  name: StringFilter = null
+
+  """Filter by scope type."""
+  scopeType: RBACElementTypeFilter = null
+
+  """Filter by auto-assign flag."""
+  autoAssign: Boolean = null
+
+  """
+  Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to `true` to inspect archived presets.
+  """
+  deleted: Boolean = null
+
+  """Combine multiple filters with AND logic. All conditions must match."""
+  AND: [RolePresetFilter!] = null
+
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
+  OR: [RolePresetFilter!] = null
+
+  """Negate the specified filters. Matching records are excluded."""
+  NOT: [RolePresetFilter!] = null
+}
+
+"""Added in UNRELEASED. Specifies ordering for role preset results."""
+input RolePresetOrderBy {
+  """The field to order by."""
+  field: RolePresetOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in UNRELEASED. Fields available for ordering role preset results.
+"""
+enum RolePresetOrderField {
+  NAME
+  SCOPE_TYPE
   CREATED_AT
   UPDATED_AT
 }
@@ -12460,7 +12910,7 @@ type UpdateAutoScalingRulePayload {
 """
 Added in 26.4.2. Input for updating a container registry. All fields optional except id.
 """
-input UpdateContainerRegistryInputGQL {
+input UpdateContainerRegistryInput {
   """ID of the registry to update."""
   id: String!
 
@@ -12493,7 +12943,7 @@ input UpdateContainerRegistryInputGQL {
 }
 
 """Added in 26.4.2. Payload for container registry update mutation."""
-type UpdateContainerRegistryPayloadGQL {
+type UpdateContainerRegistryPayload {
   """Updated container registry."""
   registry: ContainerRegistryV2!
 }
@@ -12617,7 +13067,7 @@ input UpdateDeploymentRevisionPresetInput {
 }
 
 """Added in 26.4.2. Update deployment revision preset payload."""
-type UpdateDeploymentRevisionPresetPayloadGQL {
+type UpdateDeploymentRevisionPresetPayload {
   """The updated preset."""
   preset: DeploymentRevisionPreset!
 }
@@ -12625,7 +13075,7 @@ type UpdateDeploymentRevisionPresetPayloadGQL {
 """
 Added in 26.4.2. Input for updating domain information. All fields optional.
 """
-input UpdateDomainInputGQL {
+input UpdateDomainInput {
   """New domain name."""
   name: String = null
 
@@ -12659,7 +13109,7 @@ type UpdateHuggingFaceRegistryPayload {
 """
 Added in 26.4.2. Input for updating a keypair resource policy. All fields optional.
 """
-input UpdateKeypairResourcePolicyInputGQL {
+input UpdateKeypairResourcePolicyInput {
   """Updated default for unspecified."""
   defaultForUnspecified: String = null
 
@@ -12692,7 +13142,7 @@ input UpdateKeypairResourcePolicyInputGQL {
 }
 
 """Added in 26.4.2. Payload for keypair resource policy update mutation."""
-type UpdateKeypairResourcePolicyPayloadGQL {
+type UpdateKeypairResourcePolicyPayload {
   """Updated keypair resource policy."""
   keypairResourcePolicy: KeypairResourcePolicyV2!
 }
@@ -12715,7 +13165,7 @@ type UpdateLoginClientTypePayload {
 }
 
 """Added in 26.4.2. Update model card payload."""
-type UpdateModelCardPayloadGQL {
+type UpdateModelCardPayload {
   """The updated model card."""
   modelCard: ModelCardV2!
 }
@@ -12804,7 +13254,7 @@ input UpdateMyKeypairInput {
 """Added in 26.2.0. Payload returned after updating a keypair."""
 type UpdateMyKeypairPayload {
   """The updated keypair."""
-  keypair: KeyPairGQL!
+  keypair: KeyPairV2!
 }
 
 """Added in 24.09.0. Input for updating a notification channel"""
@@ -12866,7 +13316,7 @@ input UpdatePermissionInput {
 """
 Added in 26.4.2. Input for updating project information. All fields optional.
 """
-input UpdateProjectInputGQL {
+input UpdateProjectInput {
   """New project name."""
   name: String = null
 
@@ -12886,7 +13336,7 @@ input UpdateProjectInputGQL {
 """
 Added in 26.4.2. Input for updating a project resource policy. All fields optional.
 """
-input UpdateProjectResourcePolicyInputGQL {
+input UpdateProjectResourcePolicyInput {
   """Updated max vfolder count."""
   maxVfolderCount: Int = null
 
@@ -12898,7 +13348,7 @@ input UpdateProjectResourcePolicyInputGQL {
 }
 
 """Added in 26.4.2. Payload for project resource policy update mutation."""
-type UpdateProjectResourcePolicyPayloadGQL {
+type UpdateProjectResourcePolicyPayload {
   """Updated project resource policy."""
   projectResourcePolicy: ProjectResourcePolicyV2!
 }
@@ -13003,7 +13453,7 @@ type UpdateResourceGroupPayload {
 }
 
 """Added in 26.4.2. Payload for resource preset update."""
-type UpdateResourcePresetPayloadGQL {
+type UpdateResourcePresetPayload {
   """Updated resource preset."""
   resourcePreset: ResourcePresetV2!
 }
@@ -13034,6 +13484,33 @@ input UpdateRoleInput {
   name: String
   description: String
   status: RoleStatus
+
+  """
+  Added in UNRELEASED. Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  """
+  autoAssign: Boolean
+}
+
+"""
+Added in UNRELEASED. Input for updating a role preset's metadata. Permission entries are managed via the dedicated add/remove mutations; the `deleted` flag via delete/restore mutations.
+"""
+input UpdateRolePresetInput {
+  """Role preset UUID to update."""
+  rolePresetId: ID!
+
+  """Updated name."""
+  name: String
+
+  """
+  Updated default value for the `auto_assign` flag of instantiated roles.
+  """
+  autoAssign: Boolean
+}
+
+"""Added in UNRELEASED. Payload returned after updating a role preset."""
+type UpdateRolePresetPayload {
+  """Updated role preset."""
+  rolePreset: RolePreset!
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""
@@ -13064,7 +13541,7 @@ input UpdateRuntimeVariantInput {
 }
 
 """Added in 26.4.2. Payload for runtime variant update."""
-type UpdateRuntimeVariantPayloadGQL {
+type UpdateRuntimeVariantPayload {
   """The updated runtime variant."""
   runtimeVariant: RuntimeVariant!
 }
@@ -13097,7 +13574,7 @@ input UpdateRuntimeVariantPresetInput {
 }
 
 """Added in 26.4.2. Update preset payload."""
-type UpdateRuntimeVariantPresetPayloadGQL {
+type UpdateRuntimeVariantPresetPayload {
   """The updated preset."""
   preset: RuntimeVariantPreset!
 }
@@ -13105,7 +13582,7 @@ type UpdateRuntimeVariantPresetPayloadGQL {
 """
 Added in 26.4.2. Input for updating a user resource policy. All fields optional.
 """
-input UpdateUserResourcePolicyInputGQL {
+input UpdateUserResourcePolicyInput {
   """Updated max vfolder count."""
   maxVfolderCount: Int = null
 
@@ -13125,7 +13602,7 @@ input UpdateUserResourcePolicyInputGQL {
 }
 
 """Added in 26.4.2. Payload for user resource policy update mutation."""
-type UpdateUserResourcePolicyPayloadGQL {
+type UpdateUserResourcePolicyPayload {
   """Updated user resource policy."""
   userResourcePolicy: UserResourcePolicyV2!
 }

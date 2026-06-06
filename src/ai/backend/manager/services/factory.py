@@ -109,6 +109,8 @@ from ai.backend.manager.services.resource_slot.processors import ResourceSlotPro
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
+from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
+from ai.backend.manager.services.role_preset.service import RolePresetService
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 from ai.backend.manager.services.runtime_variant_preset.processors import (
@@ -276,6 +278,7 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.resource_preset.repository,
         ),
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
+        role_preset=RolePresetService(repositories.role_preset.repository),
         runtime_variant=RuntimeVariantService(
             repositories.runtime_variant.repository,
         ),
@@ -326,6 +329,7 @@ def create_services(args: ServiceArgs) -> Services:
             user_resource_policy_repository=repositories.user_resource_policy.repository,
             user_repository=repositories.user.repository,
             group_repository=repositories.group.repository,
+            ssh_key_validator=args.ssh_key_validator,
         ),
         login_client_type=LoginClientTypeService(
             repository=repositories.auth.login_client_type,
@@ -468,6 +472,7 @@ def create_processors(
             services.resource_preset, action_monitors, validators
         ),
         resource_slot=ResourceSlotProcessors(services.resource_slot, action_monitors, validators),
+        role_preset=RolePresetProcessors(services.role_preset, action_monitors, validators),
         runtime_variant=RuntimeVariantProcessors(
             services.runtime_variant, action_monitors, validators
         ),

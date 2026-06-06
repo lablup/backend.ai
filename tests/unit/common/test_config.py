@@ -9,9 +9,11 @@ from ai.backend.common.config import (
     ModelDefinition,
     ModelDefinitionDraft,
     ModelHealthCheck,
+    ModelHealthCheckDraft,
     ModelMetadata,
     ModelServiceConfig,
     _merge_config,
+    _merge_config_draft,
     _merge_definition,
     _merge_metadata,
     _merge_service_config,
@@ -177,6 +179,148 @@ class TestMergeFieldCoverage:
         result = _merge_definition(base, override)
         missing = set(ModelDefinition.model_fields) - result.model_fields_set
         assert not missing, f"_merge_definition() does not handle: {missing}"
+
+
+class TestHealthCheckEnable:
+    """Tests for the ``enable`` flag on ModelHealthCheck."""
+
+    def test_health_check_config_returns_none_when_disabled(self) -> None:
+        definition = ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "m",
+                    "model_path": "/m",
+                    "service": {"port": 8080, "health_check": {"path": "/health", "enable": False}},
+                }
+            ]
+        })
+        assert definition.health_check_config() is None
+
+    def test_health_check_config_returns_check_when_enabled(self) -> None:
+        definition = ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "m",
+                    "model_path": "/m",
+                    "service": {"port": 8080, "health_check": {"path": "/health", "enable": True}},
+                }
+            ]
+        })
+        check = definition.health_check_config()
+        assert check is not None
+        assert check.path == "/health"
+
+    def test_enable_defaults_to_false(self) -> None:
+        check = ModelHealthCheck.model_validate({"path": "/health"})
+        assert check.enable is False
+
+    def test_to_resolved_without_path_uses_default(self) -> None:
+        resolved = ModelHealthCheckDraft(enable=True).to_resolved()
+        assert resolved.enable is True
+        assert resolved.path == "/health"
+
+    def test_file_normalization_enables_present_health_check(self) -> None:
+        normalized = ModelDefinitionDraft.from_file_payload({
+            "models": [
+                {"name": "m", "service": {"health_check": {"path": "/health"}}},
+            ]
+        })
+        assert normalized.models is not None
+        service = normalized.models[0].service
+        assert service is not None
+        hc = service.health_check
+        assert hc is not None
+        assert hc.enable is True
+
+    def test_file_normalization_respects_explicit_enable_false(self) -> None:
+        normalized = ModelDefinitionDraft.from_file_payload({
+            "models": [
+                {"name": "m", "service": {"health_check": {"path": "/health", "enable": False}}},
+            ]
+        })
+        assert normalized.models is not None
+        service = normalized.models[0].service
+        assert service is not None
+        hc = service.health_check
+        assert hc is not None
+        assert hc.enable is False
+
+    def test_file_normalization_no_health_check_unchanged(self) -> None:
+        normalized = ModelDefinitionDraft.from_file_payload({
+            "models": [{"name": "m", "service": {"port": 8080}}]
+        })
+        assert normalized.models is not None
+        service = normalized.models[0].service
+        assert service is not None
+        assert service.health_check is None
+
+    def test_file_normalization_null_health_check_becomes_disabled(self) -> None:
+        """An empty ``health_check:`` (null) normalizes to an explicit disabled override."""
+        normalized = ModelDefinitionDraft.from_file_payload({
+            "models": [
+                {"name": "m", "service": {"port": 8080, "health_check": None}},
+            ]
+        })
+        assert normalized.models is not None
+        service = normalized.models[0].service
+        assert service is not None
+        assert service.health_check is not None
+        assert service.health_check.enable is False
+
+    def test_file_normalization_empty_dict_health_check_becomes_disabled(self) -> None:
+        """An empty ``health_check: {}`` block carries no values; disable it like null."""
+        normalized = ModelDefinitionDraft.from_file_payload({
+            "models": [
+                {"name": "m", "service": {"port": 8080, "health_check": {}}},
+            ]
+        })
+        assert normalized.models is not None
+        service = normalized.models[0].service
+        assert service is not None
+        assert service.health_check is not None
+        assert service.health_check.enable is False
+
+    def test_file_normalization_empty_health_check_overrides_enabled_baseline(self) -> None:
+        """An empty ``health_check:`` overlay turns off an enabled baseline (higher priority wins)."""
+        baseline = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "name": "custom-model",
+                    "service": {"health_check": {"enable": True, "path": "/health"}},
+                }
+            ]
+        })
+        overlay = ModelDefinitionDraft.from_file_payload({
+            "models": [
+                {"name": "m", "model_path": "/m", "service": {"port": 8080, "health_check": None}},
+            ]
+        })
+        assert baseline.models is not None and overlay.models is not None
+        merged = _merge_config_draft(baseline.models[0], overlay.models[0])
+        service = merged.to_resolved().service
+        assert service is not None
+        assert service.health_check is not None
+        assert service.health_check.enable is False
+
+    def test_merge_override_enables_from_request(self) -> None:
+        """A disabled baseline is opted in when a higher-priority draft sets enable=True."""
+        base = ModelServiceConfig.model_construct(
+            _fields_set={"health_check"},
+            start_command=[],
+            port=2,
+            health_check=ModelHealthCheck.model_construct(
+                _fields_set=set(ModelHealthCheck.model_fields), enable=False, path="/health"
+            ),
+        )
+        override = ModelServiceConfig.model_construct(
+            _fields_set={"health_check"},
+            start_command=[],
+            port=2,
+            health_check=ModelHealthCheck.model_construct(_fields_set={"enable"}, enable=True),
+        )
+        result = _merge_service_config(base, override)
+        assert result.health_check is not None
+        assert result.health_check.enable is True
 
 
 class TestModelConfigs:

@@ -95,6 +95,7 @@ def auth_service(
         user_resource_policy_repository=mock_user_resource_policy_repository,
         user_repository=mock_user_repository,
         group_repository=mock_group_repository,
+        ssh_key_validator=AsyncMock(),
     )
 
 

@@ -278,6 +278,10 @@ class PreStartActionInfoDTO(BaseResponseModel):
 class ModelHealthCheckInfoDTO(BaseResponseModel):
     """Output DTO for model health check configuration."""
 
+    enable: bool = Field(
+        default=False,
+        description="Whether the route is health-checked. When false the route activates immediately.",
+    )
     interval: float = Field(description="Interval in seconds between health checks.")
     path: str = Field(description="Path to check for health status.")
     max_retries: int = Field(description="Maximum number of retries for health check.")

@@ -69,17 +69,22 @@ class SessionDBSource:
 
     async def resolve_session_id(
         self,
-        session_name: str,
+        session_name_or_id: str,
         user_id: uuid.UUID,
     ) -> SessionId:
-        """Resolve a single live session to its ``session_id`` by name within a user scope.
+        """Infer a session id from ``(session_name_or_id, user_id)`` for legacy callers.
 
-        The ``user_id`` scope spans every keypair access key owned by the user, since the
-        owner is denormalized onto ``SessionRow.user_uuid``. Terminal sessions (ERROR,
-        TERMINATED, CANCELLED) are excluded so a stale namesake does not shadow the live
-        one. This matches the `ix_sessions_unique_name_per_user_nonterminal` partial unique
-        index, which guarantees at most one matching session.
+        The goal is to derive a usable session id when only a name is known, not to return
+        a validated one. A UUID-shaped input is already an id and is returned verbatim;
+        otherwise the live (non-terminal) session owned by the user with that name is
+        resolved, matching the ``ix_sessions_unique_name_per_user_nonterminal`` partial
+        unique index. DO NOT USE FOR NEW DEVELOPMENT.
         """
+        try:
+            return SessionId(uuid.UUID(session_name_or_id))
+        except (ValueError, TypeError):
+            pass
+        session_name = session_name_or_id
         query = sa.select(SessionRow).where(
             (SessionRow.name == session_name)
             & (SessionRow.user_uuid == user_id)

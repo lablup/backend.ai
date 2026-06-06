@@ -142,6 +142,7 @@ class UpdateRuntimeVariantInputGQL(PydanticInputMixin[UpdateRuntimeVariantInputD
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.4.2", description="Payload for runtime variant creation."),
     model=CreateRuntimeVariantPayloadDTO,
+    name="CreateRuntimeVariantPayload",
 )
 class CreateRuntimeVariantPayloadGQL(PydanticOutputMixin[CreateRuntimeVariantPayloadDTO]):
     runtime_variant: RuntimeVariantGQL = gql_field(description="The created runtime variant.")
@@ -150,6 +151,7 @@ class CreateRuntimeVariantPayloadGQL(PydanticOutputMixin[CreateRuntimeVariantPay
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.4.2", description="Payload for runtime variant update."),
     model=UpdateRuntimeVariantPayloadDTO,
+    name="UpdateRuntimeVariantPayload",
 )
 class UpdateRuntimeVariantPayloadGQL(PydanticOutputMixin[UpdateRuntimeVariantPayloadDTO]):
     runtime_variant: RuntimeVariantGQL = gql_field(description="The updated runtime variant.")
@@ -158,6 +160,7 @@ class UpdateRuntimeVariantPayloadGQL(PydanticOutputMixin[UpdateRuntimeVariantPay
 @gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.4.2", description="Payload for runtime variant deletion."),
     model=DeleteRuntimeVariantPayloadDTO,
+    name="DeleteRuntimeVariantPayload",
 )
 class DeleteRuntimeVariantPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantPayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted runtime variant.")
@@ -180,6 +183,7 @@ class DeleteRuntimeVariantsInputGQL(PydanticInputMixin[DeleteRuntimeVariantsInpu
         description="Payload for bulk runtime variant deletion.",
     ),
     model=DeleteRuntimeVariantsPayloadDTO,
+    name="DeleteRuntimeVariantsPayload",
 )
 class DeleteRuntimeVariantsPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantsPayloadDTO]):
     deleted_count: int = gql_field(description="Number of runtime variants successfully deleted.")

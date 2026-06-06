@@ -187,6 +187,7 @@ class CreateResourcePresetInputGQL(PydanticInputMixin[CreateResourcePresetInputD
         description="Payload for resource preset creation.",
     ),
     model=CreateResourcePresetPayloadDTO,
+    name="CreateResourcePresetPayload",
 )
 class CreateResourcePresetPayloadGQL(PydanticOutputMixin[CreateResourcePresetPayloadDTO]):
     resource_preset: ResourcePresetGQL = gql_field(description="The created resource preset.")
@@ -221,6 +222,7 @@ class UpdateResourcePresetInputGQL(PydanticInputMixin[UpdateResourcePresetInputD
         description="Payload for resource preset update.",
     ),
     model=UpdateResourcePresetPayloadDTO,
+    name="UpdateResourcePresetPayload",
 )
 class UpdateResourcePresetPayloadGQL(PydanticOutputMixin[UpdateResourcePresetPayloadDTO]):
     resource_preset: ResourcePresetGQL = gql_field(description="The updated resource preset.")
@@ -232,6 +234,7 @@ class UpdateResourcePresetPayloadGQL(PydanticOutputMixin[UpdateResourcePresetPay
         description="Payload for resource preset deletion.",
     ),
     model=DeleteResourcePresetPayloadDTO,
+    name="DeleteResourcePresetPayload",
 )
 class DeleteResourcePresetPayloadGQL(PydanticOutputMixin[DeleteResourcePresetPayloadDTO]):
     id: str = gql_field(description="UUID of the deleted resource preset.")

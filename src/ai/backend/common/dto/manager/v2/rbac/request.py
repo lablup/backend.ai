@@ -61,6 +61,13 @@ class CreateRoleInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=256, description="Role name")
     description: str | None = Field(default=None, description="Role description")
     source: RoleSource = Field(default=RoleSource.CUSTOM, description="Role source")
+    auto_assign: bool = Field(
+        default=False,
+        description=(
+            "When true, the role is automatically granted to a user when the user is added "
+            "to a scope this role is registered in."
+        ),
+    )
     scopes: list[ScopeInputDTO] | None = Field(
         default=None, description="Scopes to register the role in"
     )
@@ -82,6 +89,13 @@ class UpdateRoleInput(BaseRequestModel):
         default=SENTINEL, description="Updated role description. Use SENTINEL to clear."
     )
     status: RoleStatus | None = Field(default=None, description="Updated role status")
+    auto_assign: bool | None = Field(
+        default=None,
+        description=(
+            "Updated value for the `auto_assign` flag. When true, the role is automatically "
+            "granted to a user when the user is added to a scope this role is registered in."
+        ),
+    )
 
     @field_validator("name")
     @classmethod

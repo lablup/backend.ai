@@ -39,6 +39,7 @@ from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePoli
 from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.resource_usage.adapter import ResourceUsageAdapter
+from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
     RuntimeVariantPresetAdapter,
@@ -102,6 +103,7 @@ class Adapters:
         deployment_revision_preset: DeploymentRevisionPresetAdapter,
         model_card: ModelCardAdapter,
         resource_usage: ResourceUsageAdapter,
+        role_preset: RolePresetAdapter,
         scheduling_handler: SchedulingHandlerAdapter,
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
@@ -143,6 +145,7 @@ class Adapters:
         self.deployment_revision_preset = deployment_revision_preset
         self.model_card = model_card
         self.resource_usage = resource_usage
+        self.role_preset = role_preset
         self.scheduling_handler = scheduling_handler
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
@@ -205,6 +208,7 @@ class Adapters:
             deployment_revision_preset=DeploymentRevisionPresetAdapter(processors),
             model_card=ModelCardAdapter(processors),
             resource_usage=ResourceUsageAdapter(processors),
+            role_preset=RolePresetAdapter(processors),
             scheduling_handler=SchedulingHandlerAdapter(deployment_coordinator),
             scheduling_history=SchedulingHistoryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),

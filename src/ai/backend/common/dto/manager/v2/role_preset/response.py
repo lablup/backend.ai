@@ -70,7 +70,12 @@ class BulkRolePresetFailureInfo(BaseResponseModel):
 
 
 class BulkDeleteRolePresetsPayload(BaseResponseModel):
-    """Payload for bulk-soft-deleting role presets."""
+    """Payload for bulk-soft-deleting role presets.
+
+    Soft-delete is validated per row (each isolated by a savepoint) so individual
+    presets may fail independently (e.g., a protected/system preset); successes and
+    failures are reported separately.
+    """
 
     items: list[RolePresetNode] = Field(
         default_factory=list,
@@ -83,7 +88,11 @@ class BulkDeleteRolePresetsPayload(BaseResponseModel):
 
 
 class BulkRestoreRolePresetsPayload(BaseResponseModel):
-    """Payload for bulk-restoring soft-deleted role presets."""
+    """Payload for bulk-restoring soft-deleted role presets.
+
+    Restore is validated per row (each isolated by a savepoint) so individual
+    presets may fail independently; successes and failures are reported separately.
+    """
 
     items: list[RolePresetNode] = Field(
         default_factory=list,
@@ -96,11 +105,16 @@ class BulkRestoreRolePresetsPayload(BaseResponseModel):
 
 
 class BulkPurgeRolePresetsPayload(BaseResponseModel):
-    """Payload for bulk-hard-deleting role presets."""
+    """Payload for bulk-hard-deleting role presets.
+
+    Purge is validated per row (each isolated by a savepoint) so individual presets
+    may fail independently; successes and failures are reported separately. The
+    returned items are snapshots of the rows as they existed just before purge.
+    """
 
     items: list[RolePresetNode] = Field(
         default_factory=list,
-        description="Snapshot of role presets that were purged.",
+        description="Role presets that were purged.",
     )
     failed: list[BulkRolePresetFailureInfo] = Field(
         default_factory=list,

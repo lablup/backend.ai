@@ -4,8 +4,18 @@
 
 ## Type Naming
 
-- Every Strawberry type MUST carry a `GQL` suffix: `DomainGQL`, `DomainFilterGQL`, `DomainScopeGQL`.
+- Every Strawberry type MUST carry a `GQL` suffix in its **Python class name**:
+  `DomainGQL`, `DomainFilterGQL`, `DomainScopeGQL`.
 - Applies to all GQL output types, input types, and connection types.
+- The **schema-exposed name** MUST NOT contain `GQL`. Always pass `name=` to the decorator
+  with the class name minus the `GQL` suffix (e.g. `class CreateDomainInputGQL` →
+  `name="CreateDomainInput"`). Omitting `name=` leaks the `GQL` suffix into the SDL.
+- **Federation collision caveat:** the v2 Strawberry schema is composed into a supergraph
+  alongside the v1 Graphene schema. If the stripped name collides with an existing v1
+  Graphene type of a different shape (e.g. `KeyPair`, `CreateContainerRegistryInput`),
+  supergraph composition fails. In that case use a `V2`-suffixed schema name instead
+  (`name="KeyPairV2"`) — matching the existing `DomainV2` / `UserV2` convention.
+  Run `scripts/generate-graphql-schema.sh` to verify composition after naming changes.
 
 ## Decorators
 
