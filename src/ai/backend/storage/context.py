@@ -16,7 +16,7 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
 from ai.backend.common.clients.valkey_client.valkey_tus.client import (
-    ValkeyTusOffsetClient,
+    ValkeyTusClient,
 )
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
@@ -109,7 +109,7 @@ class RootContext:
     cors_options: Mapping[str, aiohttp_cors.ResourceOptions]
     manager_client_pool: ManagerHTTPClientPool
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
-    valkey_tus_client: ValkeyTusOffsetClient
+    valkey_tus_client: ValkeyTusClient
     health_probe: HealthProbe
     volume_stats_observer: VolumeStatsObserver
     volume_stats_state: VolumeState

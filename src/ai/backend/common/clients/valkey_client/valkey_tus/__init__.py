@@ -1,3 +1,3 @@
-from .client import ValkeyTusOffsetClient
+from .client import ValkeyTusClient
 
-__all__ = ["ValkeyTusOffsetClient"]
+__all__ = ["ValkeyTusClient"]

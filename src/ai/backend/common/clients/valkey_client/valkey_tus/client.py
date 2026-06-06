@@ -81,8 +81,18 @@ end
 """
 
 
-class ValkeyTusOffsetClient:
-    """Tiny Valkey-backed offset coordinator for TUS uploads."""
+class ValkeyTusClient:
+    """Valkey-backed coordinator for TUS upload sessions.
+
+    Manages two per-session primitives:
+
+    - **Committed offset** (``initialize_offset`` / ``get_offset`` /
+      ``advance_offset``) — the canonical byte length of the upload file,
+      shared by all storage-proxy replicas so no replica needs ``stat()``.
+    - **Write lease** (``acquire_session_lease`` / ``release_session_lease``)
+      — a TTL'd admission token that serializes the destructive write +
+      offset-advance section across replicas.
+    """
 
     _client: AbstractValkeyClient
     _release_lease_script: Script

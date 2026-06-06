@@ -32,7 +32,7 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
 )
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_tus.client import (
-    ValkeyTusOffsetClient,
+    ValkeyTusClient,
 )
 from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
 from ai.backend.common.config import (
@@ -648,10 +648,10 @@ async def server_main(
         )
         storage_init_stack.push_async_callback(valkey_artifact_client.close)
 
-        # Create ValkeyTusOffsetClient — shared TUS offset coordinator that lets
+        # Create ValkeyTusClient — shared TUS offset coordinator that lets
         # all storage-proxy replicas agree on the current committed offset
         # without relying on NFS attribute cache (BA-3974 fix).
-        valkey_tus_client = await ValkeyTusOffsetClient.create(
+        valkey_tus_client = await ValkeyTusClient.create(
             valkey_target=valkey_target,
             db_id=REDIS_TUS_DB,
             human_readable_name=f"storage-proxy-tus-offset-{pidx}",
