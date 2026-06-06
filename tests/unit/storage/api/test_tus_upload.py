@@ -52,7 +52,7 @@ class TestTusUploadPartOffsetValidation:
         file_cm.__aexit__ = AsyncMock(return_value=None)
         with (
             patch("ai.backend.storage.api.client.aiofiles.open", return_value=file_cm),
-            patch("ai.backend.storage.api.client._async_fsync", new=AsyncMock()),
+            patch("ai.backend.storage.api.client.os.fsync"),
         ):
             yield
 

@@ -82,11 +82,6 @@ def _create_if_missing_opener(path: str | bytes, flags: int) -> int:
     return os.open(path, flags | os.O_CREAT, 0o644)
 
 
-# ``aiofiles.os`` does not expose ``fsync``; ``wrap`` schedules the sync
-# call on the default executor and returns a coroutine.
-_async_fsync = aiofiles.os.wrap(os.fsync)
-
-
 class DownloadTokenData(TypedDict):
     op: Literal["download"]
     volume: str
@@ -450,7 +445,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                         await f.write(chunk)
                         bytes_written += len(chunk)
                     await f.flush()
-                    await _async_fsync(f.fileno())
+                    await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
 
                 new_offset = await ctx.valkey_tus_client.advance_offset(
                     token_data["session"], length=bytes_written
