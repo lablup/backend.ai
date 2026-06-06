@@ -10,7 +10,7 @@ import os
 import urllib.parse
 import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
-from contextlib import AbstractAsyncContextManager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
@@ -66,6 +66,11 @@ from ai.backend.storage.utils import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from aiohttp import StreamReader
+
+    from ai.backend.common.clients.valkey_client.valkey_tus import ValkeyTusClient
     from ai.backend.storage.context import RootContext
     from ai.backend.storage.volumes.abc import AbstractVolume
 
@@ -73,6 +78,39 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
+
+
+@asynccontextmanager
+async def _session_lease(
+    client: ValkeyTusClient, session_id: str, node_id: str
+) -> AsyncIterator[None]:
+    """Acquire-or-409 the per-session write lease, releasing on exit."""
+    holder_token = f"{node_id}:{uuid.uuid4().hex}"
+    if not await client.acquire_session_lease(session_id, holder_token):
+        raise UploadSessionLeaseHeldError("session is being written by another replica")
+    try:
+        yield
+    finally:
+        await client.release_session_lease(session_id, holder_token)
+
+
+async def _drain_into_upload_file(
+    content: StreamReader, upload_temp_path: Path, start_offset: int
+) -> int:
+    """Truncate ``upload_temp_path`` to ``start_offset`` and append the body. Returns bytes written."""
+    bytes_written = 0
+    async with aiofiles.open(upload_temp_path, mode="r+b", opener=_create_if_missing_opener) as f:
+        await f.truncate(start_offset)
+        await f.seek(start_offset)
+        while not content.at_eof():
+            chunk = await content.read(DEFAULT_CHUNK_SIZE)
+            if not chunk:
+                continue
+            await f.write(chunk)
+            bytes_written += len(chunk)
+        await f.flush()
+        await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
+    return bytes_written
 
 
 def _create_if_missing_opener(path: str | bytes, flags: int) -> int:
@@ -399,45 +437,22 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     f"Invalid Upload-Offset header value: {upload_offset_header}"
                 ) from e
 
-            upload_dir = upload_temp_path.parent
-            await aiofiles.os.makedirs(upload_dir, exist_ok=True)
+            await aiofiles.os.makedirs(upload_temp_path.parent, exist_ok=True)
 
-            holder_token = f"{ctx.node_id}:{uuid.uuid4().hex}"
-            acquired = await ctx.valkey_tus_client.acquire_session_lease(
-                token_data["session"], holder_token
-            )
-            if not acquired:
-                raise UploadSessionLeaseHeldError("session is being written by another replica")
-            try:
-                actual_offset = await ctx.valkey_tus_client.get_offset(token_data["session"])
+            session_id = token_data["session"]
+            async with _session_lease(ctx.valkey_tus_client, session_id, ctx.node_id):
+                actual_offset = await ctx.valkey_tus_client.get_offset(session_id)
                 if actual_offset is None:
                     raise UploadSessionNotFoundError
                 if client_offset != actual_offset:
                     raise UploadOffsetMismatchError(
                         f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
                     )
-
-                bytes_written = 0
-                async with aiofiles.open(
-                    upload_temp_path, mode="r+b", opener=_create_if_missing_opener
-                ) as f:
-                    await f.truncate(actual_offset)
-                    await f.seek(actual_offset)
-                    while not request.content.at_eof():
-                        chunk = await request.content.read(DEFAULT_CHUNK_SIZE)
-                        if not chunk:
-                            continue
-                        await f.write(chunk)
-                        bytes_written += len(chunk)
-                    await f.flush()
-                    await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
-
-                new_offset = await ctx.valkey_tus_client.advance_offset(
-                    token_data["session"], length=bytes_written
+                bytes_written = await _drain_into_upload_file(
+                    request.content, upload_temp_path, actual_offset
                 )
-            finally:
-                await ctx.valkey_tus_client.release_session_lease(
-                    token_data["session"], holder_token
+                new_offset = await ctx.valkey_tus_client.advance_offset(
+                    session_id, length=bytes_written
                 )
 
             headers["Upload-Offset"] = str(new_offset)
