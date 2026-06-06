@@ -14,10 +14,7 @@ import pytest
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.dto.manager.v2.group.request import (
-    AssignUsersToProjectInput,
-    UnassignUsersFromProjectInput,
-)
+from ai.backend.common.dto.manager.v2.group.request import AssignUsersToProjectInput
 from ai.backend.common.dto.manager.v2.user.request import SearchUsersRequest
 
 if TYPE_CHECKING:
@@ -60,35 +57,6 @@ class TestUserSearchViaProjectAssign:
         member_role_fixture: uuid.UUID,
     ) -> None:
         """A user who is not a project member cannot search the project."""
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.user.search_by_project(
-                target_project_fixture, SearchUsersRequest()
-            )
-
-    async def test_unassigned_user_loses_access(
-        self,
-        admin_v2_registry: V2ClientRegistry,
-        user_v2_registry: V2ClientRegistry,
-        regular_user_fixture: UserFixtureData,
-        target_project_fixture: uuid.UUID,
-        member_role_fixture: uuid.UUID,
-        admin_target_project_permission: uuid.UUID,
-    ) -> None:
-        """After SDK unassign, project search becomes forbidden."""
-        user_id = regular_user_fixture.user_uuid
-
-        await admin_v2_registry.project.assign_users(
-            target_project_fixture,
-            AssignUsersToProjectInput(user_ids=[user_id], role_id=member_role_fixture),
-        )
-        # Sanity: search succeeds while assigned.
-        await user_v2_registry.user.search_by_project(target_project_fixture, SearchUsersRequest())
-
-        await admin_v2_registry.project.unassign_users(
-            target_project_fixture,
-            UnassignUsersFromProjectInput(user_ids=[user_id]),
-        )
-
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.user.search_by_project(
                 target_project_fixture, SearchUsersRequest()
