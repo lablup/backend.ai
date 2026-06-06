@@ -36,17 +36,19 @@ class TestTusUploadPartOffsetValidation:
 
     @pytest.fixture(autouse=True)
     def _patch_disk_helpers(self) -> Generator[None, None, None]:
-        """Replace the real fsync / commit helpers with no-ops.
+        """Replace the real fd helpers with no-ops.
 
-        ``tus_upload_part`` drains the request body to a staging file and then
-        ``fsync`` + commits it under the Sokovan lease. None of these paths
-        exist on disk in mocked tests, so we substitute no-op callables. The
-        offset validation logic (which is what these tests cover) executes
-        before the staging commit, so this leaves the assertions intact.
+        ``tus_upload_part`` opens the upload file at the Valkey-canonical
+        offset and streams the request body straight in under the lease.
+        None of these paths exist on disk in mocked tests, so we substitute
+        no-op callables. The offset validation logic (which is what these
+        tests cover) executes before the file open, so this leaves the
+        assertions intact.
         """
         with (
-            patch("ai.backend.storage.api.client._fsync_file"),
-            patch("ai.backend.storage.api.client._commit_staging"),
+            patch("ai.backend.storage.api.client._open_upload_at_offset", return_value=99),
+            patch("ai.backend.storage.api.client._write_all"),
+            patch("ai.backend.storage.api.client._fsync_close"),
         ):
             yield
 
@@ -191,17 +193,12 @@ class TestTusUploadPartOffsetValidation:
         with (
             patch("ai.backend.storage.api.client.check_params") as mock_check_params,
             patch("ai.backend.storage.api.client.prepare_tus_session_headers") as mock_headers,
-            patch("ai.backend.storage.api.client.AsyncFileWriter") as mock_writer,
         ):
             mock_check_params.return_value.__aenter__ = AsyncMock(
                 return_value={"token": token_data, "dst_dir": None}
             )
             mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
             mock_headers.return_value = {"Upload-Offset": "1024"}
-
-            writer = AsyncMock()
-            mock_writer.return_value.__aenter__ = AsyncMock(return_value=writer)
-            mock_writer.return_value.__aexit__ = AsyncMock(return_value=None)
 
             yield request
 
@@ -221,17 +218,12 @@ class TestTusUploadPartOffsetValidation:
         with (
             patch("ai.backend.storage.api.client.check_params") as mock_check_params,
             patch("ai.backend.storage.api.client.prepare_tus_session_headers") as mock_headers,
-            patch("ai.backend.storage.api.client.AsyncFileWriter") as mock_writer,
         ):
             mock_check_params.return_value.__aenter__ = AsyncMock(
                 return_value={"token": token_data, "dst_dir": None}
             )
             mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
             mock_headers.return_value = {"Upload-Offset": "0"}
-
-            writer = AsyncMock()
-            mock_writer.return_value.__aenter__ = AsyncMock(return_value=writer)
-            mock_writer.return_value.__aexit__ = AsyncMock(return_value=None)
 
             yield request
 
