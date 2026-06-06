@@ -1,26 +1,4 @@
-"""
-Minimal Valkey-backed TUS upload offset coordinator (main-branch patch).
-
-Stores a single integer per upload session — the committed byte offset — so
-that all storage-proxy replicas behind a load balancer share one consistent
-view of the upload's progress. This replaces the BA-3974-racy
-``Path(upload_temp_path).stat().st_size`` lookup with a Valkey-backed value
-that is immune to per-replica NFS attribute cache staleness.
-
-Only three operations are exposed:
-
-- :meth:`initialize_offset` — set the offset to 0 at session creation.
-- :meth:`get_offset` — read the current committed offset (used by the
-  PATCH handler to validate the caller-supplied ``Upload-Offset`` before
-  writing the chunk to disk).
-- :meth:`advance_offset` — atomically ``INCRBY`` the offset by the actual
-  number of bytes durably written. Called *after* ``fsync`` so a crash
-  between the disk commit and this call leaves the offset at its old
-  value, and a retry from the client appends the same chunk again (idem-
-  potent at the TUS protocol level).
-
-A 24-hour sliding TTL reclaims abandoned session counters.
-"""
+"""Valkey-backed offset + write-lease coordinator for TUS uploads (BA-3974)."""
 
 from __future__ import annotations
 
@@ -67,9 +45,7 @@ _LEASE_KEY_PREFIX: Final = "tus.upload.lease"
 _DEFAULT_TTL_SECONDS: Final = 24 * 60 * 60
 _DEFAULT_LEASE_TTL_SECONDS: Final = 60
 
-# Compare-and-delete release. ``DEL`` only if the value still equals the
-# caller-supplied holder token — this prevents a process whose lease has
-# already expired from accidentally deleting the next holder's lease.
+# Compare-and-delete: only release if the caller still owns the lease.
 RELEASE_LEASE_SCRIPT: Final[str] = """
 local current = redis.call('GET', KEYS[1])
 if current == ARGV[1] then
@@ -82,17 +58,7 @@ end
 
 
 class ValkeyTusClient:
-    """Valkey-backed coordinator for TUS upload sessions.
-
-    Manages two per-session primitives:
-
-    - **Committed offset** (``initialize_offset`` / ``get_offset`` /
-      ``advance_offset``) — the canonical byte length of the upload file,
-      shared by all storage-proxy replicas so no replica needs ``stat()``.
-    - **Write lease** (``acquire_session_lease`` / ``release_session_lease``)
-      — a TTL'd admission token that serializes the destructive write +
-      offset-advance section across replicas.
-    """
+    """Per-session committed offset and write lease, shared across replicas."""
 
     _client: AbstractValkeyClient
     _release_lease_script: Script
@@ -137,13 +103,7 @@ class ValkeyTusClient:
         *,
         ttl_seconds: int = _DEFAULT_LEASE_TTL_SECONDS,
     ) -> bool:
-        """Try-once TTL lease admitting a single writer per upload session.
-
-        Atomically claims the per-session lease key via ``SET NX EX``. Returns
-        ``True`` on admission, ``False`` if another replica currently holds
-        the lease. The lease auto-expires after ``ttl_seconds`` so a crashed
-        holder cannot starve the session indefinitely.
-        """
+        """``SET NX EX``: ``True`` on admission, ``False`` if another replica holds it."""
         async with self._client.client() as conn:
             result = await conn.set(
                 self._lease_key(session_id),
@@ -155,13 +115,7 @@ class ValkeyTusClient:
 
     @valkey_tus_resilience.apply()
     async def release_session_lease(self, session_id: str, holder_token: str) -> bool:
-        """Compare-and-delete release.
-
-        Only deletes the lease key if the stored value still equals the
-        caller-supplied ``holder_token``. This prevents a process whose lease
-        has already expired (and was claimed by another replica in the
-        meantime) from accidentally releasing the new holder's lease.
-        """
+        """Compare-and-delete: only release if ``holder_token`` still owns the lease."""
         async with self._client.client() as conn:
             result = await conn.invoke_script(
                 script=self._release_lease_script,
@@ -177,7 +131,7 @@ class ValkeyTusClient:
         *,
         ttl_seconds: int = _DEFAULT_TTL_SECONDS,
     ) -> None:
-        """Set the offset for ``session_id`` to 0. Called once per upload session."""
+        """Initialize the per-session committed offset to 0."""
         async with self._client.client() as conn:
             await conn.set(
                 self._key(session_id),
@@ -202,16 +156,7 @@ class ValkeyTusClient:
         *,
         ttl_seconds: int = _DEFAULT_TTL_SECONDS,
     ) -> int:
-        """Atomically advance the offset by ``length`` and return the new value.
-
-        Called *after* the chunk has been durably appended to the file. Because
-        the TUS spec mandates strictly sequential PATCH per resource
-        (``core.patch.offset-match`` MUST), the caller is the sole writer for
-        this session at this moment — no separate CAS check is needed here.
-        The precondition (client_offset == server_offset) is validated upfront
-        via :meth:`get_offset` before the file write, and ``INCRBY`` itself is
-        atomic at the Redis server.
-        """
+        """``INCRBY`` the offset by ``length`` and return the new value. Call after fsync."""
         key = self._key(session_id)
         async with self._client.client() as conn:
             new_value = await conn.incrby(key, length)
