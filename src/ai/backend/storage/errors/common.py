@@ -187,3 +187,21 @@ class UploadOffsetMismatchError(BackendAIError, web.HTTPConflict):
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class UploadSessionLeaseHeldError(BackendAIError, web.HTTPConflict):
+    """
+    Raised when the per-session write lease is currently held by another
+    storage-proxy replica. Returned as 409 so the client HEADs and resumes
+    from the canonical offset.
+    """
+
+    error_type = "https://api.backend.ai/probs/storage/upload-session-lease-held"
+    error_title = "Upload Session Lease Held"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )

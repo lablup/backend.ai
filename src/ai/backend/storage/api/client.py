@@ -49,7 +49,11 @@ from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage import __version__
 from ai.backend.storage.dto.context import StorageRootCtx
-from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
+from ai.backend.storage.errors import (
+    InvalidAPIParameters,
+    UploadOffsetMismatchError,
+    UploadSessionLeaseHeldError,
+)
 from ai.backend.storage.services.file_stream.zip import (
     ZipArchiveStreamReader,
 )
@@ -402,7 +406,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 token_data["session"], holder_token
             )
             if not acquired:
-                raise UploadOffsetMismatchError("session is being written by another replica")
+                raise UploadSessionLeaseHeldError("session is being written by another replica")
             try:
                 actual_offset = await ctx.valkey_tus_client.get_offset(token_data["session"])
                 if actual_offset is None:
