@@ -142,9 +142,7 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: Client offset (512) behind server offset (1024)."""
-        request = self._create_mock_request(
-            tmp_path, client_offset="512", server_offset=1024
-        )
+        request = self._create_mock_request(tmp_path, client_offset="512", server_offset=1024)
 
         with (
             patch("ai.backend.storage.api.client.check_params") as mock_check_params,
@@ -163,9 +161,7 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: Client offset (2048) ahead of server offset (1024)."""
-        request = self._create_mock_request(
-            tmp_path, client_offset="2048", server_offset=1024
-        )
+        request = self._create_mock_request(tmp_path, client_offset="2048", server_offset=1024)
 
         with (
             patch("ai.backend.storage.api.client.check_params") as mock_check_params,
@@ -184,9 +180,7 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: Client offset matches server offset (both 1024)."""
-        request = self._create_mock_request(
-            tmp_path, client_offset="1024", server_offset=1024
-        )
+        request = self._create_mock_request(tmp_path, client_offset="1024", server_offset=1024)
 
         # Create upload temp file (for downstream finalization paths)
         upload_parent = tmp_path / ".upload"
@@ -216,9 +210,7 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: New file upload with zero offset."""
-        request = self._create_mock_request(
-            tmp_path, client_offset="0", server_offset=0
-        )
+        request = self._create_mock_request(tmp_path, client_offset="0", server_offset=0)
 
         # Create empty upload temp file
         upload_parent = tmp_path / ".upload"
