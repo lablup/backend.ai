@@ -394,14 +394,6 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     f"Invalid Upload-Offset header value: {upload_offset_header}"
                 ) from e
 
-            # The entire write path lives inside the per-session lease: open
-            # the upload file at the Valkey-canonical offset, drain the body
-            # straight in, fsync, then INCRBY. No staging file — every byte
-            # hits NFS exactly once. The lease is the smallest serialization
-            # that keeps two replicas from clobbering the same file region;
-            # ``ftruncate`` discards any orphan tail bytes from a prior
-            # crashed holder so each PATCH starts from a known-good length
-            # without ever consulting ``stat()``.
             upload_dir = upload_temp_path.parent
             await aiofiles.os.makedirs(upload_dir, exist_ok=True)
 
