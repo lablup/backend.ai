@@ -11,6 +11,7 @@ REDIS_STREAM_DB: Final = 4
 REDIS_STREAM_LOCK: Final = 5
 REDIS_CONTAINER_LOG: Final = 6
 REDIS_BGTASK_DB: Final = 7
+REDIS_TUS_DB: Final = 8
 
 
 class RedisRole(StrEnum):
@@ -22,6 +23,7 @@ class RedisRole(StrEnum):
     STREAM_LOCK = "stream_lock"
     CONTAINER_LOG = "container_log"
     BGTASK = "bgtask"
+    TUS = "tus"
 
 
 DEFAULT_FILE_IO_TIMEOUT: Final = 10

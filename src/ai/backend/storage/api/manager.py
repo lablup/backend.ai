@@ -1189,6 +1189,11 @@ async def create_upload_session(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             session_id = await volume.prepare_upload(params["vfid"])
+        # Initialize the shared TUS offset coordinator (BA-3974 fix). All
+        # storage-proxy replicas read/CAS this value during PATCH so they
+        # agree on the current committed offset regardless of NFS attribute
+        # cache state.
+        await ctx.valkey_tus_client.initialize_offset(session_id)
         token_data = {
             "op": "upload",
             "volume": params["volume"],

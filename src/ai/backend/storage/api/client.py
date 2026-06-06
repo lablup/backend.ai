@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import urllib.parse
+import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
@@ -66,6 +67,54 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
+
+
+def _fsync_file(path: Path) -> None:
+    """Synchronously flush the chunk file's contents to durable storage.
+
+    Called between the file append and the Valkey ``INCRBY`` so that a crash
+    immediately after the write but before the offset commit cannot leave the
+    next PATCH appending on top of half-flushed bytes.
+    """
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _commit_staging(upload_temp_path: Path, staging_path: Path, known_good_offset: int) -> None:
+    """Atomically commit ``staging_path`` content onto ``upload_temp_path``.
+
+    Performed inside the per-session Sokovan lease. ``known_good_offset`` is
+    the Valkey-known committed offset — the file is unconditionally truncated
+    to that length before append, which both creates the file if missing (via
+    ``O_CREAT``) and discards any orphan bytes left behind by a prior holder
+    that crashed mid-write (no ``stat()`` needed; we always reset the length
+    to a value Valkey vouches for). The staging bytes are then written and
+    fsync'd so the durability claim is true before the caller's ``INCRBY``.
+    """
+    chunk_size = 1024 * 1024  # 1 MiB local→NFS copy buffer
+    dst_fd = os.open(
+        str(upload_temp_path),
+        os.O_WRONLY | os.O_CREAT,
+        0o644,
+    )
+    try:
+        os.ftruncate(dst_fd, known_good_offset)
+        os.lseek(dst_fd, known_good_offset, os.SEEK_SET)
+        with Path(staging_path).open("rb") as src:
+            while True:
+                buf = src.read(chunk_size)
+                if not buf:
+                    break
+                view = memoryview(buf)
+                while view:
+                    n = os.write(dst_fd, view)
+                    view = view[n:]
+        os.fsync(dst_fd)
+    finally:
+        os.close(dst_fd)
 
 
 class DownloadTokenData(TypedDict):
@@ -380,23 +429,94 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     f"Invalid Upload-Offset header value: {upload_offset_header}"
                 ) from e
 
-            actual_offset = int(headers["Upload-Offset"])
-            if client_offset != actual_offset:
-                raise UploadOffsetMismatchError(
-                    f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
+            loop = asyncio.get_running_loop()
+
+            # Phase 1 (outside the lock): drain the request body into a
+            # per-attempt staging file. Holding the Sokovan lease for the
+            # network read would balloon the critical section to the full
+            # chunk transfer time (seconds for 100MB+ chunks); keeping it
+            # outside means the lock only covers fast local commit ops.
+            # ``staged_bytes`` is tracked here — never via ``stat()`` —
+            # so the offset accounting is independent of NFS attribute
+            # cache (the very thing this whole fix exists to escape).
+            upload_dir = upload_temp_path.parent
+            await loop.run_in_executor(None, lambda: upload_dir.mkdir(parents=True, exist_ok=True))
+            staging_path = upload_dir / (f"{token_data['session']}.staging.{uuid.uuid4().hex}")
+            staged_bytes = 0
+            try:
+                async with AsyncFileWriter(
+                    target_filename=staging_path,
+                    access_mode="wb",
+                    max_chunks=DEFAULT_INFLIGHT_CHUNKS,
+                ) as writer:
+                    while not request.content.at_eof():
+                        chunk = await request.content.read(DEFAULT_CHUNK_SIZE)
+                        await writer.write(chunk)
+                        staged_bytes += len(chunk)
+                await loop.run_in_executor(None, _fsync_file, staging_path)
+
+                # Phase 2 (under the lock): commit staging → upload file →
+                # Valkey, all serialized against other replicas via the
+                # Sokovan-style TTL lease.
+                holder_token = f"{ctx.node_id}:{uuid.uuid4().hex}"
+                acquired = await ctx.valkey_tus_client.acquire_lock(
+                    token_data["session"], holder_token
                 )
+                if not acquired:
+                    # Another replica is mid-PATCH for this session — under
+                    # spec-compliant sequential clients this can only mean
+                    # a timeout-induced concurrent retry. 409 lets the
+                    # client HEAD and re-sync to the canonical offset.
+                    raise UploadOffsetMismatchError("session is being written by another replica")
+                try:
+                    actual_offset = await ctx.valkey_tus_client.get_offset(token_data["session"])
+                    if actual_offset is None:
+                        raise web.HTTPNotFound(
+                            body=dump_json_str(
+                                {
+                                    "title": "No such upload session",
+                                    "type": "https://api.backend.ai/probs/storage/no-such-upload-session",
+                                },
+                            ),
+                            content_type="application/problem+json",
+                        )
+                    if client_offset != actual_offset:
+                        raise UploadOffsetMismatchError(
+                            f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
+                        )
 
-            async with AsyncFileWriter(
-                target_filename=upload_temp_path,
-                access_mode="ab",
-                max_chunks=DEFAULT_INFLIGHT_CHUNKS,
-            ) as writer:
-                while not request.content.at_eof():
-                    chunk = await request.content.read(DEFAULT_CHUNK_SIZE)
-                    await writer.write(chunk)
+                    # Single fd: open with O_CREAT (handles first PATCH of a
+                    # fresh session), ftruncate to the Valkey-known committed
+                    # offset (discards any orphan bytes from a prior crashed
+                    # holder — no ``stat()`` needed because we always reset
+                    # the length to a known-good value), seek to the end,
+                    # write staging payload, fsync, close.
+                    await loop.run_in_executor(
+                        None,
+                        _commit_staging,
+                        upload_temp_path,
+                        staging_path,
+                        actual_offset,
+                    )
+                    new_offset = await ctx.valkey_tus_client.advance_offset(
+                        token_data["session"], length=staged_bytes
+                    )
+                finally:
+                    await ctx.valkey_tus_client.release_lock(token_data["session"], holder_token)
+            finally:
+                # Always remove the staging file. Crash-leftover stagings are
+                # garbage-collected separately by directory mtime sweeps.
+                try:
+                    await loop.run_in_executor(
+                        None,
+                        staging_path.unlink,
+                        True,  # missing_ok=True
+                    )
+                except OSError:
+                    pass
 
-            current_size = Path(upload_temp_path).stat().st_size
-            if current_size >= int(token_data["size"]):
+            headers["Upload-Offset"] = str(new_offset)
+            if new_offset >= int(token_data["size"]):
                 parent_dir = vfpath
                 if (dst_dir := params["dst_dir"]) is not None:
                     parent_dir = vfpath / dst_dir
@@ -412,7 +532,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     )
                 except OSError:
                     pass
-            headers["Upload-Offset"] = str(current_size)
+            headers["Upload-Offset"] = str(new_offset)
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
@@ -440,7 +560,7 @@ async def tus_options(request: web.Request) -> web.Response:
 
 
 async def prepare_tus_session_headers(
-    _request: web.Request,
+    request: web.Request,
     token_data: Mapping[str, Any],
     volume: AbstractVolume,
 ) -> MutableMapping[str, str]:
@@ -467,7 +587,23 @@ async def prepare_tus_session_headers(
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"
-    headers["Upload-Offset"] = str(Path(upload_temp_path).stat().st_size)
+    # Read the offset from the shared TUS coordinator (BA-3974 fix). Falling
+    # back to ``stat().st_size`` would re-introduce the NFS-attribute-cache
+    # race that this coordinator exists to bypass.
+    ctx: RootContext = request.app["ctx"]
+    redis_offset = await ctx.valkey_tus_client.get_offset(token_data["session"])
+    if redis_offset is None:
+        # Session was never registered or its TTL elapsed.
+        raise web.HTTPNotFound(
+            body=dump_json_str(
+                {
+                    "title": "No such upload session",
+                    "type": "https://api.backend.ai/probs/storage/no-such-upload-session",
+                },
+            ),
+            content_type="application/problem+json",
+        )
+    headers["Upload-Offset"] = str(redis_offset)
     headers["Upload-Length"] = str(token_data["size"])
     return headers
 
