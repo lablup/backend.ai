@@ -86,7 +86,7 @@ def _fsync_file(path: Path) -> None:
 def _commit_staging(upload_temp_path: Path, staging_path: Path, known_good_offset: int) -> None:
     """Atomically commit ``staging_path`` content onto ``upload_temp_path``.
 
-    Performed inside the per-session Sokovan lease. ``known_good_offset`` is
+    Performed inside the per-session lease. ``known_good_offset`` is
     the Valkey-known committed offset — the file is unconditionally truncated
     to that length before append, which both creates the file if missing (via
     ``O_CREAT``) and discards any orphan bytes left behind by a prior holder
@@ -431,11 +431,11 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 
             loop = asyncio.get_running_loop()
 
-            # Phase 1 (outside the lock): drain the request body into a
-            # per-attempt staging file. Holding the Sokovan lease for the
-            # network read would balloon the critical section to the full
-            # chunk transfer time (seconds for 100MB+ chunks); keeping it
-            # outside means the lock only covers fast local commit ops.
+            # Phase 1 (outside the lease): drain the request body into a
+            # per-attempt staging file. Holding the lease for the network
+            # read would balloon the critical section to the full chunk
+            # transfer time (seconds for 100MB+ chunks); keeping it outside
+            # means the lease only covers fast local commit ops.
             # ``staged_bytes`` is tracked here — never via ``stat()`` —
             # so the offset accounting is independent of NFS attribute
             # cache (the very thing this whole fix exists to escape).
@@ -455,11 +455,11 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                         staged_bytes += len(chunk)
                 await loop.run_in_executor(None, _fsync_file, staging_path)
 
-                # Phase 2 (under the lock): commit staging → upload file →
+                # Phase 2 (under the lease): commit staging → upload file →
                 # Valkey, all serialized against other replicas via the
-                # Sokovan-style TTL lease.
+                # TTL lease.
                 holder_token = f"{ctx.node_id}:{uuid.uuid4().hex}"
-                acquired = await ctx.valkey_tus_client.acquire_lock(
+                acquired = await ctx.valkey_tus_client.acquire_session_lease(
                     token_data["session"], holder_token
                 )
                 if not acquired:
@@ -502,7 +502,9 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                         token_data["session"], length=staged_bytes
                     )
                 finally:
-                    await ctx.valkey_tus_client.release_lock(token_data["session"], holder_token)
+                    await ctx.valkey_tus_client.release_session_lease(
+                        token_data["session"], holder_token
+                    )
             finally:
                 # Always remove the staging file. Crash-leftover stagings are
                 # garbage-collected separately by directory mtime sweeps.

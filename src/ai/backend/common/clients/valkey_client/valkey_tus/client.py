@@ -63,14 +63,14 @@ valkey_tus_resilience = Resilience(
 )
 
 _OFFSET_KEY_PREFIX: Final = "tus.upload.offset"
-_LOCK_KEY_PREFIX: Final = "tus.upload.lock"
+_LEASE_KEY_PREFIX: Final = "tus.upload.lease"
 _DEFAULT_TTL_SECONDS: Final = 24 * 60 * 60
-_DEFAULT_LOCK_TTL_SECONDS: Final = 60
+_DEFAULT_LEASE_TTL_SECONDS: Final = 60
 
 # Compare-and-delete release. ``DEL`` only if the value still equals the
 # caller-supplied holder token — this prevents a process whose lease has
 # already expired from accidentally deleting the next holder's lease.
-RELEASE_LOCK_SCRIPT: Final[str] = """
+RELEASE_LEASE_SCRIPT: Final[str] = """
 local current = redis.call('GET', KEYS[1])
 if current == ARGV[1] then
     redis.call('DEL', KEYS[1])
@@ -85,11 +85,11 @@ class ValkeyTusOffsetClient:
     """Tiny Valkey-backed offset coordinator for TUS uploads."""
 
     _client: AbstractValkeyClient
-    _release_lock_script: Script
+    _release_lease_script: Script
 
     def __init__(self, client: AbstractValkeyClient) -> None:
         self._client = client
-        self._release_lock_script = Script(RELEASE_LOCK_SCRIPT)
+        self._release_lease_script = Script(RELEASE_LEASE_SCRIPT)
 
     @classmethod
     async def create(
@@ -116,27 +116,27 @@ class ValkeyTusOffsetClient:
         return f"{_OFFSET_KEY_PREFIX}:{session_id}"
 
     @staticmethod
-    def _lock_key(session_id: str) -> str:
-        return f"{_LOCK_KEY_PREFIX}:{session_id}"
+    def _lease_key(session_id: str) -> str:
+        return f"{_LEASE_KEY_PREFIX}:{session_id}"
 
     @valkey_tus_resilience.apply()
-    async def acquire_lock(
+    async def acquire_session_lease(
         self,
         session_id: str,
         holder_token: str,
         *,
-        ttl_seconds: int = _DEFAULT_LOCK_TTL_SECONDS,
+        ttl_seconds: int = _DEFAULT_LEASE_TTL_SECONDS,
     ) -> bool:
-        """Sokovan-style TTL lease.
+        """Try-once TTL lease admitting a single writer per upload session.
 
-        Acquires the per-session lock by atomically setting the lock key with
-        ``SET NX EX``. Returns ``True`` if acquired, ``False`` if another
-        replica already holds the lease. The lease auto-expires after
-        ``ttl_seconds`` so a crashed holder cannot deadlock the session.
+        Atomically claims the per-session lease key via ``SET NX EX``. Returns
+        ``True`` on admission, ``False`` if another replica currently holds
+        the lease. The lease auto-expires after ``ttl_seconds`` so a crashed
+        holder cannot starve the session indefinitely.
         """
         async with self._client.client() as conn:
             result = await conn.set(
-                self._lock_key(session_id),
+                self._lease_key(session_id),
                 holder_token,
                 conditional_set=ConditionalChange.ONLY_IF_DOES_NOT_EXIST,
                 expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
@@ -144,18 +144,18 @@ class ValkeyTusOffsetClient:
         return result is not None
 
     @valkey_tus_resilience.apply()
-    async def release_lock(self, session_id: str, holder_token: str) -> bool:
+    async def release_session_lease(self, session_id: str, holder_token: str) -> bool:
         """Compare-and-delete release.
 
-        Only deletes the lock key if the stored value still equals the
+        Only deletes the lease key if the stored value still equals the
         caller-supplied ``holder_token``. This prevents a process whose lease
-        has already expired (and was acquired by another replica in the
+        has already expired (and was claimed by another replica in the
         meantime) from accidentally releasing the new holder's lease.
         """
         async with self._client.client() as conn:
             result = await conn.invoke_script(
-                script=self._release_lock_script,
-                keys=[self._lock_key(session_id)],
+                script=self._release_lease_script,
+                keys=[self._lease_key(session_id)],
                 args=[holder_token],
             )
         return int(result) == 1
