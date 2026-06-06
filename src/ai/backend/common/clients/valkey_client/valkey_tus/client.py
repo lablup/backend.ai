@@ -61,7 +61,7 @@ end
 
 
 class ValkeyTusClient:
-    """Per-session committed offset and write lease, shared across replicas."""
+    """Per-session committed offset and write lease, shared across storage-proxy instances."""
 
     _client: AbstractValkeyClient
     _release_lease_script: Script
@@ -106,7 +106,7 @@ class ValkeyTusClient:
         *,
         ttl_seconds: int = _DEFAULT_LEASE_TTL_SECONDS,
     ) -> bool:
-        """``SET NX EX``: ``True`` on admission, ``False`` if another replica holds it."""
+        """``SET NX EX``: ``True`` on admission, ``False`` if another storage-proxy holds it."""
         async with self._client.client() as conn:
             result = await conn.set(
                 self._lease_key(session_id),

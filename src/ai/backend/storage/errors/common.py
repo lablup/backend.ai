@@ -209,7 +209,7 @@ class UploadSessionNotFoundError(BackendAIError, web.HTTPNotFound):
 class UploadSessionLeaseHeldError(BackendAIError, web.HTTPConflict):
     """
     Raised when the per-session write lease is currently held by another
-    storage-proxy replica. Returned as 409 so the client HEADs and resumes
+    storage-proxy instance. Returned as 409 so the client HEADs and resumes
     from the canonical offset.
     """
 

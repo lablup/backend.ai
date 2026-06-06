@@ -87,12 +87,12 @@ async def _session_lease(
 ) -> AsyncIterator[None]:
     """Hold the per-session write lease for the body of the ``async with``.
 
-    Raises :class:`UploadSessionLeaseHeldError` if another replica is already
-    inside the critical section; the lease is always released on exit.
+    Raises :class:`UploadSessionLeaseHeldError` if another storage-proxy is
+    already inside the critical section; the lease is always released on exit.
     """
     holder_token = f"{node_id}:{uuid.uuid4().hex}"
     if not await client.acquire_session_lease(session_id, holder_token):
-        raise UploadSessionLeaseHeldError("session is being written by another replica")
+        raise UploadSessionLeaseHeldError("session is being written by another storage-proxy")
     try:
         yield
     finally:
