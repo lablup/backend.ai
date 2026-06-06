@@ -42,7 +42,7 @@
     "colorama>=0.4.6",
     "coloredlogs~=15.0",
     "cryptography>=44.0.2",
-    "dataclasses-json~=0.5.7",
+    "dataclasses-json~=0.6.7",
     "etcd-client-py~=0.5.1",
     "faker~=24.7.1",
     "graphene-federation~=3.2.0",

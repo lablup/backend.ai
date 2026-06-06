@@ -727,15 +727,15 @@ wheels = [
 
 [[package]]
 name = "dataclasses-json"
-version = "0.5.14"
+version = "0.6.7"
 source = { registry = "https://pypi.org/simple/" }
 dependencies = [
     { name = "marshmallow" },
     { name = "typing-inspect" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/92/30/43b04314b64fbd4562216721bfbf95022922c57e0340809b99f5e049d8ea/dataclasses_json-0.5.14.tar.gz", hash = "sha256:d82896a94c992ffaf689cd1fafc180164e2abdd415b8f94a7f78586af5886236", size = 29334, upload-time = "2023-07-30T18:06:13.503Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/a4/f71d9cf3a5ac257c993b5ca3f93df5f7fb395c725e7f1e6479d2514173c3/dataclasses_json-0.6.7.tar.gz", hash = "sha256:b6b3e528266ea45b9535223bc53ca645f5208833c29229e847b3f26a1cc55fc0", size = 32227, upload-time = "2024-06-09T16:20:19.103Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/5f/e7cc90f36152810cab08b6c9c1125e8bcb9d76f8b3018d101b5f877b386c/dataclasses_json-0.5.14-py3-none-any.whl", hash = "sha256:5ec6fed642adb1dbdb4182badb01e0861badfd8fda82e3b67f44b2d1e9d10d21", size = 26297, upload-time = "2023-07-30T18:06:11.656Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/be/d0d44e092656fe7a06b55e6103cbce807cdbdee17884a5367c68c9860853/dataclasses_json-0.6.7-py3-none-any.whl", hash = "sha256:0dbf33f26c8d5305befd61b39d2b3414e8a407bedc2834dea9b8d642666fb40a", size = 28686, upload-time = "2024-06-09T16:20:16.715Z" },
 ]
 
 [[package]]
@@ -993,11 +993,11 @@ wheels = [
 
 [[package]]
 name = "graphql-core"
-version = "3.2.10"
+version = "3.2.11"
 source = { registry = "https://pypi.org/simple/" }
-sdist = { url = "https://files.pythonhosted.org/packages/b3/a5/c8f043d53079445213bdccb7bac27d086baab5294a3b51d06840370bd907/graphql_core-3.2.10.tar.gz", hash = "sha256:175f909aa876b2eeea4acffc5a6215f6588a32e1e07550e10f68423c5bd9052f", size = 524319, upload-time = "2026-06-05T12:02:17.032Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4d/90/f2aff026ab4aebd80eb71905106a0885f4cfde85dcf965543f45bed0d9ee/graphql_core-3.2.11.tar.gz", hash = "sha256:e7e156d10beb127cab5c89ff0da71416fc73d27c484a4757d3b2d35633774802", size = 528407, upload-time = "2026-06-05T13:45:22.915Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/08/76/d034eeb3f3b0e4a4d8b65d941ec075551640569c5a76af6e306085a4ebc2/graphql_core-3.2.10-py3-none-any.whl", hash = "sha256:ebc5e7e3b552d58ffa7979d650937cf2393ff529b87c88a87b81d83634b189a0", size = 213237, upload-time = "2026-06-05T12:02:15.421Z" },
+    { url = "https://files.pythonhosted.org/packages/00/15/b92b4e1d88d02c6eff9733c9eea21846ab435cc4d813d84ccc5d335955df/graphql_core-3.2.11-py3-none-any.whl", hash = "sha256:0b3e35ff41e9adba53021ab0cef475eb18f57c7f53f0f2ca55567fbf3c537ea0", size = 214879, upload-time = "2026-06-05T13:45:21.245Z" },
 ]
 
 [[package]]
@@ -1997,7 +1997,7 @@ requires-dist = [
     { name = "colorama", specifier = ">=0.4.6" },
     { name = "coloredlogs", specifier = "~=15.0" },
     { name = "cryptography", specifier = ">=44.0.2" },
-    { name = "dataclasses-json", specifier = "~=0.5.7" },
+    { name = "dataclasses-json", specifier = "~=0.6.7" },
     { name = "etcd-client-py", specifier = "~=0.5.1" },
     { name = "faker", specifier = "~=24.7.1" },
     { name = "graphene", specifier = "~=3.3.0" },
@@ -3344,11 +3344,11 @@ wheels = [
 
 [[package]]
 name = "wcwidth"
-version = "0.7.0"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple/" }
-sdist = { url = "https://files.pythonhosted.org/packages/2c/ee/afaf0f85a9a18fe47a67f1e4422ed6cf1fe642f0ae0a2f81166231303c52/wcwidth-0.7.0.tar.gz", hash = "sha256:90e3a7ea092341c44b99562e75d09e4d5160fe7a3974c6fb842a101a95e7eed0", size = 182132, upload-time = "2026-05-02T16:04:12.653Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/44/c833e6b746ffb654e9abacf7ad6c2480a9c8c42e9637c1ae849964fb4dde/wcwidth-0.8.0.tar.gz", hash = "sha256:68a882ff6d14e3d14e0cae590b96a0551be64ce4905408112a8254434a1bdf69", size = 1305357, upload-time = "2026-06-05T21:19:35.667Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/41/52/e465037f5375f43533d1a80b6923955201596a99142ed524d77b571a1418/wcwidth-0.7.0-py3-none-any.whl", hash = "sha256:5d69154c429a82910e241c738cd0e2976fac8a2dd47a1a805f4afed1c0f136f2", size = 110825, upload-time = "2026-05-02T16:04:11.033Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/17/c68b6cbcfeadbf420b3c3edaf8fda51335bc9c38732adb2d3ba8984dc607/wcwidth-0.8.0-py3-none-any.whl", hash = "sha256:8c75e6099cefd197c4bcc67a486f70b5dbc68f997c05f34a811d853910450d64", size = 324935, upload-time = "2026-06-05T21:19:33.999Z" },
 ]
 
 [[package]]
