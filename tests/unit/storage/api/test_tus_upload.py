@@ -36,19 +36,23 @@ class TestTusUploadPartOffsetValidation:
 
     @pytest.fixture(autouse=True)
     def _patch_disk_helpers(self) -> Generator[None, None, None]:
-        """Replace the real fd helpers with no-ops.
+        """Mock the aiofiles-based file write path with no-ops.
 
-        ``tus_upload_part`` opens the upload file at the Valkey-canonical
-        offset and streams the request body straight in under the lease.
-        None of these paths exist on disk in mocked tests, so we substitute
-        no-op callables. The offset validation logic (which is what these
-        tests cover) executes before the file open, so this leaves the
-        assertions intact.
+        ``tus_upload_part`` opens the upload file via ``aiofiles.open`` and
+        streams the request body straight in under the lease. None of these
+        paths exist on disk in mocked tests, so we substitute an AsyncMock
+        for both the file handle and the wrapped ``fsync``. The offset
+        validation logic (which is what these tests cover) executes before
+        the file open, so this leaves the assertions intact.
         """
+        async_file = AsyncMock()
+        async_file.fileno = MagicMock(return_value=99)
+        file_cm = MagicMock()
+        file_cm.__aenter__ = AsyncMock(return_value=async_file)
+        file_cm.__aexit__ = AsyncMock(return_value=None)
         with (
-            patch("ai.backend.storage.api.client._open_upload_at_offset", return_value=99),
-            patch("ai.backend.storage.api.client._write_all"),
-            patch("ai.backend.storage.api.client._fsync_close"),
+            patch("ai.backend.storage.api.client.aiofiles.open", return_value=file_cm),
+            patch("ai.backend.storage.api.client._async_fsync", new=AsyncMock()),
         ):
             yield
 

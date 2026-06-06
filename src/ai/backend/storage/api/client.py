@@ -23,6 +23,7 @@ from typing import (
     cast,
 )
 
+import aiofiles
 import aiofiles.os
 import aiohttp_cors
 import janus
@@ -69,40 +70,21 @@ DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
-def _open_upload_at_offset(upload_temp_path: Path, known_good_offset: int) -> int:
-    """Open ``upload_temp_path`` for write at ``known_good_offset``.
+def _create_if_missing_opener(path: str | bytes, flags: int) -> int:
+    """Custom ``open()`` opener that adds ``O_CREAT`` so ``aiofiles.open``
+    in ``r+b`` mode can also create the file on the first PATCH of a fresh
+    upload session.
 
-    ``O_CREAT`` covers the first PATCH of a fresh session. ``ftruncate`` then
-    discards any orphan bytes left behind by a prior holder that crashed
-    mid-write — no ``stat()`` is needed because we always reset the length to
-    a value Valkey vouches for. The fd is left seeked to the end so the
-    caller can ``os.write`` the request body straight in.
+    The aiofiles AsyncFile wraps Python's builtin ``open(path, mode,
+    opener=...)`` — the opener receives ``(file, flags)`` and must return
+    a file descriptor.
     """
-    fd = os.open(str(upload_temp_path), os.O_WRONLY | os.O_CREAT, 0o644)
-    try:
-        os.ftruncate(fd, known_good_offset)
-        os.lseek(fd, known_good_offset, os.SEEK_SET)
-    except BaseException:
-        os.close(fd)
-        raise
-    return fd
+    return os.open(path, flags | os.O_CREAT, 0o644)
 
 
-def _write_all(fd: int, buf: bytes) -> None:
-    """Write ``buf`` to ``fd`` in full, looping over partial writes."""
-    view = memoryview(buf)
-    while view:
-        n = os.write(fd, view)
-        view = view[n:]
-
-
-def _fsync_close(fd: int) -> None:
-    """``fsync`` then ``close`` ``fd`` — single call so the caller can
-    schedule both in one ``run_in_executor`` hop."""
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
+# ``aiofiles.os`` does not expose ``fsync``; ``wrap`` schedules the sync
+# call on the default executor and returns a coroutine.
+_async_fsync = aiofiles.os.wrap(os.fsync)
 
 
 class DownloadTokenData(TypedDict):
@@ -417,8 +399,6 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     f"Invalid Upload-Offset header value: {upload_offset_header}"
                 ) from e
 
-            loop = asyncio.get_running_loop()
-
             # The entire write path lives inside the per-session lease: open
             # the upload file at the Valkey-canonical offset, drain the body
             # straight in, fsync, then INCRBY. No staging file — every byte
@@ -457,21 +437,20 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                         f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
                     )
 
-                fd = await loop.run_in_executor(
-                    None, _open_upload_at_offset, upload_temp_path, actual_offset
-                )
                 bytes_written = 0
-                try:
+                async with aiofiles.open(
+                    upload_temp_path, mode="r+b", opener=_create_if_missing_opener
+                ) as f:
+                    await f.truncate(actual_offset)
+                    await f.seek(actual_offset)
                     while not request.content.at_eof():
                         chunk = await request.content.read(DEFAULT_CHUNK_SIZE)
                         if not chunk:
                             continue
-                        await loop.run_in_executor(None, _write_all, fd, chunk)
+                        await f.write(chunk)
                         bytes_written += len(chunk)
-                    await loop.run_in_executor(None, _fsync_close, fd)
-                except BaseException:
-                    await loop.run_in_executor(None, os.close, fd)
-                    raise
+                    await f.flush()
+                    await _async_fsync(f.fileno())
 
                 new_offset = await ctx.valkey_tus_client.advance_offset(
                     token_data["session"], length=bytes_written
