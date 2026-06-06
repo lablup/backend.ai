@@ -10,7 +10,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common import redis_helper
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.defs import REDIS_BGTASK_DB, REDIS_STREAM_DB
 from ai.backend.common.events.dispatcher import (
@@ -133,10 +133,12 @@ async def background_task_manager(
     event_producer: EventProducer,
     valkey_bgtask_client: ValkeyBgtaskClient,
 ) -> AsyncIterator[BackgroundTaskManager]:
-    bgtask_manager = BackgroundTaskManager(
-        event_producer,
-        valkey_client=valkey_bgtask_client,
-        server_id=f"test-server-{uuid4()}",
+    bgtask_manager = await BackgroundTaskManager.create(
+        BackgroundTaskManagerArgs(
+            event_producer=event_producer,
+            valkey_client=valkey_bgtask_client,
+            server_id=f"test-server-{uuid4()}",
+        )
     )
 
     yield bgtask_manager

@@ -257,6 +257,16 @@ def _exception_to_task_result[**P](
     return wrapper
 
 
+@dataclass
+class BackgroundTaskManagerArgs:
+    event_producer: EventProducer
+    valkey_client: ValkeyBgtaskClient
+    server_id: str
+    tags: Iterable[str] | None = None
+    bgtask_observer: BackgroundTaskObserver | None = None
+    task_registry: BackgroundTaskHandlerRegistry | None = None
+
+
 class BackgroundTaskManager:
     _event_producer: EventProducer
     _ongoing_tasks: MutableMapping[TaskID, BackgroundTaskMeta]
@@ -266,39 +276,38 @@ class BackgroundTaskManager:
     _task_set_key: TaskSetKey
     _task_registry: BackgroundTaskHandlerRegistry
 
-    _local_cron: LocalCron
+    _local_cron: LocalCron | None
 
-    def __init__(
-        self,
-        event_producer: EventProducer,
-        *,
-        valkey_client: ValkeyBgtaskClient,
-        server_id: str,
-        tags: Iterable[str] | None = None,
-        bgtask_observer: BackgroundTaskObserver | None = None,
-        task_registry: BackgroundTaskHandlerRegistry | None = None,
-    ) -> None:
-        self._event_producer = event_producer
+    def __init__(self, args: BackgroundTaskManagerArgs) -> None:
+        self._event_producer = args.event_producer
         self._ongoing_tasks = {}
 
-        self._valkey_client = valkey_client
+        self._valkey_client = args.valkey_client
         self._task_set_key = TaskSetKey(
-            server_id=server_id, tags=set(tags) if tags is not None else set()
+            server_id=args.server_id, tags=set(args.tags) if args.tags is not None else set()
         )
-        if bgtask_observer is None:
-            bgtask_observer = NopBackgroundTaskObserver()
+        bgtask_observer = args.bgtask_observer or NopBackgroundTaskObserver()
         self._metric_observer = bgtask_observer
         self._hook = CompositeTaskHook([
             MetricObserverHook(bgtask_observer),
-            EventProducerHook(event_producer),
-            ValkeyUnregisterHook(valkey_client, self._task_set_key),
+            EventProducerHook(args.event_producer),
+            ValkeyUnregisterHook(args.valkey_client, self._task_set_key),
         ])
-        self._task_registry = task_registry or BackgroundTaskHandlerRegistry()
-        self._local_cron = LocalCron([
-            BgtaskHeartbeatTask(self),
-            BgtaskRetryTask(self),
+        self._task_registry = args.task_registry or BackgroundTaskHandlerRegistry()
+        self._local_cron = None
+
+    @classmethod
+    async def create(cls, args: BackgroundTaskManagerArgs) -> Self:
+        """Construct a manager and start its local cron in an async context."""
+        instance = cls(args)
+        local_cron = LocalCron([
+            BgtaskHeartbeatTask(instance),
+            BgtaskRetryTask(instance),
         ])
-        asyncio.create_task(self._local_cron.start())
+        await local_cron.start()
+        # No setter because we don't want this to be changed after initialization
+        instance._local_cron = local_cron
+        return instance
 
     def set_registry(self, registry: BackgroundTaskHandlerRegistry) -> None:
         self._task_registry = registry
@@ -335,7 +344,8 @@ class BackgroundTaskManager:
                     await async_task
                 except asyncio.CancelledError:
                     pass
-        await self._local_cron.stop()
+        if self._local_cron is not None:
+            await self._local_cron.stop()
 
     def _convert_bgtask_to_event(
         self, task_id: uuid.UUID, bgtask_result: DispatchResult[Any] | str | None

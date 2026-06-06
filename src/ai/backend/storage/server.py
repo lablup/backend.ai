@@ -26,7 +26,7 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -225,16 +225,19 @@ async def bgtask_ctx(
     )
     bgtask_registry_creator = BgtaskHandlerRegistryCreator(volume_pool, event_producer)
     registry = bgtask_registry_creator.create()
-    bgtask_mgr = BackgroundTaskManager(
-        event_producer=event_producer,
-        task_registry=registry,
-        valkey_client=valkey_client,
-        server_id=local_config.storage_proxy.node_id,
+    bgtask_mgr = await BackgroundTaskManager.create(
+        BackgroundTaskManagerArgs(
+            event_producer=event_producer,
+            task_registry=registry,
+            valkey_client=valkey_client,
+            server_id=local_config.storage_proxy.node_id,
+        )
     )
 
     try:
         yield bgtask_mgr
     finally:
+        await bgtask_mgr.shutdown()
         await valkey_client.close()
 
 

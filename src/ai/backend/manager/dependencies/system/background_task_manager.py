@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.bgtask.hooks.metric_hook import BackgroundTaskObserver
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -34,11 +34,13 @@ class BackgroundTaskManagerDependency(
     async def provide(
         self, setup_input: BackgroundTaskManagerInput
     ) -> AsyncIterator[BackgroundTaskManager]:
-        manager = BackgroundTaskManager(
-            setup_input.event_producer,
-            valkey_client=setup_input.valkey_bgtask,
-            server_id=setup_input.server_id,
-            bgtask_observer=setup_input.bgtask_observer,
+        manager = await BackgroundTaskManager.create(
+            BackgroundTaskManagerArgs(
+                event_producer=setup_input.event_producer,
+                valkey_client=setup_input.valkey_bgtask,
+                server_id=setup_input.server_id,
+                bgtask_observer=setup_input.bgtask_observer,
+            )
         )
         try:
             yield manager

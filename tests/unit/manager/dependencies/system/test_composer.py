@@ -140,7 +140,7 @@ class TestSystemComposer:
         ) as mock_bgtask_class:
             mock_bgtask_manager = MagicMock()
             mock_bgtask_manager.shutdown = AsyncMock()
-            mock_bgtask_class.return_value = mock_bgtask_manager
+            mock_bgtask_class.create = AsyncMock(return_value=mock_bgtask_manager)
 
             setup_input = SystemInput(
                 config=mock_config,

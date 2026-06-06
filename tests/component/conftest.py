@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -1130,10 +1130,12 @@ async def background_task_manager(
     valkey_clients: ValkeyClients,
 ) -> AsyncIterator[BackgroundTaskManager]:
     """Real BackgroundTaskManager backed by Valkey."""
-    mgr = BackgroundTaskManager(
-        event_producer,
-        valkey_client=valkey_clients.bgtask,
-        server_id=f"test-server-{uuid4()}",
+    mgr = await BackgroundTaskManager.create(
+        BackgroundTaskManagerArgs(
+            event_producer=event_producer,
+            valkey_client=valkey_clients.bgtask,
+            server_id=f"test-server-{uuid4()}",
+        )
     )
     yield mgr
     await mgr.shutdown()
