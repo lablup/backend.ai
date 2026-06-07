@@ -29,10 +29,9 @@ Repositories implement 6 standard operations:
 5. **delete** - Soft delete (status change)
 6. **purge** - Hard delete (permanent removal)
 
-**Batch operations:**
-- `batch_update` - Update multiple entities
-- `batch_delete` - Soft delete multiple entities
-- `batch_purge` - Hard delete multiple entities
+**Multi-target operations** — two semantics:
+- **Batch** (`batch_*`): many rows in one SQL statement, **atomic** (all-or-nothing); returns only the affected-row count. e.g. `batch_update`, `batch_delete`, `batch_purge`.
+- **Bulk** (`bulk_*`): rows processed individually, **partial failures allowed** (returns successes + errors). e.g. `bulk_create`, `bulk_upsert`.
 
 **Method naming (no prefix):**
 ```python
@@ -42,9 +41,11 @@ await repository.search(scope, filters, pagination)
 await repository.update(id, data)
 await repository.delete(id)
 await repository.purge(id)
-await repository.batch_update(ids, data)
+await repository.batch_update(ids, data)   # atomic
 await repository.batch_delete(ids)
 await repository.batch_purge(ids)
+await repository.bulk_create(specs)         # partial failures allowed
+await repository.bulk_upsert(specs)
 ```
 
 **Note:** Getter methods use entity name (e.g., `user(id)`, `session(id)`) instead of `get_entity(id)`.

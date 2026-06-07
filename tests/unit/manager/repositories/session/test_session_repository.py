@@ -505,6 +505,18 @@ class TestSessionRepository:
         resolved = await repository.resolve_session_id("test-session", session_with_kernel.user_id)
         assert resolved == session_with_kernel.session_id
 
+    async def test_resolve_session_id_returns_uuid_input_as_is(
+        self,
+        repository: SessionRepository,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        """A UUID-shaped input is already a session id, so it is returned verbatim without
+        a name lookup. This resolver only disambiguates name-vs-id for legacy callers, so an
+        arbitrary UUID resolves to itself even when no such session exists."""
+        some_id = uuid.uuid4()
+        resolved = await repository.resolve_session_id(str(some_id), session_with_kernel.user_id)
+        assert resolved == SessionId(some_id)
+
     # =========================================================================
     # Tests - get_session_with_routing_minimal
     # =========================================================================

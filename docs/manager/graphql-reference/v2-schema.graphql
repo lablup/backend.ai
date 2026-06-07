@@ -6458,6 +6458,11 @@ input ModelDeploymentNetworkAccessInput {
 
 """Added in 26.4.2. Health check configuration for a model service."""
 type ModelHealthCheck {
+  """
+  Whether the route is health-checked. When false the route activates immediately.
+  """
+  enable: Boolean!
+
   """Interval in seconds between health checks."""
   interval: Float!
 
@@ -6479,6 +6484,11 @@ type ModelHealthCheck {
 
 """Added in 26.4.0. Health check configuration for a model service."""
 input ModelHealthCheckInput {
+  """
+  Whether the route should be health-checked. When false the route activates immediately and the remaining fields are ignored.
+  """
+  enable: Boolean! = false
+
   """Interval in seconds between health checks."""
   interval: Float = null
 

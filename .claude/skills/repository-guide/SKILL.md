@@ -21,10 +21,10 @@ Repositories implement 6 standard operations:
 5. **delete** - Soft delete (status change)
 6. **purge** - Hard delete (permanent removal)
 
-**Batch operations:**
-- `batch_update` - Update multiple entities
-- `batch_delete` - Soft delete multiple entities
-- `batch_purge` - Hard delete multiple entities
+**Target semantics:**
+- **Single** (`create`/`get`/`update`/`delete`/`purge`) — one row by PK.
+- **Batch** (`batch_*`) — many rows in one SQL statement, **atomic** (all-or-nothing); returns only the affected-row count.
+- **Bulk** (`bulk_*`) — rows processed individually, **partial failures allowed** (returns successes + errors).
 
 **Method naming (no prefix):**
 ```python
@@ -34,9 +34,11 @@ await repository.search(scope, filters, pagination)
 await repository.update(id, data)
 await repository.delete(id)
 await repository.purge(id)
-await repository.batch_update(ids, data)
+await repository.batch_update(ids, data)   # atomic
 await repository.batch_delete(ids)
 await repository.batch_purge(ids)
+await repository.bulk_create(specs)         # partial failures allowed
+await repository.bulk_upsert(specs)
 ```
 
 ## Base Utilities
@@ -64,7 +66,8 @@ Multi-tenant access control for queries.
 - `BatchQuerier[TRow]` - Search with filters and pagination
 - `Updater[TRow]` - Update with OptionalState pattern
 - `Purger[TRow]` - Hard delete operations
-- `BatchUpdater[TRow]`, `BatchPurger[TRow]` - Batch operations
+- `BatchUpdater[TRow]`, `BatchPurger[TRow]` - atomic multi-row (single statement)
+- `BulkCreator[TRow]`, `BulkUpserter[TRow]` - per-row with partial failures (`execute_bulk_*_partial`)
 
 **See implementations:**
 - `repositories/base/` - Base utility source code
