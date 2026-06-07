@@ -1,3 +1,12 @@
+"""Regression tests for #11955.
+
+``get_container_logs`` / ``get_status_history`` / ``get_commit_status`` are GET
+requests whose manager handlers parse parameters from the query string
+(``QueryParam``). The request DTO must therefore be serialized into the query
+string, never the JSON body — otherwise fields like ``owner_access_key`` are
+silently dropped and a privileged delegated read 404s.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -67,69 +76,58 @@ def session_client(captured_session: aiohttp.ClientSession) -> SessionClient:
     return SessionClient(client)
 
 
-class TestGetMethodsUseQueryString:
-    """Regression for #11955.
+async def test_get_container_logs_sends_query_params_not_body(
+    session_client: SessionClient,
+    captured_session: aiohttp.ClientSession,
+) -> None:
+    kernel_id = UUID("11111111-1111-1111-1111-111111111111")
+    await session_client.get_container_logs(
+        "sess-1",
+        GetContainerLogsRequest(owner_access_key="AKIATEST", kernel_id=kernel_id),
+    )
 
-    ``get_container_logs`` / ``get_status_history`` / ``get_commit_status`` are GET
-    requests whose manager handlers parse parameters from the query string
-    (``QueryParam``). The request DTO must therefore be serialized into the query
-    string, never the JSON body — otherwise fields like ``owner_access_key`` are
-    silently dropped and a privileged delegated read 404s.
-    """
+    _, kwargs = captured_session.request.call_args
+    assert kwargs["json"] is None
+    assert kwargs["params"] == {
+        "owner_access_key": "AKIATEST",
+        "kernel_id": str(kernel_id),
+    }
 
-    async def test_get_container_logs_sends_query_params_not_body(
-        self,
-        session_client: SessionClient,
-        captured_session: aiohttp.ClientSession,
-    ) -> None:
-        kernel_id = UUID("11111111-1111-1111-1111-111111111111")
-        await session_client.get_container_logs(
-            "sess-1",
-            GetContainerLogsRequest(owner_access_key="AKIATEST", kernel_id=kernel_id),
-        )
 
-        _, kwargs = captured_session.request.call_args
-        assert kwargs["json"] is None
-        assert kwargs["params"] == {
-            "owner_access_key": "AKIATEST",
-            "kernel_id": str(kernel_id),
-        }
+async def test_get_status_history_sends_query_params_not_body(
+    session_client: SessionClient,
+    captured_session: aiohttp.ClientSession,
+) -> None:
+    await session_client.get_status_history(
+        "sess-1",
+        GetStatusHistoryRequest(owner_access_key="AKIATEST"),
+    )
 
-    async def test_get_status_history_sends_query_params_not_body(
-        self,
-        session_client: SessionClient,
-        captured_session: aiohttp.ClientSession,
-    ) -> None:
-        await session_client.get_status_history(
-            "sess-1",
-            GetStatusHistoryRequest(owner_access_key="AKIATEST"),
-        )
+    _, kwargs = captured_session.request.call_args
+    assert kwargs["json"] is None
+    assert kwargs["params"] == {"owner_access_key": "AKIATEST"}
 
-        _, kwargs = captured_session.request.call_args
-        assert kwargs["json"] is None
-        assert kwargs["params"] == {"owner_access_key": "AKIATEST"}
 
-    async def test_get_commit_status_sends_query_params_not_body(
-        self,
-        session_client: SessionClient,
-        captured_session: aiohttp.ClientSession,
-    ) -> None:
-        await session_client.get_commit_status(
-            "sess-1",
-            GetCommitStatusRequest(login_session_token="tok-123"),
-        )
+async def test_get_commit_status_sends_query_params_not_body(
+    session_client: SessionClient,
+    captured_session: aiohttp.ClientSession,
+) -> None:
+    await session_client.get_commit_status(
+        "sess-1",
+        GetCommitStatusRequest(login_session_token="tok-123"),
+    )
 
-        _, kwargs = captured_session.request.call_args
-        assert kwargs["json"] is None
-        assert kwargs["params"] == {"login_session_token": "tok-123"}
+    _, kwargs = captured_session.request.call_args
+    assert kwargs["json"] is None
+    assert kwargs["params"] == {"login_session_token": "tok-123"}
 
-    async def test_get_container_logs_without_request_sends_no_params(
-        self,
-        session_client: SessionClient,
-        captured_session: aiohttp.ClientSession,
-    ) -> None:
-        await session_client.get_container_logs("sess-1")
 
-        _, kwargs = captured_session.request.call_args
-        assert kwargs["json"] is None
-        assert kwargs["params"] is None
+async def test_get_container_logs_without_request_sends_no_params(
+    session_client: SessionClient,
+    captured_session: aiohttp.ClientSession,
+) -> None:
+    await session_client.get_container_logs("sess-1")
+
+    _, kwargs = captured_session.request.call_args
+    assert kwargs["json"] is None
+    assert kwargs["params"] is None
