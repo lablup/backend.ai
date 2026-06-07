@@ -24,6 +24,7 @@ from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.session import SessionClient
 from ai.backend.common.dto.manager.session.request import (
+    GetAbusingReportRequest,
     GetCommitStatusRequest,
     GetContainerLogsRequest,
     GetStatusHistoryRequest,
@@ -115,6 +116,20 @@ async def test_get_commit_status_sends_query_params_not_body(
     await session_client.get_commit_status(
         "sess-1",
         GetCommitStatusRequest(login_session_token="tok-123"),
+    )
+
+    _, kwargs = captured_session.request.call_args
+    assert kwargs["json"] is None
+    assert kwargs["params"] == {"login_session_token": "tok-123"}
+
+
+async def test_get_abusing_report_sends_query_params_not_body(
+    session_client: SessionClient,
+    captured_session: aiohttp.ClientSession,
+) -> None:
+    await session_client.get_abusing_report(
+        "sess-1",
+        GetAbusingReportRequest(login_session_token="tok-123"),
     )
 
     _, kwargs = captured_session.request.call_args

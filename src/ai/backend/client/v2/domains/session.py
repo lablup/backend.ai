@@ -340,11 +340,12 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: GetAbusingReportRequest | None = None,
     ) -> GetAbusingReportResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"{_BASE_PATH}/{session_name}/abusing-report",
-            request=request,
             response_model=GetAbusingReportResponse,
+            params=params,
         )
 
     # -----------------------------------------------------------------------
