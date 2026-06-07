@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from datetime import datetime
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -12,6 +13,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
+from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -93,6 +95,22 @@ class ReplicaGroupRepository:
         updaters: Sequence[Updater[ReplicaGroupRow]],
     ) -> BulkUpdaterResult[ReplicaGroupRow]:
         return await self._db_source.update_replica_groups(updaters)
+
+    @replica_group_repository_resilience.apply()
+    async def current_time(self) -> datetime:
+        return await self._db_source.current_time()
+
+    @replica_group_repository_resilience.apply()
+    async def apply_writes(
+        self,
+        *,
+        group_updaters: Sequence[Updater[ReplicaGroupRow]],
+        endpoint_updaters: Sequence[Updater[EndpointRow]],
+    ) -> None:
+        return await self._db_source.apply_writes(
+            group_updaters=group_updaters,
+            endpoint_updaters=endpoint_updaters,
+        )
 
     @replica_group_repository_resilience.apply()
     async def apply_scaling_reconcile(

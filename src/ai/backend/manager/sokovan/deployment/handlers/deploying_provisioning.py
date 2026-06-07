@@ -111,23 +111,28 @@ class DeployingProvisioningHandler(DeploymentHandler):
 
         for deployment in deployments:
             info = deployment.deployment_info
-            target_groups = [
-                group
-                for group in groups_by_deployment.get(info.id, [])
-                if group.target_revision_id == info.deploying_revision_id
-            ]
-            if not target_groups:
-                # INITIALIZING has not set up the target group yet; wait.
+            if info.target_replica_group_id is None:
                 skipped.append(deployment)
-            elif any(group.lifecycle is ReplicaGroupLifecycle.FAILED for group in target_groups):
+                continue
+            target = next(
+                (
+                    group
+                    for group in groups_by_deployment.get(info.id, [])
+                    if group.group_id == info.target_replica_group_id
+                ),
+                None,
+            )
+            if target is None:
+                skipped.append(deployment)
+            elif target.lifecycle is ReplicaGroupLifecycle.FAILED:
                 failures.append(
                     DeploymentExecutionError(
                         deployment_info=deployment,
                         reason="Target replica group failed to roll out",
-                        error_detail="A target replica group entered FAILED during provisioning",
+                        error_detail="The target replica group entered FAILED during provisioning",
                     )
                 )
-            elif all(group.lifecycle is ReplicaGroupLifecycle.STABLE for group in target_groups):
+            elif target.lifecycle is ReplicaGroupLifecycle.STABLE:
                 successes.append(deployment)
             else:
                 skipped.append(deployment)
@@ -136,12 +141,13 @@ class DeployingProvisioningHandler(DeploymentHandler):
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
-        for sub_step in (
-            DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
-            DeploymentLifecycleSubStep.DEPLOYING_PROMOTING,
-            DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
-        ):
+        if result.successes:
             await self._deployment_controller.mark_lifecycle_needed(
                 DeploymentLifecycleType.DEPLOYING,
-                sub_step=sub_step,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROMOTING,
+            )
+        if result.failures:
+            await self._deployment_controller.mark_lifecycle_needed(
+                DeploymentLifecycleType.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
             )

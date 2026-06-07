@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
@@ -53,6 +54,31 @@ class ReplicaSpecUpdaterSpec(UpdaterSpec[EndpointRow]):
         to_update: dict[str, Any] = {}
         # Use the actual database column names
         self.replica_count.update_dict(to_update, "replicas")
+        return to_update
+
+
+@dataclass
+class EndpointReplicaGroupUpdaterSpec(UpdaterSpec[EndpointRow]):
+    """UpdaterSpec for the endpoint's replica-group pointers: the rollout target group
+    (PROVISIONING sets it, PROMOTING clears it) and the serving primary (PROMOTING swaps it)."""
+
+    primary_replica_group_id: OptionalState[ReplicaGroupID] = field(
+        default_factory=OptionalState[ReplicaGroupID].nop
+    )
+    target_replica_group_id: TriState[ReplicaGroupID] = field(
+        default_factory=TriState[ReplicaGroupID].nop
+    )
+
+    @property
+    @override
+    def row_class(self) -> type[EndpointRow]:
+        return EndpointRow
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.primary_replica_group_id.update_dict(to_update, "primary_replica_group_id")
+        self.target_replica_group_id.update_dict(to_update, "target_replica_group_id")
         return to_update
 
 

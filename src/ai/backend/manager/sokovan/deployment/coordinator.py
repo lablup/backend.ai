@@ -65,6 +65,9 @@ from .deployment_controller import DeploymentController
 from .executor import DeploymentExecutor
 from .handlers import (
     CheckReplicaDeploymentHandler,
+    DeployingDrainingHandler,
+    DeployingInitializingHandler,
+    DeployingPromotingHandler,
     DeployingProvisioningHandler,
     DeployingRollingBackHandler,
     DeploymentHandler,
@@ -329,11 +332,41 @@ class DeploymentCoordinator:
             (
                 (
                     DeploymentLifecycleType.DEPLOYING,
+                    DeploymentLifecycleSubStep.DEPLOYING_INITIALIZING,
+                ),
+                DeployingInitializingHandler(
+                    deployment_controller=self._deployment_controller,
+                    deployment_executor=executor,
+                ),
+            ),
+            (
+                (
+                    DeploymentLifecycleType.DEPLOYING,
                     DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
                 ),
                 DeployingProvisioningHandler(
                     deployment_controller=self._deployment_controller,
                     replica_group_repository=self._replica_group_repository,
+                ),
+            ),
+            (
+                (
+                    DeploymentLifecycleType.DEPLOYING,
+                    DeploymentLifecycleSubStep.DEPLOYING_PROMOTING,
+                ),
+                DeployingPromotingHandler(
+                    deployment_controller=self._deployment_controller,
+                    replica_group_repository=self._replica_group_repository,
+                ),
+            ),
+            (
+                (
+                    DeploymentLifecycleType.DEPLOYING,
+                    DeploymentLifecycleSubStep.DEPLOYING_DRAINING,
+                ),
+                DeployingDrainingHandler(
+                    replica_group_repository=self._replica_group_repository,
+                    deployment_repository=self._deployment_repository,
                 ),
             ),
             (
@@ -855,18 +888,43 @@ class DeploymentCoordinator:
                 long_interval=60.0,
                 initial_delay=25.0,
             ),
+            # Deploying — one task per sub-step handler
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_INITIALIZING,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=10.0,
+            ),
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=10.0,
+            ),
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROMOTING,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=10.0,
+            ),
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_DRAINING,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=10.0,
+            ),
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=10.0,
+            ),
         ]
-        # Deploying — one task per handler sub-step
-        for sub_step in DeploymentLifecycleSubStep.deploying_handler_sub_steps():
-            specs.append(
-                DeploymentTaskSpec(
-                    DeploymentLifecycleType.DEPLOYING,
-                    sub_step=sub_step,
-                    short_interval=5.0,
-                    long_interval=30.0,
-                    initial_delay=10.0,
-                )
-            )
         return specs
 
     def create_task_specs(self) -> list[EventTaskSpec]:

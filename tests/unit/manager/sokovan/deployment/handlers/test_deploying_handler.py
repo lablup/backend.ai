@@ -48,6 +48,7 @@ class TestDeployingProvisioningHandler:
             deployment_info=DeploymentInfo(
                 id=DeploymentID(uuid4()),
                 primary_replica_group_id=ReplicaGroupID(uuid4()),
+                target_replica_group_id=ReplicaGroupID(uuid4()),
                 deploying_revision_id=deploying_revision_id,
                 metadata=DeploymentMetadata(
                     name="test-deployment",
@@ -94,9 +95,9 @@ class TestDeployingProvisioningHandler:
         lifecycle: ReplicaGroupLifecycle,
     ) -> ReplicaGroupDeploySchedulingView:
         info = deployment.deployment_info
-        assert info.primary_replica_group_id is not None
+        assert info.target_replica_group_id is not None
         return ReplicaGroupDeploySchedulingView(
-            group_id=info.primary_replica_group_id,
+            group_id=info.target_replica_group_id,
             deployment_id=info.id,
             current_revision_id=None,
             target_revision_id=info.deploying_revision_id,

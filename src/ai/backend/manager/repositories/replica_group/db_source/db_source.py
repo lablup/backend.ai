@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -33,9 +34,17 @@ from ai.backend.manager.models.replica_group_history.conditions import (
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, execute_batch_querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    execute_batch_querier,
+)
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater, BulkUpdaterResult, Updater
+from ai.backend.manager.repositories.base.updater import (
+    BatchUpdater,
+    BulkUpdaterResult,
+    Updater,
+)
 from ai.backend.manager.repositories.deployment.creators import (
     RouteBatchUpdaterSpec,
     RouteCreatorSpec,
@@ -270,6 +279,26 @@ class ReplicaGroupDBSource:
     ) -> BulkUpdaterResult[ReplicaGroupRow]:
         async with self._ops.write_ops() as w:
             return await w.bulk_update_partial(updaters)
+
+    async def current_time(self) -> datetime:
+        async with self._ops.read_ops() as r:
+            return await r.current_time()
+
+    async def apply_writes(
+        self,
+        *,
+        group_updaters: Sequence[Updater[ReplicaGroupRow]],
+        endpoint_updaters: Sequence[Updater[EndpointRow]],
+    ) -> None:
+        """Apply the given replica-group and endpoint updates in one transaction. The caller
+        (handler) decides what to write; this only persists it atomically."""
+        if not group_updaters and not endpoint_updaters:
+            return
+        async with self._ops.write_ops() as w:
+            if group_updaters:
+                await w.bulk_update_partial(group_updaters)
+            if endpoint_updaters:
+                await w.bulk_update_partial(endpoint_updaters)
 
     async def apply_scaling_reconcile(
         self,

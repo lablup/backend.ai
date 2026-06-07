@@ -228,11 +228,6 @@ class DeploymentLifecycleSubStep(enum.StrEnum):
     DEPLOYING_COMPLETED = "deploying_completed"
     """All strategy conditions satisfied; triggers revision swap."""
 
-    @classmethod
-    def deploying_handler_sub_steps(cls) -> tuple[DeploymentLifecycleSubStep, ...]:
-        """Sub-steps that have their own deploying handler (excludes COMPLETED, which is an evaluator outcome)."""
-        return (cls.DEPLOYING_PROVISIONING, cls.DEPLOYING_ROLLING_BACK)
-
 
 @dataclass(frozen=True)
 class DeploymentLifecycleStatus:
@@ -525,10 +520,12 @@ class RolloutTargetInput:
 
 @dataclass(frozen=True)
 class TargetGroupSpec:
-    """The group the deploying revision rolls out into; ``replica_group_id`` None means create."""
+    """The group the deploying revision rolls out into; ``replica_group_id`` None means create.
+
+    No traffic weight here: a freshly rolled-out group serves no traffic until PROMOTING shifts
+    it over, so PROVISIONING creates it at weight 0 and leaves a reused group's weight untouched."""
 
     replica_group_id: ReplicaGroupID | None
-    traffic_weight: int
     rollout: ReplicaGroupRolloutSpec
 
 
@@ -849,6 +846,7 @@ class DeploymentInfo:
     network: DeploymentNetworkData
     options: DeploymentOptions
     primary_replica_group_id: ReplicaGroupID | None = None
+    target_replica_group_id: ReplicaGroupID | None = None
     current_revision_id: DeploymentRevisionID | None = None
     deploying_revision_id: DeploymentRevisionID | None = None
     # Full revision data, populated only by the legacy (REST v1) / engine

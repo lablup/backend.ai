@@ -58,7 +58,6 @@ class RollingUpdateSpec(DeploymentStrategySchema):
     def rollout_target(self, target_input: RolloutTargetInput) -> TargetGroupSpec:
         return TargetGroupSpec(
             replica_group_id=target_input.primary_replica_group_id,
-            traffic_weight=100,
             rollout=self.to_rollout_spec(),
         )
 
@@ -117,7 +116,7 @@ class BlueGreenSpec(DeploymentStrategySchema):
     promote_delay_seconds: int = 0
 
     def to_rollout_spec(self) -> ReplicaGroupRolloutSpec:
-        """The per-group rollout step: blue-green rolls out via a separate group,
+        """The per-group rollout step: blue-green fills a separate group to the goal at creation,
         so there is no in-place surge."""
         return ReplicaGroupRolloutSpec(
             max_surge=IntOrPercent(count=0),
@@ -128,7 +127,6 @@ class BlueGreenSpec(DeploymentStrategySchema):
     def rollout_target(self, target_input: RolloutTargetInput) -> TargetGroupSpec:
         return TargetGroupSpec(
             replica_group_id=target_input.existing_target_replica_group_id,
-            traffic_weight=0,
             rollout=self.to_rollout_spec(),
         )
 
@@ -158,7 +156,7 @@ class CanarySpec(DeploymentStrategySchema):
     step_interval_seconds: int = Field(default=0, ge=0)
 
     def to_rollout_spec(self) -> ReplicaGroupRolloutSpec:
-        """The per-group rollout step: canary rolls out via a separate group,
+        """The per-group rollout step: canary fills a separate group to the goal at creation,
         so there is no in-place surge."""
         return ReplicaGroupRolloutSpec(
             max_surge=IntOrPercent(count=0),
@@ -169,7 +167,6 @@ class CanarySpec(DeploymentStrategySchema):
     def rollout_target(self, target_input: RolloutTargetInput) -> TargetGroupSpec:
         return TargetGroupSpec(
             replica_group_id=target_input.existing_target_replica_group_id,
-            traffic_weight=0,
             rollout=self.to_rollout_spec(),
         )
 
