@@ -19,6 +19,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -413,3 +414,44 @@ class TestPrepareVFolderMountsSubpathFlow:
 
         assert len(mounts) == 1
         assert mounts[0].vfsubpath == PurePosixPath("shards/a")
+
+    async def test_inaccessible_uuid_request_raises_not_found(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        fixture_vfolder: tuple[UUID, str, UUID, UUID],
+        mock_storage_manager: MagicMock,
+    ) -> None:
+        """A UUID-referenced request that matches no accessible vfolder must
+        raise ``VFolderNotFound`` rather than being silently dropped — even
+        when it is bundled with a resolvable request for another subpath of an
+        accessible vfolder (lablup/backend.ai#11936)."""
+        user_uuid, domain_name, group_id, vfolder_id = fixture_vfolder
+        missing_vfolder_id = uuid4()
+        with pytest.raises(VFolderNotFound, match=str(missing_vfolder_id)):
+            async with db_with_cleanup.connect() as conn:
+                await prepare_vfolder_mounts(
+                    conn=conn,
+                    storage_manager=mock_storage_manager,
+                    allowed_vfolder_types=["user"],
+                    user_scope=UserScope(
+                        domain_name=domain_name,
+                        group_id=group_id,
+                        user_uuid=user_uuid,
+                        user_role=UserRole.USER,
+                    ),
+                    resource_policy={
+                        "allowed_vfolder_hosts": {"proxy:noop": ["mount-in-session"]},
+                    },
+                    mount_requests=[
+                        VFolderMountRequest(
+                            ref=vfolder_id,
+                            dst_path="/home/work/in1",
+                            options=VFolderMountOptions(subpath="shards/a"),
+                        ),
+                        VFolderMountRequest(
+                            ref=missing_vfolder_id,
+                            dst_path="/home/work/in2",
+                            options=VFolderMountOptions(subpath="shards/b"),
+                        ),
+                    ],
+                )

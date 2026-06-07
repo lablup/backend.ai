@@ -1017,15 +1017,17 @@ async def prepare_vfolder_mounts(
 
     # Fast-path for empty requested mounts
     if not accessible_vfolders:
-        if requested_vfolder_names:
+        if requested_vfolder_names or requested_vfolder_ids:
             raise VFolderNotFound("There is no accessible vfolders at all.")
         return []
 
     requested_names = set(requested_vfolder_names.values())
+    resolved_vfolder_ids: set[uuid.UUID] = set()
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
         if vfid in requested_vfolder_ids:
+            resolved_vfolder_ids.add(vfid)
             # Bind every UUID-referenced request for this vfolder to its
             # resolved name. Each request keeps its own subpath/destination/
             # options (captured above), so multiple subpaths of one vfolder
@@ -1039,6 +1041,16 @@ async def prepare_vfolder_mounts(
         if name not in requested_names:
             requested_vfolder_names[vfid] = name
         requested_mounts.append(name)
+
+    # A UUID-referenced request that matched no accessible vfolder would
+    # otherwise be silently dropped (its index never enters the mount loop
+    # below). Surface it like the name-referenced path does, so the caller
+    # learns the requested mount was not honored (lablup/backend.ai#11936).
+    if unresolved_vfolder_ids := (requested_vfolder_ids - resolved_vfolder_ids):
+        raise VFolderNotFound(
+            "VFolder(s) not found or accessible: "
+            + ", ".join(sorted(str(vfid) for vfid in unresolved_vfolder_ids))
+        )
 
     # Check if there are overlapping mount sources
     check_overlapping_mounts(requested_mounts)
