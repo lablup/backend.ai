@@ -248,11 +248,12 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: GetCommitStatusRequest | None = None,
     ) -> GetCommitStatusResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"{_BASE_PATH}/{session_name}/commit",
-            request=request,
             response_model=GetCommitStatusResponse,
+            params=params,
         )
 
     async def convert_to_image(
@@ -289,11 +290,12 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: GetContainerLogsRequest | None = None,
     ) -> GetContainerLogsResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"{_BASE_PATH}/{session_name}/logs",
-            request=request,
             response_model=GetContainerLogsResponse,
+            params=params,
         )
 
     async def get_status_history(
@@ -301,11 +303,12 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: GetStatusHistoryRequest | None = None,
     ) -> GetStatusHistoryResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"{_BASE_PATH}/{session_name}/status-history",
-            request=request,
             response_model=GetStatusHistoryResponse,
+            params=params,
         )
 
     # -----------------------------------------------------------------------
