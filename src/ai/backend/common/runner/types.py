@@ -36,14 +36,13 @@ class Runner:
         self._closed_event = asyncio.Event()
         self._tasks = set()
 
-    def _track(self, coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+    def _track(self, coro: Coroutine[Any, Any, None]) -> None:
         # The event loop only keeps weak references to tasks, so a fire-and-forget
         # task may be garbage collected mid-execution. Hold a strong reference until
         # it completes, then drop it via the done callback.
         task = asyncio.create_task(coro)
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
-        return task
 
     async def register_observer(self, observer: AbstractObserver) -> None:
         """
