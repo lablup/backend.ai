@@ -468,6 +468,37 @@ class InstallReport(Static):
                 """
                         )
                     )
+            if service.sftp_agent_enabled:
+                with TabPane("SFTP Agent", id="sftp-agent"):
+                    yield Markdown(
+                        textwrap.dedent(
+                            f"""
+                A dedicated SFTP agent has been configured alongside the
+                regular compute agent, assigned to the
+                `{service.sftp_agent_scaling_group}` scaling group.
+
+                Start it in a separate shell (or via the `./dev` helper):
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./dev start sftp-agent
+                ```
+
+                Or run the agent process directly against the SFTP config:
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backendai-agent ag start-server -f agent-sftp.toml
+                ```
+
+                The SFTP agent listens on:
+                - RPC:     `{service.sftp_agent_rpc_addr.bind.host}:{service.sftp_agent_rpc_addr.bind.port}`
+                - Watcher: `{service.sftp_agent_watcher_addr.bind.host}:{service.sftp_agent_watcher_addr.bind.port}`
+
+                SFTP upload sessions created via the web UI will be routed
+                to this agent; regular compute sessions continue to run on
+                the primary agent.
+                """
+                        )
+                    )
 
 
 class ModeMenu(Static):
@@ -535,6 +566,7 @@ class ModeMenu(Static):
             harbor_admin_password=args.harbor_admin_password,
             harbor_download_uri=args.harbor_download_uri,
             harbor_download_sha256=args.harbor_download_sha256,
+            with_sftp_agent=args.with_sftp_agent,
             enable_observability=args.enable_observability,
             enable_storage=args.enable_storage,
             enable_telemetry=args.enable_telemetry,

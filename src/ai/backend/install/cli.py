@@ -161,6 +161,16 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     ),
 )
 @click.option(
+    "--with-sftp-agent",
+    is_flag=True,
+    default=False,
+    help=(
+        "Also configure a dedicated SFTP agent (multi-agent per node). "
+        "Creates agent-sftp.toml with distinct ports and the 'upload' "
+        "scaling group; start it with './dev start sftp-agent'."
+    ),
+)
+@click.option(
     "--enable-observability",
     is_flag=True,
     default=False,
@@ -217,6 +227,7 @@ def main(
     harbor_admin_password: str,
     harbor_download_uri: str,
     harbor_download_sha256: str | None,
+    with_sftp_agent: bool,
     enable_observability: bool,
     enable_storage: bool,
     enable_telemetry: str | None,
@@ -257,6 +268,7 @@ def main(
         harbor_admin_password=harbor_admin_password,
         harbor_download_uri=harbor_download_uri,
         harbor_download_sha256=harbor_download_sha256,
+        with_sftp_agent=with_sftp_agent,
         enable_observability=enable_observability,
         enable_storage=enable_storage,
         enable_telemetry=(None if enable_telemetry is None else (enable_telemetry == "on")),
