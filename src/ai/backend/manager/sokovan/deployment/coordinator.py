@@ -397,9 +397,9 @@ class DeploymentCoordinator:
                     DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
                 ),
                 DeployingRollingBackHandler(
-                    deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
                     deployment_repo=self._deployment_repository,
+                    replica_group_repository=self._replica_group_repository,
                 ),
             ),
         ]

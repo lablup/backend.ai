@@ -96,9 +96,9 @@ class TestDeployingRollingBackHandler:
         mock_deployment_repo: AsyncMock,
     ) -> DeployingRollingBackHandler:
         return DeployingRollingBackHandler(
-            deployment_controller=AsyncMock(),
             route_controller=AsyncMock(),
             deployment_repo=mock_deployment_repo,
+            replica_group_repository=AsyncMock(),
         )
 
     async def test_with_current_revision_clears_and_marks_success(
