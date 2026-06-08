@@ -480,3 +480,53 @@ async def test_invalid_query_parameter(aiohttp_client: Any) -> None:
     # request with no query parameter
     error_response = await client.get("/test")
     assert error_response.status == HTTPStatus.BAD_REQUEST  # InvalidAPIParameters Error raised
+
+
+class TestListQueryModel(BaseRequestModel):
+    ids: list[str] | None = Field(default=None)
+    name: str
+
+
+class TestListQueryResponse(BaseResponseModel):
+    ids: list[str]
+    name: str
+
+
+class TestListQueryHandler:
+    @api_handler
+    async def handle_list_query(self, query: QueryParam[TestListQueryModel]) -> APIResponse:
+        parsed = query.parsed
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=TestListQueryResponse(ids=parsed.ids or [], name=parsed.name),
+        )
+
+
+async def test_repeated_query_parameter_parses_as_list(aiohttp_client: Any) -> None:
+    handler = TestListQueryHandler()
+    app = web.Application()
+    app.router.add_get("/test", handler.handle_list_query)
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/test?ids=a&ids=b&ids=c&name=foo")
+
+    assert resp.status == HTTPStatus.OK
+    data = await resp.json()
+    assert data["ids"] == ["a", "b", "c"]
+    assert data["name"] == "foo"
+
+
+async def test_single_value_list_query_parameter_parses_as_one_element_list(
+    aiohttp_client: Any,
+) -> None:
+    handler = TestListQueryHandler()
+    app = web.Application()
+    app.router.add_get("/test", handler.handle_list_query)
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/test?ids=only&name=foo")
+
+    assert resp.status == HTTPStatus.OK
+    data = await resp.json()
+    assert data["ids"] == ["only"]
+    assert data["name"] == "foo"

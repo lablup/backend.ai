@@ -7,10 +7,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from dataclasses import dataclass, field
 from inspect import Signature
+from types import UnionType
 from typing import (
     Any,
     Self,
     TypeVar,
+    Union,
     cast,
     get_args,
     get_origin,
@@ -19,7 +21,8 @@ from typing import (
 from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 from multidict import CIMultiDictProxy, MultiMapping
-from pydantic import ConfigDict, RootModel
+from pydantic import AliasChoices, ConfigDict, RootModel
+from pydantic.fields import FieldInfo
 from pydantic_core._pydantic_core import ValidationError
 
 from ai.backend.common.types import BackendAISchema, StreamReader
@@ -114,6 +117,45 @@ class BodyParam[TRequestModel: BaseRequestModel]:
         return self
 
 
+def _is_sequence_annotation(annotation: Any) -> bool:
+    """Return True if the annotation is a list/tuple/set (optionally wrapped in a Union)."""
+    origin = get_origin(annotation)
+    if origin in (list, tuple, set, frozenset):
+        return True
+    if origin is Union or origin is UnionType:
+        return any(_is_sequence_annotation(arg) for arg in get_args(annotation))
+    return False
+
+
+def _candidate_query_keys(name: str, field_info: FieldInfo) -> list[str]:
+    """Resolve the query-string keys a field accepts, honoring validation aliases."""
+    alias = field_info.validation_alias
+    if isinstance(alias, str):
+        return [alias]
+    if isinstance(alias, AliasChoices):
+        return [choice for choice in alias.choices if isinstance(choice, str)]
+    return [name]
+
+
+def _query_to_mapping(model: type[BaseRequestModel], query: MultiMapping[str]) -> dict[str, Any]:
+    """Convert an aiohttp multi-dict query into a mapping for pydantic validation.
+
+    Scalars keep their single (first) value, preserving prior behavior. For
+    list-typed fields, all values of the matching key are collected via
+    ``getall`` so repeated query params (``?k=a&k=b``) validate as a list
+    instead of silently collapsing to a single value.
+    """
+    data: dict[str, Any] = {key: query[key] for key in query}
+    for name, field_info in model.model_fields.items():
+        if not _is_sequence_annotation(field_info.annotation):
+            continue
+        for key in _candidate_query_keys(name, field_info):
+            if key in query:
+                data[key] = query.getall(key)
+                break
+    return data
+
+
 class QueryParam[TRequestModel: BaseRequestModel]:
     _model: type[TRequestModel]
     _parsed: TRequestModel | None
@@ -132,7 +174,7 @@ class QueryParam[TRequestModel: BaseRequestModel]:
 
     @convert_validation_error
     def from_query(self, query: MultiMapping[str]) -> Self:
-        self._parsed = self._model.model_validate(query)
+        self._parsed = self._model.model_validate(_query_to_mapping(self._model, query))
         return self
 
 
