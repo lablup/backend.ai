@@ -9583,7 +9583,7 @@ type ModelDeployment implements Node
   options: DeploymentOptionsInfo!
 
   """
-  Added in UNRELEASED. Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle). ``SCALING`` while the replica reconciler is adjusting replica count; ``STABLE`` once holding at the desired count.
+  Added in UNRELEASED. Endpoint-level replica scaling axis. Scaling is now reconciled per replica group, so this stays ``STABLE``; inspect each replica group's scaling status instead. Deprecated since UNRELEASED. Use per-replica-group scaling status.
   """
   scalingState: ScalingState!
 
