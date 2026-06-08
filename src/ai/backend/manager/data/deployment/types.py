@@ -229,8 +229,6 @@ class DeploymentLifecycleSubStep(enum.StrEnum):
     """The superseded replica group is being drained and removed."""
     DEPLOYING_ROLLING_BACK = "deploying_rolling_back"
     """Clearing deploying_revision and transitioning to READY."""
-    DEPLOYING_COMPLETED = "deploying_completed"
-    """All strategy conditions satisfied; triggers revision swap."""
 
 
 @dataclass(frozen=True)
