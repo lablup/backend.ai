@@ -107,6 +107,16 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     help="CIDR for metric access allowed hosts (default: 0.0.0.0/0).",
 )
 @click.option(
+    "--with-sftp-agent",
+    is_flag=True,
+    default=False,
+    help=(
+        "Also configure a dedicated SFTP agent (multi-agent per node). "
+        "Creates agent-sftp.toml with distinct ports and the 'upload' "
+        "scaling group; start it with './dev start sftp-agent'."
+    ),
+)
+@click.option(
     "--enable-observability",
     is_flag=True,
     default=False,
@@ -157,6 +167,7 @@ def main(
     use_wildcard_binding: bool,
     otel_endpoint: str | None,
     metric_access_cidr: str,
+    with_sftp_agent: bool,
     enable_observability: bool,
     enable_storage: bool,
     enable_telemetry: str | None,
@@ -191,6 +202,7 @@ def main(
         use_wildcard_binding=use_wildcard_binding,
         otel_endpoint=otel_endpoint,
         metric_access_cidr=metric_access_cidr,
+        with_sftp_agent=with_sftp_agent,
         enable_observability=enable_observability,
         enable_storage=enable_storage,
         enable_telemetry=(None if enable_telemetry is None else (enable_telemetry == "on")),
