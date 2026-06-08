@@ -77,14 +77,10 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        """Check and manage deployment replicas.
+        """Record each deployment's desired replica count.
 
-        Skips deployments without a ``current_revision_id`` — scaling is
-        only meaningful once an initial revision has been deployed.
-        Those endpoints are still in the initial rollout handled by the
-        DEPLOYING lifecycle; flipping them into ``scaling_state=SCALING``
-        here would misclassify initial provisioning as scaling work.
-        """
+        Skips deployments without a ``current_revision`` — scaling is only meaningful once an
+        initial revision has been deployed; those are still in the DEPLOYING rollout."""
         log.debug("Checking deployment replicas")
 
         scalable = [d for d in deployments if d.deployment_info.current_revision is not None]

@@ -640,14 +640,6 @@ class DeploymentRepository:
         """Fetch routes for multiple deployments."""
         return await self._db_source.fetch_active_routes_by_deployment_ids(deployment_ids)
 
-    @deployment_repository_resilience.apply()
-    async def scale_routes(
-        self,
-        scale_out_creators: Sequence[RBACEntityCreator[RoutingRow]],
-        scale_in_updater: BatchUpdater[RoutingRow] | None,
-    ) -> None:
-        await self._db_source.scale_routes(scale_out_creators, scale_in_updater)
-
     # Route operations
 
     @deployment_repository_resilience.apply()

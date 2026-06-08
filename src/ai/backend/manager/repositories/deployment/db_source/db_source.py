@@ -1643,20 +1643,6 @@ class DeploymentDBSource:
                 routes_by_deployment[row.endpoint].append(row.to_route_info())
             return routes_by_deployment
 
-    async def scale_routes(
-        self,
-        scale_out_creators: Sequence[RBACEntityCreator[RoutingRow]],
-        scale_in_updater: BatchUpdater[RoutingRow] | None,
-    ) -> None:
-        """Scale out/in routes based on provided creators and updater."""
-        async with self._begin_session_read_committed() as db_sess:
-            # Scale out routes
-            for creator in scale_out_creators:
-                await execute_rbac_entity_creator(db_sess, creator)
-            # Scale in routes
-            if scale_in_updater:
-                await execute_batch_updater(db_sess, scale_in_updater)
-
     # Route operations
 
     async def search_route_datas(
