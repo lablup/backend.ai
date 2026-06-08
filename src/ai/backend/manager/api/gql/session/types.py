@@ -39,6 +39,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
 from ai.backend.common.dto.manager.v2.session.response import (
     SessionLifecycleInfoGQLDTO,
     SessionMetadataInfoGQLDTO,
+    SessionMount,
     SessionNetworkInfo,
     SessionNode,
     SessionResourceInfoGQLDTO,
@@ -292,6 +293,27 @@ class SessionV2NetworkInfoGQL:
     network_id: strawberry.auto
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A single virtual folder mount on a session.",
+    ),
+    model=SessionMount,
+    name="SessionMount",
+)
+class SessionMountGQL:
+    vfolder_id: UUID = gql_field(description="UUID of the mounted virtual folder.")
+    name: str = gql_field(description="Name of the mounted virtual folder.")
+    subpath: str | None = gql_field(
+        description="Subpath within the vfolder that is mounted. Null when the vfolder root is mounted."
+    )
+    mount_destination: str = gql_field(
+        description="Mount destination (alias) path inside the session container."
+    )
+    permission: str = gql_field(description="Effective mount permission (e.g., 'ro', 'rw').")
+    usage_mode: str = gql_field(description="Usage mode of the mounted virtual folder.")
+
+
 # ========== Main Session Type ==========
 
 
@@ -329,6 +351,16 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     lifecycle: SessionV2LifecycleInfoGQL = gql_field(description="Lifecycle status and timestamps.")
     runtime: SessionV2RuntimeInfoGQL = gql_field(description="Runtime execution configuration.")
     network: SessionV2NetworkInfoGQL = gql_field(description="Network configuration.")
+
+    mounts: list[SessionMountGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Virtual folder mounts of this session, including per-mount subpath, "
+                "alias (mount destination), and permission."
+            ),
+        ),
+    )
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.3.0", description="The domain this session belongs to.")
@@ -433,8 +465,6 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             ),
             count=payload.total_count,
         )
-
-    # TODO: Add `vfolder_mounts` dynamic field (VFolder connection type needed)
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

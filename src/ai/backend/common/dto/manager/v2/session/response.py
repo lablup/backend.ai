@@ -28,6 +28,7 @@ __all__ = (
     "SessionLogsPayload",
     "SessionMetadataInfo",
     "SessionMetadataInfoGQLDTO",
+    "SessionMount",
     "SessionNetworkInfo",
     "SessionNode",
     "SessionResourceInfo",
@@ -144,6 +145,22 @@ class SessionNetworkInfo(BaseResponseModel):
     network_id: str | None = Field(default=None, description="ID of the network if applicable.")
 
 
+class SessionMount(BaseResponseModel):
+    """A single virtual folder mount on a session."""
+
+    vfolder_id: UUID = Field(description="UUID of the mounted virtual folder.")
+    name: str = Field(description="Name of the mounted virtual folder.")
+    subpath: str | None = Field(
+        default=None,
+        description="Subpath within the vfolder that is mounted. Null when the vfolder root is mounted.",
+    )
+    mount_destination: str = Field(
+        description="Mount destination (alias) path inside the session container."
+    )
+    permission: str = Field(description="Effective mount permission (e.g., 'ro', 'rw').")
+    usage_mode: str = Field(description="Usage mode of the mounted virtual folder.")
+
+
 # ---------------------------------------------------------------------------
 # Main node model
 # ---------------------------------------------------------------------------
@@ -172,6 +189,13 @@ class SessionNode(BaseResponseModel):
     lifecycle: SessionLifecycleInfoGQLDTO = Field(description="Lifecycle status and timestamps.")
     runtime: SessionRuntimeInfoGQLDTO = Field(description="Runtime execution configuration.")
     network: SessionNetworkInfo = Field(description="Network configuration.")
+    mounts: list[SessionMount] = Field(
+        default_factory=list,
+        description=(
+            "Virtual folder mounts of this session, including per-mount subpath, "
+            "alias (mount destination), and permission."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

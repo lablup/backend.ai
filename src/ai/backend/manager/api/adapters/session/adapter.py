@@ -56,6 +56,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionLifecycleInfoGQLDTO,
     SessionLogsPayload,
     SessionMetadataInfoGQLDTO,
+    SessionMount,
     SessionNetworkInfo,
     SessionNode,
     SessionResourceInfoGQLDTO,
@@ -960,6 +961,17 @@ class SessionAdapter(BaseAdapter):
                 network_type=data.network_type.value if data.network_type else None,
                 network_id=data.network_id,
             ),
+            mounts=[
+                SessionMount(
+                    vfolder_id=m.vfid.folder_id,
+                    name=m.name,
+                    subpath=None if str(m.vfsubpath) == "." else str(m.vfsubpath),
+                    mount_destination=str(m.kernel_path),
+                    permission=m.mount_perm.value,
+                    usage_mode=m.usage_mode.value,
+                )
+                for m in (data.vfolder_mounts or [])
+            ],
         )
 
     @staticmethod

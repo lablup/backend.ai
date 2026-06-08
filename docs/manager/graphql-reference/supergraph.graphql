@@ -17695,6 +17695,31 @@ enum SessionFailurePolicy
   TOLERANT @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in UNRELEASED. A single virtual folder mount on a session."""
+type SessionMount
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the mounted virtual folder."""
+  vfolderId: UUID!
+
+  """Name of the mounted virtual folder."""
+  name: String!
+
+  """
+  Subpath within the vfolder that is mounted. Null when the vfolder root is mounted.
+  """
+  subpath: String
+
+  """Mount destination (alias) path inside the session container."""
+  mountDestination: String!
+
+  """Effective mount permission (e.g., 'ro', 'rw')."""
+  permission: String!
+
+  """Usage mode of the mounted virtual folder."""
+  usageMode: String!
+}
+
 """Added in 26.4.2. A virtual folder mount specification."""
 input SessionMountItemInput
   @join__type(graph: STRAWBERRY)
@@ -17898,6 +17923,11 @@ type SessionV2 implements Node
 
   """Network configuration."""
   network: SessionV2NetworkInfo!
+
+  """
+  Added in UNRELEASED. Virtual folder mounts of this session, including per-mount subpath, alias (mount destination), and permission.
+  """
+  mounts: [SessionMount!]!
 
   """Added in 26.3.0. The domain this session belongs to."""
   domain: DomainV2
