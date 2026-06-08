@@ -9,6 +9,7 @@ from datetime import datetime
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.manager.data.deployment.types import TargetGroupSpec
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scheduling_history.creators import (
@@ -47,6 +48,27 @@ class ReplicaGroupReconcileTransition:
 
     history_spec: ReplicaGroupHistoryCreatorSpec
     status_updater: Updater[ReplicaGroupRow] | None = None
+
+
+@dataclass
+class GroupRolloutSetup:
+    """One deployment's PROVISIONING target-group setup: reuse (``spec.replica_group_id`` set,
+    e.g. rolling reuses the primary group) or create (None, e.g. blue-green/canary) the rollout
+    target group as ROLLING, then point the endpoint's ``target_replica_group_id`` at it."""
+
+    deployment_id: DeploymentID
+    target_revision_id: DeploymentRevisionID
+    spec: TargetGroupSpec
+    desired_target_replica_count: int
+
+
+@dataclass
+class ApplyWritesResult:
+    """Which replica groups and endpoints a deploy-write actually updated. ``bulk_update_partial``
+    is per-row: a row that is missing or whose update failed is simply absent from the set."""
+
+    updated_group_ids: set[ReplicaGroupID]
+    updated_endpoint_ids: set[DeploymentID]
 
 
 @dataclass

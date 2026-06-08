@@ -66,8 +66,10 @@ from .executor import DeploymentExecutor
 from .handlers import (
     CheckReplicaDeploymentHandler,
     DeployingDrainingHandler,
+    DeployingFinalizingHandler,
     DeployingInitializingHandler,
     DeployingPromotingHandler,
+    DeployingProvisionedHandler,
     DeployingProvisioningHandler,
     DeployingRollingBackHandler,
     DeploymentHandler,
@@ -352,9 +354,29 @@ class DeploymentCoordinator:
             (
                 (
                     DeploymentLifecycleType.DEPLOYING,
+                    DeploymentLifecycleSubStep.DEPLOYING_PROVISIONED,
+                ),
+                DeployingProvisionedHandler(
+                    deployment_controller=self._deployment_controller,
+                    replica_group_repository=self._replica_group_repository,
+                ),
+            ),
+            (
+                (
+                    DeploymentLifecycleType.DEPLOYING,
                     DeploymentLifecycleSubStep.DEPLOYING_PROMOTING,
                 ),
                 DeployingPromotingHandler(
+                    deployment_controller=self._deployment_controller,
+                    replica_group_repository=self._replica_group_repository,
+                ),
+            ),
+            (
+                (
+                    DeploymentLifecycleType.DEPLOYING,
+                    DeploymentLifecycleSubStep.DEPLOYING_FINALIZING,
+                ),
+                DeployingFinalizingHandler(
                     deployment_controller=self._deployment_controller,
                     replica_group_repository=self._replica_group_repository,
                 ),
@@ -905,7 +927,21 @@ class DeploymentCoordinator:
             ),
             DeploymentTaskSpec(
                 DeploymentLifecycleType.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONED,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=10.0,
+            ),
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.DEPLOYING,
                 sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROMOTING,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=10.0,
+            ),
+            DeploymentTaskSpec(
+                DeploymentLifecycleType.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_FINALIZING,
                 short_interval=5.0,
                 long_interval=30.0,
                 initial_delay=10.0,

@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -19,6 +20,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import BulkUpdaterResult, Updater
 from ai.backend.manager.repositories.replica_group.types import (
+    ApplyWritesResult,
+    GroupRolloutSetup,
     LifecycleReconcileFetch,
     ReplicaGroupLifecycleReconcileApply,
     ReplicaGroupScalingReconcileApply,
@@ -101,12 +104,16 @@ class ReplicaGroupRepository:
         return await self._db_source.current_time()
 
     @replica_group_repository_resilience.apply()
+    async def setup_target_groups(self, setups: Sequence[GroupRolloutSetup]) -> set[DeploymentID]:
+        return await self._db_source.setup_target_groups(setups)
+
+    @replica_group_repository_resilience.apply()
     async def apply_writes(
         self,
         *,
         group_updaters: Sequence[Updater[ReplicaGroupRow]],
         endpoint_updaters: Sequence[Updater[EndpointRow]],
-    ) -> None:
+    ) -> ApplyWritesResult:
         return await self._db_source.apply_writes(
             group_updaters=group_updaters,
             endpoint_updaters=endpoint_updaters,

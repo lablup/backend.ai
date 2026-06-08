@@ -19,6 +19,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
     ReplicaGroupHandlerCategory,
+    ReplicaGroupLifecycle,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -26,6 +27,7 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.reconciler.types import LastHistory
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
 from ai.backend.manager.models.replica_group_history.conditions import (
@@ -37,6 +39,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
+    NoPagination,
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -49,8 +52,17 @@ from ai.backend.manager.repositories.deployment.creators import (
     RouteBatchUpdaterSpec,
     RouteCreatorSpec,
 )
+from ai.backend.manager.repositories.deployment.updaters.deployment import (
+    EndpointReplicaGroupUpdaterSpec,
+)
+from ai.backend.manager.repositories.deployment.updaters.replica_group import (
+    ReplicaGroupDeployUpdaterSpec,
+)
 from ai.backend.manager.repositories.ops.sokovan.provider import SokovanOpsProvider, Transition
+from ai.backend.manager.repositories.replica_group.creators import ReplicaGroupCreatorSpec
 from ai.backend.manager.repositories.replica_group.types import (
+    ApplyWritesResult,
+    GroupRolloutSetup,
     GroupRouteCreateInstruction,
     GroupRouteDrainInstruction,
     LifecycleReconcileFetch,
@@ -60,7 +72,7 @@ from ai.backend.manager.repositories.replica_group.types import (
     RevisionReplicaCount,
     ScalingReconcileFetch,
 )
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupDeploySchedulingView,
     ReplicaGroupLifecycleReconcileView,
@@ -199,11 +211,14 @@ class ReplicaGroupDBSource:
     ) -> Mapping[DeploymentID, int]:
         if not deployment_ids:
             return {}
-        query = sa.select(EndpointRow.id, EndpointRow.replicas).where(
+        # Goal is the autoscaling-resolved target (desired_replicas), falling back to the
+        # user-set replicas when autoscaling has not computed one.
+        target = sa.func.coalesce(EndpointRow.desired_replicas, EndpointRow.replicas)
+        query = sa.select(EndpointRow.id, target.label("target")).where(
             EndpointRow.id.in_(deployment_ids)
         )
         rows = (await db_sess.execute(query)).all()
-        return {row.id: row.replicas for row in rows}
+        return {row.id: row.target for row in rows}
 
     async def _handler_options_by_deployment(
         self,
@@ -289,16 +304,86 @@ class ReplicaGroupDBSource:
         *,
         group_updaters: Sequence[Updater[ReplicaGroupRow]],
         endpoint_updaters: Sequence[Updater[EndpointRow]],
-    ) -> None:
-        """Apply the given replica-group and endpoint updates in one transaction. The caller
-        (handler) decides what to write; this only persists it atomically."""
+    ) -> ApplyWritesResult:
+        """Apply the given replica-group and endpoint updates in one transaction and return which
+        rows were actually updated. ``bulk_update_partial`` is per-row, so a missing/failed row is
+        simply absent from the returned id sets."""
+        updated_group_ids: set[ReplicaGroupID] = set()
+        updated_endpoint_ids: set[DeploymentID] = set()
         if not group_updaters and not endpoint_updaters:
-            return
+            return ApplyWritesResult(updated_group_ids, updated_endpoint_ids)
         async with self._ops.write_ops() as w:
             if group_updaters:
-                await w.bulk_update_partial(group_updaters)
+                group_result = await w.bulk_update_partial(group_updaters)
+                updated_group_ids = {row.id for row in group_result.successes}
             if endpoint_updaters:
-                await w.bulk_update_partial(endpoint_updaters)
+                endpoint_result = await w.bulk_update_partial(endpoint_updaters)
+                updated_endpoint_ids = {row.id for row in endpoint_result.successes}
+        return ApplyWritesResult(
+            updated_group_ids=updated_group_ids,
+            updated_endpoint_ids=updated_endpoint_ids,
+        )
+
+    async def setup_target_groups(self, setups: Sequence[GroupRolloutSetup]) -> set[DeploymentID]:
+        """Set up each deployment's rollout target group in one transaction. ``use_primary_group``
+        (rolling) reuses the deployment's primary group read here, creating one only if none exists;
+        otherwise (blue-green/canary) a fresh group is created. Then the endpoint's
+        ``target_replica_group_id`` is pointed at it. Returns the deployment ids whose endpoint
+        pointer was actually set."""
+        if not setups:
+            return set()
+        deployment_ids = [setup.deployment_id for setup in setups]
+        async with self._ops.write_ops() as w:
+            endpoint_rows = await w.batch_query_in_global(
+                sa.select(EndpointRow),
+                BatchQuerier(
+                    pagination=NoPagination(),
+                    conditions=[DeploymentConditions.by_ids(deployment_ids)],
+                ),
+            )
+            primary_by_deployment = {
+                row.EndpointRow.id: row.EndpointRow.primary_replica_group_id
+                for row in endpoint_rows.rows
+            }
+            reuse_updaters: list[Updater[ReplicaGroupRow]] = []
+            endpoint_updaters: list[Updater[EndpointRow]] = []
+            for setup in setups:
+                primary_group_id = primary_by_deployment.get(setup.deployment_id)
+                if setup.spec.use_primary_group and primary_group_id is not None:
+                    reuse_updaters.append(
+                        Updater(
+                            pk_value=primary_group_id,
+                            spec=ReplicaGroupDeployUpdaterSpec(
+                                target_revision_id=TriState.update(setup.target_revision_id),
+                                lifecycle=OptionalState.update(ReplicaGroupLifecycle.ROLLING),
+                            ),
+                        )
+                    )
+                    target_group_id = primary_group_id
+                else:
+                    created = await w.create(
+                        Creator(
+                            spec=ReplicaGroupCreatorSpec(
+                                deployment_id=setup.deployment_id,
+                                target_revision_id=setup.target_revision_id,
+                                desired_target_replica_count=setup.desired_target_replica_count,
+                                rollout=setup.spec.rollout,
+                            )
+                        )
+                    )
+                    target_group_id = created.row.id
+                endpoint_updaters.append(
+                    Updater(
+                        pk_value=setup.deployment_id,
+                        spec=EndpointReplicaGroupUpdaterSpec(
+                            target_replica_group_id=TriState.update(target_group_id),
+                        ),
+                    )
+                )
+            if reuse_updaters:
+                await w.bulk_update_partial(reuse_updaters)
+            endpoint_result = await w.bulk_update_partial(endpoint_updaters)
+            return {row.id for row in endpoint_result.successes}
 
     async def apply_scaling_reconcile(
         self,

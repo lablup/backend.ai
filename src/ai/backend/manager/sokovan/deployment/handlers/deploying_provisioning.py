@@ -4,7 +4,6 @@ import logging
 from collections.abc import Sequence
 from typing import override
 
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
@@ -12,13 +11,11 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
-    ReplicaGroupLifecycle,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
+from ai.backend.manager.repositories.replica_group.types import GroupRolloutSetup
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionError,
@@ -26,7 +23,6 @@ from ai.backend.manager.sokovan.deployment.types import (
     DeploymentLifecycleType,
     DeploymentWithHistory,
 )
-from ai.backend.manager.views.replica_group import ReplicaGroupDeploySchedulingView
 
 from .base import DeploymentHandler
 
@@ -34,9 +30,9 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class DeployingProvisioningHandler(DeploymentHandler):
-    """DEPLOYING / PROVISIONING: wait for the target replica group (the one rolling out the
-    deploying revision) to reach STABLE, then hand off to PROMOTING. The group scaling/rolling
-    reconcile fills routes and steps counts; this handler only polls the group lifecycle."""
+    """DEPLOYING / PROVISIONING: set up the target replica group for the deploying revision
+    (rolling reuses the primary group, blue-green/canary creates a new one), then hand off to
+    PROVISIONED which waits for it to reach STABLE."""
 
     def __init__(
         self,
@@ -75,7 +71,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROMOTING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONED,
             ),
             need_retry=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
@@ -95,59 +91,52 @@ class DeployingProvisioningHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        deployment_ids = [d.deployment_info.id for d in deployments]
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[ReplicaGroupConditions.by_deployment_ids(deployment_ids)],
-        )
-        views = await self._replica_group_repository.search_deploy_scheduling_views(querier)
-        groups_by_deployment: dict[DeploymentID, list[ReplicaGroupDeploySchedulingView]] = {}
-        for view in views:
-            groups_by_deployment.setdefault(view.deployment_id, []).append(view)
-
-        successes: list[DeploymentWithHistory] = []
         failures: list[DeploymentExecutionError] = []
-        skipped: list[DeploymentWithHistory] = []
+        setups: list[GroupRolloutSetup] = []
+        to_set_up: list[DeploymentWithHistory] = []
 
         for deployment in deployments:
             info = deployment.deployment_info
-            if info.target_replica_group_id is None:
-                skipped.append(deployment)
-                continue
-            target = next(
-                (
-                    group
-                    for group in groups_by_deployment.get(info.id, [])
-                    if group.group_id == info.target_replica_group_id
-                ),
-                None,
-            )
-            if target is None:
-                skipped.append(deployment)
-            elif target.lifecycle is ReplicaGroupLifecycle.FAILED:
+            if info.policy is None or info.deploying_revision_id is None:
                 failures.append(
                     DeploymentExecutionError(
                         deployment_info=deployment,
-                        reason="Target replica group failed to roll out",
-                        error_detail="The target replica group entered FAILED during provisioning",
+                        reason="Cannot set up target replica group",
+                        error_detail="Deployment has no policy or deploying revision to provision",
                     )
                 )
-            elif target.lifecycle is ReplicaGroupLifecycle.STABLE:
-                successes.append(deployment)
-            else:
-                skipped.append(deployment)
+                continue
+            setups.append(
+                GroupRolloutSetup(
+                    deployment_id=info.id,
+                    target_revision_id=info.deploying_revision_id,
+                    spec=info.policy.strategy_spec.rollout_target(),
+                    desired_target_replica_count=info.replica.target_replica_count,
+                )
+            )
+            to_set_up.append(deployment)
 
-        return DeploymentExecutionResult(successes=successes, failures=failures, skipped=skipped)
+        successes: list[DeploymentWithHistory] = []
+        if setups:
+            done_ids = await self._replica_group_repository.setup_target_groups(setups)
+            for deployment in to_set_up:
+                if deployment.deployment_info.id in done_ids:
+                    successes.append(deployment)
+                else:
+                    failures.append(
+                        DeploymentExecutionError(
+                            deployment_info=deployment,
+                            reason="Failed to set up target replica group",
+                            error_detail="Endpoint target replica group pointer was not set",
+                        )
+                    )
+
+        return DeploymentExecutionResult(successes=successes, failures=failures)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         if result.successes:
             await self._deployment_controller.mark_lifecycle_needed(
                 DeploymentLifecycleType.DEPLOYING,
-                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROMOTING,
-            )
-        if result.failures:
-            await self._deployment_controller.mark_lifecycle_needed(
-                DeploymentLifecycleType.DEPLOYING,
-                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONED,
             )

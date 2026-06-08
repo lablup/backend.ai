@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.types import BackendAISchema
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupRolloutSpec,
-    RolloutTargetInput,
     TargetGroupSpec,
     TrafficStep,
     TrafficStepInput,
@@ -33,8 +32,8 @@ class DeploymentStrategySchema(BackendAISchema):
     out into and how traffic promotes to it. I/O are plain data dataclasses, no side effects."""
 
     @abstractmethod
-    def rollout_target(self, target_input: RolloutTargetInput) -> TargetGroupSpec:
-        """The group the deploying revision rolls out into (reuse primary / create new)."""
+    def rollout_target(self) -> TargetGroupSpec:
+        """How the deploying revision's target group is chosen (reuse primary / create new)."""
         raise NotImplementedError
 
     @abstractmethod
@@ -55,11 +54,8 @@ class RollingUpdateSpec(DeploymentStrategySchema):
     max_unavailable: IntOrPercent = Field(default_factory=lambda: IntOrPercent(percent=0.0))
 
     @override
-    def rollout_target(self, target_input: RolloutTargetInput) -> TargetGroupSpec:
-        return TargetGroupSpec(
-            replica_group_id=target_input.primary_replica_group_id,
-            rollout=self.to_rollout_spec(),
-        )
+    def rollout_target(self) -> TargetGroupSpec:
+        return TargetGroupSpec(use_primary_group=True, rollout=self.to_rollout_spec())
 
     @override
     def traffic_step(self, step_input: TrafficStepInput) -> TrafficStep:
@@ -124,11 +120,8 @@ class BlueGreenSpec(DeploymentStrategySchema):
         )
 
     @override
-    def rollout_target(self, target_input: RolloutTargetInput) -> TargetGroupSpec:
-        return TargetGroupSpec(
-            replica_group_id=target_input.existing_target_replica_group_id,
-            rollout=self.to_rollout_spec(),
-        )
+    def rollout_target(self) -> TargetGroupSpec:
+        return TargetGroupSpec(use_primary_group=False, rollout=self.to_rollout_spec())
 
     @override
     def traffic_step(self, step_input: TrafficStepInput) -> TrafficStep:
@@ -164,11 +157,8 @@ class CanarySpec(DeploymentStrategySchema):
         )
 
     @override
-    def rollout_target(self, target_input: RolloutTargetInput) -> TargetGroupSpec:
-        return TargetGroupSpec(
-            replica_group_id=target_input.existing_target_replica_group_id,
-            rollout=self.to_rollout_spec(),
-        )
+    def rollout_target(self) -> TargetGroupSpec:
+        return TargetGroupSpec(use_primary_group=False, rollout=self.to_rollout_spec())
 
     @override
     def traffic_step(self, step_input: TrafficStepInput) -> TrafficStep:

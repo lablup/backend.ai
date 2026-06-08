@@ -218,9 +218,13 @@ class DeploymentLifecycleSubStep(enum.StrEnum):
     """Pre-deploy cleanup of stale replica groups and creation of the target
     replica group for the selected revision."""
     DEPLOYING_PROVISIONING = "deploying_provisioning"
-    """New revision routes are being provisioned and old routes are being drained."""
+    """The target replica group is being set up (created or reused) for the deploying revision."""
+    DEPLOYING_PROVISIONED = "deploying_provisioned"
+    """Waiting for the target replica group to reach STABLE (its replicas are coming up)."""
     DEPLOYING_PROMOTING = "deploying_promoting"
-    """The fully provisioned target replica group is being promoted to primary."""
+    """Traffic is being shifted to the (STABLE) target replica group per the strategy."""
+    DEPLOYING_FINALIZING = "deploying_finalizing"
+    """Traffic shift is complete; the target group is being swapped in as primary."""
     DEPLOYING_DRAINING = "deploying_draining"
     """The superseded replica group is being drained and removed."""
     DEPLOYING_ROLLING_BACK = "deploying_rolling_back"
@@ -510,22 +514,16 @@ class ReplicaGroupRolloutSpec(ConfiguredModel):
 
 
 @dataclass(frozen=True)
-class RolloutTargetInput:
-    """Resolved group ids the strategy picks the rollout target from (primary for rolling;
-    an existing group carrying the deploying revision, or None to create, for bg/canary)."""
-
-    primary_replica_group_id: ReplicaGroupID | None
-    existing_target_replica_group_id: ReplicaGroupID | None
-
-
-@dataclass(frozen=True)
 class TargetGroupSpec:
-    """The group the deploying revision rolls out into; ``replica_group_id`` None means create.
+    """How the deploying revision's target group is chosen. ``use_primary_group`` True rolls out
+    in place into the deployment's primary group (rolling) — the setup reads that group at creation
+    time and creates a fresh one if none exists yet. When False, a fresh group is always created
+    (blue-green/canary).
 
     No traffic weight here: a freshly rolled-out group serves no traffic until PROMOTING shifts
     it over, so PROVISIONING creates it at weight 0 and leaves a reused group's weight untouched."""
 
-    replica_group_id: ReplicaGroupID | None
+    use_primary_group: bool
     rollout: ReplicaGroupRolloutSpec
 
 
