@@ -74,6 +74,7 @@ from .types import (
     DeploymentExecutionError,
     DeploymentExecutionResult,
     DeploymentWithHistory,
+    EndpointRegistrationResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -131,10 +132,11 @@ class DeploymentExecutor:
     async def register_endpoints_bulk(
         self,
         entries: Sequence[tuple[DeploymentWithHistory, DeploymentRevisionID]],
-    ) -> DeploymentExecutionResult:
+    ) -> EndpointRegistrationResult:
         """Register appproxy endpoints and persist their URLs.
 
-        Entries without a proxy target are reported as ``skipped``.
+        Entries without a proxy target are reported as ``failures`` (a missing
+        target is a misconfiguration that retrying will not resolve).
         Entries sharing a proxy target are sent to the coordinator in a
         single bulk call so circuit initialization is batched on the
         AppProxy side. Appproxy's endpoint create is idempotent on
@@ -142,7 +144,7 @@ class DeploymentExecutor:
         next tick.
         """
         if not entries:
-            return DeploymentExecutionResult()
+            return EndpointRegistrationResult()
 
         with DeploymentRecorderContext.shared_phase("load_configuration"):
             with DeploymentRecorderContext.shared_step("load_proxy_targets"):
@@ -151,9 +153,8 @@ class DeploymentExecutor:
                     await self._deployment_repo.fetch_scaling_group_proxy_targets(scaling_groups)
                 )
 
-        successes: list[DeploymentWithHistory] = []
+        registered: list[DeploymentWithHistory] = []
         failures: list[DeploymentExecutionError] = []
-        skipped: list[DeploymentWithHistory] = []
 
         # Group entries by proxy target so each target receives one bulk call.
         groups: dict[
@@ -165,11 +166,19 @@ class DeploymentExecutor:
             target = scaling_group_targets.get(info.metadata.resource_group)
             if not target:
                 log.warning(
-                    "No proxy target found for scaling group {}, skipping deployment {}",
+                    "No proxy target found for scaling group {} of deployment {}",
                     info.metadata.resource_group,
                     info.id,
                 )
-                skipped.append(deployment)
+                failures.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="No proxy target for scaling group",
+                        error_detail=(
+                            f"No proxy target for scaling group {info.metadata.resource_group}"
+                        ),
+                    )
+                )
                 continue
             groups.setdefault((target.addr, target.api_token), []).append((
                 deployment,
@@ -178,21 +187,20 @@ class DeploymentExecutor:
             ))
 
         if not groups:
-            return DeploymentExecutionResult(skipped=skipped)
+            return EndpointRegistrationResult(failures=failures)
 
         for (addr, token), group_entries in groups.items():
             await self._dispatch_bulk_register(
                 addr,
                 token,
                 group_entries,
-                successes,
+                registered,
                 failures,
             )
 
-        return DeploymentExecutionResult(
-            successes=successes,
+        return EndpointRegistrationResult(
+            registered=registered,
             failures=failures,
-            skipped=skipped,
         )
 
     async def _dispatch_bulk_register(
@@ -202,13 +210,13 @@ class DeploymentExecutor:
         group_entries: Sequence[
             tuple[DeploymentWithHistory, DeploymentRevisionID, ScalingGroupProxyTarget]
         ],
-        successes: list[DeploymentWithHistory],
+        registered: list[DeploymentWithHistory],
         failures: list[DeploymentExecutionError],
     ) -> None:
         """Build + send one bulk create call for a single proxy target.
 
-        Successes / failures are appended to the shared lists so the
-        caller can compose a final ``DeploymentExecutionResult``.
+        Registered / failures are appended to the shared lists so the
+        caller can compose a final ``EndpointRegistrationResult``.
         """
         try:
             items = [
@@ -274,7 +282,7 @@ class DeploymentExecutor:
                     )
                 )
                 continue
-            successes.append(deployment)
+            registered.append(deployment)
             log.info(
                 "Successfully registered endpoint for deployment {} with URL: {}",
                 dep_id,

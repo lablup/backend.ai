@@ -54,6 +54,15 @@ class DeploymentExecutionResult:
 
 
 @dataclass
+class EndpointRegistrationResult:
+    """Outcome of registering appproxy endpoints: which deployments registered and which failed.
+    The caller composes its own lifecycle result from this."""
+
+    registered: list[DeploymentWithHistory] = field(default_factory=list)
+    failures: list[DeploymentExecutionError] = field(default_factory=list)
+
+
+@dataclass
 class ActivateRevisionResult:
     """Result of activating a deployment revision.
 

@@ -16,6 +16,7 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.types import (
+    DeploymentExecutionError,
     DeploymentExecutionResult,
     DeploymentLifecycleType,
     DeploymentWithHistory,
@@ -86,27 +87,30 @@ class DeployingInitializingHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        ready: list[DeploymentWithHistory] = []
+        successes: list[DeploymentWithHistory] = []
+        failures: list[DeploymentExecutionError] = []
         entries: list[tuple[DeploymentWithHistory, DeploymentRevisionID]] = []
         for deployment in deployments:
             info = deployment.deployment_info
-            if info.network.url is not None or info.deploying_revision is None:
-                ready.append(deployment)
+            if info.network.url is not None:
+                successes.append(deployment)
+            elif info.deploying_revision is None:
+                failures.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="No deploying revision to register",
+                        error_detail="Deployment reached INITIALIZING without a deploying revision",
+                    )
+                )
             else:
                 entries.append((deployment, info.deploying_revision.id))
 
-        successes = list(ready)
-        skipped: list[DeploymentWithHistory] = []
         if entries:
             result = await self._deployment_executor.register_endpoints_bulk(entries)
-            failed_ids = {error.deployment_info.deployment_info.id for error in result.failures}
-            for deployment, _ in entries:
-                if deployment.deployment_info.id in failed_ids:
-                    skipped.append(deployment)
-                else:
-                    successes.append(deployment)
+            successes.extend(result.registered)
+            failures.extend(result.failures)
 
-        return DeploymentExecutionResult(successes=successes, skipped=skipped)
+        return DeploymentExecutionResult(successes=successes, failures=failures)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
