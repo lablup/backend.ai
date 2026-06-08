@@ -25,8 +25,6 @@ if TYPE_CHECKING:
 
 class DeploymentLifecycleType(StrEnum):
     CHECK_REPLICA = "check_replica"
-    SCALING = "scaling"
-    RECONCILE = "reconcile"
     DEPLOYING = "deploying"
     DESTROYING = "destroying"
 

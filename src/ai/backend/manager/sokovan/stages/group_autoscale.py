@@ -1,4 +1,5 @@
-"""Group draining reconcile stage spec paired with its repo-built handler/source/applier."""
+"""Group autoscale reconcile stage: keep a STABLE serving group's replica count at the
+deployment's desired count (steady-state scaling), paired with its repo-built source/applier."""
 
 from __future__ import annotations
 
@@ -16,8 +17,8 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.deployment.group.categories import GroupReconcileKind
 from ai.backend.manager.sokovan.deployment.group.lifecycle.applier import GroupLifecycleApplier
-from ai.backend.manager.sokovan.deployment.group.lifecycle.handlers.draining import (
-    GroupDrainingHandler,
+from ai.backend.manager.sokovan.deployment.group.lifecycle.handlers.autoscale import (
+    GroupAutoscaleHandler,
 )
 from ai.backend.manager.sokovan.deployment.group.lifecycle.source import GroupLifecycleSource
 from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
@@ -32,41 +33,43 @@ from ai.backend.manager.sokovan.reconciler.base import (
 )
 
 
-def build_group_draining_stage(
+def build_group_autoscale_stage(
     replica_group_repository: ReplicaGroupRepository,
 ) -> ReconcilerStageRegistration:
-    reconcile_type = "group_draining"
+    reconcile_type = "group_autoscale"
     metadata = ReconcilerStageMetadata(
         category=ReplicaGroupHandlerCategory.LIFECYCLE,
         kind=GroupReconcileKind.GROUP,
+        # Steady-state group at rest (scaling STABLE): sync its count to the deployment goal.
         target_statuses=GroupLifecycleTargetStatuses(
-            lifecycles=frozenset({ReplicaGroupLifecycle.DRAINING}),
+            lifecycles=frozenset({ReplicaGroupLifecycle.STABLE}),
             scaling_statuses=frozenset({ReplicaGroupScalingStatus.STABLE}),
         ),
-        name="group_draining_reconcile",
-        phase="group_draining",
-        lock_id=LockID.LOCKID_REPLICA_GROUP_DRAINING_RECONCILE,
+        name="group_autoscale_reconcile",
+        phase="group_autoscale",
+        lock_id=LockID.LOCKID_REPLICA_GROUP_AUTOSCALE_RECONCILE,
+        # Stays STABLE; a count change re-arms scaling so the scaling reconcile fills routes.
         transitions={
             SchedulingResult.SUCCESS: GroupReconcileStatus(
-                lifecycle=ReplicaGroupLifecycle.DRAINED,
+                lifecycle=ReplicaGroupLifecycle.STABLE,
                 scaling_status=ReplicaGroupScalingStatus.STABLE,
             ),
             SchedulingResult.NEED_RETRY: GroupReconcileStatus(
-                lifecycle=ReplicaGroupLifecycle.DRAINING,
+                lifecycle=ReplicaGroupLifecycle.STABLE,
                 scaling_status=ReplicaGroupScalingStatus.SCALING,
             ),
             SchedulingResult.EXPIRED: GroupReconcileStatus(
-                lifecycle=ReplicaGroupLifecycle.DRAINING,
+                lifecycle=ReplicaGroupLifecycle.STABLE,
                 scaling_status=ReplicaGroupScalingStatus.SCALING,
             ),
             SchedulingResult.GIVE_UP: GroupReconcileStatus(
-                lifecycle=ReplicaGroupLifecycle.DRAINING,
+                lifecycle=ReplicaGroupLifecycle.STABLE,
                 scaling_status=ReplicaGroupScalingStatus.SCALING,
             ),
         },
     )
     stage = ReconcilerStage(
-        handler=GroupDrainingHandler(),
+        handler=GroupAutoscaleHandler(),
         source=GroupLifecycleSource(replica_group_repository),
         applier=GroupLifecycleApplier(replica_group_repository),
         metadata=metadata,

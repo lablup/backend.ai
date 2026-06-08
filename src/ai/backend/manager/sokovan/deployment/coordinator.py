@@ -74,8 +74,6 @@ from .handlers import (
     DeployingRollingBackHandler,
     DeploymentHandler,
     DestroyingDeploymentHandler,
-    ReconcileDeploymentHandler,
-    ScalingDeploymentHandler,
 )
 from .types import (
     DeploymentExecutionError,
@@ -304,21 +302,6 @@ class DeploymentCoordinator:
             (
                 (DeploymentLifecycleType.CHECK_REPLICA, None),
                 CheckReplicaDeploymentHandler(
-                    deployment_executor=executor,
-                    deployment_controller=self._deployment_controller,
-                ),
-            ),
-            (
-                (DeploymentLifecycleType.SCALING, None),
-                ScalingDeploymentHandler(
-                    deployment_executor=executor,
-                    deployment_controller=self._deployment_controller,
-                    route_controller=self._route_controller,
-                ),
-            ),
-            (
-                (DeploymentLifecycleType.RECONCILE, None),
-                ReconcileDeploymentHandler(
                     deployment_executor=executor,
                     deployment_controller=self._deployment_controller,
                 ),
@@ -887,19 +870,6 @@ class DeploymentCoordinator:
             DeploymentTaskSpec(
                 DeploymentLifecycleType.CHECK_REPLICA,
                 short_interval=5.0,
-                long_interval=30.0,
-                initial_delay=10.0,
-            ),
-            # Scaling operations with both short and long cycles
-            DeploymentTaskSpec(
-                DeploymentLifecycleType.SCALING,
-                short_interval=5.0,
-                long_interval=30.0,
-                initial_delay=10.0,
-            ),
-            DeploymentTaskSpec(
-                DeploymentLifecycleType.RECONCILE,
-                short_interval=None,
                 long_interval=30.0,
                 initial_delay=10.0,
             ),

@@ -11,7 +11,6 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
-from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment.updaters.replica_group import (
     ReplicaGroupLifecycleUpdaterSpec,
@@ -29,6 +28,7 @@ from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
     GroupLifecycleDecision,
     GroupLifecycleReconcileResult,
     GroupLifecycleTargetStatuses,
+    GroupReconcileStatus,
 )
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerApplier, ReconcilerApplyInput
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
@@ -39,7 +39,7 @@ _LifecycleApplyInput = ReconcilerApplyInput[
     ReplicaGroupHandlerCategory,
     GroupReconcileKind,
     GroupLifecycleTargetStatuses,
-    ReplicaGroupLifecycle,
+    GroupReconcileStatus,
 ]
 
 
@@ -49,7 +49,7 @@ class GroupLifecycleApplier(
         ReplicaGroupHandlerCategory,
         GroupReconcileKind,
         GroupLifecycleTargetStatuses,
-        ReplicaGroupLifecycle,
+        GroupReconcileStatus,
     ]
 ):
     _replica_group_repository: ReplicaGroupRepository
@@ -74,20 +74,15 @@ class GroupLifecycleApplier(
     ) -> ReplicaGroupReconcileTransition:
         metadata = apply_input.metadata
         result = apply_input.classified[decision.replica_group_id]
-        target_lifecycle = metadata.transitions.get(result)
-        lifecycle_state = (
-            OptionalState.update(target_lifecycle)
-            if target_lifecycle is not None
-            else OptionalState[ReplicaGroupLifecycle].nop()
-        )
-        to_status = target_lifecycle.value if target_lifecycle is not None else None
-        # A step (not converged) re-arms scaling so it fills the new desired counts;
-        # convergence (SUCCESS) leaves the already-STABLE scaling status untouched.
-        scaling_state = (
-            OptionalState[ReplicaGroupScalingStatus].nop()
-            if result is SchedulingResult.SUCCESS
-            else OptionalState.update(ReplicaGroupScalingStatus.SCALING)
-        )
+        target = metadata.transitions.get(result)
+        if target is not None:
+            lifecycle_state = OptionalState.update(target.lifecycle)
+            scaling_state = OptionalState.update(target.scaling_status)
+            to_status = target.lifecycle.value
+        else:
+            lifecycle_state = OptionalState[ReplicaGroupLifecycle].nop()
+            scaling_state = OptionalState[ReplicaGroupScalingStatus].nop()
+            to_status = None
         updater = Updater(
             spec=ReplicaGroupLifecycleUpdaterSpec(
                 lifecycle=lifecycle_state,

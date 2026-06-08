@@ -8,6 +8,7 @@ from ai.backend.manager.repositories.replica_group.repository import ReplicaGrou
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerStageRunner, ReconcilerTaskSpec
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.reconciler.flag import ValkeyReconcilerFlag
+from ai.backend.manager.sokovan.stages.group_autoscale import build_group_autoscale_stage
 from ai.backend.manager.sokovan.stages.group_draining import build_group_draining_stage
 from ai.backend.manager.sokovan.stages.group_rolling import build_group_rolling_stage
 from ai.backend.manager.sokovan.stages.group_scaling import build_group_scaling_stage
@@ -25,6 +26,7 @@ def build_reconciler_coordinator(
         build_group_scaling_stage(replica_group_repository),
         build_group_rolling_stage(replica_group_repository),
         build_group_draining_stage(replica_group_repository),
+        build_group_autoscale_stage(replica_group_repository),
     ]
     stages: dict[str, ReconcilerStageRunner] = {}
     task_specs: list[ReconcilerTaskSpec] = []

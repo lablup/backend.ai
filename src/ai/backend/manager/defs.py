@@ -120,6 +120,9 @@ class LockID(enum.IntEnum):
     LOCKID_REPLICA_GROUP_SCALING_RECONCILE = 235  # For replica-group scaling reconcile
     LOCKID_REPLICA_GROUP_ROLLING_RECONCILE = 236  # For replica-group rolling reconcile
     LOCKID_REPLICA_GROUP_DRAINING_RECONCILE = 237  # For replica-group draining reconcile
+    LOCKID_REPLICA_GROUP_AUTOSCALE_RECONCILE = (
+        238  # For replica-group steady-state autoscale reconcile
+    )
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable

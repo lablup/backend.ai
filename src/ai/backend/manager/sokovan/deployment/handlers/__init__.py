@@ -11,9 +11,7 @@ from .deploying_provisioned import DeployingProvisionedHandler
 from .deploying_provisioning import DeployingProvisioningHandler
 from .deploying_rolling_back import DeployingRollingBackHandler
 from .destroying import DestroyingDeploymentHandler
-from .reconcile import ReconcileDeploymentHandler
 from .replica import CheckReplicaDeploymentHandler
-from .scaling import ScalingDeploymentHandler
 
 __all__ = [
     "CheckReplicaDeploymentHandler",
@@ -26,6 +24,4 @@ __all__ = [
     "DeployingRollingBackHandler",
     "DeploymentHandler",
     "DestroyingDeploymentHandler",
-    "ReconcileDeploymentHandler",
-    "ScalingDeploymentHandler",
 ]

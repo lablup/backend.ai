@@ -37,6 +37,15 @@ class GroupLifecycleTargetStatuses(BaseReconcilerTargetStatuses):
     scaling_statuses: frozenset[ReplicaGroupScalingStatus]
 
 
+@dataclass(frozen=True)
+class GroupReconcileStatus:
+    """The (lifecycle, scaling_status) a group transitions to for a given reconcile outcome.
+    Carried in a stage's ``transitions`` map so both axes are declared there, not in the applier."""
+
+    lifecycle: ReplicaGroupLifecycle
+    scaling_status: ReplicaGroupScalingStatus
+
+
 @dataclass
 class GroupLifecycleReconcileInfo(BaseReconcilerInfo):
     """One fetch's worth of lifecycle-reconcile decision state (per-group views + DB now)."""

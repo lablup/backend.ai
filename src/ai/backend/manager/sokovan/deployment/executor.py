@@ -11,7 +11,6 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
@@ -40,23 +39,10 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    ModelRevisionData,
-    RouteInfo,
-    RouteStatus,
-    RouteTrafficStatus,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound, ReplicaCountMismatch
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.repositories.deployment.creators import (
-    RouteBatchUpdaterSpec,
-    RouteCreatorSpec,
-)
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.repositories.deployment.repository import (
     AutoScalingMetricsData,
     DeploymentRepository,
@@ -65,10 +51,8 @@ from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
-from ai.backend.manager.sokovan.deployment.exceptions import InvalidEndpointState
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
-from ai.backend.manager.types import OptionalState
 
 from .types import (
     DeploymentExecutionError,
@@ -288,128 +272,6 @@ class DeploymentExecutor:
                 dep_id,
                 result_item.url,
             )
-
-    async def check_ready_deployments_that_need_scaling(
-        self, deployments: Sequence[DeploymentWithHistory]
-    ) -> DeploymentExecutionResult:
-        # Phase 1: Load routes
-        with DeploymentRecorderContext.shared_phase("load_routes"):
-            with DeploymentRecorderContext.shared_step("load_active_routes"):
-                deployment_ids = {dep.deployment_info.id for dep in deployments}
-                route_map = await self._deployment_repo.fetch_active_routes_by_deployment_ids(
-                    deployment_ids
-                )
-
-        successes: list[DeploymentWithHistory] = []
-        skipped: list[DeploymentWithHistory] = []
-        errors: list[DeploymentExecutionError] = []
-
-        # Phase 2: Verify replicas (per-deployment)
-        for deployment in deployments:
-            # A deployment without a current_revision is either a brand new
-            # endpoint that never completed its first rollout or one whose
-            # rollout was rolled back. In either case there is nothing to
-            # "scale" — there is no revision to create sessions against.
-            # Treat it as skipped so no lifecycle transition fires; leaving
-            # the handler to attempt scaling would permanently wedge the
-            # deployment in SCALING because scale_deployment() would then
-            # refuse to act on a None revision id.
-            if deployment.deployment_info.current_revision is None:
-                skipped.append(deployment)
-                continue
-            try:
-                self._verify_deployment_replicas(deployment.deployment_info, route_map)
-                successes.append(deployment)
-            except ReplicaCountMismatch as e:
-                log.warning(
-                    "Deployment {} has mismatched active routes: {}",
-                    deployment.deployment_info.id,
-                    e,
-                )
-                errors.append(
-                    DeploymentExecutionError(
-                        deployment_info=deployment,
-                        reason="Mismatched active routes",
-                        error_detail=str(e),
-                        error_code=_extract_error_code(e),
-                    )
-                )
-
-        return DeploymentExecutionResult(
-            successes=successes,
-            skipped=skipped,
-            failures=errors,
-        )
-
-    async def scale_deployment(
-        self, deployments: Sequence[DeploymentWithHistory]
-    ) -> DeploymentExecutionResult:
-        # Phase 1: Load routes
-        with DeploymentRecorderContext.shared_phase("load_routes"):
-            with DeploymentRecorderContext.shared_step("load_active_routes"):
-                deployment_ids = {dep.deployment_info.id for dep in deployments}
-                route_map = await self._deployment_repo.fetch_active_routes_by_deployment_ids(
-                    deployment_ids
-                )
-
-        scale_out_creators: list[RBACEntityCreator[RoutingRow]] = []
-        scale_in_route_ids: list[UUID] = []
-        successes: list[DeploymentWithHistory] = []
-        skipped: list[DeploymentWithHistory] = []
-        errors: list[DeploymentExecutionError] = []
-
-        # Phase 2: Evaluate scaling (per-deployment)
-        for deployment in deployments:
-            info = deployment.deployment_info
-            if info.current_revision is None:
-                skipped.append(deployment)
-                continue
-            try:
-                out_creators, in_route_ids = self._evaluate_deployment_scaling(
-                    info, route_map, info.current_revision.id
-                )
-                if out_creators or in_route_ids:
-                    scale_out_creators.extend(out_creators)
-                    scale_in_route_ids.extend(in_route_ids)
-                    successes.append(deployment)
-                else:
-                    # No scaling action needed
-                    skipped.append(deployment)
-            except Exception as e:
-                log.warning("Failed to scale deployment {}: {}", deployment.deployment_info.id, e)
-                errors.append(
-                    DeploymentExecutionError(
-                        deployment_info=deployment,
-                        reason=str(e),
-                        error_detail="Failed to scale deployment",
-                        error_code=_extract_error_code(e),
-                    )
-                )
-
-        # Build BatchUpdater for scale in
-        scale_in_updater: BatchUpdater[RoutingRow] | None = None
-        if scale_in_route_ids:
-            scale_in_updater = BatchUpdater(
-                spec=RouteBatchUpdaterSpec(
-                    status=OptionalState.update(RouteStatus.TERMINATING),
-                    traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
-                ),
-                conditions=[RouteConditions.by_ids(scale_in_route_ids)],
-            )
-
-        # Phase 3: Apply scaling (only for successful deployments)
-        if scale_out_creators or scale_in_updater:
-            with DeploymentRecorderContext.shared_phase(
-                "apply_scaling", entity_ids={dep.deployment_info.id for dep in successes}
-            ):
-                with DeploymentRecorderContext.shared_step("scale_routes"):
-                    await self._deployment_repo.scale_routes(scale_out_creators, scale_in_updater)
-
-        return DeploymentExecutionResult(
-            successes=successes,
-            skipped=skipped,
-            failures=errors,
-        )
 
     async def calculate_desired_replicas(
         self, deployments: Sequence[DeploymentWithHistory]
@@ -672,90 +534,6 @@ class DeploymentExecutor:
             open_to_public=deployment.network.open_to_public,
             health_check=health_check_config,
         )
-
-    def _verify_deployment_replicas(
-        self,
-        deployment: DeploymentInfo,
-        route_map: Mapping[DeploymentID, Sequence[RouteInfo]],
-    ) -> None:
-        """Verify that deployment has the expected number of active routes."""
-        pool = DeploymentRecorderContext.current_pool()
-        recorder = pool.recorder(deployment.id)
-        with recorder.phase("verify_replicas"):
-            with recorder.step("compare_route_count"):
-                routes = route_map[deployment.id]
-                if len(routes) != deployment.replica.target_replica_count:
-                    raise ReplicaCountMismatch(
-                        expected=deployment.replica.target_replica_count,
-                        actual=len(routes),
-                    )
-
-    def _evaluate_deployment_scaling(
-        self,
-        deployment: DeploymentInfo,
-        route_map: Mapping[DeploymentID, Sequence[RouteInfo]],
-        revision_id: DeploymentRevisionID,
-    ) -> tuple[list[RBACEntityCreator[RoutingRow]], list[UUID]]:
-        """Evaluate scaling action for a deployment and return creators/route IDs."""
-        pool = DeploymentRecorderContext.current_pool()
-        recorder = pool.recorder(deployment.id)
-
-        scale_out_creators: list[RBACEntityCreator[RoutingRow]] = []
-        scale_in_route_ids: list[UUID] = []
-
-        with recorder.phase("evaluate_scaling"):
-            with recorder.step("calculate_scale_action"):
-                target_count = deployment.replica.target_replica_count
-                routes = route_map[deployment.id]
-                if len(routes) < target_count:
-                    # Build creators for scale out
-                    new_replica_count = target_count - len(routes)
-                    if deployment.primary_replica_group_id is None:
-                        raise InvalidEndpointState(
-                            f"Cannot scale deployment {deployment.id}: no primary replica group"
-                        )
-                    replica_group_id = deployment.primary_replica_group_id
-                    revision_data: ModelRevisionData | None
-                    if (
-                        deployment.current_revision is not None
-                        and deployment.current_revision.id == revision_id
-                    ):
-                        revision_data = deployment.current_revision
-                    else:
-                        revision_data = deployment.deploying_revision
-                    health_check = (
-                        revision_data.model_definition.health_check_config()
-                        if revision_data is not None and revision_data.model_definition
-                        else None
-                    )
-                    for _ in range(new_replica_count):
-                        creator_spec = RouteCreatorSpec(
-                            deployment_id=deployment.id,
-                            session_owner_id=deployment.metadata.session_owner,
-                            domain=deployment.metadata.domain,
-                            project_id=deployment.metadata.project,
-                            revision_id=revision_id,
-                            health_check=health_check,
-                            replica_group_id=replica_group_id,
-                        )
-                        scale_out_creators.append(
-                            RBACEntityCreator(
-                                spec=creator_spec,
-                                element_type=RBACElementType.ROUTING,
-                                scope_ref=RBACElementRef(
-                                    element_type=RBACElementType.MODEL_DEPLOYMENT,
-                                    element_id=str(deployment.id),
-                                ),
-                            )
-                        )
-                elif len(routes) > target_count:
-                    termination_route_candidates = sorted(
-                        routes, key=lambda r: r.termination_priority
-                    )
-                    candidates = termination_route_candidates[: len(routes) - target_count]
-                    scale_in_route_ids.extend(r.route_id for r in candidates)
-
-        return scale_out_creators, scale_in_route_ids
 
     async def _fetch_prometheus_metrics(
         self,

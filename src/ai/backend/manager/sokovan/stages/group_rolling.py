@@ -20,7 +20,10 @@ from ai.backend.manager.sokovan.deployment.group.lifecycle.handlers.rolling impo
     GroupRollingHandler,
 )
 from ai.backend.manager.sokovan.deployment.group.lifecycle.source import GroupLifecycleSource
-from ai.backend.manager.sokovan.deployment.group.lifecycle.types import GroupLifecycleTargetStatuses
+from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
+    GroupLifecycleTargetStatuses,
+    GroupReconcileStatus,
+)
 from ai.backend.manager.sokovan.reconciler.base import (
     ReconcilerStage,
     ReconcilerStageMetadata,
@@ -45,10 +48,22 @@ def build_group_rolling_stage(
         phase="group_rolling",
         lock_id=LockID.LOCKID_REPLICA_GROUP_ROLLING_RECONCILE,
         transitions={
-            SchedulingResult.SUCCESS: ReplicaGroupLifecycle.STABLE,
-            SchedulingResult.NEED_RETRY: ReplicaGroupLifecycle.ROLLING,
-            SchedulingResult.EXPIRED: ReplicaGroupLifecycle.ROLLING,
-            SchedulingResult.GIVE_UP: ReplicaGroupLifecycle.ROLLING,
+            SchedulingResult.SUCCESS: GroupReconcileStatus(
+                lifecycle=ReplicaGroupLifecycle.STABLE,
+                scaling_status=ReplicaGroupScalingStatus.STABLE,
+            ),
+            SchedulingResult.NEED_RETRY: GroupReconcileStatus(
+                lifecycle=ReplicaGroupLifecycle.ROLLING,
+                scaling_status=ReplicaGroupScalingStatus.SCALING,
+            ),
+            SchedulingResult.EXPIRED: GroupReconcileStatus(
+                lifecycle=ReplicaGroupLifecycle.ROLLING,
+                scaling_status=ReplicaGroupScalingStatus.SCALING,
+            ),
+            SchedulingResult.GIVE_UP: GroupReconcileStatus(
+                lifecycle=ReplicaGroupLifecycle.ROLLING,
+                scaling_status=ReplicaGroupScalingStatus.SCALING,
+            ),
         },
     )
     stage = ReconcilerStage(
