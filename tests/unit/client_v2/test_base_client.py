@@ -1,4 +1,5 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import aiohttp
@@ -55,6 +56,25 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
     return mock_session
 
 
+class _RecordingAuth(MockAuth):
+    """MockAuth that records the rel_url it was asked to sign."""
+
+    def __init__(self) -> None:
+        self.signed_rel_urls: list[str] = []
+
+    def sign(
+        self,
+        method: str,
+        version: str,
+        endpoint: URL,
+        date: datetime,
+        rel_url: str,
+        content_type: str,
+    ) -> Mapping[str, str]:
+        self.signed_rel_urls.append(rel_url)
+        return super().sign(method, version, endpoint, date, rel_url, content_type)
+
+
 def _make_anon_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
@@ -106,6 +126,33 @@ class TestBackendAIClient:
         client = _make_client(mock_session)
         result = await client._request("GET", "/test")
         assert result == {"result": "ok"}
+
+    async def test_request_signs_url_encoded_query_string(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value={})
+        auth = _RecordingAuth()
+        client = BackendAIAuthClient(_DEFAULT_CONFIG, auth, _make_request_session(mock_resp))
+
+        await client._request("GET", "/test", params={"file": "a b/c.txt"})
+
+        # The signed rel_url must carry the URL-encoded query (matching the wire),
+        # not a raw unencoded "file=a b/c.txt".
+        signed = auth.signed_rel_urls[-1]
+        assert "file=a b/c.txt" not in signed
+        assert signed == URL("/test").with_query({"file": "a b/c.txt"}).raw_path_qs
+
+    async def test_request_signs_list_params_as_repeated_keys(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value={})
+        auth = _RecordingAuth()
+        client = BackendAIAuthClient(_DEFAULT_CONFIG, auth, _make_request_session(mock_resp))
+
+        await client._request("GET", "/test", params={"ids": ["a", "b"]})
+
+        signed = auth.signed_rel_urls[-1]
+        assert "ids=a" in signed and "ids=b" in signed
 
     async def test_request_raises_on_4xx(self) -> None:
         mock_resp = AsyncMock()

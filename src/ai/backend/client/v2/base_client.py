@@ -132,15 +132,17 @@ class BackendAIAuthClient:
         path: str,
         *,
         json: Any | None = None,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
         extra_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any] | list[Any] | str | None:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
         if params:
-            qs = "&".join(f"{k}={v}" for k, v in params.items())
-            rel_url = f"{rel_url}?{qs}"
+            # Build the signed query string with yarl so it matches what aiohttp
+            # actually sends on the wire (URL-encoding plus repeated keys for list
+            # values); the manager verifies the signature against request.raw_path.
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = {**self._sign(method, rel_url, content_type)}
         if extra_headers:
             headers.update(extra_headers)
@@ -251,6 +253,10 @@ class BackendAIAuthClient:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
+        if params:
+            # Sign the encoded query string that aiohttp will send on the wire so
+            # the HMAC signature matches the manager's view of request.raw_path.
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = dict(self._sign(method, rel_url, content_type))
         url = self._build_url(path)
         async with session.request(
