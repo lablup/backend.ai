@@ -1315,6 +1315,8 @@ type ComputeSession implements Item {
 }
 
 """
+Added in 26.4.4.
+
 Per-mount details for a vfolder attached to a compute session.
 
 Unlike the ``mounts`` (vfolder names) and ``vfolder_mounts`` (vfolder UUIDs)

@@ -194,6 +194,8 @@ class SessionPermissionValueField(graphene.Scalar):  # type: ignore[misc]
 
 class VFolderMountInfo(graphene.ObjectType):  # type: ignore[misc]
     """
+    Added in 26.4.4.
+
     Per-mount details for a vfolder attached to a compute session.
 
     Unlike the ``mounts`` (vfolder names) and ``vfolder_mounts`` (vfolder UUIDs)
