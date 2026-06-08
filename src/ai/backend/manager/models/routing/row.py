@@ -127,11 +127,11 @@ class RoutingRow(Base):  # type: ignore[misc]
 
     # Revision reference without FK (relationship only)
     revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
-    # Replica group this replica belongs to (``NULL`` until assigned).
-    # No FK (relationship only); mirrors ``revision`` above.
+    # Replica group this replica belongs to (``NULL`` until assigned). FK is SET NULL on group delete.
     replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
         "replica_group_id",
         GUID(ReplicaGroupID),
+        sa.ForeignKey("replica_groups.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
