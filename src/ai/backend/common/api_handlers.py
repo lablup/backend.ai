@@ -146,35 +146,33 @@ class QueryParam[TRequestModel: BaseRequestModel]:
         ``getall`` so repeated query params (``?k=a&k=b``) validate as a list
         instead of silently collapsing to a single value.
         """
+
+        def is_sequence_annotation(annotation: Any) -> bool:
+            origin = get_origin(annotation)
+            if origin in (list, tuple, set, frozenset):
+                return True
+            if origin is Union or origin is UnionType:
+                return any(is_sequence_annotation(arg) for arg in get_args(annotation))
+            return False
+
+        def candidate_query_keys(name: str, field_info: FieldInfo) -> list[str]:
+            """Query-string keys a field accepts, honoring validation aliases."""
+            alias = field_info.validation_alias
+            if isinstance(alias, str):
+                return [alias]
+            if isinstance(alias, AliasChoices):
+                return [choice for choice in alias.choices if isinstance(choice, str)]
+            return [name]
+
         data: dict[str, Any] = {key: query[key] for key in query}
         for name, field_info in self._model.model_fields.items():
-            if not self._is_sequence_annotation(field_info.annotation):
+            if not is_sequence_annotation(field_info.annotation):
                 continue
-            for key in self._candidate_query_keys(name, field_info):
+            for key in candidate_query_keys(name, field_info):
                 if key in query:
                     data[key] = query.getall(key)
                     break
         return data
-
-    @staticmethod
-    def _is_sequence_annotation(annotation: Any) -> bool:
-        """Return True if the annotation is a list/tuple/set (optionally wrapped in a Union)."""
-        origin = get_origin(annotation)
-        if origin in (list, tuple, set, frozenset):
-            return True
-        if origin is Union or origin is UnionType:
-            return any(QueryParam._is_sequence_annotation(arg) for arg in get_args(annotation))
-        return False
-
-    @staticmethod
-    def _candidate_query_keys(name: str, field_info: FieldInfo) -> list[str]:
-        """Resolve the query-string keys a field accepts, honoring validation aliases."""
-        alias = field_info.validation_alias
-        if isinstance(alias, str):
-            return [alias]
-        if isinstance(alias, AliasChoices):
-            return [choice for choice in alias.choices if isinstance(choice, str)]
-        return [name]
 
 
 class HeaderParam[TRequestModel: BaseRequestModel]:
