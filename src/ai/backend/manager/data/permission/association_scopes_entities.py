@@ -15,5 +15,5 @@ class AssociationScopesEntitiesData:
     scope_id: ScopeId
     object_id: ObjectId
     relation_type: RelationType
-    permission_cap: Permission
+    permission_cap: Permission | None
     registered_at: datetime

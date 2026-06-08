@@ -58,11 +58,11 @@ class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
         nullable=False,
         server_default=RelationType.AUTO.value,
     )
-    permission_cap: Mapped[Permission] = mapped_column(
+    # A NULL cap means "no ceiling" and is treated as the full cap during resolution.
+    permission_cap: Mapped[Permission | None] = mapped_column(
         "permission_cap",
         IntFlagType(Permission),
-        nullable=False,
-        server_default=sa.text(str(Permission.full().value)),
+        nullable=True,
     )
     registered_at: Mapped[datetime] = mapped_column(
         "registered_at",
