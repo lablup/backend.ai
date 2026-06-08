@@ -558,11 +558,11 @@ class Permission(enum.IntFlag):
     """
 
     NONE = 0
-    READ = 1
-    UPDATE = 2
-    CREATE = 4
-    SOFT_DELETE = 8
-    HARD_DELETE = 16
+    READ = 1 << 0
+    UPDATE = 1 << 1
+    CREATE = 1 << 2
+    SOFT_DELETE = 1 << 3
+    HARD_DELETE = 1 << 4
 
     @classmethod
     def full(cls) -> Permission:
