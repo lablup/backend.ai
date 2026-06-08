@@ -83,7 +83,7 @@ from ai.backend.agent.tasks import (
 )
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks, current_loop
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -989,11 +989,14 @@ class AbstractAgent[
             db_id=REDIS_LIVE_DB,
         )
         self.background_task_manager = BackgroundTaskManager(
-            self.event_producer,
-            valkey_client=self.valkey_bgtask_client,
-            server_id=self.id,
-            bgtask_observer=self._metric_registry.bgtask,
+            BackgroundTaskManagerArgs(
+                event_producer=self.event_producer,
+                valkey_client=self.valkey_bgtask_client,
+                server_id=self.id,
+                bgtask_observer=self._metric_registry.bgtask,
+            )
         )
+        await self.background_task_manager.init()
 
         log.info("Resource slots: {!r}", self.slots)
         log.info("Slot types: {!r}", known_slot_types)
@@ -1536,6 +1539,7 @@ class AbstractAgent[
 
     async def _clean_kernel_registry_loop(self) -> None:
         # TODO: After reducing `kernel_registry` dependencies and roles, this kind of tasks should be deprecated
+        cleanup_tasks: set[asyncio.Task[None]] = set()
         while True:
             try:
                 alive_containers = await self.enumerate_containers()
@@ -1551,11 +1555,13 @@ class AbstractAgent[
                         "cleaning up dangling kernel objects (kernel ids): {}",
                         ", ".join(map(str, dangling_kernel_ids)),
                     )
-                    asyncio.create_task(
+                    cleanup_task = asyncio.create_task(
                         asyncio.wait_for(
                             self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0
                         )
                     )
+                    cleanup_tasks.add(cleanup_task)
+                    cleanup_task.add_done_callback(cleanup_tasks.discard)
             except Exception as e:
                 log.exception("unexpected error in _clean_kernel_registry_loop: {0}", repr(e))
             finally:
@@ -3188,9 +3194,6 @@ class AbstractAgent[
                                     ctx.image_ref.canonical,
                                 )
                                 continue
-                            asyncio.create_task(
-                                self.start_and_monitor_model_service_health(kernel_obj, model)
-                            )
                             log.info(
                                 "create_kernel(kernel:{}, session:{}, container:{}) start monitoring model service: {}",
                                 kernel_id,
@@ -3235,26 +3238,6 @@ class AbstractAgent[
                 except Exception:
                     await self.reconstruct_resource_usage()
                     raise
-
-    async def start_and_monitor_model_service_health(
-        self,
-        kernel_obj: KernelObjectType,
-        model: ModelConfig,
-    ) -> None:
-        log.debug("starting model service of model {}", model.name)
-        result = await kernel_obj.start_model_service(model.model_dump(mode="json"))
-        if result["status"] == "failed":
-            log.error(
-                "Model service failed to start for kernel {} (session {}). Destroying kernel.",
-                kernel_obj.kernel_id,
-                kernel_obj.session_id,
-            )
-            await self.inject_container_lifecycle_event(
-                kernel_obj.kernel_id,
-                kernel_obj.session_id,
-                LifecycleEvent.DESTROY,
-                KernelLifecycleEventReason.FAILED_TO_START,
-            )
 
     async def _load_model_definition(
         self,
