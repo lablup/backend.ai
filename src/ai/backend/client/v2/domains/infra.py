@@ -103,11 +103,12 @@ class InfraClient(BaseDomainClient):
     async def get_wsproxy_version(
         self, scaling_group: str, request: GetWSProxyVersionRequest | None = None
     ) -> GetWSProxyVersionResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"/scaling-groups/{scaling_group}/wsproxy-version",
-            request=request,
             response_model=GetWSProxyVersionResponse,
+            params=params,
         )
 
     # ---- Resources ----
