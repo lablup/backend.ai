@@ -3007,6 +3007,24 @@ class TestRouteOperations:
             valkey_schedule=valkey_schedule,
         )
 
+    @pytest.fixture
+    async def test_replica_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: DeploymentID,
+    ) -> ReplicaGroupID:
+        """Create a replica group for the test endpoint and return its ID."""
+        group_id = ReplicaGroupID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ReplicaGroupRow(
+                    id=group_id,
+                    deployment_id=test_endpoint_id,
+                )
+            )
+            await db_sess.commit()
+        return group_id
+
     async def test_create_route(
         self,
         deployment_repository: DeploymentRepository,
@@ -3014,6 +3032,7 @@ class TestRouteOperations:
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_replica_group_id: ReplicaGroupID,
     ) -> None:
         """Test creating a route using Creator with RouteCreatorSpec."""
         spec = RouteCreatorSpec(
@@ -3023,7 +3042,7 @@ class TestRouteOperations:
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
             health_check=None,
-            replica_group_id=ReplicaGroupID(uuid.uuid4()),
+            replica_group_id=test_replica_group_id,
             traffic_ratio=1.0,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
@@ -3049,6 +3068,7 @@ class TestRouteOperations:
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_replica_group_id: ReplicaGroupID,
     ) -> None:
         """Test updating route status using RouteStatusUpdaterSpec."""
         # Create a route first
@@ -3059,7 +3079,7 @@ class TestRouteOperations:
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
             health_check=None,
-            replica_group_id=ReplicaGroupID(uuid.uuid4()),
+            replica_group_id=test_replica_group_id,
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3099,6 +3119,7 @@ class TestRouteOperations:
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_replica_group_id: ReplicaGroupID,
     ) -> None:
         """Test updating route using unified RouteUpdaterSpec."""
         # Create a route first
@@ -3109,7 +3130,7 @@ class TestRouteOperations:
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
             health_check=None,
-            replica_group_id=ReplicaGroupID(uuid.uuid4()),
+            replica_group_id=test_replica_group_id,
         )
         creator = RBACEntityCreator(
             spec=spec,
