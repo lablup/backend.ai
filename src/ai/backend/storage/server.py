@@ -225,7 +225,7 @@ async def bgtask_ctx(
     )
     bgtask_registry_creator = BgtaskHandlerRegistryCreator(volume_pool, event_producer)
     registry = bgtask_registry_creator.create()
-    bgtask_mgr = await BackgroundTaskManager.create(
+    bgtask_mgr = BackgroundTaskManager(
         BackgroundTaskManagerArgs(
             event_producer=event_producer,
             task_registry=registry,
@@ -233,6 +233,7 @@ async def bgtask_ctx(
             server_id=local_config.storage_proxy.node_id,
         )
     )
+    await bgtask_mgr.init()
 
     try:
         yield bgtask_mgr

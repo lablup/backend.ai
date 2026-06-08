@@ -1130,13 +1130,14 @@ async def background_task_manager(
     valkey_clients: ValkeyClients,
 ) -> AsyncIterator[BackgroundTaskManager]:
     """Real BackgroundTaskManager backed by Valkey."""
-    mgr = await BackgroundTaskManager.create(
+    mgr = BackgroundTaskManager(
         BackgroundTaskManagerArgs(
             event_producer=event_producer,
             valkey_client=valkey_clients.bgtask,
             server_id=f"test-server-{uuid4()}",
         )
     )
+    await mgr.init()
     yield mgr
     await mgr.shutdown()
 

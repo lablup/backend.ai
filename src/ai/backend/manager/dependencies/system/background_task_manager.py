@@ -34,7 +34,7 @@ class BackgroundTaskManagerDependency(
     async def provide(
         self, setup_input: BackgroundTaskManagerInput
     ) -> AsyncIterator[BackgroundTaskManager]:
-        manager = await BackgroundTaskManager.create(
+        manager = BackgroundTaskManager(
             BackgroundTaskManagerArgs(
                 event_producer=setup_input.event_producer,
                 valkey_client=setup_input.valkey_bgtask,
@@ -42,6 +42,7 @@ class BackgroundTaskManagerDependency(
                 bgtask_observer=setup_input.bgtask_observer,
             )
         )
+        await manager.init()
         try:
             yield manager
         finally:

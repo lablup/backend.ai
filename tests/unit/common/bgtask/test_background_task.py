@@ -133,13 +133,14 @@ async def background_task_manager(
     event_producer: EventProducer,
     valkey_bgtask_client: ValkeyBgtaskClient,
 ) -> AsyncIterator[BackgroundTaskManager]:
-    bgtask_manager = await BackgroundTaskManager.create(
+    bgtask_manager = BackgroundTaskManager(
         BackgroundTaskManagerArgs(
             event_producer=event_producer,
             valkey_client=valkey_bgtask_client,
             server_id=f"test-server-{uuid4()}",
         )
     )
+    await bgtask_manager.init()
 
     yield bgtask_manager
 

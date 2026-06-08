@@ -845,7 +845,6 @@ class AbstractAgent[
     # Health monitoring tracking
     _active_pulls: dict[str, PullTaskInfo]  # key: image canonical name
     _active_creates: dict[KernelId, CreateTaskInfo]
-    _model_service_health_tasks: set[asyncio.Task[Any]]
 
     @contextmanager
     def track_pull(self, image: str) -> Generator[bool, None, None]:
@@ -929,7 +928,6 @@ class AbstractAgent[
         # Initialize health monitoring tracking maps
         self._active_pulls = {}
         self._active_creates = {}
-        self._model_service_health_tasks = set()
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
@@ -990,7 +988,7 @@ class AbstractAgent[
             human_readable_name="agent.kernel_presence",
             db_id=REDIS_LIVE_DB,
         )
-        self.background_task_manager = await BackgroundTaskManager.create(
+        self.background_task_manager = BackgroundTaskManager(
             BackgroundTaskManagerArgs(
                 event_producer=self.event_producer,
                 valkey_client=self.valkey_bgtask_client,
@@ -998,6 +996,7 @@ class AbstractAgent[
                 bgtask_observer=self._metric_registry.bgtask,
             )
         )
+        await self.background_task_manager.init()
 
         log.info("Resource slots: {!r}", self.slots)
         log.info("Slot types: {!r}", known_slot_types)
@@ -3195,11 +3194,6 @@ class AbstractAgent[
                                     ctx.image_ref.canonical,
                                 )
                                 continue
-                            health_task = asyncio.create_task(
-                                self.start_and_monitor_model_service_health(kernel_obj, model)
-                            )
-                            self._model_service_health_tasks.add(health_task)
-                            health_task.add_done_callback(self._model_service_health_tasks.discard)
                             log.info(
                                 "create_kernel(kernel:{}, session:{}, container:{}) start monitoring model service: {}",
                                 kernel_id,
@@ -3244,26 +3238,6 @@ class AbstractAgent[
                 except Exception:
                     await self.reconstruct_resource_usage()
                     raise
-
-    async def start_and_monitor_model_service_health(
-        self,
-        kernel_obj: KernelObjectType,
-        model: ModelConfig,
-    ) -> None:
-        log.debug("starting model service of model {}", model.name)
-        result = await kernel_obj.start_model_service(model.model_dump(mode="json"))
-        if result["status"] == "failed":
-            log.error(
-                "Model service failed to start for kernel {} (session {}). Destroying kernel.",
-                kernel_obj.kernel_id,
-                kernel_obj.session_id,
-            )
-            await self.inject_container_lifecycle_event(
-                kernel_obj.kernel_id,
-                kernel_obj.session_id,
-                LifecycleEvent.DESTROY,
-                KernelLifecycleEventReason.FAILED_TO_START,
-            )
 
     async def _load_model_definition(
         self,

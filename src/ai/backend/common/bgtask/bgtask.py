@@ -276,7 +276,7 @@ class BackgroundTaskManager:
     _task_set_key: TaskSetKey
     _task_registry: BackgroundTaskHandlerRegistry
 
-    _local_cron: LocalCron | None
+    _local_cron: LocalCron
 
     def __init__(self, args: BackgroundTaskManagerArgs) -> None:
         self._event_producer = args.event_producer
@@ -294,20 +294,13 @@ class BackgroundTaskManager:
             ValkeyUnregisterHook(args.valkey_client, self._task_set_key),
         ])
         self._task_registry = args.task_registry or BackgroundTaskHandlerRegistry()
-        self._local_cron = None
-
-    @classmethod
-    async def create(cls, args: BackgroundTaskManagerArgs) -> Self:
-        """Construct a manager and start its local cron in an async context."""
-        instance = cls(args)
-        local_cron = LocalCron([
-            BgtaskHeartbeatTask(instance),
-            BgtaskRetryTask(instance),
+        self._local_cron = LocalCron([
+            BgtaskHeartbeatTask(self),
+            BgtaskRetryTask(self),
         ])
-        await local_cron.start()
-        # No setter because we don't want this to be changed after initialization
-        instance._local_cron = local_cron
-        return instance
+
+    async def init(self) -> None:
+        await self._local_cron.start()
 
     def set_registry(self, registry: BackgroundTaskHandlerRegistry) -> None:
         self._task_registry = registry
@@ -344,8 +337,7 @@ class BackgroundTaskManager:
                     await async_task
                 except asyncio.CancelledError:
                     pass
-        if self._local_cron is not None:
-            await self._local_cron.stop()
+        await self._local_cron.stop()
 
     def _convert_bgtask_to_event(
         self, task_id: uuid.UUID, bgtask_result: DispatchResult[Any] | str | None
