@@ -98,6 +98,8 @@ class GroupLifecycleApplier(
                     decision.next_desired_target_replica_count
                 ),
                 scaling_status=scaling_state,
+                current_revision_id=decision.next_current_revision_id,
+                target_revision_id=decision.next_target_revision_id,
             ),
             pk_value=decision.replica_group_id,
         )

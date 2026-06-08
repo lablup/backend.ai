@@ -9,6 +9,7 @@ from datetime import datetime
 from uuid import UUID
 
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
@@ -23,6 +24,7 @@ from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerTargetStatuses,
     ReconcilerDecision,
 )
+from ai.backend.manager.types import TriState
 from ai.backend.manager.views.replica_group import ReplicaGroupLifecycleReconcileView
 
 
@@ -65,6 +67,9 @@ class GroupLifecycleDecision(ReconcilerDecision):
     prior_history: LastHistory | None
     handler_options: DeploymentHandlerOptions
     error_code: str | None = None
+    # On rollout convergence the group promotes its target revision to current and clears target.
+    next_current_revision_id: TriState[DeploymentRevisionID] = field(default_factory=TriState.nop)
+    next_target_revision_id: TriState[DeploymentRevisionID] = field(default_factory=TriState.nop)
 
     def entity_id(self) -> UUID:
         return self.replica_group_id

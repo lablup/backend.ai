@@ -75,6 +75,9 @@ class ReplicaGroupLifecycleUpdaterSpec(UpdaterSpec[ReplicaGroupRow]):
     scaling_status: OptionalState[ReplicaGroupScalingStatus] = field(
         default_factory=OptionalState.nop
     )
+    # On rollout convergence the group promotes its target revision to current and clears target.
+    current_revision_id: TriState[DeploymentRevisionID] = field(default_factory=TriState.nop)
+    target_revision_id: TriState[DeploymentRevisionID] = field(default_factory=TriState.nop)
 
     @property
     @override
@@ -88,4 +91,6 @@ class ReplicaGroupLifecycleUpdaterSpec(UpdaterSpec[ReplicaGroupRow]):
         self.desired_current_replica_count.update_dict(values, "desired_current_replica_count")
         self.desired_target_replica_count.update_dict(values, "desired_target_replica_count")
         self.scaling_status.update_dict(values, "scaling_status")
+        self.current_revision_id.update_dict(values, "current_revision_id")
+        self.target_revision_id.update_dict(values, "target_revision_id")
         return values

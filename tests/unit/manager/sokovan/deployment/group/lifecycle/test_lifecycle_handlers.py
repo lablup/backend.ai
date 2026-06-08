@@ -4,6 +4,7 @@ from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
@@ -31,6 +32,7 @@ def _view(
     goal: int = 4,
     desired_current: int = 4,
     desired_target: int = 0,
+    target_revision_id: DeploymentRevisionID | None = None,
 ) -> ReplicaGroupLifecycleReconcileView:
     # surge 50%, unavailable 0% baseline.
     rollout = ReplicaGroupRolloutSpec(
@@ -41,7 +43,7 @@ def _view(
         group_id=ReplicaGroupID(uuid.uuid4()),
         deployment_id=DeploymentID(uuid.uuid4()),
         current_revision_id=None,
-        target_revision_id=None,
+        target_revision_id=target_revision_id,
         lifecycle=lifecycle,
         scaling_status=ReplicaGroupScalingStatus.STABLE,
         desired_current_replica_count=desired_current,
@@ -70,13 +72,22 @@ async def test_rolling_steps_target_up_and_current_down() -> None:
 
 
 async def test_rolling_converges_when_target_full_and_current_drained() -> None:
-    view = _view(lifecycle=ReplicaGroupLifecycle.ROLLING, desired_current=0, desired_target=4)
+    revision = DeploymentRevisionID(uuid.uuid4())
+    view = _view(
+        lifecycle=ReplicaGroupLifecycle.ROLLING,
+        desired_current=0,
+        desired_target=4,
+        target_revision_id=revision,
+    )
     with RecorderContext[UUID].scope("group_rolling", [view.group_id]):
         result = await GroupRollingHandler().execute(_info(view))
     decision = result.lifecycle_decisions[0]
     assert decision.outcome() is HandlerOutcome.SUCCESS
-    assert decision.next_desired_current_replica_count == 0
-    assert decision.next_desired_target_replica_count == 4
+    # The target revision is promoted to current and the counts flip onto it.
+    assert decision.next_desired_current_replica_count == 4
+    assert decision.next_desired_target_replica_count == 0
+    assert decision.next_current_revision_id.optional_value() == revision
+    assert decision.next_target_revision_id.is_nullify()
 
 
 async def test_draining_in_progress_sets_zero_and_keeps_scaling() -> None:
