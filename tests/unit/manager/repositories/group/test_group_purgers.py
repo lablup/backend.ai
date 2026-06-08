@@ -26,6 +26,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -77,6 +78,7 @@ class TestGroupPurgersIntegration:
                 KernelRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 RoutingRow,
             ],
         ):
