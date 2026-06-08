@@ -316,25 +316,28 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
         return self._enum_cls
 
 
-class IntEnumType[T_IntEnum: enum.IntEnum](TypeDecorator[T_IntEnum]):
+class IntFlagType[T_IntFlag: enum.IntFlag](TypeDecorator[T_IntFlag]):
     """
-    Maps a Postgres SMALLINT column with a Python enum.IntEnum type.
+    Maps a Postgres SMALLINT column with a Python enum.IntFlag bitmask.
 
-    Stores the enum's integer value, preserving the ordinal ordering in the
-    database (e.g. for range comparisons), unlike string-based enum columns.
+    Stores the flag's integer value so membership/cap checks reduce to bitwise
+    operations both in Python (``flag & MASK``) and in SQL (``column & :mask``).
+    A SMALLINT integer bitmask is the idiomatic representation for a small flag
+    enum; PostgreSQL's BIT / BIT VARYING string types are reserved for actual
+    bit-vector data and would require explicit int<->bitstring conversion.
     """
 
     impl = sa.SmallInteger
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_IntEnum], **opts: Any) -> None:
+    def __init__(self, enum_cls: type[T_IntFlag], **opts: Any) -> None:
         self._opts = opts
         super().__init__(**opts)
         self._enum_cls = enum_cls
 
     def process_bind_param(
         self,
-        value: T_IntEnum | None,
+        value: T_IntFlag | None,
         dialect: Dialect,
     ) -> int | None:
         if value is None:
@@ -345,16 +348,16 @@ class IntEnumType[T_IntEnum: enum.IntEnum](TypeDecorator[T_IntEnum]):
         self,
         value: int | None,
         dialect: Dialect,
-    ) -> T_IntEnum | None:
+    ) -> T_IntFlag | None:
         if value is None:
             return None
         return self._enum_cls(value)
 
     def copy(self, **_kw: Any) -> Self:
-        return IntEnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
+        return IntFlagType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
-    def python_type(self) -> type[T_IntEnum]:
+    def python_type(self) -> type[T_IntFlag]:
         return self._enum_cls
 
 

@@ -19,23 +19,26 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add the permission cap column (PermissionCap IntEnum stored as SMALLINT).
-    # The NOT NULL column is created with the WRITE_DELETE (30) server default so
-    # existing rows (and any rows created before write paths populate the cap) are
-    # backfilled to the full cap, matching the AUTO relation default.
+    # Add the permission cap column (Permission IntFlag bitmask stored as SMALLINT).
+    # The NOT NULL column is created with the full-cap (31 = READ|UPDATE|SOFT_DELETE|
+    # CREATE|HARD_DELETE) server default so existing rows (and any rows created before
+    # write paths populate the cap) are backfilled to the full cap, matching the AUTO
+    # relation default.
     op.add_column(
         "association_scopes_entities",
         sa.Column(
-            "permission",
+            "permission_cap",
             sa.SmallInteger(),
-            server_default=sa.text("30"),
+            server_default=sa.text("31"),
             nullable=False,
         ),
     )
-    # Backfill from relation_type: REF edges map to the READ_ONLY cap (10); AUTO
-    # edges already carry the WRITE_DELETE default (30) applied above.
-    op.execute("UPDATE association_scopes_entities SET permission = 10 WHERE relation_type = 'ref'")
+    # Backfill from relation_type: REF edges map to a read-only cap (1 = READ); AUTO
+    # edges already carry the full-cap (31) default applied above.
+    op.execute(
+        "UPDATE association_scopes_entities SET permission_cap = 1 WHERE relation_type = 'ref'"
+    )
 
 
 def downgrade() -> None:
-    op.drop_column("association_scopes_entities", "permission")
+    op.drop_column("association_scopes_entities", "permission_cap")

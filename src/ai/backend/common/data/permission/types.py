@@ -33,6 +33,13 @@ class RoleSource(enum.StrEnum):
 
 
 class OperationType(enum.StrEnum):
+    """
+    .. deprecated::
+        Superseded by :class:`Permission`, an :class:`enum.IntFlag` bitmask.
+        Retained because permission resolution and the ``permissions.operation``
+        column still consume these string values; do not build new features on it.
+    """
+
     CREATE = "create"
     READ = "read"
     UPDATE = "update"
@@ -540,37 +547,24 @@ def member_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
     return _MEMBER_OPS_OVERRIDES.get(entity_type, _DEFAULT_MEMBER_OPS)
 
 
-# ---------------------------------------------------------------------------
-# Permission cap (ceiling) on scope-entity edges
-#
-# A cap expresses the *maximum* permission assignable through a scope-entity
-# edge, generalizing the binary auto/ref relation into ordered levels. Caps are
-# cumulative ceilings: a higher cap permits a superset of the operations a lower
-# cap permits, so the integer ordering of :class:`PermissionCap` is a faithful
-# proxy for the subset ordering of :func:`cap_operations`. The integer gaps
-# (10/20/30) leave room to insert intermediate levels without renumbering.
-# ---------------------------------------------------------------------------
+class Permission(enum.IntFlag):
+    """A bitmask of operations, each a distinct power-of-two bit.
 
+    Bit magnitude carries no semantics; checks are purely bitwise:
 
-class PermissionCap(enum.IntEnum):
-    READ_ONLY = 10
-    READ_WRITE = 20
-    WRITE_DELETE = 30
+    * does the mask include an operation?  ``bool(mask & Permission.X)``
+    * is one mask a subset of another?     ``(a & ~b) == Permission.NONE``
+    * intersect / union two masks          ``a & b`` / ``a | b``
+    """
 
+    NONE = 0
+    READ = 1
+    UPDATE = 2
+    CREATE = 4
+    SOFT_DELETE = 8
+    HARD_DELETE = 16
 
-_READ_WRITE_OPS: frozenset[OperationType] = frozenset({
-    OperationType.CREATE,
-    OperationType.READ,
-    OperationType.UPDATE,
-})
-
-_CAP_OPERATIONS: Mapping[PermissionCap, frozenset[OperationType]] = {
-    PermissionCap.READ_ONLY: _READ_ONLY_OPS,
-    PermissionCap.READ_WRITE: _READ_WRITE_OPS,
-    PermissionCap.WRITE_DELETE: _STANDARD_OPS,
-}
-
-
-def cap_operations(cap: PermissionCap) -> frozenset[OperationType]:
-    """Operations permitted under the given permission cap (ceiling)."""
-    return _CAP_OPERATIONS[cap]
+    @classmethod
+    def full(cls) -> Permission:
+        """The full permission cap — every operation allowed."""
+        return cls.READ | cls.UPDATE | cls.CREATE | cls.SOFT_DELETE | cls.HARD_DELETE

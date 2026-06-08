@@ -12,14 +12,14 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
-    PermissionCap,
+    Permission,
     RelationType,
     ScopeType,
 )
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    IntEnumType,
+    IntFlagType,
     StrEnumType,
 )
 
@@ -58,11 +58,11 @@ class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
         nullable=False,
         server_default=RelationType.AUTO.value,
     )
-    permission: Mapped[PermissionCap] = mapped_column(
-        "permission",
-        IntEnumType(PermissionCap),
+    permission_cap: Mapped[Permission] = mapped_column(
+        "permission_cap",
+        IntFlagType(Permission),
         nullable=False,
-        server_default=sa.text(str(PermissionCap.WRITE_DELETE.value)),
+        server_default=sa.text(str(Permission.full().value)),
     )
     registered_at: Mapped[datetime] = mapped_column(
         "registered_at",
@@ -92,6 +92,6 @@ class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
             ),
             object_id=self.object_id(),
             relation_type=self.relation_type,
-            permission=self.permission,
+            permission_cap=self.permission_cap,
             registered_at=self.registered_at,
         )

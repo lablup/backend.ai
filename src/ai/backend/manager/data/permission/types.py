@@ -8,12 +8,11 @@ from ai.backend.common.data.permission.types import (
     EntityType,
     FieldType,
     OperationType,
-    PermissionCap,
+    Permission,
     RBACElementType,
     RelationType,
     RoleSource,
     ScopeType,
-    cap_operations,
 )
 from ai.backend.manager.data.common.types import SearchResult
 
@@ -25,7 +24,7 @@ __all__ = (
     "EntityType",
     "FieldType",
     "OperationType",
-    "PermissionCap",
+    "Permission",
     "RBACElementType",
     "RBACElementRef",
     "RelationType",
@@ -33,7 +32,6 @@ __all__ = (
     "ScopeData",
     "ScopeListResult",
     "ScopeType",
-    "cap_operations",
 )
 
 
