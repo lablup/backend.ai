@@ -840,6 +840,7 @@ class AbstractAgent[
     _pending_creation_tasks: dict[KernelId, set[asyncio.Task[Any]]]
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task[Any]]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task[Any]]
+    _ongoing_model_service_tasks: set[asyncio.Task[None]]
     _metric_registry: CommonMetricRegistry
 
     # Health monitoring tracking
@@ -923,6 +924,7 @@ class AbstractAgent[
         self._pending_creation_tasks = defaultdict(set)
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
+        self._ongoing_model_service_tasks = set()
         self._metric_registry = CommonMetricRegistry.instance()
 
         # Initialize health monitoring tracking maps
@@ -1100,6 +1102,7 @@ class AbstractAgent[
         It must call this super method in an appropriate order, only once.
         """
         await cancel_tasks(self._ongoing_exec_batch_tasks)
+        await cancel_tasks(self._ongoing_model_service_tasks)
 
         async with self.registry_lock:
             # Close all pending kernel runners.
@@ -3195,11 +3198,18 @@ class AbstractAgent[
                                 )
                                 continue
                             log.info(
-                                "create_kernel(kernel:{}, session:{}, container:{}) start monitoring model service: {}",
+                                "create_kernel(kernel:{}, session:{}, container:{}) starting model service: {}",
                                 kernel_id,
                                 session_id,
                                 pretty_container_id,
                                 model.name,
+                            )
+                            model_service_task = asyncio.create_task(
+                                self.start_model_service_and_handle_failure(kernel_obj, model)
+                            )
+                            self._ongoing_model_service_tasks.add(model_service_task)
+                            model_service_task.add_done_callback(
+                                self._ongoing_model_service_tasks.discard
                             )
 
                     # Finally we are done.
@@ -3238,6 +3248,26 @@ class AbstractAgent[
                 except Exception:
                     await self.reconstruct_resource_usage()
                     raise
+
+    async def start_model_service_and_handle_failure(
+        self,
+        kernel_obj: KernelObjectType,
+        model: ModelConfig,
+    ) -> None:
+        log.debug("starting model service of model {}", model.name)
+        result = await kernel_obj.start_model_service(model.model_dump(mode="json"))
+        if result["status"] == "failed":
+            log.error(
+                "Model service failed to start for kernel {} (session {}). Destroying kernel.",
+                kernel_obj.kernel_id,
+                kernel_obj.session_id,
+            )
+            await self.inject_container_lifecycle_event(
+                kernel_obj.kernel_id,
+                kernel_obj.session_id,
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.FAILED_TO_START,
+            )
 
     async def _load_model_definition(
         self,
