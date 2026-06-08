@@ -265,6 +265,43 @@ cmd_log() {
   fi
 }
 
+cmd_harbor() {
+  local action=${1:-}
+  local harbor_dir="./harbor"
+  if [ ! -d "$harbor_dir" ] || [ ! -f "$harbor_dir/docker-compose.yml" ]; then
+    echo "$(_color red "Harbor is not installed.")"
+    echo "Install it by running: ./backendai-install install --with-harbor"
+    exit 1
+  fi
+  case "$action" in
+    start)
+      echo "$(_color bold "Starting Harbor...")"
+      (cd "$harbor_dir" && docker compose up -d)
+      echo "$(_color green "Harbor started.")"
+      ;;
+    stop)
+      echo "$(_color bold "Stopping Harbor...")"
+      (cd "$harbor_dir" && docker compose down)
+      echo "$(_color green "Harbor stopped.")"
+      ;;
+    restart)
+      echo "$(_color bold "Restarting Harbor...")"
+      (cd "$harbor_dir" && docker compose down && docker compose up -d)
+      echo "$(_color green "Harbor restarted.")"
+      ;;
+    status)
+      (cd "$harbor_dir" && docker compose ps)
+      ;;
+    logs)
+      (cd "$harbor_dir" && docker compose logs -f --tail=200)
+      ;;
+    *)
+      echo "$(_color red "Usage: ./dev harbor <start|stop|restart|status|logs>")"
+      exit 1
+      ;;
+  esac
+}
+
 usage() {
   cat <<EOF
 
@@ -276,6 +313,8 @@ Commands:
   stop    <service|all>     Stop a service
   restart <service|all>     Restart a service
   log     <service> [-f]    Show recent log output (-f to follow)
+  harbor  <start|stop|restart|status|logs>
+                            Manage the optional Harbor registry
 
 Services:
   mgr, agent, storage, web, proxy-coordinator, proxy-worker, all
@@ -288,6 +327,7 @@ Examples:
   ./dev restart mgr
   ./dev restart all
   ./dev log mgr
+  ./dev harbor start
   ./dev start sftp-agent
 
 EOF
@@ -324,6 +364,9 @@ case "$1" in
     [ $# -lt 2 ] && { echo "$(_color red "Usage: ./dev log <service> [-f]")"; exit 1; }
     _validate_service "$2"
     cmd_log "$2" "${3:-}"
+    ;;
+  harbor)
+    cmd_harbor "${2:-}"
     ;;
   *) echo "$(_color red "Unknown command: $1")"; usage; exit 1 ;;
 esac

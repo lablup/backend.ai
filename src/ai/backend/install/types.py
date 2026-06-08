@@ -71,6 +71,15 @@ class CliArgs:
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
+    with_harbor: bool = False
+    harbor_hostname: str | None = None
+    harbor_http_port: int = 8084
+    harbor_admin_password: str = "Harbor12345"
+    harbor_download_uri: str = (
+        "https://github.com/goharbor/harbor/releases/download/"
+        "v2.11.0/harbor-offline-installer-v2.11.0.tgz"
+    )
+    harbor_download_sha256: str | None = None
     with_sftp_agent: bool = False
     enable_observability: bool = False
     enable_storage: bool = False
@@ -205,6 +214,11 @@ class ServiceConfig:
     appproxy_tcp_worker_addr: ServerAddr = dataclasses.field(
         default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10202))
     )
+    # Harbor (optional local container registry)
+    harbor_enabled: bool = False
+    harbor_hostname: str = "127.0.0.1"
+    harbor_http_port: int = 8084
+    harbor_admin_password: str = "Harbor12345"
     # Optional dedicated SFTP agent (multi-agent per node).
     # The actual port / path values live in
     # ``configs/agent/halfstack-sftp.toml`` — these fields simply mirror
@@ -235,6 +249,15 @@ class InstallVariable:
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
+    with_harbor: bool = False
+    harbor_hostname: str | None = None
+    harbor_http_port: int = 8084
+    harbor_admin_password: str = "Harbor12345"
+    harbor_download_uri: str = (
+        "https://github.com/goharbor/harbor/releases/download/"
+        "v2.11.0/harbor-offline-installer-v2.11.0.tgz"
+    )
+    harbor_download_sha256: str | None = None
     with_sftp_agent: bool = False
     enable_observability: bool = False
     enable_storage: bool = False
