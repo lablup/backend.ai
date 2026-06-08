@@ -50,9 +50,15 @@ class GroupRollingHandler(
                     else:
                         surge = view.rollout.resolve_max_surge(goal)
                         unavailable = view.rollout.resolve_max_unavailable(goal)
-                        # Grow target by surge above what is up; keep the availability floor on current.
+                        # Grow target by surge above what is up; keep the availability floor on
+                        # current. An initial deploy has no current revision to keep serving, so
+                        # there is no floor to maintain and current stays at zero.
                         next_target = min(goal, target_desired + surge)
-                        next_current = max(0, (goal - unavailable) - target_desired)
+                        next_current = (
+                            0
+                            if view.current_revision_id is None
+                            else max(0, (goal - unavailable) - target_desired)
+                        )
                         outcome = HandlerOutcome.FAILURE
                         message = "rolling out target revision toward desired"
             decisions.append(

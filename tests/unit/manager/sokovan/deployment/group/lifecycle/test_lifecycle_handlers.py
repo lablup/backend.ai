@@ -32,6 +32,7 @@ def _view(
     goal: int = 4,
     desired_current: int = 4,
     desired_target: int = 0,
+    current_revision_id: DeploymentRevisionID | None = None,
     target_revision_id: DeploymentRevisionID | None = None,
 ) -> ReplicaGroupLifecycleReconcileView:
     # surge 50%, unavailable 0% baseline.
@@ -42,7 +43,7 @@ def _view(
     return ReplicaGroupLifecycleReconcileView(
         group_id=ReplicaGroupID(uuid.uuid4()),
         deployment_id=DeploymentID(uuid.uuid4()),
-        current_revision_id=None,
+        current_revision_id=current_revision_id,
         target_revision_id=target_revision_id,
         lifecycle=lifecycle,
         scaling_status=ReplicaGroupScalingStatus.STABLE,
@@ -61,13 +62,36 @@ def _info(view: ReplicaGroupLifecycleReconcileView) -> GroupLifecycleReconcileIn
 
 async def test_rolling_steps_target_up_and_current_down() -> None:
     # goal 4, surge 50% (=2), unavailable 0; 2 of the new revision are already desired/up.
-    view = _view(lifecycle=ReplicaGroupLifecycle.ROLLING, desired_current=4, desired_target=2)
+    # A current revision exists, so the availability floor keeps current routes alive.
+    view = _view(
+        lifecycle=ReplicaGroupLifecycle.ROLLING,
+        desired_current=4,
+        desired_target=2,
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+    )
     info = _info(view)
     with RecorderContext[UUID].scope("group_rolling", [view.group_id]):
         result = await GroupRollingHandler().execute(info)
     decision = result.lifecycle_decisions[0]
     assert decision.next_desired_target_replica_count == 4  # min(4, 2 + 2)
     assert decision.next_desired_current_replica_count == 2  # max(0, (4 - 0) - 2)
+    assert decision.outcome() is HandlerOutcome.FAILURE
+
+
+async def test_rolling_initial_deploy_keeps_current_at_zero() -> None:
+    # Initial deploy: no current revision to keep serving, so current stays at zero
+    # while the target ramps up (no availability floor to maintain).
+    view = _view(
+        lifecycle=ReplicaGroupLifecycle.ROLLING,
+        desired_current=0,
+        desired_target=2,
+        current_revision_id=None,
+    )
+    with RecorderContext[UUID].scope("group_rolling", [view.group_id]):
+        result = await GroupRollingHandler().execute(_info(view))
+    decision = result.lifecycle_decisions[0]
+    assert decision.next_desired_target_replica_count == 4  # min(4, 2 + 2)
+    assert decision.next_desired_current_replica_count == 0  # no current revision → no floor
     assert decision.outcome() is HandlerOutcome.FAILURE
 
 
