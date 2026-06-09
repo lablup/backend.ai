@@ -214,11 +214,13 @@ class BackendAIAuthClient:
         path: str,
         data: aiohttp.FormData,
         *,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
     ) -> dict[str, Any] | None:
         """Send a multipart file upload and return the parsed JSON response."""
         session = self._session
         rel_url = "/" + path.lstrip("/")
+        if params:
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = dict(self._sign("POST", rel_url, "multipart/form-data"))
         # Let aiohttp set the actual Content-Type with the multipart boundary.
         del headers["Content-Type"]
@@ -247,7 +249,7 @@ class BackendAIAuthClient:
         *,
         method: str = "POST",
         json: Any | None = None,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
     ) -> bytes:
         """Send a request and return the raw binary response."""
         session = self._session
@@ -279,7 +281,7 @@ class BackendAIAuthClient:
         self,
         path: str,
         *,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
         heartbeat: float | None = 30.0,
         protocols: Iterable[str] = (),
     ) -> AsyncIterator[WebSocketSession]:
@@ -293,6 +295,8 @@ class BackendAIAuthClient:
                     print(msg.data)
         """
         rel_url = "/" + path.lstrip("/")
+        if params:
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = self._sign("GET", rel_url, "application/octet-stream")
         url = self._build_url(path)
         ws: aiohttp.ClientWebSocketResponse | None = None
@@ -320,7 +324,7 @@ class BackendAIAuthClient:
         self,
         path: str,
         *,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
     ) -> AsyncIterator[SSEConnection]:
         """Open an SSE connection with proper auth headers.
 
@@ -331,6 +335,8 @@ class BackendAIAuthClient:
                     print(event.event, event.data)
         """
         rel_url = "/" + path.lstrip("/")
+        if params:
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = dict(self._sign("GET", rel_url, "text/event-stream"))
         headers["Accept"] = "text/event-stream"
         url = self._build_url(path)

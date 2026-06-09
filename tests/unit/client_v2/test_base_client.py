@@ -401,6 +401,23 @@ class TestWSConnect:
         assert "Authorization" in headers
         assert "X-BackendAI-Version" in headers
 
+    async def test_ws_connect_signs_encoded_query_string(self) -> None:
+        mock_ws = _make_mock_ws()
+        mock_session = MagicMock()
+        mock_session.ws_connect = AsyncMock(return_value=mock_ws)
+        auth = _RecordingAuth()
+        client = BackendAIAuthClient(_DEFAULT_CONFIG, auth, mock_session)
+
+        async with client.ws_connect("/stream/test", params={"sessionId": "a b"}):
+            pass
+
+        # The query must reach the wire AND be part of the signed rel_url.
+        assert mock_session.ws_connect.call_args.kwargs["params"] == {"sessionId": "a b"}
+        assert (
+            auth.signed_rel_urls[-1]
+            == URL("/stream/test").with_query({"sessionId": "a b"}).raw_path_qs
+        )
+
     async def test_ws_connect_send_receive(self) -> None:
         mock_ws = _make_mock_ws()
         mock_session = MagicMock()
@@ -507,6 +524,23 @@ class TestSSEConnect:
         headers = call_kwargs.kwargs["headers"]
         assert "Authorization" in headers
         assert headers["Accept"] == "text/event-stream"
+
+    async def test_sse_connect_signs_encoded_query_string(self) -> None:
+        mock_resp = _make_sse_response_body([b"\n"])
+        mock_session = MagicMock()
+        mock_session.get = AsyncMock(return_value=mock_resp)
+        auth = _RecordingAuth()
+        client = BackendAIAuthClient(_DEFAULT_CONFIG, auth, mock_session)
+
+        async with client.sse_connect("/events/test", params={"taskId": "t-1"}):
+            pass
+
+        # The query must reach the wire AND be part of the signed rel_url.
+        assert mock_session.get.call_args.kwargs["params"] == {"taskId": "t-1"}
+        assert (
+            auth.signed_rel_urls[-1]
+            == URL("/events/test").with_query({"taskId": "t-1"}).raw_path_qs
+        )
 
     async def test_sse_connect_parses_events(self) -> None:
         mock_resp = _make_sse_response_body([
