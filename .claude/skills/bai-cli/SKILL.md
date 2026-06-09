@@ -238,6 +238,11 @@ For local development, restart services first — see `/local-dev` skill.
 # Switch to regular user, same command should fail with 403
 ```
 
+After a command, confirm runtime behavior through the Grafana MCP — see `/observability`.
+Query Loki for the service that handled the request (e.g. `{service_name="manager"} |=
+"error"`) to catch errors not surfaced by the CLI response, and Prometheus
+(`backendai_api_request_count`) to confirm the request was counted.
+
 ### Testing as a Regular User
 
 Default accounts in `fixtures/manager/example-users.json`.
@@ -286,4 +291,5 @@ If a CLI command for an entity/operation does not exist in the reference above:
 ## Related Skills
 
 - `/local-dev` — Restart local services before CLI testing
+- `/observability` — Verify logs/metrics via Grafana MCP after CLI testing
 - `/cli-sdk-guide` — Implement new CLI commands
