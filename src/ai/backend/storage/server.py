@@ -651,7 +651,7 @@ async def server_main(
         valkey_tus_client = await ValkeyTusClient.create(
             valkey_target=valkey_target,
             db_id=REDIS_TUS_DB,
-            human_readable_name=f"storage-proxy-tus-offset-{pidx}",
+            human_readable_name=f"storage-proxy-tus-{pidx}",
         )
         storage_init_stack.push_async_callback(valkey_tus_client.close)
 
