@@ -419,7 +419,7 @@ class SessionClient(BaseDomainClient):
     ) -> bytes:
         return await self._client.download(
             f"{_BASE_PATH}/{session_name}/download_single",
-            json=request.model_dump(exclude_none=True),
+            params=request.model_dump(mode="json", exclude_none=True),
         )
 
     async def get_task_logs(
