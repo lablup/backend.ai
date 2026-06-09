@@ -22,6 +22,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId
@@ -137,6 +138,7 @@ class DeploymentCRUDBaseFixtures:
     @pytest.fixture
     def endpoint_info(self, endpoint_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
             id=DeploymentID(endpoint_id),
             metadata=DeploymentMetadata(
                 name="test-deployment",

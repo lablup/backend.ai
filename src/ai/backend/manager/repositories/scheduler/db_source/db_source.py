@@ -2793,7 +2793,9 @@ class ScheduleDBSource:
             cancelled_rows = result.all()
             cancelled_kernel_ids = [row.id for row in cancelled_rows]
 
-            await self._free_kernel_allocations(db_sess, cancelled_kernel_ids, now)
+            # SCHEDULED/PULLING/PREPARING kernels hold a reservation, so release
+            # their agent_resources hold (decrements per used_at), not just free_at.
+            await self._free_allocations_and_release(db_sess, cancelled_kernel_ids, now)
 
             return {row.session_id for row in cancelled_rows}
 
@@ -3434,21 +3436,13 @@ class ScheduleDBSource:
                         {KernelStatus.CANCELLED.name: now.isoformat()},
                     ),
                 )
+                .returning(KernelRow.id)
             )
-            await db_sess.execute(kernel_stmt)
+            cancelled_kernel_ids = [row.id for row in await db_sess.execute(kernel_stmt)]
 
-            # Mark resource allocations as freed for all kernels in this session
-            kernel_ids_subq = (
-                sa.select(KernelRow.id).where(KernelRow.session_id == session_id).scalar_subquery()
-            )
-            await db_sess.execute(
-                sa.update(ResourceAllocationRow)
-                .where(
-                    ResourceAllocationRow.kernel_id.in_(kernel_ids_subq),
-                    ResourceAllocationRow.free_at.is_(None),
-                )
-                .values(free_at=sa.func.now())
-            )
+            # Free the kernels' allocations and release their reserved/used hold on
+            # agent_resources (decrements per used_at), not just set free_at.
+            await self._free_allocations_and_release(db_sess, cancelled_kernel_ids, now)
 
     async def update_session_error_info(
         self, session_id: SessionId, error_info: ErrorStatusInfo

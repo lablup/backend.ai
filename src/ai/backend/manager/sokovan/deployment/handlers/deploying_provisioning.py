@@ -3,9 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from typing import override
-from uuid import UUID
 
-from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
@@ -16,17 +14,9 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
+from ai.backend.manager.repositories.replica_group.types import GroupRolloutSetup
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
-from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
-from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
-from ai.backend.manager.sokovan.deployment.strategy.applier import (
-    StrategyResultApplier,
-)
-from ai.backend.manager.sokovan.deployment.strategy.evaluator import (
-    DeploymentStrategyEvaluator,
-)
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionError,
     DeploymentExecutionResult,
@@ -40,36 +30,17 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class DeployingProvisioningHandler(DeploymentHandler):
-    """Handler for the DEPLOYING / PROVISIONING sub-step.
-
-    Runs the strategy FSM each cycle to create/drain routes and check
-    for completion.  Classification:
-
-    - **Route mutations executed** (create/drain): need_retry — stays in
-      PROVISIONING with a new history record for progress tracking.
-      Once ``max_retry_count`` attempts in this phase are exhausted the
-      coordinator escalates to give_up, transitioning the deployment to
-      ROLLING_BACK so a wedged provisioning loop (e.g. every spawn fails
-      on the agent) cannot accumulate routes indefinitely.
-    - **No changes** (routes still warming up): skipped — no history.
-    - **Completed** (all old routes replaced): success → READY.
-    """
+    """DEPLOYING / PROVISIONING: set up the target replica group for the deploying revision
+    (rolling reuses the primary group, blue-green/canary creates a new one), then hand off to
+    PROVISIONED which waits for it to reach STABLE."""
 
     def __init__(
         self,
         deployment_controller: DeploymentController,
-        route_controller: RouteController,
-        evaluator: DeploymentStrategyEvaluator,
-        applier: StrategyResultApplier,
-        deployment_executor: DeploymentExecutor,
-        deployment_repo: DeploymentRepository,
+        replica_group_repository: ReplicaGroupRepository,
     ) -> None:
         self._deployment_controller = deployment_controller
-        self._route_controller = route_controller
-        self._evaluator = evaluator
-        self._applier = applier
-        self._deployment_executor = deployment_executor
-        self._deployment_repo = deployment_repo
+        self._replica_group_repository = replica_group_repository
 
     @classmethod
     @override
@@ -99,8 +70,8 @@ class DeployingProvisioningHandler(DeploymentHandler):
     def status_transitions(cls) -> DeploymentStatusTransitions:
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.READY,
-                sub_step=None,
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONED,
             ),
             need_retry=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
@@ -116,127 +87,56 @@ class DeployingProvisioningHandler(DeploymentHandler):
             ),
         )
 
-    async def _ensure_endpoints_registered(
-        self, deployments: Sequence[DeploymentWithHistory]
-    ) -> set[UUID]:
-        """Register endpoints for deployments that entered DEPLOYING via
-        ActivateRevision and therefore skipped ``check_pending``.
-
-        Returns IDs whose registration failed so the caller can exclude
-        them from this tick's route provisioning.
-        """
-        entries: list[tuple[DeploymentWithHistory, DeploymentRevisionID]] = []
-        for deployment in deployments:
-            info = deployment.deployment_info
-            if info.network.url:
-                continue
-            if info.deploying_revision is None:
-                continue
-            entries.append((deployment, info.deploying_revision.id))
-
-        if not entries:
-            return set()
-
-        result = await self._deployment_executor.register_endpoints_bulk(entries)
-        return {error.deployment_info.deployment_info.id for error in result.failures}
-
     @override
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        # BA-5557: pre-register endpoints for deployments that bypassed
-        # check_pending via ActivateRevision. On failure, drop them from
-        # this tick so they retry next cycle; pre-registered deployments
-        # keep flowing into route provisioning.
-        try:
-            failed_registration_ids = await self._ensure_endpoints_registered(deployments)
-        except Exception as exc:
-            log.exception("Pre-registration step failed: {}", exc)
-            failed_registration_ids = {
-                d.deployment_info.id
-                for d in deployments
-                if not d.deployment_info.network.url
-                and d.deployment_info.deploying_revision is not None
-            }
-        if failed_registration_ids:
-            deployments = [
-                d for d in deployments if d.deployment_info.id not in failed_registration_ids
-            ]
+        failures: list[DeploymentExecutionError] = []
+        setups: list[GroupRolloutSetup] = []
+        to_set_up: list[DeploymentWithHistory] = []
 
-        deployment_infos = [d.deployment_info for d in deployments]
-        deployment_map = {d.deployment_info.id: d for d in deployments}
-
-        summary = await self._evaluator.evaluate(deployment_infos)
-        apply_result = await self._applier.apply(summary)
-
-        # Filter out deployments marked for destruction during DEPLOYING.
-        destroying_ids = {
-            d.deployment_info.id
-            for d in deployments
-            if d.deployment_info.state.lifecycle
-            in (EndpointLifecycle.DESTROYING, EndpointLifecycle.DESTROYED)
-        }
-        if destroying_ids:
-            log.warning(
-                "Skipping {} deployments with DESTROYING/DESTROYED lifecycle during DEPLOYING",
-                len(destroying_ids),
+        for deployment in deployments:
+            info = deployment.deployment_info
+            if info.policy is None or info.deploying_revision_id is None:
+                failures.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="Cannot set up target replica group",
+                        error_detail="Deployment has no policy or deploying revision to provision",
+                    )
+                )
+                continue
+            setups.append(
+                GroupRolloutSetup(
+                    deployment_id=info.id,
+                    target_revision_id=info.deploying_revision_id,
+                    spec=info.policy.strategy_spec.rollout_target(),
+                    desired_target_replica_count=info.replica.target_replica_count,
+                )
             )
+            to_set_up.append(deployment)
 
         successes: list[DeploymentWithHistory] = []
-        failures: list[DeploymentExecutionError] = []
-        skipped: list[DeploymentWithHistory] = []
-
-        # COMPLETED → success (coordinator transitions to READY)
-        for deployment_id in apply_result.completed_ids:
-            if deployment_id in destroying_ids:
-                continue
-            deployment = deployment_map.get(deployment_id)
-            if deployment is not None:
-                successes.append(deployment)
-
-        # Evaluation errors → failures
-        for error_data in summary.errors:
-            deployment = deployment_map.get(error_data.deployment.id)
-            if deployment is not None:
-                failures.append(
-                    DeploymentExecutionError(
-                        deployment_info=deployment,
-                        reason=error_data.reason,
-                        error_detail=error_data.reason,
+        if setups:
+            done_ids = await self._replica_group_repository.setup_target_groups(setups)
+            for deployment in to_set_up:
+                if deployment.deployment_info.id in done_ids:
+                    successes.append(deployment)
+                else:
+                    failures.append(
+                        DeploymentExecutionError(
+                            deployment_info=deployment,
+                            reason="Failed to set up target replica group",
+                            error_detail="Endpoint target replica group pointer was not set",
+                        )
                     )
-                )
 
-        # Classify rest: route mutations happened → failures (recoverable, coordinator
-        # will classify as need_retry), no changes → skipped (no history).
-        completed_or_error_ids = apply_result.completed_ids | {
-            e.deployment.id for e in summary.errors
-        }
-        has_route_mutations = bool(apply_result.routes_created or apply_result.routes_drained)
-        for deployment in deployments:
-            deployment_id = deployment.deployment_info.id
-            if deployment_id in completed_or_error_ids or deployment_id in destroying_ids:
-                continue
-            if has_route_mutations:
-                failures.append(
-                    DeploymentExecutionError(
-                        deployment_info=deployment,
-                        reason="Route mutations in progress",
-                        error_detail="Waiting for route provisioning to complete",
-                    )
-                )
-            else:
-                skipped.append(deployment)
-
-        return DeploymentExecutionResult(successes=successes, failures=failures, skipped=skipped)
+        return DeploymentExecutionResult(successes=successes, failures=failures)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
-        await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING,
-            sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
-        )
-        await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING,
-            sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
-        )
-        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
+        if result.successes:
+            await self._deployment_controller.mark_lifecycle_needed(
+                DeploymentLifecycleType.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONED,
+            )

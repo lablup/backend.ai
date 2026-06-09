@@ -244,3 +244,75 @@ class DoRouteLifecycleEvent(AbstractAnycastEvent):
     @override
     def user_event(self) -> UserEvent | None:
         return None
+
+
+class DoReconcileProcessIfNeededEvent(AbstractAnycastEvent):
+    """Event to trigger a generic reconcile stage if its needed-flag is set (short cycle)."""
+
+    reconcile_type: str
+
+    def __init__(self, reconcile_type: str) -> None:
+        self.reconcile_type = reconcile_type
+
+    @override
+    def serialize(self) -> tuple[Any, ...]:
+        return (self.reconcile_type,)
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
+        return cls(reconcile_type=value[0])
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_reconcile_process_if_needed"
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SCHEDULE
+
+    @override
+    def domain_id(self) -> str | None:
+        return None
+
+    @override
+    def user_event(self) -> UserEvent | None:
+        return None
+
+
+class DoReconcileProcessEvent(AbstractAnycastEvent):
+    """Event to trigger a generic reconcile stage unconditionally (long cycle)."""
+
+    reconcile_type: str
+
+    def __init__(self, reconcile_type: str) -> None:
+        self.reconcile_type = reconcile_type
+
+    @override
+    def serialize(self) -> tuple[Any, ...]:
+        return (self.reconcile_type,)
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
+        return cls(reconcile_type=value[0])
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_reconcile_process"
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SCHEDULE
+
+    @override
+    def domain_id(self) -> str | None:
+        return None
+
+    @override
+    def user_event(self) -> UserEvent | None:
+        return None

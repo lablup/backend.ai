@@ -102,7 +102,6 @@ from ai.backend.manager.errors.resource import (
     ScalingGroupProxyTargetNotFound,
 )
 from ai.backend.manager.errors.service import (
-    AutoScalingPolicyNotFound,
     AutoScalingRuleNotFound,
     DeploymentPolicyNotFound,
     EndpointNotFound,
@@ -111,10 +110,6 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import (
-    DeploymentAutoScalingPolicyData,
-    DeploymentAutoScalingPolicyRow,
-)
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import (
@@ -150,9 +145,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    Creator,
     execute_batch_querier,
-    execute_creator,
 )
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import (
@@ -343,10 +336,11 @@ class DeploymentDBSource:
             # Every deployment owns a primary replica group that holds its
             # revision pointers and per-revision desired replica counts. The
             # revision pointers start empty; the first rollout populates them
-            # via ``set_deploying_revision`` / the deployment swap.
+            # via ``activate_revision`` / the deployment swap.
             primary_replica_group = ReplicaGroupRow(
                 deployment_id=endpoint.id,
                 desired_current_replica_count=endpoint.replicas,
+                rollout=policy_creator_spec.strategy_spec.to_rollout_spec(),
             )
             db_sess.add(primary_replica_group)
             await db_sess.flush()
@@ -1649,20 +1643,6 @@ class DeploymentDBSource:
                 routes_by_deployment[row.endpoint].append(row.to_route_info())
             return routes_by_deployment
 
-    async def scale_routes(
-        self,
-        scale_out_creators: Sequence[RBACEntityCreator[RoutingRow]],
-        scale_in_updater: BatchUpdater[RoutingRow] | None,
-    ) -> None:
-        """Scale out/in routes based on provided creators and updater."""
-        async with self._begin_session_read_committed() as db_sess:
-            # Scale out routes
-            for creator in scale_out_creators:
-                await execute_rbac_entity_creator(db_sess, creator)
-            # Scale in routes
-            if scale_in_updater:
-                await execute_batch_updater(db_sess, scale_in_updater)
-
     # Route operations
 
     async def search_route_datas(
@@ -2876,55 +2856,52 @@ class DeploymentDBSource:
             stored: DeploymentOptions = row[0]
             return stored
 
-    async def set_deploying_revision(
+    async def activate_revision(
         self,
         endpoint_id: DeploymentID,
         revision_id: DeploymentRevisionID,
     ) -> tuple[DeploymentRevisionID | None, bool]:
-        """Set deploying_revision and transition lifecycle to DEPLOYING.
+        """Record the deploy intent and transition lifecycle to DEPLOYING.
 
-        Overrides any previous ``deploying_revision`` unconditionally;
-        leftover routes from the previous rollout are picked up by
-        ``RouteEvictionHandler``'s orphan-revision branch.
+        Writes ``endpoints.deploying_revision_id`` (the deploy intent) and
+        moves the endpoint into ``DEPLOYING`` /
+        ``DEPLOYING_INITIALIZING``. Overrides any previous deploy intent
+        unconditionally; leftover routes from the previous rollout are
+        picked up by ``RouteEvictionHandler``'s orphan-revision branch.
+
+        Does not touch the replica groups or ``target_replica_group_id``;
+        the INITIALIZING handler owns the subsequent group/route work.
 
         Returns:
             Tuple of (previous_current_revision_id, updated).
             ``updated=False`` means the endpoint row was not found.
         """
         async with self._begin_session_read_committed() as db_sess:
-            # Revision pointers live on the primary replica group. Resolve it
-            # (and its current revision, returned as the "previous") first.
-            group_query = (
-                sa.select(ReplicaGroupRow.id, ReplicaGroupRow.current_revision_id)
-                .select_from(EndpointRow)
-                .join(
-                    ReplicaGroupRow,
-                    EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+            # The previous current revision (returned to the caller) lives on
+            # the primary replica group.
+            previous_current_revision_id = (
+                await db_sess.execute(
+                    sa.select(ReplicaGroupRow.current_revision_id)
+                    .select_from(EndpointRow)
+                    .join(
+                        ReplicaGroupRow,
+                        EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+                    )
+                    .where(EndpointRow.id == endpoint_id)
                 )
-                .where(EndpointRow.id == endpoint_id)
-            )
-            group_row = (await db_sess.execute(group_query)).one_or_none()
-            if group_row is None:
-                return None, False
-            primary_group_id, previous_current_revision_id = group_row
+            ).scalar_one_or_none()
 
-            # Set the rollout target on the primary group and point the
-            # deployment's target group at it (rolling within the same group).
-            await db_sess.execute(
-                sa.update(ReplicaGroupRow)
-                .where(ReplicaGroupRow.id == primary_group_id)
-                .values(target_revision_id=revision_id)
-            )
-            await db_sess.execute(
+            result = await db_sess.execute(
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .values(
-                    target_replica_group_id=primary_group_id,
+                    deploying_revision_id=revision_id,
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,
-                    sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+                    sub_step=DeploymentLifecycleSubStep.DEPLOYING_INITIALIZING,
                 )
             )
-            return cast(DeploymentRevisionID | None, previous_current_revision_id), True
+            updated = cast(CursorResult[Any], result).rowcount > 0
+            return previous_current_revision_id, updated
 
     async def prune_old_revisions(
         self,
@@ -3007,77 +2984,6 @@ class DeploymentDBSource:
                     revision_history_limit,
                 )
             return deleted_count
-
-    # -------------------------------------------------------------------------
-    # Auto-Scaling Policy Methods (DeploymentAutoScalingPolicyRow)
-    # -------------------------------------------------------------------------
-
-    async def create_auto_scaling_policy(
-        self,
-        creator: Creator[DeploymentAutoScalingPolicyRow],
-    ) -> DeploymentAutoScalingPolicyData:
-        """Create a new auto-scaling policy for an endpoint.
-
-        Each endpoint can have at most one auto-scaling policy (1:1 relationship).
-        If a policy already exists for the endpoint, the database will raise a
-        unique constraint violation.
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
-
-    async def get_auto_scaling_policy(
-        self,
-        endpoint_id: DeploymentID,
-    ) -> DeploymentAutoScalingPolicyData:
-        """Get the auto-scaling policy for an endpoint.
-
-        Raises:
-            AutoScalingPolicyNotFound: If no policy exists for the endpoint.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(DeploymentAutoScalingPolicyRow).where(
-                DeploymentAutoScalingPolicyRow.endpoint == endpoint_id
-            )
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            if row is None:
-                raise AutoScalingPolicyNotFound(
-                    f"Auto-scaling policy for endpoint {endpoint_id} not found"
-                )
-            return row.to_data()
-
-    async def update_auto_scaling_policy(
-        self,
-        updater: Updater[DeploymentAutoScalingPolicyRow],
-    ) -> DeploymentAutoScalingPolicyData:
-        """Update an auto-scaling policy using the provided updater spec.
-
-        The updater's pk_value should be the policy ID (primary key).
-
-        Raises:
-            AutoScalingPolicyNotFound: If the policy does not exist.
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            result = await execute_updater(db_sess, updater)
-            if result is None:
-                raise AutoScalingPolicyNotFound(f"Auto-scaling policy {updater.pk_value} not found")
-            return result.row.to_data()
-
-    async def delete_auto_scaling_policy(
-        self,
-        purger: Purger[DeploymentAutoScalingPolicyRow],
-    ) -> PurgerResult[DeploymentAutoScalingPolicyRow] | None:
-        """Delete the auto-scaling policy by primary key.
-
-        Args:
-            purger: Purger containing the policy ID (primary key) to delete.
-
-        Returns:
-            PurgerResult containing the deleted row, or None if no policy existed.
-        """
-        async with self._begin_session_read_committed() as db_sess:
-            return await execute_purger(db_sess, purger)
 
     async def upsert_deployment_policy(
         self,
@@ -3380,7 +3286,7 @@ class DeploymentDBSource:
             return
         async with self._begin_session_read_committed() as db_sess:
             # Drop the rollout target on each primary group, then clear the
-            # deployment's rollout pointer and sub-step.
+            # deployment's deploy intent, rollout pointer, and sub-step.
             primary_group_ids = sa.select(EndpointRow.primary_replica_group_id).where(
                 EndpointRow.id.in_(deployment_ids)
             )
@@ -3393,6 +3299,7 @@ class DeploymentDBSource:
                 sa.update(EndpointRow)
                 .where(EndpointRow.id.in_(deployment_ids))
                 .values(
+                    deploying_revision_id=None,
                     target_replica_group_id=None,
                     sub_step=None,
                 )

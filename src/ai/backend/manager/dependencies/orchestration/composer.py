@@ -23,6 +23,7 @@ from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
+from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
@@ -59,6 +60,7 @@ class OrchestrationInput:
     # Sokovan-specific
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
+    replica_group_repository: ReplicaGroupRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     agent_client_pool: AgentClientPool
@@ -134,6 +136,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
         sokovan_input = SokovanOrchestratorInput(
             scheduler_repository=setup_input.scheduler_repository,
             deployment_repository=setup_input.deployment_repository,
+            replica_group_repository=setup_input.replica_group_repository,
             fair_share_repository=setup_input.fair_share_repository,
             resource_usage_repository=setup_input.resource_usage_repository,
             config_provider=setup_input.config_provider,

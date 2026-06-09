@@ -134,35 +134,6 @@ class InvalidDeploymentStrategy(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidDeploymentStrategySpec(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/invalid-deployment-strategy-spec"
-    error_title = "Mismatched deployment strategy spec type."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class ReplicaCountMismatch(BackendAIError):
-    error_type = "https://api.backend.ai/probs/replica-count-mismatch"
-    error_title = "Active route count does not match target replica count."
-
-    def __init__(self, expected: int, actual: int) -> None:
-        super().__init__(f"Expected {expected} replicas, found {actual}")
-        self.expected = expected
-        self.actual = actual
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
 class RouteSessionNotFound(BackendAIError):
     error_type = "https://api.backend.ai/probs/route-session-not-found"
     error_title = "No session associated with route."
