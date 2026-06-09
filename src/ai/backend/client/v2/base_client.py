@@ -124,15 +124,17 @@ class BackendAIAuthClient:
         path: str,
         *,
         json: Any | None = None,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
         extra_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any] | list[Any] | str | None:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
         if params:
-            qs = "&".join(f"{k}={v}" for k, v in params.items())
-            rel_url = f"{rel_url}?{qs}"
+            # Build the signed query string with yarl so it matches what aiohttp
+            # actually sends on the wire (URL-encoding plus repeated keys for list
+            # values); the manager verifies the signature against request.raw_path.
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = {**self._sign(method, rel_url, content_type)}
         if extra_headers:
             headers.update(extra_headers)
@@ -204,11 +206,13 @@ class BackendAIAuthClient:
         path: str,
         data: aiohttp.FormData,
         *,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
     ) -> dict[str, Any] | None:
         """Send a multipart file upload and return the parsed JSON response."""
         session = self._session
         rel_url = "/" + path.lstrip("/")
+        if params:
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = dict(self._sign("POST", rel_url, "multipart/form-data"))
         # Let aiohttp set the actual Content-Type with the multipart boundary.
         del headers["Content-Type"]
@@ -237,12 +241,16 @@ class BackendAIAuthClient:
         *,
         method: str = "POST",
         json: Any | None = None,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
     ) -> bytes:
         """Send a request and return the raw binary response."""
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
+        if params:
+            # Sign the encoded query string that aiohttp will send on the wire so
+            # the HMAC signature matches the manager's view of request.raw_path.
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = dict(self._sign(method, rel_url, content_type))
         url = self._build_url(path)
         async with session.request(
@@ -265,7 +273,7 @@ class BackendAIAuthClient:
         self,
         path: str,
         *,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
         heartbeat: float | None = 30.0,
         protocols: Iterable[str] = (),
     ) -> AsyncIterator[WebSocketSession]:
@@ -279,6 +287,8 @@ class BackendAIAuthClient:
                     print(msg.data)
         """
         rel_url = "/" + path.lstrip("/")
+        if params:
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = self._sign("GET", rel_url, "application/octet-stream")
         url = self._build_url(path)
         ws: aiohttp.ClientWebSocketResponse | None = None
@@ -306,7 +316,7 @@ class BackendAIAuthClient:
         self,
         path: str,
         *,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
     ) -> AsyncIterator[SSEConnection]:
         """Open an SSE connection with proper auth headers.
 
@@ -317,6 +327,8 @@ class BackendAIAuthClient:
                     print(event.event, event.data)
         """
         rel_url = "/" + path.lstrip("/")
+        if params:
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = dict(self._sign("GET", rel_url, "text/event-stream"))
         headers["Accept"] = "text/event-stream"
         url = self._build_url(path)
