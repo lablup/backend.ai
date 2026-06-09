@@ -14,6 +14,7 @@ import logging
 from pants.backend.python.dependency_inference.rules import (
     PythonImportDependenciesInferenceFieldSet,  # FieldSet for Python import dependency inference
     InferPythonImportDependencies,  # Request type for standard Python import dependency inference
+    infer_python_dependencies_via_source,  # Rule function for call-by-name invocation
 )
 from pants.backend.python.dependency_inference.subsystem import (
     PythonInferSubsystem,  # Configuration subsystem for Python dependency inference
@@ -21,7 +22,7 @@ from pants.backend.python.dependency_inference.subsystem import (
 from pants.backend.python.subsystems.setup import PythonSetup  # Global Python setup configuration
 from pants.backend.python.target_types import PythonSourceTarget  # Python source file target type
 from pants.engine.addresses import Address  # Target address type for dependency graph
-from pants.engine.rules import Get, collect_rules, rule  # Core Pants rule engine primitives
+from pants.engine.rules import collect_rules, implicitly, rule  # Core Pants rule engine primitives
 from pants.engine.target import (
     InferDependenciesRequest,  # Base request type for dependency inference
     InferredDependencies,  # Result type containing inferred dependencies
@@ -143,11 +144,9 @@ async def fake_infer_accelerator_python_import_dependencies(
     Returns:
         InferredDependencies with empty includes and Backend.AI core exclusions
     """
-    # Use 'await Get' to request standard Python import dependency inference
-    # This is the core Pants rules API pattern for requesting types dynamically
-    inferred_deps = await Get(
-        InferredDependencies,
+    inferred_deps = await infer_python_dependencies_via_source(
         InferPythonImportDependencies(request.field_set),
+        **implicitly(),
     )
 
     # Filter the inferred dependencies to exclude Backend.AI core packages
