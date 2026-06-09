@@ -147,7 +147,6 @@ ignore = [
     # RUF
     "RUF003", # ambiguous-unicode-character-comment - intentional use of special characters (e.g., × for multiplication)
     "RUF005", # collection-literal-concatenation - explicit concatenation is sometimes clearer
-    "RUF006", # asyncio-dangling-task - fire-and-forget tasks are intentional in some cases
     "RUF009", # function-call-in-dataclass-default - cast() in dataclass defaults is intentional
     "RUF012", # mutable-class-default - existing codebase uses mutable defaults intentionally
     "RUF015", # unnecessary-iterable-allocation-for-first-element - [0] is clearer than next(iter())

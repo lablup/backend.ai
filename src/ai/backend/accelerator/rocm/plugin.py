@@ -39,7 +39,6 @@ from ai.backend.agent.stats import (
     StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     BinarySize,
@@ -50,6 +49,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 __all__ = (
     "PREFIX",
@@ -279,21 +279,23 @@ class ROCmPlugin(AbstractComputePlugin):
                 return []
 
             log.debug("device_stats_by_device_filename: {}", device_stats_by_device_filename)
-            for cid in container_ids:
-                mem_stats[cid] = 0
-                mem_sizes[cid] = 0
-                util_stats[cid] = Decimal("0")
-                number_of_devices_per_container[cid] = 0
-                async with aiodocker.Docker() as docker:
+            async with aiodocker.Docker() as docker:
+                for cid in container_ids:
+                    mem_stats[cid] = 0
+                    mem_sizes[cid] = 0
+                    util_stats[cid] = Decimal("0")
+                    number_of_devices_per_container[cid] = 0
                     container_info = await docker.containers.get(cid)
-                log.debug("Container {}: Devices: {}", cid, container_info["HostConfig"]["Devices"])
-                for device in container_info["HostConfig"]["Devices"]:
-                    if device["PathOnHost"] in device_stats_by_device_filename:
-                        device_stat = device_stats_by_device_filename[device["PathOnHost"]]
-                        mem_stats[cid] += int(device_stat["mem_used"])
-                        mem_sizes[cid] += int(device_stat["mem_total"])
-                        util_stats[cid] += Decimal(device_stat["util"])
-                        number_of_devices_per_container[cid] += 1
+                    log.debug(
+                        "Container {}: Devices: {}", cid, container_info["HostConfig"]["Devices"]
+                    )
+                    for device in container_info["HostConfig"]["Devices"]:
+                        if device["PathOnHost"] in device_stats_by_device_filename:
+                            device_stat = device_stats_by_device_filename[device["PathOnHost"]]
+                            mem_stats[cid] += int(device_stat["mem_used"])
+                            mem_sizes[cid] += int(device_stat["mem_total"])
+                            util_stats[cid] += Decimal(device_stat["util"])
+                            number_of_devices_per_container[cid] += 1
 
         return [
             ContainerMeasurement(

@@ -787,9 +787,9 @@ class GroupDBSource:
     ) -> UnassignUsersResult:
         """Remove users from a project and return unassigned users and failures.
 
-        Deletes RBAC scope associations (AssociationScopesEntitiesRow) and any
-        project-scoped user-role mappings. Reports which requested user IDs
-        could not be unassigned and why.
+        Deletes the RBAC scope associations (AssociationScopesEntitiesRow) that
+        record project membership. Reports which requested user IDs could not be
+        unassigned and why.
         """
         async with self._db.begin_session_read_committed() as session:
             requested_ids = set(unbinder.user_uuids)
@@ -818,22 +818,6 @@ class GroupDBSource:
 
             # Delete RBAC scope associations via the unbinder API
             await execute_rbac_scope_entity_unbinder(session, unbinder)
-
-            if assigned_rows:
-                # Delete user-role mappings for project-scoped roles
-                project_role_ids_subq = sa.select(
-                    AssociationScopesEntitiesRow.entity_id,
-                ).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(unbinder.project_id),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
-                )
-                await session.execute(
-                    sa.delete(UserRoleRow).where(
-                        UserRoleRow.user_id.in_([row.uuid for row in assigned_rows]),
-                        sa.cast(UserRoleRow.role_id, sa.String).in_(project_role_ids_subq),
-                    )
-                )
 
             # Compute failures
             failures: list[UnassignUserFailure] = []
