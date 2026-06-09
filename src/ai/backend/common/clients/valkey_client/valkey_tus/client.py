@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Final, NewType, Self, cast
 
-from aiohttp import web
 from glide import Batch, ConditionalChange, ExpirySet, ExpiryType, Script
 
 from ai.backend.common.clients.valkey_client.client import (
@@ -14,10 +13,9 @@ from ai.backend.common.clients.valkey_client.client import (
 )
 from ai.backend.common.exception import (
     BackendAIError,
-    ErrorCode,
-    ErrorDetail,
-    ErrorDomain,
-    ErrorOperation,
+    TusLeaseHeldError,
+    TusLeaseLostError,
+    TusSessionNotFoundError,
     UnreachableError,
 )
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -86,48 +84,6 @@ redis.call('EXPIRE', KEYS[1], ARGV[3])
 redis.call('DEL', KEYS[2])
 return new_off
 """
-
-
-class TusLeaseHeldError(BackendAIError, web.HTTPConflict):
-    """Another storage-proxy is mid-write for this session (lease held)."""
-
-    error_type = "https://api.backend.ai/probs/storage/tus-lease-held"
-    error_title = "TUS session lease is held by another storage-proxy"
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.STORAGE_PROXY,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
-
-
-class TusLeaseLostError(BackendAIError, web.HTTPConflict):
-    """Lease expired and was reclaimed by another storage-proxy mid-write."""
-
-    error_type = "https://api.backend.ai/probs/storage/tus-lease-lost"
-    error_title = "TUS session lease lost mid-write"
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.STORAGE_PROXY,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.CONFLICT,
-        )
-
-
-class TusSessionNotFoundError(BackendAIError, web.HTTPNotFound):
-    """No offset entry exists for this session (never registered or TTL elapsed)."""
-
-    error_type = "https://api.backend.ai/probs/storage/tus-session-not-found"
-    error_title = "TUS upload session not found"
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.STORAGE_PROXY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
 
 
 class ValkeyTusClient:
