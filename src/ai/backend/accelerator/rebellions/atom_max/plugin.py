@@ -11,7 +11,6 @@ from ai.backend.agent.stats import (
     NodeMeasurement,
     StatContext,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     DeviceId,
@@ -20,6 +19,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .types import ATOMMaxChildDevice, ATOMMaxDevice
 

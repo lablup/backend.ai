@@ -30,7 +30,6 @@ from ai.backend.agent.stats import (
 )
 from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common import config
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     BinarySize,
@@ -42,6 +41,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from . import __version__
 from .exception import DockerNetworkError, NoIPUoFConfError
