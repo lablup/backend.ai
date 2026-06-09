@@ -20,8 +20,6 @@ from .common import (
     StorageTransferError,
     StorageTypeInvalidError,
     UploadOffsetMismatchError,
-    UploadSessionLeaseHeldError,
-    UploadSessionNotFoundError,
 )
 from .object import (
     ArtifactImportError,
@@ -92,8 +90,6 @@ __all__ = [
     "InvalidDataLengthError",
     "ServiceNotInitializedError",
     "UploadOffsetMismatchError",
-    "UploadSessionLeaseHeldError",
-    "UploadSessionNotFoundError",
     # vfolder
     "VFolderNotFoundError",
     "InvalidSubpathError",

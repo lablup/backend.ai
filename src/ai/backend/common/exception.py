@@ -949,6 +949,24 @@ class ValkeyRoleMismatchError(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class ValkeyBatchExecError(BackendAIError, web.HTTPInternalServerError):
+    """
+    Raised when a Valkey MULTI/EXEC pipeline returns no results (atomic batch
+    aborted server-side without raising). Indicates a server-side or connection
+    anomaly: the caller cannot make progress because the pipeline never ran.
+    """
+
+    error_type = "https://api.backend.ai/probs/valkey-batch-exec-error"
+    error_title = "Valkey batch pipeline returned no results"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class DatabaseError(BackendAIError, web.HTTPServiceUnavailable):
     """
     Raised when a database operation fails.

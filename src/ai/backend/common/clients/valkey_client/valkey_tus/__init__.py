@@ -1,3 +1,15 @@
-from .client import TusSessionId, ValkeyTusClient
+from .client import (
+    TusLeaseHeldError,
+    TusLeaseLostError,
+    TusSessionId,
+    TusSessionNotFoundError,
+    ValkeyTusClient,
+)
 
-__all__ = ["TusSessionId", "ValkeyTusClient"]
+__all__ = [
+    "TusLeaseHeldError",
+    "TusLeaseLostError",
+    "TusSessionId",
+    "TusSessionNotFoundError",
+    "ValkeyTusClient",
+]

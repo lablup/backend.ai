@@ -68,14 +68,11 @@ class TestTusUploadPartOffsetValidation:
         volume = MagicMock()
         volume.mangle_vfpath.return_value = tmp_path
 
-        # Mock Valkey TUS offset coordinator (replaces stat()-based offset lookup)
+        # Mock Valkey TUS coordinator (try_load_offset / advance_offset).
         valkey_tus_client = AsyncMock()
         valkey_tus_client.get_offset = AsyncMock(return_value=server_offset)
-        valkey_tus_client.acquire_lock = AsyncMock(return_value=True)
-        valkey_tus_client.release_lock = AsyncMock(return_value=True)
-        valkey_tus_client.advance_offset = AsyncMock(
-            return_value=(server_offset or 0),  # bumped to staged_bytes-aware below
-        )
+        valkey_tus_client.try_load_offset = AsyncMock(return_value=server_offset or 0)
+        valkey_tus_client.advance_offset = AsyncMock(return_value=server_offset or 0)
 
         # Mock context
         ctx = MagicMock()

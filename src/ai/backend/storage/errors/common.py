@@ -187,38 +187,3 @@ class UploadOffsetMismatchError(BackendAIError, web.HTTPConflict):
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.CONFLICT,
         )
-
-
-class UploadSessionNotFoundError(BackendAIError, web.HTTPNotFound):
-    """
-    Raised when an upload session referenced by a PATCH/HEAD request is not
-    registered (or its TTL has elapsed) in the shared TUS coordinator.
-    """
-
-    error_type = "https://api.backend.ai/probs/storage/no-such-upload-session"
-    error_title = "No such upload session"
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.STORAGE_PROXY,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class UploadSessionLeaseHeldError(BackendAIError, web.HTTPConflict):
-    """
-    Raised when the per-session write lease is currently held by another
-    storage-proxy instance. Returned as 409 so the client HEADs and resumes
-    from the canonical offset.
-    """
-
-    error_type = "https://api.backend.ai/probs/storage/upload-session-lease-held"
-    error_title = "Upload Session Lease Held"
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.STORAGE_PROXY,
-            operation=ErrorOperation.UPDATE,
-            error_detail=ErrorDetail.CONFLICT,
-        )

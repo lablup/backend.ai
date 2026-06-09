@@ -10,7 +10,7 @@ import os
 import urllib.parse
 import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
@@ -52,8 +52,6 @@ from ai.backend.storage.dto.context import StorageRootCtx
 from ai.backend.storage.errors import (
     InvalidAPIParameters,
     UploadOffsetMismatchError,
-    UploadSessionLeaseHeldError,
-    UploadSessionNotFoundError,
 )
 from ai.backend.storage.services.file_stream.zip import (
     ZipArchiveStreamReader,
@@ -66,37 +64,20 @@ from ai.backend.storage.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-
     from aiohttp import StreamReader
 
     from ai.backend.storage.context import RootContext
     from ai.backend.storage.volumes.abc import AbstractVolume
 
-from ai.backend.common.clients.valkey_client.valkey_tus import TusSessionId, ValkeyTusClient
+from ai.backend.common.clients.valkey_client.valkey_tus import (
+    TusSessionId,
+    TusSessionNotFoundError,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
-
-
-@asynccontextmanager
-async def _session_lease(
-    client: ValkeyTusClient, session_id: TusSessionId, node_id: str
-) -> AsyncIterator[None]:
-    """Hold the per-session write lease for the body of the ``async with``.
-
-    Raises :class:`UploadSessionLeaseHeldError` if another storage-proxy is
-    already inside the critical section; the lease is always released on exit.
-    """
-    holder_token = f"{node_id}:{uuid.uuid4().hex}"
-    if not await client.acquire_session_lease(session_id, holder_token):
-        raise UploadSessionLeaseHeldError("session is being written by another storage-proxy")
-    try:
-        yield
-    finally:
-        await client.release_session_lease(session_id, holder_token)
 
 
 async def _drain_into_upload_file(
@@ -439,22 +420,26 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             await aiofiles.os.makedirs(upload_temp_path.parent, exist_ok=True)
 
             session_id = TusSessionId(token_data["session"])
-            async with _session_lease(ctx.valkey_tus_client, session_id, ctx.node_id):
-                actual_offset = await ctx.valkey_tus_client.get_offset(session_id)
-                if actual_offset is None:
-                    raise UploadSessionNotFoundError(
-                        f"Upload session {session_id} is not registered or has expired"
-                    )
-                if client_offset != actual_offset:
-                    raise UploadOffsetMismatchError(
-                        f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
-                    )
+            holder_token = f"{ctx.node_id}:{uuid.uuid4().hex}"
+            actual_offset = await ctx.valkey_tus_client.try_load_offset(session_id, holder_token)
+            if client_offset != actual_offset:
+                # We hold the lease but the precondition fails — release it
+                # before bailing so the next PATCH does not have to wait for
+                # the TTL.
+                await ctx.valkey_tus_client.release_lease(session_id, holder_token)
+                raise UploadOffsetMismatchError(
+                    f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
+                )
+            try:
                 bytes_written = await _drain_into_upload_file(
                     request.content, upload_temp_path, actual_offset
                 )
-                new_offset = await ctx.valkey_tus_client.advance_offset(
-                    session_id, length=bytes_written
-                )
+            except BaseException:
+                await ctx.valkey_tus_client.release_lease(session_id, holder_token)
+                raise
+            new_offset = await ctx.valkey_tus_client.advance_offset(
+                session_id, holder_token, bytes_written
+            )
 
             headers["Upload-Offset"] = str(new_offset)
             if new_offset >= int(token_data["size"]):
@@ -504,7 +489,7 @@ async def prepare_tus_session_headers(
     vfpath = volume.mangle_vfpath(token_data["vfid"])
     upload_temp_path = vfpath / ".upload" / token_data["session"]
     if not Path(upload_temp_path).exists():
-        raise UploadSessionNotFoundError(
+        raise TusSessionNotFoundError(
             f"Upload session {token_data['session']} has no on-disk staging file"
         )
     headers = {}
@@ -521,7 +506,7 @@ async def prepare_tus_session_headers(
     ctx: RootContext = request.app["ctx"]
     redis_offset = await ctx.valkey_tus_client.get_offset(TusSessionId(token_data["session"]))
     if redis_offset is None:
-        raise UploadSessionNotFoundError(
+        raise TusSessionNotFoundError(
             f"Upload session {token_data['session']} is not registered or has expired"
         )
     headers["Upload-Offset"] = str(redis_offset)
