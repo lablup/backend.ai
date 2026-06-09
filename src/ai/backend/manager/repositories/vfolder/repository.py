@@ -53,6 +53,7 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.permission import UserSystemRoleNotProvisioned
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     RepositoryIntegrityError,
@@ -1135,7 +1136,8 @@ class VfolderRepository:
         Get the system role_id associated with a user.
 
         Looks up the UserRoleRow joined with RoleRow where the role source is SYSTEM.
-        Raises ObjectNotFound if the user's system role is not found.
+        Raises UserSystemRoleNotProvisioned (5xx) if the user's system role is not found,
+        as a missing SYSTEM role is a server-side data-integrity condition.
         """
         stmt = (
             sa.select(UserRoleRow.role_id)
@@ -1149,7 +1151,7 @@ class VfolderRepository:
         )
         result = await session.scalar(stmt)
         if result is None:
-            raise ObjectNotFound(object_name="user system role", extra_msg=str(user_id))
+            raise UserSystemRoleNotProvisioned(extra_msg=str(user_id))
         return result
 
     def _get_vfolder_scope(self, vfolder: VFolderData) -> ScopeId:
