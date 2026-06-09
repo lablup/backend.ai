@@ -21,12 +21,14 @@ from .pretty import print_error, print_fail, print_info
 class WebSocketProxy:
     __slots__ = (
         "down_conn",
+        "downstream_task",
         "up_conn",
         "upstream_buffer",
         "upstream_buffer_task",
     )
 
     upstream_buffer: asyncio.Queue[tuple[str | bytes, aiohttp.WSMsgType]]
+    downstream_task: asyncio.Future[None] | None
 
     def __init__(
         self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse
@@ -35,9 +37,10 @@ class WebSocketProxy:
         self.down_conn = down_conn
         self.upstream_buffer = asyncio.Queue()
         self.upstream_buffer_task = None
+        self.downstream_task = None
 
     async def proxy(self) -> None:
-        asyncio.ensure_future(self.downstream())
+        self.downstream_task = asyncio.ensure_future(self.downstream())
         await self.upstream()
 
     async def upstream(self) -> None:
