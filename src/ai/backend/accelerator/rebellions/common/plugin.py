@@ -203,10 +203,10 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
             # filtering devices relevant to actual containers is necessary
             stats = await ATOMAPI.get_stats(self._rbln_stat_path)
             device_stats_by_device_filename: dict[str, ATOMDeviceStat] = {}
-            for device in stats.devices:
-                device_filename = "/dev/" + device.device
+            for device_stat in stats.devices:
+                device_filename = "/dev/" + device_stat.device
                 if device_filename in own_device_files:
-                    device_stats_by_device_filename[device_filename] = device
+                    device_stats_by_device_filename[device_filename] = device_stat
             async with Docker() as docker:
                 for cid in container_ids:
                     mem_stats[cid] = 0
