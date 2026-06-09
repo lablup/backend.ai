@@ -218,33 +218,33 @@ class RngdPlugin(AbstractComputePlugin):
             return []
 
         # Step 2: For each container, find allocated devices via Docker inspection
-        for cid in container_ids:
-            mem_stats[cid] = 0
-            mem_sizes[cid] = 0
-            util_stats[cid] = Decimal("0")
-            num_devices_per_container[cid] = 0
-            try:
-                async with aiodocker.Docker() as docker:
+        async with aiodocker.Docker() as docker:
+            for cid in container_ids:
+                mem_stats[cid] = 0
+                mem_sizes[cid] = 0
+                util_stats[cid] = Decimal("0")
+                num_devices_per_container[cid] = 0
+                try:
                     container_info = await docker.containers.get(cid)
-                seen_indices: set[int] = set()
-                for dev_entry in container_info["HostConfig"].get("Devices", []):
-                    m = _NPU_INDEX_RE.match(dev_entry["PathOnHost"])
-                    if m is None:
-                        continue
-                    dev_idx = int(m.group(1))
-                    if dev_idx in seen_indices:
-                        continue
-                    seen_indices.add(dev_idx)
-                    dev_metric = device_metrics.get(dev_idx)
-                    if dev_metric is None:
-                        continue
-                    mem_used, mem_total, avg_util = dev_metric
-                    mem_stats[cid] += mem_used
-                    mem_sizes[cid] += mem_total
-                    util_stats[cid] += Decimal(str(avg_util))
-                    num_devices_per_container[cid] += 1
-            except Exception:
-                log.warning("failed to inspect container {} for RNGD measures", cid)
+                    seen_indices: set[int] = set()
+                    for dev_entry in container_info["HostConfig"].get("Devices", []):
+                        m = _NPU_INDEX_RE.match(dev_entry["PathOnHost"])
+                        if m is None:
+                            continue
+                        dev_idx = int(m.group(1))
+                        if dev_idx in seen_indices:
+                            continue
+                        seen_indices.add(dev_idx)
+                        dev_metric = device_metrics.get(dev_idx)
+                        if dev_metric is None:
+                            continue
+                        mem_used, mem_total, avg_util = dev_metric
+                        mem_stats[cid] += mem_used
+                        mem_sizes[cid] += mem_total
+                        util_stats[cid] += Decimal(str(avg_util))
+                        num_devices_per_container[cid] += 1
+                except Exception:
+                    log.warning("failed to inspect container {} for RNGD measures", cid)
 
         return [
             ContainerMeasurement(
