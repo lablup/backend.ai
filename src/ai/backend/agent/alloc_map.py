@@ -25,13 +25,13 @@ from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 from ai.backend.logging import BraceStyleAdapter
 
 from .affinity_map import AffinityHint, AffinityPolicy
-from .errors import ResourceAllocationError
-from .exception import (
+from .errors import (
     FractionalResourceFragmented,
     InsufficientResource,
     InvalidResourceArgument,
     InvalidResourceCombination,
     NotMultipleOfQuantum,
+    ResourceAllocationError,
     ResourceError,
 )
 

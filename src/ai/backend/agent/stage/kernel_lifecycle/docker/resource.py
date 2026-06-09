@@ -8,7 +8,7 @@ from typing import Any, override
 from aiodocker.docker import Docker
 
 from ai.backend.agent.affinity_map import AffinityMap, AffinityPolicy
-from ai.backend.agent.exception import UnsupportedResource
+from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.resources import (
     ComputerContext,
     KernelResourceSpec,

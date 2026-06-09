@@ -45,8 +45,7 @@ from typing import Any, TypeVar
 from callosum.rpc import Peer, RPCMessage
 
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.errors import AgentIdNotFoundError
-from ai.backend.agent.exception import ResourceError
+from ai.backend.agent.errors import AgentIdNotFoundError, ResourceError
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter

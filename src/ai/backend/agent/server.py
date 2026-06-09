@@ -48,7 +48,11 @@ from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.errors import AgentInitializationError, InvalidAgentConfigError
+from ai.backend.agent.errors import (
+    AgentInitializationError,
+    InvalidAgentConfigError,
+    ResourceError,
+)
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -142,7 +146,6 @@ from .config.unified import (
     EventLoopType,
     KernelLifecyclesConfig,
 )
-from .exception import ResourceError
 from .types import (
     KernelLifecycleStatus,
     KernelOwnershipData,
