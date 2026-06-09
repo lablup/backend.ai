@@ -79,6 +79,7 @@ class TestRuntimeVariantPresetRepositoryFlag:
             value_type=PresetValueType.FLAG,
             default_value="true",
             key="--verbose",
+            required=False,
             category=None,
             display_name=None,
             ui_option=None,
