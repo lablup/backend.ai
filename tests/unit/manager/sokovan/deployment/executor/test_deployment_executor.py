@@ -12,7 +12,6 @@ Test Scenarios:
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 import pytest
 
@@ -49,11 +48,6 @@ class TestDestroyDeployment:
         Then: Routes terminated, endpoint unregistered
         """
         # Arrange
-        mock_route = MagicMock()
-        mock_route.route_id = uuid4()
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
-            destroying_deployment.deployment_info.id: [mock_route]
-        }
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
@@ -78,14 +72,12 @@ class TestDestroyDeployment:
         # Assert
         assert len(result.successes) == 1
         assert len(result.failures) == 0
-        mock_deployment_repo.mark_terminating_route_status_bulk.assert_awaited_once()
         mock_unregister.assert_awaited_once()
 
-        # Verify 1 route marked for termination
-        call_args = mock_deployment_repo.mark_terminating_route_status_bulk.call_args
-        route_ids = call_args[0][0]
-        assert len(route_ids) == 1
-        assert mock_route.route_id in route_ids
+        # The destroyed deployment's replica groups are retired (drained + revision cleared).
+        mock_deployment_repo.retire_replica_groups_on_destroy.assert_awaited_once_with({
+            destroying_deployment.deployment_info.id
+        })
 
     async def test_multiple_deployments_destroyed(
         self,
@@ -101,13 +93,6 @@ class TestDestroyDeployment:
         Then: All destroyed successfully
         """
         # Arrange
-        routes_map = {}
-        for deployment in destroying_deployments_multiple:
-            mock_route = MagicMock()
-            mock_route.route_id = uuid4()
-            routes_map[deployment.deployment_info.id] = [mock_route]
-
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = routes_map
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
@@ -149,9 +134,6 @@ class TestDestroyDeployment:
         Then: Error captured in result
         """
         # Arrange
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
-            destroying_deployment.deployment_info.id: []
-        }
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )

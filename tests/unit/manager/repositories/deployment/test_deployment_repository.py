@@ -43,6 +43,8 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentOptions,
     DeploymentPolicyData,
     ModelRevisionData,
+    ReplicaGroupLifecycle,
+    ReplicaGroupScalingStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -2069,6 +2071,74 @@ class TestDeploymentRevisionOperations:
             endpoint = result.scalar_one()
             assert endpoint.name == new_name
             assert endpoint.replicas == new_replica_count
+
+    async def test_retire_replica_groups_on_destroy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        """Drains live groups to DRAINING with zeroed desired counts and clears the endpoint's
+        deploy pointer, leaving already-DRAINED groups untouched."""
+        drained_group_id = ReplicaGroupID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            # The endpoint's primary group is live and still requesting replicas.
+            await db_sess.execute(
+                sa.update(ReplicaGroupRow)
+                .where(ReplicaGroupRow.deployment_id == test_endpoint_id)
+                .values(
+                    lifecycle=ReplicaGroupLifecycle.ROLLING,
+                    desired_current_replica_count=1,
+                    desired_target_replica_count=1,
+                    scaling_status=ReplicaGroupScalingStatus.SCALING,
+                )
+            )
+            # A second group that has already finished draining.
+            db_sess.add(
+                ReplicaGroupRow(
+                    id=drained_group_id,
+                    deployment_id=test_endpoint_id,
+                    lifecycle=ReplicaGroupLifecycle.DRAINED,
+                    desired_current_replica_count=0,
+                    desired_target_replica_count=0,
+                )
+            )
+            await db_sess.execute(
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == test_endpoint_id)
+                .values(sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING)
+            )
+
+        await deployment_repository.retire_replica_groups_on_destroy({test_endpoint_id})
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            groups = (
+                (
+                    await db_sess.execute(
+                        sa.select(ReplicaGroupRow).where(
+                            ReplicaGroupRow.deployment_id == test_endpoint_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            by_id = {group.id: group for group in groups}
+            live = next(group for group in groups if group.id != drained_group_id)
+            # Live group is driven to DRAINING with zeroed desired counts.
+            assert live.lifecycle is ReplicaGroupLifecycle.DRAINING
+            assert live.desired_current_replica_count == 0
+            assert live.desired_target_replica_count == 0
+            assert live.scaling_status is ReplicaGroupScalingStatus.SCALING
+            # The already-DRAINED group is left as-is.
+            assert by_id[drained_group_id].lifecycle is ReplicaGroupLifecycle.DRAINED
+            # The endpoint's deploy pointer/sub-step is cleared.
+            endpoint = (
+                await db_sess.execute(
+                    sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
+                )
+            ).scalar_one()
+            assert endpoint.sub_step is None
 
 
 class TestDeploymentPolicyOperations:

@@ -115,18 +115,34 @@ async def test_rolling_converges_when_target_full_and_current_drained() -> None:
 
 
 async def test_draining_in_progress_sets_zero_and_keeps_scaling() -> None:
-    view = _view(lifecycle=ReplicaGroupLifecycle.DRAINING, desired_current=2, desired_target=0)
+    view = _view(
+        lifecycle=ReplicaGroupLifecycle.DRAINING,
+        desired_current=2,
+        desired_target=0,
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+    )
     with RecorderContext[UUID].scope("group_draining", [view.group_id]):
         result = await GroupDrainingHandler().execute(_info(view))
     decision = result.lifecycle_decisions[0]
     assert decision.next_desired_current_replica_count == 0
     assert decision.next_desired_target_replica_count == 0
     assert decision.outcome() is HandlerOutcome.FAILURE
+    # Still draining: revision pointers are left untouched until the group is fully retired.
+    assert not decision.next_current_revision_id.is_nullify()
+    assert not decision.next_target_revision_id.is_nullify()
 
 
 async def test_draining_completes_when_desired_is_zero() -> None:
-    view = _view(lifecycle=ReplicaGroupLifecycle.DRAINING, desired_current=0, desired_target=0)
+    view = _view(
+        lifecycle=ReplicaGroupLifecycle.DRAINING,
+        desired_current=0,
+        desired_target=0,
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+    )
     with RecorderContext[UUID].scope("group_draining", [view.group_id]):
         result = await GroupDrainingHandler().execute(_info(view))
     decision = result.lifecycle_decisions[0]
     assert decision.outcome() is HandlerOutcome.SUCCESS
+    # Retired group: its revision pointers are cleared with the DRAINED transition.
+    assert decision.next_current_revision_id.is_nullify()
+    assert decision.next_target_revision_id.is_nullify()
