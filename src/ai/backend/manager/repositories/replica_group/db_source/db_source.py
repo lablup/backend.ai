@@ -488,7 +488,8 @@ class ReplicaGroupDBSource:
             return None
         return BatchUpdater(
             spec=RouteBatchUpdaterSpec(
-                traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE)
+                status=OptionalState.update(RouteStatus.TERMINATING),
+                traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
             ),
             conditions=[RouteConditions.by_ids(route_ids)],
         )
