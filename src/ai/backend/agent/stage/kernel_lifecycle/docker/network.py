@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, override
 
-from ai.backend.agent.exception import NetworkPluginNotFound
+from ai.backend.agent.errors import NetworkPluginNotFound
 from ai.backend.agent.plugin.network import NetworkPluginContext
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,

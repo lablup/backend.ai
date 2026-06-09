@@ -235,6 +235,7 @@ from . import __version__ as VERSION
 from .affinity_map import AffinityMap
 from .config.unified import AgentUnifiedConfig, ContainerSandboxType
 from .errors import (
+    ContainerCreationError,
     ContainerCreationFailedError,
     ContainerStartupCancelledError,
     ContainerStartupFailedError,
@@ -246,8 +247,8 @@ from .errors import (
     ModelFolderNotSpecifiedError,
     PortConflictError,
     ReservedPortError,
+    ResourceError,
 )
-from .exception import ContainerCreationError, ResourceError
 from .kernel import (
     RUN_ID_FOR_BATCH_JOB,
     AbstractKernel,
