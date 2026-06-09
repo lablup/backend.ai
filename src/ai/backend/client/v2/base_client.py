@@ -7,6 +7,7 @@ from typing import Any, TypeVar, cast
 
 import aiohttp
 from multidict import CIMultiDict
+from yarl import URL
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.api_handlers import (
