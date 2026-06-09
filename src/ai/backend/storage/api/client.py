@@ -81,28 +81,48 @@ DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
 async def _drain_into_upload_file(
-    content: StreamReader, upload_temp_path: Path, start_offset: int
+    content: StreamReader,
+    upload_temp_path: Path,
+    start_offset: int,
+    session_id: TusSessionId,
 ) -> int:
-    """Truncate ``upload_temp_path`` to ``start_offset`` and append the body. Returns bytes written."""
+    """Truncate ``upload_temp_path`` to ``start_offset`` and append the body. Returns bytes written.
+
+    The opener only adds ``O_CREAT`` for the first PATCH (``start_offset == 0``).
+    For continuation PATCHes a missing file means the staging area was wiped
+    out of band (NFS GC, manual ``rm``, etc.) — re-creating it would silently
+    zero-pad the prefix via ``truncate``. Treat that as a vanished session.
+    """
+    opener = _create_if_missing_opener if start_offset == 0 else _open_existing_opener
     bytes_written = 0
-    async with aiofiles.open(upload_temp_path, mode="r+b", opener=_create_if_missing_opener) as f:
-        # Discard any orphan tail bytes left by a prior crashed holder.
-        await f.truncate(start_offset)
-        await f.seek(start_offset)
-        while not content.at_eof():
-            chunk = await content.read(DEFAULT_CHUNK_SIZE)
-            if not chunk:
-                continue
-            await f.write(chunk)
-            bytes_written += len(chunk)
-        await f.flush()
-        await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
+    try:
+        async with aiofiles.open(upload_temp_path, mode="r+b", opener=opener) as f:
+            # Discard any orphan tail bytes left by a prior crashed holder.
+            await f.truncate(start_offset)
+            await f.seek(start_offset)
+            while not content.at_eof():
+                chunk = await content.read(DEFAULT_CHUNK_SIZE)
+                if not chunk:
+                    continue
+                await f.write(chunk)
+                bytes_written += len(chunk)
+            await f.flush()
+            await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
+    except FileNotFoundError as e:
+        raise TusSessionNotFoundError(
+            f"Upload session {session_id} staging file is missing at offset {start_offset}"
+        ) from e
     return bytes_written
 
 
 def _create_if_missing_opener(path: str | bytes, flags: int) -> int:
     """``open()`` opener that adds ``O_CREAT`` so ``r+b`` can also create the file."""
     return os.open(path, flags | os.O_CREAT, 0o644)
+
+
+def _open_existing_opener(path: str | bytes, flags: int) -> int:
+    """``open()`` opener for continuation PATCHes — must not create the file."""
+    return os.open(path, flags)
 
 
 class DownloadTokenData(TypedDict):
@@ -432,7 +452,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 )
             try:
                 bytes_written = await _drain_into_upload_file(
-                    request.content, upload_temp_path, actual_offset
+                    request.content, upload_temp_path, actual_offset, session_id
                 )
             except BaseException:
                 await ctx.valkey_tus_client.release_lease(session_id, holder_token)
@@ -454,7 +474,6 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     await aiofiles.os.rmdir(upload_temp_path.parent)
                 except OSError:
                     pass
-            headers["Upload-Offset"] = str(new_offset)
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
