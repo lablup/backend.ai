@@ -139,6 +139,11 @@ from ai.backend.manager.repositories.base.rbac.revoker import (
     execute_rbac_revoker,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    RoleManager,
+    UserSystemRoleSpec,
+)
+
 from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
@@ -172,9 +177,11 @@ class _VFolderWithLinkedModelCards:
 
 class VfolderRepository:
     _db: ExtendedAsyncSAEngine
+    _role_manager: RoleManager
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._role_manager = RoleManager()
 
     @vfolder_repository_resilience.apply()
     async def get_by_id_validated(
@@ -1135,7 +1142,8 @@ class VfolderRepository:
         Get the system role_id associated with a user.
 
         Looks up the UserRoleRow joined with RoleRow where the role source is SYSTEM.
-        Raises ObjectNotFound if the user's system role is not found.
+        If no SYSTEM role exists for the user, creates one as a fallback within the
+        same transaction and returns its role_id.
         """
         stmt = (
             sa.select(UserRoleRow.role_id)
@@ -1148,9 +1156,13 @@ class VfolderRepository:
             )
         )
         result = await session.scalar(stmt)
-        if result is None:
-            raise ObjectNotFound(object_name="user system role", extra_msg=str(user_id))
-        return result
+        if result is not None:
+            return result
+
+        # Fallback: create a system role for this user and return its id
+        spec = UserSystemRoleSpec(user_id=user_id)
+        role = await self._role_manager.create_system_role(session, spec)
+        return role.id
 
     def _get_vfolder_scope(self, vfolder: VFolderData) -> ScopeId:
         """Determine scope from vfolder ownership."""
