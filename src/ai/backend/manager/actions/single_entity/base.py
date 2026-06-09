@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ai.backend.common.data.permission.types import OperationType
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.manager.actions.types import Entity
 
 
@@ -14,5 +14,6 @@ class BaseSingleEntityAction(ABC):
 
     @classmethod
     @abstractmethod
-    def operation_type(cls) -> OperationType:
+    def required_permission(cls) -> Permission:
+        """Return the permission required to perform this action."""
         raise NotImplementedError

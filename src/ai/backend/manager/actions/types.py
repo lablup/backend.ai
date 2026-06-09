@@ -56,8 +56,8 @@ class AbstractProcessorPackage(ABC):
 
 @dataclass(frozen=True)
 class Entity:
-    id: str
     type: CommonEntityType
+    id: str
 
 
 @dataclass(frozen=True)
