@@ -230,20 +230,20 @@ class AbstractGaudiPlugin[TDevice: AbstractGaudiDevice](AbstractComputePlugin, m
                 self.enabled = False
                 return []
 
-            for cid in container_ids:
-                mem_stats[cid] = 0
-                mem_sizes[cid] = 0
-                util_stats[cid] = Decimal("0")
-                number_of_devices_per_container[cid] = 0
-                async with aiodocker.Docker() as docker:
+            async with aiodocker.Docker() as docker:
+                for cid in container_ids:
+                    mem_stats[cid] = 0
+                    mem_sizes[cid] = 0
+                    util_stats[cid] = Decimal("0")
+                    number_of_devices_per_container[cid] = 0
                     container_info = await docker.containers.get(cid)
-                for device in container_info["HostConfig"]["Devices"]:
-                    if device["PathOnHost"] in device_stats_by_device_filename:
-                        device_stat = device_stats_by_device_filename[device["PathOnHost"]]
-                        mem_stats[cid] += int(device_stat["mem_used"])
-                        mem_sizes[cid] += int(device_stat["mem_total"])
-                        util_stats[cid] += Decimal(device_stat["util"])
-                        number_of_devices_per_container[cid] += 1
+                    for device in container_info["HostConfig"]["Devices"]:
+                        if device["PathOnHost"] in device_stats_by_device_filename:
+                            device_stat = device_stats_by_device_filename[device["PathOnHost"]]
+                            mem_stats[cid] += int(device_stat["mem_used"])
+                            mem_sizes[cid] += int(device_stat["mem_total"])
+                            util_stats[cid] += Decimal(device_stat["util"])
+                            number_of_devices_per_container[cid] += 1
 
         return [
             ContainerMeasurement(

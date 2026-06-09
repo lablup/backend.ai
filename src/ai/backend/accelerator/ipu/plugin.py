@@ -261,37 +261,38 @@ class IPUPlugin(AbstractComputePlugin):
             devices_by_hw_id: dict[str, IPUDevice] = {
                 d.hw_location: d for d in await self.list_devices()
             }
-            for cid in container_ids:
-                mem_stats[cid] = 0
-                mem_sizes[cid] = 0
-                util_stats[cid] = Decimal("0")
-                number_of_devices_per_container[cid] = 0
-                async with aiodocker.Docker() as docker:
+            async with aiodocker.Docker() as docker:
+                for cid in container_ids:
+                    mem_stats[cid] = 0
+                    mem_sizes[cid] = 0
+                    util_stats[cid] = Decimal("0")
+                    number_of_devices_per_container[cid] = 0
                     container_info = await docker.containers.get(cid)
-                for mount in container_info["HostConfig"]["Mounts"]:
-                    if mount["Target"] == "/etc/ipuof.conf.d":
-                        ipuof_conf_path = (
-                            Path(mount["Source"]) / Path(self.ipu_config["ipuof-config-path"]).name
-                        )
-                        ipuof_conf = json.loads(
-                            await asyncio.get_running_loop().run_in_executor(
-                                None, ipuof_conf_path.read_text
+                    for mount in container_info["HostConfig"]["Mounts"]:
+                        if mount["Target"] == "/etc/ipuof.conf.d":
+                            ipuof_conf_path = (
+                                Path(mount["Source"])
+                                / Path(self.ipu_config["ipuof-config-path"]).name
                             )
-                        )
-                        for device in ipuof_conf["devices"]:
-                            hw_location = device["ip"] + ":" + str(device["device_id"])
-                            device = devices_by_hw_id[hw_location]
-                            inventory_info = inventory_map[device.device_id]
-                            mem_stats[cid] += int(
-                                inventory_info["hexoatt active size (bytes)"]
-                            ) + int(inventory_info["hexopt active size (bytes)"])
-                            mem_sizes[cid] += int(
-                                inventory_info["hexoatt total size (bytes)"]
-                            ) + int(inventory_info["hexopt total size (bytes)"])
-                            util_stats[cid] += Decimal(
-                                inventory_info["ipu utilisation"].replace("%", "")
+                            ipuof_conf = json.loads(
+                                await asyncio.get_running_loop().run_in_executor(
+                                    None, ipuof_conf_path.read_text
+                                )
                             )
-                            number_of_devices_per_container[cid] += 1
+                            for device in ipuof_conf["devices"]:
+                                hw_location = device["ip"] + ":" + str(device["device_id"])
+                                device = devices_by_hw_id[hw_location]
+                                inventory_info = inventory_map[device.device_id]
+                                mem_stats[cid] += int(
+                                    inventory_info["hexoatt active size (bytes)"]
+                                ) + int(inventory_info["hexopt active size (bytes)"])
+                                mem_sizes[cid] += int(
+                                    inventory_info["hexoatt total size (bytes)"]
+                                ) + int(inventory_info["hexopt total size (bytes)"])
+                                util_stats[cid] += Decimal(
+                                    inventory_info["ipu utilisation"].replace("%", "")
+                                )
+                                number_of_devices_per_container[cid] += 1
         return [
             ContainerMeasurement(
                 MetricKey("ipu_mem"),
