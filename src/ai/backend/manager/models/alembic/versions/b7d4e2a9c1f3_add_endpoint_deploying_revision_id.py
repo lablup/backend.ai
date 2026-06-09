@@ -16,7 +16,7 @@ from alembic import op
 from ai.backend.manager.models.base import GUID
 
 revision = "b7d4e2a9c1f3"
-down_revision = "ed42bc179b91"
+down_revision = "d69322160c90"
 # Part of: 26.6.0
 branch_labels = None
 depends_on = None
