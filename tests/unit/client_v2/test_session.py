@@ -519,7 +519,10 @@ class TestBinaryOperations:
         mock_download.assert_awaited_once()
         call_args = mock_download.call_args
         assert "/session/my-sess/download_single" in call_args.args[0]
-        assert call_args.kwargs["json"]["file"] == "data.csv"
+        # download_single is a query-string endpoint (manager reads QueryParam),
+        # so the file param must travel in the query string, not the JSON body.
+        assert call_args.kwargs.get("json") is None
+        assert call_args.kwargs["params"]["file"] == "data.csv"
 
     async def test_get_task_logs(self) -> None:
         kernel_id = uuid4()
