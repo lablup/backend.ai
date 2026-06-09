@@ -1,15 +1,21 @@
 from abc import ABC, abstractmethod
 
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.actions.types import Entity
+from ai.backend.common.entity.types import EntityType
 
 
 class BaseSingleEntityAction(ABC):
     """Base for actions that operate on a single, already-identified entity."""
 
+    @classmethod
     @abstractmethod
-    def entity(self) -> Entity:
-        """Return the entity that this action applies to."""
+    def entity_type(self) -> EntityType:
+        """Return the type of entity that this action applies to."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def entity_id(self) -> str:
+        """Return the ID of the entity that this action applies to."""
         raise NotImplementedError
 
     @classmethod

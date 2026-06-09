@@ -6,19 +6,18 @@ from ai.backend.common.entity.types import EntityType
 from ai.backend.manager.actions.types import Scope
 
 
-class ScopeTarget:
-    """An entity type qualified by the scope it is resolved within."""
-
-    scope: Scope
-    entity_type: EntityType
-
-
 class BaseScopeAction(ABC):
     """Base for actions that target entities by scope rather than by identity."""
 
     @abstractmethod
-    def scope_targets(self) -> Sequence[ScopeTarget]:
+    def scope_targets(self) -> Sequence[Scope]:
         """Return the Sequence of scopes that this action applies to."""
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def entity_type(self) -> EntityType:
+        """Return the type of entity that this action applies to."""
         raise NotImplementedError
 
     @classmethod
