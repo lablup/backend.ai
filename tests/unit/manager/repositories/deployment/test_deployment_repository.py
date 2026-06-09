@@ -3678,6 +3678,70 @@ class TestDeploymentRepositoryDuplicateName:
         assert updated is False
         assert previous_current is None
 
+    async def test_clear_deploying_revision_clears_intent(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> None:
+        """``clear_deploying_revision`` wipes the deploy intent: the endpoint's
+        ``deploying_revision_id`` / ``target_replica_group_id`` / ``sub_step`` and
+        the primary group's ``target_revision_id``."""
+        endpoint_id = DeploymentID(uuid.uuid4())
+        deploying = DeploymentRevisionID(uuid.uuid4())
+        target_revision = uuid.uuid4()
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"clear-{uuid.uuid4().hex[:8]}",
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.name,
+                project=test_group.id,
+                resource_group=test_scaling_group.name,
+                replicas=1,
+                desired_replicas=1,
+                url=None,
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONED,
+                deploying_revision_id=deploying,
+            )
+            db_sess.add(endpoint)
+            group = attach_primary_replica_group(
+                db_sess, endpoint, target_revision_id=target_revision
+            )
+            await db_sess.commit()
+            group_id = group.id
+
+        await deployment_repository.clear_deploying_revision({endpoint_id})
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(
+                        EndpointRow.deploying_revision_id,
+                        EndpointRow.target_replica_group_id,
+                        EndpointRow.sub_step,
+                    ).where(EndpointRow.id == endpoint_id)
+                )
+            ).one()
+            assert row.deploying_revision_id is None
+            assert row.target_replica_group_id is None
+            assert row.sub_step is None
+            group_target = (
+                await db_sess.execute(
+                    sa.select(ReplicaGroupRow.target_revision_id).where(
+                        ReplicaGroupRow.id == group_id
+                    )
+                )
+            ).scalar_one()
+            assert group_target is None
+
     async def test_destroy_endpoint_deletes_associated_tokens(
         self,
         deployment_repository: DeploymentRepository,

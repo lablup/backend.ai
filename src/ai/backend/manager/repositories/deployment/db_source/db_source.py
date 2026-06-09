@@ -3286,7 +3286,7 @@ class DeploymentDBSource:
             return
         async with self._begin_session_read_committed() as db_sess:
             # Drop the rollout target on each primary group, then clear the
-            # deployment's rollout pointer and sub-step.
+            # deployment's deploy intent, rollout pointer, and sub-step.
             primary_group_ids = sa.select(EndpointRow.primary_replica_group_id).where(
                 EndpointRow.id.in_(deployment_ids)
             )
@@ -3299,6 +3299,7 @@ class DeploymentDBSource:
                 sa.update(EndpointRow)
                 .where(EndpointRow.id.in_(deployment_ids))
                 .values(
+                    deploying_revision_id=None,
                     target_replica_group_id=None,
                     sub_step=None,
                 )
