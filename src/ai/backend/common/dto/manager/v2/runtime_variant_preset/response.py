@@ -25,7 +25,6 @@ class RuntimeVariantPresetNode(BaseResponseModel):
     rank: int = Field(description="Display order rank.")
     target_spec: PresetTargetSpec = Field(description="Preset target specification.")
     required: bool = Field(
-        default=False,
         description="Whether this preset param must be supplied on a deployment revision.",
     )
     category: str | None = Field(default=None, description="UI category group.")
