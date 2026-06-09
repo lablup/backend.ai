@@ -193,17 +193,20 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         stat_prefix = self.key.replace("-", "_")
 
         if self.enabled:
-            stats = await ATOMAPI.get_stats(self._rbln_stat_path)
-            # rbln-stat reports every Rebellions device regardless of variant, so
-            # filter to this plugin's own devices to avoid cross-variant attribution.
             own_device_files: set[str] = set()
-            for device in await self.list_devices():
-                own_device_files.update(await self.list_device_files(device))
-            device_stats_by_device_filename: dict[str, ATOMDeviceStat] = {
-                "/dev/" + device.device: device
-                for device in stats.devices
-                if "/dev/" + device.device in own_device_files
-            }
+            devices = await self.list_devices()
+            for device in devices:
+                dev_files = await self.list_device_files(device)
+                own_device_files.update(dev_files)
+
+            # rbln-stat returns all devices
+            # filtering devices relevant to actual containers is necessary
+            stats = await ATOMAPI.get_stats(self._rbln_stat_path)
+            device_stats_by_device_filename: dict[str, ATOMDeviceStat] = {}
+            for device in stats.devices:
+                device_filename = "/dev/" + device.device
+                if device_filename in own_device_files:
+                    device_stats_by_device_filename[device_filename] = device
             async with Docker() as docker:
                 for cid in container_ids:
                     mem_stats[cid] = 0
