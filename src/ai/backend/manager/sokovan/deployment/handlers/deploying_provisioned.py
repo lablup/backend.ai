@@ -107,7 +107,6 @@ class DeployingProvisionedHandler(DeploymentHandler):
 
         successes: list[DeploymentWithHistory] = []
         failures: list[DeploymentExecutionError] = []
-        skipped: list[DeploymentWithHistory] = []
 
         for deployment in deployments:
             info = deployment.deployment_info
@@ -142,9 +141,18 @@ class DeployingProvisionedHandler(DeploymentHandler):
             elif target.lifecycle is ReplicaGroupLifecycle.STABLE:
                 successes.append(deployment)
             else:
-                skipped.append(deployment)
+                failures.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="Target replica group not yet stable",
+                        error_detail=(
+                            f"Target replica group still {target.lifecycle.value}; "
+                            "waiting for replicas to come up"
+                        ),
+                    )
+                )
 
-        return DeploymentExecutionResult(successes=successes, failures=failures, skipped=skipped)
+        return DeploymentExecutionResult(successes=successes, failures=failures, skipped=[])
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:

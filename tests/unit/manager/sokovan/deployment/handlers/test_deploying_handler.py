@@ -235,21 +235,26 @@ class TestDeployingProvisionedHandler:
         assert not result.skipped
         assert not result.failures
 
-    async def test_target_group_rolling_is_skipped(
+    async def test_target_group_rolling_is_failure(
         self,
         handler: DeployingProvisionedHandler,
         mock_replica_group_repository: AsyncMock,
         deployment: DeploymentWithHistory,
     ) -> None:
+        # Still rolling out: report a failure so the coordinator keeps the
+        # deployment waiting (NEED_RETRY) and the phase timeout can eventually
+        # expire into rollback — never a skip (skips leave no history).
         mock_replica_group_repository.search_deploy_scheduling_views.return_value = [
             _target_group(deployment, ReplicaGroupLifecycle.ROLLING)
         ]
 
         result = await handler.execute([deployment])
 
-        assert [d.deployment_info.id for d in result.skipped] == [deployment.deployment_info.id]
+        assert [e.deployment_info.deployment_info.id for e in result.failures] == [
+            deployment.deployment_info.id
+        ]
         assert not result.successes
-        assert not result.failures
+        assert not result.skipped
 
     async def test_target_group_failed_is_failure(
         self,

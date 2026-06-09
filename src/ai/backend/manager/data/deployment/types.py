@@ -443,6 +443,25 @@ class ConfiguredModel(BackendAISchema):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
+def _default_deploy_handler_default() -> HandlerOptions:
+    # Generous phase timeout (2h) covers hour-scale model-service startup; waits
+    # never give up by count, only time out.
+    return HandlerOptions(timeout=7200, max_retry_count=None)
+
+
+def _default_deploy_by_handler() -> dict[str, HandlerOptions]:
+    # Action sub-steps (vs. the PROVISIONED/DRAINING waits) keep the retry-count
+    # budget so a broken deploy rolls back fast instead of churning for the full
+    # timeout. Keyed by the sokovan handler names (this layer cannot import them).
+    return {
+        "deploying-initializing": HandlerOptions(max_retry_count=5),
+        "deploying-provisioning": HandlerOptions(max_retry_count=5),
+        "deploying-promoting": HandlerOptions(max_retry_count=5),
+        "deploying-finalizing": HandlerOptions(max_retry_count=5),
+        "deploying-rolling-back": HandlerOptions(max_retry_count=5),
+    }
+
+
 class DeploymentHandlerOptions(ConfiguredModel):
     """Handler-keyed deployment scheduler policy.
 
@@ -452,14 +471,14 @@ class DeploymentHandlerOptions(ConfiguredModel):
     2. ``default`` otherwise.
 
     Each ``HandlerOptions`` field falls back to ``default``'s value
-    when the per-handler override leaves it ``None``. The
-    ``HandlerOptions`` field defaults (timeout=None, max_retry_count=5)
-    flow through here so a freshly-constructed
-    ``DeploymentHandlerOptions()`` keeps the legacy retry budget.
+    when the per-handler override leaves it ``None``. The default policy
+    is a generous 2h timeout with no retry-count limit (for the long
+    PROVISIONED/DRAINING waits); action sub-steps override with a
+    max_retry_count of 5 via ``by_handler``.
     """
 
-    default: HandlerOptions = Field(default_factory=HandlerOptions)
-    by_handler: dict[str, HandlerOptions] = Field(default_factory=dict)
+    default: HandlerOptions = Field(default_factory=_default_deploy_handler_default)
+    by_handler: dict[str, HandlerOptions] = Field(default_factory=_default_deploy_by_handler)
 
     def resolve(self, handler_name: str) -> HandlerOptions:
         override = self.by_handler.get(handler_name)
