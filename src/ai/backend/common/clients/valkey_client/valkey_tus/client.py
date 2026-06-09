@@ -18,7 +18,7 @@ from ai.backend.common.exception import (
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
-    ValkeyBatchExecError,
+    UnreachableError,
 )
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -226,7 +226,15 @@ class ValkeyTusClient:
         async with self._client.client() as conn:
             results = await conn.exec(tx, raise_on_error=True)
             if results is None:
-                raise ValkeyBatchExecError
+                # MULTI/EXEC only returns nil when (a) a WATCH'ed key was
+                # modified mid-transaction — we do not use WATCH here — or
+                # (b) the batch was queued with no commands — we queued
+                # SET + GET above. With ``raise_on_error=True`` every other
+                # failure surfaces as an exception already.
+                raise UnreachableError(
+                    "try_load_offset: MULTI/EXEC returned no results — no WATCH in use "
+                    "and SET+GET were queued, so this path should be unreachable."
+                )
             set_ok = results[0] is not None
             offset_raw = results[1]
             if not set_ok:
