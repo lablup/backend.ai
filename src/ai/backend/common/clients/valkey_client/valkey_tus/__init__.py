@@ -1,10 +1,9 @@
-from ai.backend.common.exception import (
+from .client import TusSessionId, ValkeyTusClient
+from .exceptions import (
     TusLeaseHeldError,
     TusLeaseLostError,
     TusSessionNotFoundError,
 )
-
-from .client import TusSessionId, ValkeyTusClient
 
 __all__ = [
     "TusLeaseHeldError",

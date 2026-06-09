@@ -11,13 +11,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
-from ai.backend.common.exception import (
-    BackendAIError,
-    TusLeaseHeldError,
-    TusLeaseLostError,
-    TusSessionNotFoundError,
-    UnreachableError,
-)
+from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     BackoffStrategy,
@@ -29,6 +23,8 @@ from ai.backend.common.resilience import (
 )
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging import BraceStyleAdapter
+
+from .exceptions import TusLeaseHeldError, TusLeaseLostError, TusSessionNotFoundError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
