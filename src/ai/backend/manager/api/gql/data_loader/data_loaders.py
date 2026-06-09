@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
+from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 
 if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.rbac.response import EntityNode  # pants: no-infer-dep
@@ -102,6 +106,15 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.vfs_storage import VFSStorage  # pants: no-infer-dep
 
 
+@dataclass
+class BatchProbeData:
+    """Snapshot of a single probe ``load_fn`` invocation: the coalesced batch of
+    keys it received and the user observed via the ambient context at dispatch time."""
+
+    batch: list[str]
+    seen_user: str | None
+
+
 class DataLoaders:
     """
     Manages domain-specific DataLoader instances for GraphQL resolvers.
@@ -112,9 +125,44 @@ class DataLoaders:
     """
 
     _adapters: Adapters
+    # Optional rendezvous barrier used only to make cross-request batch coalescing
+    # observable/deterministic in tests; ``None`` disables waiting in production.
+    probe_barrier: asyncio.Barrier | None = None
 
     def __init__(self, adapters: Adapters) -> None:
         self._adapters = adapters
+
+    @cached_property
+    def loaded_batch_ids_loader(self) -> DataLoader[str, BatchProbeData]:
+        """Probe loader: echoes the full coalesced batch (and the user seen at dispatch)
+        back to every caller, so batching behaviour is observable from the API."""
+
+        async def load_fn(ids: list[str]) -> list[BatchProbeData]:
+            user = current_user()
+            snapshot = BatchProbeData(
+                batch=list(ids),
+                seen_user=str(user.user_id) if user is not None else None,
+            )
+            return [snapshot for _ in ids]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def authz_probe_loader(self) -> DataLoader[str, str]:
+        """Probe loader that performs an owner-only authorization check INSIDE
+        load_fn: a key may be loaded only by the user whose id equals the key.
+        This is the anti-pattern -- a shared cache (or cross-request batch)
+        serves a previously authorized result without re-running this check."""
+
+        async def load_fn(ids: list[str]) -> list[str]:
+            user = current_user()
+            caller = str(user.user_id) if user is not None else None
+            for key in ids:
+                if key != caller:
+                    raise InsufficientPrivilege("caller may only load their own id")
+            return [f"secret-of:{key}" for key in ids]
+
+        return DataLoader(load_fn=load_fn)
 
     @cached_property
     def audit_log_loader(

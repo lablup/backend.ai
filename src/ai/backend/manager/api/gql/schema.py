@@ -234,6 +234,7 @@ from .object_storage import (
     object_storages,
     update_object_storage,
 )
+from .probe import authz_probe, loaded_batch_ids
 from .project_v2 import (
     admin_create_project_v2,
     admin_delete_project_v2,
@@ -472,6 +473,8 @@ from .vfs_storage import (
 class Query:
     agent_stats = agent_stats
     agents_v2 = agents_v2
+    loaded_batch_ids = loaded_batch_ids
+    authz_probe = authz_probe
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision

@@ -208,6 +208,8 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/api/gql/schema.py" = ["TID251"]
 # test_pydantic_compat.py defines fixture types without BackendAIGQLMeta metadata
 "tests/unit/manager/api/gql/test_pydantic_compat.py" = ["TID251"]
+# probe.py defines a test-only probe GQL output type with a raw strawberry decorator
+"src/ai/backend/manager/api/gql/probe.py" = ["TID251"]
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
