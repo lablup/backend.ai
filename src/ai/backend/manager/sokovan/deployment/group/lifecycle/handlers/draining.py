@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.reconciler.types import HandlerOutcome
 from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
     GroupLifecycleDecision,
@@ -14,6 +15,7 @@ from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
 )
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerHandler
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.types import TriState
 
 
 class GroupDrainingHandler(
@@ -35,9 +37,14 @@ class GroupDrainingHandler(
                         view.desired_current_replica_count == 0
                         and view.desired_target_replica_count == 0
                     )
+                    next_current_revision: TriState[DeploymentRevisionID] = TriState.nop()
+                    next_target_revision: TriState[DeploymentRevisionID] = TriState.nop()
                     if drained:
                         outcome = HandlerOutcome.SUCCESS
                         message = "drain complete; no routes remain"
+                        # Retired group: clear its revision pointers along with the DRAINED transition.
+                        next_current_revision = TriState.nullify()
+                        next_target_revision = TriState.nullify()
                     else:
                         outcome = HandlerOutcome.FAILURE
                         message = "draining routes to zero"
@@ -52,6 +59,8 @@ class GroupDrainingHandler(
                     next_desired_target_replica_count=0,
                     prior_history=view.last_history,
                     handler_options=view.handler_options,
+                    next_current_revision_id=next_current_revision,
+                    next_target_revision_id=next_target_revision,
                 )
             )
 

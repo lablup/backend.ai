@@ -366,14 +366,9 @@ class DeploymentExecutor:
     async def destroy_deployment(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        # Phase 1: Load termination configuration
+        # Phase 1: Load proxy configuration
+        deployment_ids = {dep.deployment_info.id for dep in deployments}
         with DeploymentRecorderContext.shared_phase("load_termination_config"):
-            with DeploymentRecorderContext.shared_step("load_routes"):
-                deployment_ids = {dep.deployment_info.id for dep in deployments}
-                routes = await self._deployment_repo.fetch_active_routes_by_deployment_ids(
-                    deployment_ids
-                )
-
             with DeploymentRecorderContext.shared_step("load_proxy_config"):
                 scaling_groups = {
                     dep.deployment_info.metadata.resource_group for dep in deployments
@@ -382,15 +377,12 @@ class DeploymentExecutor:
                     scaling_groups
                 )
 
-        route_ids: set[UUID] = set()
-        for route_list in routes.values():
-            for route in route_list:
-                route_ids.add(route.route_id)
-
-        # Phase 2: Terminate routes
-        with DeploymentRecorderContext.shared_phase("terminate_routes"):
-            with DeploymentRecorderContext.shared_step("mark_routes_terminating"):
-                await self._deployment_repo.mark_terminating_route_status_bulk(route_ids)
+        # Phase 2: Retire replica groups and clear the deploying-revision pointer in one
+        # transaction. Zeroing desired counts makes the scaling reconcile drain existing routes
+        # (TERMINATING) and stops it provisioning new replicas for the destroyed endpoints.
+        with DeploymentRecorderContext.shared_phase("retire_replica_groups"):
+            with DeploymentRecorderContext.shared_step("drain_replica_groups"):
+                await self._deployment_repo.retire_replica_groups_on_destroy(deployment_ids)
 
         successes: list[DeploymentWithHistory] = []
         errors: list[DeploymentExecutionError] = []

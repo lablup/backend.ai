@@ -1619,6 +1619,15 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
+    async def retire_replica_groups_on_destroy(self, deployment_ids: set[DeploymentID]) -> None:
+        """Drain the deployments' replica groups and clear their deploying-revision pointer atomically.
+
+        Called from the destroy flow so the reconcile stops provisioning replicas for the gone
+        endpoint and no stale group/revision pointer lingers.
+        """
+        await self._db_source.retire_replica_groups_on_destroy(deployment_ids)
+
+    @deployment_repository_resilience.apply()
     async def clear_deploying_revision(self, deployment_ids: set[DeploymentID]) -> None:
         """Clear deploying_revision and sub_step for rolled-back deployments.
 

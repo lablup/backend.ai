@@ -74,6 +74,8 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ReplicaGroupLifecycle,
+    ReplicaGroupScalingStatus,
     RevisionSearchResult,
     RouteHandlerCategory,
     RouteHealthStatus,
@@ -3278,6 +3280,41 @@ class DeploymentDBSource:
             )
         )
         return swapped
+
+    async def retire_replica_groups_on_destroy(
+        self,
+        deployment_ids: set[DeploymentID],
+    ) -> None:
+        """Drain the deployments' replica groups and clear their deploying-revision pointer atomically.
+
+        Marking the live (non-DRAINED) groups DRAINING with zeroed desired counts stops the
+        reconcile from provisioning replicas for the destroyed endpoint; the group draining
+        reconcile then retires them to DRAINED. Done in one transaction so the destroy cleanup
+        cannot leave a group requesting replicas while its endpoint is gone.
+        """
+        if not deployment_ids:
+            return
+        async with self._begin_session_read_committed() as db_sess:
+            await db_sess.execute(
+                sa.update(ReplicaGroupRow)
+                .where(ReplicaGroupRow.deployment_id.in_(deployment_ids))
+                .where(ReplicaGroupRow.lifecycle != ReplicaGroupLifecycle.DRAINED)
+                .values(
+                    lifecycle=ReplicaGroupLifecycle.DRAINING,
+                    desired_current_replica_count=0,
+                    desired_target_replica_count=0,
+                    scaling_status=ReplicaGroupScalingStatus.SCALING,
+                )
+            )
+            await db_sess.execute(
+                sa.update(EndpointRow)
+                .where(EndpointRow.id.in_(deployment_ids))
+                .values(
+                    deploying_revision_id=None,
+                    target_replica_group_id=None,
+                    sub_step=None,
+                )
+            )
 
     async def clear_deploying_revision(
         self,
