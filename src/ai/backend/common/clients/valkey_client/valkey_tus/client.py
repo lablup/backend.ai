@@ -91,7 +91,7 @@ class ValkeyTusClient:
         await self._client.disconnect()
 
     @staticmethod
-    def _key(session_id: TusSessionId) -> str:
+    def _offset_key(session_id: TusSessionId) -> str:
         return f"{_OFFSET_KEY_PREFIX}:{session_id}"
 
     @staticmethod
@@ -137,7 +137,7 @@ class ValkeyTusClient:
         """Initialize the per-session committed offset to 0."""
         async with self._client.client() as conn:
             await conn.set(
-                self._key(session_id),
+                self._offset_key(session_id),
                 "0",
                 expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
             )
@@ -145,7 +145,7 @@ class ValkeyTusClient:
     @valkey_tus_resilience.apply()
     async def get_offset(self, session_id: TusSessionId) -> int | None:
         async with self._client.client() as conn:
-            raw = await conn.get(self._key(session_id))
+            raw = await conn.get(self._offset_key(session_id))
         if raw is None:
             return None
         decoded = raw.decode() if isinstance(raw, bytes) else raw
@@ -160,7 +160,7 @@ class ValkeyTusClient:
         ttl_seconds: int = _DEFAULT_TTL_SECONDS,
     ) -> int:
         """``INCRBY`` the offset by ``length`` and return the new value. Call after fsync."""
-        key = self._key(session_id)
+        key = self._offset_key(session_id)
         async with self._client.client() as conn:
             new_value = await conn.incrby(key, length)
             await conn.expire(key, ttl_seconds)
