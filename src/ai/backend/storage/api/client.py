@@ -88,15 +88,16 @@ async def _drain_into_upload_file(
 ) -> int:
     """Truncate ``upload_temp_path`` to ``start_offset`` and append the body. Returns bytes written.
 
-    The opener only adds ``O_CREAT`` for the first PATCH (``start_offset == 0``).
-    For continuation PATCHes a missing file means the staging area was wiped
-    out of band (NFS GC, manual ``rm``, etc.) — re-creating it would silently
-    zero-pad the prefix via ``truncate``. Treat that as a vanished session.
+    First PATCH uses ``w+b`` (create or truncate to 0); continuations use
+    ``r+b`` which refuses to create. A continuation with a missing staging
+    file means it was wiped out of band (NFS GC, manual ``rm``, etc.) —
+    re-creating would silently zero-pad the prefix via ``truncate`` and
+    corrupt the upload. Surface it as a vanished session instead.
     """
-    opener = _create_if_missing_opener if start_offset == 0 else _open_existing_opener
+    mode: Literal["w+b", "r+b"] = "w+b" if start_offset == 0 else "r+b"
     bytes_written = 0
     try:
-        async with aiofiles.open(upload_temp_path, mode="r+b", opener=opener) as f:
+        async with aiofiles.open(upload_temp_path, mode=mode) as f:
             # Discard any orphan tail bytes left by a prior crashed holder.
             await f.truncate(start_offset)
             await f.seek(start_offset)
@@ -113,16 +114,6 @@ async def _drain_into_upload_file(
             f"Upload session {session_id} staging file is missing at offset {start_offset}"
         ) from e
     return bytes_written
-
-
-def _create_if_missing_opener(path: str | bytes, flags: int) -> int:
-    """``open()`` opener that adds ``O_CREAT`` so ``r+b`` can also create the file."""
-    return os.open(path, flags | os.O_CREAT, 0o644)
-
-
-def _open_existing_opener(path: str | bytes, flags: int) -> int:
-    """``open()`` opener for continuation PATCHes — must not create the file."""
-    return os.open(path, flags)
 
 
 class DownloadTokenData(TypedDict):
