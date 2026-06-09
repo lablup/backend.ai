@@ -1807,6 +1807,13 @@ type BackgroundTaskEventPayload
   totalProgress: Float
 }
 
+type BatchProbeResult
+  @join__type(graph: STRAWBERRY)
+{
+  batch: [String!]!
+  seenUser: String
+}
+
 """Added in 24.3.0. Type of background task event"""
 enum BgtaskEventType
   @join__type(graph: STRAWBERRY)
@@ -13971,6 +13978,16 @@ type Query
 
   """Added in 26.1.0. List agents with filtering and pagination"""
   agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Probe: returns the DataLoader batch a single load was coalesced into.
+  """
+  loadedBatchIds(id: ID!): BatchProbeResult! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Probe: owner-only authz check inside load_fn; demonstrates cache bypass.
+  """
+  authzProbe(id: ID!): String! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
