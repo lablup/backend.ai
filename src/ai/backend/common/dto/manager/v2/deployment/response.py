@@ -436,6 +436,7 @@ class ReplicaNode(BaseResponseModel):
     """Node model representing a deployment replica (user-facing view of routing row)."""
 
     id: UUID = Field(description="Replica ID")
+    deployment_id: UUID = Field(description="ID of the deployment this replica belongs to")
     revision_id: UUID = Field(description="Associated revision ID")
     session_id: UUID | None = Field(
         default=None,

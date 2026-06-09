@@ -158,7 +158,9 @@ class RoutingRow(Base):  # type: ignore[misc]
     )
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
-    session_row: Mapped[SessionRow | None] = relationship("SessionRow", back_populates="routing")
+    session_row: Mapped[SessionRow | None] = relationship(
+        "SessionRow", back_populates="routing", foreign_keys="RoutingRow.session"
+    )
     revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
         primaryjoin=_get_deployment_revision_join_condition,

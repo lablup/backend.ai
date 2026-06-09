@@ -335,6 +335,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
 
         assert result.data is not None
         assert result.data.id == route_info.route_id
+        assert result.data.deployment_id == route_info.deployment_id
         assert result.data.readiness_status == ReadinessStatus.HEALTHY
         assert result.data.liveness_status == LivenessStatus.HEALTHY
         assert result.data.activeness_status == ActivenessStatus.ACTIVE

@@ -1041,21 +1041,6 @@ class DeploymentDBSource:
                 for row in rows
             ]
 
-    async def update_route_session(
-        self,
-        route_id: uuid.UUID,
-        session_id: SessionId,
-    ) -> bool:
-        """Update route with session ID."""
-        async with self._begin_session_read_committed() as db_sess:
-            query = (
-                sa.update(RoutingRow)
-                .where(RoutingRow.id == route_id)
-                .values(session=session_id, status=RouteStatus.PROVISIONING)
-            )
-            result = await db_sess.execute(query)
-            return cast(CursorResult[Any], result).rowcount > 0
-
     async def update_route(
         self,
         updater: Updater[RoutingRow],
@@ -1955,6 +1940,27 @@ class DeploymentDBSource:
                     .values(session=session_id)
                 )
                 await db_sess.execute(query)
+                # Mirror the binding onto the session: point replica_id at the
+                # route it now serves. Self-guarding via EXISTS so it only fires
+                # when this route is actually bound to this session (never a route
+                # serving another), and `replica_id IS NULL` keeps first-bind-wins
+                # to match the migration backfill.
+                await db_sess.execute(
+                    sa.update(SessionRow)
+                    .where(
+                        sa.and_(
+                            SessionRow.id == session_id,
+                            SessionRow.replica_id.is_(None),
+                            sa.exists().where(
+                                sa.and_(
+                                    RoutingRow.id == route_id,
+                                    RoutingRow.session == session_id,
+                                )
+                            ),
+                        )
+                    )
+                    .values(replica_id=route_id)
+                )
 
     async def fetch_kernel_connection_info(
         self,

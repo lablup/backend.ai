@@ -6631,6 +6631,11 @@ type ModelReplica implements Node {
   sessionId: ID
   revisionId: ID!
 
+  """
+  Added in UNRELEASED. ID of the model deployment this replica belongs to.
+  """
+  deploymentId: ID!
+
   """Whether the replica has been checked and its health state."""
   readinessStatus: ReadinessStatus!
 
@@ -6666,6 +6671,9 @@ type ModelReplica implements Node {
 
   """The revision of this entity."""
   revision: ModelRevision
+
+  """Added in UNRELEASED. The model deployment this replica belongs to."""
+  deployment: ModelDeployment
 }
 
 """
@@ -12279,6 +12287,11 @@ type SessionV2 implements Node {
   userId: ID!
   projectId: ID!
 
+  """
+  Added in UNRELEASED. UUID of the model deployment replica served by this session.
+  """
+  replicaId: ID
+
   """Metadata including domain, project, and user information."""
   metadata: SessionV2MetadataInfo!
 
@@ -12313,6 +12326,11 @@ type SessionV2 implements Node {
 
   """Added in 26.3.0. The kernels belonging to this session."""
   kernels: KernelV2Connection
+
+  """
+  Added in UNRELEASED. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
+  """
+  replica: ModelReplica
 }
 
 """Added in 26.3.0. Connection type for paginated session results."""

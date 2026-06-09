@@ -172,6 +172,10 @@ class SessionNode(BaseResponseModel):
     lifecycle: SessionLifecycleInfoGQLDTO = Field(description="Lifecycle status and timestamps.")
     runtime: SessionRuntimeInfoGQLDTO = Field(description="Runtime execution configuration.")
     network: SessionNetworkInfo = Field(description="Network configuration.")
+    replica_id: UUID | None = Field(
+        default=None,
+        description="UUID of the routing replica this session serves, if any.",
+    )
 
 
 # ---------------------------------------------------------------------------
