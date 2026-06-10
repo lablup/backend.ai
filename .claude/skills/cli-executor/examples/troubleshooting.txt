@@ -53,7 +53,7 @@ sudo usermod -aG docker $USER
 
 **Symptoms:**
 ```
-Error: Connection refused to localhost:5432
+Error: Connection refused to localhost:8101
 Error: FATAL: the database system is not accepting connections
 ```
 
@@ -77,7 +77,7 @@ docker logs backend-ai-halfstack-db
 ```bash
 docker run -d \
   --name backend-ai-halfstack-db \
-  -p 5432:5432 \
+  -p 8101:5432 \
   -e POSTGRES_PASSWORD=develove \
   -e POSTGRES_DB=backend \
   postgres:13
@@ -94,7 +94,7 @@ docker run -d \
 
 **Symptoms:**
 ```
-Error: Connection refused to localhost:6379
+Error: Connection refused to localhost:8111
 Error: Error connecting to Valkey
 ```
 
@@ -104,7 +104,7 @@ Error: Error connecting to Valkey
 docker ps | grep valkey
 
 # Test Valkey connection
-valkey-cli ping  # Should return PONG
+valkey-cli -p 8111 ping  # Should return PONG
 ```
 
 **Solutions:**
@@ -118,14 +118,14 @@ valkey-cli ping  # Should return PONG
 ```bash
 docker run -d \
   --name backend-ai-halfstack-valkey \
-  -p 6379:6379 \
+  -p 8111:6379 \
   valkey/valkey:9.1.0-alpine
 ```
 
 **Connection test:**
 ```bash
 # Should return PONG
-valkey-cli ping
+valkey-cli -p 8111 ping
 ```
 
 ---
@@ -134,7 +134,7 @@ valkey-cli ping
 
 **Symptoms:**
 ```
-Error: Connection refused to localhost:2379
+Error: Connection refused to localhost:8121
 Error: Failed to connect to etcd
 ```
 
@@ -144,7 +144,7 @@ Error: Failed to connect to etcd
 docker ps | grep etcd
 
 # Check etcd health
-curl http://localhost:2379/health
+curl http://localhost:8121/health
 ```
 
 **Solutions:**
@@ -158,7 +158,7 @@ curl http://localhost:2379/health
 ```bash
 docker run -d \
   --name backend-ai-halfstack-etcd \
-  -p 2379:2379 \
+  -p 8121:2379 \
   -e ALLOW_NONE_AUTHENTICATION=yes \
   quay.io/coreos/etcd:v3.5.0
 ```
@@ -234,7 +234,7 @@ Error: Missing required field 'etcd.namespace'
 
 4. **Check types:**
    - Strings need quotes: `host = "localhost"`
-   - Numbers don't: `port = 5432`
+   - Numbers don't: `port = 8101`
    - Booleans: `debug = true`
 
 ---
@@ -289,7 +289,7 @@ Error: Database does not exist
 docker ps | grep postgres
 
 # Test connection manually
-psql -h localhost -U postgres -d backend
+psql -h localhost -p 8101 -U postgres -d backend
 ```
 
 **Solutions:**
@@ -301,14 +301,14 @@ psql -h localhost -U postgres -d backend
 
 2. **Check credentials:**
    - Host: `localhost`
-   - Port: `5432`
+   - Port: `8101`
    - User: `postgres`
    - Password: `develove`
    - Database: `backend`
 
 3. **Create database if missing:**
    ```bash
-   psql -h localhost -U postgres -c "CREATE DATABASE backend;"
+   psql -h localhost -p 8101 -U postgres -c "CREATE DATABASE backend;"
    ```
 
 4. **Run migrations:**
@@ -427,7 +427,7 @@ Error: Cannot write to file
 **Symptoms:**
 ```
 Error: Cannot connect to Manager
-Error: Connection refused to localhost:8081
+Error: Connection refused to localhost:8091
 ```
 
 **Diagnosis:**
@@ -436,7 +436,7 @@ Error: Connection refused to localhost:8081
 /cli-executor --component=mgr --subcommand=health
 
 # Or manually
-curl http://localhost:8081/health
+curl http://localhost:8091/health
 ```
 
 **Solutions:**
@@ -453,7 +453,7 @@ curl http://localhost:8081/health
 3. **Verify endpoint in component config:**
    ```toml
    [manager]
-   endpoint = "http://localhost:8081"
+   endpoint = "http://localhost:8091"
    ```
 
 ---
@@ -463,7 +463,7 @@ curl http://localhost:8081/health
 **Symptoms:**
 ```
 Error: Cannot connect to Coordinator
-Error: Connection refused to localhost:6010
+Error: Connection refused to localhost:10200
 ```
 
 **Solutions:**
@@ -481,7 +481,7 @@ Error: Connection refused to localhost:6010
 3. **Verify endpoint in Worker config:**
    ```toml
    [coordinator]
-   endpoint = "http://localhost:6010"
+   endpoint = "http://localhost:10200"
    ```
 
 ---
@@ -493,15 +493,15 @@ Error: Connection refused to localhost:6010
 **Symptoms:**
 ```
 Error: Address already in use
-Error: Bind failed: port 8081 already in use
+Error: Bind failed: port 8091 already in use
 ```
 
 **Diagnosis:**
 ```bash
-# Check what's using the port (example: 8081)
-sudo lsof -i :8081
+# Check what's using the port (example: 8091)
+sudo lsof -i :8091
 # Or
-sudo netstat -tulpn | grep 8081
+sudo netstat -tulpn | grep 8091
 ```
 
 **Solutions:**
@@ -509,7 +509,7 @@ sudo netstat -tulpn | grep 8081
 1. **Stop conflicting process:**
    ```bash
    # Find process ID
-   sudo lsof -i :8081
+   sudo lsof -i :8091
 
    # Kill process
    kill <PID>
@@ -522,11 +522,11 @@ sudo netstat -tulpn | grep 8081
    ```
 
 3. **Common Backend.AI ports:**
-   - Manager: 8081
+   - Manager: 8091
    - Agent: varies (not exposed)
    - Storage: 6021
-   - Web: 8080
-   - App Proxy Coordinator: 6010
+   - Web: 8090
+   - App Proxy Coordinator: 10200
    - App Proxy Worker: varies (not exposed)
 
 ---
@@ -602,22 +602,22 @@ docker logs backend-ai-halfstack-etcd
 
 **PostgreSQL:**
 ```bash
-psql -h localhost -U postgres -d backend
+psql -h localhost -p 8101 -U postgres -d backend
 ```
 
 **Valkey:**
 ```bash
-valkey-cli ping
+valkey-cli -p 8111 ping
 ```
 
 **etcd:**
 ```bash
-curl http://localhost:2379/health
+curl http://localhost:8121/health
 ```
 
 **Manager API:**
 ```bash
-curl http://localhost:8081/health
+curl http://localhost:8091/health
 ```
 
 ---

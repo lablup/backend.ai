@@ -345,7 +345,7 @@ Related documentation:
 ```
 ❌ Error: PostgreSQL connection failed
 
-Details: Connection refused to localhost:5432
+Details: Connection refused to localhost:8101
 
 Recommended actions:
 1. Check PostgreSQL is running:
@@ -370,7 +370,7 @@ Related skills:
 ```
 ❌ Error: Valkey connection failed
 
-Details: Connection refused to localhost:6379
+Details: Connection refused to localhost:8111
 
 Recommended actions:
 1. Check Valkey is running:
@@ -386,7 +386,7 @@ Recommended actions:
 ```
 ❌ Error: etcd connection failed
 
-Details: Cannot connect to etcd at localhost:2379
+Details: Cannot connect to etcd at localhost:8121
 
 Recommended actions:
 1. Check etcd is running:
@@ -480,7 +480,7 @@ Recommended actions:
 ```
 ❌ Error: Cannot connect to Manager
 
-Details: Connection refused to localhost:8081
+Details: Connection refused to localhost:8091
 
 Recommended actions:
 1. Check Manager is running:
@@ -498,7 +498,7 @@ Recommended actions:
 ```
 ❌ Error: Cannot connect to App Proxy Coordinator
 
-Details: Connection refused to localhost:6010
+Details: Connection refused to localhost:10200
 
 Recommended actions:
 1. Check Coordinator is running:
@@ -613,7 +613,7 @@ Running: /cli-executor --component=mgr --subcommand=start-server
 📌 Manager starting...
 
 Manager is now running!
-- API: http://localhost:8081
+- API: http://localhost:8091
 - Press Ctrl+C to stop
 ```
 

@@ -25,9 +25,9 @@
 ```
 
 **Infrastructure Requirements:**
-- PostgreSQL (port 5432)
-- Valkey (port 6379)
-- etcd (port 2379)
+- PostgreSQL (port 8101)
+- Valkey (port 8111)
+- etcd (port 8121)
 
 **Configuration:** `configs/manager.toml`
 
@@ -138,8 +138,8 @@
 ```
 
 **Infrastructure Requirements:**
-- PostgreSQL (port 5432, separate from manager DB)
-- Valkey (port 6379)
+- PostgreSQL (port 8101, separate database from manager)
+- Valkey (port 8111)
 - Database migrations applied
 
 **Configuration:** `configs/app-proxy-coordinator.toml`
@@ -167,7 +167,7 @@
 
 **Infrastructure Requirements:**
 - App Proxy Coordinator accessible
-- Valkey (port 6379)
+- Valkey (port 8111)
 
 **Configuration:** `configs/app-proxy-worker.toml`
 
