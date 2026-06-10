@@ -12,7 +12,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp import web
 
-from ai.backend.storage.api.client import tus_upload_part
+from ai.backend.common.clients.valkey_client.valkey_tus import TusSessionId
+from ai.backend.storage.api.client import _drain_into_upload_file, tus_upload_part
 from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
 
 
@@ -281,3 +282,52 @@ class TestTusUploadPartOffsetValidation:
         """When both client offset and file size are 0, upload should proceed successfully."""
         # No exception should be raised
         await tus_upload_part(request_with_zero_offset)
+
+
+class TestDrainOrphanBytesRecovery:
+    """Idempotent recovery when a prior PATCH wrote bytes to disk but did not
+    update the Valkey offset (e.g. ``advance_offset`` raised
+    ``TusLeaseLostError`` after a successful drain, or the storage-proxy
+    crashed between ``fsync`` and the ``INCRBY`` Lua step).
+
+    The next PATCH must:
+      1. ``truncate`` the staging file back to the Valkey-canonical offset
+         so the orphan tail bytes are discarded.
+      2. Append the client-replayed chunk from there.
+
+    The on-disk content after the retry must be identical to what it would
+    have been if the prior PATCH had never landed on disk.
+    """
+
+    async def test_orphan_tail_is_truncated_then_overwritten(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        committed_offset = 1024
+        committed_payload = b"\x11" * committed_offset
+        orphan_tail = b"\x22" * 512
+        retry_payload = b"\x33" * 768
+
+        upload_temp_path = tmp_path / "session-id"
+        # State left by the prior PATCH: committed bytes + orphan tail.
+        upload_temp_path.write_bytes(committed_payload + orphan_tail)
+
+        # Client-replayed chunk feed. ``at_eof`` is sync on aiohttp.StreamReader;
+        # ``read`` is async — model each accordingly so the drain loop iterates.
+        content = AsyncMock()
+        content.at_eof = MagicMock(side_effect=[False, True])
+        content.read = AsyncMock(side_effect=[retry_payload])
+
+        bytes_written = await _drain_into_upload_file(
+            content,
+            upload_temp_path,
+            start_offset=committed_offset,
+            session_id=TusSessionId("test-session"),
+        )
+
+        assert bytes_written == len(retry_payload)
+        final_bytes = upload_temp_path.read_bytes()
+        assert final_bytes == committed_payload + retry_payload
+        # The orphan tail bytes are gone; the prior failure did not corrupt
+        # the file as observed by future PATCHes.
+        assert orphan_tail not in final_bytes[committed_offset:]
