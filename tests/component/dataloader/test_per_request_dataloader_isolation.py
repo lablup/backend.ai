@@ -2,95 +2,94 @@
 
 Every ``/admin/gql/strawberry`` request must execute with its own ``DataLoaders``
 instance, so a value cached by one request's loader is never served to a later
-request. These tests exercise the caching behaviour itself through the real
-stack — real Strawberry schema, real ImageAdapter/ImageService/ImageRepository,
-and real DB rows: a change made to an image between two requests must be
-visible to the second request.
+request. These tests call a test-only probe field (defined in conftest, not in
+the production schema) whose loader reads from a mutable in-memory store: a
+store change made between two requests must be visible to the second request.
 
 With a process-wide shared DataLoaders instance, the second request is served
-the first request's cached node without re-reading the DB, so both tests fail
-deterministically.
+the first request's cached value without re-reading the store, so every test
+here fails deterministically.
 """
 
 from __future__ import annotations
 
-import uuid
 from typing import Any, cast
 
-import sqlalchemy as sa
-from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
-
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.manager.models.image.row import ImageRow
 
-_IMAGE_QUERY = "query($id: ID!) { imageV2(id: $id) { id identity { canonicalName } } }"
+_PROBE_QUERY = "query($key: String!) { probeCachedValue(key: $key) }"
 
 
-async def _query_image(
+async def _probe(
     registry: BackendAIClientRegistry,
-    image_id: uuid.UUID,
-) -> dict[str, Any] | None:
-    """Query imageV2 by id and return the (nullable) node payload."""
+    key: str,
+) -> dict[str, Any]:
+    """Query the probe field and return the raw GQL response."""
     result = await registry._client._request(
         "POST",
         "/admin/gql/strawberry",
-        json={"query": _IMAGE_QUERY, "variables": {"id": str(image_id)}},
+        json={"query": _PROBE_QUERY, "variables": {"key": key}},
     )
     assert result is not None, "Expected a non-null JSON response from the GQL endpoint"
-    resp = cast(dict[str, Any], result)
+    return cast(dict[str, Any], result)
+
+
+async def _probe_value(registry: BackendAIClientRegistry, key: str) -> int:
+    """Query the probe field and return the loaded value, asserting no errors."""
+    resp = await _probe(registry, key)
     assert not resp.get("errors"), f"Unexpected GQL errors: {resp.get('errors')}"
-    return cast("dict[str, Any] | None", resp["data"]["imageV2"])
+    return cast(int, resp["data"]["probeCachedValue"])
 
 
 class TestPerRequestDataLoaderIsolation:
     async def test_update_between_requests_is_visible_to_the_next_request(
         self,
         admin_registry: BackendAIClientRegistry,
-        image_fixture: uuid.UUID,
-        db_engine: SAEngine,
+        loader_backing_store: dict[str, int],
+        probe_key: str,
     ) -> None:
-        """Renaming an image between two requests must be visible to the second.
+        """A value changed between two requests must be visible to the second.
 
         A loader cache shared across requests would serve the first request's
-        cached node, so the second response would still carry the old name.
+        cached value, so the second response would still carry the old one.
         """
-        image_id = image_fixture
+        loader_backing_store[probe_key] = 1
+        assert await _probe_value(admin_registry, probe_key) == 1
 
-        first = await _query_image(admin_registry, image_id)
-        assert first is not None
-        old_canonical = first["identity"]["canonicalName"]
+        loader_backing_store[probe_key] = 2
+        assert await _probe_value(admin_registry, probe_key) == 2
 
-        new_canonical = f"registry.test.local/testproject/renamed-{uuid.uuid4().hex[:8]}:latest"
-        assert new_canonical != old_canonical
-        async with db_engine.begin() as conn:
-            await conn.execute(
-                sa.update(ImageRow.__table__)
-                .where(ImageRow.__table__.c.id == image_id)
-                .values(name=new_canonical)
-            )
-
-        second = await _query_image(admin_registry, image_id)
-        assert second is not None
-        assert second["identity"]["canonicalName"] == new_canonical
-
-    async def test_deletion_between_requests_is_visible_to_the_next_request(
+    async def test_removal_between_requests_is_visible_to_the_next_request(
         self,
         admin_registry: BackendAIClientRegistry,
-        image_fixture: uuid.UUID,
-        db_engine: SAEngine,
+        loader_backing_store: dict[str, int],
+        probe_key: str,
     ) -> None:
-        """Deleting an image between two requests must yield null on the second.
+        """A value removed between two requests must not be served to the second.
 
-        A loader cache shared across requests would keep serving the deleted
-        image's node from the first request's cache.
+        A loader cache shared across requests would keep serving the removed
+        value from the first request's cache instead of failing.
         """
-        image_id = image_fixture
+        loader_backing_store[probe_key] = 1
+        assert await _probe_value(admin_registry, probe_key) == 1
 
-        assert await _query_image(admin_registry, image_id) is not None
+        del loader_backing_store[probe_key]
+        resp = await _probe(admin_registry, probe_key)
+        assert resp.get("errors"), "a removed value must not be served from a previous request"
 
-        async with db_engine.begin() as conn:
-            await conn.execute(
-                ImageRow.__table__.delete().where(ImageRow.__table__.c.id == image_id)
-            )
+    async def test_load_failure_is_not_replayed_to_a_later_request(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        loader_backing_store: dict[str, int],
+        probe_key: str,
+    ) -> None:
+        """A failed load in one request must not deny a later request.
 
-        assert await _query_image(admin_registry, image_id) is None
+        A loader cache shared across requests would cache the raised exception
+        (negative caching) under the key and replay it to every later request.
+        """
+        failed = await _probe(admin_registry, probe_key)
+        assert failed.get("errors"), "loading a missing key should fail"
+
+        loader_backing_store[probe_key] = 3
+        assert await _probe_value(admin_registry, probe_key) == 3
