@@ -210,6 +210,23 @@ class TestHealthCheckEnable:
         assert check is not None
         assert check.path == "/health"
 
+    def test_health_check_setting_preserves_disabled_check(self) -> None:
+        """health_check_setting returns the config (with enable) even when disabled."""
+        definition = ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "m",
+                    "model_path": "/m",
+                    "service": {"port": 8080, "health_check": {"path": "/health", "enable": False}},
+                }
+            ]
+        })
+        assert definition.health_check_config() is None
+        setting = definition.health_check_setting()
+        assert setting is not None
+        assert setting.enable is False
+        assert setting.path == "/health"
+
     def test_enable_defaults_to_false(self) -> None:
         check = ModelHealthCheck.model_validate({"path": "/health"})
         assert check.enable is False
@@ -321,6 +338,40 @@ class TestHealthCheckEnable:
         result = _merge_service_config(base, override)
         assert result.health_check is not None
         assert result.health_check.enable is True
+
+
+class TestHealthCheckJudgment:
+    """Tests for ModelHealthCheck judgment helpers used by the route health loop."""
+
+    def _check(self, **overrides: Any) -> ModelHealthCheck:
+        return ModelHealthCheck.model_validate({"path": "/health", **overrides})
+
+    def test_is_retry_exhausted_below_threshold(self) -> None:
+        check = self._check(max_retries=3)
+        assert check.is_retry_exhausted(0) is False
+        assert check.is_retry_exhausted(2) is False
+
+    def test_is_retry_exhausted_at_and_above_threshold(self) -> None:
+        check = self._check(max_retries=3)
+        assert check.is_retry_exhausted(3) is True
+        assert check.is_retry_exhausted(4) is True
+
+    def test_is_probe_due_before_interval(self) -> None:
+        check = self._check(interval=10.0)
+        assert check.is_probe_due(last_check=1000, now=1005) is False
+
+    def test_is_probe_due_at_and_after_interval(self) -> None:
+        check = self._check(interval=10.0)
+        assert check.is_probe_due(last_check=1000, now=1010) is True
+        assert check.is_probe_due(last_check=1000, now=1030) is True
+
+    def test_health_status_ttl_floor(self) -> None:
+        """Short intervals are clamped to the 120s floor."""
+        assert self._check(interval=10.0).health_status_ttl_sec() == 120
+
+    def test_health_status_ttl_scales_with_interval(self) -> None:
+        """Long intervals stay above the probe cadence (interval * 3)."""
+        assert self._check(interval=60.0).health_status_ttl_sec() == 180
 
 
 class TestModelConfigs:
