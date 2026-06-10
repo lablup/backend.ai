@@ -14586,7 +14586,7 @@ type VFolder implements Node {
   unmanagedPath: String
 
   """
-  Added in UNRELEASED. Storage-proxy-sourced usage and quota statistics: file count, used capacity, and capacity/file-count quota limits. Null for list responses where usage is not loaded.
+  Added in UNRELEASED. Usage and quota statistics resolved on demand when this field is selected: the measurements (numFiles, usedBytes) are measured live through the storage proxy, while the quota limits (maxSize, maxFiles) are read from the manager database. This is a very slow operation: every selection makes a round-trip to the storage proxy, and the measurement cost depends on the storage backend (e.g., a full directory walk on vfs). Select only when needed. Null for unmanaged vfolders.
   """
   usage: VFolderUsageInfo
 
@@ -14786,7 +14786,7 @@ enum VFolderOwnershipType {
 }
 
 """
-Added in UNRELEASED. Storage-proxy-sourced usage and quota statistics for a virtual folder. Includes current used capacity, file count, and capacity/file-count quota limits.
+Added in UNRELEASED. Usage and quota statistics for a virtual folder. The measurements (numFiles, usedBytes) are measured live through the storage proxy, while the quota limits (maxSize, maxFiles) are read from the manager database.
 """
 type VFolderUsageInfo {
   numFiles: Int!

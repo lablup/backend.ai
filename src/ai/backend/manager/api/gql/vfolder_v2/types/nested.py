@@ -98,24 +98,39 @@ class VFolderAccessControlInfoGQL:
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Storage-proxy-sourced usage and quota statistics for a virtual folder. "
-            "Includes current used capacity, file count, and capacity/file-count quota limits."
+            "Usage and quota statistics for a virtual folder. "
+            "The measurements (numFiles, usedBytes) are measured live through the "
+            "storage proxy, while the quota limits (maxSize, maxFiles) are read "
+            "from the manager database."
         ),
     ),
     model=VFolderUsageInfoDTO,
     name="VFolderUsageInfo",
 )
 class VFolderUsageInfoGQL:
-    """Storage-proxy-sourced usage and quota statistics for a virtual folder."""
+    """Usage (storage-proxy-measured) and quota (DB-sourced) statistics for a virtual folder."""
 
-    num_files: int = gql_field(description="Number of files currently stored in the folder.")
+    num_files: int = gql_field(
+        description=(
+            "Number of files currently stored in the folder, "
+            "measured live through the storage proxy."
+        )
+    )
     used_bytes: BinarySizeInfoGQL = gql_field(
-        description="Current used capacity in bytes, with human-readable display."
+        description=(
+            "Current used capacity in bytes with human-readable display, "
+            "measured live through the storage proxy."
+        )
     )
     max_size: BinarySizeInfoGQL | None = gql_field(
-        description="Capacity quota limit in bytes, with human-readable display. Null if unlimited."
+        description=(
+            "Capacity quota limit in bytes with human-readable display, "
+            "read from the manager database. Null if unlimited."
+        )
     )
-    max_files: int = gql_field(description="File-count quota for the folder.")
+    max_files: int = gql_field(
+        description="File-count quota for the folder, read from the manager database."
+    )
 
 
 @gql_pydantic_type(

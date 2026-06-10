@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import logging
 import math
 import uuid
@@ -37,6 +36,7 @@ from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
     VFolderData,
+    VFolderLiveUsageData,
     VFolderMountPermission,
 )
 from ai.backend.manager.errors.common import Forbidden, InternalServerError, ObjectNotFound
@@ -110,6 +110,10 @@ from ai.backend.manager.services.vfolder.actions.create_v2 import (
 from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
     CloneVFolderV2ActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.get_live_usage import (
+    GetVFolderLiveUsageAction,
+    GetVFolderLiveUsageActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions import (
     GetMyStorageHostPermissionsAction,
@@ -1724,33 +1728,34 @@ class VFolderService:
     async def get_v2(self, action: GetVFolderV2Action) -> GetVFolderV2ActionResult:
         """Get a single vfolder by ID (v2). RBAC is enforced at the processor level."""
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
-        vfolder_data = await self._fetch_live_usage(vfolder_data)
         return GetVFolderV2ActionResult(vfolder=vfolder_data)
 
-    async def _fetch_live_usage(self, vfolder_data: VFolderData) -> VFolderData:
-        """Replace usage measurements with live values from the storage proxy.
+    async def get_folder_usage(
+        self, action: GetVFolderLiveUsageAction
+    ) -> GetVFolderLiveUsageActionResult:
+        """Fetch usage statistics on demand through the storage proxy.
 
-        The ``vfolders.num_files`` / ``cur_size`` columns are never updated by
-        any code path, so the storage proxy filesystem scan is the only source
-        of truth. Best-effort: on any storage-proxy failure the DB values are
-        returned as-is.
+        Very slow: every call is a round-trip to the storage proxy, and the
+        measurement cost depends on the storage backend (e.g., a full directory
+        walk on vfs). Returns ``usage=None`` for unmanaged vfolders, which have
+        no storage-proxy backing. RBAC is enforced at the processor level.
         """
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         if vfolder_data.unmanaged_path:
-            return vfolder_data
-        try:
-            proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
-            client = self._storage_manager.get_manager_facing_client(proxy_name)
-            vfid = f"{vfolder_data.quota_scope_id}/{vfolder_data.id}"
-            usage = await client.get_folder_usage(volume_name, vfid)
-            num_files = int(usage["file_count"])
-            cur_size = int(usage["used_bytes"])
-        except Exception:
-            log.warning(
-                "Failed to fetch usage of vfolder {} from storage proxy",
-                vfolder_data.id,
-            )
-            return vfolder_data
-        return dataclasses.replace(vfolder_data, num_files=num_files, cur_size=cur_size)
+            return GetVFolderLiveUsageActionResult(vfolder_uuid=vfolder_data.id, usage=None)
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
+        client = self._storage_manager.get_manager_facing_client(proxy_name)
+        vfid = str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id))
+        usage = await client.get_folder_usage(volume_name, vfid)
+        return GetVFolderLiveUsageActionResult(
+            vfolder_uuid=vfolder_data.id,
+            usage=VFolderLiveUsageData(
+                num_files=int(usage["file_count"]),
+                used_bytes=int(usage["used_bytes"]),
+                max_size=vfolder_data.max_size,
+                max_files=vfolder_data.max_files,
+            ),
+        )
 
     async def create_in_project(
         self, action: CreateVFolderInProjectAction

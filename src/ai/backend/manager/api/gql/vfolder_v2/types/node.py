@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCards
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -79,16 +80,37 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         )
     )
     unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
-    usage: VFolderUsageInfoGQL | None = gql_added_field(
+
+    @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
-                "Storage-proxy-sourced usage and quota statistics: file count, used capacity, "
-                "and capacity/file-count quota limits. Null for list responses where usage is not loaded."
+                "Usage and quota statistics resolved on demand when this field is "
+                "selected: the measurements (numFiles, usedBytes) are measured live "
+                "through the storage proxy, while the quota limits (maxSize, maxFiles) "
+                "are read from the manager database. This is a very slow operation: "
+                "every selection makes a round-trip to the storage proxy, and the "
+                "measurement cost depends on the storage backend (e.g., a full "
+                "directory walk on vfs). Select only when needed. "
+                "Null for unmanaged vfolders."
             ),
-        ),
-        default=None,
-    )
+        )
+    )  # type: ignore[misc]
+    async def usage(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> VFolderUsageInfoGQL | None:
+        result = await info.context.adapters.vfolder.get_folder_usage(UUID(self.id))
+        if result is None:
+            return None
+        return VFolderUsageInfoGQL(
+            num_files=result.num_files,
+            used_bytes=BinarySizeInfoGQL.from_pydantic(result.used_bytes),
+            max_size=BinarySizeInfoGQL.from_pydantic(result.max_size)
+            if result.max_size is not None
+            else None,
+            max_files=result.max_files,
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(

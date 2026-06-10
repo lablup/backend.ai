@@ -121,6 +121,9 @@ from ai.backend.manager.services.vfolder.actions.file_v2 import (
     MkdirV2Action,
     MoveFileV2Action,
 )
+from ai.backend.manager.services.vfolder.actions.get_live_usage import (
+    GetVFolderLiveUsageAction,
+)
 from ai.backend.manager.services.vfolder.actions.get_v2 import GetVFolderV2Action
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
@@ -416,6 +419,27 @@ class VFolderAdapter(BaseAdapter):
             GetVFolderV2Action(vfolder_uuid=vfolder_id)
         )
         return self._vfolder_data_to_node(result.vfolder)
+
+    async def get_folder_usage(self, vfolder_id: UUID) -> VFolderUsageInfoDTO | None:
+        """Fetch usage statistics on demand through the storage proxy.
+
+        Very slow: every call is a round-trip to the storage proxy, and the
+        measurement cost depends on the storage backend (e.g., a full directory
+        walk on vfs). Returns ``None`` for unmanaged vfolders, which have no
+        storage-proxy backing.
+        """
+        result = await self._processors.vfolder.get_folder_usage.wait_for_complete(
+            GetVFolderLiveUsageAction(vfolder_uuid=vfolder_id)
+        )
+        usage = result.usage
+        if usage is None:
+            return None
+        return VFolderUsageInfoDTO(
+            num_files=usage.num_files,
+            used_bytes=_to_binary_size_info(usage.used_bytes),
+            max_size=_to_binary_size_info(usage.max_size) if usage.max_size is not None else None,
+            max_files=usage.max_files,
+        )
 
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
         """Soft-delete a vfolder (move to trash). RBAC enforced."""

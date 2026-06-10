@@ -194,6 +194,19 @@ class VFolderData:
 
 
 @dataclass
+class VFolderLiveUsageData:
+    """
+    Usage measurements fetched live from the storage proxy,
+    combined with DB-side quota limits.
+    """
+
+    num_files: int
+    used_bytes: int
+    max_size: int | None
+    max_files: int
+
+
+@dataclass
 class VFolderPermissionData:
     """
     VFolder permission data representing user-specific permissions on a VFolder.
