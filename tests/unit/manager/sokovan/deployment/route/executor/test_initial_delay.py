@@ -61,7 +61,9 @@ class TestRegisterReplicaProbeTargets:
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """health_path comes from route.health_check when present."""
-        route = _make_route(health_check=ModelHealthCheck(path="/healthz", initial_delay=60.0))
+        route = _make_route(
+            health_check=ModelHealthCheck(enable=True, path="/healthz", initial_delay=60.0)
+        )
         replica_id = ReplicaID(route.route_id)
 
         await route_executor._register_route_probe_targets(
@@ -99,7 +101,7 @@ class TestRegisterReplicaProbeTargets:
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """Multiple routes with health_check produce multiple ReplicaProbeTarget entries."""
-        health_check = ModelHealthCheck(path="/health", initial_delay=60.0)
+        health_check = ModelHealthCheck(enable=True, path="/health", initial_delay=60.0)
         routes = [_make_route(health_check=health_check) for _ in range(3)]
         replica_infos = {
             ReplicaID(r.route_id): RouteSessionKernelInfo(
@@ -124,7 +126,9 @@ class TestSyncReplicaProbeTargets:
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """Routes with health_check, replica_host and replica_port are synced."""
-        route = _make_route(health_check=ModelHealthCheck(path="/health", initial_delay=60.0))
+        route = _make_route(
+            health_check=ModelHealthCheck(enable=True, path="/health", initial_delay=60.0)
+        )
 
         with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
             result = await route_executor.sync_route_probe_targets([route])
@@ -139,7 +143,9 @@ class TestSyncReplicaProbeTargets:
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """Routes missing health_check or replica info are silently skipped."""
-        route = _make_route(health_check=ModelHealthCheck(path="/health", initial_delay=60.0))
+        route = _make_route(
+            health_check=ModelHealthCheck(enable=True, path="/health", initial_delay=60.0)
+        )
         route_no_health_check = _make_route(health_check=None)
         route_no_replica = RouteData(
             route_id=ReplicaID(uuid4()),
@@ -151,7 +157,7 @@ class TestSyncReplicaProbeTargets:
             created_at=datetime.fromtimestamp(1000, tz=tzutc()),
             revision_id=DeploymentRevisionID(uuid4()),
             traffic_status=RouteTrafficStatus.INACTIVE,
-            health_check=ModelHealthCheck(path="/health", initial_delay=60.0),
+            health_check=ModelHealthCheck(enable=True, path="/health", initial_delay=60.0),
             replica_host=None,
             replica_port=None,
         )

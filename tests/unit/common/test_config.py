@@ -210,6 +210,23 @@ class TestHealthCheckEnable:
         assert check is not None
         assert check.path == "/health"
 
+    def test_health_check_setting_preserves_disabled_check(self) -> None:
+        """health_check_setting returns the config (with enable) even when disabled."""
+        definition = ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "m",
+                    "model_path": "/m",
+                    "service": {"port": 8080, "health_check": {"path": "/health", "enable": False}},
+                }
+            ]
+        })
+        assert definition.health_check_config() is None
+        setting = definition.health_check_setting()
+        assert setting is not None
+        assert setting.enable is False
+        assert setting.path == "/health"
+
     def test_enable_defaults_to_false(self) -> None:
         check = ModelHealthCheck.model_validate({"path": "/health"})
         assert check.enable is False

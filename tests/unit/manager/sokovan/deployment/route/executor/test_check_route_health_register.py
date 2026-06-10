@@ -19,6 +19,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaHealthStatus as ValkeyReplicaHealthStatus,
 )
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica import ReplicaID
@@ -44,7 +45,7 @@ def _route(health_status: RouteHealthStatus) -> RouteData:
         traffic_ratio=1.0,
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.ACTIVE,
-        health_check=None,
+        health_check=ModelHealthCheck(enable=True, max_retries=1),
         replica_host="10.0.0.1",
         replica_port=8000,
         created_at=datetime.now(tzutc()),
@@ -64,6 +65,7 @@ def _unhealthy_status(route: RouteData) -> ValkeyReplicaHealthStatus:
         replica_id=route.route_id,
         healthy=False,
         last_check=999,
+        consecutive_failures=1,
     )
 
 

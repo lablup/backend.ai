@@ -86,16 +86,17 @@ class RouteHealthObserver(RouteObserver):
         plans: list[_ProbePlan] = []
         for route in routes:
             target = probe_targets.get(route.route_id)
-            if target is None or route.health_check is None:
+            health_check = route.enabled_health_check
+            if target is None or health_check is None:
                 continue
             prev = prev_statuses.get(route.route_id)
-            if prev is not None and not route.health_check.is_probe_due(prev.last_check, now):
+            if prev is not None and not health_check.is_probe_due(prev.last_check, now):
                 continue
             plans.append(
                 _ProbePlan(
                     route_id=route.route_id,
                     target=target,
-                    health_check=route.health_check,
+                    health_check=health_check,
                     prev_failures=prev.consecutive_failures if prev is not None else 0,
                 )
             )

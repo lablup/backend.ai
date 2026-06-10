@@ -481,6 +481,18 @@ class ModelDefinition(BaseConfigModel):
                 return model.service.health_check
         return None
 
+    def health_check_setting(self) -> ModelHealthCheck | None:
+        """The configured health check, preserved even when disabled.
+
+        Unlike :meth:`health_check_config`, this does not gate on ``enable``,
+        so a caller that persists the setting keeps the ``enable`` flag intact
+        and consumers decide based on it rather than on presence alone.
+        """
+        for model in self.models:
+            if model.service and model.service.health_check:
+                return model.service.health_check
+        return None
+
     def with_args_appended(self, args: list[str]) -> ModelDefinition:
         """Return a copy with ``args`` appended to each model's
         ``service.start_command`` as separate argv tokens.

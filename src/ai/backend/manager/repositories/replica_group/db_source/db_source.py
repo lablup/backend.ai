@@ -526,7 +526,7 @@ class ReplicaGroupDBSource:
         result = await db_sess.execute(query)
         return {
             DeploymentRevisionID(revision_id): (
-                model_definition.health_check_config() if model_definition is not None else None
+                model_definition.health_check_setting() if model_definition is not None else None
             )
             for revision_id, model_definition in result.all()
         }

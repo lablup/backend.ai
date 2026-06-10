@@ -184,6 +184,22 @@ class TestRouteHealthObserverThrottle:
         assert result.observed_count == 0
         observer._http_health_check.assert_not_called()
 
+    async def test_skips_disabled_health_check(self) -> None:
+        """A route whose health_check has enable=False is not probed."""
+        route = _make_route(ModelHealthCheck(enable=False, interval=10.0))
+        valkey = _make_valkey(
+            probe_targets={route.route_id: _probe_target(route)},
+            statuses={route.route_id: None},
+        )
+        observer = _observer(valkey)
+        observer._http_health_check = AsyncMock(return_value=True)  # type: ignore[method-assign]
+
+        result = await observer.observe([route])
+
+        assert result.observed_count == 0
+        observer._http_health_check.assert_not_called()
+        valkey.record_route_health_statuses_batch.assert_not_called()
+
 
 class TestRouteHealthObserverProbePolicy:
     async def test_probe_uses_per_route_timeout_and_status_code(self) -> None:
