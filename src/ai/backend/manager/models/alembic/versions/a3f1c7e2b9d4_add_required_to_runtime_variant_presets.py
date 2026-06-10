@@ -18,19 +18,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    conn = op.get_bind()
-    inspector = sa.inspect(conn)
-    columns = [c["name"] for c in inspector.get_columns("runtime_variant_presets")]
-    if "required" not in columns:
-        op.add_column(
-            "runtime_variant_presets",
-            sa.Column("required", sa.Boolean(), nullable=False, server_default=sa.false()),
-        )
+    op.add_column(
+        "runtime_variant_presets",
+        sa.Column("required", sa.Boolean(), nullable=False, server_default=sa.false()),
+    )
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-    inspector = sa.inspect(conn)
-    columns = [c["name"] for c in inspector.get_columns("runtime_variant_presets")]
-    if "required" in columns:
-        op.drop_column("runtime_variant_presets", "required")
+    op.drop_column("runtime_variant_presets", "required")
