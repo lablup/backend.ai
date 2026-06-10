@@ -5570,6 +5570,11 @@ type DeploymentRevisionPreset implements Node
   """Added in 26.4.3. The runtime variant this preset is designed for."""
   runtimeVariant: RuntimeVariant
 
+  """
+  Added in UNRELEASED. The container image used to run the inference server. None when the preset does not specify an image.
+  """
+  image: ImageV2
+
   """Added in 26.4.2. Resource slot allocations for this preset."""
   resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null): [AllocatedResourceSlot!]
 }
