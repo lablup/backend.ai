@@ -18,6 +18,12 @@ Changes
 
 ## 26.4.4rc7 (2026-06-10)
 
+### Test Updates
+* Remove stale xfail markers on infra usage stats component tests now that v2 InfraClient GET params are routed through the query string. ([#12021](https://github.com/lablup/backend.ai/issues/12021))
+
+
+## 26.4.4rc7 (2026-06-10)
+
 ### Breaking Changes
 * Remove the unintended `GQL` suffix from v2 GraphQL schema type names (e.g. `CreateDomainInputGQL` → `CreateDomainInput`); types whose name would collide with v1 schema types use a `V2` suffix instead (e.g. `KeyPairV2`). ([#11906](https://github.com/lablup/backend.ai/issues/11906))
 
