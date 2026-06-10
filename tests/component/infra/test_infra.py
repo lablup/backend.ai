@@ -30,12 +30,6 @@ from ai.backend.common.dto.manager.infra import (
     UsagePerPeriodResponse,
 )
 
-_GET_JSON_BODY_XFAIL_REASON = (
-    "Client SDK v2 sends JSON body on GET requests, but the server's "
-    "check_api_params reads from request.query for GET/HEAD methods, "
-    "ignoring the body entirely.  Params are never seen by the server."
-)
-
 
 class TestEtcdConfigRead:
     """Tests for read-only etcd config endpoints (no auth required)."""
@@ -246,7 +240,6 @@ class TestResourcePresets:
 class TestUsageStats:
     """Tests for usage statistics endpoints."""
 
-    @pytest.mark.xfail(reason=_GET_JSON_BODY_XFAIL_REASON, strict=True)
     async def test_admin_gets_usage_per_month(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -258,7 +251,6 @@ class TestUsageStats:
         assert isinstance(result, UsagePerMonthResponse)
         assert isinstance(result.root, list)
 
-    @pytest.mark.xfail(reason=_GET_JSON_BODY_XFAIL_REASON, strict=True)
     async def test_admin_gets_usage_per_period(
         self,
         admin_registry: BackendAIClientRegistry,
