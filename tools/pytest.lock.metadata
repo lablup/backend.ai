@@ -4,6 +4,7 @@
     "CPython==3.13.7"
   ],
   "generated_with_requirements": [
+    "aiohttp~=3.13.3",
     "aioresponses>=0.7.6",
     "pytest-aiohttp>=1.0.5",
     "pytest-asyncio>=0.24.0",
