@@ -490,6 +490,7 @@ class LayerType(enum.StrEnum):
     VALKEY_STREAM = "valkey_stream"
     VALKEY_BGTASK = "valkey_bgtask"
     VALKEY_VOLUME_STATS = "valkey_volume_stats"
+    VALKEY_TUS = "valkey_tus"
 
     # Client layers
     AGENT_CLIENT = "agent_client"
