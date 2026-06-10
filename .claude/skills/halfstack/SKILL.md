@@ -52,7 +52,7 @@ only the **required** services start. To include optional ones, pass `--profile 
 | Service | Image | Purpose | Profile |
 |---------|-------|---------|---------|
 | `backendai-half-db` | postgres:16.3-alpine | Main database | (required) |
-| `backendai-half-valkey` | valkey/valkey:9.1.0-alpine | Cache / pub-sub | (required) |
+| `backendai-half-redis` | valkey/valkey:9.1.0-alpine | Cache / pub-sub | (required) |
 | `backendai-half-etcd` | etcd v3.5 | Config store | (required) |
 | `backendai-half-apollo-router` | Hive Gateway | GraphQL federation (manager has 2 GQL servers federated through this) | (required) |
 | `backendai-half-prometheus` | Prometheus | Metrics — manager queries it for deployment autoscale rule evaluation | (required) |
@@ -62,7 +62,7 @@ only the **required** services start. To include optional ones, pass `--profile 
 | `backendai-half-tempo` | Tempo | Tracing | `observability` |
 | `backendai-half-pyroscope` | Pyroscope | Profiling | `observability` |
 | `backendai-half-db-exporter` | postgres-exporter | Postgres metrics | `observability` |
-| `backendai-half-valkey-exporter` | redis_exporter | Valkey metrics | `observability` |
+| `backendai-half-redis-exporter` | redis_exporter | Valkey metrics | `observability` |
 | `backendai-half-minio` | MinIO | Object storage | `storage` |
 
 **Profile semantics:**
@@ -259,24 +259,24 @@ docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -d appproxy -c 
 ### Valkey
 
 ```bash
-VALKEY_CONTAINER=$(docker compose -f docker-compose.halfstack.current.yml ps -q backendai-half-valkey)
+REDIS_CONTAINER=$(docker compose -f docker-compose.halfstack.current.yml ps -q backendai-half-redis)
 
 # Ping
-docker exec $VALKEY_CONTAINER valkey-cli ping
+docker exec $REDIS_CONTAINER valkey-cli ping
 
 # Info
-docker exec $VALKEY_CONTAINER valkey-cli info server
-docker exec $VALKEY_CONTAINER valkey-cli dbsize
+docker exec $REDIS_CONTAINER valkey-cli info server
+docker exec $REDIS_CONTAINER valkey-cli dbsize
 
 # List keys (dev only)
-docker exec $VALKEY_CONTAINER valkey-cli keys '*'
+docker exec $REDIS_CONTAINER valkey-cli keys '*'
 
 # Get/check specific key
-docker exec $VALKEY_CONTAINER valkey-cli get <key>
-docker exec $VALKEY_CONTAINER valkey-cli type <key>
+docker exec $REDIS_CONTAINER valkey-cli get <key>
+docker exec $REDIS_CONTAINER valkey-cli type <key>
 
 # Flush all (destructive)
-docker exec $VALKEY_CONTAINER valkey-cli flushall
+docker exec $REDIS_CONTAINER valkey-cli flushall
 ```
 
 ### etcd

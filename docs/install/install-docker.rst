@@ -188,7 +188,7 @@ Create ``webserver.conf`` with the following content:
 
    [session.redis]
    # Use the halfstack Valkey service name for container networking
-   addr = "backendai-half-valkey-node01:8110"
+   addr = "backendai-half-redis-node01:8110"
 
    [session.redis.redis_helper_config]
    socket_timeout = 5.0

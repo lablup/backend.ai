@@ -46,7 +46,7 @@ services:
     ports:
       - "9187:9187"
 
-  backendai-half-valkey:
+  backendai-half-redis:
     image: valkey/valkey:9.1.0-alpine
     restart: unless-stopped
     networks:
@@ -64,14 +64,14 @@ services:
       timeout: 3s
       retries: 10
 
-  backendai-half-valkey-exporter:
+  backendai-half-redis-exporter:
     image: oliver006/redis_exporter:v1.73.0
     profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
     command: >
-      --redis.addr redis://backendai-half-valkey:6379
+      --redis.addr redis://backendai-half-redis:6379
       --include-system-metrics
       --include-config-metrics
       --include-modules-metrics

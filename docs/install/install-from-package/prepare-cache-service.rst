@@ -17,9 +17,9 @@ Please refer `the latest configuration <https://github.com/lablup/backend.ai/blo
             max-size: "10m"
 
    services:
-      backendai-half-valkey:
+      backendai-half-redis:
          <<: *base
-         container_name: backendai-halfstack-valkey
+         container_name: backendai-halfstack-redis
          image: valkey/valkey:9.1.0-alpine
          restart: unless-stopped
          command: >

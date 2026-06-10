@@ -685,7 +685,7 @@ Halfstack includes exporters for infrastructure metrics collection.
 ```bash
 docker compose -f docker-compose.halfstack.current.yml up -d \
   backendai-half-db \
-  backendai-half-valkey \
+  backendai-half-redis \
   backendai-half-etcd \
   backendai-half-prometheus \
   backendai-hive-router
