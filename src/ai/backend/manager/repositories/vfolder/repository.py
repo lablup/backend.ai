@@ -31,6 +31,7 @@ from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     RBACElementRef,
     RBACElementType,
     RelationType,
@@ -2270,6 +2271,7 @@ class VfolderRepository:
                         scope_id=str(vfolder_id),
                         entity_type=EntityType.VFOLDER,
                         operation=OperationType.READ,
+                        permission=Permission.READ,
                     )
                     .on_conflict_do_nothing(
                         constraint="uq_permissions_role_scope_entity_op",

@@ -12,7 +12,12 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import (
+    OperationType,
+    Permission,
+    RBACElementType,
+    ScopeType,
+)
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -364,6 +369,7 @@ class TestRBACEntityPurgerWithPermissions:
                     scope_id=str(entity_uuid),
                     entity_type=EntityType.VFOLDER,
                     operation=op,
+                    permission=Permission.from_operation(op),
                 )
                 db_sess.add(perm)
             await db_sess.flush()
@@ -421,6 +427,7 @@ class TestRBACEntityPurgerWithPermissions:
                     scope_id=str(entity_uuid),
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
+                    permission=Permission.from_operation(OperationType.READ),
                 )
                 db_sess.add(perm)
             await db_sess.flush()
@@ -758,6 +765,7 @@ class TestRBACEntityBatchPurger:
                     scope_id=str(entity_uuid),
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
+                    permission=Permission.from_operation(OperationType.READ),
                 )
                 db_sess.add(perm)
             await db_sess.flush()
@@ -1048,6 +1056,7 @@ class TestRBACEntityPurgerTransactionRollback:
                     scope_id=str(entity_uuid),
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
+                    permission=Permission.from_operation(OperationType.READ),
                 )
             )
             db_sess.add(

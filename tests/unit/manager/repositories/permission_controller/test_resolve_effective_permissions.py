@@ -20,6 +20,7 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     ScopeType,
 )
 from ai.backend.manager.data.user.types import UserStatus
@@ -415,6 +416,7 @@ class TestResolveEffectivePermissions:
                         scope_id=scope_id,
                         entity_type=entry.entity_type,
                         operation=entry.operation,
+                        permission=Permission.from_operation(entry.operation),
                     )
                 )
                 await db_sess.flush()
@@ -758,6 +760,7 @@ class TestResolveEffectivePermissions:
                     scope_id=fixture.project_id,
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
+                    permission=Permission.from_operation(OperationType.READ),
                 )
             )
             await db_sess.flush()
@@ -788,6 +791,7 @@ class TestResolveEffectivePermissions:
                     scope_id=fixture.project_id,
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
+                    permission=Permission.from_operation(OperationType.READ),
                 )
             )
             # role_b grants UPDATE at project scope
@@ -798,6 +802,7 @@ class TestResolveEffectivePermissions:
                     scope_id=fixture.project_id,
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.UPDATE,
+                    permission=Permission.from_operation(OperationType.UPDATE),
                 )
             )
             await db_sess.flush()

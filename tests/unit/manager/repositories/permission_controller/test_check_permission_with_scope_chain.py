@@ -23,6 +23,7 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     ScopeType,
 )
 from ai.backend.manager.data.user.types import UserStatus
@@ -229,6 +230,7 @@ class TestCheckPermissionWithScopeChain:
                     scope_id=scope_id,
                     entity_type=entry.entity_type,
                     operation=entry.operation,
+                    permission=Permission.from_operation(entry.operation),
                 )
                 db_sess.add(perm)
                 await db_sess.flush()
@@ -647,6 +649,7 @@ class TestCheckPermissionWithScopeChain:
                 scope_id=fixture_ids.project_id,
                 entity_type=EntityType.VFOLDER,
                 operation=OperationType.READ,
+                permission=Permission.from_operation(OperationType.READ),
             )
             db_sess.add(perm)
             await db_sess.flush()
@@ -748,6 +751,7 @@ class TestCheckPermissionWithScopeChain:
                     scope_id=scope_id,
                     entity_type=EntityType.VFOLDER,
                     operation=operation,
+                    permission=Permission.from_operation(operation),
                 )
                 db_sess.add(perm)
                 await db_sess.flush()
@@ -999,6 +1003,7 @@ class TestCheckPermissionWithScopeChain:
                 scope_id=fixture_ids.project_id,
                 entity_type=EntityType.VFOLDER,
                 operation=OperationType.READ,
+                permission=Permission.from_operation(OperationType.READ),
             )
             db_sess.add(perm)
             await db_sess.flush()
