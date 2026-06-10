@@ -2711,6 +2711,11 @@ input CreateRuntimeVariantPresetInput {
   For 'env' target, the environment variable name; for 'args' target, the CLI flag name.
   """
   key: String!
+
+  """
+  Added in UNRELEASED. Whether this preset parameter must be supplied when building a deployment revision.
+  """
+  required: Boolean! = false
 }
 
 """Added in 26.4.2. Create preset payload."""
@@ -11694,6 +11699,11 @@ type RuntimeVariantPreset implements Node {
   """
   targetSpec: PresetTargetSpec!
 
+  """
+  Added in UNRELEASED. Whether this preset parameter must be supplied when building a deployment revision.
+  """
+  required: Boolean!
+
   """UI category group for organizing parameters."""
   category: String
 
@@ -13589,6 +13599,9 @@ input UpdateRuntimeVariantPresetInput {
 
   """New key."""
   key: String = null
+
+  """Added in UNRELEASED. New required flag."""
+  required: Boolean = null
 }
 
 """Added in 26.4.2. Update preset payload."""

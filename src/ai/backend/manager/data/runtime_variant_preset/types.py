@@ -59,6 +59,7 @@ class RuntimeVariantPresetData:
     value_type: PresetValueType
     default_value: str | None
     key: str
+    required: bool
     category: str | None
     ui_type: str | None
     display_name: str | None

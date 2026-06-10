@@ -50,6 +50,10 @@ class CreateRuntimeVariantPresetInput(BaseRequestModel):
     value_type: PresetValueType = Field(description="Value type: str, int, float, bool, flag.")
     default_value: str | None = Field(default=None, max_length=512, description="Default value.")
     key: str = Field(min_length=1, max_length=256, description="Env key or args flag.")
+    required: bool = Field(
+        default=False,
+        description="Whether this preset param must be supplied on a deployment revision.",
+    )
     category: str | None = Field(default=None, max_length=64, description="UI category group.")
     display_name: str | None = Field(default=None, max_length=256, description="UI display name.")
     ui_option: UIOption | None = Field(
@@ -87,6 +91,9 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
     value_type: PresetValueType | None = Field(default=None)
     default_value: str | Sentinel | None = Field(default=SENTINEL)
     key: str | None = Field(default=None, min_length=1, max_length=256)
+    required: bool | None = Field(
+        default=None, description="Toggle required flag; None = no change."
+    )
     category: str | Sentinel | None = Field(default=SENTINEL)
     display_name: str | Sentinel | None = Field(default=SENTINEL)
     ui_option: UIOption | Sentinel | None = Field(default=SENTINEL)

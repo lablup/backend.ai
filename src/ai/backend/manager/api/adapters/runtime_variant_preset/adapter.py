@@ -154,6 +154,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 value_type=input.value_type,
                 default_value=input.default_value,
                 key=input.key,
+                required=input.required,
                 category=input.category,
                 display_name=input.display_name,
                 ui_option=input.ui_option,
@@ -200,6 +201,11 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 else TriState.update(input.default_value)
             ),
             key=(OptionalState.update(input.key) if input.key is not None else OptionalState.nop()),
+            required=(
+                OptionalState.update(input.required)
+                if input.required is not None
+                else OptionalState.nop()
+            ),
             category=(
                 TriState.nop()
                 if input.category is SENTINEL
@@ -299,6 +305,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 default_value=data.default_value,
                 key=data.key,
             ),
+            required=data.required,
             category=data.category,
             ui_type=data.ui_type,
             display_name=data.display_name,
