@@ -114,6 +114,26 @@ def _slash(v: str) -> str:
     return v.rstrip("/") + "/" if len(v) > 0 else ""
 
 
+def _flatten_nested_dict(
+    key_prefix: str,
+    dict_obj: NestedStrKeyedMapping,
+    out: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Flatten a nested dict into ``{slash-joined quoted key: value}`` pairs.
+
+    An empty-string key maps to the parent prefix itself (value-at-prefix).
+    """
+    if out is None:
+        out = {}
+    for k, v in dict_obj.items():
+        flattened_key = key_prefix if k == "" else key_prefix + "/" + quote(k)
+        if isinstance(v, Mapping):
+            _flatten_nested_dict(flattened_key, v, out)
+        else:
+            out[flattened_key] = v
+    return out
+
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -425,20 +445,7 @@ class AsyncEtcd(AbstractKVStore):
         :return:
         """
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
-        flattened_dict: NestedStrKeyedDict = {}
-
-        def _flatten(prefix: str, inner_dict: NestedStrKeyedDict) -> None:
-            for k, v in inner_dict.items():
-                if k == "":
-                    flattened_key = prefix
-                else:
-                    flattened_key = prefix + "/" + quote(k)
-                if isinstance(v, dict):
-                    _flatten(flattened_key, v)
-                else:
-                    flattened_dict[flattened_key] = v
-
-        _flatten(key, cast(NestedStrKeyedDict, dict_obj))
+        flattened_dict = _flatten_nested_dict(key, dict_obj)
 
         actions = []
         for k, v in flattened_dict.items():
@@ -481,6 +488,54 @@ class AsyncEtcd(AbstractKVStore):
             )
 
         async with self.etcd.connect() as communicator:
+            await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
+
+    async def atomic_replace_prefixes(
+        self,
+        replacements: Mapping[str, NestedStrKeyedMapping],
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> None:
+        """Replace each subtree under the given prefixes in a single etcd transaction.
+
+        For every ``(prefix, dict_obj)`` pair the subtree rooted at ``prefix`` is
+        replaced by the flattened ``dict_obj``: keys present under the prefix but
+        absent from the new contents are deleted, and every new key is put. The
+        current-key reads and the delete/put operations are committed as one
+        transaction so watchers (e.g. Traefik) never observe a partially-applied
+        state where a router's backing service has briefly vanished.
+
+        An empty ``dict_obj`` removes the whole subtree under its prefix. Prefixes
+        are expected to be disjoint subtrees (one per logical object); sibling
+        subtrees not listed in ``replacements`` are left untouched.
+
+        :param replacements: Mapping of subtree prefix to its new nested contents.
+            Both prefixes and dict keys must be quoted by the caller as needed.
+        :param scope: The config scope for the operation.
+        :param scope_prefix_map: The scope map used to mangle the prefix.
+        """
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+
+        new_pairs: dict[str, str] = {}
+        existing_keys: set[str] = set()
+        async with self.etcd.connect() as communicator:
+            for prefix, dict_obj in replacements.items():
+                mangled_prefix = self._mangle_key(f"{_slash(scope_prefix)}{prefix}")
+                pairs = await communicator.get_prefix(mangled_prefix.encode(self.encoding))
+                for raw_key, _ in pairs:
+                    existing_keys.add(bytes(raw_key).decode(self.encoding))
+                for k, v in _flatten_nested_dict(prefix, dict_obj).items():
+                    new_pairs[self._mangle_key(f"{_slash(scope_prefix)}{k}")] = str(v)
+
+            stale_keys = existing_keys - new_pairs.keys()
+            actions = [TxnOp.delete(k.encode(self.encoding)) for k in stale_keys]
+            actions.extend(
+                TxnOp.put(k.encode(self.encoding), v.encode(self.encoding))
+                for k, v in new_pairs.items()
+            )
+            if not actions:
+                return
             await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
     async def get(
