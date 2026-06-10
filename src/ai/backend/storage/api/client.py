@@ -442,7 +442,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
                 )
             watcher_task = asyncio.create_task(
-                ctx.valkey_tus_client.watch_lease(session_id, holder_token),
+                ctx.valkey_tus_client.watch_lease(session_id),
                 name=f"tus-lease-watch-{session_id}",
             )
             try:
