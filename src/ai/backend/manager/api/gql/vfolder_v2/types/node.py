@@ -36,6 +36,7 @@ from .nested import (
     VFolderAccessControlInfoGQL,
     VFolderMetadataInfoGQL,
     VFolderOwnershipInfoGQL,
+    VFolderUsageInfoGQL,
 )
 
 
@@ -78,6 +79,16 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         )
     )
     unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
+    usage: VFolderUsageInfoGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Storage-proxy-sourced usage and quota statistics: file count, used capacity, "
+                "and capacity/file-count quota limits. Null for list responses where usage is not loaded."
+            ),
+        ),
+        default=None,
+    )
 
     @gql_added_field(
         BackendAIGQLMeta(

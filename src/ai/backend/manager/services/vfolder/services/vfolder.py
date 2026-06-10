@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import logging
 import math
 import uuid
@@ -1723,7 +1724,33 @@ class VFolderService:
     async def get_v2(self, action: GetVFolderV2Action) -> GetVFolderV2ActionResult:
         """Get a single vfolder by ID (v2). RBAC is enforced at the processor level."""
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        vfolder_data = await self._refresh_usage(vfolder_data)
         return GetVFolderV2ActionResult(vfolder=vfolder_data)
+
+    async def _refresh_usage(self, vfolder_data: VFolderData) -> VFolderData:
+        """Refresh usage statistics from the storage proxy and persist them.
+
+        Best-effort: on any storage-proxy failure the stale DB values are returned.
+        """
+        if vfolder_data.unmanaged_path:
+            return vfolder_data
+        try:
+            proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
+            client = self._storage_manager.get_manager_facing_client(proxy_name)
+            vfid = f"{vfolder_data.quota_scope_id}/{vfolder_data.id}"
+            usage = await client.get_folder_usage(volume_name, vfid)
+            num_files = int(usage["file_count"])
+            cur_size = int(usage["used_bytes"])
+        except Exception:
+            log.warning(
+                "Failed to refresh usage of vfolder {} from storage proxy; using cached values",
+                vfolder_data.id,
+            )
+            return vfolder_data
+        await self._vfolder_repository.update_usage(
+            vfolder_data.id, num_files=num_files, cur_size=cur_size
+        )
+        return dataclasses.replace(vfolder_data, num_files=num_files, cur_size=cur_size)
 
     async def create_in_project(
         self, action: CreateVFolderInProjectAction

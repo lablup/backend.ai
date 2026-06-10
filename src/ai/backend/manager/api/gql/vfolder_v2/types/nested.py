@@ -18,6 +18,11 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderOwnershipInfo as VFolderOwnershipInfoDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder.types import (
+    VFolderUsageInfo as VFolderUsageInfoDTO,
+)
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -87,6 +92,30 @@ class VFolderAccessControlInfoGQL:
     ownership_type: VFolderOwnershipTypeGQL = gql_field(
         description="Ownership type: USER (personal folder) or GROUP (project-shared folder)."
     )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Storage-proxy-sourced usage and quota statistics for a virtual folder. "
+            "Includes current used capacity, file count, and capacity/file-count quota limits."
+        ),
+    ),
+    model=VFolderUsageInfoDTO,
+    name="VFolderUsageInfo",
+)
+class VFolderUsageInfoGQL:
+    """Storage-proxy-sourced usage and quota statistics for a virtual folder."""
+
+    num_files: int = gql_field(description="Number of files currently stored in the folder.")
+    used_bytes: BinarySizeInfoGQL = gql_field(
+        description="Current used capacity in bytes, with human-readable display."
+    )
+    max_size: BinarySizeInfoGQL | None = gql_field(
+        description="Capacity quota limit in bytes, with human-readable display. Null if unlimited."
+    )
+    max_files: int = gql_field(description="File-count quota for the folder.")
 
 
 @gql_pydantic_type(

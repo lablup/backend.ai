@@ -6,7 +6,7 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@externa
   subscription: Subscription
 }
 
-"""Added in 26.4.4. Input for accepting a role invitation."""
+"""Added in UNRELEASED. Input for accepting a role invitation."""
 input AcceptRoleInvitationInput {
   invitationId: UUID!
 }
@@ -138,7 +138,9 @@ input AddRevisionInput {
   """Extra vfolder mounts"""
   extraMounts: [ExtraVFolderMountInput!] = null
 
-  """Added in 26.4.4. Additional options for the add revision operation."""
+  """
+  Added in UNRELEASED. Additional options for the add revision operation.
+  """
   options: AddRevisionOptions = null
 }
 
@@ -1030,7 +1032,7 @@ enum AuditLogOrderField {
 }
 
 """
-Added in 26.4.4. Scope for the scoped audit log query. All items are OR'd; raises an error if every field is empty.
+Added in UNRELEASED. Scope for the scoped audit log query. All items are OR'd; raises an error if every field is empty.
 """
 input AuditLogScope {
   """Entity-tagged scope items."""
@@ -1265,7 +1267,7 @@ input BlueGreenConfigInput {
 }
 
 """
-Added in 26.4.4. Failure detail for a single permission entry in bulk add
+Added in UNRELEASED. Failure detail for a single permission entry in bulk add
 """
 type BulkAddRolePermissionFailureInfo {
   """Role ID of the failed entry"""
@@ -1288,7 +1290,7 @@ type BulkAddRolePermissionFailureInfo {
 }
 
 """
-Added in 26.4.4. Failure detail for a single permission entry in a bulk add operation.
+Added in UNRELEASED. Failure detail for a single permission entry in a bulk add operation.
 """
 type BulkAddRolePermissionPresetFailureInfo {
   """Entity type of the permission entry that failed."""
@@ -1302,7 +1304,7 @@ type BulkAddRolePermissionPresetFailureInfo {
 }
 
 """
-Added in 26.4.4. Input for bulk-adding permission entries to an existing role preset.
+Added in UNRELEASED. Input for bulk-adding permission entries to an existing role preset.
 """
 input BulkAddRolePermissionPresetsInput {
   """ID of the role preset to add permissions to."""
@@ -1313,7 +1315,7 @@ input BulkAddRolePermissionPresetsInput {
 }
 
 """
-Added in 26.4.4. Payload returned after bulk-adding permission entries to a role preset.
+Added in UNRELEASED. Payload returned after bulk-adding permission entries to a role preset.
 """
 type BulkAddRolePermissionPresetsPayload {
   """Permission entries that were added."""
@@ -1324,13 +1326,13 @@ type BulkAddRolePermissionPresetsPayload {
 }
 
 """
-Added in 26.4.4. Input for bulk-inserting scoped permissions across one or more roles
+Added in UNRELEASED. Input for bulk-inserting scoped permissions across one or more roles
 """
 input BulkAddRolePermissionsInput {
   permissions: [CreatePermissionInput!]!
 }
 
-"""Added in 26.4.4. Payload for bulk role-permission insertion"""
+"""Added in UNRELEASED. Payload for bulk role-permission insertion"""
 type BulkAddRolePermissionsPayload {
   """Successfully inserted permission rows"""
   items: [Permission!]!
@@ -1401,7 +1403,7 @@ type BulkCreateUsersV2Payload {
 }
 
 """
-Added in 26.4.4. Payload for bulk user creation, including each user's generated keypair.
+Added in UNRELEASED. Payload for bulk user creation, including each user's generated keypair.
 """
 type BulkCreateUsersWithKeypairV2Payload {
   """List of successfully created users with their generated keypairs."""
@@ -1412,7 +1414,7 @@ type BulkCreateUsersWithKeypairV2Payload {
 }
 
 """
-Added in 26.4.4. Error information for a model card that failed during bulk deletion.
+Added in UNRELEASED. Error information for a model card that failed during bulk deletion.
 """
 type BulkDeleteModelCardV2Error {
   """UUID of the model card that failed to delete."""
@@ -1422,7 +1424,7 @@ type BulkDeleteModelCardV2Error {
   message: String!
 }
 
-"""Added in 26.4.4. Input for bulk-deleting multiple model cards."""
+"""Added in UNRELEASED. Input for bulk-deleting multiple model cards."""
 input BulkDeleteModelCardsV2Input {
   """List of model card UUIDs to delete."""
   ids: [UUID!]!
@@ -1431,7 +1433,7 @@ input BulkDeleteModelCardsV2Input {
   options: DeleteModelCardV2Options = null
 }
 
-"""Added in 26.4.4. Payload for bulk model card deletion."""
+"""Added in UNRELEASED. Payload for bulk model card deletion."""
 type BulkDeleteModelCardsV2Payload {
   """UUIDs of model cards that were successfully deleted."""
   successes: [UUID!]!
@@ -1440,14 +1442,14 @@ type BulkDeleteModelCardsV2Payload {
   failed: [BulkDeleteModelCardV2Error!]!
 }
 
-"""Added in 26.4.4. Input for bulk-soft-deleting role presets."""
+"""Added in UNRELEASED. Input for bulk-soft-deleting role presets."""
 input BulkDeleteRolePresetsInput {
   """Role preset UUIDs to soft-delete."""
   rolePresetIds: [ID!]!
 }
 
 """
-Added in 26.4.4. Payload returned after bulk-soft-deleting role presets.
+Added in UNRELEASED. Payload returned after bulk-soft-deleting role presets.
 """
 type BulkDeleteRolePresetsPayload {
   """Role presets that were soft-deleted."""
@@ -1469,14 +1471,14 @@ type BulkDeleteVFoldersV2Payload {
   deletedCount: Int!
 }
 
-"""Added in 26.4.4. Input for bulk-hard-deleting role presets."""
+"""Added in UNRELEASED. Input for bulk-hard-deleting role presets."""
 input BulkPurgeRolePresetsInput {
   """Role preset UUIDs to purge."""
   rolePresetIds: [ID!]!
 }
 
 """
-Added in 26.4.4. Payload returned after bulk-hard-deleting role presets.
+Added in UNRELEASED. Payload returned after bulk-hard-deleting role presets.
 """
 type BulkPurgeRolePresetsPayload {
   """Role presets that were purged."""
@@ -1526,7 +1528,9 @@ type BulkPurgeUsersV2Payload {
   failed: [BulkPurgeUserV2Error!]!
 }
 
-"""Added in 26.4.4. Failure detail for a single vfolder in a bulk purge."""
+"""
+Added in UNRELEASED. Failure detail for a single vfolder in a bulk purge.
+"""
 type BulkPurgeVFolderV2Error {
   """UUID of the vfolder that failed to purge."""
   vfolderId: UUID!
@@ -1543,7 +1547,7 @@ input BulkPurgeVFoldersV2Input {
   ids: [UUID!]!
 
   """
-  Added in 26.4.4. Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
+  Added in UNRELEASED. Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
   """
   options: PurgeVFolderOptionsInput
 }
@@ -1558,7 +1562,7 @@ type BulkPurgeVFoldersV2Payload {
 }
 
 """
-Added in 26.4.4. Failure detail for a single permission ID in bulk remove
+Added in UNRELEASED. Failure detail for a single permission ID in bulk remove
 """
 type BulkRemoveRolePermissionFailureInfo {
   """Permission row ID that failed to delete"""
@@ -1569,7 +1573,7 @@ type BulkRemoveRolePermissionFailureInfo {
 }
 
 """
-Added in 26.4.4. Input for bulk-removing permission entries from a role preset.
+Added in UNRELEASED. Input for bulk-removing permission entries from a role preset.
 """
 input BulkRemoveRolePermissionPresetsInput {
   """Permission entry row IDs to delete."""
@@ -1577,7 +1581,7 @@ input BulkRemoveRolePermissionPresetsInput {
 }
 
 """
-Added in 26.4.4. Payload returned after bulk-removing permission entries from a role preset.
+Added in UNRELEASED. Payload returned after bulk-removing permission entries from a role preset.
 """
 type BulkRemoveRolePermissionPresetsPayload {
   """Permission entries that were removed."""
@@ -1588,13 +1592,13 @@ type BulkRemoveRolePermissionPresetsPayload {
 }
 
 """
-Added in 26.4.4. Input for bulk-deleting permission rows by primary key
+Added in UNRELEASED. Input for bulk-deleting permission rows by primary key
 """
 input BulkRemoveRolePermissionsInput {
   permissionIds: [UUID!]!
 }
 
-"""Added in 26.4.4. Payload for bulk role-permission deletion"""
+"""Added in UNRELEASED. Payload for bulk role-permission deletion"""
 type BulkRemoveRolePermissionsPayload {
   """Successfully deleted permission rows"""
   items: [Permission!]!
@@ -1603,14 +1607,16 @@ type BulkRemoveRolePermissionsPayload {
   failed: [BulkRemoveRolePermissionFailureInfo!]!
 }
 
-"""Added in 26.4.4. Input for bulk-restoring soft-deleted role presets."""
+"""
+Added in UNRELEASED. Input for bulk-restoring soft-deleted role presets.
+"""
 input BulkRestoreRolePresetsInput {
   """Role preset UUIDs to restore."""
   rolePresetIds: [ID!]!
 }
 
 """
-Added in 26.4.4. Payload returned after bulk-restoring soft-deleted role presets.
+Added in UNRELEASED. Payload returned after bulk-restoring soft-deleted role presets.
 """
 type BulkRestoreRolePresetsPayload {
   """Role presets that were restored."""
@@ -1647,7 +1653,7 @@ type BulkRevokeRolePayload {
 }
 
 """
-Added in 26.4.4. Failure detail for a single permission entry in a bulk operation.
+Added in UNRELEASED. Failure detail for a single permission entry in a bulk operation.
 """
 type BulkRolePermissionPresetFailureInfo {
   """role_permission_presets row ID that the operation failed on."""
@@ -1658,7 +1664,7 @@ type BulkRolePermissionPresetFailureInfo {
 }
 
 """
-Added in 26.4.4. Failure detail for a single role preset ID in a bulk operation.
+Added in UNRELEASED. Failure detail for a single role preset ID in a bulk operation.
 """
 type BulkRolePresetFailureInfo {
   """Role preset ID that the operation failed on."""
@@ -1781,7 +1787,7 @@ type CancelImportArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in 26.4.4. Input for canceling a role invitation."""
+"""Added in UNRELEASED. Input for canceling a role invitation."""
 input CancelRoleInvitationInput {
   invitationId: UUID!
 }
@@ -2167,52 +2173,54 @@ input CreateDeploymentRevisionPresetInput {
   """Default deployment strategy for deployments created from this preset."""
   deploymentStrategy: PresetDeploymentStrategyInput!
 
-  """Added in 26.4.4. Container image to run the inference server."""
+  """Added in UNRELEASED. Container image to run the inference server."""
   imageId: UUID!
 
   """
-  Added in 26.4.4. Detailed explanation of when and why to use this preset configuration.
+  Added in UNRELEASED. Detailed explanation of when and why to use this preset configuration.
   """
   description: String = null
 
   """
-  Added in 26.4.4. Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint. Optional, but when provided it must be fully populated with at least one model.
+  Added in UNRELEASED. Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.
   """
-  modelDefinition: PresetModelDefinitionInput = null
+  modelDefinition: ModelDefinitionInput = null
 
   """
-  Added in 26.4.4. Resource slot allocations (e.g. cpu, mem, cuda.device).
+  Added in UNRELEASED. Resource slot allocations (e.g. cpu, mem, cuda.device).
   """
   resourceSlots: [ResourceSlotEntryInput!] = null
 
   """
-  Added in 26.4.4. Additional resource options such as shared memory (shmem) size.
+  Added in UNRELEASED. Additional resource options such as shared memory (shmem) size.
   """
   resourceOpts: [ResourceOptsEntryInput!] = null
 
-  """Added in 26.4.4. Deployment topology mode (single-node or multi-node)."""
+  """
+  Added in UNRELEASED. Deployment topology mode (single-node or multi-node).
+  """
   clusterMode: ClusterMode!
 
-  """Added in 26.4.4. Number of worker nodes in the cluster."""
+  """Added in UNRELEASED. Number of worker nodes in the cluster."""
   clusterSize: Int!
 
   """
-  Added in 26.4.4. Command to start the inference server process inside the container.
+  Added in UNRELEASED. Command to start the inference server process inside the container.
   """
   startupCommand: String = null
 
   """
-  Added in 26.4.4. Script executed before the main process starts (e.g. to download model weights).
+  Added in UNRELEASED. Script executed before the main process starts (e.g. to download model weights).
   """
   bootstrapScript: String = null
 
   """
-  Added in 26.4.4. Environment variables injected into the inference container.
+  Added in UNRELEASED. Environment variables injected into the inference container.
   """
   environ: [EnvironEntryInput!] = null
 
   """
-  Added in 26.4.4. Runtime variant preset values applied when using this deployment preset.
+  Added in UNRELEASED. Runtime variant preset values applied when using this deployment preset.
   """
   presetValues: [DeploymentRevisionPresetValueEntryInput!] = null
 }
@@ -2273,7 +2281,7 @@ type CreateHuggingFaceRegistryPayload {
 }
 
 """
-Added in 26.4.4. A keypair returned at creation time, including its one-time secret key.
+Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
 """
 type CreateKeypairPayload {
   """The newly created keypair."""
@@ -2617,25 +2625,25 @@ input CreateRoleInput {
   source: RoleSource! = CUSTOM
 
   """
-  Added in 26.4.4. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  Added in UNRELEASED. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean! = false
   scopes: [ScopeInput!] = null
 }
 
-"""Added in 26.4.4. Input for creating role invitations."""
+"""Added in UNRELEASED. Input for creating role invitations."""
 input CreateRoleInvitationInput {
   roleId: UUID!
   emails: [String!]!
 }
 
-"""Added in 26.4.4. Payload for role invitation creation."""
+"""Added in UNRELEASED. Payload for role invitation creation."""
 type CreateRoleInvitationPayload {
   """List of created role invitations."""
   items: [RoleInvitation!]!
 }
 
-"""Added in 26.4.4. Input for creating a new role preset."""
+"""Added in UNRELEASED. Input for creating a new role preset."""
 input CreateRolePresetInput {
   """Role preset name."""
   name: String!
@@ -2652,7 +2660,7 @@ input CreateRolePresetInput {
   permissions: [RolePermissionPresetEntryInput!]!
 }
 
-"""Added in 26.4.4. Payload returned after creating a role preset."""
+"""Added in UNRELEASED. Payload returned after creating a role preset."""
 type CreateRolePresetPayload {
   """Created role preset."""
   rolePreset: RolePreset!
@@ -2703,11 +2711,6 @@ input CreateRuntimeVariantPresetInput {
   For 'env' target, the environment variable name; for 'args' target, the CLI flag name.
   """
   key: String!
-
-  """
-  Added in 26.4.4. Whether this preset parameter must be supplied when building a deployment revision.
-  """
-  required: Boolean! = false
 }
 
 """Added in 26.4.2. Create preset payload."""
@@ -2852,7 +2855,7 @@ type CreateVFSStoragePayload {
 }
 
 """
-Added in 26.4.4. Scope-agnostic body for vfolder creation. The owning scope is supplied as a separate mutation argument.
+Added in UNRELEASED. Scope-agnostic body for vfolder creation. The owning scope is supplied as a separate mutation argument.
 """
 input CreateVFolderInScopeInput {
   """VFolder name."""
@@ -2928,7 +2931,7 @@ input DateTimeFilter {
 scalar Decimal
 
 """
-Added in 26.4.4. A single (handler_name, options) entry response for session handler options.
+Added in UNRELEASED. A single (handler_name, options) entry response for session handler options.
 """
 type DefaultSessionHandlerOptionsEntryInfo {
   """Phase timeout in seconds; `null` means unbounded for this entry."""
@@ -2944,7 +2947,7 @@ type DefaultSessionHandlerOptionsEntryInfo {
 }
 
 """
-Added in 26.4.4. A single (handler_name, options) entry for session handler options.
+Added in UNRELEASED. A single (handler_name, options) entry for session handler options.
 """
 input DefaultSessionHandlerOptionsEntryInput {
   handlerName: String!
@@ -2953,7 +2956,7 @@ input DefaultSessionHandlerOptionsEntryInput {
 }
 
 """
-Added in 26.4.4. Per-handler scheduler policy snapshot for session handler options.
+Added in UNRELEASED. Per-handler scheduler policy snapshot for session handler options.
 """
 type DefaultSessionHandlerOptionsInfo {
   """Phase timeout in seconds; `null` means unbounded for this entry."""
@@ -2966,14 +2969,14 @@ type DefaultSessionHandlerOptionsInfo {
 }
 
 """
-Added in 26.4.4. Per-handler scheduler policy fields for session handler options.
+Added in UNRELEASED. Per-handler scheduler policy fields for session handler options.
 """
 input DefaultSessionHandlerOptionsInput {
   timeoutSec: Int = null
   maxRetryCount: Int = null
 }
 
-"""Added in 26.4.4. Session handler-options policy response."""
+"""Added in UNRELEASED. Session handler-options policy response."""
 type DefaultSessionHandlerOptionsPolicyInfo {
   """
   Fallback per-handler policy applied to handlers not listed in `by_handler`.
@@ -2985,14 +2988,14 @@ type DefaultSessionHandlerOptionsPolicyInfo {
 }
 
 """
-Added in 26.4.4. Session handler-options input (timeout + retry, handler-keyed).
+Added in UNRELEASED. Session handler-options input (timeout + retry, handler-keyed).
 """
 input DefaultSessionHandlerOptionsPolicyInput {
   default: DefaultSessionHandlerOptionsInput = null
   byHandler: [DefaultSessionHandlerOptionsEntryInput!] = null
 }
 
-"""Added in 26.4.4. Baseline kernel execution spec response."""
+"""Added in UNRELEASED. Baseline kernel execution spec response."""
 type DefaultSessionKernelExecutionSpecInfo {
   """Container image identifier, or `null` if not resolved."""
   imageId: String
@@ -3017,7 +3020,7 @@ type DefaultSessionKernelExecutionSpecInfo {
 }
 
 """
-Added in 26.4.4. Baseline kernel execution spec input used as the resource-group default.
+Added in UNRELEASED. Baseline kernel execution spec input used as the resource-group default.
 """
 input DefaultSessionKernelExecutionSpecInput {
   imageId: String = null
@@ -3029,7 +3032,7 @@ input DefaultSessionKernelExecutionSpecInput {
   batchTimeoutSec: Int = null
 }
 
-"""Added in 26.4.4. Resource-group default session options response."""
+"""Added in UNRELEASED. Resource-group default session options response."""
 type DefaultSessionOptionsInfo {
   """Default scheduling priority."""
   priority: Int!
@@ -3057,7 +3060,9 @@ type DefaultSessionOptionsInfo {
   agentSelectionPolicy: SessionAgentSelectionPolicy!
 }
 
-"""Added in 26.4.4. Resource-group default session options input payload."""
+"""
+Added in UNRELEASED. Resource-group default session options input payload.
+"""
 input DefaultSessionOptionsInput {
   priority: Int = null
   isPreemptible: Boolean = null
@@ -3068,7 +3073,7 @@ input DefaultSessionOptionsInput {
   agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
-"""Added in 26.4.4. Qualitative resource hints response."""
+"""Added in UNRELEASED. Qualitative resource hints response."""
 type DefaultSessionResourceOptsInfo {
   """
   Shared-memory size as a human-readable string (e.g. '64m'). `null` means 'use the runtime default'.
@@ -3077,7 +3082,7 @@ type DefaultSessionResourceOptsInfo {
 }
 
 """
-Added in 26.4.4. Qualitative resource hints for session-level defaults (shared memory, ...).
+Added in UNRELEASED. Qualitative resource hints for session-level defaults (shared memory, ...).
 """
 input DefaultSessionResourceOptsInput {
   shmem: BinarySizeInput = null
@@ -3154,13 +3159,13 @@ input DelegateeTarget {
   targetRegistryId: ID!
 }
 
-"""Added in 26.4.4. Input for deleting an access token."""
+"""Added in UNRELEASED. Input for deleting an access token."""
 input DeleteAccessTokenInput {
   """The ID of the access token to delete."""
   id: ID!
 }
 
-"""Added in 26.4.4. Payload for deleting an access token."""
+"""Added in UNRELEASED. Payload for deleting an access token."""
 type DeleteAccessTokenPayload {
   """ID of the deleted access token"""
   id: UUID!
@@ -3291,7 +3296,7 @@ type DeleteModelCardPayload {
   id: UUID!
 }
 
-"""Added in 26.4.4. Options for the model card delete operation."""
+"""Added in UNRELEASED. Options for the model card delete operation."""
 input DeleteModelCardV2Options {
   """
   If true, also soft-delete (move to trash) the model VFolder(s) associated with the deleted model card(s).
@@ -3594,7 +3599,7 @@ input DeploymentFilter {
   NOT: [DeploymentFilter!] = null
 }
 
-"""Added in 26.4.4. Deployment handler-options policy response."""
+"""Added in UNRELEASED. Deployment handler-options policy response."""
 type DeploymentHandlerOptionsInfo {
   """Fallback per-handler policy."""
   default: HandlerOptionsInfo!
@@ -3603,7 +3608,7 @@ type DeploymentHandlerOptionsInfo {
   byHandler: [HandlerOptionsEntryInfo!]!
 }
 
-"""Added in 26.4.4. Deployment handler-options policy input."""
+"""Added in UNRELEASED. Deployment handler-options policy input."""
 input DeploymentHandlerOptionsInput {
   default: HandlerOptionsInput = null
   byHandler: [HandlerOptionsEntryInput!] = null
@@ -3626,7 +3631,7 @@ type DeploymentHistory implements Node {
   updatedAt: DateTime!
 
   """
-  Added in 26.4.4. Handler category that produced this row. ``lifecycle`` for monotonic lifecycle transitions; ``scaling`` for replica-reconcile transitions; ``health`` is reserved.
+  Added in UNRELEASED. Handler category that produced this row. ``lifecycle`` for monotonic lifecycle transitions; ``scaling`` for replica-reconcile transitions; ``health`` is reserved.
   """
   category: String!
 
@@ -3682,13 +3687,13 @@ enum DeploymentHistoryOrderField {
   UPDATED_AT
 }
 
-"""Added in 26.4.4. Deployment options payload response."""
+"""Added in UNRELEASED. Deployment options payload response."""
 type DeploymentOptionsInfo {
   """Handler-keyed scheduler policy (timeout + retry)."""
   handlerOptions: DeploymentHandlerOptionsInfo!
 }
 
-"""Added in 26.4.4. Deployment options payload input."""
+"""Added in UNRELEASED. Deployment options payload input."""
 input DeploymentOptionsInput {
   handlerOptions: DeploymentHandlerOptionsInput!
 }
@@ -3776,11 +3781,6 @@ type DeploymentRevisionPreset implements Node {
   """Added in 26.4.3. The runtime variant this preset is designed for."""
   runtimeVariant: RuntimeVariant
 
-  """
-  Added in 26.4.4. The container image used to run the inference server. None when the preset does not specify an image.
-  """
-  image: ImageV2
-
   """Added in 26.4.2. Resource slot allocations for this preset."""
   resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null): [AllocatedResourceSlot!]
 }
@@ -3817,7 +3817,7 @@ type DeploymentRevisionPresetEnvironEntry {
 
 """Added in 26.4.2. Filter for deployment revision presets."""
 input DeploymentRevisionPresetFilter {
-  """Added in 26.4.4. Filter by preset ID."""
+  """Added in UNRELEASED. Filter by preset ID."""
   id: UUIDFilter = null
 
   """Name filter."""
@@ -3855,7 +3855,7 @@ type DeploymentRevisionPresetValueEntry {
 }
 
 """
-Added in 26.4.4. A mapping of a runtime variant preset to a concrete value, used to auto-configure runtime parameters when this deployment preset is applied.
+Added in UNRELEASED. A mapping of a runtime variant preset to a concrete value, used to auto-configure runtime parameters when this deployment preset is applied.
 """
 input DeploymentRevisionPresetValueEntryInput {
   """The runtime variant preset that this value applies to."""
@@ -4605,7 +4605,9 @@ type EntityTimestamps {
   modifiedAt: DateTime
 }
 
-"""Added in 26.4.4. Entity reference parametrized by RBAC element type."""
+"""
+Added in UNRELEASED. Entity reference parametrized by RBAC element type.
+"""
 input EntityTypeScope {
   """RBAC element type of the entity."""
   entityType: RBACElementType!
@@ -4615,7 +4617,7 @@ input EntityTypeScope {
 }
 
 """
-Added in 26.4.4. A single environment variable entry with key and value.
+Added in UNRELEASED. A single environment variable entry with key and value.
 """
 input EnvironEntryInput {
   """Environment variable key (e.g., 'CUDA_VISIBLE_DEVICES')."""
@@ -4679,7 +4681,7 @@ type ExtraVFolderMountInfo {
   mountPerm: MountPermission!
 
   """
-  Added in 26.4.4. Subpath within the vfolder. ``None`` means the vfolder root.
+  Added in UNRELEASED. Subpath within the vfolder. ``None`` means the vfolder root.
   """
   subpath: String
 }
@@ -4690,7 +4692,7 @@ input ExtraVFolderMountInput {
   mountDestination: String
 
   """
-  Added in 26.4.4. Subpath within the vfolder. ``null`` (default) mounts the vfolder root.
+  Added in UNRELEASED. Subpath within the vfolder. ``null`` (default) mounts the vfolder root.
   """
   subpath: String = null
 }
@@ -4805,7 +4807,7 @@ extend type GroupNode @key(fields: "id") {
 }
 
 """
-Added in 26.4.4. A single (handler_name, options) entry response for deployment handler options.
+Added in UNRELEASED. A single (handler_name, options) entry response for deployment handler options.
 """
 type HandlerOptionsEntryInfo {
   """Phase timeout in seconds; `null` means unbounded for this entry."""
@@ -4821,7 +4823,7 @@ type HandlerOptionsEntryInfo {
 }
 
 """
-Added in 26.4.4. A single (handler_name, options) entry for deployment handler options.
+Added in UNRELEASED. A single (handler_name, options) entry for deployment handler options.
 """
 input HandlerOptionsEntryInput {
   handlerName: String!
@@ -4830,7 +4832,7 @@ input HandlerOptionsEntryInput {
 }
 
 """
-Added in 26.4.4. Per-handler scheduler policy snapshot for deployment handler options.
+Added in UNRELEASED. Per-handler scheduler policy snapshot for deployment handler options.
 """
 type HandlerOptionsInfo {
   """Phase timeout in seconds; `null` means unbounded for this entry."""
@@ -4843,7 +4845,7 @@ type HandlerOptionsInfo {
 }
 
 """
-Added in 26.4.4. Per-handler scheduler policy fields for deployment handler options.
+Added in UNRELEASED. Per-handler scheduler policy fields for deployment handler options.
 """
 input HandlerOptionsInput {
   timeoutSec: Int = null
@@ -5023,7 +5025,7 @@ input ImageV2Filter {
   name: StringFilter = null
   architecture: StringFilter = null
 
-  """Added in 26.4.4. Filter by image UUID."""
+  """Added in UNRELEASED. Filter by image UUID."""
   id: UUIDFilter = null
 
   """Added in 26.4.0. Filter by container registry ID."""
@@ -5215,7 +5217,7 @@ type ImportArtifactsPayload {
 }
 
 """
-Added in 26.4.4. Filter for integer array fields. Supports 'contains' (column contains this single value), 'contains_any' (column contains any of these values), and 'contains_all' (column contains all of these values).
+Added in UNRELEASED. Filter for integer array fields. Supports 'contains' (column contains this single value), 'contains_any' (column contains any of these values), and 'contains_all' (column contains all of these values).
 """
 input IntArrayFilter {
   contains: Int = null
@@ -5625,7 +5627,7 @@ input KeypairFilter {
   accessKey: StringFilter = null
   resourcePolicy: StringFilter = null
 
-  """Added in 26.4.4. Filter keypairs by the UUID of their owner."""
+  """Added in UNRELEASED. Filter keypairs by the UUID of their owner."""
   userId: UUIDFilter = null
   createdAt: DateTimeFilter = null
   lastUsed: DateTimeFilter = null
@@ -5660,7 +5662,7 @@ type KeypairResourceAllocationV2 {
 }
 
 """
-Added in 26.4.4. Nested filter for keypairs assigned to a keypair resource policy. Filters policies linked to at least one keypair matching all specified conditions.
+Added in UNRELEASED. Nested filter for keypairs assigned to a keypair resource policy. Filters policies linked to at least one keypair matching all specified conditions.
 """
 input KeypairResourcePolicyKeypairNestedFilter {
   userId: UUIDFilter = null
@@ -5711,7 +5713,7 @@ type KeypairResourcePolicyV2 implements Node {
   """Allowed vfolder host permissions."""
   allowedVfolderHosts: [VFolderHostPermissionEntry!]!
 
-  """Added in 26.4.4. Keypairs assigned to this resource policy."""
+  """Added in UNRELEASED. Keypairs assigned to this resource policy."""
   keypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection
 }
 
@@ -5748,7 +5750,7 @@ input KeypairResourcePolicyV2Filter {
   maxPendingSessionCount: IntFilter = null
 
   """
-  Added in 26.4.4. Filter policies by their assigned keypairs. A policy matches if at least one of its keypairs satisfies the conditions.
+  Added in UNRELEASED. Filter policies by their assigned keypairs. A policy matches if at least one of its keypairs satisfies the conditions.
   """
   keypair: KeypairResourcePolicyKeypairNestedFilter = null
 }
@@ -6342,7 +6344,7 @@ type ModelDeployment implements Node {
   options: DeploymentOptionsInfo!
 
   """
-  Added in 26.4.4. Endpoint-level replica scaling axis. Scaling is now reconciled per replica group, so this stays ``STABLE``; inspect each replica group's scaling status instead. Deprecated since 26.4.4. Use per-replica-group scaling status.
+  Added in UNRELEASED. Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle). ``SCALING`` while the replica reconciler is adjusting replica count; ``STABLE`` once holding at the desired count.
   """
   scalingState: ScalingState!
 
@@ -6401,7 +6403,7 @@ Added in 25.19.0. Contains metadata information for a model deployment including
 """
 type ModelDeploymentMetadata {
   """
-  Added in 26.4.4. The resource group this deployment runs in, resolved via DataLoader.
+  Added in UNRELEASED. The resource group this deployment runs in, resolved via DataLoader.
   """
   resourceGroup: ResourceGroup
 
@@ -6603,7 +6605,7 @@ type ModelMountConfig {
   definitionPath: String!
 
   """
-  Added in 26.4.4. Subpath within the model vfolder. ``None`` means the vfolder root.
+  Added in UNRELEASED. Subpath within the model vfolder. ``None`` means the vfolder root.
   """
   subpath: String
 }
@@ -6615,7 +6617,7 @@ input ModelMountConfigInput {
   definitionPath: String = null
 
   """
-  Added in 26.4.4. Subpath within the model vfolder. ``null`` (default) mounts the vfolder root.
+  Added in UNRELEASED. Subpath within the model vfolder. ``null`` (default) mounts the vfolder root.
   """
   subpath: String = null
 }
@@ -6629,9 +6631,6 @@ type ModelReplica implements Node {
   sessionId: ID
   revisionId: ID!
 
-  """Added in 26.4.4. ID of the model deployment this replica belongs to."""
-  deploymentId: ID!
-
   """Whether the replica has been checked and its health state."""
   readinessStatus: ReadinessStatus!
 
@@ -6642,14 +6641,14 @@ type ModelReplica implements Node {
   activenessStatus: ActivenessStatus!
 
   """
-  Added in 26.4.4. Provisioning status of the replica (mirrors the underlying route status).
+  Added in UNRELEASED. Provisioning status of the replica (mirrors the underlying route status).
   """
   status: ReplicaStatus!
 
-  """Added in 26.4.4. Traffic status of the replica."""
+  """Added in UNRELEASED. Traffic status of the replica."""
   trafficStatus: TrafficStatus!
 
-  """Added in 26.4.4. Health check status of the replica."""
+  """Added in UNRELEASED. Health check status of the replica."""
   healthStatus: ReplicaHealthStatus!
 
   """Timestamp when the replica was created."""
@@ -6667,9 +6666,6 @@ type ModelReplica implements Node {
 
   """The revision of this entity."""
   revision: ModelRevision
-
-  """Added in 26.4.4. The model deployment this replica belongs to."""
-  deployment: ModelDeployment
 }
 
 """
@@ -6702,7 +6698,7 @@ type ModelRevision implements Node {
   imageId: ID!
 
   """
-  Added in 26.4.4. Per-deployment sequential revision number assigned at insert time (UNIQUE per deployment). Use this to surface 'Revision #N' labels and to order revisions client-side.
+  Added in UNRELEASED. Per-deployment sequential revision number assigned at insert time (UNIQUE per deployment). Use this to surface 'Revision #N' labels and to order revisions client-side.
   """
   revisionNumber: Int!
 
@@ -6725,12 +6721,12 @@ type ModelRevision implements Node {
   extraMounts: [ExtraVFolderMountInfo!]!
 
   """
-  Added in 26.4.4. ID of the deployment-level preset that produced this revision. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
+  Added in UNRELEASED. ID of the deployment-level preset that produced this revision. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
   """
   revisionPresetId: UUID
 
   """
-  Added in 26.4.4. ID of the parent deployment that owns this revision. Exposed alongside the resolved ``deployment`` node so clients can navigate without re-fetching.
+  Added in UNRELEASED. ID of the parent deployment that owns this revision. Exposed alongside the resolved ``deployment`` node so clients can navigate without re-fetching.
   """
   deploymentId: ID!
 
@@ -6746,12 +6742,12 @@ type ModelRevision implements Node {
   imageV2: ImageV2
 
   """
-  Added in 26.4.4. The deployment-level preset that produced this revision, resolved via DataLoader. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
+  Added in UNRELEASED. The deployment-level preset that produced this revision, resolved via DataLoader. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
   """
   revisionPreset: DeploymentRevisionPreset
 
   """
-  Added in 26.4.4. The parent deployment owning this revision, resolved via DataLoader.
+  Added in UNRELEASED. The parent deployment owning this revision, resolved via DataLoader.
   """
   deployment: ModelDeployment
 
@@ -6822,7 +6818,7 @@ Added in 25.19.0. Runtime configuration for the inference framework. Includes th
 """
 type ModelRuntimeConfig {
   """
-  Added in 26.4.4. The runtime variant referenced by this runtime config.
+  Added in UNRELEASED. The runtime variant referenced by this runtime config.
   """
   runtimeVariant: RuntimeVariant
   runtimeVariantId: UUID!
@@ -7197,7 +7193,7 @@ type Mutation {
   """Added in 25.16.0. Create access token."""
   createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload
 
-  """Added in 26.4.4. Delete access token."""
+  """Added in UNRELEASED. Delete access token."""
   deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload
 
   """
@@ -7305,12 +7301,12 @@ type Mutation {
   adminUpdateAllowedProjectsForResourceGroupV2(input: UpdateAllowedProjectsForResourceGroupInput!): AllowedProjectsPayload
 
   """
-  Added in 26.4.4. Fully replace a resource group's ``default_deployment_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New deployments created in this resource group snapshot the new default; existing deployments are not affected.
+  Added in UNRELEASED. Fully replace a resource group's ``default_deployment_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New deployments created in this resource group snapshot the new default; existing deployments are not affected.
   """
   replaceResourceGroupDefaultDeploymentOptions(input: ReplaceResourceGroupDefaultDeploymentOptionsInput!): ReplaceResourceGroupDefaultDeploymentOptionsPayload
 
   """
-  Added in 26.4.4. Fully replace a resource group's ``default_session_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New sessions created in this resource group consult the new default via the scheduling controller's options resolver at enqueue time; already-enqueued sessions keep the frozen options they were enqueued with.
+  Added in UNRELEASED. Fully replace a resource group's ``default_session_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New sessions created in this resource group consult the new default via the scheduling controller's options resolver at enqueue time; already-enqueued sessions keep the frozen options they were enqueued with.
   """
   replaceResourceGroupDefaultSessionOptions(input: ReplaceResourceGroupDefaultSessionOptionsInput!): ReplaceResourceGroupDefaultSessionOptionsPayload
 
@@ -7375,7 +7371,7 @@ type Mutation {
   adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload @deprecated(reason: "Use adminBulkCreateUsersWithKeypairV2 instead, which also returns each created user's generated keypair and secret key.")
 
   """
-  Added in 26.4.4. Create multiple users in bulk (admin only). Requires superadmin privileges. Returns each created user together with its automatically generated keypair and secret key (the secret key is only returned at creation time).
+  Added in UNRELEASED. Create multiple users in bulk (admin only). Requires superadmin privileges. Returns each created user together with its automatically generated keypair and secret key (the secret key is only returned at creation time).
   """
   adminBulkCreateUsersWithKeypairV2(input: BulkCreateUserV2Input!): BulkCreateUsersWithKeypairV2Payload
 
@@ -7486,30 +7482,32 @@ type Mutation {
   """Added in 26.3.0. Delete a query preset category (admin only)."""
   adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload
 
-  """Added in 26.4.4. Create a new role preset (admin only)."""
+  """Added in UNRELEASED. Create a new role preset (admin only)."""
   adminCreateRolePreset(input: CreateRolePresetInput!): CreateRolePresetPayload
 
   """
-  Added in 26.4.4. Update an existing role preset's metadata (admin only).
+  Added in UNRELEASED. Update an existing role preset's metadata (admin only).
   """
   adminUpdateRolePreset(input: UpdateRolePresetInput!): UpdateRolePresetPayload
 
-  """Added in 26.4.4. Bulk-soft-delete role presets (admin only)."""
+  """Added in UNRELEASED. Bulk-soft-delete role presets (admin only)."""
   adminDeleteRolePresets(input: BulkDeleteRolePresetsInput!): BulkDeleteRolePresetsPayload
 
-  """Added in 26.4.4. Bulk-restore soft-deleted role presets (admin only)."""
+  """
+  Added in UNRELEASED. Bulk-restore soft-deleted role presets (admin only).
+  """
   adminRestoreRolePresets(input: BulkRestoreRolePresetsInput!): BulkRestoreRolePresetsPayload
 
-  """Added in 26.4.4. Bulk-hard-delete role presets (admin only)."""
+  """Added in UNRELEASED. Bulk-hard-delete role presets (admin only)."""
   adminPurgeRolePresets(input: BulkPurgeRolePresetsInput!): BulkPurgeRolePresetsPayload
 
   """
-  Added in 26.4.4. Bulk-add permission entries to an existing role preset (admin only).
+  Added in UNRELEASED. Bulk-add permission entries to an existing role preset (admin only).
   """
   adminBulkAddRolePresetPermissions(input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload
 
   """
-  Added in 26.4.4. Bulk-remove permission entries from a role preset (admin only).
+  Added in UNRELEASED. Bulk-remove permission entries from a role preset (admin only).
   """
   adminBulkRemoveRolePresetPermissions(input: BulkRemoveRolePermissionPresetsInput!): BulkRemoveRolePermissionPresetsPayload
 
@@ -7547,30 +7545,30 @@ type Mutation {
   adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload
 
   """
-  Added in 26.4.4. Bulk-insert scoped permission rows across one or more roles (admin only).
+  Added in UNRELEASED. Bulk-insert scoped permission rows across one or more roles (admin only).
   """
   adminBulkAddRolePermissions(input: BulkAddRolePermissionsInput!): BulkAddRolePermissionsPayload
 
   """
-  Added in 26.4.4. Bulk-delete permission rows by primary key (admin only).
+  Added in UNRELEASED. Bulk-delete permission rows by primary key (admin only).
   """
   adminBulkRemoveRolePermissions(input: BulkRemoveRolePermissionsInput!): BulkRemoveRolePermissionsPayload
 
   """
-  Added in 26.4.4. Replace one role's entire scoped-permission set (admin only).
+  Added in UNRELEASED. Replace one role's entire scoped-permission set (admin only).
   """
   adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload
 
-  """Added in 26.4.4. Create role invitations by email."""
+  """Added in UNRELEASED. Create role invitations by email."""
   createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload
 
-  """Added in 26.4.4. Accept a pending role invitation."""
+  """Added in UNRELEASED. Accept a pending role invitation."""
   acceptRoleInvitation(input: AcceptRoleInvitationInput!): RoleInvitation
 
-  """Added in 26.4.4. Reject a pending role invitation."""
+  """Added in UNRELEASED. Reject a pending role invitation."""
   rejectRoleInvitation(input: RejectRoleInvitationInput!): RoleInvitation
 
-  """Added in 26.4.4. Cancel a pending role invitation (admin only)."""
+  """Added in UNRELEASED. Cancel a pending role invitation (admin only)."""
   adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation
 
   """Added in 26.4.2. Create a new keypair resource policy (admin only)."""
@@ -7664,7 +7662,7 @@ type Mutation {
   adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload
 
   """
-  Added in 26.4.4. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
+  Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
   """
   adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload
 
@@ -7682,7 +7680,7 @@ type Mutation {
   createVfolderV2(input: CreateVFolderV2Input!): CreateVFolderV2Payload
 
   """
-  Added in 26.4.4. Create a virtual folder owned by the specified project. Requires project-scoped CREATE permission.
+  Added in UNRELEASED. Create a virtual folder owned by the specified project. Requires project-scoped CREATE permission.
   """
   createVFolderInProject(projectId: UUID!, input: CreateVFolderInScopeInput!): CreateVFolderV2Payload
 
@@ -7693,7 +7691,7 @@ type Mutation {
   purgeVfolderV2(vfolderId: UUID!, options: PurgeVFolderOptionsInput = null): PurgeVFolderV2Payload
 
   """
-  Added in 26.4.4. Restore a trashed virtual folder. RBAC enforced via scope chain.
+  Added in UNRELEASED. Restore a trashed virtual folder. RBAC enforced via scope chain.
   """
   restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload
 
@@ -7731,7 +7729,7 @@ type Mutation {
   enqueueSession(input: EnqueueSessionInput!): EnqueueSessionPayload
 
   """
-  Added in 26.4.4. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  Added in UNRELEASED. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload
 }
@@ -8022,7 +8020,7 @@ enum OperationType {
 }
 
 """
-Added in 26.4.4. Filter for permission operation columns. Supports equals / in / not_equals / not_in.
+Added in UNRELEASED. Filter for permission operation columns. Supports equals / in / not_equals / not_in.
 """
 input OperationTypeFilter {
   """Matches rows with this exact operation."""
@@ -8282,125 +8280,6 @@ type PresetExecutionSpec {
 }
 
 """
-Added in 26.4.4. Strict configuration for a single model within a preset model definition.
-"""
-input PresetModelConfigInput {
-  """Name of the model."""
-  name: String!
-
-  """Path to the model file."""
-  modelPath: String!
-
-  """Configuration for the model service."""
-  service: PresetModelServiceConfigInput!
-
-  """Metadata about the model."""
-  metadata: PresetModelMetadataInput = null
-}
-
-"""
-Added in 26.4.4. Strict model definition for a preset. When provided on create it must be fully populated with at least one model.
-"""
-input PresetModelDefinitionInput {
-  """
-  List of models in the model definition. Must contain at least one model.
-  """
-  models: [PresetModelConfigInput!]!
-}
-
-"""
-Added in 26.4.4. Strict health check configuration for a preset model service.
-"""
-input PresetModelHealthCheckInput {
-  """
-  Whether the route should be health-checked. When false the route activates immediately and the remaining fields are ignored.
-  """
-  enable: Boolean! = false
-
-  """Interval in seconds between health checks."""
-  interval: Float! = 10
-
-  """Path to check for health status."""
-  path: String! = "/health"
-
-  """Maximum number of retries for health check."""
-  maxRetries: Int! = 10
-
-  """Maximum time in seconds to wait for a health check response."""
-  maxWaitTime: Float! = 15
-
-  """Expected HTTP status code for a healthy response."""
-  expectedStatusCode: Int! = 200
-
-  """Initial delay in seconds before the first health check."""
-  initialDelay: Float! = 1800
-}
-
-"""Added in 26.4.4. Strict metadata describing a preset model entry."""
-input PresetModelMetadataInput {
-  """Author of the model."""
-  author: String = null
-
-  """Title of the model."""
-  title: String = null
-
-  """Version of the model."""
-  version: String = null
-
-  """Creation date of the model."""
-  created: String = null
-
-  """Last modified date of the model."""
-  lastModified: String = null
-
-  """Description of the model."""
-  description: String = null
-
-  """Task type of the model."""
-  task: String = null
-
-  """Category of the model."""
-  category: String = null
-
-  """Architecture of the model."""
-  architecture: String = null
-
-  """Frameworks used by the model."""
-  framework: [String!] = null
-
-  """Labels for the model."""
-  label: [String!] = null
-
-  """License of the model."""
-  license: String = null
-
-  """Minimum resource requirements for the model."""
-  minResource: JSON = null
-}
-
-"""
-Added in 26.4.4. Strict service configuration for a preset model entry.
-"""
-input PresetModelServiceConfigInput {
-  """
-  Pre-start actions to execute before starting the model service. Provide an empty list when no pre-start actions are needed.
-  """
-  preStartActions: [PreStartActionInput!]!
-
-  """Command to start the model service."""
-  startCommand: [String!]!
-
-  """Shell configured for the model service."""
-  shell: String! = "/bin/bash"
-
-  """Port number for the model service. Must be greater than 1."""
-  port: Int!
-
-  """Health check configuration for the model service."""
-  healthCheck: PresetModelHealthCheckInput = null
-}
-
-"""
 Added in 26.4.2. Compute resource allocation for the deployment, specifying CPU, memory, and accelerator requirements along with additional resource options.
 """
 type PresetResourceAllocation {
@@ -8443,7 +8322,7 @@ enum PresetValueType {
 }
 
 """
-Added in 26.4.4. Input for previewing a prometheus query template (admin only).
+Added in UNRELEASED. Input for previewing a prometheus query template (admin only).
 """
 input PreviewQueryDefinitionInput {
   """PromQL template to validate."""
@@ -9139,7 +9018,9 @@ type PurgeUserV2Payload {
   success: Boolean!
 }
 
-"""Added in 26.4.4. Optional behavior flags for vfolder purge operations."""
+"""
+Added in UNRELEASED. Optional behavior flags for vfolder purge operations.
+"""
 input PurgeVFolderOptionsInput {
   """
   If true, also delete model card record(s) referencing the vfolder. If false, the request is rejected when any model card still references it.
@@ -9266,7 +9147,7 @@ type Query {
   adminResourceGroupV2(name: String!): ResourceGroup
 
   """
-  Added in 26.4.4. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.handler_options.by_handler``.
+  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.handler_options.by_handler``.
   """
   schedulingHandlers: [SchedulingHandlerNode!]
 
@@ -9365,7 +9246,7 @@ type Query {
   adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection
 
   """
-  Added in 26.4.4. Query audit logs within a scope (non-admin accessible, subject to RBAC). All scope items are OR'd; raises an error if every field is empty.
+  Added in UNRELEASED. Query audit logs within a scope (non-admin accessible, subject to RBAC). All scope items are OR'd; raises an error if every field is empty.
   """
   scopedAuditLogsV2(scope: AuditLogScope!, filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection
 
@@ -9436,7 +9317,7 @@ type Query {
   prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult
 
   """
-  Added in 26.4.4. Preview a prometheus query template before saving it as a preset (admin only).
+  Added in UNRELEASED. Preview a prometheus query template before saving it as a preset (admin only).
   """
   adminPreviewPrometheusQueryPreset(input: PreviewQueryDefinitionInput!): QueryDefinitionExecuteResult
 
@@ -9450,11 +9331,11 @@ type Query {
   """
   prometheusQueryPresetCategories(filter: CategoryFilter = null, orderBy: [CategoryOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [QueryPresetCategory!]
 
-  """Added in 26.4.4. Get a single role preset by ID (admin only)."""
+  """Added in UNRELEASED. Get a single role preset by ID (admin only)."""
   adminRolePreset(id: ID!): RolePreset
 
   """
-  Added in 26.4.4. List role presets with filtering and pagination (admin only).
+  Added in UNRELEASED. List role presets with filtering and pagination (admin only).
   """
   adminRolePresets(filter: RolePresetFilter = null, orderBy: [RolePresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePresetConnection
 
@@ -9516,21 +9397,21 @@ type Query {
   """
   myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection
 
-  """Added in 26.4.4. List the current user's role invitations."""
+  """Added in UNRELEASED. List the current user's role invitations."""
   myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
 
-  """Added in 26.4.4. List role invitations sent by the current user."""
+  """Added in UNRELEASED. List role invitations sent by the current user."""
   mySentRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
 
   """
-  Added in 26.4.4. List all role invitations across the system (superadmin only).
+  Added in UNRELEASED. List all role invitations across the system (superadmin only).
   """
   adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
 
   """Added in 26.4.2. List roles registered in a project scope."""
   projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection
 
-  """Added in 26.4.4. List invitations for a specific role."""
+  """Added in UNRELEASED. List invitations for a specific role."""
   roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
@@ -9643,10 +9524,10 @@ type Query {
   """
   Added in 25.16.0. Get configuration JSON Schemas for all inference runtimes.
   """
-  inferenceRuntimeConfigs: JSON @deprecated(reason: "Deprecated since 26.4.4. Use the runtime_variant resources instead.")
+  inferenceRuntimeConfigs: JSON @deprecated(reason: "Deprecated since UNRELEASED. Use the runtime_variant resources instead.")
 
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
-  inferenceRuntimeConfig(name: String!): JSON @deprecated(reason: "Deprecated since 26.4.4. Use the runtime_variant resources instead.")
+  inferenceRuntimeConfig(name: String!): JSON @deprecated(reason: "Deprecated since UNRELEASED. Use the runtime_variant resources instead.")
 
   """Added in 25.19.0. Get a specific route by ID."""
   route(id: ID!): Route
@@ -9934,21 +9815,21 @@ input QueryDefinitionFilter {
   """Filter by name."""
   name: StringFilter = null
 
-  """Added in 26.4.4. Filter by category ID."""
+  """Added in UNRELEASED. Filter by category ID."""
   categoryId: UUIDFilter = null
 
   """
-  Added in 26.4.4. Combine multiple filters with AND logic. All conditions must match.
+  Added in UNRELEASED. Combine multiple filters with AND logic. All conditions must match.
   """
   AND: [QueryDefinitionFilter!] = null
 
   """
-  Added in 26.4.4. Combine multiple filters with OR logic. At least one condition must match.
+  Added in UNRELEASED. Combine multiple filters with OR logic. At least one condition must match.
   """
   OR: [QueryDefinitionFilter!] = null
 
   """
-  Added in 26.4.4. Negate the specified filters. Records matching these conditions will be excluded.
+  Added in UNRELEASED. Negate the specified filters. Records matching these conditions will be excluded.
   """
   NOT: [QueryDefinitionFilter!] = null
 }
@@ -10084,7 +9965,7 @@ enum RBACElementType {
 }
 
 """
-Added in 26.4.4. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
+Added in UNRELEASED. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
 """
 input RBACElementTypeFilter {
   """Matches rows with this exact element type."""
@@ -10218,13 +10099,13 @@ type RejectArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in 26.4.4. Input for rejecting a role invitation."""
+"""Added in UNRELEASED. Input for rejecting a role invitation."""
 input RejectRoleInvitationInput {
   invitationId: UUID!
 }
 
 """
-Added in 26.4.4. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
+Added in UNRELEASED. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
 """
 input ReplaceResourceGroupDefaultDeploymentOptionsInput {
   """Target resource group name."""
@@ -10235,7 +10116,7 @@ input ReplaceResourceGroupDefaultDeploymentOptionsInput {
 }
 
 """
-Added in 26.4.4. Payload returned after replacing a resource group's default_deployment_options surface.
+Added in UNRELEASED. Payload returned after replacing a resource group's default_deployment_options surface.
 """
 type ReplaceResourceGroupDefaultDeploymentOptionsPayload {
   """Name of the resource group whose default options were replaced."""
@@ -10246,7 +10127,7 @@ type ReplaceResourceGroupDefaultDeploymentOptionsPayload {
 }
 
 """
-Added in 26.4.4. Input for the replaceResourceGroupDefaultSessionOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
+Added in UNRELEASED. Input for the replaceResourceGroupDefaultSessionOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
 """
 input ReplaceResourceGroupDefaultSessionOptionsInput {
   """Target resource group name."""
@@ -10257,7 +10138,7 @@ input ReplaceResourceGroupDefaultSessionOptionsInput {
 }
 
 """
-Added in 26.4.4. Payload returned after replacing a resource group's default_session_options surface.
+Added in UNRELEASED. Payload returned after replacing a resource group's default_session_options surface.
 """
 type ReplaceResourceGroupDefaultSessionOptionsPayload {
   """Name of the resource group whose default options were replaced."""
@@ -10268,7 +10149,7 @@ type ReplaceResourceGroupDefaultSessionOptionsPayload {
 }
 
 """
-Added in 26.4.4. Failure detail for a single permission entry in replace
+Added in UNRELEASED. Failure detail for a single permission entry in replace
 """
 type ReplaceRolePermissionFailureInfo {
   """Role ID of the failed entry"""
@@ -10291,7 +10172,7 @@ type ReplaceRolePermissionFailureInfo {
 }
 
 """
-Added in 26.4.4. Input for replacing one role's entire scoped-permission set
+Added in UNRELEASED. Input for replacing one role's entire scoped-permission set
 """
 input ReplaceRolePermissionsInput {
   roleId: UUID!
@@ -10299,7 +10180,7 @@ input ReplaceRolePermissionsInput {
 }
 
 """
-Added in 26.4.4. Payload for replacing a role's entire scoped-permission set
+Added in UNRELEASED. Payload for replacing a role's entire scoped-permission set
 """
 type ReplaceRolePermissionsPayload {
   """Permission rows that make up the new set"""
@@ -10319,7 +10200,7 @@ input ReplicaFilter {
 }
 
 """
-Added in 26.4.4. This enum represents the health check status of a replica.
+Added in UNRELEASED. This enum represents the health check status of a replica.
 """
 enum ReplicaHealthStatus {
   NOT_CHECKED
@@ -10486,12 +10367,12 @@ type ResourceGroup implements Node {
   scheduler: ResourceGroupSchedulerConfig!
 
   """
-  Added in 26.4.4. Default deployment options (timeouts, etc.) snapshot-copied onto each new deployment created in this resource group.
+  Added in UNRELEASED. Default deployment options (timeouts, etc.) snapshot-copied onto each new deployment created in this resource group.
   """
   defaultDeploymentOptions: DeploymentOptionsInfo!
 
   """
-  Added in 26.4.4. Default session options used as the fallback layer for the scheduling controller's options resolver at session enqueue time.
+  Added in UNRELEASED. Default session options used as the fallback layer for the scheduling controller's options resolver at session enqueue time.
   """
   defaultSessionOptions: DefaultSessionOptionsInfo!
 
@@ -10933,7 +10814,7 @@ type RestoreArtifactsPayload {
 }
 
 """
-Added in 26.4.4. Payload returned after restoring a virtual folder from trash.
+Added in UNRELEASED. Payload returned after restoring a virtual folder from trash.
 """
 type RestoreVFolderPayload {
   """ID of the restored virtual folder"""
@@ -10998,7 +10879,7 @@ type Role implements Node {
   deletedAt: DateTime
 
   """
-  Added in 26.4.4. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  Added in UNRELEASED. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean!
 
@@ -11123,7 +11004,7 @@ input RoleFilter {
   NOT: [RoleFilter!] = null
 }
 
-"""Added in 26.4.4. A role invitation."""
+"""Added in UNRELEASED. A role invitation."""
 type RoleInvitation implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -11160,7 +11041,7 @@ type RoleInvitation implements Node {
   role: Role
 }
 
-"""Added in 26.4.4. Role invitation connection."""
+"""Added in UNRELEASED. Role invitation connection."""
 type RoleInvitationConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -11179,7 +11060,7 @@ type RoleInvitationEdge {
   node: RoleInvitation!
 }
 
-"""Added in 26.4.4. Filter for role invitations."""
+"""Added in UNRELEASED. Filter for role invitations."""
 input RoleInvitationFilter {
   state: RoleInvitationStateFilter = null
   roleId: UUIDFilter = null
@@ -11191,13 +11072,13 @@ input RoleInvitationFilter {
   NOT: [RoleInvitationFilter!] = null
 }
 
-"""Added in 26.4.4. Order by specification for role invitations."""
+"""Added in UNRELEASED. Order by specification for role invitations."""
 input RoleInvitationOrderBy {
   field: RoleInvitationOrderField!
   direction: OrderDirection! = DESC
 }
 
-"""Added in 26.4.4. Role invitation ordering field."""
+"""Added in UNRELEASED. Role invitation ordering field."""
 enum RoleInvitationOrderField {
   CREATED_AT
   UPDATED_AT
@@ -11205,13 +11086,13 @@ enum RoleInvitationOrderField {
 }
 
 """
-Added in 26.4.4. Nested filter for the role associated with an invitation.
+Added in UNRELEASED. Nested filter for the role associated with an invitation.
 """
 input RoleInvitationRoleNestedFilter {
   name: StringFilter = null
 }
 
-"""Added in 26.4.4. Role invitation state."""
+"""Added in UNRELEASED. Role invitation state."""
 enum RoleInvitationState {
   PENDING
   ACCEPTED
@@ -11219,7 +11100,7 @@ enum RoleInvitationState {
   CANCELED
 }
 
-"""Added in 26.4.4. Filter for role invitation state."""
+"""Added in UNRELEASED. Filter for role invitation state."""
 input RoleInvitationStateFilter {
   equals: RoleInvitationState = null
 
@@ -11234,7 +11115,7 @@ input RoleInvitationStateFilter {
 }
 
 """
-Added in 26.4.4. Nested filter for a user (inviter or invitee) of an invitation.
+Added in UNRELEASED. Nested filter for a user (inviter or invitee) of an invitation.
 """
 input RoleInvitationUserNestedFilter {
   email: StringFilter = null
@@ -11253,7 +11134,7 @@ enum RoleOrderField {
   UPDATED_AT
 }
 
-"""Added in 26.4.4. A stored permission entry under a role preset."""
+"""Added in UNRELEASED. A stored permission entry under a role preset."""
 type RolePermissionPreset implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -11272,7 +11153,7 @@ type RolePermissionPreset implements Node {
 }
 
 """
-Added in 26.4.4. Paginated connection for role permission preset entries.
+Added in UNRELEASED. Paginated connection for role permission preset entries.
 """
 type RolePermissionPresetConnection {
   """Pagination data for this connection"""
@@ -11295,7 +11176,7 @@ type RolePermissionPresetEdge {
 }
 
 """
-Added in 26.4.4. A single (entity_type, operation) pair carried by a role preset.
+Added in UNRELEASED. A single (entity_type, operation) pair carried by a role preset.
 """
 input RolePermissionPresetEntryInput {
   """Entity type the permission applies to."""
@@ -11306,7 +11187,7 @@ input RolePermissionPresetEntryInput {
 }
 
 """
-Added in 26.4.4. Filter input for role permission preset entries. Also used as the input for the `permission_presets` field resolver on a role preset (the resolver injects `role_preset_id` from its parent).
+Added in UNRELEASED. Filter input for role permission preset entries. Also used as the input for the `permission_presets` field resolver on a role preset (the resolver injects `role_preset_id` from its parent).
 """
 input RolePermissionPresetFilter {
   """Filter by parent role preset ID."""
@@ -11334,7 +11215,7 @@ input RolePermissionPresetFilter {
 }
 
 """
-Added in 26.4.4. Specifies ordering for role permission preset entries.
+Added in UNRELEASED. Specifies ordering for role permission preset entries.
 """
 input RolePermissionPresetOrderBy {
   """The field to order by."""
@@ -11345,7 +11226,7 @@ input RolePermissionPresetOrderBy {
 }
 
 """
-Added in 26.4.4. Fields available for ordering role permission preset entries.
+Added in UNRELEASED. Fields available for ordering role permission preset entries.
 """
 enum RolePermissionPresetOrderField {
   ENTITY_TYPE
@@ -11354,7 +11235,7 @@ enum RolePermissionPresetOrderField {
 }
 
 """
-Added in 26.4.4. Role preset entity implementing the Relay Node pattern.
+Added in UNRELEASED. Role preset entity implementing the Relay Node pattern.
 """
 type RolePreset implements Node {
   """The Globally Unique ID of this object"""
@@ -11382,11 +11263,11 @@ type RolePreset implements Node {
   """Last modification timestamp."""
   updatedAt: DateTime!
 
-  """Added in 26.4.4. Permission entries carried by this role preset."""
+  """Added in UNRELEASED. Permission entries carried by this role preset."""
   permissionPresets(filter: RolePermissionPresetFilter = null, orderBy: [RolePermissionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePermissionPresetConnection
 }
 
-"""Added in 26.4.4. Paginated connection for role preset records."""
+"""Added in UNRELEASED. Paginated connection for role preset records."""
 type RolePresetConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -11407,7 +11288,7 @@ type RolePresetEdge {
   node: RolePreset!
 }
 
-"""Added in 26.4.4. Filter input for querying role presets."""
+"""Added in UNRELEASED. Filter input for querying role presets."""
 input RolePresetFilter {
   """Filter by name."""
   name: StringFilter = null
@@ -11435,7 +11316,7 @@ input RolePresetFilter {
   NOT: [RolePresetFilter!] = null
 }
 
-"""Added in 26.4.4. Specifies ordering for role preset results."""
+"""Added in UNRELEASED. Specifies ordering for role preset results."""
 input RolePresetOrderBy {
   """The field to order by."""
   field: RolePresetOrderField!
@@ -11444,7 +11325,9 @@ input RolePresetOrderBy {
   direction: OrderDirection! = ASC
 }
 
-"""Added in 26.4.4. Fields available for ordering role preset results."""
+"""
+Added in UNRELEASED. Fields available for ordering role preset results.
+"""
 enum RolePresetOrderField {
   NAME
   SCOPE_TYPE
@@ -11499,7 +11382,7 @@ input RoleStatusFilter {
   notIn: [RoleStatus!] = null
 }
 
-"""Added in 26.4.4. Filter roles by their user assignments."""
+"""Added in UNRELEASED. Filter roles by their user assignments."""
 input RoleUserNestedFilter {
   userId: UUIDFilter = null
   AND: [RoleUserNestedFilter!] = null
@@ -11803,11 +11686,6 @@ type RuntimeVariantPreset implements Node {
   """
   targetSpec: PresetTargetSpec!
 
-  """
-  Added in 26.4.4. Whether this preset parameter must be supplied when building a deployment revision.
-  """
-  required: Boolean!
-
   """UI category group for organizing parameters."""
   category: String
 
@@ -11898,7 +11776,7 @@ extend type ScalingGroupNode @key(fields: "id") {
 }
 
 """
-Added in 26.4.4. Replica scaling axis for a deployment, orthogonal to the lifecycle status. ``SCALING`` while the replica reconciler is adjusting replica count against desired_replica_count; ``STABLE`` once holding at the desired count.
+Added in UNRELEASED. Replica scaling axis for a deployment, orthogonal to the lifecycle status. ``SCALING`` while the replica reconciler is adjusting replica count against desired_replica_count; ``STABLE`` once holding at the desired count.
 """
 enum ScalingState {
   STABLE
@@ -11996,7 +11874,7 @@ enum SchedulingHandlerCategory {
 }
 
 """
-Added in 26.4.4. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.handler_options.by_handler``.
+Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.handler_options.by_handler``.
 """
 type SchedulingHandlerNode {
   """Stable handler key used in deployment timeout maps."""
@@ -12237,7 +12115,7 @@ type ServicePorts {
 }
 
 """
-Added in 26.4.4. Scheduling constraint applied to designated agents for a session.
+Added in UNRELEASED. Scheduling constraint applied to designated agents for a session.
 """
 enum SessionAgentSelectionPolicy {
   STRICT
@@ -12263,7 +12141,7 @@ enum SessionClusterMode {
 }
 
 """
-Added in 26.4.4. Policy for how a kernel group's startup failures affect the owning session.
+Added in UNRELEASED. Policy for how a kernel group's startup failures affect the owning session.
 """
 enum SessionFailurePolicy {
   STRICT
@@ -12283,7 +12161,7 @@ input SessionMountItemInput {
   permission: String = null
 
   """
-  Added in 26.4.4. Subpath within the vfolder to mount. Null mounts the vfolder root.
+  Added in UNRELEASED. Subpath within the vfolder to mount. Null mounts the vfolder root.
   """
   subpath: String = null
 }
@@ -12401,11 +12279,6 @@ type SessionV2 implements Node {
   userId: ID!
   projectId: ID!
 
-  """
-  Added in 26.4.4. UUID of the model deployment replica served by this session.
-  """
-  replicaId: ID
-
   """Metadata including domain, project, and user information."""
   metadata: SessionV2MetadataInfo!
 
@@ -12440,11 +12313,6 @@ type SessionV2 implements Node {
 
   """Added in 26.3.0. The kernels belonging to this session."""
   kernels: KernelV2Connection
-
-  """
-  Added in 26.4.4. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
-  """
-  replica: ModelReplica
 }
 
 """Added in 26.3.0. Connection type for paginated session results."""
@@ -12889,7 +12757,7 @@ input UUIDFilter {
   notIn: [UUID!] = null
 }
 
-"""Added in 26.4.4. Single-UUID scope item wrapper."""
+"""Added in UNRELEASED. Single-UUID scope item wrapper."""
 input UUIDScope {
   """UUID value."""
   value: UUID!
@@ -13124,11 +12992,6 @@ input UpdateDeploymentRevisionPresetInput {
   """Preset ID."""
   id: UUID!
 
-  """
-  Added in 26.4.4. New runtime variant for the preset. Omit to leave unchanged.
-  """
-  runtimeVariantId: UUID = null
-
   """New name."""
   name: String = null
 
@@ -13159,44 +13022,46 @@ input UpdateDeploymentRevisionPresetInput {
   deploymentStrategy: PresetDeploymentStrategyInput
 
   """
-  Added in 26.4.4. Container image for the inference server. Set to null to clear.
+  Added in UNRELEASED. Container image for the inference server. Set to null to clear.
   """
   imageId: UUID
 
-  """Added in 26.4.4. Parsed model definition. Set to null to clear."""
+  """Added in UNRELEASED. Parsed model definition. Set to null to clear."""
   modelDefinition: ModelDefinitionInput
 
-  """Added in 26.4.4. Container startup command. Set to null to clear."""
+  """Added in UNRELEASED. Container startup command. Set to null to clear."""
   startupCommand: String
 
   """
-  Added in 26.4.4. Bootstrap script run before the main process. Set to null to clear.
+  Added in UNRELEASED. Bootstrap script run before the main process. Set to null to clear.
   """
   bootstrapScript: String
 
   """
-  Added in 26.4.4. Replace resource slot allocations. Omit to leave unchanged.
+  Added in UNRELEASED. Replace resource slot allocations. Omit to leave unchanged.
   """
   resourceSlots: [ResourceSlotEntryInput!] = null
 
   """
-  Added in 26.4.4. Replace additional resource options. Omit to leave unchanged.
+  Added in UNRELEASED. Replace additional resource options. Omit to leave unchanged.
   """
   resourceOpts: [ResourceOptsEntryInput!] = null
 
-  """Added in 26.4.4. New cluster topology mode. Omit to leave unchanged."""
+  """
+  Added in UNRELEASED. New cluster topology mode. Omit to leave unchanged.
+  """
   clusterMode: ClusterMode = null
 
-  """Added in 26.4.4. New cluster size. Omit to leave unchanged."""
+  """Added in UNRELEASED. New cluster size. Omit to leave unchanged."""
   clusterSize: Int = null
 
   """
-  Added in 26.4.4. Replace environment variables. Omit to leave unchanged.
+  Added in UNRELEASED. Replace environment variables. Omit to leave unchanged.
   """
   environ: [EnvironEntryInput!] = null
 
   """
-  Added in 26.4.4. Replace runtime variant preset values. Omit to leave unchanged.
+  Added in UNRELEASED. Replace runtime variant preset values. Omit to leave unchanged.
   """
   presetValues: [DeploymentRevisionPresetValueEntryInput!] = null
 }
@@ -13621,13 +13486,13 @@ input UpdateRoleInput {
   status: RoleStatus
 
   """
-  Added in 26.4.4. Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  Added in UNRELEASED. Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean
 }
 
 """
-Added in 26.4.4. Input for updating a role preset's metadata. Permission entries are managed via the dedicated add/remove mutations; the `deleted` flag via delete/restore mutations.
+Added in UNRELEASED. Input for updating a role preset's metadata. Permission entries are managed via the dedicated add/remove mutations; the `deleted` flag via delete/restore mutations.
 """
 input UpdateRolePresetInput {
   """Role preset UUID to update."""
@@ -13642,7 +13507,7 @@ input UpdateRolePresetInput {
   autoAssign: Boolean
 }
 
-"""Added in 26.4.4. Payload returned after updating a role preset."""
+"""Added in UNRELEASED. Payload returned after updating a role preset."""
 type UpdateRolePresetPayload {
   """Updated role preset."""
   rolePreset: RolePreset!
@@ -13706,9 +13571,6 @@ input UpdateRuntimeVariantPresetInput {
 
   """New key."""
   key: String = null
-
-  """Added in 26.4.4. New required flag."""
-  required: Boolean = null
 }
 
 """Added in 26.4.2. Update preset payload."""
@@ -14521,40 +14383,42 @@ input UserV2Filter {
   username: StringFilter = null
   email: StringFilter = null
 
-  """Added in 26.4.4. Filter by full name."""
+  """Added in UNRELEASED. Filter by full name."""
   fullName: StringFilter = null
 
-  """Added in 26.4.4. Filter by description."""
+  """Added in UNRELEASED. Filter by description."""
   description: StringFilter = null
   status: UserStatusV2EnumFilter = null
 
-  """Added in 26.4.4. Filter by status info detail."""
+  """Added in UNRELEASED. Filter by status info detail."""
   statusInfo: StringFilter = null
   domainName: StringFilter = null
 
   """Added in 26.4.2. Filter by external integration identifier."""
   integrationName: StringFilter = null
 
-  """Added in 26.4.4. Filter by user resource policy name."""
+  """Added in UNRELEASED. Filter by user resource policy name."""
   resourcePolicy: StringFilter = null
   role: UserRoleV2EnumFilter = null
 
-  """Added in 26.4.4. Filter by whether a password change is required."""
+  """Added in UNRELEASED. Filter by whether a password change is required."""
   needPasswordChange: Boolean = null
 
-  """Added in 26.4.4. Filter by whether TOTP two-factor auth is activated."""
+  """
+  Added in UNRELEASED. Filter by whether TOTP two-factor auth is activated.
+  """
   totpActivated: Boolean = null
 
-  """Added in 26.4.4. Filter by whether sudo sessions are enabled."""
+  """Added in UNRELEASED. Filter by whether sudo sessions are enabled."""
   sudoSessionEnabled: Boolean = null
 
-  """Added in 26.4.4. Filter by container UID."""
+  """Added in UNRELEASED. Filter by container UID."""
   containerUid: IntFilter = null
 
-  """Added in 26.4.4. Filter by container main GID."""
+  """Added in UNRELEASED. Filter by container main GID."""
   containerMainGid: IntFilter = null
 
-  """Added in 26.4.4. Filter by container supplementary GIDs."""
+  """Added in UNRELEASED. Filter by container supplementary GIDs."""
   containerGids: IntArrayFilter = null
   createdAt: DateTimeFilter = null
   domain: UserDomainNestedFilter = null
@@ -14721,7 +14585,12 @@ type VFolder implements Node {
   """Path for unmanaged virtual folders."""
   unmanagedPath: String
 
-  """Added in 26.4.4. Model cards backed by this vfolder."""
+  """
+  Added in UNRELEASED. Storage-proxy-sourced usage and quota statistics: file count, used capacity, and capacity/file-count quota limits. Null for list responses where usage is not loaded.
+  """
+  usage: VFolderUsageInfo
+
+  """Added in UNRELEASED. Model cards backed by this vfolder."""
   modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 }
 
@@ -14914,6 +14783,16 @@ type VFolderOwnershipInfo {
 enum VFolderOwnershipType {
   USER
   GROUP
+}
+
+"""
+Added in UNRELEASED. Storage-proxy-sourced usage and quota statistics for a virtual folder. Includes current used capacity, file count, and capacity/file-count quota limits.
+"""
+type VFolderUsageInfo {
+  numFiles: Int!
+  usedBytes: BinarySizeInfo!
+  maxSize: BinarySizeInfo
+  maxFiles: Int!
 }
 
 """
