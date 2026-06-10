@@ -444,8 +444,9 @@ class RouteExecutor:
         Check health status of RUNNING routes and push newly-healthy ones to AppProxy.
 
         Reads RouteHealthStatus from Valkey and classifies:
-        - HEALTHY:   status.healthy is True
-        - UNHEALTHY: status.healthy is False
+        - HEALTHY:   latest probe passed, or it failed but consecutive_failures
+                     has not yet reached ``max_retries`` (still within retry budget)
+        - UNHEALTHY: consecutive_failures reached ``max_retries``
         - DEGRADED:  status absent (key missing or TTL expired — no recent check)
 
         Routes whose pre-execute health_status was not HEALTHY but whose
@@ -480,12 +481,20 @@ class RouteExecutor:
 
             if status.healthy:
                 successes.append(route)
+            elif route.health_check is not None and not route.health_check.is_retry_exhausted(
+                status.consecutive_failures
+            ):
+                # Probe failing but still within the retry budget → keep HEALTHY.
+                successes.append(route)
             else:
                 errors.append(
                     RouteExecutionError(
                         route_info=route,
                         reason="Route health check failed",
-                        error_detail="RouteHealthStatus reports unhealthy",
+                        error_detail=(
+                            f"RouteHealthStatus reports unhealthy after "
+                            f"{status.consecutive_failures} consecutive failures"
+                        ),
                         error_code=None,
                     )
                 )

@@ -25,6 +25,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaHealthStatus as ValkeyReplicaHealthStatus,
 )
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkUpdateRoutesResponse,
 )
@@ -254,6 +255,56 @@ class TestCheckRouteHealth:
         entity_ids = [healthy_route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
             result = await route_executor.check_route_health([healthy_route])
+
+        assert len(result.successes) == 0
+        assert len(result.errors) == 1
+        assert len(result.stale) == 0
+
+    async def test_failing_route_within_retry_budget_stays_healthy(
+        self,
+        route_executor: RouteExecutor,
+        mock_valkey_schedule: AsyncMock,
+        healthy_route: RouteData,
+    ) -> None:
+        """A failing probe below max_retries keeps the route HEALTHY (within budget)."""
+        route = dataclasses.replace(
+            healthy_route, health_check=ModelHealthCheck(enable=True, max_retries=3)
+        )
+        status = ValkeyReplicaHealthStatus(
+            replica_id=route.route_id,
+            healthy=False,
+            last_check=995,
+            consecutive_failures=2,
+        )
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {route.route_id: status}
+
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
+
+        assert len(result.successes) == 1
+        assert len(result.errors) == 0
+        assert len(result.stale) == 0
+
+    async def test_failing_route_exhausts_retries_in_errors(
+        self,
+        route_executor: RouteExecutor,
+        mock_valkey_schedule: AsyncMock,
+        healthy_route: RouteData,
+    ) -> None:
+        """Once consecutive_failures reaches max_retries the route is UNHEALTHY."""
+        route = dataclasses.replace(
+            healthy_route, health_check=ModelHealthCheck(enable=True, max_retries=3)
+        )
+        status = ValkeyReplicaHealthStatus(
+            replica_id=route.route_id,
+            healthy=False,
+            last_check=995,
+            consecutive_failures=3,
+        )
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {route.route_id: status}
+
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
 
         assert len(result.successes) == 0
         assert len(result.errors) == 1
