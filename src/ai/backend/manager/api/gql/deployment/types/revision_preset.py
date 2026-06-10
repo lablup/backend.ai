@@ -304,7 +304,7 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="The container image used to run the inference server, resolved via DataLoader. None when the preset does not specify an image.",
+            description="The container image used to run the inference server. None when the preset does not specify an image.",
         )
     )  # type: ignore[misc]
     async def image(

@@ -3787,7 +3787,7 @@ type DeploymentRevisionPreset implements Node {
   runtimeVariant: RuntimeVariant
 
   """
-  Added in UNRELEASED. The container image used to run the inference server, resolved via DataLoader. None when the preset does not specify an image.
+  Added in UNRELEASED. The container image used to run the inference server. None when the preset does not specify an image.
   """
   image: ImageV2
 
