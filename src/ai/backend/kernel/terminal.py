@@ -41,6 +41,7 @@ class Terminal:
         loop: AbstractEventLoop | None = None,
     ) -> None:
         self._sorna_media: list[Any] = []
+        self._background_tasks: set[asyncio.Task[Any]] = set()
         self.zctx = sock_out.context
 
         self.ev_term = ev_term
@@ -203,7 +204,9 @@ class Terminal:
                 await self.sock_term_out.send_multipart([b"Terminated.\r\n"])
                 return
             if not self.ev_term.is_set() and self.accept_term_input:
-                asyncio.create_task(self.restart())
+                restart_task = asyncio.create_task(self.restart())
+                self._background_tasks.add(restart_task)
+                restart_task.add_done_callback(self._background_tasks.discard)
         except asyncio.CancelledError:
             pass
         except Exception:

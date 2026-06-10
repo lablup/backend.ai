@@ -177,6 +177,7 @@ class WebSocketProxy:
         self.downstream_cb = downstream_callback
         self.upstream_cb = upstream_callback
         self.ping_cb = ping_callback
+        self.downstream_task = None
 
     async def proxy(self) -> None:
         self.downstream_task = asyncio.create_task(self.downstream())
