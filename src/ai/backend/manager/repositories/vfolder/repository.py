@@ -230,16 +230,6 @@ class VfolderRepository:
             return self._vfolder_row_to_data(vfolder_row)
 
     @vfolder_repository_resilience.apply()
-    async def update_usage(self, vfolder_id: uuid.UUID, *, num_files: int, cur_size: int) -> None:
-        """Persist usage statistics reported by the storage proxy."""
-        async with self._db.begin_session() as session:
-            await session.execute(
-                sa.update(VFolderRow)
-                .where(VFolderRow.id == vfolder_id)
-                .values(num_files=num_files, cur_size=cur_size)
-            )
-
-    @vfolder_repository_resilience.apply()
     async def get_row_by_id(self, vfolder_id: VFolderUUID) -> Mapping[str, Any]:
         """
         Fetch a vfolder row as a plain mapping by UUID, without permission filtering.
