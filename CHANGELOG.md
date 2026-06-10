@@ -16,6 +16,140 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.4rc7 (2026-06-10)
+
+### Breaking Changes
+* Remove the unintended `GQL` suffix from v2 GraphQL schema type names (e.g. `CreateDomainInputGQL` → `CreateDomainInput`); types whose name would collide with v1 schema types use a `V2` suffix instead (e.g. `KeyPairV2`). ([#11906](https://github.com/lablup/backend.ai/issues/11906))
+
+### Features
+* Exclude agent heartbeat action processing from audit log monitoring to avoid generating high-volume audit records for routine heartbeat events. ([#6987](https://github.com/lablup/backend.ai/issues/6987))
+* Add --with-harbor option to the dev-mode TUI installer that installs a local Harbor container registry via the official offline installer, configured through ruamel.yaml round-trip editing. Manage lifecycle with ./dev harbor start/stop. ([#10963](https://github.com/lablup/backend.ai/issues/10963))
+* Add optional --with-sftp-agent option to the dev-mode TUI installer that
+  provisions a dedicated SFTP agent alongside the regular compute agent using
+  the multi-agent-per-node feature, register the 'upload' scaling group for
+  routing SFTP upload sessions, and pre-pull the SFTP server container image
+  when the SFTP agent is enabled so the first SFTP session starts without a
+  cold image fetch. ([#10971](https://github.com/lablup/backend.ai/issues/10971))
+* Generalize `BaseBulkAction` to carry `list[RBACElementRef]` so bulk actions can mix RBAC element types in a single bulk permission check; any denial across the validator chain aggregates and raises `PermissionDeniedError` with per-entity reasons. ([#11695](https://github.com/lablup/backend.ai/issues/11695))
+* Add the service and repository core for scoped audit log search — per-target RBAC batch validation plus `OR`'d `SearchScope` against `audit_logs`. ([#11713](https://github.com/lablup/backend.ai/issues/11713))
+* Add `assigned_user` nested filter to the `admin_roles` GraphQL query so callers can filter roles by user assignment via a correlated EXISTS subquery. ([#11714](https://github.com/lablup/backend.ai/issues/11714))
+* Wire `scopedAuditLogsV2` GraphQL resolver to the scoped audit-log search service. ([#11726](https://github.com/lablup/backend.ai/issues/11726))
+* Replace `terminateProjectSessionsV2` with scope-agnostic `terminateSessionsV2`, with per-session RBAC via the bulk validator. ([#11748](https://github.com/lablup/backend.ai/issues/11748))
+* Track per-agent resource reservations in a new `agent_resources.reserved` column so the scheduler reserves capacity at scheduling time and atomically prevents over-allocation. ([#11813](https://github.com/lablup/backend.ai/issues/11813))
+* Skip image-side validation for resource slots marked `enabled=false` in `resource_slot_types`, fixing session-creation 500s on clusters that do not serve vendor-declared slots ([#11835](https://github.com/lablup/backend.ai/issues/11835))
+* Add `role_presets` and `role_permission_presets` tables to support admin-managed RBAC role templates. ([#11841](https://github.com/lablup/backend.ai/issues/11841))
+* Add v2 DTOs for role preset CRUD and permission management under `common/dto/manager/v2/role_preset/`. ([#11842](https://github.com/lablup/backend.ai/issues/11842))
+* Expand and rename the default Prometheus query presets with explicit aggregation variants (sum/avg/max/min) for container and vLLM metrics ([#11845](https://github.com/lablup/backend.ai/issues/11845))
+* Add role preset repository, service, and processor layers covering CRUD, soft-delete with restore, purge, and bulk add/remove of `role_permission_preset` entries. ([#11846](https://github.com/lablup/backend.ai/issues/11846))
+* Add an `enable` flag to model-deployment health checks (default off), making health checks opt-in. The custom runtime variant ships with a disabled default health check, and a model-definition file that declares a health check is treated as enabled. ([#11863](https://github.com/lablup/backend.ai/issues/11863))
+* Add a keypair nested filter to `adminKeypairResourcePoliciesV2` for filtering keypair resource policies by their assigned keypairs. ([#11866](https://github.com/lablup/backend.ai/issues/11866))
+* Add a `keypairs` connection to the `KeypairResourcePolicyV2` GraphQL node for navigating from a keypair resource policy to its assigned keypairs. ([#11867](https://github.com/lablup/backend.ai/issues/11867))
+* Introduce replica groups that own deployment revision pointers and per-revision replica counts, moving revision ownership off the endpoint and splitting the v1 (full revision) and v2 (id-only) deployment read paths. ([#11871](https://github.com/lablup/backend.ai/issues/11871))
+* Add the Role Preset GraphQL update/delete/restore mutations and adapter (stub resolvers; service wire-up to follow). ([#11872](https://github.com/lablup/backend.ai/issues/11872))
+* Add a base-layer `execute_bulk_updater_partial` that updates rows per-spec with savepoint isolation, reporting per-row failures. ([#11874](https://github.com/lablup/backend.ai/issues/11874))
+* Add container UID/GID filters (`container_uid`, `container_main_gid`, `container_gids`) to the v2 user search API. ([#11878](https://github.com/lablup/backend.ai/issues/11878))
+* Support filtering users by full name, description, status info, resource policy, password-change requirement, TOTP activation, and sudo-session flag in the v2 user GraphQL query. ([#11879](https://github.com/lablup/backend.ai/issues/11879))
+* Add a session resolver that maps `(session_name, user_id)` to a `session_id`, scoped across all of the user's keypair access keys. ([#11883](https://github.com/lablup/backend.ai/issues/11883))
+* Add the Role Preset GraphQL create/get/search/purge mutations and permission-entry management (stub resolvers; service wire-up to follow). ([#11892](https://github.com/lablup/backend.ai/issues/11892))
+* Add a `userId` owner filter to `KeypairFilter`, exposing it on all keypair connections (`adminKeypairsV2`, `myKeypairs`, and the `keypairs` connection on `adminKeypairResourcePoliciesV2`) so keypairs can be filtered by their owner. ([#11896](https://github.com/lablup/backend.ai/issues/11896))
+* Add `auto_assign` column to roles so system-sourced roles are automatically granted when a user joins the owning scope. ([#11905](https://github.com/lablup/backend.ai/issues/11905))
+* Return the automatically generated default keypair and its one-time secret key when creating users via the GraphQL v2 API. Added `adminBulkCreateUsersWithKeypairV2` for bulk creation and deprecated `adminBulkCreateUsersV2`. ([#11907](https://github.com/lablup/backend.ai/issues/11907))
+* Wire up the Role Preset GraphQL resolvers and adapter so role presets can be created, queried, updated, soft-deleted/restored/purged, and have their permission entries managed. ([#11908](https://github.com/lablup/backend.ai/issues/11908))
+* Add an `auto_assign` field to the Role create/update inputs and role response, allowing a role to be marked for automatic assignment when a user is added to a scope the role is registered in. ([#11911](https://github.com/lablup/backend.ai/issues/11911))
+* Expose the `auto_assign` field on the GraphQL `Role` type and accept it in the role create/update mutation inputs. ([#11912](https://github.com/lablup/backend.ai/issues/11912))
+* Add a search read-path for role permission presets so the permission entries of a role preset can be queried with filtering and pagination. ([#11913](https://github.com/lablup/backend.ai/issues/11913))
+* Add Role Preset REST v2 API under `/api/rest/v2/role-presets` with create, search, get, update, soft-delete, restore, purge, and bulk permission-entry management. ([#11914](https://github.com/lablup/backend.ai/issues/11914))
+* Add Role Preset client SDK v2 and `admin role-preset` CLI v2 commands. ([#11916](https://github.com/lablup/backend.ai/issues/11916))
+* Add `rbac role update` CLI command and expose the role `auto_assign` flag on `rbac role create`/`update`. ([#11918](https://github.com/lablup/backend.ai/issues/11918))
+* Manage replica group lifecycles for model deployments: drive the deploying sub-steps (`INITIALIZING` → `PROVISIONING` → `PROVISIONED` → `PROMOTING` → `FINALIZING` → `DRAINING`, plus `ROLLING_BACK`) through per-group rolling/scaling/draining/autoscale reconcile stages, where autoscaling sets only the deployment's desired replica count and the replica groups reconcile the actual routes. ([#11924](https://github.com/lablup/backend.ai/issues/11924))
+* Surface the deployment a session serves on `SessionV2`: add a `replica` field, plus `deploymentId`/`deployment` on `ModelReplica`. ([#11925](https://github.com/lablup/backend.ai/issues/11925))
+* Auto-generate roles from matching role presets when a project or user is created, and assign auto_assign roles to newly created users. ([#11926](https://github.com/lablup/backend.ai/issues/11926))
+* Grant every auto-assign role bound to a project scope when a user is added to the project, instead of only the project's member role. ([#11927](https://github.com/lablup/backend.ai/issues/11927))
+* Support OpenSSH-format private keys (e.g. ed25519) when registering an SSH keypair. ([#11932](https://github.com/lablup/backend.ai/issues/11932))
+* Record inter-container network cleanup as a sub-step in session scheduling history on termination ([#11946](https://github.com/lablup/backend.ai/issues/11946))
+* Add entity/scope action target abstraction base classes (`BaseSingleEntityAction`, `BaseBulkAction`, `BaseScopeAction`) so action monitoring, validation, and RBAC can read a uniform target interface. ([#11952](https://github.com/lablup/backend.ai/issues/11952))
+* Render a per-request CSP nonce in the webserver, injecting it into the `script-src`/`style-src` directives and into `index.html` so nonce-based Content-Security-Policy works end-to-end. ([#12007](https://github.com/lablup/backend.ai/issues/12007))
+
+### Improvements
+* Migrate model definition validation from trafaret to Pydantic ModelDefinition, surfacing structured field-level error details via ModelDefinitionValidationError ([#11710](https://github.com/lablup/backend.ai/issues/11710))
+* Add `DomainFixtureData` and `domain_factory` test fixtures exposing both `domain_name` and `domain_id`. ([#11752](https://github.com/lablup/backend.ai/issues/11752))
+* Remove orphan `sync_kernel_stats` and `_free_kernel_resources` helpers from AgentRegistry ([#11753](https://github.com/lablup/backend.ai/issues/11753))
+* Format scheduling failure messages as newline-separated bullet lists so web UI and CLI can render per-agent and per-kernel reasons on their own lines. ([#11756](https://github.com/lablup/backend.ai/issues/11756))
+* Add a session-bound DB ops wrapper (`DBOpsProvider`/`ReadOps`/`WriteOps`) and `DependentCreatorSpec` as the basis for repository operations. ([#11777](https://github.com/lablup/backend.ai/issues/11777))
+* Introduce `LocalCron` for robust node-local periodic tasks and migrate all `aiotools.create_timer` usages and manual heartbeat loops across agent, manager, and app-proxy. ([#11844](https://github.com/lablup/backend.ai/issues/11844))
+* Exclude unenforced grant operations from the RBAC permission matrix so it only exposes (scope, entity, operation) combinations that are actually checked at runtime. ([#11870](https://github.com/lablup/backend.ai/issues/11870))
+* Identify the session by `session_id` (instead of `session_name` + `access_key`) for the start-service action across the legacy and v2 session APIs, and enforce session-access authorization via RBAC. ([#11884](https://github.com/lablup/backend.ai/issues/11884))
+* Add a permission cap column to RBAC scope-entity relations as the foundation for bounding assignable permissions. ([#11947](https://github.com/lablup/backend.ai/issues/11947))
+* Remove legacy role-scope auto-binding behaviors so that the role `auto_assign` flag is the single mechanism for granting roles on scope join. ([#11949](https://github.com/lablup/backend.ai/issues/11949))
+* Import BraceStyleAdapter from ai.backend.logging instead of the deprecated ai.backend.common.logging shim in accelerator plugins ([#11988](https://github.com/lablup/backend.ai/issues/11988))
+* Reuse a single Docker client per stats-collection pass in accelerator plugins instead of opening one per container ([#11990](https://github.com/lablup/backend.ai/issues/11990))
+* Migrate agent-side exceptions into the structured `errors` subpackage as `BackendAIError` subclasses so agent failures carry a Backend.AI error code. ([#12001](https://github.com/lablup/backend.ai/issues/12001))
+
+### Deprecations
+* Deprecate the endpoint `scalingState` GraphQL field; per-replica-group scaling status now drives scaling, and the endpoint value is frozen to `STABLE`. ([#11924](https://github.com/lablup/backend.ai/issues/11924))
+
+### Fixes
+* Fix the installer hanging on the WSL/LiveCD environment warning when run with `--headless` because the "Press Enter to continue" prompt could not receive keystrokes; in headless mode it now auto-proceeds after printing the warning. ([#11564](https://github.com/lablup/backend.ai/issues/11564))
+* Fix custom runtime variant's `reads_vfolder_config_files` flag being silently dropped during fixture load, which caused model service deployments with the custom variant to fail on fresh installs. ([#11712](https://github.com/lablup/backend.ai/issues/11712))
+* Make `options` nullable in the `BulkPurgeVFoldersV2Input` GraphQL input so clients can omit it and fall back to the server-side defaults. ([#11732](https://github.com/lablup/backend.ai/issues/11732))
+* Detect Valkey Sentinel failover via the connected node's ROLE instead of comparing the Sentinel-reported master address, so a demoted master is recognized immediately by the monitor loop and reconnection is triggered through a single round-trip health check. ([#11734](https://github.com/lablup/backend.ai/issues/11734))
+* Fix `RBACTypeConversionError` when resolving the `kernels` field under a session in GraphQL. ([#11736](https://github.com/lablup/backend.ai/issues/11736))
+* Fix `sftp`, `scp`, and other ssh subsystems failing with `Received message too long` when connecting to sessions launched from the `sftp-server` image, caused by the kernel-runner default rc files emitting the persistent-path notice on non-interactive shells. ([#11773](https://github.com/lablup/backend.ai/issues/11773))
+* Add explicit UUID ids to prometheus query preset fixtures so repeated populate runs do not create duplicate rows ([#11779](https://github.com/lablup/backend.ai/issues/11779))
+* Fix auto-mount vfolders (dot-prefixed, e.g. `.config`) not being mounted into sessions created without any explicit vfolder mount request. ([#11781](https://github.com/lablup/backend.ai/issues/11781))
+* Apply resource slot changes when updating a deployment revision preset (previously the new resource slots were silently ignored). ([#11783](https://github.com/lablup/backend.ai/issues/11783))
+* Assign the deployment revision preset rank race-free within the create transaction (previously two concurrent creates could compute the same rank). ([#11784](https://github.com/lablup/backend.ai/issues/11784))
+* Preserve extra vfolder mounts and the model vfolder subpath when refreshing deployment revisions via `./bai admin deployment revision refresh`; previously the rebuilder hard-coded `extra_mounts=[]` and omitted `vfolder_subpath`, silently stripping both fields from the new revision. ([#11790](https://github.com/lablup/backend.ai/issues/11790))
+* Seed missing `start_command` into `runtime_variants.default_model_definition` for vllm / huggingface-tgi / sglang / modular-max so legacy deployment_revision rows with `NULL` model_definition can be repaired by `./bai admin deployment revision refresh` ([#11812](https://github.com/lablup/backend.ai/issues/11812))
+* Show the inviter's username when the stored email is empty (e.g. SSO-created accounts) on VFolder invitation listings, so the sender no longer renders blank. ([#11837](https://github.com/lablup/backend.ai/issues/11837))
+* Allow accounts whose email is an empty string and whose domain_name is NULL to send, accept, reject, update, list, and leave VFolder invitations. ([#11838](https://github.com/lablup/backend.ai/issues/11838))
+* Plug a `zmq.asyncio.Context` leak in `AgentClientPool._create_entry`: when the
+  initial `client.connect()` failed, the partially-initialized peer was raised
+  away without being closed, leaving its callosum-allocated ZMQ context (and
+  its background IO thread) dangling. Because the failure also never cached
+  an unhealthy entry, every subsequent `acquire()` rebuilt a fresh peer and
+  leaked again. The fix closes the peer in the connect-failure path and stores
+  an unhealthy `_CachedEntry` so subsequent acquires short-circuit via the
+  existing unhealthy branch in `_get_or_create`. `AgentClient.close()` now
+  also logs teardown exceptions instead of swallowing them, so future
+  regressions are observable. ([#11857](https://github.com/lablup/backend.ai/issues/11857))
+* Fix session app connection failure for users with multiple keypairs by looking up streaming sessions by user ID instead of access key. ([#11859](https://github.com/lablup/backend.ai/issues/11859))
+* Make sokovan deployment pick a deterministic, currently-active keypair when resolving `sessions.access_key`, so INFERENCE sessions no longer get pinned to an arbitrary or already-inactive access key. ([#11868](https://github.com/lablup/backend.ai/issues/11868))
+* Fix `mgr fixture populate` CompileError by removing the stale top-level `ui_type` key from the install runtime variant preset fixture ([#11894](https://github.com/lablup/backend.ai/issues/11894))
+* Recalculate App Proxy worker's `available_slots` on restart so a changed `port_range` takes effect. ([#11909](https://github.com/lablup/backend.ai/issues/11909))
+* Fix volatile inter-container networks leaking after session termination by restoring overlay/local network cleanup in the TERMINATED hook ([#11922](https://github.com/lablup/backend.ai/issues/11922))
+* Fix legacy session resolvers raising `SessionNotFound` (404) for a live session referenced by its session ID, by resolving a session ID or name interchangeably. ([#11934](https://github.com/lablup/backend.ai/issues/11934))
+* Fix hook-recorded execution sub-steps not being persisted to scheduling history ([#11942](https://github.com/lablup/backend.ai/issues/11942))
+* Prevent fire-and-forget background tasks from being garbage collected mid-execution by retaining strong references to them. ([#11953](https://github.com/lablup/backend.ai/issues/11953))
+* Fix v2 client `SessionClient` GET methods (`get_container_logs`, `get_status_history`, `get_commit_status`, `get_abusing_report`) sending their parameters (e.g. `owner_access_key`, `kernel_id`) in the GET request body instead of the query string, which caused the manager to silently drop them and return a `404 SessionNotFound` for privileged delegated reads. ([#11956](https://github.com/lablup/backend.ai/issues/11956))
+* Fix v2 client `InfraClient.get_wsproxy_version` sending its `group` filter in the GET request body instead of the query string, which caused the manager to silently drop it so the wsproxy-version lookup was not scoped to the requested group. ([#11958](https://github.com/lablup/backend.ai/issues/11958))
+* Fix four v2 client methods (`SessionClient.download_single`, `InfraClient.get_watcher_status`, `get_usage_per_period`, `get_usage_per_month`) sending their parameters in the request body instead of the query string. Also sign the URL-encoded query string across all v2 client transports so HMAC signatures match the wire, fixing signature-validation failures for SSE/WebSocket calls that pass query params. ([#11968](https://github.com/lablup/backend.ai/issues/11968))
+* Make the manager's `QueryParam` request parser collect repeated query keys into list-typed fields (e.g. `?group_ids=a&group_ids=b`), which previously failed schema validation because the aiohttp multi-dict collapsed to a single value. Scalar fields keep their existing single-value behavior. ([#11970](https://github.com/lablup/backend.ai/issues/11970))
+* Fix the HA (Sentinel) development halfstack so app-proxy and the webserver start: `install-dev.sh --configure-ha` now wires their Redis to the Sentinel cluster instead of leaving them pointed at a non-existent standalone Redis port. ([#11974](https://github.com/lablup/backend.ai/issues/11974))
+* Fix duplicated ATOM container live_stat across atom/atom-max/atom-plus variants by scoping stats to each plugin's own devices ([#11983](https://github.com/lablup/backend.ai/issues/11983))
+* Add the missing `backend.ai-cli` dependency to the Storage Proxy and App Proxy Worker distributions so their virtualenvs install the `backend.ai` console script and can be started via `backend.ai <component> start-server`. ([#11992](https://github.com/lablup/backend.ai/issues/11992))
+* Keep strong references to fire-and-forget `asyncio` tasks across the WebSocket proxies (client CLI, web, manager) and the kernel runner/terminal so they are not garbage-collected mid-flight, clearing the remaining `RUF006` violations left after BA-6287. ([#11995](https://github.com/lablup/backend.ai/issues/11995))
+* Fix runtime variant health-check migration for operator-added definitions. ([#12003](https://github.com/lablup/backend.ai/issues/12003))
+* Retire a model service's replica groups when its endpoint is destroyed, so the reconciler stops provisioning replicas for the gone endpoint instead of accumulating `failed_to_start` routes. ([#12012](https://github.com/lablup/backend.ai/issues/12012))
+* Return a server-side error instead of a 404 when a user is missing their RBAC SYSTEM role during vfolder operations such as invitation acceptance. ([#12015](https://github.com/lablup/backend.ai/issues/12015))
+* Honor `max_retries`, `interval`, `max_wait_time`, and `expected_status_code` in model service health checks so a running route is only marked unhealthy after the configured number of consecutive failed probes. ([#12016](https://github.com/lablup/backend.ai/issues/12016))
+* Publish App Proxy Traefik routing config as a single atomic etcd transaction so route updates no longer leave a brief window where a circuit's router points at a deleted backing service, which intermittently dropped in-flight requests during route churn. ([#12018](https://github.com/lablup/backend.ai/issues/12018))
+
+### Documentation Updates
+* Document single/batch/bulk CRUD target semantics across skill guides and component READMEs ([#11937](https://github.com/lablup/backend.ai/issues/11937))
+
+### External Dependency Updates
+* Upgrade `aiodocker` to 0.27.0 to pick up proper `DockerStreamError` detection during image pulls/pushes and Python 3.14 compatibility (raised `aiohttp` minimum to 3.11.13, already satisfied). ([#11840](https://github.com/lablup/backend.ai/issues/11840))
+
+### Miscellaneous
+* Add `auto_assign` and role preset sections to the default RBAC role fixtures and remove `grant:*` operation permissions. ([#11930](https://github.com/lablup/backend.ai/issues/11930))
+* Remove dead `AgentRegistry.increment_session_usage()` test mock. ([#11933](https://github.com/lablup/backend.ai/issues/11933))
+* Add a project-scope Grafana MCP and an `/observability` skill so AI agents can query Loki logs and Prometheus metrics during local development. ([#12004](https://github.com/lablup/backend.ai/issues/12004))
+
+### Test Updates
+* Pin `aiohttp~=3.13.3` in the pytest resolve so it matches the production resolve; otherwise `pytest-aiohttp` floats aiohttp to 3.14.x, whose `ClientResponse` requires a `stream_writer` argument that `aioresponses` does not pass, breaking mocked HTTP tests. ([#12011](https://github.com/lablup/backend.ai/issues/12011))
+
+
 ## 26.4.4rc6 (2026-05-20)
 
 ### Features
