@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/EduAppLauncher-CjZz4Wg7.js","assets/index-CuMUOZIG.js"])))=>i.map(i=>d[i]);
+import{j as s,dx as c,r as p,h as i,ix as u,be as l,cU as x}from"./index-CuMUOZIG.js";const d=l.lazy(()=>x(()=>import("./EduAppLauncher-CjZz4Wg7.js"),__vite__mapDeps([0,1]))),j=({sToken:a,extraParams:e})=>s.jsxs(s.Fragment,{children:[s.jsx(c,{}),s.jsx(p.Suspense,{fallback:null,children:s.jsx(m,{sToken:a,extraParams:e})})]}),m=a=>{"use memo";const e=i.c(4),{sToken:n,extraParams:r}=a,o=u();let t;return e[0]!==o||e[1]!==r||e[2]!==n?(t=s.jsx(d,{apiEndpoint:o,active:!0,sToken:n,extraParams:r}),e[0]=o,e[1]=r,e[2]=n,e[3]=t):t=e[3],t};export{j as default};
+//# sourceMappingURL=EduAppLauncherPage-COEi-9sv.js.map
