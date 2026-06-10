@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Final, NewType, Self, cast
 
@@ -48,7 +49,20 @@ TusSessionId = NewType("TusSessionId", str)
 _OFFSET_KEY_PREFIX: Final = "tus.upload.offset"
 _LEASE_KEY_PREFIX: Final = "tus.upload.lease"
 _DEFAULT_TTL_SECONDS: Final = 24 * 60 * 60
-_DEFAULT_LEASE_TTL_SECONDS: Final = 60
+_DEFAULT_LEASE_TTL_SECONDS: Final = 30
+_DEFAULT_LEASE_HEARTBEAT_SECONDS: Final = 10
+
+
+# Compare-and-expire: refresh the lease TTL only if we still own it. Returns
+# 1 on success, 0 if the lease no longer belongs to ``holder_token`` (in
+# which case the background heartbeat should stop and the PATCH be aborted).
+EXTEND_LEASE_SCRIPT: Final[str] = """
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    redis.call('EXPIRE', KEYS[1], ARGV[2])
+    return 1
+end
+return 0
+"""
 
 
 # Compare-and-delete release: drop the lease only if we still own it. Used by
@@ -87,11 +101,13 @@ class ValkeyTusClient:
 
     _client: AbstractValkeyClient
     _advance_offset_script: Script
+    _extend_lease_script: Script
     _release_lease_script: Script
 
     def __init__(self, client: AbstractValkeyClient) -> None:
         self._client = client
         self._advance_offset_script = Script(ADVANCE_OFFSET_SCRIPT)
+        self._extend_lease_script = Script(EXTEND_LEASE_SCRIPT)
         self._release_lease_script = Script(RELEASE_LEASE_SCRIPT)
 
     @classmethod
@@ -199,6 +215,54 @@ class ValkeyTusClient:
                 offset_raw.decode() if isinstance(offset_raw, bytes) else cast(str, offset_raw)
             )
             return int(decoded)
+
+    async def watch_lease(
+        self,
+        session_id: TusSessionId,
+        holder_token: str,
+        *,
+        interval: float = _DEFAULT_LEASE_HEARTBEAT_SECONDS,
+        ttl_seconds: int = _DEFAULT_LEASE_TTL_SECONDS,
+    ) -> None:
+        """Background loop: refresh the lease every ``interval`` seconds.
+
+        Stops on its own when ``extend_lease`` returns ``False`` (the lease
+        was reclaimed by another holder). The PATCH handler keeps draining;
+        its final ``advance_offset`` then raises ``TusLeaseLostError`` which
+        surfaces the conflict to the client as 409.
+        """
+        while True:
+            await asyncio.sleep(interval)
+            if not await self.extend_lease(session_id, holder_token, ttl_seconds=ttl_seconds):
+                log.warning(
+                    "lease heartbeat: session {} lost lease (holder={})",
+                    session_id,
+                    holder_token,
+                )
+                return
+
+    @valkey_tus_resilience.apply()
+    async def extend_lease(
+        self,
+        session_id: TusSessionId,
+        holder_token: str,
+        *,
+        ttl_seconds: int = _DEFAULT_LEASE_TTL_SECONDS,
+    ) -> bool:
+        """Refresh the lease TTL iff still owned by ``holder_token``.
+
+        Returns ``True`` on a successful renewal, ``False`` if the lease was
+        reclaimed by another holder (heartbeat task should stop in that
+        case). Called periodically from a background heartbeat coroutine so
+        long-running PATCH bodies do not lose the lease mid-drain.
+        """
+        async with self._client.client() as conn:
+            result = await conn.invoke_script(
+                script=self._extend_lease_script,
+                keys=[self._lease_key(session_id)],
+                args=[holder_token, str(ttl_seconds)],
+            )
+        return int(cast(int, result)) == 1
 
     @valkey_tus_resilience.apply()
     async def release_lease(self, session_id: TusSessionId, holder_token: str) -> None:

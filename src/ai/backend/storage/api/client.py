@@ -441,6 +441,10 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 raise UploadOffsetMismatchError(
                     f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
                 )
+            watcher_task = asyncio.create_task(
+                ctx.valkey_tus_client.watch_lease(session_id, holder_token),
+                name=f"tus-lease-watch-{session_id}",
+            )
             try:
                 bytes_written = await _drain_into_upload_file(
                     request.content, upload_temp_path, actual_offset, session_id
@@ -448,6 +452,12 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             except BaseException:
                 await ctx.valkey_tus_client.release_lease(session_id, holder_token)
                 raise
+            finally:
+                watcher_task.cancel()
+                try:
+                    await watcher_task
+                except asyncio.CancelledError:
+                    pass
             new_offset = await ctx.valkey_tus_client.advance_offset(
                 session_id, holder_token, bytes_written
             )

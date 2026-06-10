@@ -73,6 +73,8 @@ class TestTusUploadPartOffsetValidation:
         valkey_tus_client.get_offset = AsyncMock(return_value=server_offset)
         valkey_tus_client.try_load_offset = AsyncMock(return_value=server_offset or 0)
         valkey_tus_client.advance_offset = AsyncMock(return_value=server_offset or 0)
+        valkey_tus_client.extend_lease = AsyncMock(return_value=True)
+        valkey_tus_client.release_lease = AsyncMock(return_value=None)
 
         # Mock context
         ctx = MagicMock()
