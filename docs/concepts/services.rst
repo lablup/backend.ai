@@ -85,7 +85,7 @@ Event bus
 ^^^^^^^^^
 :raw-html-m2r:`<span style="background-color:#ffbbb1;border:1px solid #ccc;display:inline-block;width:16px;height:16px;margin:0;padding:0;"></span>`
 
-Backend.AI uses Redis to keep track of various real-time information and notify system events to other service components.
+Backend.AI uses Valkey (a Redis-compatible data store) to keep track of various real-time information and notify system events to other service components.
 
 Control Panel (Enterprise only)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -90,21 +90,21 @@ docker run -d \
 
 ---
 
-#### 3. Redis Not Running
+#### 3. Valkey Not Running
 
 **Symptoms:**
 ```
 Error: Connection refused to localhost:6379
-Error: Error connecting to Redis
+Error: Error connecting to Valkey
 ```
 
 **Diagnosis:**
 ```bash
-# Check Redis container
-docker ps | grep redis
+# Check Valkey container
+docker ps | grep valkey
 
-# Test Redis connection
-redis-cli ping  # Should return PONG
+# Test Valkey connection
+valkey-cli ping  # Should return PONG
 ```
 
 **Solutions:**
@@ -114,18 +114,18 @@ redis-cli ping  # Should return PONG
 ./scripts/run-dev.sh
 ```
 
-**Manual Redis start:**
+**Manual Valkey start:**
 ```bash
 docker run -d \
-  --name backend-ai-halfstack-redis \
+  --name backend-ai-halfstack-valkey \
   -p 6379:6379 \
-  redis:latest
+  valkey/valkey:9.1.0-alpine
 ```
 
 **Connection test:**
 ```bash
 # Should return PONG
-redis-cli ping
+valkey-cli ping
 ```
 
 ---
@@ -229,7 +229,7 @@ Error: Missing required field 'etcd.namespace'
 
 3. **Validate required fields:**
    - Database connection (host, port, user, password, dbname)
-   - Redis connection (host, port)
+   - Valkey connection (host, port)
    - etcd connection (for Manager)
 
 4. **Check types:**
@@ -594,7 +594,7 @@ export BACKEND_LOG_LEVEL=DEBUG
 **Container logs:**
 ```bash
 docker logs backend-ai-halfstack-db
-docker logs backend-ai-halfstack-redis
+docker logs backend-ai-halfstack-valkey
 docker logs backend-ai-halfstack-etcd
 ```
 
@@ -605,9 +605,9 @@ docker logs backend-ai-halfstack-etcd
 psql -h localhost -U postgres -d backend
 ```
 
-**Redis:**
+**Valkey:**
 ```bash
-redis-cli ping
+valkey-cli ping
 ```
 
 **etcd:**
@@ -628,7 +628,7 @@ When component won't start, check:
 
 - [ ] Docker daemon running: `docker ps`
 - [ ] PostgreSQL running (if needed): `docker ps | grep postgres`
-- [ ] Redis running: `docker ps | grep redis`
+- [ ] Valkey running: `docker ps | grep valkey`
 - [ ] etcd running (Manager only): `docker ps | grep etcd`
 - [ ] Configuration file exists: `ls configs/<component>.toml`
 - [ ] Database migrations up-to-date: `/db-status`

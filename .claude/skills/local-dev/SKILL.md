@@ -63,5 +63,5 @@ docker compose -f docker-compose.halfstack.current.yml restart backendai-half-ap
 
 - `/observability` — Inspect logs/metrics via Grafana MCP after a restart
 - `/bai-cli` — Verify changes via CLI after restarting services
-- `/halfstack` — Docker Compose infrastructure (DB, Redis, etcd, Hive Gateway)
+- `/halfstack` — Docker Compose infrastructure (DB, Valkey, etcd, Hive Gateway)
 - `/cli-executor` — Run Backend.AI component servers directly

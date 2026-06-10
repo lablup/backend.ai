@@ -32,7 +32,7 @@ Requirements
 **Required**:
 - Docker 20.10+ (with Compose v2)
 - PostgreSQL 16+ (tested with 16.3)
-- Redis 7.2+ (tested with 7.2.11)
+- Valkey 9.1+ (tested with 9.1.0; Redis-compatible)
 - etcd 3.5+ (tested with 3.5.14)
 - Prometheus 3.x (tested with 3.1.0)
 
@@ -67,7 +67,7 @@ cd backend.ai
 This script will:
 - Check required dependencies (Docker, Python, etc.)
 - Set up Python virtual environment with Pantsbuild
-- Start halfstack infrastructure (PostgreSQL, Redis, etcd, Apollo Router) — only required services by default; observability and object storage are opt-in via Compose profiles (`--profile observability`, `--profile storage`)
+- Start halfstack infrastructure (PostgreSQL, Valkey, etcd, Apollo Router) — only required services by default; observability and object storage are opt-in via Compose profiles (`--profile observability`, `--profile storage`)
 - Initialize database schemas
 - Create default API keypairs and user accounts
 

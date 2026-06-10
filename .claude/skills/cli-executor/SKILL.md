@@ -1,6 +1,6 @@
 ---
 name: cli-executor
-description: Execute Backend.AI component CLI commands (mgr start-server, ag start-server, storage start-server) with pre-flight checks (DB, Redis, etcd), health checks, and troubleshooting
+description: Execute Backend.AI component CLI commands (mgr start-server, ag start-server, storage start-server) with pre-flight checks (DB, Valkey, etcd), health checks, and troubleshooting
 invoke_method: automatic
 auto_execute: false
 enabled: true
@@ -50,7 +50,7 @@ Guide execution of Backend.AI component CLI commands with pre-flight checks, com
 
 **Pre-flight Checks:**
 - ✅ PostgreSQL database running
-- ✅ Redis running
+- ✅ Valkey running
 - ✅ etcd running
 - ✅ Database migrations up-to-date (`/db-status`)
 - ✅ Configuration file exists
@@ -182,7 +182,7 @@ Guide execution of Backend.AI component CLI commands with pre-flight checks, com
 
 **Pre-flight Checks:**
 - ✅ PostgreSQL database running
-- ✅ Redis running
+- ✅ Valkey running
 - ✅ Database migrations up-to-date (use `/db-status --component=appproxy`)
 - ✅ Configuration file exists
 
@@ -212,7 +212,7 @@ Guide execution of Backend.AI component CLI commands with pre-flight checks, com
 
 **Pre-flight Checks:**
 - ✅ Coordinator accessible
-- ✅ Redis running
+- ✅ Valkey running
 - ✅ Configuration file exists
 
 **Usage:**
@@ -262,7 +262,7 @@ Before executing command, verify:
 🔍 Pre-flight checks for Manager:
 
 ✅ PostgreSQL database running
-✅ Redis running
+✅ Valkey running
 ✅ etcd running
 ⚠️ Database migrations pending (2 migrations)
 ✅ Configuration file exists
@@ -366,20 +366,20 @@ Related skills:
 - /db-migrate - Apply database migrations
 ```
 
-**Redis not running:**
+**Valkey not running:**
 ```
-❌ Error: Redis connection failed
+❌ Error: Valkey connection failed
 
 Details: Connection refused to localhost:6379
 
 Recommended actions:
-1. Check Redis is running:
-   docker ps | grep redis
+1. Check Valkey is running:
+   docker ps | grep valkey
 
 2. Start infrastructure:
    ./scripts/run-dev.sh
 
-3. Verify Redis configuration in config file
+3. Verify Valkey configuration in config file
 ```
 
 **etcd not running (Manager only):**
@@ -570,7 +570,7 @@ Use: /cli-executor --component=<name> to run a component
 🔍 Pre-flight checks for Manager:
 
 ✅ PostgreSQL database running
-✅ Redis running
+✅ Valkey running
 ✅ etcd running
 ✅ Database schema up-to-date
 ✅ Configuration file exists
@@ -594,7 +594,7 @@ Executing...
 **Agent workflow:**
 ```
 Step 1: Check infrastructure
-🔍 Checking Docker, PostgreSQL, Redis, etcd...
+🔍 Checking Docker, PostgreSQL, Valkey, etcd...
 ✅ All infrastructure running
 
 Step 2: Check database schema
@@ -638,7 +638,7 @@ Commands like `start-server` block the terminal:
 
 This starts:
 - PostgreSQL
-- Redis
+- Valkey
 - etcd
 - Other required infrastructure
 

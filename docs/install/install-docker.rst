@@ -12,13 +12,13 @@ Prerequisites
 
       ./scripts/build-wheels.sh
 
-2. Start the halfstack infrastructure (PostgreSQL, Redis, etcd):
+2. Start the halfstack infrastructure (PostgreSQL, Valkey, etcd):
 
    .. code-block:: bash
 
       docker compose -f docker-compose.halfstack-ha.yml up -d
 
-3. Configure etcd for Redis connection:
+3. Configure etcd for Valkey connection:
 
    .. code-block:: bash
 
@@ -187,8 +187,8 @@ Create ``webserver.conf`` with the following content:
    [session]
 
    [session.redis]
-   # Use the halfstack Redis service name for container networking
-   addr = "backendai-half-redis-node01:8110"
+   # Use the halfstack Valkey service name for container networking
+   addr = "backendai-half-valkey-node01:8110"
 
    [session.redis.redis_helper_config]
    socket_timeout = 5.0
@@ -332,7 +332,7 @@ Create ``proxy-worker.toml`` with the following content:
 
 Key configuration points for Docker containers:
 
-- Use ``host.docker.internal`` to access services on the host machine (etcd, PostgreSQL, Redis, OTEL)
+- Use ``host.docker.internal`` to access services on the host machine (etcd, PostgreSQL, Valkey, OTEL)
 - Use container service names for inter-container communication (``backend-ai-manager``, ``backend-ai-appproxy-coordinator``)
 - The webserver endpoint uses multiple values: first for container-to-container, second for browser access
 - Port numbers (8101, 8111, 8121) correspond to ``docker-compose.halfstack.current.yml``. Adjust if using a different halfstack configuration

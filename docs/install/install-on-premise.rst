@@ -7,7 +7,7 @@ The minimal server node configuration:
 * 1x manager server
 * Nx agent servers
 * 1x PostgreSQL server
-* 1x Redis server
+* 1x Valkey (or Redis-compatible) server
 * 1x etcd cluster
 
   - For HA setup, it should consist of 5 separate server nodes.

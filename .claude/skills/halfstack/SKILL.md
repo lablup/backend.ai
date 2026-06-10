@@ -1,6 +1,6 @@
 ---
 name: halfstack
-description: Diagnose and fix Docker Compose halfstack issues — config mapping, service health, DB/Redis/etcd inspection, supergraph regeneration
+description: Diagnose and fix Docker Compose halfstack issues — config mapping, service health, DB/Valkey/etcd inspection, supergraph regeneration
 invoke_method: user
 auto_execute: false
 enabled: true
@@ -20,7 +20,7 @@ Diagnose and directly fix issues with the Docker Compose halfstack development e
 - Docker Compose services fail to start or keep restarting
 - Config files are missing, stale, or have wrong port/secret values
 - Supergraph schema needs regeneration after GQL changes
-- Need to inspect DB, Redis, or etcd state directly
+- Need to inspect DB, Valkey, or etcd state directly
 - Halfstack needs to be brought up after a fresh clone or branch switch
 
 ## Compose File
@@ -52,7 +52,7 @@ only the **required** services start. To include optional ones, pass `--profile 
 | Service | Image | Purpose | Profile |
 |---------|-------|---------|---------|
 | `backendai-half-db` | postgres:16.3-alpine | Main database | (required) |
-| `backendai-half-redis` | redis:7.2-alpine | Cache / pub-sub | (required) |
+| `backendai-half-valkey` | valkey/valkey:9.1.0-alpine | Cache / pub-sub | (required) |
 | `backendai-half-etcd` | etcd v3.5 | Config store | (required) |
 | `backendai-half-apollo-router` | Hive Gateway | GraphQL federation (manager has 2 GQL servers federated through this) | (required) |
 | `backendai-half-prometheus` | Prometheus | Metrics — manager queries it for deployment autoscale rule evaluation | (required) |
@@ -62,7 +62,7 @@ only the **required** services start. To include optional ones, pass `--profile 
 | `backendai-half-tempo` | Tempo | Tracing | `observability` |
 | `backendai-half-pyroscope` | Pyroscope | Profiling | `observability` |
 | `backendai-half-db-exporter` | postgres-exporter | Postgres metrics | `observability` |
-| `backendai-half-redis-exporter` | redis_exporter | Redis metrics | `observability` |
+| `backendai-half-valkey-exporter` | redis_exporter | Valkey metrics | `observability` |
 | `backendai-half-minio` | MinIO | Object storage | `storage` |
 
 **Profile semantics:**
@@ -256,27 +256,27 @@ docker exec -e PGPASSWORD=develove $PGCONTAINER psql -U postgres -d appproxy -c 
 ./py -m alembic -c alembic-appproxy.ini upgrade head
 ```
 
-### Redis
+### Valkey
 
 ```bash
-REDIS_CONTAINER=$(docker compose -f docker-compose.halfstack.current.yml ps -q backendai-half-redis)
+VALKEY_CONTAINER=$(docker compose -f docker-compose.halfstack.current.yml ps -q backendai-half-valkey)
 
 # Ping
-docker exec $REDIS_CONTAINER redis-cli ping
+docker exec $VALKEY_CONTAINER valkey-cli ping
 
 # Info
-docker exec $REDIS_CONTAINER redis-cli info server
-docker exec $REDIS_CONTAINER redis-cli dbsize
+docker exec $VALKEY_CONTAINER valkey-cli info server
+docker exec $VALKEY_CONTAINER valkey-cli dbsize
 
 # List keys (dev only)
-docker exec $REDIS_CONTAINER redis-cli keys '*'
+docker exec $VALKEY_CONTAINER valkey-cli keys '*'
 
 # Get/check specific key
-docker exec $REDIS_CONTAINER redis-cli get <key>
-docker exec $REDIS_CONTAINER redis-cli type <key>
+docker exec $VALKEY_CONTAINER valkey-cli get <key>
+docker exec $VALKEY_CONTAINER valkey-cli type <key>
 
 # Flush all (destructive)
-docker exec $REDIS_CONTAINER redis-cli flushall
+docker exec $VALKEY_CONTAINER valkey-cli flushall
 ```
 
 ### etcd
@@ -333,15 +333,15 @@ These config files live in the project root and are generated from `configs/` te
 | `alembic-accountmgr.ini` | `configs/account-manager/halfstack.alembic.ini` | PG connection string |
 | `agent.toml` | `configs/agent/halfstack.toml` | etcd/RPC/watcher port, ipc/var/mount paths, accelerator plugins |
 | `storage-proxy.toml` | `configs/storage-proxy/halfstack.toml` | etcd port, 2 secrets, volume config, MinIO creds |
-| `app-proxy-coordinator.toml` | `configs/app-proxy-coordinator/halfstack.toml` | PG/Redis port, service port, 3 generated secrets |
+| `app-proxy-coordinator.toml` | `configs/app-proxy-coordinator/halfstack.toml` | PG/Valkey port, service port, 3 generated secrets |
 | `alembic-appproxy.ini` | `configs/app-proxy-coordinator/halfstack.alembic.ini` | PG connection string |
-| `app-proxy-worker.toml` | `configs/app-proxy-worker/halfstack.toml` | Redis port, service port, **same 3 secrets as coordinator** |
-| `webserver.conf` | `configs/webserver/halfstack.conf` | Manager endpoint URL, Redis addr |
+| `app-proxy-worker.toml` | `configs/app-proxy-worker/halfstack.toml` | Valkey port, service port, **same 3 secrets as coordinator** |
+| `webserver.conf` | `configs/webserver/halfstack.conf` | Manager endpoint URL, Valkey addr |
 
 ### Cross-Config Consistency Rules
 
 - **PG port** in compose must match `manager.toml`, `alembic.ini`, `account-manager.toml`, `app-proxy-coordinator.toml`, `alembic-appproxy.ini`
-- **Redis port** in compose must match `app-proxy-coordinator.toml`, `app-proxy-worker.toml`, `webserver.conf`
+- **Valkey port** in compose must match `app-proxy-coordinator.toml`, `app-proxy-worker.toml`, `webserver.conf`
 - **etcd port** in compose must match `manager.toml`, `agent.toml`, `storage-proxy.toml`
 - **App Proxy secrets**: `app-proxy-coordinator.toml` and `app-proxy-worker.toml` must share identical `api_secret`, `jwt_secret`, `permit_hash.secret`
 - **Manager ↔ Storage Proxy**: the volume auth secret in etcd (set via `dev.etcd.volumes.json`) must match `storage-proxy.toml`'s `[api.manager] secret`
@@ -365,5 +365,5 @@ When halfstack issues are reported, follow this order:
    - If a directory exists where a file should be: stop service → `rm -rf <dir>` → copy correct file → restart
 5. **For Backend.AI components** (manager, agent, etc.): verify `.toml`/`.conf` exists and ports match compose
 6. **For DB issues:** connect to PostgreSQL directly and check schema/data
-7. **For Redis/etcd issues:** connect directly and inspect state
+7. **For Valkey/etcd issues:** connect directly and inspect state
 8. **Fix the root cause directly** — don't just report the problem.

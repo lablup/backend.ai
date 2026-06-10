@@ -377,12 +377,12 @@ See `configs/agent/halfstack.toml` for configuration file examples.
 - **Purpose**: Container creation and management
 - **Supported Runtimes**: Docker
 
-#### Redis (Event and State Management)
+#### Valkey (Event and State Management)
 - **Purpose**:
   - Send heartbeat events (for Manager registration)
   - Update agent status
   - Manage background tasks
-- **Note**: Agent registers with Manager via Redis and receives RPC commands from Manager.
+- **Note**: Agent registers with Manager via Valkey and receives RPC commands from Manager.
 
 #### Manager Connection
 - **Protocol**: ZeroMQ RPC (6011), HTTP Watcher API (6009)

@@ -198,7 +198,7 @@ should be able to access the public Internet (maybe via some corporate firewalls
 |:------------------------:|-------|
 | manager:5002             | ZeroMQ-based event push from agents to the manager |
 | etcd:2379                | etcd API access |
-| redis:6379               | Redis API access |
+| redis:6379               | Valkey/Redis API access |
 | docker-registry:{80,443} | HTTP watcher API |
 | (Other hosts)            | Depending on user program requirements |
 

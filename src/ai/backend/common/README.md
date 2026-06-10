@@ -41,7 +41,7 @@ Client and abstraction layer for integration with external services and systems.
 
 - **message_queue/** - Message queue interface and implementation
   - Provide message publish/subscribe interface
-  - Currently implemented based on Redis Streams
+  - Currently implemented based on Valkey/Redis streams
   - Consumer Group management
   - Future support for other message queue systems planned
 

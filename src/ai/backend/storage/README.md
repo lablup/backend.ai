@@ -72,7 +72,7 @@ Storage Proxy has 4 entry points to receive and process external requests.
 
 ### 3. Event Dispatcher
 
-**Framework**: Backend.AI Event Dispatcher (Redis Streams-based)
+**Framework**: Backend.AI Event Dispatcher (Valkey Streams-based)
 
 **Location**: `src/ai/backend/common/events/`
 
@@ -283,7 +283,7 @@ Mount methods:
 ## Performance Optimization
 
 ### Caching
-- Cache vfolder metadata in Redis
+- Cache vfolder metadata in Valkey
 - Cache user permissions
 - Invalidate cache on updates
 
@@ -320,7 +320,7 @@ See `configs/storage-proxy/halfstack.toml` for configuration file examples.
 **Basic Settings**:
 - Listen address and port
 - Backend volume definitions
-- Cache settings (if using Redis)
+- Cache settings (if using Valkey)
 
 **Backend-specific Settings**:
 - CephFS: Monitor hosts, paths
@@ -364,7 +364,7 @@ Storage Proxy connects directly to storage backends and has no separate required
   - Query user information
   - Synchronize quota information
 
-#### Redis (Caching)
+#### Valkey (Caching)
 - **Purpose**:
   - Cache vfolder metadata
   - Cache user permissions
@@ -375,7 +375,7 @@ Storage Proxy connects directly to storage backends and has no separate required
   - `vfolder:{vfolder_id}:*` - VFolder metadata
   - `user:{user_id}:perms` - User permissions
   - `upload:{upload_id}` - Upload sessions
-- **Note**: Redis is optional; works without it but recommended for performance
+- **Note**: Valkey is optional; works without it but recommended for performance
 
 #### Prometheus (Metrics Collection)
 - **Purpose**:

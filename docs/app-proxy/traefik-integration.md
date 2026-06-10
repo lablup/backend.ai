@@ -1,5 +1,5 @@
 # Traefik Integration
-Traefik can be used as a proxy dataplane for AppProxy worker. When enabled, AppProxy Worker operates in a "trimmed down" mode, with certain features like Redis Event Bus and Proxy dataplanes disabled on startup.
+Traefik can be used as a proxy dataplane for AppProxy worker. When enabled, AppProxy Worker operates in a "trimmed down" mode, with certain features like the Valkey event bus and Proxy dataplanes disabled on startup.
 
 ## What's supported
 - HTTP: All

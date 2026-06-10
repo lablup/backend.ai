@@ -28,53 +28,53 @@ services:
     ports:
       - "9187:9187"
 
-  backendai-half-redis-exporter-node01:
+  backendai-half-valkey-exporter-node01:
     image: oliver006/redis_exporter:v1.73.0
     profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
     command: >
-      --redis.addr redis://:${REDIS_PASSWORD:-develove}@backendai-half-redis-node01:${REDIS_MASTER_PORT}
+      --redis.addr redis://:${REDIS_PASSWORD:-develove}@backendai-half-valkey-node01:${REDIS_MASTER_PORT}
       --include-system-metrics
       --include-config-metrics
       --include-modules-metrics
     ports:
       - "9121:9121"
     depends_on:
-      - backendai-half-redis-node01
+      - backendai-half-valkey-node01
 
-  backendai-half-redis-exporter-node02:
+  backendai-half-valkey-exporter-node02:
     image: oliver006/redis_exporter:v1.73.0
     profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
     command: >
-      --redis.addr redis://:${REDIS_PASSWORD:-develove}@backendai-half-redis-node02:${REDIS_SLAVE1_PORT}
+      --redis.addr redis://:${REDIS_PASSWORD:-develove}@backendai-half-valkey-node02:${REDIS_SLAVE1_PORT}
       --include-system-metrics
       --include-config-metrics
       --include-modules-metrics
     ports:
       - "9122:9121"
     depends_on:
-      - backendai-half-redis-node02
+      - backendai-half-valkey-node02
 
-  backendai-half-redis-exporter-node03:
+  backendai-half-valkey-exporter-node03:
     image: oliver006/redis_exporter:v1.73.0
     profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
     command: >
-      --redis.addr redis://:${REDIS_PASSWORD:-develove}@backendai-half-redis-node03:${REDIS_SLAVE2_PORT}
+      --redis.addr redis://:${REDIS_PASSWORD:-develove}@backendai-half-valkey-node03:${REDIS_SLAVE2_PORT}
       --include-system-metrics
       --include-config-metrics
       --include-modules-metrics
     ports:
       - "9123:9121"
     depends_on:
-      - backendai-half-redis-node03
+      - backendai-half-valkey-node03
 
   backendai-half-node-exporter:
     image: prom/node-exporter:v1.9.1
@@ -95,8 +95,8 @@ services:
     ports:
       - "9100:9100"
 
-  # Initial master is redis-node01.
-  backendai-half-redis-node01:
+  # Initial master is valkey-node01.
+  backendai-half-valkey-node01:
     image: valkey/valkey:9.1.0-alpine
     hostname: node01
     networks:
@@ -116,7 +116,7 @@ services:
     # because it interferes with pause/unpause of container to simulate
     # network partitioning.
 
-  backendai-half-redis-node02:
+  backendai-half-valkey-node02:
     image: valkey/valkey:9.1.0-alpine
     hostname: node02
     networks:
@@ -134,7 +134,7 @@ services:
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
 
-  backendai-half-redis-node03:
+  backendai-half-valkey-node03:
     image: valkey/valkey:9.1.0-alpine
     hostname: node03
     ports:
@@ -152,7 +152,7 @@ services:
       --min-slaves-to-write 1
       --min-slaves-max-lag 10
 
-  backendai-half-redis-sentinel01:
+  backendai-half-valkey-sentinel01:
     image: valkey/valkey:9.1.0-alpine
     hostname: sentinel01
     networks:
@@ -164,15 +164,15 @@ services:
     ports:
     - 0.0.0.0:${REDIS_SENTINEL1_PORT}:${REDIS_SENTINEL1_PORT}
     depends_on:
-    - backendai-half-redis-node01
-    - backendai-half-redis-node02
-    - backendai-half-redis-node03
+    - backendai-half-valkey-node01
+    - backendai-half-valkey-node02
+    - backendai-half-valkey-node03
     command: >
       valkey-sentinel /config/sentinel01.conf
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
-  backendai-half-redis-sentinel02:
+  backendai-half-valkey-sentinel02:
     image: valkey/valkey:9.1.0-alpine
     hostname: sentinel02
     networks:
@@ -184,15 +184,15 @@ services:
     ports:
     - 0.0.0.0:${REDIS_SENTINEL2_PORT}:${REDIS_SENTINEL2_PORT}
     depends_on:
-    - backendai-half-redis-node01
-    - backendai-half-redis-node02
-    - backendai-half-redis-node03
+    - backendai-half-valkey-node01
+    - backendai-half-valkey-node02
+    - backendai-half-valkey-node03
     command: >
       valkey-sentinel /config/sentinel02.conf
     environment:
     - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
-  backendai-half-redis-sentinel03:
+  backendai-half-valkey-sentinel03:
     image: valkey/valkey:9.1.0-alpine
     hostname: sentinel03
     networks:
@@ -204,9 +204,9 @@ services:
     ports:
     - 0.0.0.0:${REDIS_SENTINEL3_PORT}:${REDIS_SENTINEL3_PORT}
     depends_on:
-    - backendai-half-redis-node01
-    - backendai-half-redis-node02
-    - backendai-half-redis-node03
+    - backendai-half-valkey-node01
+    - backendai-half-valkey-node02
+    - backendai-half-valkey-node03
     command: >
       valkey-sentinel /config/sentinel03.conf
     environment:
