@@ -16,6 +16,19 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.4rc8 (2026-06-11)
+
+### Features
+* Add a `required` flag to runtime variant presets to mark a preset param as mandatory ([#12000](https://github.com/lablup/backend.ai/issues/12000))
+* Add an `image` field to the `DeploymentRevisionPreset` GraphQL type that resolves the container image as an `ImageV2` node ([#12023](https://github.com/lablup/backend.ai/issues/12023))
+
+### Fixes
+* Fix TUS resumable upload `409 Conflict` errors behind multi-instance storage-proxy load balancers on NFS storage by coordinating per-session upload offsets through Valkey (single source of truth) and serializing the destructive write section with a TTL'd per-session lease, eliminating reliance on NFS-cached `stat()` results that diverge across storage-proxy instances. ([#11948](https://github.com/lablup/backend.ai/issues/11948))
+* Fix cross-request DataLoader cache reuse in the v2 GraphQL API by creating the `DataLoaders` instance per request instead of sharing a single instance per worker, so stale cached entities are no longer served across requests and loader memory no longer grows unboundedly ([#12022](https://github.com/lablup/backend.ai/issues/12022))
+* Add missing superadmin role permissions to the example RBAC fixture so superadmin operations are no longer denied when the fixture is populated ([#12129](https://github.com/lablup/backend.ai/issues/12129))
+* Sync deployment replicas to AppProxy by traffic-ACTIVE state instead of health, so that health-check-disabled routes are no longer dropped from the proxy pool on each fallback cycle. ([#12131](https://github.com/lablup/backend.ai/issues/12131))
+
+
 ## 26.4.4rc7 (2026-06-10)
 
 ### Test Updates
