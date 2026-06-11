@@ -359,8 +359,114 @@ class TestGranterMultipleOperations:
             assert assoc_count == 0
 
 
-# TODO(#9411): Re-enable idempotency tests once permissions table has unique constraint.
-# These tests verify:
-# 1. Duplicate grants raise IntegrityError (test_granter_raises_on_duplicate_grant)
-# 2. Same entity can be granted to different scopes (test_granter_grants_to_different_scopes_sequentially)
-# Currently disabled because permissions table lacks the required unique constraint.
+class TestGranterIdempotency:
+    """Tests that repeated grants are idempotent.
+
+    The permissions table has a unique constraint on
+    (role_id, scope_type, scope_id, entity_type, operation), and the granter inserts
+    with ON CONFLICT DO NOTHING. Re-granting an already-held permission (e.g. accepting
+    a VFolder invitation for an entity the invitee's role can already access) must
+    therefore succeed without raising and without duplicating rows.
+    """
+
+    @pytest.fixture
+    async def single_role(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+    ) -> AsyncGenerator[SingleRoleContext, None]:
+        """Create a single role for idempotency testing."""
+        entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
+        target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=str(uuid.uuid4()))
+
+        role_id: UUID
+        async with database_connection.begin_session_read_committed() as db_sess:
+            role = RoleRow(
+                id=uuid.uuid4(),
+                name="test-role",
+                source=RoleSource.SYSTEM,
+            )
+            db_sess.add(role)
+            await db_sess.flush()
+            role_id = role.id
+
+        yield SingleRoleContext(
+            entity_scope_type=RBACElementType.VFOLDER,
+            entity_id=entity_id,
+            target_scope_id=target_scope_id,
+            role_id=role_id,
+        )
+
+    async def test_duplicate_grant_is_idempotent(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        single_role: SingleRoleContext,
+    ) -> None:
+        """Granting the same permissions twice across separate transactions must not
+        raise and must not create duplicate permission or ref-edge rows."""
+        ctx = single_role
+
+        def make_granter() -> RBACGranter:
+            return RBACGranter(
+                granted_entity_id=ctx.entity_id,
+                granted_entity_scope_type=ctx.entity_scope_type,
+                target_scope_id=ctx.target_scope_id,
+                target_role_ids=[ctx.role_id],
+                operations=[OperationType.READ, OperationType.UPDATE],
+            )
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            await execute_rbac_granter(db_sess, make_granter())
+
+        # Second grant with identical parameters: a no-op, not a UniqueViolationError.
+        async with database_connection.begin_session_read_committed() as db_sess:
+            await execute_rbac_granter(db_sess, make_granter())
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            perm_count = await db_sess.scalar(sa.select(sa.func.count()).select_from(PermissionRow))
+            assert perm_count == 2  # READ + UPDATE, not duplicated
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 1  # single ref edge, not duplicated
+
+    async def test_overlapping_grant_adds_only_new_operation(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        single_role: SingleRoleContext,
+    ) -> None:
+        """A second grant overlapping an existing operation grants only the new one and
+        leaves the already-held operation intact."""
+        ctx = single_role
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            await execute_rbac_granter(
+                db_sess,
+                RBACGranter(
+                    granted_entity_id=ctx.entity_id,
+                    granted_entity_scope_type=ctx.entity_scope_type,
+                    target_scope_id=ctx.target_scope_id,
+                    target_role_ids=[ctx.role_id],
+                    operations=[OperationType.READ],
+                ),
+            )
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            await execute_rbac_granter(
+                db_sess,
+                RBACGranter(
+                    granted_entity_id=ctx.entity_id,
+                    granted_entity_scope_type=ctx.entity_scope_type,
+                    target_scope_id=ctx.target_scope_id,
+                    target_role_ids=[ctx.role_id],
+                    operations=[OperationType.READ, OperationType.UPDATE],
+                ),
+            )
+
+        async with database_connection.begin_session_read_committed() as db_sess:
+            perms = (await db_sess.scalars(sa.select(PermissionRow))).all()
+            assert len(perms) == 2
+            assert {perm.operation for perm in perms} == {
+                OperationType.READ,
+                OperationType.UPDATE,
+            }

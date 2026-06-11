@@ -22,6 +22,7 @@ from ai.backend.manager.repositories.base.integrity import (
     match_integrity_error,
     parse_integrity_error,
 )
+from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
 
 TRow = TypeVar("TRow", bound=Base)
 
@@ -106,16 +107,17 @@ async def execute_rbac_entity_creator[TRow: Base](
     pk_value = instance_state.identity[0]
     entity_type = creator.element_type.to_entity_type()
     all_scope_refs = [creator.scope_ref, *creator.additional_scope_refs]
-    for scope_ref in all_scope_refs:
-        db_sess.add(
-            AssociationScopesEntitiesRow(
-                scope_type=scope_ref.element_type.to_scope_type(),
-                scope_id=scope_ref.element_id,
-                entity_type=entity_type,
-                entity_id=str(pk_value),
-                relation_type=creator.relation_type,
-            ),
+    associations = [
+        AssociationScopesEntitiesRow(
+            scope_type=scope_ref.element_type.to_scope_type(),
+            scope_id=scope_ref.element_id,
+            entity_type=entity_type,
+            entity_id=str(pk_value),
+            relation_type=creator.relation_type,
         )
+        for scope_ref in all_scope_refs
+    ]
+    await bulk_insert_on_conflict_do_nothing(db_sess, associations)
 
     return RBACEntityCreatorResult(row=row)
 
@@ -201,7 +203,7 @@ async def execute_rbac_bulk_entity_creator[TRow: Base](
         )
         for row in rows
     ]
-    db_sess.add_all(associations)
+    await bulk_insert_on_conflict_do_nothing(db_sess, associations)
 
     return RBACBulkEntityCreatorResult(rows=rows)
 
@@ -268,6 +270,6 @@ async def execute_rbac_entity_creators[TRow: Base](
                     relation_type=creator.relation_type,
                 ),
             )
-    db_sess.add_all(associations)
+    await bulk_insert_on_conflict_do_nothing(db_sess, associations)
 
     return RBACBulkEntityCreatorResult(rows=rows)
