@@ -1,110 +1,71 @@
-# REST v2 API Layer — Guardrails
+# REST v2 API 레이어 — 가드레일
 
-> REST v2 uses Pydantic DTOs from `common/dto/manager/v2/` — the same DTOs that back
-> the GraphQL schema. Both APIs share a single source of truth.
+> 배경(페이지네이션 동작·DI 예시·scoped URL 예시)은 같은 디렉터리 `CONTEXTS.md`, 구현 패턴은 `/api-guide` 스킬.
+> REST v2는 `common/dto/manager/v2/`의 Pydantic DTO를 쓴다 — GQL 스키마와 같은 DTO(단일 원천).
 
-## Architecture
+## 아키텍처
 
 ```
 REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Repository
 ```
 
-## Handler Style
+## 핸들러 스타일
 
-- All handlers MUST be methods on an `APIHandler` class.
-- Parse requests via `BodyParam[T]` where `T` is a DTO from `common/dto/manager/v2/`.
-- Return `APIResponse.build(status_code=..., response_model=payload)` where `payload`
-  is a DTO from `common/dto/manager/v2/`.
+- 모든 핸들러는 `APIHandler` 클래스의 메서드여야 한다.
+- 요청은 `BodyParam[T]`로 파싱한다 — `T`는 `common/dto/manager/v2/`의 DTO.
+- `APIResponse.build(status_code=..., response_model=payload)`로 반환 — `payload`도 v2 DTO.
 
-## Handler Dependency Injection
+## 핸들러 의존성 주입
 
-Each handler receives its **individual adapter** (NOT the Adapters registry):
+- 각 핸들러는 **개별 adapter**를 주입받는다(Adapters 레지스트리가 아님): `self._adapter.method()` 호출 —
+  `self._adapters.domain.method()` 금지.
+- Adapter는 GQL 레이어와 공유한다 — REST 전용 adapter를 만들지 않는다.
+- `admin_` 접두 adapter 메서드 → `superadmin_required` 미들웨어, non-admin → `auth_required`.
 
-```python
-class V2DomainHandler:
-    def __init__(self, *, adapter: DomainAdapter) -> None:
-        self._adapter = adapter
+## DTO
 
-    async def admin_search(self, body: BodyParam[T]) -> APIResponse:
-        result = await self._adapter.admin_search(body.parsed)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
-```
+- `common/dto/manager/v2/`의 DTO만 쓴다.
+- `common/dto/manager/`(v1, 레거시 REST용)에서 import 금지.
+- REST 전용 요청/응답 모델을 정의하지 않는다 — 공유 v2 DTO를 쓴다.
 
-- Call `self._adapter.method()` — never `self._adapters.domain.method()`.
-- Adapters are shared with the GQL layer — do not create REST-specific adapters.
-- `admin_` prefixed adapter methods → `superadmin_required` middleware.
-- Non-admin methods → `auth_required` middleware.
+## 네이밍 & 스코프
 
-## DTOs
+- superadmin 전용: `admin_` 접두 + `superadmin_required` 미들웨어.
+- scoped: 현재는 `{scope}_` 접두. **향후 방향(검토 중):** `scoped_`로 통일하고 scope를 요청 필드로 받는다(아래 참고).
+- self-service: `/v2/{entity}/my/` — 엔티티 앞, `my`는 스코프 한정자.
 
-- Use DTOs from `common/dto/manager/v2/` exclusively.
-- Never import from `common/dto/manager/` (those are v1 DTOs used by legacy REST handlers).
-- Never define REST-specific request/response models — use the shared v2 DTOs.
+**search — 항상 두 변형:**
+- `POST /v2/{entity}/search`: superadmin 전용, 스코프 없음 — 전체 시스템 조회.
+- scoped search(non-admin): 스코프 필수 — 해당 스코프 내 조회.
+- non-admin에게 "스코프 없는 전체 조회"는 없다.
 
-## Naming & Scope Rules
+**scoped search URL** (검토 중):
+- 현재: `POST /v2/{entity}/{scope_type}/{scope_id}/search` — 스코프를 중첩 리소스 경로로(`search-by-{scope}` 아님).
+  예: `/v2/sessions/projects/{project_id}/search`. (예시 더 보기: `CONTEXTS.md`)
+- **향후 방향:** `/v2/{entity}/scoped/search` 고정 path + scope를 요청 body 필드로(path param 아님).
+  SDK `scoped_search`·GQL `scopedFoosV2`와 일관.
+- 모든 scoped search 라우트는 `auth_required` 미들웨어.
 
-- Superadmin-only endpoints: `admin_` prefix + `superadmin_required` middleware.
-- Scoped endpoints: `{scope}_` prefix (e.g., `domain_search_users`).
-- Self-service endpoints: `/v2/{entity}/my/` — entity first, `my` as scope qualifier.
+**self-service(`my`):**
+- `POST /v2/{entity}/my/{operation}` (예: `/v2/keypairs/my/search`). adapter가 `current_user()`로
+  사용자를 resolve. `auth_required` 미들웨어.
 
-**search — always two variants:**
-- `POST /v2/{entity}/search`: superadmin only, no scope — queries entire system.
-- Scoped search (non-admin): scope is a **required** path segment — queries within the given scope only.
-- There is NO "search everything without scope" for non-admin users.
+**create / update / get / delete / purge — `admin_` 분리 기준:**
+- admin 전용 엔티티: 단일 `admin_`.
+- admin·사용자 둘 다이고 동작 다름: `admin_`·non-admin 분리(서로 다른 DTO).
+- 권한 검사만 다름: 단일 — admin은 이미 접근 권한 있음.
 
-**Scoped search URL pattern:**
-- Pattern: `POST /v2/{entity}/{scope_type}/{scope_id}/search`
-- The scope type and ID are expressed as nested resource path segments.
-- Examples:
-  - `POST /v2/sessions/projects/{project_id}/search` — sessions within a project
-  - `POST /v2/sessions/agents/{agent_id}/search` — sessions on an agent
-  - `POST /v2/users/domains/{domain_name}/search` — users within a domain
-  - `POST /v2/users/projects/{project_id}/search` — users within a project
-  - `POST /v2/users/roles/{role_id}/search` — users with a specific role
-- Do NOT use `search-by-{scope}` pattern (e.g., `/search-by-agent/{id}` is wrong).
-- All scoped search routes use `auth_required` middleware.
+## 페이지네이션
 
-**Self-service (`my`) endpoints:**
-- URL pattern: `POST /v2/{entity}/my/{operation}` (entity is the primary resource, `my` as scope qualifier).
-- Examples: `POST /v2/keypairs/my/search`, `POST /v2/sessions/my/search`.
-- The adapter resolves the current user internally via `current_user()`.
-- All `my` routes use `auth_required` middleware.
+- 커서·오프셋 인자를 모두 받는다. 한 요청에 한 모드만 — `first`와 `limit` 혼용은 에러.
+- 모드별 동작·기본값은 `CONTEXTS.md` 참고.
 
-**create / update / get / delete / purge — when to separate `admin_` vs non-admin:**
-- **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` endpoint.
-- **Both admin and users, behavior differs** (e.g., admin sets more fields): separate `admin_` and non-admin endpoints with different DTOs.
-- **Both admin and users, only permission check differs**: single endpoint — admin already has entity access permissions, no separate `admin_` variant needed.
+## 라우팅
 
-## Pagination Mode Behavior
+- 라우트 등록은 `RouteRegistry`(REST v1과 동일 프레임워크)로, 도메인별 전용 registrar 함수에서.
 
-Search endpoints accept both cursor-based and offset-based pagination arguments.
+## 여기 속하는 것 / 속하지 않는 것
 
-**Default (no pagination args):** Falls back to offset pagination (`limit=10, offset=0`).
-
-**Offset pagination (`limit`/`offset`):**
-- User-specified `order` is applied. If no `order`, the entity's default order is used.
-- Use this mode when custom ordering is needed.
-
-**Cursor pagination (`first`/`after` or `last`/`before`):**
-- Ordering is fixed to the entity's cursor key (typically `created_at` or the primary key).
-- User-specified `order` is **ignored** — cursor consistency requires a fixed sort order.
-- Use this mode for infinite scrolling / "load more" UX where stable page boundaries matter.
-
-Only one pagination mode is allowed per request. Combining `first` with `limit` raises an error.
-
-## Routing
-
-- Use `RouteRegistry` for route registration (same framework as REST v1).
-- Route registration in a dedicated registrar function per domain.
-
-## What Belongs Here
-
-- HTTP request/response translation only.
-- Auth middleware (`superadmin_required`, `auth_required`).
-
-## What Does NOT Belong Here
-
-- Business logic or domain rules.
-- Direct database access or ORM imports.
-- Imports of Repository, Service, or Processor classes.
-- Conversion logic between domain Data types and DTOs (that belongs in Adapters).
+- 속함: HTTP 요청/응답 변환, auth 미들웨어(`superadmin_required`, `auth_required`).
+- 속하지 않음: 비즈니스 로직·도메인 규칙, 직접 DB 접근·ORM import, Repository/Service/Processor import,
+  도메인 Data ↔ DTO 변환(Adapter 소관).

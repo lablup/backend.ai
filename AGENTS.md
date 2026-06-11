@@ -50,6 +50,7 @@
 - **예외**: 가능하면 모든 곳에서 `BackendAIError`를 상속한다 — 비즈니스 로직에서 빌트인 예외를 직접 raise하지 않는다.
 - **import**: 부모 상대 import(`from ..module`)를 쓰지 않는다 — 절대 import를 쓴다.
 - **re-export**: 가능하면 `__init__.py` re-export를 쓰지 않고 모듈을 직접 import한다.
+- **클래스 필드**: 클래스가 쓰는 인스턴스 필드는 클래스 본문 최상위에 타입과 함께 선언한다(할당은 `__init__`에서).
 
 **BUILD 파일:**
 - ❌ `src/` 디렉터리에는 BUILD 파일을 추가하지 않는다.
