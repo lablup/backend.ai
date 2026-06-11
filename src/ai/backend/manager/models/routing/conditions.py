@@ -7,6 +7,7 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
@@ -129,6 +130,20 @@ class RouteConditions:
     def by_revision_ids(revision_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoutingRow.revision.in_(revision_ids)
+
+        return inner
+
+    @staticmethod
+    def by_replica_group_ids(group_ids: Collection[ReplicaGroupID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.replica_group_id.in_(group_ids)
+
+        return inner
+
+    @staticmethod
+    def orphan_group() -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.replica_group_id.is_(None)
 
         return inner
 

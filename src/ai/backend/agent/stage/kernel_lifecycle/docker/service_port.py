@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.agent.exception import ServicePortAlreadyUsedError
+from ai.backend.agent.errors import ServicePortAlreadyUsedError
 from ai.backend.common.docker import LabelName
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.stage.types import (

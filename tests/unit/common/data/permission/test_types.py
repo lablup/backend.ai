@@ -4,8 +4,21 @@ from __future__ import annotations
 
 import pytest
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import (
+    EntityType,
+    Permission,
+    RBACElementType,
+    ScopeType,
+)
 from ai.backend.common.exception import RBACTypeConversionError
+
+_ATOMIC_PERMISSIONS = [
+    Permission.READ,
+    Permission.UPDATE,
+    Permission.CREATE,
+    Permission.SOFT_DELETE,
+    Permission.HARD_DELETE,
+]
 
 # Dynamically compute convertible members from enum value intersections.
 # This avoids hard-coding and auto-covers new members added to any enum.
@@ -76,3 +89,43 @@ class TestRBACElementTypeToScopeType:
         """Test that RBACElementType values without ScopeType counterparts raise error."""
         with pytest.raises(RBACTypeConversionError, match="has no corresponding ScopeType"):
             element_type.to_scope_type()
+
+
+class TestPermission:
+    """Tests for the Permission IntFlag bitmask and cap semantics."""
+
+    def test_atomic_bits_are_disjoint_powers_of_two(self) -> None:
+        """Each atomic permission occupies its own bit so flags never collide."""
+        combined = Permission.NONE
+        for perm in _ATOMIC_PERMISSIONS:
+            assert perm.value & (perm.value - 1) == 0  # power of two
+            assert not (combined & perm)  # bit not yet used
+            combined |= perm
+        # The OR of all atomic bits equals the full cap with no overlap lost.
+        assert combined == Permission.full()
+        assert int(combined) == sum(int(p) for p in _ATOMIC_PERMISSIONS)
+
+    def test_cap_membership_is_bitwise(self) -> None:
+        """A cap contains exactly the operations whose bit is set."""
+        cap = Permission.READ | Permission.UPDATE | Permission.CREATE
+        assert cap & Permission.READ
+        assert cap & Permission.UPDATE
+        assert cap & Permission.CREATE
+        assert not (cap & Permission.SOFT_DELETE)
+        assert not (cap & Permission.HARD_DELETE)
+
+    def test_granted_within_cap_check(self) -> None:
+        """``(granted & ~cap) == NONE`` holds iff granted is within the cap."""
+        cap = Permission.READ | Permission.UPDATE
+        within = Permission.READ
+        exceeding = Permission.READ | Permission.HARD_DELETE
+        assert (within & ~cap) == Permission.NONE
+        assert (exceeding & ~cap) != Permission.NONE
+
+    def test_cap_superset_check_is_not_magnitude(self) -> None:
+        """Cap membership is a bitwise superset test, never an int >= comparison."""
+        cap = Permission.HARD_DELETE
+        op = Permission.READ
+        # Magnitude would wrongly allow (16 >= 1); the superset test correctly rejects.
+        assert int(cap) >= int(op)
+        assert (cap & op) != op

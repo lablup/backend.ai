@@ -193,24 +193,34 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         stat_prefix = self.key.replace("-", "_")
 
         if self.enabled:
+            own_device_files: set[str] = set()
+            devices = await self.list_devices()
+            for device in devices:
+                dev_files = await self.list_device_files(device)
+                own_device_files.update(dev_files)
+
+            # rbln-stat returns all devices
+            # filtering devices relevant to actual containers is necessary
             stats = await ATOMAPI.get_stats(self._rbln_stat_path)
-            device_stats_by_device_filename: dict[str, ATOMDeviceStat] = {
-                "/dev/" + device.device: device for device in stats.devices
-            }
-            for cid in container_ids:
-                mem_stats[cid] = 0
-                mem_sizes[cid] = 0
-                util_stats[cid] = Decimal("0")
-                number_of_devices_per_container[cid] = 0
-                async with Docker() as docker:
+            device_stats_by_device_filename: dict[str, ATOMDeviceStat] = {}
+            for device_stat in stats.devices:
+                device_filename = "/dev/" + device_stat.device
+                if device_filename in own_device_files:
+                    device_stats_by_device_filename[device_filename] = device_stat
+            async with Docker() as docker:
+                for cid in container_ids:
+                    mem_stats[cid] = 0
+                    mem_sizes[cid] = 0
+                    util_stats[cid] = Decimal("0")
+                    number_of_devices_per_container[cid] = 0
                     container_info = await docker.containers.get(cid)
-                for device in container_info["HostConfig"]["Devices"]:
-                    if device["PathOnHost"] in device_stats_by_device_filename:
-                        device_stat = device_stats_by_device_filename[device["PathOnHost"]]
-                        mem_stats[cid] += int(device_stat.memory.used)
-                        mem_sizes[cid] += int(device_stat.memory.total)
-                        util_stats[cid] += Decimal(device_stat.util)
-                        number_of_devices_per_container[cid] += 1
+                    for device in container_info["HostConfig"]["Devices"]:
+                        if device["PathOnHost"] in device_stats_by_device_filename:
+                            device_stat = device_stats_by_device_filename[device["PathOnHost"]]
+                            mem_stats[cid] += int(device_stat.memory.used)
+                            mem_sizes[cid] += int(device_stat.memory.total)
+                            util_stats[cid] += Decimal(device_stat.util)
+                            number_of_devices_per_container[cid] += 1
         return [
             ContainerMeasurement(
                 MetricKey(f"{stat_prefix}_mem"),

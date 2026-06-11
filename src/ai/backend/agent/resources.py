@@ -67,7 +67,7 @@ from .alloc_map import AllocationStrategy as AllocationStrategy
 from .alloc_map import DeviceSlotInfo as DeviceSlotInfo
 from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap
 from .alloc_map import FractionAllocMap as FractionAllocMap
-from .exception import ResourceError
+from .errors import ResourceError
 from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .types import AbstractAgentDiscovery, MountInfo, get_agent_discovery
 from .types import Container as SessionContainer

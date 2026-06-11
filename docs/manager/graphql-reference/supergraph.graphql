@@ -4179,6 +4179,11 @@ input CreateRuntimeVariantPresetInput
   For 'env' target, the environment variable name; for 'args' target, the CLI flag name.
   """
   key: String!
+
+  """
+  Added in UNRELEASED. Whether this preset parameter must be supplied when building a deployment revision.
+  """
+  required: Boolean! = false
 }
 
 """Added in 26.4.2. Create preset payload."""
@@ -5564,6 +5569,11 @@ type DeploymentRevisionPreset implements Node
 
   """Added in 26.4.3. The runtime variant this preset is designed for."""
   runtimeVariant: RuntimeVariant
+
+  """
+  Added in UNRELEASED. The container image used to run the inference server. None when the preset does not specify an image.
+  """
+  image: ImageV2
 
   """Added in 26.4.2. Resource slot allocations for this preset."""
   resourceSlots(filter: AllocatedResourceSlotFilter = null, orderBy: [AllocatedResourceSlotOrderBy!] = null): [AllocatedResourceSlot!]
@@ -9583,7 +9593,7 @@ type ModelDeployment implements Node
   options: DeploymentOptionsInfo!
 
   """
-  Added in UNRELEASED. Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle). ``SCALING`` while the replica reconciler is adjusting replica count; ``STABLE`` once holding at the desired count.
+  Added in UNRELEASED. Endpoint-level replica scaling axis. Scaling is now reconciled per replica group, so this stays ``STABLE``; inspect each replica group's scaling status instead. Deprecated since UNRELEASED. Use per-replica-group scaling status.
   """
   scalingState: ScalingState!
 
@@ -9897,6 +9907,11 @@ type ModelReplica implements Node
   sessionId: ID
   revisionId: ID!
 
+  """
+  Added in UNRELEASED. ID of the model deployment this replica belongs to.
+  """
+  deploymentId: ID!
+
   """Whether the replica has been checked and its health state."""
   readinessStatus: ReadinessStatus!
 
@@ -9932,6 +9947,9 @@ type ModelReplica implements Node
 
   """The revision of this entity."""
   revision: ModelRevision
+
+  """Added in UNRELEASED. The model deployment this replica belongs to."""
+  deployment: ModelDeployment
 }
 
 """
@@ -17040,6 +17058,11 @@ type RuntimeVariantPreset implements Node
   """
   targetSpec: PresetTargetSpec!
 
+  """
+  Added in UNRELEASED. Whether this preset parameter must be supplied when building a deployment revision.
+  """
+  required: Boolean!
+
   """UI category group for organizing parameters."""
   category: String
 
@@ -17884,6 +17907,11 @@ type SessionV2 implements Node
   userId: ID!
   projectId: ID!
 
+  """
+  Added in UNRELEASED. UUID of the model deployment replica served by this session.
+  """
+  replicaId: ID
+
   """Metadata including domain, project, and user information."""
   metadata: SessionV2MetadataInfo!
 
@@ -17918,6 +17946,11 @@ type SessionV2 implements Node
 
   """Added in 26.3.0. The kernels belonging to this session."""
   kernels: KernelV2Connection
+
+  """
+  Added in UNRELEASED. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
+  """
+  replica: ModelReplica
 }
 
 """Added in 26.3.0. Connection type for paginated session results."""
@@ -19455,6 +19488,9 @@ input UpdateRuntimeVariantPresetInput
 
   """New key."""
   key: String = null
+
+  """Added in UNRELEASED. New required flag."""
+  required: Boolean = null
 }
 
 """Added in 26.4.2. Update preset payload."""

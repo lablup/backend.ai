@@ -67,7 +67,9 @@ def upgrade() -> None:
             "UPDATE runtime_variants "
             "SET default_model_definition = jsonb_set("
             "default_model_definition, '{models,0,service,health_check,enable}', 'true') "
-            "WHERE name NOT IN ('custom', 'cmd')"
+            "WHERE name NOT IN ('custom', 'cmd') "
+            "AND jsonb_typeof(default_model_definition #> "
+            "'{models,0,service,health_check}') = 'object'"
         )
     )
 
@@ -77,9 +79,11 @@ def downgrade() -> None:
     bind.execute(
         sa.text(
             "UPDATE runtime_variants "
-            "SET default_model_definition = jsonb_set("
-            "default_model_definition, '{models,0,service,health_check,enable}', 'false') "
-            "WHERE name NOT IN ('custom', 'cmd')"
+            "SET default_model_definition = "
+            "default_model_definition #- '{models,0,service,health_check,enable}' "
+            "WHERE name NOT IN ('custom', 'cmd') "
+            "AND jsonb_typeof(default_model_definition #> "
+            "'{models,0,service,health_check}') = 'object'"
         )
     )
     bind.execute(

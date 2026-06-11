@@ -35,8 +35,8 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ScratchType
+from ai.backend.agent.errors import K8sError, UnsupportedResource
 from ai.backend.agent.etcd import AgentEtcdClientView
-from ai.backend.agent.exception import K8sError, UnsupportedResource
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
 from ai.backend.agent.kernel_registry.recovery.kubernetes_recovery import (
     KubernetesKernelRegistryRecovery,

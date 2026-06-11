@@ -524,11 +524,13 @@ class RouteCoordinator:
                 long_interval=30.0,
                 initial_delay=15.0,
             ),
-            # Health observer - manager fallback health check for stale routes
+            # Health observer - drives per-route HTTP probes. Ticks frequently so the
+            # observer can honor each route's configured ``interval`` (it throttles
+            # per route by last_check); intervals shorter than this tick are clamped.
             RouteTaskSpec(
                 RouteLifecycleType.OBSERVE_HEALTH,
                 short_interval=None,
-                long_interval=30.0,
+                long_interval=10.0,
                 initial_delay=15.0,
             ),
             # Probe target sync - refresh ReplicaProbeTarget TTL and recover lost Valkey entries

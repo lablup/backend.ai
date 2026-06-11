@@ -27,6 +27,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, kernels
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -89,6 +90,7 @@ async def db_with_cleanup(
             SessionRow,
             AgentRow,
             KernelRow,
+            ReplicaGroupRow,
             RoutingRow,
             ResourcePresetRow,
         ],

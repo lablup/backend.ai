@@ -1,6 +1,5 @@
 """CreatorSpec implementations for deployment domain."""
 
-from .auto_scaling import DeploymentAutoScalingPolicyCreatorSpec
 from .deployment import (
     DeploymentCreatorSpec,
     DeploymentExecutionFields,
@@ -32,8 +31,6 @@ __all__ = [
     "ModelRevisionFields",
     # Revision
     "DeploymentRevisionCreatorSpec",
-    # Auto-scaling
-    "DeploymentAutoScalingPolicyCreatorSpec",
     # Policy
     "DeploymentPolicyCreatorSpec",
     # Route

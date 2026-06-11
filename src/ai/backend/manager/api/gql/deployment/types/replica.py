@@ -64,6 +64,7 @@ from ai.backend.manager.data.deployment.types import (
 from .revision import ModelRevision
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
 # ========== Enums ==========
@@ -192,6 +193,12 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     id: NodeID[str]
     session_id: ID | None
     revision_id: ID
+    deployment_id: ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="ID of the model deployment this replica belongs to.",
+        )
+    )
     readiness_status: ReadinessStatus = gql_field(
         description="Whether the replica has been checked and its health state."
     )
@@ -263,6 +270,23 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         if result is None:
             raise ValueError(f"Revision not found: {self.revision_id}")
         return result
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The model deployment this replica belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def deployment(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ModelDeployment,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.deployment"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

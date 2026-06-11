@@ -61,6 +61,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     UpdateDeploymentRevisionPresetPayload as UpdatePayloadDTO,
 )
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
@@ -100,6 +101,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.image.types import ImageV2GQL
     from ai.backend.manager.api.gql.runtime_variant.types import RuntimeVariantGQL
 
 
@@ -298,6 +300,26 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         | None
     ):
         return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The container image used to run the inference server. None when the preset does not specify an image.",
+        )
+    )  # type: ignore[misc]
+    async def image(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ImageV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.image.types"),
+        ]
+        | None
+    ):
+        if self.execution.image_id is None:
+            return None
+        return await info.context.data_loaders.image_loader.load(ImageID(self.execution.image_id))
 
     @gql_added_field(
         BackendAIGQLMeta(

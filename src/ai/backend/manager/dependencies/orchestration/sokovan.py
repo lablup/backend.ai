@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
+from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
@@ -46,6 +47,7 @@ from ai.backend.manager.sokovan.scheduler.fair_share import (
 )
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
+from ai.backend.manager.sokovan.stages.factory import build_reconciler_coordinator
 from ai.backend.manager.types import DistributedLockFactory
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -58,6 +60,7 @@ class SokovanOrchestratorInput:
     # Scheduler component dependencies
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
+    replica_group_repository: ReplicaGroupRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     config_provider: ManagerConfigProvider
@@ -137,6 +140,7 @@ class SokovanOrchestratorDependency(
             prometheus_client=setup_input.prometheus_client,
             prometheus_query_preset_repository=setup_input.prometheus_query_preset_repository,
             runtime_variant_repository=setup_input.runtime_variant_repository,
+            replica_group_repository=setup_input.replica_group_repository,
         )
 
         # Create route coordinator
@@ -182,11 +186,21 @@ class SokovanOrchestratorDependency(
             lock_factory=setup_input.distributed_lock_factory,
         )
 
+        # Reconciler coordinator: sokovan owns its stage assembly (DI just passes deps).
+        reconciler_coordinator, reconciler_task_specs = build_reconciler_coordinator(
+            replica_group_repository=setup_input.replica_group_repository,
+            valkey_schedule=setup_input.valkey_schedule,
+            lock_factory=setup_input.distributed_lock_factory,
+            config_provider=setup_input.config_provider,
+        )
+
         # Create sokovan orchestrator with all coordinators injected
         orchestrator = SokovanOrchestrator(
             schedule_coordinator=schedule_coordinator,
             deployment_coordinator=deployment_coordinator,
             route_coordinator=route_coordinator,
+            reconciler_coordinator=reconciler_coordinator,
+            reconciler_task_specs=reconciler_task_specs,
         )
 
         log.info("Sokovan orchestrator initialized")

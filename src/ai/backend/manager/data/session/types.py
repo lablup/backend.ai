@@ -194,6 +194,9 @@ class SessionData:
     # Loaded from relationship
     service_ports: str | None
 
+    # The routing replica (RoutingRow.id) this session serves, if any.
+    replica_id: UUID | None = None
+
 
 @dataclass(frozen=True)
 class SessionRoutingInfo:

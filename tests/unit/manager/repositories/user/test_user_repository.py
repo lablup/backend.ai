@@ -45,6 +45,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -126,6 +127,7 @@ class TestUserRepository:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],

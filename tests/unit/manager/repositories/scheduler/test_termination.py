@@ -42,6 +42,7 @@ from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -92,6 +93,7 @@ class TestKernelTermination:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],

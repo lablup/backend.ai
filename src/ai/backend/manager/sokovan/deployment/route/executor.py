@@ -344,11 +344,12 @@ class RouteExecutor:
     @staticmethod
     def _build_probe_target(route: RouteData) -> ReplicaProbeTarget | None:
         """Build a ReplicaProbeTarget from a route, or None if any required field is absent."""
-        if route.health_check is None or route.replica_host is None or route.replica_port is None:
+        health_check = route.enabled_health_check
+        if health_check is None or route.replica_host is None or route.replica_port is None:
             return None
         return ReplicaProbeTarget(
             replica_id=route.route_id,
-            health_path=route.health_check.path,
+            health_path=health_check.path,
             inference_port=route.replica_port,
             replica_host=route.replica_host,
         )
@@ -362,12 +363,12 @@ class RouteExecutor:
         targets: list[ReplicaProbeTarget] = [
             ReplicaProbeTarget(
                 replica_id=route.route_id,
-                health_path=route.health_check.path,
+                health_path=health_check.path,
                 inference_port=replica_info[route.route_id].replica_port,
                 replica_host=replica_info[route.route_id].replica_host,
             )
             for route in routes
-            if route.health_check is not None
+            if (health_check := route.enabled_health_check) is not None
         ]
 
         if targets:
@@ -412,7 +413,8 @@ class RouteExecutor:
         errors: list[RouteExecutionError] = []
 
         for route in routes:
-            if route.health_check is None:
+            health_check = route.enabled_health_check
+            if health_check is None:
                 successes.append(route)
                 continue
 
@@ -425,14 +427,14 @@ class RouteExecutor:
                 continue
 
             elapsed = (now - route.last_transition_at).total_seconds()
-            if elapsed > route.health_check.initial_delay:
+            if elapsed > health_check.initial_delay:
                 errors.append(
                     RouteExecutionError(
                         route_info=route,
                         reason="Route warming-up timed out waiting for healthy probe",
                         error_detail=(
                             f"Elapsed {elapsed:.0f}s exceeds "
-                            f"initial_delay {route.health_check.initial_delay}s"
+                            f"initial_delay {health_check.initial_delay}s"
                         ),
                     )
                 )
@@ -443,9 +445,12 @@ class RouteExecutor:
         """
         Check health status of RUNNING routes and push newly-healthy ones to AppProxy.
 
-        Reads RouteHealthStatus from Valkey and classifies:
-        - HEALTHY:   status.healthy is True
-        - UNHEALTHY: status.healthy is False
+        Routes with no active health check (absent or disabled) are skipped —
+        their health is left unmanaged. For the rest, reads RouteHealthStatus
+        from Valkey and classifies:
+        - HEALTHY:   latest probe passed, or it failed but consecutive_failures
+                     has not yet reached ``max_retries`` (still within retry budget)
+        - UNHEALTHY: consecutive_failures reached ``max_retries``
         - DEGRADED:  status absent (key missing or TTL expired — no recent check)
 
         Routes whose pre-execute health_status was not HEALTHY but whose
@@ -471,6 +476,12 @@ class RouteExecutor:
 
         # Phase 2: Classify health state (per-route)
         for route in routes:
+            health_check = route.enabled_health_check
+            if health_check is None:
+                # No active health check (absent or disabled) → leave health
+                # unmanaged; do not transition this route.
+                continue
+
             status = statuses.get(route.route_id)
 
             if status is None:
@@ -480,12 +491,18 @@ class RouteExecutor:
 
             if status.healthy:
                 successes.append(route)
+            elif not health_check.is_retry_exhausted(status.consecutive_failures):
+                # Probe failing but still within the retry budget → keep HEALTHY.
+                successes.append(route)
             else:
                 errors.append(
                     RouteExecutionError(
                         route_info=route,
                         reason="Route health check failed",
-                        error_detail="RouteHealthStatus reports unhealthy",
+                        error_detail=(
+                            f"RouteHealthStatus reports unhealthy after "
+                            f"{status.consecutive_failures} consecutive failures"
+                        ),
                         error_code=None,
                     )
                 )

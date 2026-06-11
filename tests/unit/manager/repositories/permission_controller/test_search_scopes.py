@@ -36,6 +36,7 @@ from ai.backend.manager.models.rbac_models.orders import (
     ProjectScopeOrders,
     UserScopeOrders,
 )
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -101,6 +102,7 @@ class TestSearchDomainScopes:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -356,6 +358,7 @@ class TestSearchProjectScopes:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -571,6 +574,7 @@ class TestSearchUserScopes:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -786,6 +790,7 @@ class TestSearchGlobalScope:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -836,6 +841,7 @@ class TestSearchScopesEmptyResult:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],

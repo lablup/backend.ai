@@ -319,7 +319,23 @@ class TestInfraClientUsageStats:
         assert result.model_dump() == raw_data
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
-        assert call_args.kwargs["json"]["month"] == "202506"
+        # Manager reads these via QueryParam, so they must be query params, not a body.
+        assert call_args.kwargs.get("json") is None
+        assert call_args.kwargs["params"]["month"] == "202506"
+
+    async def test_get_usage_per_month_sends_group_ids_as_list_query_param(self) -> None:
+        raw_data = [{"session_id": "abc", "cpu": 2}]
+        mock_resp = _ok_response(raw_data)
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+        infra = InfraClient(client)
+
+        request = UsagePerMonthRequest(group_ids=["g1", "g2"], month="202506")
+        await infra.get_usage_per_month(request)
+
+        call_args = mock_session.request.call_args
+        assert call_args.kwargs.get("json") is None
+        assert call_args.kwargs["params"] == {"group_ids": ["g1", "g2"], "month": "202506"}
 
     async def test_get_usage_per_period(self) -> None:
         raw_data = [{"session_id": "def", "cpu": 4}]
@@ -334,6 +350,12 @@ class TestInfraClientUsageStats:
         assert isinstance(result, UsagePerPeriodResponse)
         assert len(result.root) == 1
         assert result.model_dump() == raw_data
+        call_args = mock_session.request.call_args
+        assert call_args.kwargs.get("json") is None
+        assert call_args.kwargs["params"] == {
+            "start_date": "20250601",
+            "end_date": "20250630",
+        }
 
     async def test_get_user_month_stats(self) -> None:
         raw_data = [{"count": 10, "timestamp": "2025-06-01"}]
@@ -381,7 +403,9 @@ class TestInfraClientWatcher:
         assert result.model_dump() == raw_data
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
-        assert call_args.kwargs["json"]["agent_id"] == "agent-001"
+        # Manager reads agent_id via QueryParam, so it must be a query param.
+        assert call_args.kwargs.get("json") is None
+        assert call_args.kwargs["params"]["agent_id"] == "agent-001"
 
     async def test_start_watcher_agent(self) -> None:
         raw_data = {"status": "started"}

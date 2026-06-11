@@ -223,6 +223,7 @@ class ValkeyScheduleClient:
         seconds_bytes, _ = result
         return int(seconds_bytes)
 
+    @valkey_schedule_resilience.apply()
     async def get_redis_time(self) -> int:
         """
         Get current Unix timestamp from Redis server using TIME command.
@@ -778,9 +779,11 @@ class ValkeyScheduleClient:
                 "replica_id": str(result.replica_id),
                 "healthy": "1" if result.healthy else "0",
                 "last_check": current_time,
+                "consecutive_failures": str(result.consecutive_failures),
             }
             batch.hset(key, data)
-            batch.expire(key, ROUTE_HEALTH_STATUS_TTL_SEC)
+            ttl_sec = result.ttl_sec if result.ttl_sec is not None else ROUTE_HEALTH_STATUS_TTL_SEC
+            batch.expire(key, ttl_sec)
 
         async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)

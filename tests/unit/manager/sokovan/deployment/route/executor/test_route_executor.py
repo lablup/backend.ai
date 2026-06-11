@@ -25,6 +25,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaHealthStatus as ValkeyReplicaHealthStatus,
 )
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkUpdateRoutesResponse,
 )
@@ -213,18 +214,16 @@ class TestCheckRouteHealth:
         When: Check route health
         Then: Route in successes list
         """
+        route = dataclasses.replace(healthy_route, health_check=ModelHealthCheck(enable=True))
         status = ValkeyReplicaHealthStatus(
-            replica_id=healthy_route.route_id,
+            replica_id=route.route_id,
             healthy=True,
             last_check=995,
         )
-        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {
-            healthy_route.route_id: status,
-        }
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {route.route_id: status}
 
-        entity_ids = [healthy_route.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            result = await route_executor.check_route_health([healthy_route])
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
 
         assert len(result.successes) == 1
         assert len(result.errors) == 0
@@ -236,24 +235,109 @@ class TestCheckRouteHealth:
         mock_valkey_schedule: AsyncMock,
         healthy_route: RouteData,
     ) -> None:
-        """RH-002: Unhealthy route is in errors.
+        """RH-002: Route whose failures exhausted max_retries is in errors.
 
-        Given: Route with RouteHealthStatus(healthy=False) in Valkey
+        Given: Enabled health check with max_retries=1 and a failing status
+               whose consecutive_failures reached the budget
         When: Check route health
         Then: Route in errors list
         """
+        route = dataclasses.replace(
+            healthy_route, health_check=ModelHealthCheck(enable=True, max_retries=1)
+        )
         status = ValkeyReplicaHealthStatus(
-            replica_id=healthy_route.route_id,
+            replica_id=route.route_id,
             healthy=False,
             last_check=995,
+            consecutive_failures=1,
         )
-        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {
-            healthy_route.route_id: status,
-        }
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {route.route_id: status}
 
-        entity_ids = [healthy_route.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
+
+        assert len(result.successes) == 0
+        assert len(result.errors) == 1
+        assert len(result.stale) == 0
+
+    async def test_disabled_health_check_is_skipped(
+        self,
+        route_executor: RouteExecutor,
+        mock_valkey_schedule: AsyncMock,
+        healthy_route: RouteData,
+    ) -> None:
+        """A route with health_check present but enable=False is skipped (unmanaged)."""
+        route = dataclasses.replace(healthy_route, health_check=ModelHealthCheck(enable=False))
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {}
+
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
+
+        assert len(result.successes) == 0
+        assert len(result.errors) == 0
+        assert len(result.stale) == 0
+
+    async def test_absent_health_check_is_skipped(
+        self,
+        route_executor: RouteExecutor,
+        mock_valkey_schedule: AsyncMock,
+        healthy_route: RouteData,
+    ) -> None:
+        """A route with no health check is skipped, neither HEALTHY nor DEGRADED."""
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {}
+
+        with RouteRecorderContext.scope("test", entity_ids=[healthy_route.route_id]):
             result = await route_executor.check_route_health([healthy_route])
+
+        assert len(result.successes) == 0
+        assert len(result.errors) == 0
+        assert len(result.stale) == 0
+
+    async def test_failing_route_within_retry_budget_stays_healthy(
+        self,
+        route_executor: RouteExecutor,
+        mock_valkey_schedule: AsyncMock,
+        healthy_route: RouteData,
+    ) -> None:
+        """A failing probe below max_retries keeps the route HEALTHY (within budget)."""
+        route = dataclasses.replace(
+            healthy_route, health_check=ModelHealthCheck(enable=True, max_retries=3)
+        )
+        status = ValkeyReplicaHealthStatus(
+            replica_id=route.route_id,
+            healthy=False,
+            last_check=995,
+            consecutive_failures=2,
+        )
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {route.route_id: status}
+
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
+
+        assert len(result.successes) == 1
+        assert len(result.errors) == 0
+        assert len(result.stale) == 0
+
+    async def test_failing_route_exhausts_retries_in_errors(
+        self,
+        route_executor: RouteExecutor,
+        mock_valkey_schedule: AsyncMock,
+        healthy_route: RouteData,
+    ) -> None:
+        """Once consecutive_failures reaches max_retries the route is UNHEALTHY."""
+        route = dataclasses.replace(
+            healthy_route, health_check=ModelHealthCheck(enable=True, max_retries=3)
+        )
+        status = ValkeyReplicaHealthStatus(
+            replica_id=route.route_id,
+            healthy=False,
+            last_check=995,
+            consecutive_failures=3,
+        )
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {route.route_id: status}
+
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
 
         assert len(result.successes) == 0
         assert len(result.errors) == 1
@@ -265,17 +349,18 @@ class TestCheckRouteHealth:
         mock_valkey_schedule: AsyncMock,
         healthy_route: RouteData,
     ) -> None:
-        """RH-003: Route with expired TTL (no key) is in stale list.
+        """RH-003: Enabled-health-check route with expired TTL (no key) is in stale list.
 
-        Given: Route whose RouteHealthStatus TTL has expired (key absent)
+        Given: Route with an active health check whose RouteHealthStatus
+               TTL has expired (key absent)
         When: Check route health
         Then: Route in stale list (DEGRADED)
         """
+        route = dataclasses.replace(healthy_route, health_check=ModelHealthCheck(enable=True))
         mock_valkey_schedule.get_route_health_statuses_batch.return_value = {}
 
-        entity_ids = [healthy_route.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            result = await route_executor.check_route_health([healthy_route])
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
 
         assert len(result.successes) == 0
         assert len(result.errors) == 0
@@ -287,17 +372,17 @@ class TestCheckRouteHealth:
         mock_valkey_schedule: AsyncMock,
         healthy_route: RouteData,
     ) -> None:
-        """RH-004: Missing health data is treated as stale.
+        """RH-004: Missing health data for an active health check is treated as stale.
 
-        Given: Route with no RouteHealthStatus in Valkey
+        Given: Route with an active health check and no RouteHealthStatus in Valkey
         When: Check route health
         Then: Route in stale list
         """
+        route = dataclasses.replace(healthy_route, health_check=ModelHealthCheck(enable=True))
         mock_valkey_schedule.get_route_health_statuses_batch.return_value = {}
 
-        entity_ids = [healthy_route.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            result = await route_executor.check_route_health([healthy_route])
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
 
         assert len(result.successes) == 0
         assert len(result.errors) == 0
