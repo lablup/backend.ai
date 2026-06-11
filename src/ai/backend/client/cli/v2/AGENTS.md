@@ -1,68 +1,69 @@
-# CLI v2 — Guardrails
+# CLI v2 — 가드레일
 
-## Command Hierarchy
+## 명령 계층
 
 ```
 ./bai [admin|my] {entity} [{sub-entity}] {command} [options]
 ```
 
-- `cli/v2/{entity}/commands.py` — user-facing commands (any authenticated user)
-- `cli/v2/admin/{entity}.py` — admin-only commands (superadmin required)
-- `cli/v2/my/{entity}.py` — self-service commands (current user's own resources)
+- `cli/v2/{entity}/commands.py` — 사용자 대면 명령(인증된 모든 사용자)
+- `cli/v2/admin/{entity}.py` — admin 전용 명령(superadmin 필요)
+- `cli/v2/my/{entity}.py` — self-service 명령(현재 사용자 본인 리소스)
 
-## Admin vs Non-admin vs My Placement
+## admin / non-admin / my 배치
 
-**Admin-only operations MUST go in `admin/{entity}.py`, NOT in `{entity}/commands.py`.**
+**admin 전용 연산은 `{entity}/commands.py`가 아니라 `admin/{entity}.py`에 둔다.**
 
-- `create`, `update`, `delete`, `purge` for admin-only entities (Domain, ContainerRegistry, etc.) → `admin/`
-- `search` without scope (queries entire system) → `admin/`
-- `get` by ID (any authenticated user) → `{entity}/commands.py`
-- Scoped search → `{entity}/commands.py` with scope as a required argument
+- admin 전용 엔티티(Domain, ContainerRegistry 등)의 `create`, `update`, `delete`, `purge` → `admin/`
+- 스코프 없는 `search`(전체 시스템 조회) → `admin/`
+- ID로 `get`(인증된 모든 사용자) → `{entity}/commands.py`
+- scoped search → 스코프를 필수 인자로 받아 `{entity}/commands.py`
 
-**Scoped search CLI pattern:**
-- Command name reflects the scope: `./bai session project-search {project_id}`
-- Scope ID is a required positional argument, not an optional flag.
-- Maps to REST `POST /v2/{entity}/{scope_type}/{scope_id}/search`.
-- Do NOT use `--scope-{type}` optional flags for scoped search (those are filters, not scopes).
+**scoped search CLI 패턴** (검토 중 — SDK `scoped_search` 방향에 맞춰 바뀔 수 있음):
+- 현재: 명령 이름이 스코프를 반영한다 — `./bai session project-search {project_id}`.
+- 스코프 ID는 옵션 플래그가 아니라 필수 위치 인자.
+- REST `POST /v2/{entity}/{scope_type}/{scope_id}/search`에 매핑.
 
-**Self-service operations (`my_` prefix on the server) MUST go in `my/{entity}.py`.**
+**self-service 연산(서버 `my_` 접두)은 `my/{entity}.py`에 둔다.**
 
-- Self-service operations that act on the current user's own resources → `my/`
-- Maps to `my_` prefix server APIs and `/v2/{entity}/my/` REST endpoints (`my` is a scope qualifier, entity comes first)
-- Examples: `./bai my keypair search`, `./bai my keypair issue`
+- 현재 사용자 본인 리소스를 다루는 self-service 연산 → `my/`
+- 서버 `my_` 접두 API와 `/v2/{entity}/my/` REST 엔드포인트에 매핑(`my`는 스코프 한정자, 엔티티가 앞)
+- 예) `./bai my keypair search`, `./bai my keypair issue`
 
-If both admin and non-admin variants exist for the same operation (different behavior, not just permissions), put admin in `admin/` and non-admin in `{entity}/commands.py`.
+같은 연산에 admin/non-admin 변형이 둘 다 있으면(권한이 아니라 동작이 다름), admin은 `admin/`에,
+non-admin은 `{entity}/commands.py`에 둔다.
 
-## SDK v2 Integration
+## SDK v2 통합
 
-- CLI calls SDK v2 methods (`registry.{entity}.method()`), never REST directly.
-- SDK client: `client/v2/domains_v2/{entity}.py`
-- SDK registry: `client/v2/v2_registry.py`
-- New SDK domain clients must be registered as `@cached_property` in `V2ClientRegistry`.
+- CLI는 SDK v2 메서드(`registry.{entity}.method()`)를 호출한다 — REST 직접 호출 금지.
+- SDK 클라이언트: `client/v2/domains_v2/{entity}.py`
+- SDK 레지스트리: `client/v2/v2_registry.py`
+- 새 SDK 도메인 클라이언트는 `V2ClientRegistry`에 `@cached_property`로 등록한다.
 
-## Operation Naming
+## 연산 네이밍
 
-Standard 6 operations use fixed command names: `create`, `get`, `search`, `update`, `delete`, `purge`.
-Only use different names for operations outside the 6-op pattern:
-- `enqueue`, `terminate` (session lifecycle)
-- `revision add`, `revision activate`, `revision current` (deployment revision)
-- `login`, `logout` (auth)
+표준 6개 연산은 고정 명령 이름을 쓴다: `create`, `get`, `search`, `update`, `delete`, `purge`.
+6-op 패턴 밖의 연산만 다른 이름을 쓴다:
+- `enqueue`, `terminate`(세션 라이프사이클)
+- `revision add`, `revision activate`, `revision current`(deployment revision)
+- `login`, `logout`(auth)
 
-## Command Input Style
+## 명령 입력 스타일
 
-- **Primary:** Individual `--option` flags for each field.
-- **Secondary:** For deeply nested structures (e.g., revision config), accept JSON string or `@file` path via a single option (e.g., `--config '{"cluster_config": ...}'` or `--config @revision.json`).
-- **Never** use raw JSON as a positional argument for create/update.
-- Entity identifier (UUID, name) as positional argument for get/delete/purge.
-- Filter options as `--option` flags for search: `./bai admin domain search --name-contains foo`
-- Use `print_result()` helper for JSON output.
-- Use lazy imports inside command functions for DTO classes.
+- **기본:** 각 필드마다 개별 `--option` 플래그.
+- **보조:** 깊게 중첩된 구조(예: revision config)는 단일 옵션으로 JSON 문자열이나 `@file` 경로를 받는다
+  (예: `--config '{"cluster_config": ...}'` 또는 `--config @revision.json`).
+- create/update에 raw JSON을 위치 인자로 **절대** 쓰지 않는다.
+- get/delete/purge는 엔티티 식별자(UUID, 이름)를 위치 인자로.
+- search 필터는 `--option` 플래그로: `./bai admin domain search --name-contains foo`
+- JSON 출력은 `print_result()` 헬퍼를 쓴다.
+- DTO 클래스는 명령 함수 안에서 lazy import한다.
 
-## Adding a New Entity
+## 새 엔티티 추가
 
-1. Create `cli/v2/{entity}/commands.py` with user-facing commands + `__init__.py`
-2. Create `cli/v2/admin/{entity}.py` with admin-only commands
-3. Create `cli/v2/my/{entity}.py` with self-service commands (if applicable)
-4. Register user-facing group in `cli/v2/__init__.py`
-5. Register admin group in `cli/v2/admin/__init__.py`
-6. Register my group in `cli/v2/my/__init__.py` (if applicable)
+1. 사용자 대면 명령 + `__init__.py`를 담은 `cli/v2/{entity}/commands.py` 생성
+2. admin 전용 명령 `cli/v2/admin/{entity}.py` 생성
+3. self-service 명령 `cli/v2/my/{entity}.py` 생성(해당 시)
+4. `cli/v2/__init__.py`에 사용자 대면 그룹 등록
+5. `cli/v2/admin/__init__.py`에 admin 그룹 등록
+6. `cli/v2/my/__init__.py`에 my 그룹 등록(해당 시)

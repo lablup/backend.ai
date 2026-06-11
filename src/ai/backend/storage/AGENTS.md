@@ -1,37 +1,30 @@
-# Storage Proxy — Guardrails
+# Storage Proxy — 가드레일
 
-> For component overview, see `src/ai/backend/storage/README.md`.
+> 컴포넌트 개요는 `src/ai/backend/storage/README.md`.
 
-## API Handlers
+## API 핸들러
 
-- All handlers MUST be methods on a typed handler class — no module-level async functions.
-- Use `@api_handler` or `@stream_api_handler` decorators.
-- Parse requests via `PathParam[T]` and `BodyParam[T]` — never access the raw request object.
+- 모든 핸들러는 타입 핸들러 클래스의 메서드여야 한다 — 모듈 레벨 async 함수 금지.
+- `@api_handler` 또는 `@stream_api_handler` 데코레이터를 쓴다.
+- 요청은 `PathParam[T]`, `BodyParam[T]`로 파싱한다 — raw request 객체에 직접 접근 금지.
 
-## Exceptions
+## 예외
 
-- All exceptions MUST inherit from `StorageProxyError` (which inherits `BackendAIError`).
-- `storage/exception.py` is legacy — do NOT add new exceptions there.
-- All new exceptions go in `storage/errors/` only, organized by feature:
-  `object.py`, `quota.py`, `vfolder.py`, `volume.py`, `process.py`.
-- Never raise built-in exceptions (`RuntimeError`, `OSError`, etc.) directly in business logic.
+- 모든 예외는 `StorageProxyError`(이는 `BackendAIError` 상속)를 상속해야 한다.
+- `storage/exception.py`는 legacy — 새 예외를 여기 추가하지 않는다.
+- 새 예외는 `storage/errors/`에만, 기능별로 둔다: `object.py`, `quota.py`, `vfolder.py`,
+  `volume.py`, `process.py`.
 
-## Storage Volume Plugins
+## 스토리지 볼륨 플러그인
 
-- New storage backends MUST be added as plugins under `storage/volumes/`.
-- Every plugin MUST implement the abstract volume interface — no duck typing shortcuts.
+- 새 스토리지 백엔드는 `storage/volumes/` 아래 플러그인으로 추가한다.
+- 모든 플러그인은 추상 볼륨 인터페이스를 구현해야 한다 — 덕 타이핑 단축 금지.
 
-## Authentication
+## 상태 저장
 
-- Use Storage's own `token_auth_middleware` — do NOT copy `@auth_required` from `manager/api/`.
-- The Storage proxy has its own auth model independent of the Manager.
+- Storage는 관계형 DB를 쓰지 않는다 — 상태는 etcd·redis만 사용한다.
 
-## Database Independence
+## 여기 속하는 것
 
-- Storage has its own database — NEVER share a DB connection or session with the Manager.
-- Do NOT import Manager ORM models (`manager/models/`) from Storage code.
-
-## What Belongs Here
-
-- File/volume operations, quota management, vfolder lifecycle.
-- Background tasks related to storage (scan, cleanup, migration).
+- 파일/볼륨 연산, 쿼터 관리, vfolder 라이프사이클.
+- 스토리지 관련 백그라운드 태스크(스캔, 정리, 마이그레이션).

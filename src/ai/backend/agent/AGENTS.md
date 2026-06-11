@@ -1,39 +1,30 @@
-# Agent — Guardrails
+# Agent — 가드레일
 
-> For full component overview, see `src/ai/backend/agent/README.md`.
+> 컴포넌트 전체 개요는 `src/ai/backend/agent/README.md`.
 
-## Exceptions
+## 예외
 
-- Every exception raised in business logic MUST inherit from `BackendAIError`.
-- NEVER raise `RuntimeError`, `ValueError`, or other built-ins directly in business logic.
-- Define new exceptions in `agent/errors/` — NOT in `agent/exception.py` (that file is legacy).
+- 새 예외는 `agent/errors/`에 정의한다 — `agent/exception.py`는 legacy.
 
-## Async Rules
+## 컨테이너 라이프사이클
 
-- All I/O MUST use `async`/`await`.
-- `time.sleep()` is forbidden — use `asyncio.sleep()`.
-- Blocking calls inside async functions are forbidden — use `asyncio.to_thread()` if unavoidable.
+- 컨테이너 상태 전이는 `agent/stage/`의 상태 머신을 거쳐야 한다.
+- 라이프사이클 핸들러 밖에서 컨테이너 상태를 바꾸는 직접 Docker/K8s API 호출 금지.
+- 헬스체크·하트비트 로직은 `agent/health/`에 둔다 — 메인 루프에 인라인 금지.
 
-## Container Lifecycle
+## 인프라 구현 (Docker / Kubernetes / Dummy)
 
-- Container state transitions MUST go through the defined state machine in `agent/stage/`.
-- Direct Docker/K8s API calls that change container state outside the lifecycle handler are forbidden.
-- Health check and heartbeat logic belongs in `agent/health/` — do not inline it into the main loop.
+- 구현 전 항상 `agent/`의 추상 베이스 클래스를 확인한다.
+- Dummy 구현은 Docker/Kubernetes 변경과 함께 갱신해야 한다.
+- 인프라별 신규 코드는 해당 하위 디렉터리(`agent/docker/`, `agent/kubernetes/`, `agent/dummy/`)에 둔다.
 
-## Infrastructure Implementations (Docker / Kubernetes / Dummy)
+## Manager 통신
 
-- Always check the abstract base class in `agent/` before implementing.
-- The Dummy implementation must be updated alongside Docker/Kubernetes changes.
-- New infrastructure-specific code goes in the corresponding subdirectory
-  (`agent/docker/`, `agent/kubernetes/`, `agent/dummy/`).
+- Agent → Manager 통신은 이벤트 시스템만 쓴다.
+- Manager 직접 RPC 호출은 지정된 RPC Server 진입점에서만 허용.
+- Agent 비즈니스 로직 안에서 Manager로의 새 직접 HTTP 호출을 추가하지 않는다.
 
-## Manager Communication
+## 리소스 추적
 
-- Agent → Manager communication uses the event system only.
-- Direct Manager RPC calls are allowed only from the designated RPC Server entry point.
-- Do NOT add new direct HTTP calls to the Manager from inside Agent business logic.
-
-## Resource Tracking
-
-- Resource allocation / deallocation MUST go through `alloc_map.py`.
-- Do NOT manipulate resource counters directly outside `alloc_map.py`.
+- 리소스 할당/해제는 `alloc_map.py`를 거쳐야 한다.
+- `alloc_map.py` 밖에서 리소스 카운터를 직접 조작하지 않는다.
