@@ -16,11 +16,11 @@ from collections.abc import AsyncIterator
 
 import pytest
 import sqlalchemy as sa
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.config import ModelConfig, ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
@@ -28,6 +28,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrate
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput,
     DeploymentRevisionPresetFilter,
+    PresetModelConfigInput,
+    PresetModelDefinitionInput,
+    PresetModelServiceConfigInput,
     SearchDeploymentRevisionPresetsInput,
     UpdateDeploymentRevisionPresetInput,
 )
@@ -106,8 +109,17 @@ class TestDeploymentRevisionPresetCRUD:
         runtime_variant_id: RuntimeVariantID,
     ) -> None:
         image_id = ImageID(uuid.uuid4())
-        model_definition = ModelDefinition(
-            models=[ModelConfig(name="llama", model_path="/models/llama")],
+        model_definition = PresetModelDefinitionInput(
+            models=[
+                PresetModelConfigInput(
+                    name="llama",
+                    model_path="/models/llama",
+                    service=PresetModelServiceConfigInput(
+                        port=8080,
+                        start_command=["python", "server.py"],
+                    ),
+                ),
+            ],
         )
         create_result = await admin_v2_registry.deployment_revision_preset.create(
             CreateDeploymentRevisionPresetInput(
@@ -144,6 +156,25 @@ class TestDeploymentRevisionPresetCRUD:
         assert preset.model_definition.models[0].model_path == "/models/llama"
 
         await admin_v2_registry.deployment_revision_preset.delete(preset_id)
+
+    async def test_create_with_empty_model_definition_models_rejected(
+        self,
+        runtime_variant_id: RuntimeVariantID,
+    ) -> None:
+        # An empty models list is rejected at the strict request-DTO boundary
+        # (CREATE only) before any request is sent.
+        with pytest.raises(ValidationError):
+            CreateDeploymentRevisionPresetInput(
+                runtime_variant_id=runtime_variant_id,
+                name="md-empty-preset",
+                image_id=ImageID(uuid.uuid4()),
+                model_definition=PresetModelDefinitionInput(models=[]),
+                resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                cluster_mode="single-node",
+                cluster_size=1,
+                replica_count=1,
+                deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
+            )
 
     async def test_update(
         self,

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import DEFAULT_SHELL, ModelDefinition, PreStartAction
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     EnvironmentVariableEntryInput,
@@ -26,6 +27,78 @@ class PresetValueInput(BaseRequestModel):
     value: str = Field(description="Value for this preset.")
 
 
+class PresetModelHealthCheckInput(BaseRequestModel):
+    enable: bool = Field(
+        default=False,
+        description="Whether the route is health-checked. When false the route activates "
+        "immediately and the remaining fields are ignored.",
+    )
+    interval: float = Field(default=10.0, description="Interval in seconds between health checks.")
+    path: str = Field(default="/health", description="Path to check for health status.")
+    max_retries: int = Field(default=10, description="Maximum number of retries for health check.")
+    max_wait_time: float = Field(
+        default=15.0, description="Maximum time in seconds to wait for a health check response."
+    )
+    expected_status_code: int = Field(
+        default=200, gt=100, description="Expected HTTP status code for a healthy response."
+    )
+    initial_delay: float = Field(
+        default=1800.0, ge=0, description="Initial delay in seconds before the first health check."
+    )
+
+
+class PresetModelMetadataInput(BaseRequestModel):
+    author: str | None = Field(default=None, description="Author of the model.")
+    title: str | None = Field(default=None, description="Title of the model.")
+    version: str | None = Field(default=None, description="Version of the model.")
+    created: str | None = Field(default=None, description="Creation date of the model.")
+    last_modified: str | None = Field(default=None, description="Last modified date of the model.")
+    description: str | None = Field(default=None, description="Description of the model.")
+    task: str | None = Field(default=None, description="Task type of the model.")
+    category: str | None = Field(default=None, description="Category of the model.")
+    architecture: str | None = Field(default=None, description="Architecture of the model.")
+    framework: list[str] | None = Field(default=None, description="Frameworks used by the model.")
+    label: list[str] | None = Field(default=None, description="Labels for the model.")
+    license: str | None = Field(default=None, description="License of the model.")
+    min_resource: dict[str, Any] | None = Field(
+        default=None, description="Minimum resource requirements for the model."
+    )
+
+
+class PresetModelServiceConfigInput(BaseRequestModel):
+    pre_start_actions: list[PreStartAction] = Field(
+        default_factory=list,
+        description="Pre-start actions to execute before starting the model service. May be empty.",
+    )
+    start_command: list[str] = Field(description="Command to start the model service.")
+    shell: str = Field(default=DEFAULT_SHELL, description="Shell configured for the model service.")
+    port: int = Field(
+        gt=1, description="Port number for the model service. Must be greater than 1."
+    )
+    health_check: PresetModelHealthCheckInput | None = Field(
+        default=None, description="Health check configuration for the model service."
+    )
+
+
+class PresetModelConfigInput(BaseRequestModel):
+    name: str = Field(min_length=1, description="Name of the model.")
+    model_path: str = Field(min_length=1, description="Path to the model file.")
+    service: PresetModelServiceConfigInput = Field(
+        description="Configuration for the model service."
+    )
+    metadata: PresetModelMetadataInput | None = Field(
+        default=None, description="Metadata about the model."
+    )
+
+
+class PresetModelDefinitionInput(BaseRequestModel):
+    models: list[PresetModelConfigInput] = Field(
+        min_length=1,
+        max_length=1,
+        description="List of models in the model definition. Exactly one model is supported.",
+    )
+
+
 class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     runtime_variant_id: RuntimeVariantID = Field(
         description="ID of the runtime variant this preset belongs to."
@@ -33,8 +106,10 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=256, description="Preset name.")
     description: str | None = Field(default=None, description="Description.")
     image_id: ImageID = Field(description="Container image UUID.")
-    model_definition: ModelDefinition | None = Field(
-        default=None, description="Model definition configuration."
+    model_definition: PresetModelDefinitionInput | None = Field(
+        default=None,
+        description="Model definition configuration. Optional, but when provided it must be "
+        "fully populated (non-empty models, each with name/model_path/service).",
     )
     resource_slots: list[ResourceSlotEntryInput] | None = Field(
         default=None, description="Resource slot allocations."
