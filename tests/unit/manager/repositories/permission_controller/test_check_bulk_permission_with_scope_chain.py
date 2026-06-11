@@ -412,7 +412,7 @@ class TestCheckBulkPermissionWithScopeChain:
                     scope_id=fixture_ids.project_id,
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
-                    permission=Permission.from_operation(OperationType.READ),
+                    permission=Permission.READ,
                 )
             )
             await db_sess.flush()

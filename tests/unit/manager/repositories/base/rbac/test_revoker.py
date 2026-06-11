@@ -266,7 +266,7 @@ class TestRevokerMultipleRoles:
                     scope_id=entity_id.entity_id,
                     entity_type=entity_id.entity_type,
                     operation=OperationType.READ,
-                    permission=Permission.from_operation(OperationType.READ),
+                    permission=Permission.READ,
                 )
                 db_sess.add(perm)
             await db_sess.flush()
@@ -357,7 +357,7 @@ class TestRevokerIdempotent:
                 scope_id=entity_id.entity_id,
                 entity_type=entity_id.entity_type,
                 operation=OperationType.READ,
-                permission=Permission.from_operation(OperationType.READ),
+                permission=Permission.READ,
             )
             db_sess.add(perm)
             await db_sess.flush()

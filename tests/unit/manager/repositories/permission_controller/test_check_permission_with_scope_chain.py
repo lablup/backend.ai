@@ -649,7 +649,7 @@ class TestCheckPermissionWithScopeChain:
                 scope_id=fixture_ids.project_id,
                 entity_type=EntityType.VFOLDER,
                 operation=OperationType.READ,
-                permission=Permission.from_operation(OperationType.READ),
+                permission=Permission.READ,
             )
             db_sess.add(perm)
             await db_sess.flush()
@@ -1003,7 +1003,7 @@ class TestCheckPermissionWithScopeChain:
                 scope_id=fixture_ids.project_id,
                 entity_type=EntityType.VFOLDER,
                 operation=OperationType.READ,
-                permission=Permission.from_operation(OperationType.READ),
+                permission=Permission.READ,
             )
             db_sess.add(perm)
             await db_sess.flush()

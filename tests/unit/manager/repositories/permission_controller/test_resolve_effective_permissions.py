@@ -760,7 +760,7 @@ class TestResolveEffectivePermissions:
                     scope_id=fixture.project_id,
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
-                    permission=Permission.from_operation(OperationType.READ),
+                    permission=Permission.READ,
                 )
             )
             await db_sess.flush()
@@ -791,7 +791,7 @@ class TestResolveEffectivePermissions:
                     scope_id=fixture.project_id,
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
-                    permission=Permission.from_operation(OperationType.READ),
+                    permission=Permission.READ,
                 )
             )
             # role_b grants UPDATE at project scope
@@ -802,7 +802,7 @@ class TestResolveEffectivePermissions:
                     scope_id=fixture.project_id,
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.UPDATE,
-                    permission=Permission.from_operation(OperationType.UPDATE),
+                    permission=Permission.UPDATE,
                 )
             )
             await db_sess.flush()

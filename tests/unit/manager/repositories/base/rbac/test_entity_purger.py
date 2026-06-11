@@ -427,7 +427,7 @@ class TestRBACEntityPurgerWithPermissions:
                     scope_id=str(entity_uuid),
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
-                    permission=Permission.from_operation(OperationType.READ),
+                    permission=Permission.READ,
                 )
                 db_sess.add(perm)
             await db_sess.flush()
@@ -765,7 +765,7 @@ class TestRBACEntityBatchPurger:
                     scope_id=str(entity_uuid),
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
-                    permission=Permission.from_operation(OperationType.READ),
+                    permission=Permission.READ,
                 )
                 db_sess.add(perm)
             await db_sess.flush()
@@ -1056,7 +1056,7 @@ class TestRBACEntityPurgerTransactionRollback:
                     scope_id=str(entity_uuid),
                     entity_type=EntityType.VFOLDER,
                     operation=OperationType.READ,
-                    permission=Permission.from_operation(OperationType.READ),
+                    permission=Permission.READ,
                 )
             )
             db_sess.add(
