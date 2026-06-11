@@ -40,7 +40,12 @@ from ai.backend.common.dto.manager.v2.user.request import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    Permission,
+    ScopeType,
+)
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -442,6 +447,7 @@ async def user_with_rbac_rows(
                 scope_id=scope_id,
                 entity_type=EntityType.USER,
                 operation=OperationType.READ,
+                permission=Permission.READ,
             )
         )
 

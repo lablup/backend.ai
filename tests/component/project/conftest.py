@@ -44,7 +44,12 @@ from ai.backend.manager.api.rest.v2.user.registry import register_v2_user_routes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    Permission,
+    ScopeType,
+)
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.group.row import GroupRow
@@ -235,6 +240,7 @@ async def rbac_permission_fixture(
                 scope_id=str(group_fixture),
                 entity_type=EntityType.PROJECT,
                 operation=OperationType.UPDATE,
+                permission=Permission.UPDATE,
             )
         )
 
@@ -288,6 +294,7 @@ async def admin_target_project_permission(
                 scope_id=str(target_project_fixture),
                 entity_type=EntityType.PROJECT,
                 operation=OperationType.UPDATE,
+                permission=Permission.UPDATE,
             )
         )
     yield role_id
@@ -391,6 +398,7 @@ async def member_role_fixture(
                 scope_id=str(target_project_fixture),
                 entity_type=EntityType.USER,
                 operation=OperationType.READ,
+                permission=Permission.READ,
             )
         )
     yield role_id

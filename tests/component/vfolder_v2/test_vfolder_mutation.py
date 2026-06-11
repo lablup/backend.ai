@@ -43,7 +43,12 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
 from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_routes
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    Permission,
+    ScopeType,
+)
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -238,6 +243,7 @@ async def regular_user_vfolder_create_permission(
                 scope_id=str(group_fixture),
                 entity_type=EntityType.VFOLDER,
                 operation=OperationType.CREATE,
+                permission=Permission.CREATE,
             )
         )
     yield

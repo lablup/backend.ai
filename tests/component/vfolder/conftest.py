@@ -14,6 +14,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     RelationType,
     RoleStatus,
     ScopeType,
@@ -433,6 +434,7 @@ async def user_system_role(
                         scope_id=str(user_uuid),
                         entity_type=entity_type,
                         operation=operation,
+                        permission=Permission.from_operation(operation),
                     )
                 )
 
