@@ -1,3 +1,0 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/EmailVerificationView-Di9jl7xv.js","assets/index-CuMUOZIG.js"])))=>i.map(i=>d[i]);
-import{j as e,dx as a,dy as o,r as n,h as r,be as c,cU as l}from"./index-CuMUOZIG.js";import{u as m}from"./useApiEndpoint-DgASFKOc.js";const p=c.lazy(()=>l(()=>import("./EmailVerificationView-Di9jl7xv.js"),__vite__mapDeps([0,1]))),d=()=>e.jsxs(e.Fragment,{children:[e.jsx(a,{}),e.jsx(o,{}),e.jsx(n.Suspense,{fallback:null,children:e.jsx(u,{})})]}),u=()=>{"use memo";const t=r.c(2),s=m();let i;return t[0]!==s?(i=e.jsx(p,{apiEndpoint:s,active:!0}),t[0]=s,t[1]=i):i=t[1],i};export{d as default};
-//# sourceMappingURL=EmailVerificationPage-DTuCnQc-.js.map
