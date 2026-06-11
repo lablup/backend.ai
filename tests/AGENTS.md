@@ -1,218 +1,54 @@
-# Testing Guidelines
+# 테스트 가이드라인 — 가드레일
 
-This document provides testing patterns and best practices for Backend.AI.
-For TDD workflow, see `/tdd-guide` skill.
+> 배경·근거는 같은 디렉터리 `CONTEXTS.md`. TDD 워크플로·패턴·코드 예시는 `/tdd-guide` 스킬, BUILD 정책은 `BUILDING.md`.
 
-## Which Directory to Use
+## 어느 디렉터리에 둘까
 
-| Test target | Directory |
-|-------------|-----------|
-| Service / handler logic (mocking) | `tests/unit/{component}/` |
-| Repository / Model (real DB, `with_tables`) | `tests/unit/{component}/repositories/` |
-| HTTP API layer (real aiohttp server + DB) | `tests/component/{component}/` |
-| E2E user scenarios (Client SDK v2) | `tests/integration/` |
+| 테스트 대상 | 디렉터리 |
+|-------------|----------|
+| Service / handler 로직(모킹) | `tests/unit/{component}/` |
+| Repository / Model(실 DB, `with_tables`) | `tests/unit/{component}/repositories/` |
+| HTTP API 레이어(실 aiohttp 서버 + DB) | `tests/component/{component}/` |
+| E2E 사용자 시나리오(Client SDK v2) | `tests/integration/` |
 
-Each directory has its own `CLAUDE.md` with setup patterns.
+각 디렉터리는 자체 `AGENTS.md`에 셋업 패턴을 둔다.
 
-## Test Strategy
+## 테스트 전략
 
-**Use the appropriate testing approach based on the component:**
+- **Repository / Model**: 실제 DB(`ai.backend.testutils.db.with_tables`)·실제 Redis로 실제 상호작용(쿼리·
+  트랜잭션·제약)을 검증한다. DB 호출을 모킹하지 않는다.
+- **Service / Handler / Controller**: 모킹 유닛 테스트. repository 호출·외부 의존성을
+  `unittest.mock.AsyncMock`으로 모킹하고 비즈니스 로직을 검증한다.
+- 구분 근거는 `CONTEXTS.md`.
 
-### Repositories & Models
-- **Use real database connections** with `ai.backend.testutils.db.with_tables`
-- **Use real Redis connections** when testing cache operations
-- Test actual database interactions (queries, transactions, constraints)
-- Include all Row dependencies in `with_tables` for proper FK constraints
+## 무엇을 테스트하나 (구현이 아니라 동작)
 
-### Services, Handlers, Controllers
-- **Use unit tests with mocking**
-- Mock repository calls and external dependencies
-- Focus on business logic validation
-- Use `unittest.mock.AsyncMock` for async mocking
+관찰 가능한 계약을 테스트한다 — 동작이 같은 리팩터에도 살아남는 테스트가 좋은 테스트다.
 
-**Why this distinction?**
-- Repositories/Models: Integration points where actual behavior matters
-- Other layers: Logic verification where isolation improves speed and clarity
+- **테스트할 것**: 코드가 강제하는 제약/전제(예: 빈 스코프 → `EmptySearchScopeError`), 메서드가 호출자에게
+  한 약속(추상화 보장), 실제 결과(`with_tables`로 create→read-back, update 반영, purge 제거, scoped 필터링).
+- **테스트하지 말 것**: 구현 디테일·내부 호출 배선 스파이, 하위 레이어가 이미 검증한 위임 로직. (예시는 `CONTEXTS.md`)
 
-## What to Test (Behavior, Not Implementation)
+## 테스트 구조
 
-Test **observable contracts**, not how they are implemented internally. A good test
-survives a refactor that keeps behavior the same.
+- 대상 단위(클래스/모듈/함수)별로 테스트 클래스로 묶는다.
+- 테스트 조건은 인라인 셋업이 아니라 fixture로 표현한다.
+- 함수는 간결하게: Arrange(fixture) → Act → Assert.
+- 다른 테스트 파일에서 import하지 않는다 — 공용 유틸은 `conftest.py`나 `ai.backend.testutils`.
+- 패턴·예시는 `/tdd-guide` 스킬.
 
-**Do test:**
-- **Constraints / preconditions** the code enforces — e.g. an empty scope list raises
-  `EmptySearchScopeError`; an invalid argument is rejected.
-- **Abstraction guarantees** — the promise a method makes to its caller — e.g. a
-  dependent insert receives the resolved dependency, and the child row actually carries
-  the parent's id.
-- **Real outcomes** (for repositories/models, via `with_tables`) — create then read back
-  the same row; update is reflected; purge removes it; a scoped query filters by scope.
+## `with_tables` 핵심 규칙
 
-**Do NOT test:**
-- **Implementation details / internal call wiring** — e.g. asserting that `savepoint()`
-  calls `session.begin_nested()`, that `write_ops()` opens one specific session method, or
-  spying on which delegate function was invoked. Such tests break on harmless refactors
-  and verify nothing the caller actually relies on.
-- **Behavior already covered by a lower layer's own tests** — do not re-assert delegated
-  logic (e.g. a thin wrapper that forwards to an already-tested `execute_*` function).
+- 모든 `Row` 의존성을 포함한다(SQLAlchemy 문자열 관계 — `RowA`가 `RowB`와 관계면 둘 다 넣는다).
+- FK 순서대로(부모 먼저). 각 Row의 `relationship()`을 따라 체인을 추적한다.
+- 관련 Row를 `# noqa: F401` 없이 모두 import해 `with_tables`에 넣는다.
 
-## Test Structure & Organization
+## 테스트 타입 힌트
 
-### Use Test Classes
-Group tests by target unit (class, module, or function):
+- 모든 테스트 코드는 완전한 타입 어노테이션을 가진다: fixture 참조·함수 반환·테스트 함수(`-> None`).
+  mock은 필요 시 `typing.Protocol`/`TypedDict`.
 
-```python
-class TestScheduleSessionsLifecycleHandler:
-    """Tests for ScheduleSessionsLifecycleHandler."""
+## BUILD 파일
 
-    async def test_all_sessions_scheduled_successfully(self, ...) -> None:
-        ...
-
-    async def test_partial_scheduling_failure(self, ...) -> None:
-        ...
-```
-
-### Use Fixtures for Test Scenarios
-Express test conditions through fixtures, not inline setup:
-
-```python
-@pytest.fixture
-def session_with_pending_status() -> SessionData:
-    return create_session(status=SessionStatus.PENDING)
-
-@pytest.fixture
-def mock_provisioner_success(mock_provisioner: AsyncMock) -> AsyncMock:
-    mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(...)
-    return mock_provisioner
-
-async def test_success(
-    handler: ScheduleSessionsLifecycleHandler,
-    session_with_pending_status: SessionData,
-    mock_provisioner_success: AsyncMock,
-) -> None:
-    # Act
-    result = await handler.execute("default", [session_with_pending_status])
-
-    # Assert
-    assert len(result.successes) == 1
-```
-
-### Keep Test Functions Concise
-Focus on: Arrange (fixtures) → Act (call) → Assert (verify)
-
-### No Cross-Test Imports
-- Never import from other test files
-- Shared utilities go in `conftest.py` or `ai.backend.testutils`
-
-## Database Tests with `with_tables`
-
-When using `with_tables` from `ai.backend.testutils.db`:
-
-**Critical Rules:**
-1. **Include all Row dependencies**: SQLAlchemy uses string-based relationships.
-   If `RowA` has relationships to `RowB`, both must be in `with_tables`.
-2. **Order by FK dependencies**: Parent tables before children.
-3. **Trace relationship chains**: Check each Row's `relationship()` definitions.
-4. **Import all related Rows**: Do NOT use `# noqa: F401` - include them in `with_tables`.
-
-```python
-@pytest.fixture
-async def sample_data(
-    database_engine: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[list[DataRow], None]:
-    data = []
-    async with with_tables(
-        database_engine,
-        [
-            ParentRow,      # Parent first
-            ChildRow,       # Child second (FK to Parent)
-            GrandChildRow,  # Grandchild third (FK to Child)
-        ],
-    ) as db_sess:
-        # Create test data
-        parent = ParentRow(...)
-        db_sess.add(parent)
-        await db_sess.flush()
-
-        child = ChildRow(parent_id=parent.id, ...)
-        db_sess.add(child)
-        await db_sess.flush()
-
-        yield [parent, child]
-
-        # Cleanup (reverse order)
-        await db_sess.delete(child)
-        await db_sess.delete(parent)
-```
-
-## Type Hints in Tests
-
-**All test code must have complete type annotations:**
-- Fixture references in test functions: `session: SessionRow`
-- Fixture functions: `-> SessionRow` or `-> AsyncGenerator[SessionRow, None]`
-- Test functions: `-> None`
-- Mock objects: Use `typing.Protocol` or `typing.TypedDict` when applicable
-
-```python
-@pytest.fixture
-async def sample_data(
-    database_engine: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[list[DataRow], None]:
-    ...
-
-async def test_something(
-    repository: FairShareRepository,
-    sample_data: list[DataRow],
-) -> None:
-    ...
-```
-
-## BUILD Files for Tests
-
-**Required for every test directory:**
-
-```python
-# tests/manager/repositories/BUILD
-python_tests()
-```
-
-```python
-# tests/testutils/BUILD
-python_testutils()
-```
-
-**Rules:**
-- Add BUILD file when creating new test directories
-- Use `python_tests()` for test modules
-- Use `python_testutils()` for shared utilities
-- Do NOT list dependencies explicitly - Pants infers from imports
-
-See `BUILDING.md` for detailed BUILD file policies.
-
-## Running Tests
-
-```bash
-# Run all tests in a directory
-pants test tests/manager::
-
-# Run specific test file
-pants test tests/manager/repositories/test_fair_share.py
-
-# Run tests for changed code
-pants test --changed-since=HEAD~1 --changed-dependents=transitive
-```
-
-## TDD Workflow
-
-For complete TDD workflow (scenario definition → test writing → implementation):
-- See `/tdd-guide` skill
-- Includes step-by-step process and examples
-
-## Quality Checks
-
-**Always fix errors - never suppress:**
-- Run `pants lint` and fix issues
-- Run `pants check` and fix type errors
-- Do NOT use `# noqa` or `# type: ignore`
-
-See `BUILDING.md` for quality enforcement details.
+- 새 테스트 디렉터리마다 `BUILD`를 추가한다: 테스트 모듈 `python_tests()`, 공용 유틸 `python_testutils()`.
+- 의존성을 명시하지 않는다 — Pants가 import에서 추론한다. 상세는 `BUILDING.md`.
