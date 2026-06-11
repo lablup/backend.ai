@@ -280,6 +280,7 @@ async def check_and_upgrade(
         cors_options={},
         manager_client_pool=manager_client_pool,
         valkey_artifact_client=None,  # type: ignore[arg-type]
+        valkey_tus_client=None,  # type: ignore[arg-type]
         backends={**DEFAULT_BACKENDS},
         volumes={},
         health_probe=health_probe,

@@ -26,11 +26,14 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
+from ai.backend.common.clients.valkey_client.valkey_tus.client import (
+    ValkeyTusClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
 from ai.backend.common.config import (
     ConfigurationError,
@@ -42,6 +45,7 @@ from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
+    REDIS_TUS_DB,
     RedisRole,
 )
 from ai.backend.common.etcd import AsyncEtcd
@@ -226,15 +230,19 @@ async def bgtask_ctx(
     bgtask_registry_creator = BgtaskHandlerRegistryCreator(volume_pool, event_producer)
     registry = bgtask_registry_creator.create()
     bgtask_mgr = BackgroundTaskManager(
-        event_producer=event_producer,
-        task_registry=registry,
-        valkey_client=valkey_client,
-        server_id=local_config.storage_proxy.node_id,
+        BackgroundTaskManagerArgs(
+            event_producer=event_producer,
+            task_registry=registry,
+            valkey_client=valkey_client,
+            server_id=local_config.storage_proxy.node_id,
+        )
     )
+    await bgtask_mgr.init()
 
     try:
         yield bgtask_mgr
     finally:
+        await bgtask_mgr.shutdown()
         await valkey_client.close()
 
 
@@ -644,6 +652,13 @@ async def server_main(
         )
         storage_init_stack.push_async_callback(valkey_artifact_client.close)
 
+        valkey_tus_client = await ValkeyTusClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_TUS_DB,
+            human_readable_name=f"storage-proxy-tus-{pidx}",
+        )
+        storage_init_stack.push_async_callback(valkey_tus_client.close)
+
         # Initialize health probe
         health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
         # Liveness-registered: also surfaced in readiness — connection-stuck
@@ -724,6 +739,7 @@ async def server_main(
             },
             manager_client_pool=manager_client_pool,
             valkey_artifact_client=valkey_artifact_client,
+            valkey_tus_client=valkey_tus_client,
             health_probe=health_probe,
             volume_stats_observer=volume_stats_observer,
             volume_stats_state=volume_stats_state,

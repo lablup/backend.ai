@@ -60,6 +60,9 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
         "default_value", sa.String(length=512), nullable=True
     )
     key: Mapped[str] = mapped_column("key", sa.String(length=256), nullable=False)
+    required: Mapped[bool] = mapped_column(
+        "required", sa.Boolean, nullable=False, server_default=sa.false()
+    )
 
     # UI metadata
     category: Mapped[str | None] = mapped_column("category", sa.String(length=64), nullable=True)
@@ -121,6 +124,7 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
             value_type=PresetValueType(self.value_type),
             default_value=self.default_value,
             key=self.key,
+            required=self.required,
             category=self.category,
             ui_type=ui_option_data.ui_type if ui_option_data is not None else None,
             display_name=self.display_name,

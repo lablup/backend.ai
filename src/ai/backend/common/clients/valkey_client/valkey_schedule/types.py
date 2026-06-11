@@ -47,10 +47,18 @@ class ReplicaHealthResult:
 
     Passed to ``record_route_health_statuses_batch``; ``last_check`` is
     assigned by the client using the current Redis time.
+
+    ``consecutive_failures`` is the running count of consecutive failed
+    probes (0 when the latest probe passed); the consuming handler compares
+    it against ``ModelHealthCheck.max_retries``. ``ttl_sec`` is the per-route
+    key TTL derived from the route's ``interval`` (``None`` falls back to the
+    module default); key expiry signals DEGRADED.
     """
 
     replica_id: ReplicaID
     healthy: bool
+    consecutive_failures: int = 0
+    ttl_sec: int | None = None
 
 
 @dataclass
@@ -65,12 +73,14 @@ class ReplicaHealthStatus:
     replica_id: ReplicaID
     healthy: bool
     last_check: int  # Unix timestamp (Redis time)
+    consecutive_failures: int = 0
 
     def to_valkey_hash(self) -> Mapping[str, str]:
         return {
             "replica_id": str(self.replica_id),
             "healthy": "1" if self.healthy else "0",
             "last_check": str(self.last_check),
+            "consecutive_failures": str(self.consecutive_failures),
         }
 
     @classmethod
@@ -79,4 +89,5 @@ class ReplicaHealthStatus:
             replica_id=ReplicaID(UUID(data["replica_id"])),
             healthy=data.get("healthy", "0") == "1",
             last_check=int(data.get("last_check", "0")),
+            consecutive_failures=int(data.get("consecutive_failures", "0")),
         )

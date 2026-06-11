@@ -87,6 +87,18 @@ class RouteData:
     last_transition_at: datetime | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def enabled_health_check(self) -> ModelHealthCheck | None:
+        """The health check to enforce, or ``None`` when absent or disabled.
+
+        A ``health_check`` with ``enable=False`` means the route activates
+        immediately and the remaining fields are ignored, so it must be
+        treated the same as no health check at all.
+        """
+        if self.health_check is None or not self.health_check.enable:
+            return None
+        return self.health_check
+
 
 @dataclass(frozen=True)
 class RouteSessionKernelInfo:

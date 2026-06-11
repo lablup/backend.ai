@@ -7,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import MutableMapping
 from typing import Any
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .exception import LibraryError
 

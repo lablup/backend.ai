@@ -196,6 +196,10 @@ class SessionNode(BaseResponseModel):
             "alias (mount destination), and permission."
         ),
     )
+    replica_id: UUID | None = Field(
+        default=None,
+        description="UUID of the routing replica this session serves, if any.",
+    )
 
 
 # ---------------------------------------------------------------------------

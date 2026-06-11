@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, ResourceSlot
@@ -367,6 +368,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     @pytest.fixture
     def deployment_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
             id=DeploymentID(deployment_id),
             metadata=DeploymentMetadata(
                 name="test-deployment",
@@ -542,6 +544,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         project_id: uuid.UUID,
     ) -> DeploymentInfo:
         return DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
             id=DeploymentID(deployment_id),
             metadata=DeploymentMetadata(
                 name="ba5881-test",
@@ -707,6 +710,7 @@ class TestConvertDeploymentInfoToData:
         current_data = make_revision_data(2)
 
         deployment_info = DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
             id=DeploymentID(uuid.uuid4()),
             metadata=DeploymentMetadata(
                 name="ba5963-test",

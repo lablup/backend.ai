@@ -161,10 +161,20 @@ class TerminatedTransitionHook(StatusTransitionHook):
         session_id = session.session_info.identity.id
         cluster_mode = ClusterMode(session.session_info.resource.cluster_mode)
 
-        if cluster_mode == ClusterMode.SINGLE_NODE:
-            await self._destroy_local_network(session, network_id)
-        elif cluster_mode == ClusterMode.MULTI_NODE:
-            await self._destroy_overlay_network(session_id, network_id)
+        pool = RecorderContext[SessionId].current_pool()
+        recorder = pool.recorder(session_id)
+        with recorder.phase(
+            "terminate_cleanup",
+            success_detail="Volatile inter-container network destroyed",
+        ):
+            with recorder.step(
+                "destroy_network",
+                success_detail=f"Destroyed {cluster_mode.value} network {network_id}",
+            ):
+                if cluster_mode == ClusterMode.SINGLE_NODE:
+                    await self._destroy_local_network(session, network_id)
+                elif cluster_mode == ClusterMode.MULTI_NODE:
+                    await self._destroy_overlay_network(session_id, network_id)
 
     async def _destroy_local_network(self, session: SessionWithKernels, network_id: str) -> None:
         session_id = session.session_info.identity.id

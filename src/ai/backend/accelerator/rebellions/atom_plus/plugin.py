@@ -3,7 +3,6 @@ from collections.abc import Iterable, Sequence
 
 from ai.backend.accelerator.rebellions.common.atom_api import ATOMAPI
 from ai.backend.accelerator.rebellions.common.plugin import AbstractATOMPlugin
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     DeviceId,
@@ -11,6 +10,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .types import ATOMPlusDevice
 

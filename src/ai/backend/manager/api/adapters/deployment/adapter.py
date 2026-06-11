@@ -2414,6 +2414,7 @@ class DeploymentAdapter(BaseAdapter):
     def _replica_data_to_dto(data: ModelReplicaData) -> ReplicaNode:
         return ReplicaNode(
             id=data.id,
+            deployment_id=data.deployment_id,
             revision_id=data.revision_id,
             session_id=data.session_id,
             readiness_status=data.readiness_status,

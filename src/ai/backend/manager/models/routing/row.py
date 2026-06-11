@@ -127,11 +127,11 @@ class RoutingRow(Base):  # type: ignore[misc]
 
     # Revision reference without FK (relationship only)
     revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
-    # Replica group this replica belongs to (``NULL`` until assigned).
-    # No FK (relationship only); mirrors ``revision`` above.
+    # Replica group this replica belongs to (``NULL`` until assigned). FK is SET NULL on group delete.
     replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
         "replica_group_id",
         GUID(ReplicaGroupID),
+        sa.ForeignKey("replica_groups.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -158,7 +158,9 @@ class RoutingRow(Base):  # type: ignore[misc]
     )
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
-    session_row: Mapped[SessionRow | None] = relationship("SessionRow", back_populates="routing")
+    session_row: Mapped[SessionRow | None] = relationship(
+        "SessionRow", back_populates="routing", foreign_keys="RoutingRow.session"
+    )
     revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
         primaryjoin=_get_deployment_revision_join_condition,
@@ -293,5 +295,6 @@ class RoutingRow(Base):  # type: ignore[misc]
             revision_id=self.revision,
             traffic_status=self.traffic_status,
             health_check=self.health_check,
+            replica_group_id=self.replica_group_id,
             error_data=self.error_data or {},
         )

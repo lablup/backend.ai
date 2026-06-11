@@ -1,13 +1,14 @@
 """Regression tests for status-based transition hooks.
 
 Covers the volatile inter-container network cleanup performed by
-``TerminatedTransitionHook`` (BA-6273). The cleanup was lost in a series
+``TerminatedTransitionHook``. The cleanup was lost in a series
 of refactors, leaking Docker overlay (MULTI_NODE) and agent-local
 (SINGLE_NODE) networks after sessions terminated.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -16,14 +17,17 @@ import pytest
 from ai.backend.common.types import AgentId, ClusterMode, SessionId
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.sokovan.recorder.pool import RecordPool
+from ai.backend.manager.sokovan.recorder.types import StepStatus
 from ai.backend.manager.sokovan.scheduler.hooks.status import (
     TerminatedHookDependencies,
     TerminatedTransitionHook,
 )
+from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
 
 
 class TestTerminatedTransitionHookNetworkCleanup:
-    """Volatile network cleanup on session TERMINATED transition (BA-6273)."""
+    """Volatile network cleanup on session TERMINATED transition."""
 
     @pytest.fixture
     def agent_client(self) -> AsyncMock:
@@ -78,6 +82,13 @@ class TestTerminatedTransitionHookNetworkCleanup:
     @pytest.fixture
     def session_id(self) -> SessionId:
         return SessionId(uuid4())
+
+    @pytest.fixture(autouse=True)
+    def recorder_pool(self, session_id: SessionId) -> Iterator[RecordPool[SessionId]]:
+        """Ambient recorder scope, mirroring the coordinator scope the hook always
+        runs within in production. Tests assert on the pool by requesting it by name."""
+        with SessionRecorderContext.scope("terminate", entity_ids=[session_id]) as pool:
+            yield pool
 
     @pytest.fixture
     def network_id(self, request: pytest.FixtureRequest) -> str | None:
@@ -202,3 +213,42 @@ class TestTerminatedTransitionHookNetworkCleanup:
 
         with pytest.raises(RuntimeError, match="docker unreachable"):
             await hook.execute(multi_node_session)
+
+    async def test_records_terminate_cleanup_into_pool(
+        self,
+        hook: TerminatedTransitionHook,
+        recorder_pool: RecordPool[SessionId],
+        multi_node_session: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        """The hook records a terminate_cleanup phase/step into the scope's pool
+        so the coordinator can persist it as session scheduling sub_steps."""
+        await hook.execute(multi_node_session)
+
+        record = recorder_pool.build_all_records()[session_id]
+        cleanup = next(p for p in record.phases if p.name == "terminate_cleanup")
+        assert cleanup.status == StepStatus.SUCCESS
+        step = next(s for s in cleanup.steps if s.name == "destroy_network")
+        assert step.status == StepStatus.SUCCESS
+
+    async def test_records_terminate_cleanup_failure_with_error_code(
+        self,
+        hook: TerminatedTransitionHook,
+        recorder_pool: RecordPool[SessionId],
+        config_provider: MagicMock,
+        multi_node_session: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        """A failed cleanup is recorded as FAILED with an error_code, since the
+        hook raises BackendAIError subclasses (ServerMisconfiguredError)."""
+        config_provider.config.network.inter_container.default_driver = None
+
+        with pytest.raises(ServerMisconfiguredError):
+            await hook.execute(multi_node_session)
+
+        record = recorder_pool.build_all_records()[session_id]
+        cleanup = next(p for p in record.phases if p.name == "terminate_cleanup")
+        assert cleanup.status == StepStatus.FAILED
+        step = next(s for s in cleanup.steps if s.name == "destroy_network")
+        assert step.status == StepStatus.FAILED
+        assert step.error_code is not None

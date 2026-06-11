@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -21,13 +22,16 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.data.session.options import HandlerOptions
 
 if TYPE_CHECKING:
@@ -175,6 +179,30 @@ class RouteSubStatus(enum.StrEnum):
     WARMING_UP = "warming_up"
 
 
+class ReplicaGroupLifecycle(enum.StrEnum):
+    """Lifecycle of a replica group: rollout progress and retirement."""
+
+    ROLLING = "rolling"
+    STABLE = "stable"
+    FAILED = "failed"
+    DRAINING = "draining"
+    DRAINED = "drained"
+
+
+class ReplicaGroupScalingStatus(enum.StrEnum):
+    """Whether the group's actual replica count matches its desired count."""
+
+    SCALING = "scaling"
+    STABLE = "stable"
+
+
+class ReplicaGroupHandlerCategory(BaseReconcilerCategory):
+    """Category of replica-group handler for history separation; also the reconcile-stage category."""
+
+    SCALING = "scaling"
+    LIFECYCLE = "lifecycle"
+
+
 # ========== Status Transition Types (BEP-1030) ==========
 
 
@@ -186,17 +214,21 @@ class DeploymentLifecycleSubStep(enum.StrEnum):
     """
 
     # -- DEPLOYING phase --
+    DEPLOYING_INITIALIZING = "deploying_initializing"
+    """Pre-deploy cleanup of stale replica groups and creation of the target
+    replica group for the selected revision."""
     DEPLOYING_PROVISIONING = "deploying_provisioning"
-    """New revision routes are being provisioned and old routes are being drained."""
+    """The target replica group is being set up (created or reused) for the deploying revision."""
+    DEPLOYING_PROVISIONED = "deploying_provisioned"
+    """Waiting for the target replica group to reach STABLE (its replicas are coming up)."""
+    DEPLOYING_PROMOTING = "deploying_promoting"
+    """Traffic is being shifted to the (STABLE) target replica group per the strategy."""
+    DEPLOYING_FINALIZING = "deploying_finalizing"
+    """Traffic shift is complete; the target group is being swapped in as primary."""
+    DEPLOYING_DRAINING = "deploying_draining"
+    """The superseded replica group is being drained and removed."""
     DEPLOYING_ROLLING_BACK = "deploying_rolling_back"
     """Clearing deploying_revision and transitioning to READY."""
-    DEPLOYING_COMPLETED = "deploying_completed"
-    """All strategy conditions satisfied; triggers revision swap."""
-
-    @classmethod
-    def deploying_handler_sub_steps(cls) -> tuple[DeploymentLifecycleSubStep, ...]:
-        """Sub-steps that have their own deploying handler (excludes COMPLETED, which is an evaluator outcome)."""
-        return (cls.DEPLOYING_PROVISIONING, cls.DEPLOYING_ROLLING_BACK)
 
 
 @dataclass(frozen=True)
@@ -411,6 +443,25 @@ class ConfiguredModel(BackendAISchema):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
+def _default_deploy_handler_default() -> HandlerOptions:
+    # Generous phase timeout (2h) covers hour-scale model-service startup; waits
+    # never give up by count, only time out.
+    return HandlerOptions(timeout=7200, max_retry_count=None)
+
+
+def _default_deploy_by_handler() -> dict[str, HandlerOptions]:
+    # Action sub-steps (vs. the PROVISIONED/DRAINING waits) keep the retry-count
+    # budget so a broken deploy rolls back fast instead of churning for the full
+    # timeout. Keyed by the sokovan handler names (this layer cannot import them).
+    return {
+        "deploying-initializing": HandlerOptions(max_retry_count=5),
+        "deploying-provisioning": HandlerOptions(max_retry_count=5),
+        "deploying-promoting": HandlerOptions(max_retry_count=5),
+        "deploying-finalizing": HandlerOptions(max_retry_count=5),
+        "deploying-rolling-back": HandlerOptions(max_retry_count=5),
+    }
+
+
 class DeploymentHandlerOptions(ConfiguredModel):
     """Handler-keyed deployment scheduler policy.
 
@@ -420,14 +471,14 @@ class DeploymentHandlerOptions(ConfiguredModel):
     2. ``default`` otherwise.
 
     Each ``HandlerOptions`` field falls back to ``default``'s value
-    when the per-handler override leaves it ``None``. The
-    ``HandlerOptions`` field defaults (timeout=None, max_retry_count=5)
-    flow through here so a freshly-constructed
-    ``DeploymentHandlerOptions()`` keeps the legacy retry budget.
+    when the per-handler override leaves it ``None``. The default policy
+    is a generous 2h timeout with no retry-count limit (for the long
+    PROVISIONED/DRAINING waits); action sub-steps override with a
+    max_retry_count of 5 via ``by_handler``.
     """
 
-    default: HandlerOptions = Field(default_factory=HandlerOptions)
-    by_handler: dict[str, HandlerOptions] = Field(default_factory=dict)
+    default: HandlerOptions = Field(default_factory=_default_deploy_handler_default)
+    by_handler: dict[str, HandlerOptions] = Field(default_factory=_default_deploy_by_handler)
 
     def resolve(self, handler_name: str) -> HandlerOptions:
         override = self.by_handler.get(handler_name)
@@ -454,6 +505,62 @@ class DeploymentOptions(ConfiguredModel):
     """
 
     handler_options: DeploymentHandlerOptions = Field(default_factory=DeploymentHandlerOptions)
+
+
+class ReplicaGroupRolloutSpec(ConfiguredModel):
+    """Per-group rollout step config snapshot from the deployment strategy at
+    DEPLOYING_INITIALIZING; bounds how fast routes move toward the group's desired counts."""
+
+    max_surge: IntOrPercent
+    max_unavailable: IntOrPercent
+
+    def resolve_max_surge(self, total: int) -> int:
+        """Extra target replicas allowed above the goal (rounds up for percentages)."""
+        return self._resolve(self.max_surge, total, round_up=True)
+
+    def resolve_max_unavailable(self, total: int) -> int:
+        """Replicas allowed unavailable below the goal (rounds down for percentages)."""
+        return self._resolve(self.max_unavailable, total, round_up=False)
+
+    @staticmethod
+    def _resolve(value: IntOrPercent, total: int, *, round_up: bool) -> int:
+        if value.count is not None:
+            return value.count
+        result = total * (value.percent or 0.0)
+        return math.ceil(result) if round_up else math.floor(result)
+
+
+@dataclass(frozen=True)
+class TargetGroupSpec:
+    """How the deploying revision's target group is chosen. ``use_primary_group`` True rolls out
+    in place into the deployment's primary group (rolling) — the setup reads that group at creation
+    time and creates a fresh one if none exists yet. When False, a fresh group is always created
+    (blue-green/canary).
+
+    No traffic weight here: a freshly rolled-out group serves no traffic until PROMOTING shifts
+    it over, so PROVISIONING creates it at weight 0 and leaves a reused group's weight untouched."""
+
+    use_primary_group: bool
+    rollout: ReplicaGroupRolloutSpec
+
+
+@dataclass(frozen=True)
+class TrafficStepInput:
+    """Current traffic split + timing for one PROMOTING tick (step is relative to current)."""
+
+    target_traffic_weight: int
+    serving_traffic_weight: int
+    last_changed_at: datetime
+    now: datetime
+
+
+@dataclass(frozen=True)
+class TrafficStep:
+    """The next traffic split (target/serving) and whether promotion is complete."""
+
+    target_traffic_weight: int
+    serving_traffic_weight: int
+    completed: bool
 
 
 class ResourceSpec(ConfiguredModel):
@@ -753,8 +860,8 @@ class DeploymentInfo:
     replica: ReplicaData
     network: DeploymentNetworkData
     options: DeploymentOptions
-    # Revision ids, always populated cheaply from the replica groups (no
-    # revision-row load). The modern (v2) read path fills only these.
+    primary_replica_group_id: ReplicaGroupID | None = None
+    target_replica_group_id: ReplicaGroupID | None = None
     current_revision_id: DeploymentRevisionID | None = None
     deploying_revision_id: DeploymentRevisionID | None = None
     # Full revision data, populated only by the legacy (REST v1) / engine
@@ -850,6 +957,7 @@ class RouteInfo:
     revision_id: UUID
     traffic_status: RouteTrafficStatus
     health_check: ModelHealthCheck | None
+    replica_group_id: ReplicaGroupID | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -908,6 +1016,7 @@ class ModelDeploymentAccessTokenData:
 @dataclass
 class ModelReplicaData:
     id: UUID
+    deployment_id: UUID
     revision_id: UUID
     session_id: UUID | None
     readiness_status: ReadinessStatus
@@ -1233,6 +1342,30 @@ class RouteHistoryData:
     to_status: str | None
     from_sub_status: str | None
     to_sub_status: str | None
+
+    result: SchedulingResult
+    error_code: str | None
+    message: str
+
+    sub_steps: list[SubStepResult]
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class ReplicaGroupHistoryData:
+    """Domain model for replica-group history."""
+
+    id: UUID
+    replica_group_id: ReplicaGroupID
+    deployment_id: DeploymentID
+
+    category: ReplicaGroupHandlerCategory
+    phase: str
+    from_status: str | None
+    to_status: str | None
 
     result: SchedulingResult
     error_code: str | None

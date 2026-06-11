@@ -20,6 +20,7 @@ When to use:
 - Writing tests → `/tdd-guide`
 - Restarting services after code changes → `/local-dev`
 - **Running any `./bai` command → `/bai-cli` (MUST load before executing)**
+- Checking logs/metrics/traces during development → `/observability` (Grafana MCP)
 - Docker/halfstack issues → `/halfstack`
 - Checking/applying DB migrations → `/db-status`, `/db-migrate`
 - Running component servers directly → `/cli-executor`
@@ -59,7 +60,7 @@ pants test --changed-since=HEAD~1
 
 **Fix all lint, type, and test errors — never suppress or skip.**
 
-**After API/CLI changes, verify with live server using `./bai` CLI.**
+**After API/CLI changes, verify with live server using `./bai` CLI, then check runtime logs/metrics via the Grafana MCP (`/observability`).**
 **MUST invoke `/bai-cli` skill before running any `./bai` command.** The skill contains the entity-command reference — without it, you will guess wrong commands.
 For service restarts, see `/local-dev`. For docker service changes, see `/halfstack` skill.
 
@@ -97,6 +98,7 @@ API Handler → Processor → Service → Repository → DB
 1. Restart server: `./dev restart mgr` (invoke `/local-dev`)
 2. Invoke `/bai-cli` skill, then test each operation via `./bai` CLI
 3. Verify both admin and non-admin scenarios
+4. Check logs/metrics via the Grafana MCP (`/observability`) to confirm no runtime errors
 
 ## Development Guidelines
 

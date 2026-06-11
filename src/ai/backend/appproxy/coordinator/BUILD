@@ -5,6 +5,7 @@ python_sources(
     name="src",
     sources=["**/*.py"],
     dependencies=[
+        "src/ai/backend/cli:src",  # explicit: provides the `backend.ai` console script
         ":resources",
     ],
 )

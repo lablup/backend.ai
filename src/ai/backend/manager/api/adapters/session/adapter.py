@@ -972,6 +972,7 @@ class SessionAdapter(BaseAdapter):
                 )
                 for m in (data.vfolder_mounts or [])
             ],
+            replica_id=data.replica_id,
         )
 
     @staticmethod

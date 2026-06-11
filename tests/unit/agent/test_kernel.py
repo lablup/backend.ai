@@ -1,5 +1,6 @@
 import pytest
 
+from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
 from ai.backend.agent.kernel import match_distro_data
 
 
@@ -44,10 +45,10 @@ def test_match_distro_data() -> None:
     assert ret[0] == "ubuntu18.04"  # assume latest
     assert ret[1] == "u2"
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(UnsupportedBaseDistroError):
         match_distro_data(krunner_volumes, "ubnt")
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(UnsupportedBaseDistroError):
         match_distro_data(krunner_volumes, "xyz")
 
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 import enum
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import ConfigDict, Field
 
@@ -167,6 +167,12 @@ class HandlerOptions(_OptionsBaseModel):
             return False
         elapsed = (current_time - phase_started_at).total_seconds()
         return elapsed > self.timeout
+
+
+class HandlerPolicyResolver(Protocol):
+    """Per-entity handler-keyed policy lookup (SessionHandlerOptions / DeploymentHandlerOptions)."""
+
+    def resolve(self, handler_name: str) -> HandlerOptions: ...
 
 
 class SessionHandlerOptions(_OptionsBaseModel):

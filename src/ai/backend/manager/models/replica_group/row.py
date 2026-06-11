@@ -11,7 +11,16 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.data.deployment.types import (
+    ReplicaGroupLifecycle,
+    ReplicaGroupRolloutSpec,
+    ReplicaGroupScalingStatus,
+)
+from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
+from ai.backend.manager.views.replica_group import (
+    ReplicaGroupDeploySchedulingView,
+    ReplicaGroupScalingSchedulingView,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -111,6 +120,26 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
         server_default=sa.text("100"),
     )
 
+    lifecycle: Mapped[ReplicaGroupLifecycle] = mapped_column(
+        "lifecycle",
+        StrEnumType(ReplicaGroupLifecycle),
+        nullable=False,
+        default=ReplicaGroupLifecycle.STABLE,
+        server_default=ReplicaGroupLifecycle.STABLE.value,
+    )
+    scaling_status: Mapped[ReplicaGroupScalingStatus] = mapped_column(
+        "scaling_status",
+        StrEnumType(ReplicaGroupScalingStatus),
+        nullable=False,
+        default=ReplicaGroupScalingStatus.STABLE,
+        server_default=ReplicaGroupScalingStatus.STABLE.value,
+    )
+    rollout: Mapped[ReplicaGroupRolloutSpec] = mapped_column(
+        "rollout",
+        PydanticColumn(ReplicaGroupRolloutSpec),
+        nullable=False,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -147,3 +176,22 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
         viewonly=True,
         uselist=False,
     )
+
+    def to_deploy_scheduling_view(self) -> ReplicaGroupDeploySchedulingView:
+        return ReplicaGroupDeploySchedulingView(
+            group_id=self.id,
+            deployment_id=self.deployment_id,
+            current_revision_id=self.current_revision_id,
+            target_revision_id=self.target_revision_id,
+            lifecycle=self.lifecycle,
+            traffic_weight=self.traffic_weight,
+        )
+
+    def to_scaling_scheduling_view(self) -> ReplicaGroupScalingSchedulingView:
+        return ReplicaGroupScalingSchedulingView(
+            group_id=self.id,
+            deployment_id=self.deployment_id,
+            desired_current_replica_count=self.desired_current_replica_count,
+            desired_target_replica_count=self.desired_target_replica_count,
+            scaling_status=self.scaling_status,
+        )

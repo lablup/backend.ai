@@ -769,7 +769,9 @@ class CSPConfig(BaseConfigSchema):
             description=(
                 "CSP script-src directive. Specifies valid sources for JavaScript. "
                 "\"'unsafe-inline'\" allows inline scripts (less secure but often required). "
-                "\"'strict-dynamic'\" can be used with nonces for better security."
+                "When set, the webserver appends a per-request \"'nonce-<random>'\" so inline "
+                "scripts in index.html are allowed; keep \"'self'\" and avoid \"'strict-dynamic'\" "
+                "so the bundled module script keeps loading."
             ),
             added_version="25.12.0",
         ),
@@ -785,7 +787,8 @@ class CSPConfig(BaseConfigSchema):
             description=(
                 "CSP style-src directive. Specifies valid sources for stylesheets. "
                 "\"'unsafe-inline'\" is often needed for frameworks that inject styles dynamically. "
-                "Consider using hashes or nonces for stricter security."
+                "When set, the webserver appends a per-request \"'nonce-<random>'\" so nonce-aware "
+                "style injectors (e.g. antd via globalThis.baiNonce) are allowed."
             ),
             added_version="25.12.0",
         ),
@@ -920,7 +923,9 @@ class SecurityConfig(BaseConfigSchema):
             description=(
                 "Content Security Policy configuration. When set, adds CSP headers to responses "
                 "to protect against XSS and other injection attacks. Leave unset (None) to skip "
-                "CSP headers entirely."
+                "CSP headers entirely. When script-src and/or style-src are set, the webserver "
+                "appends a per-request \"'nonce-<random>'\" to those directives and renders the "
+                "same value into index.html (the {{nonce}} placeholders / globalThis.baiNonce)."
             ),
             added_version="25.12.0",
             composite=CompositeType.FIELD,

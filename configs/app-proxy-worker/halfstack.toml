@@ -1,5 +1,10 @@
 [redis]
 addr = { host = "127.0.0.1", port = 8110 }
+# For HA (Sentinel) mode, install-dev.sh --configure-ha comments out `addr` above
+# and enables the three lines below.
+# sentinel = [{ host = "127.0.0.1", port = 9503 }, { host = "127.0.0.1", port = 9504 }, { host = "127.0.0.1", port = 9505 }]
+# service_name = "mymaster"
+# password = "develove"
 
 [proxy_worker]
 coordinator_endpoint = "http://127.0.0.1:10200"

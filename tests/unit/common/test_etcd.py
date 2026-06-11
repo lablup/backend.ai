@@ -188,6 +188,66 @@ async def test_multi(etcd: AsyncEtcd) -> None:
     assert v is None
 
 
+async def test_atomic_replace_prefixes_swaps_subtree(etcd: AsyncEtcd) -> None:
+    await etcd.put_prefix(
+        "svc/bai_service_a",
+        {"loadBalancer": {"servers": {"0": {"url": "old0"}, "1": {"url": "old1"}}}},
+    )
+
+    # Shrink from two servers to one: the stale servers/1 key must be dropped.
+    await etcd.atomic_replace_prefixes({
+        "svc/bai_service_a": {"loadBalancer": {"servers": {"0": {"url": "new0"}}}},
+    })
+
+    vp = await etcd.get_prefix("svc/bai_service_a")
+    assert vp == {"loadBalancer": {"servers": {"0": {"url": "new0"}}}}
+
+
+async def test_atomic_replace_prefixes_empty_removes_subtree(etcd: AsyncEtcd) -> None:
+    await etcd.put_prefix(
+        "svc/bai_service_b",
+        {"loadBalancer": {"servers": {"0": {"url": "u0"}}}},
+    )
+
+    await etcd.atomic_replace_prefixes({"svc/bai_service_b": {}})
+
+    vp = await etcd.get_prefix("svc/bai_service_b")
+    assert len(vp) == 0
+
+
+async def test_atomic_replace_prefixes_isolates_siblings(etcd: AsyncEtcd) -> None:
+    await etcd.put_prefix("svc/bai_service_c", {"loadBalancer": {"servers": {"0": {"url": "c0"}}}})
+    await etcd.put_prefix("svc/bai_service_d", {"loadBalancer": {"servers": {"0": {"url": "d0"}}}})
+
+    # Replacing one circuit's subtree must not touch its sibling under the same parent.
+    await etcd.atomic_replace_prefixes({
+        "svc/bai_service_c": {"loadBalancer": {"servers": {"0": {"url": "c0-new"}}}},
+    })
+
+    vc = await etcd.get_prefix("svc/bai_service_c")
+    assert vc == {"loadBalancer": {"servers": {"0": {"url": "c0-new"}}}}
+    vd = await etcd.get_prefix("svc/bai_service_d")
+    assert vd == {"loadBalancer": {"servers": {"0": {"url": "d0"}}}}
+
+
+async def test_atomic_replace_prefixes_multiple_subtrees(etcd: AsyncEtcd) -> None:
+    await etcd.put_prefix("cfg/routers/bai_router_e", {"rule": "old-rule"})
+    await etcd.put_prefix("cfg/services/bai_service_e", {"loadBalancer": {"servers": {"0": "old"}}})
+
+    await etcd.atomic_replace_prefixes({
+        "cfg/routers/bai_router_e": {"rule": "new-rule", "service": "bai_service_e"},
+        "cfg/services/bai_service_e": {"loadBalancer": {"servers": {"0": "new"}}},
+    })
+
+    assert await etcd.get_prefix("cfg/routers/bai_router_e") == {
+        "rule": "new-rule",
+        "service": "bai_service_e",
+    }
+    assert await etcd.get_prefix("cfg/services/bai_service_e") == {
+        "loadBalancer": {"servers": {"0": "new"}}
+    }
+
+
 async def test_watch(etcd: AsyncEtcd) -> None:
     records = []
     records_prefix = []

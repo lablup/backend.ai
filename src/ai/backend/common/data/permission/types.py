@@ -33,6 +33,13 @@ class RoleSource(enum.StrEnum):
 
 
 class OperationType(enum.StrEnum):
+    """
+    .. deprecated::
+        Superseded by :class:`Permission`, an :class:`enum.IntFlag` bitmask.
+        Retained because permission resolution and the ``permissions.operation``
+        column still consume these string values; do not build new features on it.
+    """
+
     CREATE = "create"
     READ = "read"
     UPDATE = "update"
@@ -72,7 +79,10 @@ class OperationType(enum.StrEnum):
 
 
 class EntityType(enum.StrEnum):
-    """Deprecated for RBAC: use ``RBACElementType`` instead."""
+    """
+    Deprecated for RBAC: use ``RBACElementType`` instead
+    or use ai.backend.common.entity.types.EntityType for non-RBAC-specific contexts.
+    """
 
     # === RBAC scope/resource types (original 12) ===
     USER = "user"
@@ -538,3 +548,26 @@ def owner_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
 def member_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
     """Operations granted to a *member* role on the given entity type."""
     return _MEMBER_OPS_OVERRIDES.get(entity_type, _DEFAULT_MEMBER_OPS)
+
+
+class Permission(enum.IntFlag):
+    """A bitmask of operations, each a distinct power-of-two bit.
+
+    Bit magnitude carries no semantics; checks are purely bitwise:
+
+    * does the mask include an operation?  ``bool(mask & Permission.X)``
+    * is one mask a subset of another?     ``(a & ~b) == Permission.NONE``
+    * intersect / union two masks          ``a & b`` / ``a | b``
+    """
+
+    NONE = 0
+    READ = 1 << 0
+    UPDATE = 1 << 1
+    CREATE = 1 << 2
+    SOFT_DELETE = 1 << 3
+    HARD_DELETE = 1 << 4
+
+    @classmethod
+    def full(cls) -> Permission:
+        """The full permission cap — every operation allowed."""
+        return cls.READ | cls.UPDATE | cls.CREATE | cls.SOFT_DELETE | cls.HARD_DELETE

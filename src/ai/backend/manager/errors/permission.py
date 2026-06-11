@@ -18,6 +18,7 @@ __all__ = (
     "RoleAlreadyAssigned",
     "RoleNotAssigned",
     "RoleNotFound",
+    "UserSystemRoleNotProvisioned",
 )
 
 
@@ -30,6 +31,25 @@ class RoleNotFound(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.ROLE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class UserSystemRoleNotProvisioned(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a user is missing the SYSTEM role that should exist for every user.
+
+    This is a server-side data-integrity condition (e.g. legacy or externally
+    provisioned accounts) to be remediated via the superadmin ensure-system-role
+    API, not a client error.
+    """
+
+    error_type = "https://api.backend.ai/probs/user-system-role-not-provisioned"
+    error_title = "The user's SYSTEM role is not provisioned."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ROLE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 

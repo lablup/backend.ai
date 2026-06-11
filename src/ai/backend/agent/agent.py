@@ -83,7 +83,7 @@ from ai.backend.agent.tasks import (
 )
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks, current_loop
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -235,6 +235,7 @@ from . import __version__ as VERSION
 from .affinity_map import AffinityMap
 from .config.unified import AgentUnifiedConfig, ContainerSandboxType
 from .errors import (
+    ContainerCreationError,
     ContainerCreationFailedError,
     ContainerStartupCancelledError,
     ContainerStartupFailedError,
@@ -246,8 +247,8 @@ from .errors import (
     ModelFolderNotSpecifiedError,
     PortConflictError,
     ReservedPortError,
+    ResourceError,
 )
-from .exception import ContainerCreationError, ResourceError
 from .kernel import (
     RUN_ID_FOR_BATCH_JOB,
     AbstractKernel,
@@ -840,6 +841,7 @@ class AbstractAgent[
     _pending_creation_tasks: dict[KernelId, set[asyncio.Task[Any]]]
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task[Any]]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task[Any]]
+    _ongoing_model_service_tasks: set[asyncio.Task[None]]
     _metric_registry: CommonMetricRegistry
 
     # Health monitoring tracking
@@ -923,6 +925,7 @@ class AbstractAgent[
         self._pending_creation_tasks = defaultdict(set)
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
+        self._ongoing_model_service_tasks = set()
         self._metric_registry = CommonMetricRegistry.instance()
 
         # Initialize health monitoring tracking maps
@@ -989,11 +992,14 @@ class AbstractAgent[
             db_id=REDIS_LIVE_DB,
         )
         self.background_task_manager = BackgroundTaskManager(
-            self.event_producer,
-            valkey_client=self.valkey_bgtask_client,
-            server_id=self.id,
-            bgtask_observer=self._metric_registry.bgtask,
+            BackgroundTaskManagerArgs(
+                event_producer=self.event_producer,
+                valkey_client=self.valkey_bgtask_client,
+                server_id=self.id,
+                bgtask_observer=self._metric_registry.bgtask,
+            )
         )
+        await self.background_task_manager.init()
 
         log.info("Resource slots: {!r}", self.slots)
         log.info("Slot types: {!r}", known_slot_types)
@@ -1097,6 +1103,7 @@ class AbstractAgent[
         It must call this super method in an appropriate order, only once.
         """
         await cancel_tasks(self._ongoing_exec_batch_tasks)
+        await cancel_tasks(self._ongoing_model_service_tasks)
 
         async with self.registry_lock:
             # Close all pending kernel runners.
@@ -1536,6 +1543,7 @@ class AbstractAgent[
 
     async def _clean_kernel_registry_loop(self) -> None:
         # TODO: After reducing `kernel_registry` dependencies and roles, this kind of tasks should be deprecated
+        cleanup_tasks: set[asyncio.Task[None]] = set()
         while True:
             try:
                 alive_containers = await self.enumerate_containers()
@@ -1551,11 +1559,13 @@ class AbstractAgent[
                         "cleaning up dangling kernel objects (kernel ids): {}",
                         ", ".join(map(str, dangling_kernel_ids)),
                     )
-                    asyncio.create_task(
+                    cleanup_task = asyncio.create_task(
                         asyncio.wait_for(
                             self.clean_kernel_objects(dangling_kernel_ids), timeout=30.0
                         )
                     )
+                    cleanup_tasks.add(cleanup_task)
+                    cleanup_task.add_done_callback(cleanup_tasks.discard)
             except Exception as e:
                 log.exception("unexpected error in _clean_kernel_registry_loop: {0}", repr(e))
             finally:
@@ -3188,15 +3198,19 @@ class AbstractAgent[
                                     ctx.image_ref.canonical,
                                 )
                                 continue
-                            asyncio.create_task(
-                                self.start_and_monitor_model_service_health(kernel_obj, model)
-                            )
                             log.info(
-                                "create_kernel(kernel:{}, session:{}, container:{}) start monitoring model service: {}",
+                                "create_kernel(kernel:{}, session:{}, container:{}) starting model service: {}",
                                 kernel_id,
                                 session_id,
                                 pretty_container_id,
                                 model.name,
+                            )
+                            model_service_task = asyncio.create_task(
+                                self.start_model_service_and_handle_failure(kernel_obj, model)
+                            )
+                            self._ongoing_model_service_tasks.add(model_service_task)
+                            model_service_task.add_done_callback(
+                                self._ongoing_model_service_tasks.discard
                             )
 
                     # Finally we are done.
@@ -3236,7 +3250,7 @@ class AbstractAgent[
                     await self.reconstruct_resource_usage()
                     raise
 
-    async def start_and_monitor_model_service_health(
+    async def start_model_service_and_handle_failure(
         self,
         kernel_obj: KernelObjectType,
         model: ModelConfig,

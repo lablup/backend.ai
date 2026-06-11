@@ -11,6 +11,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
@@ -44,6 +45,7 @@ def _build_deployment(
 
     return DeploymentWithHistory(
         deployment_info=DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid4()),
             id=DeploymentID(uuid4()),
             metadata=DeploymentMetadata(
                 name="test-deployment",
@@ -94,9 +96,9 @@ class TestDeployingRollingBackHandler:
         mock_deployment_repo: AsyncMock,
     ) -> DeployingRollingBackHandler:
         return DeployingRollingBackHandler(
-            deployment_controller=AsyncMock(),
             route_controller=AsyncMock(),
             deployment_repo=mock_deployment_repo,
+            replica_group_repository=AsyncMock(),
         )
 
     async def test_with_current_revision_clears_and_marks_success(

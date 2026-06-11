@@ -307,6 +307,8 @@ Automatic error diagnosis and troubleshooting suggestions.
 - Show expected output
 - Suggest next steps
 - Link to related skills
+- After a component starts, confirm runtime behavior via the Grafana MCP (`/observability`)
+  — query Loki by `service_name` and Prometheus metrics rather than scraping console output
 
 ---
 
@@ -532,6 +534,7 @@ Note: Starting with pending migrations may cause errors
 
 ## Related Skills
 
+- `/observability` - Inspect component logs/metrics via Grafana MCP after start
 - `/db-status` - Check database migration status
 - `/db-migrate` - Apply database migrations
 - `/db-rebase` - Resolve diverged migration heads

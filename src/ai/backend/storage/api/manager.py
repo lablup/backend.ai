@@ -32,6 +32,7 @@ from ai.backend.common.api_handlers import (
     BodyParam,
     api_handler,
 )
+from ai.backend.common.clients.valkey_client.valkey_tus import TusSessionId
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
@@ -1189,6 +1190,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             session_id = await volume.prepare_upload(params["vfid"])
+        await ctx.valkey_tus_client.initialize_offset(TusSessionId(session_id))
         token_data = {
             "op": "upload",
             "volume": params["volume"],

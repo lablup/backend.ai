@@ -71,6 +71,16 @@ class CliArgs:
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
+    with_harbor: bool = False
+    harbor_hostname: str | None = None
+    harbor_http_port: int = 8084
+    harbor_admin_password: str = "Harbor12345"
+    harbor_download_uri: str = (
+        "https://github.com/goharbor/harbor/releases/download/"
+        "v2.11.0/harbor-offline-installer-v2.11.0.tgz"
+    )
+    harbor_download_sha256: str | None = None
+    with_sftp_agent: bool = False
     enable_observability: bool = False
     enable_storage: bool = False
     enable_telemetry: bool | None = None  # None = auto (ON in DEVELOP, OFF in PACKAGE)
@@ -175,8 +185,10 @@ class ServiceConfig:
     webui_menu_blocklist: list[str]
     webui_menu_inactivelist: list[str]
     local_proxy_addr: ServerAddr
+    scaling_group: str
     agent_rpc_addr: ServerAddr
     agent_watcher_addr: ServerAddr
+    agent_sock_port: int
     agent_ipc_base_path: str
     agent_var_base_path: str
     storage_proxy_manager_facing_addr: ServerAddr
@@ -202,6 +214,27 @@ class ServiceConfig:
     appproxy_tcp_worker_addr: ServerAddr = dataclasses.field(
         default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10202))
     )
+    # Harbor (optional local container registry)
+    harbor_enabled: bool = False
+    harbor_hostname: str = "127.0.0.1"
+    harbor_http_port: int = 8084
+    harbor_admin_password: str = "Harbor12345"
+    # Optional dedicated SFTP agent (multi-agent per node).
+    # The actual port / path values live in
+    # ``configs/agent/halfstack-sftp.toml`` — these fields simply mirror
+    # that sample for UI display (InstallReport) and for etcd / fixture
+    # population. Keep them in sync with the sample.
+    sftp_agent_enabled: bool = False
+    sftp_agent_rpc_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 6013))
+    )
+    sftp_agent_watcher_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 6015))
+    )
+    sftp_agent_sock_port: int = 6017
+    sftp_agent_ipc_base_path: str = "ipc/agent-sftp"
+    sftp_agent_var_base_path: str = "var/agent-sftp"
+    sftp_agent_scaling_group: str = "upload"
 
 
 @dataclasses.dataclass
@@ -216,6 +249,16 @@ class InstallVariable:
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
+    with_harbor: bool = False
+    harbor_hostname: str | None = None
+    harbor_http_port: int = 8084
+    harbor_admin_password: str = "Harbor12345"
+    harbor_download_uri: str = (
+        "https://github.com/goharbor/harbor/releases/download/"
+        "v2.11.0/harbor-offline-installer-v2.11.0.tgz"
+    )
+    harbor_download_sha256: str | None = None
+    with_sftp_agent: bool = False
     enable_observability: bool = False
     enable_storage: bool = False
     enable_telemetry: bool | None = None

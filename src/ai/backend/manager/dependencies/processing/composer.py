@@ -64,6 +64,7 @@ from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory, SMTPTriggerPolicy
@@ -98,6 +99,7 @@ class ProcessingInput:
     scheduling_controller: SchedulingController
     deployment_coordinator: DeploymentCoordinator
     route_coordinator: RouteCoordinator
+    reconciler_coordinator: ReconcilerCoordinator
     scheduler_repository: SchedulerRepository
     event_hub: EventHub
     agent_registry: AgentRegistry
@@ -294,6 +296,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 scheduling_controller=setup_input.scheduling_controller,
                 deployment_coordinator=setup_input.deployment_coordinator,
                 route_coordinator=setup_input.route_coordinator,
+                reconciler_coordinator=setup_input.reconciler_coordinator,
                 scheduler_repository=setup_input.scheduler_repository,
                 event_hub=setup_input.event_hub,
                 agent_registry=setup_input.agent_registry,

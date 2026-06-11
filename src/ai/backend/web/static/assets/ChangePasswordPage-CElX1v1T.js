@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/ChangePasswordView-CrxMBJiy.js","assets/index-CuMUOZIG.js"])))=>i.map(i=>d[i]);
+import{j as s,dx as o,dy as n,r,h as i,be as c,cU as l}from"./index-CuMUOZIG.js";import{u as p}from"./useApiEndpoint-DgASFKOc.js";const u=c.lazy(()=>l(()=>import("./ChangePasswordView-CrxMBJiy.js"),__vite__mapDeps([0,1]))),j=()=>s.jsxs(s.Fragment,{children:[s.jsx(o,{}),s.jsx(n,{}),s.jsx(r.Suspense,{fallback:null,children:s.jsx(d,{})})]}),d=()=>{"use memo";const e=i.c(2),a=p();let t;return e[0]!==a?(t=s.jsx(u,{apiEndpoint:a,active:!0}),e[0]=a,e[1]=t):t=e[1],t};export{j as default};
+//# sourceMappingURL=ChangePasswordPage-CElX1v1T.js.map

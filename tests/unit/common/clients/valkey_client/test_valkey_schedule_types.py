@@ -70,31 +70,48 @@ class TestReplicaHealthStatusSerialization:
         assert h["replica_id"] == str(healthy_status.replica_id)
         assert h["healthy"] == "1"
         assert h["last_check"] == "1700000000"
+        assert h["consecutive_failures"] == "0"
 
     def test_to_valkey_hash_unhealthy(self, replica_id: ReplicaID) -> None:
         status = ReplicaHealthStatus(
             replica_id=replica_id,
             healthy=False,
             last_check=1700000000,
+            consecutive_failures=3,
         )
-        assert status.to_valkey_hash()["healthy"] == "0"
+        h = status.to_valkey_hash()
+        assert h["healthy"] == "0"
+        assert h["consecutive_failures"] == "3"
 
     def test_from_valkey_hash(self, replica_id: ReplicaID) -> None:
         data = {
             "replica_id": str(replica_id),
-            "healthy": "1",
+            "healthy": "0",
             "last_check": "1700000000",
+            "consecutive_failures": "5",
         }
         status = ReplicaHealthStatus.from_valkey_hash(data)
         assert status.replica_id == replica_id
-        assert status.healthy is True
+        assert status.healthy is False
         assert status.last_check == 1700000000
+        assert status.consecutive_failures == 5
 
     def test_from_valkey_hash_missing_optional_fields(self, replica_id: ReplicaID) -> None:
-        """Missing healthy/last_check fields default to safe values."""
+        """Missing healthy/last_check/consecutive_failures fields default to safe values."""
         status = ReplicaHealthStatus.from_valkey_hash({"replica_id": str(replica_id)})
         assert status.healthy is False
         assert status.last_check == 0
+        assert status.consecutive_failures == 0
+
+    def test_round_trip_with_failures(self, replica_id: ReplicaID) -> None:
+        status = ReplicaHealthStatus(
+            replica_id=replica_id,
+            healthy=False,
+            last_check=1700000000,
+            consecutive_failures=7,
+        )
+        restored = ReplicaHealthStatus.from_valkey_hash(status.to_valkey_hash())
+        assert restored == status
 
     def test_round_trip(self, healthy_status: ReplicaHealthStatus) -> None:
         restored = ReplicaHealthStatus.from_valkey_hash(healthy_status.to_valkey_hash())

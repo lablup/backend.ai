@@ -43,6 +43,7 @@ class VolumeService:
     _volume_pool: VolumePool
     _event_producer: EventProducer
     _deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task[Any]]
+    _background_tasks: set[asyncio.Task[Any]]
 
     def __init__(
         self,
@@ -52,6 +53,7 @@ class VolumeService:
         self._volume_pool = volume_pool
         self._event_producer = event_producer
         self._deletion_tasks = weakref.WeakValueDictionary[VFolderID, asyncio.Task[Any]]()
+        self._background_tasks = set()
 
     async def _get_capabilities(self, volume_id: VolumeID) -> list[str]:
         async with self._volume_pool.get_volume(volume_id) as volume:
@@ -256,5 +258,7 @@ class VolumeService:
         else:
             ongoing_task = self._deletion_tasks.get(vfolder_id)
             if ongoing_task is not None and ongoing_task.done():
-                asyncio.create_task(self._delete_vfolder(vfolder_key))
+                task = asyncio.create_task(self._delete_vfolder(vfolder_key))
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
         return

@@ -60,14 +60,12 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .errors import (
+    InvalidArgumentError,
+    InvalidSocket,
     KernelRunnerNotInitializedError,
     OutputQueueMismatchError,
     OutputQueueNotInitializedError,
     RunIdNotSetError,
-)
-from .exception import (
-    InvalidArgumentError,
-    InvalidSocket,
     UnsupportedBaseDistroError,
 )
 from .resources import KernelResourceSpec

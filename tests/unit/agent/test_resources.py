@@ -18,7 +18,7 @@ from ai.backend.accelerator.mock.plugin import MockPlugin
 from ai.backend.agent import resources
 from ai.backend.agent.affinity_map import AffinityMap, AffinityPolicy
 from ai.backend.agent.dummy.intrinsic import CPUPlugin, MemoryPlugin
-from ai.backend.agent.exception import FractionalResourceFragmented, InsufficientResource
+from ai.backend.agent.errors import FractionalResourceFragmented, InsufficientResource
 from ai.backend.agent.resources import ComputerContext, align_memory, scan_resource_usage_per_slot
 from ai.backend.agent.vendor import linux
 from ai.backend.common.types import DeviceId, DeviceName, KernelId, ResourceSlot, SlotName

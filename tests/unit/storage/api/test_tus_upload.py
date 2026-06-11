@@ -12,7 +12,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp import web
 
-from ai.backend.storage.api.client import tus_upload_part
+from ai.backend.common.clients.valkey_client.valkey_tus import TusSessionId
+from ai.backend.storage.api.client import _drain_into_upload_file, tus_upload_part
 from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
 
 
@@ -34,19 +35,53 @@ class TestTusUploadPartOffsetValidation:
             "relpath": "test-file.txt",
         }
 
+    @pytest.fixture(autouse=True)
+    def _patch_disk_helpers(self) -> Generator[None, None, None]:
+        """Mock the aiofiles-based file write path with no-ops.
+
+        ``tus_upload_part`` opens the upload file via ``aiofiles.open`` and
+        streams the request body straight in under the lease. None of these
+        paths exist on disk in mocked tests, so we substitute an AsyncMock
+        for both the file handle and the wrapped ``fsync``. The offset
+        validation logic (which is what these tests cover) executes before
+        the file open, so this leaves the assertions intact.
+        """
+        async_file = AsyncMock()
+        async_file.fileno = MagicMock(return_value=99)
+        file_cm = MagicMock()
+        file_cm.__aenter__ = AsyncMock(return_value=async_file)
+        file_cm.__aexit__ = AsyncMock(return_value=None)
+        with (
+            patch("ai.backend.storage.api.client.aiofiles.open", return_value=file_cm),
+            patch("ai.backend.storage.api.client.os.fsync"),
+        ):
+            yield
+
     def _create_mock_request(
         self,
         tmp_path: Path,
         client_offset: str | None,
+        *,
+        server_offset: int | None = 1024,
     ) -> MagicMock:
         """Create a fully configured mock request."""
         # Mock volume
         volume = MagicMock()
         volume.mangle_vfpath.return_value = tmp_path
 
+        # Mock Valkey TUS coordinator (try_load_offset / advance_offset).
+        valkey_tus_client = AsyncMock()
+        valkey_tus_client.get_offset = AsyncMock(return_value=server_offset)
+        valkey_tus_client.try_load_offset = AsyncMock(return_value=server_offset or 0)
+        valkey_tus_client.advance_offset = AsyncMock(return_value=server_offset or 0)
+        valkey_tus_client.extend_lease = AsyncMock(return_value=None)
+        valkey_tus_client.release_lease = AsyncMock(return_value=None)
+
         # Mock context
         ctx = MagicMock()
         ctx.local_config.storage_proxy.secret = "test-secret"
+        ctx.node_id = "test-node"
+        ctx.valkey_tus_client = valkey_tus_client
         ctx.get_volume.return_value.__aenter__ = AsyncMock(return_value=volume)
         ctx.get_volume.return_value.__aexit__ = AsyncMock(return_value=None)
 
@@ -113,7 +148,7 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: Client offset (512) behind server offset (1024)."""
-        request = self._create_mock_request(tmp_path, client_offset="512")
+        request = self._create_mock_request(tmp_path, client_offset="512", server_offset=1024)
 
         with (
             patch("ai.backend.storage.api.client.check_params") as mock_check_params,
@@ -132,7 +167,7 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: Client offset (2048) ahead of server offset (1024)."""
-        request = self._create_mock_request(tmp_path, client_offset="2048")
+        request = self._create_mock_request(tmp_path, client_offset="2048", server_offset=1024)
 
         with (
             patch("ai.backend.storage.api.client.check_params") as mock_check_params,
@@ -151,9 +186,9 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: Client offset matches server offset (both 1024)."""
-        request = self._create_mock_request(tmp_path, client_offset="1024")
+        request = self._create_mock_request(tmp_path, client_offset="1024", server_offset=1024)
 
-        # Create upload temp file
+        # Create upload temp file (for downstream finalization paths)
         upload_parent = tmp_path / ".upload"
         upload_parent.mkdir(parents=True, exist_ok=True)
         temp_file = upload_parent / token_data["session"]
@@ -162,17 +197,12 @@ class TestTusUploadPartOffsetValidation:
         with (
             patch("ai.backend.storage.api.client.check_params") as mock_check_params,
             patch("ai.backend.storage.api.client.prepare_tus_session_headers") as mock_headers,
-            patch("ai.backend.storage.api.client.AsyncFileWriter") as mock_writer,
         ):
             mock_check_params.return_value.__aenter__ = AsyncMock(
                 return_value={"token": token_data, "dst_dir": None}
             )
             mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
             mock_headers.return_value = {"Upload-Offset": "1024"}
-
-            writer = AsyncMock()
-            mock_writer.return_value.__aenter__ = AsyncMock(return_value=writer)
-            mock_writer.return_value.__aexit__ = AsyncMock(return_value=None)
 
             yield request
 
@@ -181,7 +211,7 @@ class TestTusUploadPartOffsetValidation:
         self, tmp_path: Path, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
         """Scenario: New file upload with zero offset."""
-        request = self._create_mock_request(tmp_path, client_offset="0")
+        request = self._create_mock_request(tmp_path, client_offset="0", server_offset=0)
 
         # Create empty upload temp file
         upload_parent = tmp_path / ".upload"
@@ -192,17 +222,12 @@ class TestTusUploadPartOffsetValidation:
         with (
             patch("ai.backend.storage.api.client.check_params") as mock_check_params,
             patch("ai.backend.storage.api.client.prepare_tus_session_headers") as mock_headers,
-            patch("ai.backend.storage.api.client.AsyncFileWriter") as mock_writer,
         ):
             mock_check_params.return_value.__aenter__ = AsyncMock(
                 return_value={"token": token_data, "dst_dir": None}
             )
             mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
             mock_headers.return_value = {"Upload-Offset": "0"}
-
-            writer = AsyncMock()
-            mock_writer.return_value.__aenter__ = AsyncMock(return_value=writer)
-            mock_writer.return_value.__aexit__ = AsyncMock(return_value=None)
 
             yield request
 
@@ -257,3 +282,52 @@ class TestTusUploadPartOffsetValidation:
         """When both client offset and file size are 0, upload should proceed successfully."""
         # No exception should be raised
         await tus_upload_part(request_with_zero_offset)
+
+
+class TestDrainOrphanBytesRecovery:
+    """Idempotent recovery when a prior PATCH wrote bytes to disk but did not
+    update the Valkey offset (e.g. ``advance_offset`` raised
+    ``TusLeaseLostError`` after a successful drain, or the storage-proxy
+    crashed between ``fsync`` and the ``INCRBY`` Lua step).
+
+    The next PATCH must:
+      1. ``truncate`` the staging file back to the Valkey-canonical offset
+         so the orphan tail bytes are discarded.
+      2. Append the client-replayed chunk from there.
+
+    The on-disk content after the retry must be identical to what it would
+    have been if the prior PATCH had never landed on disk.
+    """
+
+    async def test_orphan_tail_is_truncated_then_overwritten(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        committed_offset = 1024
+        committed_payload = b"\x11" * committed_offset
+        orphan_tail = b"\x22" * 512
+        retry_payload = b"\x33" * 768
+
+        upload_temp_path = tmp_path / "session-id"
+        # State left by the prior PATCH: committed bytes + orphan tail.
+        upload_temp_path.write_bytes(committed_payload + orphan_tail)
+
+        # Client-replayed chunk feed. ``at_eof`` is sync on aiohttp.StreamReader;
+        # ``read`` is async — model each accordingly so the drain loop iterates.
+        content = AsyncMock()
+        content.at_eof = MagicMock(side_effect=[False, True])
+        content.read = AsyncMock(side_effect=[retry_payload])
+
+        bytes_written = await _drain_into_upload_file(
+            content,
+            upload_temp_path,
+            start_offset=committed_offset,
+            session_id=TusSessionId("test-session"),
+        )
+
+        assert bytes_written == len(retry_payload)
+        final_bytes = upload_temp_path.read_bytes()
+        assert final_bytes == committed_payload + retry_payload
+        # The orphan tail bytes are gone; the prior failure did not corrupt
+        # the file as observed by future PATCHes.
+        assert orphan_tail not in final_bytes[committed_offset:]
