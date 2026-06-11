@@ -371,7 +371,7 @@ This script:
 
 For contributing to Backend.AI:
 - [CONTRIBUTING.md](../.github/CONTRIBUTING.md) - Development workflow and code standards
-- [CLAUDE.md](../CLAUDE.md) - Guidelines for AI-assisted development
+- [AGENTS.md](../AGENTS.md) - Guidelines for AI-assisted development
 - [MIGRATION.md](../MIGRATION.md) - Major version migration guide
 
 ## Core Components

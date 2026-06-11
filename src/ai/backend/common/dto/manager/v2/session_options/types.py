@@ -2,7 +2,7 @@
 
 Kept distinct from the in-memory ``manager.data.session.options`` enums
 so the API surface does not import from component-specific data types
-(per ``common/dto/CLAUDE.md``). Values are kept in sync manually —
+(per ``common/dto/AGENTS.md``). Values are kept in sync manually —
 adapters convert between these and the data-layer counterparts.
 """
 

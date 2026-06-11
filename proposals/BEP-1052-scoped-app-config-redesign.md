@@ -1136,7 +1136,7 @@ Mounted via `RouteRegistry.create("app-config-fragments", ...)`,
 `RouteRegistry.create("app-configs", ...)`, and
 `RouteRegistry.create("app-config-policies", ...)` respectively,
 matching the project-wide v2 conventions in
-`src/ai/backend/manager/api/rest/v2/CLAUDE.md`.
+`src/ai/backend/manager/api/rest/v2/AGENTS.md`.
 
 ### Listing convention
 

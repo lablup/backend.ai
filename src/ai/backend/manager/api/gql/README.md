@@ -331,6 +331,6 @@ async def projects(
 ## Related Documentation
 
 - [Manager API Overview](../README.md)
-- [REST v2 API](../rest/v2/CLAUDE.md)
+- [REST v2 API](../rest/v2/AGENTS.md)
 - [Repositories Layer](../../repositories/README.md)
 - [Legacy GraphQL (Graphene)](../gql_legacy/README.md) — DEPRECATED
