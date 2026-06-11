@@ -1,37 +1,32 @@
-# Component Tests — Guardrails
+# 컴포넌트 테스트 — 가드레일
 
-> Tests the HTTP API layer with a real aiohttp server and real DB.
-> Business logic is verified in `tests/unit/` — do not duplicate it here.
+> 실제 aiohttp 서버 + 실제 DB로 HTTP API 레이어를 테스트한다.
+> 비즈니스 로직은 `tests/unit/`에서 검증한다 — 여기서 중복하지 않는다.
 
-## What to Test Here
+## 여기서 테스트할 것
 
-- HTTP routing, auth decorators, request/response serialization.
-- Behavior differences between roles (superadmin vs. user keypair).
-- Error responses for invalid inputs at the API boundary.
+- HTTP 라우팅, auth 데코레이터, 요청/응답 직렬화.
+- 역할별 동작 차이(superadmin vs 사용자 keypair).
+- API 경계에서 잘못된 입력에 대한 에러 응답.
 
-## Core Fixtures
+## 핵심 픽스처
 
-**`create_app_and_client` (`AppBuilder`)** — spins up a real aiohttp server with selective
-`cleanup_contexts`. Returns `(app, client)` via the `AppBuilder` protocol:
+`create_app_and_client`(`AppBuilder`) — 선택적 `cleanup_contexts`로 실제 aiohttp 서버를 띄운다.
+`AppBuilder` 프로토콜로 `(app, client)`를 반환:
 ```python
 async def test_something(create_app_and_client: AppBuilder) -> None:
     app, client = await create_app_and_client(...)
 ```
 
-**`get_headers(keypair, method, path, ...)`** — generates signed HMAC auth headers.
-- NEVER construct auth headers manually — always use this fixture.
+`get_headers(keypair, method, path, ...)` — 서명된 HMAC auth 헤더 생성.
+- auth 헤더를 직접 만들지 않는다 — 항상 이 픽스처를 쓴다.
 
-## No `@pytest.mark.integration` Marker
+## BUILD 파일
 
-Component tests run whenever a DB is available — do not add `@pytest.mark.integration`.
-That marker is for `tests/integration/` only.
+- 새 하위 디렉터리마다 `python_tests()`를 담은 `BUILD` 파일이 필요하다.
 
-## BUILD Files
+## 여기 속하지 않는 것
 
-- Every new subdirectory needs a `BUILD` file with `python_tests()`.
-
-## What Does NOT Belong Here
-
-- Business logic assertions (service behavior) → `tests/unit/`.
-- Full E2E user workflows (create → list → delete) → `tests/integration/`.
-- Raw `aiohttp.ClientSession` usage — always go through the provided fixtures.
+- 비즈니스 로직 단언(service 동작) → `tests/unit/`.
+- 전체 E2E 사용자 워크플로(create → list → delete) → `tests/integration/`.
+- raw `aiohttp.ClientSession` 사용 — 항상 제공된 픽스처를 거친다.

@@ -1,30 +1,30 @@
-# Manager Models Layer — Guardrails
+# Manager Models 레이어 — 가드레일
 
-> This layer defines ORM schema only. For query patterns see `/repository-guide`;
-> for data type conventions see `manager/data/CLAUDE.md`.
+> 이 레이어는 ORM 스키마만 정의한다. 쿼리 패턴은 `/repository-guide`, 데이터 타입 규약은
+> `manager/data/AGENTS.md` 참고.
 
-## Directory Structure (per domain)
+## 디렉터리 구조 (도메인별)
 
-Every domain MUST follow: `models/{domain}/__init__.py` (re-exports only) + `row.py` (ORM class).
-Single-file shortcuts (`models/simple.py`) are legacy — do not add new ones.
+모든 도메인은 `models/{domain}/__init__.py`(re-export만) + `row.py`(ORM 클래스)를 따른다.
+단일 파일 단축형(`models/simple.py`)은 legacy — 새로 추가하지 않는다.
 
-## Row Class Rules
+## Row 클래스 규칙
 
-- Inherit from `Base` (defined in `manager/models/base.py`).
-- `__tablename__` is required on every Row class.
-- Cross-entity relationships: put related Row imports inside `TYPE_CHECKING` blocks only.
+- `Base`(`manager/models/base.py` 정의)를 상속한다.
+- 모든 Row 클래스에 `__tablename__`이 필요하다.
+- 엔티티 간 관계: 관련 Row import는 `TYPE_CHECKING` 블록 안에만 둔다.
 
-## No Logic in Row Classes
+## Row 클래스에 로직 금지
 
-- Do NOT add query builder methods to Row classes — that is `repositories/db_source/`'s job.
-- Do NOT add business logic methods — that is `services/`'s job.
-- `session/row.py` contains legacy query methods; do NOT follow that pattern.
+- Row 클래스에 쿼리 빌더 메서드를 추가하지 않는다 — `repositories/db_source/` 소관.
+- 비즈니스 로직 메서드를 추가하지 않는다 — `services/` 소관.
+- `session/row.py`에 legacy 쿼리 메서드가 있으나 그 패턴을 따르지 않는다.
 
-## Custom Column Types
+## 커스텀 컬럼 타입
 
-- Reuse existing `TypeDecorator` wrappers from `models/base.py` whenever possible.
-- New `TypeDecorator` additions go in `models/base.py` only — not in individual row files.
+- 가능하면 `models/base.py`의 기존 `TypeDecorator` 래퍼를 재사용한다.
+- 새 `TypeDecorator`는 `models/base.py`에만 추가한다 — 개별 row 파일에 두지 않는다.
 
-## `__init__.py` Rule
+## `__init__.py` 규칙
 
-- Only re-export the `Row` classes declared in `row.py` — nothing else.
+- `row.py`에 선언된 Row 클래스만 re-export한다 — 그 외 금지.

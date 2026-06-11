@@ -1,26 +1,25 @@
-# Manager DTO — Guardrails
+# Manager DTO — 가드레일
 
-> For API integration patterns that use these DTOs, see the `/api-guide` skill.
+> 이 DTO들을 쓰는 API 통합 패턴은 `/api-guide` 스킬 참고.
 
-## Where to Put a New DTO
+## 새 DTO를 어디에 둘까
 
-| Used by                                          | Location                       |
-|--------------------------------------------------|--------------------------------|
-| Manager API handlers only                        | `manager/dto/`                 |
-| Multiple components (agent, storage, client SDK) | `common/dto/manager/{domain}/` |
+| 사용 주체 | 위치 |
+|-----------|------|
+| Manager API 핸들러만 | `manager/dto/` |
+| 여러 컴포넌트(agent, storage, client SDK) | `common/dto/manager/{domain}/` |
 
-When in doubt: if anything outside `manager/` imports it, put it in `common/dto/`.
+애매하면: `manager/` 밖에서 import하면 `common/dto/`에 둔다.
 
-## DTO Rules
+## DTO 규칙
 
-- All DTOs MUST inherit from `BaseRequestModel` (Pydantic v2).
-- DTOs handle serialization and validation only — no business logic methods.
-- Do NOT import ORM `Row` types from `manager/models/` inside a DTO.
-- Do NOT import `data/` domain types into DTOs used by external callers
-  (keep the dependency direction: dto → common types only).
+- 모든 DTO는 `BaseRequestModel`(Pydantic v2)을 상속해야 한다.
+- DTO는 직렬화·검증만 — 비즈니스 로직 메서드 금지.
+- DTO 안에서 `manager/models/`의 ORM `Row` 타입을 import하지 않는다.
+- 외부 호출자가 쓰는 DTO에 `data/` 도메인 타입을 import하지 않는다(의존 방향 유지: dto → common 타입만).
 
-## Naming Convention
+## 네이밍 규약
 
-- Request: `{Operation}{Entity}Req` — e.g., `CreateUserReq`, `SearchSessionsReq`.
-- Response: `{Operation}{Entity}Response` — e.g., `CreateUserResponse`.
-- Path params: `{Entity}PathParam` — e.g., `ArtifactPathParam`.
+- 요청: `{Operation}{Entity}Req` — 예) `CreateUserReq`, `SearchSessionsReq`.
+- 응답: `{Operation}{Entity}Response` — 예) `CreateUserResponse`.
+- 경로 파라미터: `{Entity}PathParam` — 예) `ArtifactPathParam`.

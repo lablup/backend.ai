@@ -1,22 +1,20 @@
-# Common DTO — Guardrails
+# Common DTO — 가드레일
 
-> This package is shared across all components. Any change here affects manager, agent, storage,
-> and the client SDK simultaneously — verify all callers before modifying a field.
+> 이 패키지는 모든 컴포넌트가 공유한다. 여기 변경은 manager, agent, storage, client SDK에 동시에
+> 영향을 준다 — 필드 수정 전 모든 호출자를 확인한다.
 
-## Purpose
+## 목적
 
-DTOs shared across multiple backend.ai components (manager, agent, storage, client SDK).
-If a DTO is only used within a single component, put it in that component's own `dto/` directory.
+여러 backend.ai 컴포넌트(manager, agent, storage, client SDK)가 공유하는 DTO. 단일 컴포넌트에서만
+쓰는 DTO는 그 컴포넌트의 `dto/` 디렉터리에 둔다.
 
-## Directory Structure
+## 디렉터리 구조
 
-Organize by target component: `common/dto/{manager|agent|storage|clients|internal}/`.
+대상 컴포넌트별로 둔다: `common/dto/{manager|agent|storage|clients|internal}/`.
 
-## Rules
+## 규칙
 
-- All DTOs MUST inherit from `BaseRequestModel` (Pydantic v2).
-- Only import from Python stdlib and `common/types` — never from component-specific packages
-  (`manager/`, `agent/`, `storage/`).
-- No business logic — validation and serialization only.
-- Before modifying any field, verify all callers across components.
-- **Use only `v2/` DTOs** (e.g., `common/dto/manager/v2/`). DTOs outside `v2/` are deprecated and must not be used in new code.
+- 모든 DTO는 `BaseRequestModel`(Pydantic v2)을 상속해야 한다.
+- 비즈니스 로직 금지 — 검증·직렬화만.
+- 필드 수정 전 컴포넌트 전반의 모든 호출자를 확인한다.
+- `v2/` DTO만 쓴다(예: `common/dto/manager/v2/`). `v2/` 밖의 DTO는 deprecated이며 새 코드에서 쓰지 않는다.
