@@ -35,7 +35,6 @@ NAMESPACE = uuid.UUID("e6f1f5b7-3a8b-4d3a-9b8e-2f0a4d3e9c10")
 MEMBER_ROLE_SUFFIX = "member"
 
 EXCLUDED_ROLES: frozenset[str] = frozenset({
-    "role_superadmin",
     "role_monitor",
 })
 

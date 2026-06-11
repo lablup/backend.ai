@@ -5482,6 +5482,638 @@
             "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "entity_type": "session:app_service",
             "operation": "read"
+        },
+        {
+            "id": "31927715-a2ca-5da6-a21e-a111fd334762",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "user",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "455356be-1de9-5c3c-8f2d-4cbfcff772f0",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "user",
+            "operation": "read"
+        },
+        {
+            "id": "d3392bc0-2f12-5e30-b821-214f7393f668",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "user",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "e1c99929-afd8-5a69-938f-991168a086cd",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "user",
+            "operation": "update"
+        },
+        {
+            "id": "3dc133ad-cc63-5cb6-abfb-e2aa18352069",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "vfolder",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "569f9089-01a1-50b0-b223-b4e0ff4606aa",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "vfolder",
+            "operation": "read"
+        },
+        {
+            "id": "a4b9448c-8af5-5faf-8a69-8708584edd30",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "vfolder",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "f12dd6f5-20d3-5f7b-9aba-11ab44751edd",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "vfolder",
+            "operation": "create"
+        },
+        {
+            "id": "9b95a1ac-f217-5af2-b459-25d3b12bd4e0",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "vfolder",
+            "operation": "update"
+        },
+        {
+            "id": "1a05ffb9-1e3d-5803-acf8-b6d8defbbc74",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "vfolder:data",
+            "operation": "create"
+        },
+        {
+            "id": "65da87ba-0cc1-5c89-90f2-29a75fb55d27",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "vfolder:data",
+            "operation": "read"
+        },
+        {
+            "id": "d7fa4cc0-7ca6-52c4-8d4d-e0fa8589e1b8",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "vfolder:data",
+            "operation": "update"
+        },
+        {
+            "id": "fd7fcbf5-acd8-5108-944a-8ff7da795408",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "vfolder:data",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "72c740cd-6263-580e-9e60-cda739fbe0ef",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "session:app_service",
+            "operation": "read"
+        },
+        {
+            "id": "c7866a53-7add-55c4-8cbe-00c811c3c9b0",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "session",
+            "operation": "create"
+        },
+        {
+            "id": "3ff40770-5c93-5d04-813c-68f52feb32cc",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "session",
+            "operation": "read"
+        },
+        {
+            "id": "c5cd6b90-8612-5c8b-829c-8aa8ccb672a2",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "session",
+            "operation": "update"
+        },
+        {
+            "id": "a888c4af-cec1-5e81-8ee7-eb0b63cb2625",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "session",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "95ba13f4-5532-5597-9ae6-7103eb80092d",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "session",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "2cc73f04-cf71-51ff-9131-0b74bc75744d",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "agent",
+            "operation": "create"
+        },
+        {
+            "id": "35297349-afbc-51d8-942f-5c230c33471e",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "agent",
+            "operation": "read"
+        },
+        {
+            "id": "fc7af773-5d59-5c94-b37c-f6d7a46a410b",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "agent",
+            "operation": "update"
+        },
+        {
+            "id": "fb7e5cce-68c6-5ea5-a241-cd600b25fc31",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "agent",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "cd0b7d2a-31a9-58c5-a5b2-bb19be2150f2",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "agent",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "6bc93b35-4e0c-5018-a433-5811b4c5f35a",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "image",
+            "operation": "create"
+        },
+        {
+            "id": "93e69747-f158-5da2-8687-a9a35588e767",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "image",
+            "operation": "read"
+        },
+        {
+            "id": "6789fe6d-f3d0-5376-b4f0-5abbd30ba820",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "image",
+            "operation": "update"
+        },
+        {
+            "id": "f3706f47-33d6-5749-b550-93e2995ebf81",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "image",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "f5f819c6-682d-5946-9731-9e65d198c59d",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "image",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "2b061163-6284-5137-910b-9fb1ccb10df3",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "keypair",
+            "operation": "create"
+        },
+        {
+            "id": "bfdda20e-5cb3-5cd7-87e2-53c3ca856fef",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "keypair",
+            "operation": "read"
+        },
+        {
+            "id": "a8c8e2d0-3ec1-5e2f-b26c-80b6e8509359",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "keypair",
+            "operation": "update"
+        },
+        {
+            "id": "df44e719-9cd6-507f-b8a4-488116e1dbae",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "keypair",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "5b3fa8e3-30a1-56ac-a44c-dc03b07b4ea9",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "keypair",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "b1a0a5e6-105f-5d7d-b30e-ba22fd9e52c9",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "container_registry",
+            "operation": "create"
+        },
+        {
+            "id": "7549b664-553e-5b38-80c2-323347e22e00",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "container_registry",
+            "operation": "read"
+        },
+        {
+            "id": "4f5718d4-9267-544d-bf11-c6fcd5d2607f",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "container_registry",
+            "operation": "update"
+        },
+        {
+            "id": "37dda0c7-c688-5eac-86cb-36e2780c1b1b",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "container_registry",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "41c0dfb5-24c9-5e22-99eb-840978adf00f",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "container_registry",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "74e17cdc-cc43-574a-92d3-6198bd3ab03a",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "resource_group",
+            "operation": "create"
+        },
+        {
+            "id": "d17c9973-00d5-5e4a-b0f0-78915f8102a8",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "resource_group",
+            "operation": "read"
+        },
+        {
+            "id": "23fbeb8d-95be-5347-b852-2199851a28db",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "resource_group",
+            "operation": "update"
+        },
+        {
+            "id": "4164a0bb-dea2-57ac-92fe-15a76933d80f",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "resource_group",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "d64f983f-62a9-5af6-95ed-6eb4f7a10acb",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "resource_group",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "a80cb8a6-5ee9-5d09-ad65-51e0920e386e",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "artifact",
+            "operation": "create"
+        },
+        {
+            "id": "37021183-7644-5e0d-af25-7f8e17e6183a",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "artifact",
+            "operation": "read"
+        },
+        {
+            "id": "ecb99d28-e0bb-5a31-a34b-859a9a923d48",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "artifact",
+            "operation": "update"
+        },
+        {
+            "id": "d497d46a-f820-5867-a840-89e4394ccd61",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "artifact",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "4fe93953-7e84-5e7b-926c-3139df76a8de",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "artifact",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "cdea66fa-3572-5c00-b7ea-bf6d65e28b5f",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "artifact_registry",
+            "operation": "create"
+        },
+        {
+            "id": "25c6e555-aa53-5a5d-a86c-4fc4db659e6b",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "artifact_registry",
+            "operation": "read"
+        },
+        {
+            "id": "f1bc0d7d-195e-5af9-b647-bb7cd449f4c7",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "artifact_registry",
+            "operation": "update"
+        },
+        {
+            "id": "15bc2a01-9ba0-590e-8637-87f0f5d7f45c",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "artifact_registry",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "6cb00558-253c-57d4-8e07-4d842a69ddd9",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "artifact_registry",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "6dcbe929-3093-5cb9-a071-f3d30ff76f6f",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "app_config",
+            "operation": "create"
+        },
+        {
+            "id": "a2967ed3-087a-50de-bf09-7e960a8df26e",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "app_config",
+            "operation": "read"
+        },
+        {
+            "id": "ba7f34f6-9b23-5b2b-a105-34b32aa639f2",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "app_config",
+            "operation": "update"
+        },
+        {
+            "id": "614db176-d022-56fc-ac2b-e8e650359c7b",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "app_config",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "86841463-32b3-52a2-872c-e7a93ac2ac6f",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "app_config",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "f4e13f1f-682b-5ee2-a094-5db36e7abe49",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "notification_channel",
+            "operation": "create"
+        },
+        {
+            "id": "2deb1550-68fe-538e-b9c0-810b88a1efaa",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "notification_channel",
+            "operation": "read"
+        },
+        {
+            "id": "5b3f1eed-78da-5023-b304-cee45ef5caba",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "notification_channel",
+            "operation": "update"
+        },
+        {
+            "id": "4829b7f1-7c72-52b3-8e82-ec79bc838b78",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "notification_channel",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "214a549e-01b0-564d-8f8d-523e281ae189",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "notification_channel",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "37d566b4-9834-52a1-97f3-a71c2118d8a0",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "notification_rule",
+            "operation": "create"
+        },
+        {
+            "id": "62fde6d2-d483-512e-9c5e-2c2b5f2f8cbc",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "notification_rule",
+            "operation": "read"
+        },
+        {
+            "id": "fd6457c4-49d0-5720-b9c8-2325931fb30d",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "notification_rule",
+            "operation": "update"
+        },
+        {
+            "id": "fafc1704-5b7c-51d5-8989-1b40066eafeb",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "notification_rule",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "2b519128-94e7-5fe0-a010-54d6a75f1440",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "notification_rule",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "cc1716d4-7219-597e-af25-85a93bc2c11f",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "model_deployment",
+            "operation": "create"
+        },
+        {
+            "id": "6e9e57d4-b7d2-56bb-bd71-338c87f28cfe",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "model_deployment",
+            "operation": "read"
+        },
+        {
+            "id": "3605f65b-8f45-5e7f-b7be-22fa037a180f",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "model_deployment",
+            "operation": "update"
+        },
+        {
+            "id": "a76c9de0-2cd8-520a-a25e-e259a847b20b",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "model_deployment",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "bd25c346-10aa-5d91-ace2-a2a90cdd86d8",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "model_deployment",
+            "operation": "hard-delete"
+        },
+        {
+            "id": "e75bf5ba-794e-57fe-adb5-176dcf185543",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "model_card",
+            "operation": "create"
+        },
+        {
+            "id": "0555e310-f2ef-544f-9b87-f997d4a73cd0",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "model_card",
+            "operation": "read"
+        },
+        {
+            "id": "9b690095-3f08-53da-8335-743d75272acf",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "model_card",
+            "operation": "update"
+        },
+        {
+            "id": "7dcfdfee-94bd-5ab9-b9e1-4bd072f31cf3",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "model_card",
+            "operation": "soft-delete"
+        },
+        {
+            "id": "cd61d2c5-2455-5459-940e-297a3d5a69ad",
+            "role_id": "942d7613-27f1-49c5-944a-5c79045346a1",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "model_card",
+            "operation": "hard-delete"
         }
     ],
     "association_scopes_entities": [
