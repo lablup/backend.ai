@@ -202,15 +202,19 @@ class Worker(Base, BaseMixin):
         w.status = status
 
         w.occupied_slots = 0
-        match frontend_mode:
-            case FrontendMode.WILDCARD_DOMAIN:
-                assert wildcard_domain
-                w.available_slots = -1
-            case FrontendMode.PORT:
-                assert port_range
-                w.available_slots = port_range[1] - port_range[0] + 1
+        w.refresh_available_slots()
 
         return w
+
+    def refresh_available_slots(self) -> None:
+        """Recompute available_slots from the current frontend config."""
+        match self.frontend_mode:
+            case FrontendMode.WILDCARD_DOMAIN:
+                assert self.wildcard_domain
+                self.available_slots = -1
+            case FrontendMode.PORT:
+                assert self.port_range
+                self.available_slots = self.port_range[1] - self.port_range[0] + 1
 
     @property
     def use_tls(self) -> bool:

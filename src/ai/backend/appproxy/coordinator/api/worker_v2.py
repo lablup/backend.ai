@@ -213,6 +213,8 @@ async def update_worker(
             worker.wildcard_traffic_port = params.wildcard_traffic_port
             worker.filtered_apps_only = params.filtered_apps_only
             worker.traefik_last_used_marker_path = params.traefik_last_used_marker_path
+            # Reflect port_range / frontend_mode changes on restart.
+            worker.refresh_available_slots()
             worker.updated_at = datetime.now()
             worker.nodes += 1
             worker.status = WorkerStatus.ALIVE
