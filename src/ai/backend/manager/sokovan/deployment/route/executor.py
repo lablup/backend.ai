@@ -615,17 +615,25 @@ class RouteExecutor:
         return RouteExecutionResult(successes=[], errors=[])
 
     async def sync_appproxy(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Push the current HEALTHY routing tables for affected endpoints to AppProxy.
+        """Push the current ACTIVE routing tables for affected endpoints to AppProxy.
+
+        Sync mirrors AppProxy to the manager's routing intent (traffic
+        ACTIVE), not to live health. Evicting an UNHEALTHY backend from
+        the pool is AppProxy's own health-check responsibility; on the
+        manager side a confirmed-unhealthy route is removed via the
+        route-eviction → terminate → unregister path per the scaling
+        group's ``cleanup_target_statuses`` policy. Filtering by HEALTHY
+        here would double-manage that and drop health-check-disabled
+        (NOT_CHECKED) routes that should keep serving.
 
         Steps:
         1. Group the input routes by endpoint (the AppProxy contract is
            endpoint-scoped: one ``circuit.route_info`` per deployment).
         2. Resolve each endpoint's proxy target (wsproxy_addr / token)
            via the deployment repository in two batched calls.
-        3. Re-read the authoritative RUNNING + HEALTHY route set per
+        3. Re-read the authoritative RUNNING + ACTIVE route set per
            endpoint with a caller-composed ``BatchQuerier`` so the same
-           plumbing works for sync, debug, and reporting paths — no
-           ``only_healthy`` flag and no Row-side query method.
+           plumbing works for sync, debug, and reporting paths.
         4. Group endpoints by proxy target and issue one
            ``bulk_update_routes`` HTTP call per target instead of one
            event per endpoint, which previously meant one DB connection
@@ -659,7 +667,6 @@ class RouteExecutor:
             conditions=[
                 RouteConditions.by_endpoint_ids(endpoint_ids),
                 RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
-                RouteConditions.by_health_statuses([RouteHealthStatus.HEALTHY]),
                 RouteConditions.by_traffic_status_equals(RouteTrafficStatus.ACTIVE),
             ],
         )

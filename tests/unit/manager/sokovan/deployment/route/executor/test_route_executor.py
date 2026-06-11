@@ -1131,3 +1131,62 @@ class TestSyncAppproxy:
         assert len(result.successes) == 2
         assert len(result.errors) == 1
         assert result.errors[0].route_info.deployment_id == endpoint_ids[0]
+
+    async def test_sync_targets_traffic_not_health(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> None:
+        """AP-005: Regression — the routing-table re-read filters by traffic
+        ACTIVE only, never by health.
+
+        Sync mirrors the manager's routing intent; pruning unhealthy
+        backends from the pool is AppProxy's own responsibility. A health
+        filter here would silently drop health-check-disabled
+        (NOT_CHECKED) routes that should keep serving.
+        """
+        endpoint_id = DeploymentID(uuid4())
+        routes = [_route_for_endpoint(endpoint_id)]
+        _wire_proxy_target(mock_deployment_repo, [endpoint_id])
+        client = mock_appproxy_client_pool.load_client.return_value
+        client.bulk_update_routes.return_value = _bulk_response([
+            UpdatedRoutesItem(deployment_id=endpoint_id, success=True)
+        ])
+
+        await route_executor.sync_appproxy(routes)
+
+        querier = mock_deployment_repo.fetch_route_connection_infos.await_args.kwargs[
+            "route_querier"
+        ]
+        compiled = [str(condition()) for condition in querier.conditions]
+        assert not any("health_status" in clause for clause in compiled), (
+            f"sync_appproxy must not filter by health; got {compiled}"
+        )
+        assert any("traffic_status" in clause for clause in compiled)
+
+    async def test_not_checked_route_is_synced(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> None:
+        """AP-006: A RUNNING + ACTIVE route whose health is NOT_CHECKED
+        (health check disabled) is still pushed to AppProxy."""
+        endpoint_id = DeploymentID(uuid4())
+        route = dataclasses.replace(
+            _route_for_endpoint(endpoint_id),
+            health_status=RouteHealthStatus.NOT_CHECKED,
+        )
+        _wire_proxy_target(mock_deployment_repo, [endpoint_id])
+        client = mock_appproxy_client_pool.load_client.return_value
+        client.bulk_update_routes.return_value = _bulk_response([
+            UpdatedRoutesItem(deployment_id=endpoint_id, success=True)
+        ])
+
+        result = await route_executor.sync_appproxy([route])
+
+        assert len(result.successes) == 1
+        client.bulk_update_routes.assert_awaited_once()
+        request = client.bulk_update_routes.await_args.args[0]
+        assert [item.deployment_id for item in request.endpoints] == [endpoint_id]
