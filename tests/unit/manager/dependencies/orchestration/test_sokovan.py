@@ -49,6 +49,7 @@ class TestSokovanOrchestratorDependency:
         sokovan_input = SokovanOrchestratorInput(
             scheduler_repository=MagicMock(),
             deployment_repository=MagicMock(),
+            replica_group_repository=MagicMock(),
             fair_share_repository=MagicMock(),
             resource_usage_repository=MagicMock(),
             config_provider=MagicMock(),
@@ -113,6 +114,7 @@ class TestSokovanOrchestratorDependency:
         sokovan_input = SokovanOrchestratorInput(
             scheduler_repository=scheduler_repo,
             deployment_repository=deployment_repo,
+            replica_group_repository=MagicMock(),
             fair_share_repository=fair_share_repo,
             resource_usage_repository=MagicMock(),
             config_provider=config_provider,

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, Callable, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from sqlalchemy import Table, text
 from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.sql.ddl import SchemaGenerator
+from sqlalchemy.sql.schema import ForeignKeyConstraint
 
 
 class HasTable(Protocol):
@@ -18,18 +20,52 @@ class HasTable(Protocol):
 type TableOrORM = Table | type[HasTable]
 
 
+def _make_subset_schema_generator(table_names: frozenset[str]) -> type[SchemaGenerator]:
+    """
+    Build a ``SchemaGenerator`` that skips deferred (``use_alter``) foreign keys
+    pointing outside the requested table subset.
+
+    ``MetaData.create_all(tables=...)`` still emits the deferred
+    ``ALTER TABLE ... ADD CONSTRAINT`` for ``use_alter`` foreign keys even when the
+    referenced table is absent from the subset, which fails with ``UndefinedTableError``
+    (e.g. ``sessions.replica_id -> routings`` when a test loads ``sessions`` but not
+    ``routings``). Suppressing only that standalone ``ALTER`` keeps selective table
+    loading working without forcing every caller to pull in cycle-breaking tables.
+
+    Inline foreign keys are rendered by the ``CREATE TABLE`` compiler, not this visitor,
+    so they are unaffected; only standalone ``use_alter`` constraints flow through here.
+    """
+
+    class _SubsetSchemaGenerator(SchemaGenerator):
+        def visit_foreign_key_constraint(self, constraint: ForeignKeyConstraint) -> None:
+            elements = constraint.elements
+            if elements:
+                referred_table = elements[0].target_fullname.rsplit(".", 1)[0]
+                if referred_table not in table_names:
+                    return
+            emit = cast(
+                "Callable[[ForeignKeyConstraint], None]",
+                super().visit_foreign_key_constraint,
+            )
+            emit(constraint)
+
+    return _SubsetSchemaGenerator
+
+
 def _create_tables_sync(conn: Any, tables: list[Table]) -> None:
     """
-    Sync function to create tables using MetaData.create_all().
+    Sync function to create tables, reusing ``create_all`` machinery (checkfirst,
+    enum types, indexes) via a custom ``SchemaGenerator``.
 
-    This approach handles circular FK dependencies better than creating
-    tables individually, as SQLAlchemy can sort and defer constraints.
+    This handles circular FK dependencies via ``use_alter`` while dropping deferred
+    foreign keys that reference tables outside the requested subset, so each test file
+    can create only the tables it needs.
     """
-    # Use the shared metadata from the first table to create all tables
-    # This handles circular FK dependencies via use_alter
-    if tables:
-        metadata = tables[0].metadata
-        metadata.create_all(conn, tables=tables, checkfirst=True)
+    if not tables:
+        return
+    metadata = tables[0].metadata
+    generator = _make_subset_schema_generator(frozenset(t.name for t in tables))
+    conn._run_ddl_visitor(generator, metadata, checkfirst=True, tables=tables)
 
 
 def _to_table(item: TableOrORM) -> Table:

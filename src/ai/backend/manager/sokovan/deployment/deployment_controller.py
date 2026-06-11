@@ -551,7 +551,7 @@ class DeploymentController:
             )
 
         # 3. Set deploying_revision (override any in-flight rollout)
-        previous_revision_id, updated = await self._deployment_repository.set_deploying_revision(
+        previous_revision_id, updated = await self._deployment_repository.activate_revision(
             deployment_id, revision_id
         )
         if not updated:
@@ -560,7 +560,7 @@ class DeploymentController:
         # 4. Trigger DEPLOYING lifecycle
         await self.mark_lifecycle_needed(
             DeploymentLifecycleType.DEPLOYING,
-            sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_INITIALIZING,
         )
 
         log.info(

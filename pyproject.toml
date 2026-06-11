@@ -147,7 +147,6 @@ ignore = [
     # RUF
     "RUF003", # ambiguous-unicode-character-comment - intentional use of special characters (e.g., × for multiplication)
     "RUF005", # collection-literal-concatenation - explicit concatenation is sometimes clearer
-    "RUF006", # asyncio-dangling-task - fire-and-forget tasks are intentional in some cases
     "RUF009", # function-call-in-dataclass-default - cast() in dataclass defaults is intentional
     "RUF012", # mutable-class-default - existing codebase uses mutable defaults intentionally
     "RUF015", # unnecessary-iterable-allocation-for-first-element - [0] is clearer than next(iter())
@@ -209,6 +208,8 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/api/gql/schema.py" = ["TID251"]
 # test_pydantic_compat.py defines fixture types without BackendAIGQLMeta metadata
 "tests/unit/manager/api/gql/test_pydantic_compat.py" = ["TID251"]
+# dataloader conftest defines a test-only probe GQL schema with raw strawberry decorators
+"tests/component/dataloader/conftest.py" = ["TID251"]
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization

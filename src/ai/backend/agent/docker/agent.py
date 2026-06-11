@@ -50,13 +50,13 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
-from ai.backend.agent.errors.resources import PortPoolExhaustedError
-from ai.backend.agent.etcd import AgentEtcdClientView
-from ai.backend.agent.exception import (
+from ai.backend.agent.errors import (
     ContainerCreationError,
     InvalidArgumentError,
     UnsupportedResource,
 )
+from ai.backend.agent.errors.resources import PortPoolExhaustedError
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
 from ai.backend.agent.kernel_registry.adapter import (

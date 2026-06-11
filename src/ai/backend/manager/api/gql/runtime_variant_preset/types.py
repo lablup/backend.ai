@@ -51,11 +51,13 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption as UIOptionDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -213,6 +215,12 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     target_spec: PresetTargetSpecGQL = gql_field(
         description="Specification defining how the user-provided value is applied to the inference container."
     )
+    required: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether this preset parameter must be supplied when building a deployment revision.",
+        )
+    )
     category: str | None = gql_field(description="UI category group for organizing parameters.")
     display_name: str | None = gql_field(description="Human-readable display label for the UI.")
     ui_option: UIOptionGQL | None = gql_field(description="UI rendering options.")
@@ -281,6 +289,13 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
     key: str = gql_field(
         description="For 'env' target, the environment variable name; for 'args' target, the CLI flag name."
     )
+    required: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether this preset parameter must be supplied when building a deployment revision.",
+        ),
+        default=False,
+    )
 
 
 @gql_pydantic_input(
@@ -296,6 +311,10 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     value_type: PresetValueTypeGQL | None = gql_field(default=None, description="New value type.")
     default_value: str | None = gql_field(default=None, description="New default value.")
     key: str | None = gql_field(default=None, description="New key.")
+    required: bool | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="New required flag."),
+        default=None,
+    )
 
 
 @gql_pydantic_type(

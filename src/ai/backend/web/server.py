@@ -89,7 +89,7 @@ from ai.backend.web.clients.manager_pool import (
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
-from ai.backend.web.security import SecurityPolicy, security_policy_middleware
+from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
@@ -221,10 +221,16 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
             }),
             content_type="application/problem+json",
         ) from e
-    if file_path.is_file():
+    index_path = (static_path / "index.html").resolve()
+    if file_path.is_file() and file_path != index_path:
         return apply_cache_headers(web.FileResponse(file_path), request_path)
-    # Fallback to index.html to support the URL routing for single-page application.
-    return apply_cache_headers(web.FileResponse(static_path / "index.html"), "index.html")
+    # Serve index.html for both direct requests and the SPA URL-routing fallback.
+    # Render the per-request CSP nonce into the template so it matches the nonce
+    # advertised in the Content-Security-Policy header.
+    index_template: str = request.app["webui_index_template"]
+    rendered = index_template.replace("{{nonce}}", csp_nonce_var.get())
+    response = web.Response(text=rendered, content_type="text/html")
+    return apply_cache_headers(response, "index.html")
 
 
 async def update_password_no_auth(request: web.Request) -> web.Response:
@@ -1078,6 +1084,7 @@ async def webapp_ctx(
     if config.service.mode == ServiceMode.WEBUI:
         cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
+        app["webui_index_template"] = (config.service.static_path / "index.html").read_text()
         fallback_handler = console_handler
     elif config.service.mode == ServiceMode.STATIC:
         fallback_handler = static_handler

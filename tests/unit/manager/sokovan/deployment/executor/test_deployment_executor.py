@@ -12,7 +12,6 @@ Test Scenarios:
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 import pytest
 
@@ -23,270 +22,6 @@ from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionError,
     DeploymentWithHistory,
 )
-
-# =============================================================================
-# TestCheckReadyDeployments (CR-001 ~ CR-004)
-# =============================================================================
-
-
-class TestCheckReadyDeployments:
-    """Tests for check_ready_deployments_that_need_scaling functionality.
-
-    Verifies the executor correctly checks replica counts.
-    """
-
-    async def test_replica_count_matches(
-        self,
-        deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
-        ready_deployment: DeploymentWithHistory,
-    ) -> None:
-        """CR-001: Replica count matches target.
-
-        Given: READY deployment with matching replica count
-        When: Check ready deployments
-        Then: No error, deployment in successes
-        """
-        # Arrange - Routes matching replica count
-        mock_route = MagicMock()
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
-            ready_deployment.deployment_info.id: [mock_route, mock_route]  # 2 routes = 2 target
-        }
-
-        entity_ids = [ready_deployment.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await deployment_executor.check_ready_deployments_that_need_scaling([
-                ready_deployment
-            ])
-
-        # Assert
-        assert len(result.successes) == 1
-        assert len(result.failures) == 0
-
-    async def test_replica_count_mismatch_captured(
-        self,
-        deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
-        ready_deployment: DeploymentWithHistory,
-    ) -> None:
-        """CR-002: Replica count mismatch is captured as error.
-
-        Given: READY deployment with fewer routes than target
-        When: Check ready deployments
-        Then: Error captured (ReplicaCountMismatch)
-        """
-        # Arrange - Fewer routes than target
-        mock_route = MagicMock()
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
-            ready_deployment.deployment_info.id: [mock_route]  # 1 route != 2 target
-        }
-
-        entity_ids = [ready_deployment.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await deployment_executor.check_ready_deployments_that_need_scaling([
-                ready_deployment
-            ])
-
-        # Assert
-        assert len(result.successes) == 0
-        assert len(result.failures) == 1
-        assert "Mismatched" in result.failures[0].reason
-
-    async def test_empty_deployment_list(
-        self,
-        deployment_executor: DeploymentExecutor,
-    ) -> None:
-        """CR-003: Empty deployment list returns empty result.
-
-        Given: Empty deployment list
-        When: Check ready deployments
-        Then: Empty result
-        """
-        with DeploymentRecorderContext.scope("test", entity_ids=[]):
-            # Act
-            result = await deployment_executor.check_ready_deployments_that_need_scaling([])
-
-        # Assert
-        assert len(result.successes) == 0
-        assert len(result.failures) == 0
-
-    async def test_current_revision_none_is_skipped(
-        self,
-        deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
-        ready_deployment_no_current_revision: DeploymentWithHistory,
-    ) -> None:
-        """Regression: revisionless deployments must not trigger scaling.
-
-        Given: READY deployment with current_revision_id = None
-        When: check_ready_deployments_that_need_scaling runs
-        Then: the deployment is placed in ``skipped`` (no success → no
-              SCALING transition → no wedge). ``scale_deployment`` already
-              skips the same shape; the two must stay in lock-step.
-        """
-        # Routes count does not matter: the skip happens before the
-        # replica-count check.
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
-            ready_deployment_no_current_revision.deployment_info.id: []
-        }
-        entity_ids = [ready_deployment_no_current_revision.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            result = await deployment_executor.check_ready_deployments_that_need_scaling([
-                ready_deployment_no_current_revision
-            ])
-
-        assert len(result.successes) == 0
-        assert len(result.failures) == 0
-        assert len(result.skipped) == 1
-        assert (
-            result.skipped[0].deployment_info.id
-            == ready_deployment_no_current_revision.deployment_info.id
-        )
-
-
-# =============================================================================
-# TestScaleDeployment (SC-001 ~ SC-004)
-# =============================================================================
-
-
-class TestScaleDeployment:
-    """Tests for scale_deployment functionality.
-
-    Verifies the executor correctly handles scale up/down operations.
-    """
-
-    async def test_scale_out_creates_routes(
-        self,
-        deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
-        ready_deployment_needs_scale_up: DeploymentWithHistory,
-    ) -> None:
-        """SC-001: Scale out creates new routes.
-
-        Given: Deployment with fewer routes than target (1 route, target 3)
-        When: Scale deployment
-        Then: 2 new routes created (scale_out_creators has 2 items)
-        """
-        # Arrange - 1 route exists, target is 3, so need 2 new routes
-        mock_route = MagicMock()
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
-            ready_deployment_needs_scale_up.deployment_info.id: [mock_route]
-        }
-
-        entity_ids = [ready_deployment_needs_scale_up.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await deployment_executor.scale_deployment([ready_deployment_needs_scale_up])
-
-        # Assert
-        assert len(result.successes) == 1
-        mock_deployment_repo.scale_routes.assert_awaited_once()
-
-        # Verify scale_out count: target(3) - current(1) = 2 new routes
-        call_args = mock_deployment_repo.scale_routes.call_args
-        scale_out_creators = call_args[0][0]
-        assert len(scale_out_creators) == 2
-
-    async def test_scale_in_terminates_routes(
-        self,
-        deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
-        ready_deployment_needs_scale_down: DeploymentWithHistory,
-    ) -> None:
-        """SC-002: Scale in terminates excess routes.
-
-        Given: Deployment with more routes than target (3 routes, target 1)
-        When: Scale deployment
-        Then: 2 excess routes marked for termination
-        """
-        # Arrange - 3 routes exist, target is 1, so need to terminate 2 routes
-        mock_route1 = MagicMock()
-        mock_route1.route_id = uuid4()
-        mock_route1.termination_priority = 1
-        mock_route2 = MagicMock()
-        mock_route2.route_id = uuid4()
-        mock_route2.termination_priority = 2
-        mock_route3 = MagicMock()
-        mock_route3.route_id = uuid4()
-        mock_route3.termination_priority = 3
-
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
-            ready_deployment_needs_scale_down.deployment_info.id: [
-                mock_route1,
-                mock_route2,
-                mock_route3,
-            ]
-        }
-
-        entity_ids = [ready_deployment_needs_scale_down.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await deployment_executor.scale_deployment([ready_deployment_needs_scale_down])
-
-        # Assert
-        assert len(result.successes) == 1
-        mock_deployment_repo.scale_routes.assert_awaited_once()
-
-        # Verify scale_in count: current(3) - target(1) = 2 routes terminated
-        call_args = mock_deployment_repo.scale_routes.call_args
-        scale_in_updater = call_args[0][1]
-        # scale_in_updater contains RouteConditions.by_ids with 2 route ids
-        assert scale_in_updater is not None
-
-    async def test_no_scaling_needed_returns_skipped(
-        self,
-        deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
-        ready_deployment: DeploymentWithHistory,
-    ) -> None:
-        """SC-003: No scaling needed returns skipped.
-
-        Given: Deployment with matching route count
-        When: Scale deployment
-        Then: Deployment in skipped list
-        """
-        # Arrange - Routes match target
-        mock_route1 = MagicMock()
-        mock_route2 = MagicMock()
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
-            ready_deployment.deployment_info.id: [mock_route1, mock_route2]
-        }
-
-        entity_ids = [ready_deployment.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await deployment_executor.scale_deployment([ready_deployment])
-
-        # Assert
-        assert len(result.successes) == 0
-        assert len(result.skipped) == 1
-
-    async def test_scaling_failure_captured(
-        self,
-        deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
-        ready_deployment_needs_scale_up: DeploymentWithHistory,
-    ) -> None:
-        """SC-004: Scaling failure is captured.
-
-        Given: Deployment with scaling error
-        When: Scale deployment
-        Then: Error captured in result
-        """
-        # Arrange - Route fetch raises exception
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {}
-
-        entity_ids = [ready_deployment_needs_scale_up.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await deployment_executor.scale_deployment([ready_deployment_needs_scale_up])
-
-        # Assert - KeyError since deployment.id not in empty dict
-        assert len(result.successes) == 0
-        assert len(result.failures) == 1
-
 
 # =============================================================================
 # TestDestroyDeployment (DD-001 ~ DD-003)
@@ -313,11 +48,6 @@ class TestDestroyDeployment:
         Then: Routes terminated, endpoint unregistered
         """
         # Arrange
-        mock_route = MagicMock()
-        mock_route.route_id = uuid4()
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
-            destroying_deployment.deployment_info.id: [mock_route]
-        }
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
@@ -342,14 +72,12 @@ class TestDestroyDeployment:
         # Assert
         assert len(result.successes) == 1
         assert len(result.failures) == 0
-        mock_deployment_repo.mark_terminating_route_status_bulk.assert_awaited_once()
         mock_unregister.assert_awaited_once()
 
-        # Verify 1 route marked for termination
-        call_args = mock_deployment_repo.mark_terminating_route_status_bulk.call_args
-        route_ids = call_args[0][0]
-        assert len(route_ids) == 1
-        assert mock_route.route_id in route_ids
+        # The destroyed deployment's replica groups are retired (drained + revision cleared).
+        mock_deployment_repo.retire_replica_groups_on_destroy.assert_awaited_once_with({
+            destroying_deployment.deployment_info.id
+        })
 
     async def test_multiple_deployments_destroyed(
         self,
@@ -365,13 +93,6 @@ class TestDestroyDeployment:
         Then: All destroyed successfully
         """
         # Arrange
-        routes_map = {}
-        for deployment in destroying_deployments_multiple:
-            mock_route = MagicMock()
-            mock_route.route_id = uuid4()
-            routes_map[deployment.deployment_info.id] = [mock_route]
-
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = routes_map
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )
@@ -413,9 +134,6 @@ class TestDestroyDeployment:
         Then: Error captured in result
         """
         # Arrange
-        mock_deployment_repo.fetch_active_routes_by_deployment_ids.return_value = {
-            destroying_deployment.deployment_info.id: []
-        }
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
             proxy_targets_by_scaling_group
         )

@@ -29,6 +29,7 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -487,4 +488,72 @@ class TestCancelFreesResourceAllocations:
         )
 
         assert session_id in affected
+        await self._assert_all_freed(db_with_cleanup, kernel_id)
+
+    async def _seed_agent_reserved(
+        self, db: ExtendedAsyncSAEngine, agent_id: str, *, cpu: Decimal, mem: Decimal
+    ) -> None:
+        # A reserved (SCHEDULED/PULLING) kernel holds this much on the agent.
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=agent_id, slot_name="cpu", capacity=Decimal("10"), reserved=cpu
+                )
+            )
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=agent_id, slot_name="mem", capacity=Decimal("10240"), reserved=mem
+                )
+            )
+            await db_sess.flush()
+
+    async def _agent_reserved(self, db: ExtendedAsyncSAEngine, agent_id: str) -> dict[str, Decimal]:
+        async with db.begin_readonly_session() as db_sess:
+            rows = (
+                await db_sess.execute(
+                    sa.select(AgentResourceRow.slot_name, AgentResourceRow.reserved).where(
+                        AgentResourceRow.agent_id == agent_id
+                    )
+                )
+            ).all()
+            return {row.slot_name: row.reserved for row in rows}
+
+    async def test_cancel_kernels_for_failed_image_releases_agent_resources(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        pulling_session_on_agent: tuple[SessionId, KernelId, str],
+    ) -> None:
+        session_id, kernel_id, agent_id = pulling_session_on_agent
+        await self._seed_agent_reserved(
+            db_with_cleanup, agent_id, cpu=Decimal("2"), mem=Decimal("4096")
+        )
+        db_source = ScheduleDBSource(db_with_cleanup)
+
+        await db_source.cancel_kernels_for_failed_image(
+            AgentId(agent_id), "python:3.8", "image pull failed for test"
+        )
+
+        reserved = await self._agent_reserved(db_with_cleanup, agent_id)
+        assert reserved["cpu"] == Decimal("0")
+        assert reserved["mem"] == Decimal("0")
+        await self._assert_all_freed(db_with_cleanup, kernel_id)
+
+    async def test_mark_session_cancelled_releases_agent_resources(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        pulling_session_on_agent: tuple[SessionId, KernelId, str],
+    ) -> None:
+        session_id, kernel_id, agent_id = pulling_session_on_agent
+        await self._seed_agent_reserved(
+            db_with_cleanup, agent_id, cpu=Decimal("2"), mem=Decimal("4096")
+        )
+        db_source = ScheduleDBSource(db_with_cleanup)
+
+        await db_source.mark_session_cancelled(
+            session_id, convert_to_status_data(RuntimeError("failed to start"))
+        )
+
+        reserved = await self._agent_reserved(db_with_cleanup, agent_id)
+        assert reserved["cpu"] == Decimal("0")
+        assert reserved["mem"] == Decimal("0")
         await self._assert_all_freed(db_with_cleanup, kernel_id)

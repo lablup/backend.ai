@@ -960,6 +960,7 @@ class SessionAdapter(BaseAdapter):
                 network_type=data.network_type.value if data.network_type else None,
                 network_id=data.network_id,
             ),
+            replica_id=data.replica_id,
         )
 
     @staticmethod

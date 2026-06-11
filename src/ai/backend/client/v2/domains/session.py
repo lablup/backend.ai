@@ -248,11 +248,12 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: GetCommitStatusRequest | None = None,
     ) -> GetCommitStatusResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"{_BASE_PATH}/{session_name}/commit",
-            request=request,
             response_model=GetCommitStatusResponse,
+            params=params,
         )
 
     async def convert_to_image(
@@ -289,11 +290,12 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: GetContainerLogsRequest | None = None,
     ) -> GetContainerLogsResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"{_BASE_PATH}/{session_name}/logs",
-            request=request,
             response_model=GetContainerLogsResponse,
+            params=params,
         )
 
     async def get_status_history(
@@ -301,11 +303,12 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: GetStatusHistoryRequest | None = None,
     ) -> GetStatusHistoryResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"{_BASE_PATH}/{session_name}/status-history",
-            request=request,
             response_model=GetStatusHistoryResponse,
+            params=params,
         )
 
     # -----------------------------------------------------------------------
@@ -337,11 +340,12 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: GetAbusingReportRequest | None = None,
     ) -> GetAbusingReportResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"{_BASE_PATH}/{session_name}/abusing-report",
-            request=request,
             response_model=GetAbusingReportResponse,
+            params=params,
         )
 
     # -----------------------------------------------------------------------
@@ -415,7 +419,7 @@ class SessionClient(BaseDomainClient):
     ) -> bytes:
         return await self._client.download(
             f"{_BASE_PATH}/{session_name}/download_single",
-            json=request.model_dump(exclude_none=True),
+            params=request.model_dump(mode="json", exclude_none=True),
         )
 
     async def get_task_logs(

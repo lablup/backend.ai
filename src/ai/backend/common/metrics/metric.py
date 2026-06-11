@@ -453,6 +453,7 @@ class LayerType(enum.StrEnum):
     FAIR_SHARE_REPOSITORY = "fair_share_repository"
     RESOURCE_USAGE_HISTORY_REPOSITORY = "resource_usage_history_repository"
     RESOURCE_SLOT_REPOSITORY = "resource_slot_repository"
+    REPLICA_GROUP_REPOSITORY = "replica_group_repository"
 
     # DB Source layers
     AUDIT_LOG_DB_SOURCE = "audit_log_db_source"
@@ -489,6 +490,7 @@ class LayerType(enum.StrEnum):
     VALKEY_STREAM = "valkey_stream"
     VALKEY_BGTASK = "valkey_bgtask"
     VALKEY_VOLUME_STATS = "valkey_volume_stats"
+    VALKEY_TUS = "valkey_tus"
 
     # Client layers
     AGENT_CLIENT = "agent_client"

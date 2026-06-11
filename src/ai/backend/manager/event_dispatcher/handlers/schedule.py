@@ -4,6 +4,8 @@ from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
+    DoReconcileProcessEvent,
+    DoReconcileProcessIfNeededEvent,
     DoRouteLifecycleEvent,
     DoRouteLifecycleIfNeededEvent,
     DoSokovanProcessIfNeededEvent,
@@ -22,6 +24,7 @@ from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordina
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
+from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -34,6 +37,7 @@ class ScheduleEventHandler:
     _scheduling_controller: SchedulingController
     _deployment_coordinator: DeploymentCoordinator
     _route_coordinator: RouteCoordinator
+    _reconciler_coordinator: ReconcilerCoordinator
     _event_hub: EventHub
 
     def __init__(
@@ -42,12 +46,14 @@ class ScheduleEventHandler:
         scheduling_controller: SchedulingController,
         deployment_coordinator: DeploymentCoordinator,
         route_coordinator: RouteCoordinator,
+        reconciler_coordinator: ReconcilerCoordinator,
         event_hub: EventHub,
     ) -> None:
         self._schedule_coordinator = schedule_coordinator
         self._scheduling_controller = scheduling_controller
         self._deployment_coordinator = deployment_coordinator
         self._route_coordinator = route_coordinator
+        self._reconciler_coordinator = reconciler_coordinator
         self._event_hub = event_hub
 
     async def handle_session_enqueued(
@@ -117,3 +123,15 @@ class ScheduleEventHandler:
         """Handle route lifecycle event (unconditional)."""
         lifecycle_type = RouteLifecycleType(ev.lifecycle_type)
         await self._route_coordinator.process_route_lifecycle(lifecycle_type)
+
+    async def handle_do_reconcile_if_needed(
+        self, _context: None, _agent_id: str, ev: DoReconcileProcessIfNeededEvent
+    ) -> None:
+        """Handle a generic reconcile-if-needed event (checks marks); reconcile_type routes the stage."""
+        await self._reconciler_coordinator.process_if_needed(ev.reconcile_type)
+
+    async def handle_do_reconcile(
+        self, _context: None, _agent_id: str, ev: DoReconcileProcessEvent
+    ) -> None:
+        """Handle a generic reconcile event (unconditional); reconcile_type routes the stage."""
+        await self._reconciler_coordinator.process(ev.reconcile_type)

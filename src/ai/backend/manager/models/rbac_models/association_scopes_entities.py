@@ -10,10 +10,16 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.types import EntityType, RelationType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    Permission,
+    RelationType,
+    ScopeType,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    IntFlagType,
     StrEnumType,
 )
 
@@ -52,6 +58,12 @@ class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
         nullable=False,
         server_default=RelationType.AUTO.value,
     )
+    # A NULL cap means "no ceiling" and is treated as the full cap during resolution.
+    permission_cap: Mapped[Permission | None] = mapped_column(
+        "permission_cap",
+        IntFlagType(Permission),
+        nullable=True,
+    )
     registered_at: Mapped[datetime] = mapped_column(
         "registered_at",
         sa.DateTime(timezone=True),
@@ -80,5 +92,6 @@ class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
             ),
             object_id=self.object_id(),
             relation_type=self.relation_type,
+            permission_cap=self.permission_cap,
             registered_at=self.registered_at,
         )

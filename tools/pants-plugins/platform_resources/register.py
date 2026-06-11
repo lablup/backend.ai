@@ -4,8 +4,9 @@ import logging
 from dataclasses import dataclass
 
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.internals.graph import resolve_unparsed_address_inputs
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -89,13 +90,13 @@ async def infer_platform_specific_dependencies(
     )
     if not platform_resources_unparsed_address:
         return InferredDependencies(Addresses([]))
-    parsed_addresses = await Get(
-        Addresses,
+    parsed_addresses = await resolve_unparsed_address_inputs(
         UnparsedAddressInputs(
             (platform_resources_unparsed_address,),
             owning_address=request.field_set.address,
             description_of_origin="platform_resources",
         ),
+        **implicitly(),
     )
     return InferredDependencies(Addresses(parsed_addresses))
 

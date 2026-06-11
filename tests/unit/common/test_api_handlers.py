@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import Awaitable, Callable
 from http import HTTPStatus
 from typing import Any, Self
 
 from aiohttp import web
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import (
     APIResponse,
@@ -480,3 +481,94 @@ async def test_invalid_query_parameter(aiohttp_client: Any) -> None:
     # request with no query parameter
     error_response = await client.get("/test")
     assert error_response.status == HTTPStatus.BAD_REQUEST  # InvalidAPIParameters Error raised
+
+
+class TestListQueryModel(BaseRequestModel):
+    ids: list[str] | None = Field(default=None)
+    name: str
+
+
+class TestListQueryResponse(BaseResponseModel):
+    ids: list[str]
+    name: str
+
+
+class TestListQueryHandler:
+    @api_handler
+    async def handle_list_query(self, query: QueryParam[TestListQueryModel]) -> APIResponse:
+        parsed = query.parsed
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=TestListQueryResponse(ids=parsed.ids or [], name=parsed.name),
+        )
+
+
+async def test_repeated_query_parameter_parses_as_list(aiohttp_client: Any) -> None:
+    handler = TestListQueryHandler()
+    app = web.Application()
+    app.router.add_get("/test", handler.handle_list_query)
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/test?ids=a&ids=b&ids=c&name=foo")
+
+    assert resp.status == HTTPStatus.OK
+    data = await resp.json()
+    assert data["ids"] == ["a", "b", "c"]
+    assert data["name"] == "foo"
+
+
+async def test_single_value_list_query_parameter_parses_as_one_element_list(
+    aiohttp_client: Any,
+) -> None:
+    handler = TestListQueryHandler()
+    app = web.Application()
+    app.router.add_get("/test", handler.handle_list_query)
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/test?ids=only&name=foo")
+
+    assert resp.status == HTTPStatus.OK
+    data = await resp.json()
+    assert data["ids"] == ["only"]
+    assert data["name"] == "foo"
+
+
+class TestAliasedUuidListQueryModel(BaseRequestModel):
+    """Mirrors the motivating ``UsagePerMonthQuery.group_ids: list[uuid.UUID]`` case."""
+
+    group_ids: list[uuid.UUID] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("group_ids", "group_id"),
+    )
+
+
+class TestAliasedUuidListResponse(BaseResponseModel):
+    group_ids: list[str]
+
+
+class TestAliasedUuidListHandler:
+    @api_handler
+    async def handle(self, query: QueryParam[TestAliasedUuidListQueryModel]) -> APIResponse:
+        parsed = query.parsed
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=TestAliasedUuidListResponse(
+                group_ids=[str(gid) for gid in (parsed.group_ids or [])],
+            ),
+        )
+
+
+async def test_repeated_uuid_list_query_parameter_via_alias(aiohttp_client: Any) -> None:
+    handler = TestAliasedUuidListHandler()
+    app = web.Application()
+    app.router.add_get("/test", handler.handle)
+
+    g1 = str(uuid.uuid4())
+    g2 = str(uuid.uuid4())
+    client = await aiohttp_client(app)
+    # Provided via the alias key ("group_id") and as repeated keys -> parsed as a UUID list.
+    resp = await client.get(f"/test?group_id={g1}&group_id={g2}")
+
+    assert resp.status == HTTPStatus.OK
+    data = await resp.json()
+    assert data["group_ids"] == [g1, g2]

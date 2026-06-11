@@ -68,6 +68,8 @@ from ai.backend.common.events.event_types.notification.anycast import (
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
+    DoReconcileProcessEvent,
+    DoReconcileProcessIfNeededEvent,
     DoRouteLifecycleEvent,
     DoRouteLifecycleIfNeededEvent,
     DoSokovanProcessIfNeededEvent,
@@ -126,6 +128,7 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
+from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -151,6 +154,7 @@ class DispatcherArgs:
     scheduling_controller: SchedulingController
     deployment_coordinator: DeploymentCoordinator
     route_coordinator: RouteCoordinator
+    reconciler_coordinator: ReconcilerCoordinator
     scheduler_repository: SchedulerRepository
     event_hub: EventHub
     agent_registry: AgentRegistry
@@ -210,6 +214,7 @@ class Dispatchers:
             args.scheduling_controller,
             args.deployment_coordinator,
             args.route_coordinator,
+            args.reconciler_coordinator,
             args.event_hub,
         )
         self._session_event_handler = SessionEventHandler(
@@ -459,6 +464,19 @@ class Dispatchers:
             None,
             self._schedule_event_handler.handle_do_route_lifecycle,
             name="route.lifecycle",
+        )
+        # Generic reconcile events (reconcile_type routes to the registered stage)
+        event_dispatcher.consume(
+            DoReconcileProcessIfNeededEvent,
+            None,
+            self._schedule_event_handler.handle_do_reconcile_if_needed,
+            name="reconcile.process_if_needed",
+        )
+        event_dispatcher.consume(
+            DoReconcileProcessEvent,
+            None,
+            self._schedule_event_handler.handle_do_reconcile,
+            name="reconcile.process",
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:

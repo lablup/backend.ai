@@ -171,10 +171,12 @@ class BaseRunner(metaclass=ABCMeta):
     _main_task: asyncio.Task[Any]
     _run_task: asyncio.Task[Any]
     _health_check_task: asyncio.Task[Any] | None
+    _background_tasks: set[asyncio.Task[Any]]
 
     def __init__(self, runtime_path: Path) -> None:
         setup_logger_basic(self.log_prefix, False)
         self.subproc = None
+        self._background_tasks = set()
         self.runtime_path = runtime_path
         self.child_env = {**os.environ, **self.default_child_env}
         # set some defaults only when they are missing from the image
@@ -940,7 +942,11 @@ class BaseRunner(metaclass=ABCMeta):
                             cwd=_cwd,
                         )
                         self.services_running[service_info["name"]] = proc
-                        asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
+                        wait_task = asyncio.create_task(
+                            self._wait_service_proc(service_info["name"], proc)
+                        )
+                        self._background_tasks.add(wait_task)
+                        wait_task.add_done_callback(self._background_tasks.discard)
                         if launch_timeout is not None:
                             async with asyncio.timeout(launch_timeout):
                                 await wait_local_port_open(service_info["port"])
@@ -1229,13 +1235,19 @@ class BaseRunner(metaclass=ABCMeta):
                     await self._send_status()
                 elif op_type == "event":
                     data = json.loads(text)
-                    asyncio.create_task(self.log_event(data))
+                    event_task = asyncio.create_task(self.log_event(data))
+                    self._background_tasks.add(event_task)
+                    event_task.add_done_callback(self._background_tasks.discard)
                 elif op_type == "start-model-service":  # activate a service port
                     data = json.loads(text)
-                    asyncio.create_task(self.start_model_service(data))
+                    model_service_task = asyncio.create_task(self.start_model_service(data))
+                    self._background_tasks.add(model_service_task)
+                    model_service_task.add_done_callback(self._background_tasks.discard)
                 elif op_type == "start-service":  # activate a service port
                     data = json.loads(text)
-                    asyncio.create_task(self._start_service_and_feed_result(data))
+                    service_task = asyncio.create_task(self._start_service_and_feed_result(data))
+                    self._background_tasks.add(service_task)
+                    service_task.add_done_callback(self._background_tasks.discard)
                 elif op_type == "shutdown-service":  # shutdown the service by its name
                     data = json.loads(text)
                     await self._shutdown_service(data)

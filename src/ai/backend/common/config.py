@@ -211,6 +211,32 @@ class ModelHealthCheck(BaseConfigModel):
         ge=0,
     )
 
+    def is_retry_exhausted(self, consecutive_failures: int) -> bool:
+        """Whether consecutive failed probes have reached ``max_retries``.
+
+        The health observer accumulates ``consecutive_failures`` (reset to 0
+        on a passing probe); the consuming handler calls this to decide when
+        a route should transition to UNHEALTHY.
+        """
+        return consecutive_failures >= self.max_retries
+
+    def is_probe_due(self, last_check: int, now: int) -> bool:
+        """Whether ``interval`` has elapsed since the last probe.
+
+        ``last_check`` / ``now`` are Unix-second timestamps. Used by the
+        observer to throttle per-route probing to the configured interval.
+        """
+        return now - last_check >= self.interval
+
+    def health_status_ttl_sec(self) -> int:
+        """Per-route TTL for the cached health status in Valkey.
+
+        Key expiry signals DEGRADED (no recent check), so the TTL must stay
+        comfortably above the probe ``interval`` — normal probing refreshes
+        it every ``interval`` with margin for scheduling jitter.
+        """
+        return max(120, int(self.interval * 3))
+
 
 class ModelServiceConfig(BaseConfigModel):
     pre_start_actions: list[PreStartAction] = Field(
@@ -452,6 +478,18 @@ class ModelDefinition(BaseConfigModel):
     def health_check_config(self) -> ModelHealthCheck | None:
         for model in self.models:
             if model.service and model.service.health_check and model.service.health_check.enable:
+                return model.service.health_check
+        return None
+
+    def health_check_setting(self) -> ModelHealthCheck | None:
+        """The configured health check, preserved even when disabled.
+
+        Unlike :meth:`health_check_config`, this does not gate on ``enable``,
+        so a caller that persists the setting keeps the ``enable`` flag intact
+        and consumers decide based on it rather than on presence alone.
+        """
+        for model in self.models:
+            if model.service and model.service.health_check:
                 return model.service.health_check
         return None
 

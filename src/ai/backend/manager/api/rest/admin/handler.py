@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.admin.request import GraphQLRequest
 from ai.backend.common.dto.manager.admin.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
+from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.base import DataLoaderManager
 from ai.backend.manager.api.gql_legacy.schema import (
@@ -211,7 +212,7 @@ class AdminHandler:
             event_hub=gql_deps.processors.events.event_hub,
             event_fetcher=gql_deps.processors.events.event_fetcher,
             gql_adapter=gql_deps.strawberry_gql_adapter,
-            data_loaders=gql_deps.strawberry_data_loaders,
+            data_loaders=DataLoaders(gql_deps.adapters),
             metric_observer=gql_deps.metric_observer,
             adapters=gql_deps.adapters,
         )

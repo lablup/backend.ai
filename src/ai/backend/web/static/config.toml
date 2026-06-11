@@ -85,8 +85,7 @@ webServerURL = "[Web server website URL. App will use the site instead of local 
 
 [plugin]
 # Reserved to load plugins
-#login = "signup-cloud.js"
-#sidebar = "report-cloud.js"
+#login = "signup-cloud" # Inject a JavaScript file into the login page.
 #page = "test-plugin1,test-plugin2" # Show menus on the list which are separated by comma.
 
 #[license]
