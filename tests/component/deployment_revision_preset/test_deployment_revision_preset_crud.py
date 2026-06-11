@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import pytest
 import sqlalchemy as sa
@@ -36,11 +37,9 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
-@pytest.fixture()
-async def runtime_variant_id(
-    db_engine: SAEngine, database_fixture: None
-) -> AsyncIterator[RuntimeVariantID]:
-    """Create a runtime variant for testing."""
+@asynccontextmanager
+async def _runtime_variant(db_engine: SAEngine) -> AsyncIterator[RuntimeVariantID]:
+    """Insert a runtime variant and clean up its presets and itself on exit."""
     variant_id = RuntimeVariantID(uuid.uuid4())
     async with db_engine.begin() as conn:
         await conn.execute(
@@ -54,16 +53,36 @@ async def runtime_variant_id(
                 default_model_definition="{}",
             )
         )
-    yield variant_id
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.text(
-                "DELETE FROM deployment_revision_presets WHERE runtime_variant = :id"
-            ).bindparams(id=variant_id)
-        )
-        await conn.execute(
-            sa.text("DELETE FROM runtime_variants WHERE id = :id").bindparams(id=variant_id)
-        )
+    try:
+        yield variant_id
+    finally:
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "DELETE FROM deployment_revision_presets WHERE runtime_variant = :id"
+                ).bindparams(id=variant_id)
+            )
+            await conn.execute(
+                sa.text("DELETE FROM runtime_variants WHERE id = :id").bindparams(id=variant_id)
+            )
+
+
+@pytest.fixture()
+async def runtime_variant_id(
+    db_engine: SAEngine, database_fixture: None
+) -> AsyncIterator[RuntimeVariantID]:
+    """Create a runtime variant for testing."""
+    async with _runtime_variant(db_engine) as variant_id:
+        yield variant_id
+
+
+@pytest.fixture()
+async def other_runtime_variant_id(
+    db_engine: SAEngine, database_fixture: None
+) -> AsyncIterator[RuntimeVariantID]:
+    """Create a second runtime variant to move a preset into."""
+    async with _runtime_variant(db_engine) as variant_id:
+        yield variant_id
 
 
 class TestDeploymentRevisionPresetCRUD:
@@ -177,6 +196,39 @@ class TestDeploymentRevisionPresetCRUD:
         assert update_result.preset.rank == 50
 
         await admin_v2_registry.deployment_revision_preset.delete(preset_id)
+
+    async def test_update_runtime_variant(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        runtime_variant_id: RuntimeVariantID,
+        other_runtime_variant_id: RuntimeVariantID,
+    ) -> None:
+        create_result = await admin_v2_registry.deployment_revision_preset.create(
+            CreateDeploymentRevisionPresetInput(
+                runtime_variant_id=runtime_variant_id,
+                name="variant-move-preset",
+                image_id=ImageID(uuid.uuid4()),
+                resource_slots=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                cluster_mode="single-node",
+                cluster_size=1,
+                replica_count=1,
+                deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
+            )
+        )
+        preset_id = create_result.preset.id
+        assert create_result.preset.runtime_variant_id == runtime_variant_id
+
+        update_result = await admin_v2_registry.deployment_revision_preset.update(
+            preset_id,
+            UpdateDeploymentRevisionPresetInput(
+                id=preset_id,
+                runtime_variant_id=other_runtime_variant_id,
+            ),
+        )
+        assert update_result.preset.runtime_variant_id == other_runtime_variant_id
+
+        get_result = await admin_v2_registry.deployment_revision_preset.get(preset_id)
+        assert get_result.runtime_variant_id == other_runtime_variant_id
 
     async def test_delete(
         self,

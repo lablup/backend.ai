@@ -541,6 +541,13 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
 )
 class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     id: UUID = gql_field(description="Preset ID.")
+    runtime_variant_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="New runtime variant for the preset. Omit to leave unchanged.",
+        ),
+        default=None,
+    )
     name: str | None = gql_field(default=None, description="New name.")
     description: str | None = gql_field(default=None, description="New description.")
     rank: int | None = gql_field(default=None, description="New rank.")

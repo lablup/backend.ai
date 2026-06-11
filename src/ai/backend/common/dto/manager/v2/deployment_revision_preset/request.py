@@ -73,6 +73,7 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
 
 class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     id: UUID = Field(description="Preset ID.")
+    runtime_variant_id: RuntimeVariantID | None = Field(default=None)
     name: str | None = Field(default=None, min_length=1, max_length=256)
     description: str | Sentinel | None = Field(default=SENTINEL)
     rank: int | None = Field(default=None, ge=0)
