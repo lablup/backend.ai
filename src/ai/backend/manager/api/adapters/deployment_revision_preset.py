@@ -225,6 +225,11 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         )
 
         spec = DeploymentRevisionPresetUpdaterSpec(
+            runtime_variant=(
+                OptionalState.update(input.runtime_variant_id)
+                if input.runtime_variant_id is not None
+                else OptionalState.nop()
+            ),
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),

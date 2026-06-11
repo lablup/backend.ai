@@ -11484,6 +11484,11 @@ input UpdateDeploymentRevisionPresetInput {
   """Preset ID."""
   id: UUID!
 
+  """
+  Added in UNRELEASED. New runtime variant for the preset. Omit to leave unchanged.
+  """
+  runtimeVariantId: UUID = null
+
   """New name."""
   name: String = null
 

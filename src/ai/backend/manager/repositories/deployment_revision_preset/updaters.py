@@ -6,7 +6,7 @@ from typing import Any, override
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
@@ -16,6 +16,9 @@ from ai.backend.manager.types import OptionalState, TriState
 
 @dataclass
 class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRow]):
+    runtime_variant: OptionalState[RuntimeVariantID] = field(
+        default_factory=OptionalState[RuntimeVariantID].nop
+    )
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
@@ -57,6 +60,7 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     @override
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
+        self.runtime_variant.update_dict(to_update, "runtime_variant")
         self.name.update_dict(to_update, "name")
         self.description.update_dict(to_update, "description")
         self.rank.update_dict(to_update, "rank")
