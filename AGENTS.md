@@ -2,6 +2,15 @@
 
 이 파일은 AI 코딩 에이전트의 핵심 규칙을 담는다. 상세 패턴·워크플로는 아래 스킬과 문서를 쓴다.
 
+## 문서 구조 (AGENTS.md / CONTEXTS.md)
+
+- **`AGENTS.md`**: 가드레일(규칙)만. 단정형으로 간결하게. 항상 자동 로드된다(`CLAUDE.md`는 이 파일로의 심링크).
+- **`CONTEXTS.md`**: 개발을 위해 읽는 배경(가정·근거·caveat·예시·개발 맥락). 가정 등이 바뀌면 비교적 자주
+  갱신된다. 온디맨드로 읽으며, 해당 `AGENTS.md` 상단에 포인터를 둔다.
+- **`README.md`**: 사람이 컴포넌트 구성을 이해하기 위한 문서. 자주 바뀌지 않아야 한다. AGENTS/CONTEXTS와 중복하지 않는다.
+- 규칙은 적용 범위의 **가장 상위에 한 번만** 둔다 — 전역은 이 root, 컴포넌트 전역은 컴포넌트 최상위.
+  하위에서 상위 규칙을 중복하지 않는다.
+
 ## 문서 인덱스
 
 **핵심 문서 (직접 읽기):**
@@ -94,11 +103,8 @@ API Handler → Processor → Service → Repository → DB
 - 상세 API 패턴: `/api-guide`
 - SDK/CLI 패턴: `/cli-sdk-guide`
 
-**신규 API 엔드포인트 구현 후 라이브 서버로 검증한다:**
-1. 서버 재시작: `./dev restart mgr` (`/local-dev` 호출)
-2. `/bai-cli` 스킬 로드 후 각 연산을 `./bai` CLI로 테스트
-3. admin·non-admin 시나리오 모두 검증
-4. Grafana MCP(`/observability`)로 로그/메트릭 확인해 런타임 에러 없는지 확인
+**신규 API 엔드포인트 구현 후 라이브 서버로 검증한다** — admin·non-admin 모두 확인. 서버 재시작·`./bai`
+테스트·로그 확인 절차는 `/local-dev`, `/bai-cli`, `/observability` 스킬 참고.
 
 ## 개발 가이드라인
 

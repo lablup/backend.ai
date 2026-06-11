@@ -1,99 +1,57 @@
-# Manager API Layer — Guardrails
+# Manager API 레이어 — 가드레일
 
-> For full implementation patterns, see the `/api-guide` skill.
+> 배경·검증 절차는 같은 디렉터리 `CONTEXTS.md`, 구현 패턴은 `/api-guide` 스킬.
 
-## Handler Style
+## 핸들러 스타일
 
-- All handlers MUST be methods on an `APIHandler` class — no module-level async functions.
-- Parse requests via `BodyParam[T]` and `PathParam[T]` — never read `request.json()` or
-  `request.rel_url.query` directly inside a handler.
-- Return `APIResponse.build(status_code=..., response_model=...)` — never `web.json_response()`.
+- 모든 핸들러는 `APIHandler` 클래스의 메서드여야 한다 — 모듈 레벨 async 함수 금지.
+- 요청은 `BodyParam[T]`, `PathParam[T]`로 파싱한다 — 핸들러 안에서 `request.json()`이나
+  `request.rel_url.query`를 직접 읽지 않는다.
+- `APIResponse.build(status_code=..., response_model=...)`로 반환한다 — `web.json_response()` 금지.
 
-## Calling Services
+## Service 호출
 
-**New API (v2):** Handlers MUST call Adapters (`self._adapters.{domain}.method(dto_input)`),
-never Processors or Services directly. Adapters are shared with the GQL layer.
+- **신규(v2):** 핸들러는 Adapter(`self._adapters.{domain}.method(dto_input)`)를 호출한다 —
+  Processor/Service 직접 호출 금지. Adapter는 GQL 레이어와 공유한다.
+- **레거시 REST(v1):** 핸들러가 Processor를 직접 호출한다(`await self._foo.wait_for_complete(FooAction(...))`).
+- 신규 API 엔드포인트는 모두 v2 패턴을 따른다.
 
-**Legacy REST (v1):** Handlers call Processors directly:
-  ```python
-  await self._foo.wait_for_complete(FooAction(...))
-  ```
+## 네이밍 & 스코프
 
-**All new API endpoints MUST follow the v2 pattern.**
+- superadmin 전용: `admin_` 접두 + 첫 줄에서 `_check_superadmin(request)` 호출.
+- scoped: 현재는 `{scope}_` 접두 (예: `domain_search_users`). **향후 방향(검토 중):** `scoped_`로 통일하고
+  scope를 요청 필드로 받는다(아래 scoped search REST URL 참고).
+- self-service: `my_` 접두 (예: `my_keypairs`). Adapter가 사용자를 내부에서 resolve.
+  - REST URL: `/v2/{entity}/my/{operation}` — 엔티티가 앞, `my`는 스코프 한정자.
 
-## Naming & Scope Rules
+**search — 항상 두 변형:**
+- `admin_search_*`: superadmin 전용, 스코프 없음 — 전체 시스템 조회.
+- scoped search: non-admin, 스코프 인자 필수 — 해당 스코프 내 조회.
+- non-admin에게 "스코프 없는 전체 조회"는 없다.
 
-- Superadmin-only endpoints: `admin_` prefix + call `_check_superadmin(request)` first.
-- Scoped endpoints: `{scope}_` prefix (e.g., `domain_search_users`).
-- Self-service endpoints: `my_` prefix (e.g., `my_keypairs`). Adapter resolves user internally.
-  - REST URL pattern: `/v2/{entity}/my/{operation}` — entity first, `my` as scope qualifier.
+**scoped search REST URL** (검토 중):
+- 현재: `/v2/{entity}/{scope_type}/{scope_id}/search` — 스코프를 중첩 리소스 경로로 표현(`search-by-{scope}` 아님).
+  예: `/v2/sessions/projects/{project_id}/search`.
+- **향후 방향:** `/v2/{entity}/scoped/search` 형태의 고정 path를 쓰고 scope는 요청 body 필드로 받는다
+  (path param이 아님). SDK `scoped_search`·GQL `scopedFoosV2`와 일관.
 
-**search — always two variants:**
-- `admin_search_*`: superadmin only, no scope — queries entire system.
-- `{scope}_search_*`: non-admin, scope parameter required — queries within the given scope only.
-- There is NO "search everything without scope" for non-admin users.
+**create / update / get / delete / purge — `admin_` 분리 기준:**
+- admin 전용 엔티티(Domain, ContainerRegistry 등): 단일 `admin_` 엔드포인트.
+- admin·사용자 둘 다이고 동작이 다름(예: admin이 더 많은 필드 설정): `admin_`과 non-admin을 서로 다른 DTO로 분리.
+- admin·사용자 둘 다이고 권한 검사만 다름: 단일 엔드포인트 — admin은 이미 엔티티 접근 권한이 있어 별도 `admin_` 불필요.
 
-**Scoped search REST URL pattern:**
-- Pattern: `/v2/{entity}/{scope_type}/{scope_id}/search`
-- Scope is expressed as nested resource path segments, NOT as `search-by-{scope}`.
-- Example: `/v2/sessions/projects/{project_id}/search` (not `/v2/sessions/search-by-project/{id}`).
+## 라우팅
 
-**create / update / get / delete / purge — when to separate `admin_` vs non-admin:**
-- **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` endpoint.
-- **Both admin and users, behavior differs** (e.g., admin sets more fields): separate `admin_` and non-admin endpoints with different DTOs.
-- **Both admin and users, only permission check differs**: single endpoint — admin already has entity access permissions, no separate `admin_` variant needed.
+- 라우트 등록은 `create_app()`에서만 한다.
+- `app["prefix"]`를 이 sub-app의 URL 세그먼트로 설정한다.
 
-## Routing
+## V2 DTO — 단일 진실 원천
 
-- Route registration belongs exclusively in `create_app()`.
-- `app["prefix"]` must be set to the URL segment for this sub-app.
+v2 DTO(`common/dto/manager/v2/`)는 REST v2 핸들러, GQL 타입, Client SDK, CLI가 공유하는 스키마다.
+**DTO 변경은 이 네 레이어 모두에 영향을 준다** — DTO → Adapter → REST 핸들러 → GQL 타입 → SDK → CLI 순으로 조율한다.
 
-## What Belongs Here
+## 여기 속하는 것 / 속하지 않는 것
 
-- HTTP request/response translation only.
-- Auth decorators (`@auth_required_for_method`).
-
-## Adapter `my_` Pattern
-
-For self-service (`my_`) endpoints, the Adapter method handles authentication internally:
-- The Adapter calls `current_user()` internally to obtain the user context.
-- The Adapter constructs the `SearchScope` from the user context.
-- The GQL resolver / REST handler does NOT pass scope — only the search input DTO.
-- This keeps authentication logic inside the adapter, not scattered across resolvers.
-
-## V2 DTO — Single Source of Truth
-
-v2 DTOs (`common/dto/manager/v2/`) are the shared schema for:
-- REST v2 handlers (`api/rest/v2/`)
-- GraphQL (Strawberry) types (`api/gql/`)
-- Client SDK (`client/v2/domains_v2/`)
-- CLI (`client/cli/v2/`)
-
-**Any DTO change affects all four layers.** Coordinate updates across:
-1. DTO definition → 2. Adapter → 3. REST handler → 4. GQL type → 5. SDK client → 6. CLI command
-
-## Testing v2 Endpoints
-
-**After implementing new API endpoints, verify them with the live server before committing:**
-
-1. Restart the server: `./dev restart mgr` (add `./dev restart web` if GQL schema changed)
-2. Login if needed: `./bai login`
-3. Test each new operation via `./bai` CLI commands
-4. Verify both success cases and expected error cases (e.g., 403 for non-admin)
-
-```bash
-# Example: after adding domain CRUD
-./dev restart mgr && sleep 5
-./bai admin domain create '{"name":"test-domain"}'
-./bai domain get test-domain
-./bai admin domain update test-domain '{"description":"updated"}'
-./bai admin domain delete test-domain
-```
-
-See `/local-dev` skill for full setup, `./bai` command patterns, and regular user testing.
-
-## What Does NOT Belong Here
-
-- Business logic or domain rules.
-- Direct database access or ORM imports from `manager/models/`.
-- Imports of Repository or Service classes (use Processors via context).
+- 속함: HTTP 요청/응답 변환, auth 데코레이터(`@auth_required_for_method`).
+- 속하지 않음: 비즈니스 로직·도메인 규칙, 직접 DB 접근이나 `manager/models/` ORM import,
+  Repository/Service 클래스 import.
