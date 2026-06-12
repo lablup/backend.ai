@@ -72,13 +72,13 @@ from ai.backend.appproxy.common.utils import (
     mime_match,
     ping_redis_connection,
 )
-from ai.backend.appproxy.coordinator.api.types import AppProxyStatusResponse
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
+from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
