@@ -995,4 +995,4 @@ class StatContext:
             key_value_map[str(cid)] = serialized_metrics
 
         if key_value_map:
-            await self.agent.valkey_stat_client.set_multiple_keys(key_value_map, expire_sec=8)
+            await self.agent.valkey_stat_client.set_multiple_keys(key_value_map, expire_sec=120)
