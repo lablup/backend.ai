@@ -7,7 +7,10 @@ import psutil
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import BackendAIError, ErrorCode
-from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
+from ai.backend.common.metrics.multiprocess import (
+    generate_latest_multiprocess,
+    generate_latest_singleprocess,
+)
 from ai.backend.common.metrics.safe import (
     SafeCounter as Counter,
 )
@@ -764,6 +767,15 @@ class CommonMetricRegistry:
     def to_prometheus(self) -> str:
         self.system.observe()
         return generate_latest_multiprocess().decode("utf-8")
+
+    def to_prometheus_singleprocess(self) -> str:
+        """
+        For single-worker components that do not set up the prometheus
+        multiprocess dir (e.g., the agent, which needs per-series removal
+        that multiprocess mmap storage cannot provide).
+        """
+        self.system.observe()
+        return generate_latest_singleprocess().decode("utf-8")
 
 
 class StageObserver:
