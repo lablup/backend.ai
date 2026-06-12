@@ -217,9 +217,9 @@ async def download(request: web.Request) -> web.StreamResponse:
     ):
         token_data = params["token"]
         if token_data["unmanaged_path"] is not None:
-            vfpath = Path(token_data["unmanaged_path"])
+            vfpath = Path(token_data["unmanaged_path"]).resolve()
         else:
-            vfpath = volume.mangle_vfpath(token_data["vfid"])
+            vfpath = volume.mangle_vfpath(token_data["vfid"]).resolve()
         try:
             parent_dir = vfpath
             if (dst_dir := params["dst_dir"]) is not None:
