@@ -20869,12 +20869,9 @@ type VFolder implements Node
   unmanagedPath: String
 
   """
-  Added in UNRELEASED. Capacity quota limit in bytes with human-readable display. Null if unlimited.
+  Added in UNRELEASED. Quota limits (maxSize, maxFiles) configured for the folder.
   """
-  maxSize: BinarySizeInfo
-
-  """Added in UNRELEASED. File-count quota for the folder."""
-  maxFiles: Int!
+  quota: VFolderQuotaInfo!
 
   """
   Added in UNRELEASED. Usage statistics (numFiles, usedBytes) measured on demand through the storage proxy when this field is selected. This is a very slow operation: every selection makes a round-trip to the storage proxy, and the measurement cost depends on the storage backend (e.g., a full directory walk on vfs). Select only when needed. Null for unmanaged vfolders.
@@ -21113,6 +21110,14 @@ Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribut
 """
 scalar VFolderPermissionValueField
   @join__type(graph: GRAPHENE)
+
+"""Added in UNRELEASED. Quota limits configured for a virtual folder."""
+type VFolderQuotaInfo
+  @join__type(graph: STRAWBERRY)
+{
+  maxSize: BinarySizeInfo
+  maxFiles: Int!
+}
 
 """
 Added in UNRELEASED. Usage statistics for a virtual folder, measured live through the storage proxy.

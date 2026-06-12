@@ -19,6 +19,9 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderOwnershipInfo as VFolderOwnershipInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
+    VFolderQuotaInfo as VFolderQuotaInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
@@ -92,6 +95,23 @@ class VFolderAccessControlInfoGQL:
     ownership_type: VFolderOwnershipTypeGQL = gql_field(
         description="Ownership type: USER (personal folder) or GROUP (project-shared folder)."
     )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Quota limits configured for a virtual folder.",
+    ),
+    model=VFolderQuotaInfoDTO,
+    name="VFolderQuotaInfo",
+)
+class VFolderQuotaInfoGQL:
+    """Quota limits configured for a virtual folder."""
+
+    max_size: BinarySizeInfoGQL | None = gql_field(
+        description="Capacity quota limit in bytes with human-readable display. Null if unlimited."
+    )
+    max_files: int = gql_field(description="File-count quota for the folder.")
 
 
 @gql_pydantic_type(

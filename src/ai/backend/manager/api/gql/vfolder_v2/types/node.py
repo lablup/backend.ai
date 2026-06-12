@@ -37,6 +37,7 @@ from .nested import (
     VFolderAccessControlInfoGQL,
     VFolderMetadataInfoGQL,
     VFolderOwnershipInfoGQL,
+    VFolderQuotaInfoGQL,
     VFolderUsageInfoGQL,
 )
 
@@ -80,18 +81,10 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         )
     )
     unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
-    max_size: BinarySizeInfoGQL | None = gql_added_field(
+    quota: VFolderQuotaInfoGQL = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Capacity quota limit in bytes with human-readable display. Null if unlimited."
-            ),
-        )
-    )
-    max_files: int = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description="File-count quota for the folder.",
+            description="Quota limits (maxSize, maxFiles) configured for the folder.",
         )
     )
 

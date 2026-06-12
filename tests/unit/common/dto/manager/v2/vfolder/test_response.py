@@ -35,6 +35,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderOwnershipInfo,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
+    VFolderQuotaInfo,
     VFolderUsageMode,
 )
 
@@ -54,6 +55,13 @@ def _make_access_control_info() -> VFolderAccessControlInfo:
     return VFolderAccessControlInfo(
         permission=VFolderPermissionField.READ_WRITE,
         ownership_type=VFolderOwnershipTypeField.USER,
+    )
+
+
+def _make_quota_info() -> VFolderQuotaInfo:
+    return VFolderQuotaInfo(
+        max_size=None,
+        max_files=1000,
     )
 
 
@@ -77,8 +85,7 @@ class TestVFolderNodeCreation:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
-            max_size=None,
-            max_files=1000,
+            quota=_make_quota_info(),
         )
         assert node.unmanaged_path is None
 
@@ -90,8 +97,7 @@ class TestVFolderNodeCreation:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
-            max_size=None,
-            max_files=1000,
+            quota=_make_quota_info(),
         )
         restored = VFolderNode.model_validate_json(node.model_dump_json())
         assert restored.metadata.name == node.metadata.name
@@ -105,8 +111,7 @@ class TestVFolderNodeCreation:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
-            max_size=None,
-            max_files=1000,
+            quota=_make_quota_info(),
         )
         data = json.loads(node.model_dump_json())
         assert "metadata" in data
@@ -183,8 +188,7 @@ class TestPayloadModels:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
-            max_size=None,
-            max_files=1000,
+            quota=_make_quota_info(),
         )
         payload = CreateVFolderPayload(vfolder=node)
         assert payload.vfolder.metadata.name == "test-folder"
@@ -197,8 +201,7 @@ class TestPayloadModels:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
-            max_size=None,
-            max_files=1000,
+            quota=_make_quota_info(),
         )
         payload = UpdateVFolderPayload(vfolder=node)
         assert payload.vfolder is not None
@@ -226,8 +229,7 @@ class TestPayloadModels:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
-            max_size=None,
-            max_files=1000,
+            quota=_make_quota_info(),
         )
         payload = CloneVFolderPayload(vfolder=node, bgtask_id="task-123")
         assert payload.bgtask_id == "task-123"
@@ -282,8 +284,7 @@ class TestPayloadModels:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
-            max_size=None,
-            max_files=1000,
+            quota=_make_quota_info(),
         )
         payload = CreateVFolderPayload(vfolder=node)
         restored = CreateVFolderPayload.model_validate_json(payload.model_dump_json())

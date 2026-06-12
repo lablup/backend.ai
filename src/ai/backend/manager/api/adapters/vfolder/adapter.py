@@ -52,6 +52,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderAccessControlInfo,
     VFolderMetadataInfo,
     VFolderOwnershipInfo,
+    VFolderQuotaInfo,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
@@ -220,8 +221,12 @@ class VFolderAdapter(BaseAdapter):
                 creator_id=data.creator_id,
                 creator_email=data.creator,
             ),
-            max_size=_to_binary_size_info(data.max_size) if data.max_size is not None else None,
-            max_files=data.max_files,
+            quota=VFolderQuotaInfo(
+                max_size=_to_binary_size_info(data.max_size)
+                if data.max_size is not None
+                else None,
+                max_files=data.max_files,
+            ),
             unmanaged_path=data.unmanaged_path,
         )
 

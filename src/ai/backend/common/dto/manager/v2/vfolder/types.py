@@ -28,6 +28,7 @@ __all__ = (
     "VFolderOwnershipTypeField",
     "VFolderPermissionField",
     "VFolderAccessControlInfo",
+    "VFolderQuotaInfo",
     "VFolderStatusFilter",
     "VFolderUsageInfo",
     "VFolderUsageMode",
@@ -105,6 +106,13 @@ class VFolderOwnershipInfo(BaseResponseModel):
     project_id: UUID | None
     creator_id: UUID | None
     creator_email: str | None
+
+
+class VFolderQuotaInfo(BaseResponseModel):
+    """Quota limits configured for a virtual folder."""
+
+    max_size: BinarySizeInfo | None
+    max_files: int
 
 
 class VFolderUsageInfo(BaseResponseModel):
