@@ -26,15 +26,6 @@ class StubResponseModel(BackendAISchema):
     success: Annotated[bool, Field(default=True)]
 
 
-class AppProxyStatusResponse(BackendAISchema):
-    """Response from AppProxy /status endpoint."""
-
-    api_version: str = Field(description="AppProxy API version (e.g., 'v1', 'v2')")
-    advertise_address: str | None = Field(
-        default=None, description="Advertised address for AppProxy"
-    )
-
-
 class CircuitListResponseModel(BackendAISchema):
     circuits: list[SerializableCircuit]
 
