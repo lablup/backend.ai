@@ -170,4 +170,4 @@ See `.claude/skills/db-status/SKILL.md` and `.claude/skills/db-migrate/SKILL.md`
 For component-specific guidance, see:
 - `/cli-executor` - Component CLI operations
 - `/db-status`, `/db-migrate` - Database operations
-- `tests/CLAUDE.md` - Testing guidelines
+- `tests/AGENTS.md` - Testing guidelines

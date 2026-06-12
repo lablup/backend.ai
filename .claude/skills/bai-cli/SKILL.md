@@ -1,13 +1,14 @@
 # ./bai CLI Usage Guide
 
-Guide for using the Backend.AI **v2 CLI** to test API endpoints, verify changes, and manage resources.
+Guide for testing and verifying API endpoints and managing resources with the Backend.AI **v2 CLI** (`./bai`).
 
 **IMPORTANT:**
 - `./bai` is the v2 REST API CLI. It is separate from the legacy v1 CLI (`backend.ai` / `./backend.ai`).
-- Do NOT use v1 CLI commands. All testing and verification MUST use `./bai`.
-- **BEFORE running any `./bai` command, check the Entity-Command Reference below** to confirm the command exists. Do NOT guess or fabricate commands. Do NOT explore CLI source code.
+- Do NOT use v1 CLI commands. Do all testing and verification with `./bai`.
+- **Before running a `./bai` command, confirm the command exists in the Entity-Command Reference below.** No guessing or fabrication, no searching the CLI source.
+- Verify the command tree with `--help` (works without a server): `./bai {entity} --help`, `./bai admin {entity} --help`, `./bai my {entity} --help`.
 
-### v1 → v2 Terminology
+### v1 → v2 terminology
 
 | v1 (legacy, do NOT use) | v2 (`./bai`) |
 |--------------------------|-------------|
@@ -22,73 +23,88 @@ Guide for using the Backend.AI **v2 CLI** to test API endpoints, verify changes,
 
 Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 
-Verify options with `--help`: `./bai {entity} {command} --help`
+Each entity is marked by access level — **user** (user-facing) / **admin** (superadmin only) / **my** (own resources).
+"(empty group)" is a placeholder group with no commands (example: `./bai agent` is empty and the actual commands are under `./bai admin agent`).
+Check options with `--help`.
 
 ### Core
 
-- **domain**: user(get) | admin(search, create, update, delete)
-- **user**: user(get, create, update, delete, search) | admin(create, delete)
-- **project**: user(get) | admin(search, create, update, delete)
-- **agent**: admin(search, create, delete)
-- **image**: admin(search, create, delete)
-- **session**: user(enqueue, get, project-search, terminate, start-service, shutdown-service, logs, update) | admin(search) | my(search)
-  - admin sub: kernel(search, inspect, restart)
+- **domain**: user(get) · admin(search, create, update, delete, purge)
+- **user**: user(get, create, update, delete, search) · admin(create, delete, search)
+- **project**: user(get, assign-users, unassign-users · sub role: search) · admin(search, create, update, delete, purge)
+- **agent**: user(empty group) · admin(search, total-resources)
+- **image**: user(empty group) · admin(search, forget, purge, update · sub alias: create, remove, search)
+- **session**: user(enqueue, get, logs, project-search, start-service, shutdown-service, terminate, update) · admin(search · sub kernel: search) · my(search)
 
 ### Compute & Serving
 
-- **deployment**: user(project-search, get, create, update, delete) | admin(search) | my(search)
-  - admin sub: revision(search, add, get, current, activate), replica(search, scale-up, scale-down)
-- **model-card**: user(project-search, get, deploy, available-presets) | admin(search, create, update, delete)
-- **service-catalog**: admin(search, create, update, delete)
-- **runtime-variant**: user(search, get) | admin(search, create, update, delete)
-- **runtime-variant-preset**: user(search, get) | admin(search, create, update, delete)
-- **scheduling-history**: sub: session(search, search-scoped), deployment(search, search-scoped), route(search, search-scoped)
+- **deployment**: user(create, get, update, delete, project-search, chat) · admin(search) · my(search)
+  - user sub: access-token(create, get, search, delete, bulk-delete), auto-scaling-rule(create, get, search, update, delete, bulk-delete), replica(search), revision(add, get, current, activate, search), revision-preset(get, search), options(get, replace), chat-cache(show, clear), chat-config(set, show, clear), chat-history(show, clear), policy(empty group)
+  - admin sub: policy(search), replica(search), revision(search, refresh), revision-preset(create, get, search, update, delete)
+- **model-card**: user(project-search, get, deploy, available-presets) · admin(search, get, create, update, delete, bulk-delete, scan)
+- **service-catalog**: user(empty group) · admin(search)
+- **runtime-variant**: user(get, search) · admin(get, search, create, update, delete, bulk-delete)
+- **runtime-variant-preset**: user(get, search) · admin(get, search, create, update, delete)
+- **scheduling-history**: sub session / deployment / route — each (search, search-scoped)
+- **scheduling-handler**: admin(list)
 
 ### Storage
 
-- **vfolder**: user(my-search, project-search, admin-search, create, get, upload, download, delete, purge, ls, mkdir, mv, rm, clone, bulk-delete, bulk-purge)
-- **vfs-storage**: user(create, list-all, get, update, search, delete)
+- **vfolder**: user(my-search, project-search, admin-search, create, project-create, get, upload, download, delete, purge, restore, ls, mkdir, mv, rm, clone, deploy, bulk-delete, bulk-purge)
+- **vfs-storage**: user(create, get, search, list-all, update, delete)
 - **storage-namespace**: user(register, unregister, search, get-by-storage)
-- **object-storage**: user(create, get, update, search, delete)
+- **object-storage**: user(create, get, search, update, delete)
+- **storage-host**: my(permissions)
 
 ### Registries & Artifacts
 
-- **container-registry**: admin(search, create, update, delete)
-- **artifact**: user(get, update, delete, restore) | admin(search, purge)
-  - user sub: revision(get, approve, reject, cancel-import, cleanup)
-- **artifact-registry**: user(get) | admin(search, create, update, delete)
-- **huggingface-registry**: user(create, search, get, update, delete) | admin(search)
-- **reservoir-registry**: user(create, search, get, update, delete) | admin(search)
+- **container-registry**: user(empty group) · admin(search, create, update, delete)
+- **artifact**: user(get, update, delete, restore · sub revision: get, approve, reject, cancel-import, cleanup) · admin(search)
+- **artifact-registry**: user(get)
+- **huggingface-registry**: user(create, get, search, update, delete) — no admin variant
+- **reservoir-registry**: user(create, get, search, update, delete)
 
 ### Access Control & Auth
 
-- **rbac**: sub: role(search, get, create, delete), permission(search), assignment(search, assign, revoke), entity(search)
-- **keypair**: admin(search, get, create, update, delete) | my(search, create, issue, delete)
-- **login-history**: admin(search) | my(search)
-- **login-session**: admin(search, delete) | my(search, delete)
+- **rbac**: sub assignment(assign, revoke, search), entity(search), permission(search),
+  invitation(create, accept, reject, cancel, my-search, my-sent-search, role-search),
+  role(create, get, search, update, delete, project-search, add-permission, remove-permission, replace-permission)
+- **role**: my(search)
+- **role-preset**: admin(create, get, search, update, delete, purge, restore, permission-add, permission-remove, permission-search)
+- **invitation**: admin(search)
+- **keypair**: admin(create, get, search, update, delete · sub ssh: register, get, delete) · my(issue, revoke, search, update, switch-main)
+- **login-history**: admin(search) · my(search)
+- **login-session**: admin(search, revoke) · my(search, revoke)
+- **login-client-type**: user(get) · admin(search, create, update, delete)
 
 ### Resource Management
 
-- **resource-group**: user(search, get, create, delete, resource-info, allowed-for-domain, allow-for-domain, allowed-for-project, allow-for-project, allowed-domains, allow-domains, allowed-projects, allow-projects) | admin(search, create, update, delete)
-- **resource-allocation**: user(project-usage, resource-group-usage) | admin(search, create, update, delete) | my(search)
-- **resource-preset**: admin(search, get, create, update, delete)
-- **resource-policy**: admin(search, get, create, update, delete) | my(search)
-- **resource-slot**: sub: slot-type(search), agent-resource(search), allocation(search)
-- **resource-usage**: sub: domain(search), project(search), user(search)
+- **resource-group**: user(empty group) · admin(search, get, create, delete, resource-info, default-options, default-session-options, allow-domains, allowed-domains, allow-projects, allowed-projects, allow-for-domain, allowed-for-domain, allow-for-project, allowed-for-project)
+- **resource-allocation**: user(project-usage, resource-group-usage) · admin(domain-usage, effective) · my(effective, keypair-usage)
+- **resource-preset**: admin(search, get, create, update, delete, check-availability)
+- **resource-policy**: admin(sub keypair / project / user — each create, get, search, update, delete) · my(keypair, user)
+- **resource-slot**: sub slot-type(search), agent-resource(search), allocation(search)
+- **resource-usage**: sub domain(search), project(search), user(search)
 
 ### Monitoring & Audit
 
-- **audit-log**: user(search) | admin(search)
-- **scheduling-history**: sub: session(search, search-scoped), deployment(search, search-scoped), route(search, search-scoped)
-- **fair-share**: sub: domain(search, get), project(search, get), user(search, get)
-- **notification**: sub: channel(search, get, delete), rule(search, get, delete)
-- **prometheus-query-definition**: user(search, get, create, update, execute, delete) | admin(search, create, update, delete)
-- **app-config**: user(get-domain, delete-domain, get-user, delete-user, get-merged) | admin(create, update, delete)
-- **export**: admin(list, request, purge) | my(list, request, purge)
+- **audit-log**: user(search)
+- **fair-share**: sub domain / project / user — each (get, search)
+- **notification**: sub channel(get, search, delete), rule(get, search, delete)
+- **prometheus-query-definition**: user(get, search, execute) · admin(create, update, delete, preview)
+- **prometheus-query-definition-category**: user(get, search) · admin(create, delete)
+- **app-config**: user(get-domain, get-user, get-merged, delete-domain, delete-user)
+- **export**: admin(list-reports, get-report, audit-logs, keypairs, projects, sessions, sessions-by-project, users, users-by-domain) · my(keypairs, sessions)
+
+### Utilities (not entities)
+
+`login`, `logout`, `config`, `gql` — single commands at the root.
+
+> When adding a new CLI command, update this Reference as well (see "Adding a new entity" in `client/cli/v2/AGENTS.md`).
 
 ---
 
-## Setup (Webserver Session — Recommended)
+## Setup (Webserver session — recommended)
 
 ```bash
 ./bai config set endpoint http://127.0.0.1:8090
@@ -99,17 +115,17 @@ Verify options with `--help`: `./bai {entity} {command} --help`
 ./bai config show
 ```
 
-For non-interactive environments (CI, Claude Code):
+Non-interactive environments (CI, Claude Code):
 
 ```bash
 BACKEND_USER=admin@lablup.com BACKEND_PASSWORD=wJalrXUt ./bai login
 ```
 
-Session cookie stored in `~/.backend.ai/session/cookie.dat`.
+The session cookie is stored in `~/.backend.ai/session/cookie.dat`.
 
-### Direct API (Alternative)
+### Direct API (alternative)
 
-For direct manager access without webserver (HMAC signature auth):
+Access the manager directly without the webserver (HMAC signature auth):
 
 ```bash
 ./bai config set endpoint http://127.0.0.1:8091
@@ -119,64 +135,61 @@ For direct manager access without webserver (HMAC signature auth):
 ./bai config show
 ```
 
-Config stored in `~/.backend.ai/config.toml` and `credentials.toml`.
+The configuration is stored in `~/.backend.ai/config.toml` and `credentials.toml`.
 
-## Command Pattern
+## Command pattern
 
 ```
 ./bai [admin|my] {entity} [{sub-entity}] {command} [options]
 ```
 
 - `admin` — superadmin-only operations
-- `my` — self-service (current user's own resources)
+- `my` — self-service (the current user's own resources)
 - Entity names are **singular** (domain, user, agent)
-- Sub-entities are Click sub-groups (revision, channel, role)
+- A sub-entity is a Click sub-group (revision, channel, role, etc.)
 
-Standard 6 operations: `create`, `get`, `search`, `update`, `delete`, `purge`.
+The standard 6 operations: `create`, `get`, `search`, `update`, `delete`, `purge` (only some, depending on the entity).
 Special operations: `enqueue`/`terminate` (session), `revision add`/`revision activate` (deployment), `login`/`logout`.
 
-## CLI Input Style
+## CLI input style
 
-- **Primary:** Individual `--option` flags for each field.
-- **Secondary:** JSON string or `@file` path for complex nested structures (e.g., `--initial-revision`, `--config`).
-- Never use raw JSON as a positional argument for create/update (except some admin commands like `admin domain create`).
-- Entity identifier (UUID, name) as positional argument for get/delete/purge.
+- **Default:** an individual `--option` flag per field.
+- **Secondary:** a JSON string or an `@file` path for complex nested structures (example: `--initial-revision`, `--config`).
+- Do NOT use raw JSON as a positional argument for create/update (with some admin command exceptions: `admin domain create`).
+- For get/delete/purge, use the entity identifier (UUID, name) as a positional argument.
 
-## Search Patterns
-
-Four distinct search scopes:
+## Search patterns
 
 ```bash
-# Admin search — entire system (superadmin only)
+# admin search — whole system (superadmin only)
 ./bai admin {entity} search --limit 5
 
-# Project-scoped search — positional scope ID (not --option)
+# project-scoped search — the scope ID is a positional argument (not an option)
 ./bai {entity} project-search {project_id} --limit 5
 
-# Self-service search — current user's own resources
+# self-service search — own resources
 ./bai my {entity} search --limit 5
-
-# User search with scope filters
-./bai {entity} search --scope-domain default --limit 5
 ```
 
-### --order-by Syntax
+Options and filters differ per entity, so check with `./bai {entity} {command} --help`.
 
-Multiple ordering via `field:direction`:
+### --order-by syntax
+
+Multi-sort with `field:direction`:
 
 ```bash
 ./bai admin user search --order-by created_at:desc --order-by username:asc
 ```
 
-## Naming Conventions
+## Naming conventions
 
-- CLI `--order-by` maps to DTO `order` field (by design, all entities follow this)
-- CLI `--kebab-case` options map to DTO `snake_case` fields (standard Click convention)
-- Scoped search: scope ID is a **positional argument**, not a `--scope-*` option
+- The CLI `--order-by` maps to the DTO `order` field (common across all entities).
+- The CLI `--kebab-case` option maps to the DTO `snake_case` field (Click standard).
+- Scoped search: the scope ID is a **positional argument**, not a `--scope-*` option.
 
 ## Raw GraphQL
 
-`./bai gql` (NOT `./bai admin gql`) sends raw GraphQL queries, useful for testing GQL schema changes or when REST CLI is unavailable:
+`./bai gql` (not `./bai admin gql`) sends a raw GraphQL query. Useful for testing GQL schema changes or when there is no REST CLI:
 
 ```bash
 ./bai gql '{ domain(name: "default") { name } }'
@@ -185,82 +198,84 @@ Multiple ordering via `field:direction`:
 ./bai gql --var limit=5 '{ keypair_list(limit: $limit) { items { access_key } } }'
 ```
 
-- `--v2`: Target Strawberry v2 schema (only needed in direct API mode; session mode serves both)
-- `--var key=value`: Pass query variables (repeatable)
-- `-f file`: Read query from file
-- Stdin: `echo '{ ... }' | ./bai gql`
+- `--v2`: targets the Strawberry v2 schema (only needed in direct API mode; session mode provides both)
+- `--var key=value`: query variables (repeatable)
+- `-f file`: read the query from a file
+- stdin: `echo '{ ... }' | ./bai gql`
 
-## Common Commands
+## Common commands
 
 ```bash
-# Admin search with filters (superadmin only)
+# admin search + filter (superadmin only)
 ./bai admin domain search --limit 5 --name-contains default
 ./bai admin user search --status active --order-by created_at:desc
 ./bai admin agent search --limit 10
 ./bai admin image search --name-contains python
 ./bai admin session search --limit 5
 
-# Get single entity
+# single entity lookup
 ./bai domain get default
 ./bai user get <uuid>
 
-# Sub-entity operations
+# sub-entity operations
 ./bai admin deployment revision search
 ./bai rbac role search
 ./bai notification channel search
 ./bai scheduling-history session search --limit 10
 ```
 
-## Testing Workflow
+## Testing workflow
 
 ### Prerequisites
 
 ```bash
-./bai config show   # Check endpoint-type
-./bai login         # Login if session expired
+./bai config show   # check endpoint-type
+./bai login         # log in if the session expired
 ```
 
-### After Modifying Server Code
+### After modifying server code
 
-For local development, restart services first — see `/local-dev` skill.
+For local development, restart the service first — see the `/local-dev` skill.
 
 ```bash
-# 1. Verify basic connectivity
+# 1. confirm basic connectivity
 ./bai admin domain search --limit 1
 ./bai domain get default
 
-# 2. Test the entity you modified
+# 2. test the modified entity (with the command matching its level)
+#    if user-facing ./bai {entity} ..., if admin-only ./bai admin {entity} ...
 ./bai admin {entity} search --limit 1
 ./bai {entity} get {id}
 
-# 3. Test permission boundaries
-./bai admin {entity} search    # Should work as admin
-# Switch to regular user, same command should fail with 403
+# 3. test the permission boundary
+./bai admin {entity} search    # admin succeeds
+# after switching to a regular user, the same command → should fail with 403
 ```
 
-After a command, confirm runtime behavior through the Grafana MCP — see `/observability`.
-Query Loki for the service that handled the request (e.g. `{service_name="manager"} |=
-"error"`) to catch errors not surfaced by the CLI response, and Prometheus
-(`backendai_api_request_count`) to confirm the request was counted.
+After commands, verify the runtime behavior with the Grafana MCP — see `/observability`.
+To catch errors not surfaced in the CLI response, check Loki (`{service_name="manager"} |= "error"`);
+to check the request count, look at Prometheus (`backendai_api_request_count`).
 
-### Testing as a Regular User
+### Testing as a regular user
 
-Default accounts in `fixtures/manager/example-users.json`.
+The default accounts are in `fixtures/manager/example-users.json`.
 
 ```bash
-# Session login as regular user
+# log in as a regular user session
 BACKEND_USER=user@lablup.com BACKEND_PASSWORD=C8qnIo29 ./bai login
 
-# Should succeed (user-facing)
+# should succeed (user-facing)
 ./bai domain get default
 
-# Should fail with 403 (admin-only)
+# should fail with 403 (admin only)
 ./bai admin domain search --limit 1
 ```
 
-Remember to switch back to admin credentials after testing.
+After testing, revert to the admin credentials.
 
-## Smoke Test Script
+## Smoke test script
+
+Run everything with admin credentials. OK if each command returns JSON.
 
 ```bash
 for cmd in \
@@ -271,7 +286,7 @@ for cmd in \
   "admin agent search --limit 1" \
   "admin image search --limit 1" \
   "admin session search --limit 1" \
-  "resource-group search --limit 1" \
+  "admin resource-group search --limit 1" \
   "audit-log search --limit 1" \
   "rbac role search --limit 1"; do
   echo -n "$cmd: "
@@ -279,17 +294,17 @@ for cmd in \
 done
 ```
 
-## CLI Command Not Available
+## When a CLI command is unavailable
 
-If a CLI command for an entity/operation does not exist in the reference above:
+If the CLI command for an entity/operation is not in the Reference above:
 
-1. The command is **not implemented**
-2. **Report to the user**: "{entity} {operation} is not available via CLI. Implementation is needed."
-3. As a workaround, try `./bai gql` for GraphQL-accessible operations
-4. Do NOT guess CLI options or fabricate commands — this wastes time and causes errors
+1. That command is **not implemented**.
+2. **Report to the user**: "{entity} {operation} is not provided via the CLI. It needs to be implemented."
+3. As a temporary workaround, try `./bai gql` for operations available via GraphQL.
+4. Do NOT guess CLI options or fabricate commands — it wastes time and causes errors.
 
-## Related Skills
+## Related skills
 
-- `/local-dev` — Restart local services before CLI testing
-- `/observability` — Verify logs/metrics via Grafana MCP after CLI testing
-- `/cli-sdk-guide` — Implement new CLI commands
+- `/local-dev` — restart local services before CLI testing
+- `/observability` — check logs/metrics with the Grafana MCP after CLI testing
+- `/cli-sdk-guide` — implement new CLI commands

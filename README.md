@@ -222,7 +222,7 @@ as a reference implementation of API clients.
 * `BUILD`: The root build config file
 * `**/BUILD`: Per-directory build config files
 * `BUILD_ROOT`: An indicator to mark the build root directory for Pants
-* `CLAUDE.md`: The steering guide for agent-assisted development
+* `AGENTS.md`: The steering guide for agent-assisted development (`CLAUDE.md` is a symlink to it)
 * `requirements.txt`: The unified requirements file
 * `*.lock`, `tools/*.lock`: The dependency lock files
 * `docker-compose.*.yml`: Per-version recommended halfstack container configs
@@ -371,7 +371,7 @@ The pre-commit hook validates:
 
 Type checking and tests run in CI for comprehensive coverage.
 
-See [CLAUDE.md](CLAUDE.md#hooks-and-code-quality) for detailed hook system documentation.
+See [AGENTS.md](AGENTS.md#hooks-and-code-quality) for detailed hook system documentation.
 
 ### Development Guide
 

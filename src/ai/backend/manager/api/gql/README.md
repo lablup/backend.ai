@@ -283,7 +283,7 @@ async def admin_search_domains(
     limit: int | None = None,
     offset: int | None = None,
 ) -> AdminSearchDomainsPayloadGQL | None:
-    check_admin_only(info)
+    check_admin_only()
     return await fetch_admin_search_domains(
         info=info, filter=filter, order_by=order_by, limit=limit, offset=offset
     )
@@ -331,6 +331,6 @@ async def projects(
 ## Related Documentation
 
 - [Manager API Overview](../README.md)
-- [REST v2 API](../rest/v2/CLAUDE.md)
+- [REST v2 API](../rest/v2/AGENTS.md)
 - [Repositories Layer](../../repositories/README.md)
 - [Legacy GraphQL (Graphene)](../gql_legacy/README.md) — DEPRECATED
