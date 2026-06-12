@@ -7,6 +7,11 @@
   <meta name="description" content="Backend.AI">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <meta name="theme-color" content="#fff">
+  <!-- CSP nonce source for Vite's module-preload helper: Vite reads this meta's
+       nonce at runtime and stamps it on the <link rel="modulepreload"> tags it
+       injects for code-split chunks, so they pass a strict script-src nonce
+       policy. The web server substitutes {{nonce}} per request (empty in dev). -->
+  <meta property="csp-nonce" nonce="{{nonce}}">
   <base href="/">
   <link rel="icon" href="manifest/favicon.ico">
   <link rel="apple-touch-icon" sizes="256x256" href="manifest/backend-ai.iconset/icon_256x256@2x.png">
@@ -17,12 +22,12 @@
   <link rel="stylesheet" href="resources/fonts/ubuntu/ubuntu.css">
   <link rel="stylesheet" href="resources/webui.css">
   <link rel="stylesheet" href="resources/custom.css">
-  <script src="manifest/app.js"></script>
+  <script nonce="{{nonce}}" src="manifest/app.js"></script>
   <title>Backend.AI</title>
   <!-- Critical inline CSS: paints the page/splash backdrop immediately so there
        is no color flash before the stylesheet applies. The full splash (Diagonal
        Weave) styling lives in resources/webui.css. -->
-  <style>
+  <style nonce="{{nonce}}">
     body { margin: 0; background-color: rgba(247, 247, 246, 1); }
     body.dark-theme { background-color: #191919; }
     #splash {
@@ -40,15 +45,16 @@
     }
     globalThis.enableSW = true;
 
-    globalThis.packageVersion = "26.4.8-rc.9";
-    globalThis.buildNumber = "8310";
+    globalThis.packageVersion = "26.4.8-rc.10";
+    globalThis.buildNumber = "8322";
     globalThis.baiNonce = "{{nonce}}";
 
     // DO NOT CHANGE BELOW LINE
     
   </script>
   <!-- DO NOT CHANGE BELOW LINE -->
-  <script type="module" crossorigin src="/assets/index-DluNL-GQ.js"></script>
+  <script type="module" nonce="{{nonce}}" crossorigin src="/assets/index-DUzRNOsy.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CDgRDCYd.css">
 </head>
 
 <body>
