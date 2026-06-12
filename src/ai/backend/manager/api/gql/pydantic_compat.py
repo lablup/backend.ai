@@ -64,10 +64,6 @@ def _from_pydantic_kwargs(
     resolved_hints = get_type_hints(cls, include_extras=True)
     kwargs: dict[str, Any] = {}
     for field in dataclasses.fields(cls):
-        if not field.init:
-            # Resolver-backed fields are not constructor arguments, even when a
-            # DTO field with the same name exists (the resolver supersedes it).
-            continue
         field_name = field.name
         if field_name in skip_fields:
             continue

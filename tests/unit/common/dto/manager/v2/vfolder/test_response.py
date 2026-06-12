@@ -6,7 +6,6 @@ import json
 import uuid
 from datetime import UTC, datetime
 
-from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     CloneVFolderPayload,
     CreateDownloadSessionPayload,
@@ -36,7 +35,6 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderOwnershipInfo,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
-    VFolderUsageInfo,
     VFolderUsageMode,
 )
 
@@ -68,19 +66,10 @@ def _make_owner_info() -> VFolderOwnershipInfo:
     )
 
 
-def _make_usage_info() -> VFolderUsageInfo:
-    return VFolderUsageInfo(
-        num_files=10,
-        used_bytes=BinarySizeInfo(value=1024, display="1024"),
-        max_size=None,
-        max_files=1000,
-    )
-
-
 class TestVFolderNodeCreation:
     """Tests for VFolderNode model creation."""
 
-    def test_creation_with_usage(self) -> None:
+    def test_creation(self) -> None:
         node = VFolderNode(
             id=uuid.uuid4(),
             status=VFolderOperationStatusField.READY,
@@ -88,12 +77,10 @@ class TestVFolderNodeCreation:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
-            usage=_make_usage_info(),
         )
-        assert node.usage is not None
         assert node.unmanaged_path is None
 
-    def test_creation_without_usage(self) -> None:
+    def test_round_trip(self) -> None:
         node = VFolderNode(
             id=uuid.uuid4(),
             status=VFolderOperationStatusField.READY,
@@ -101,36 +88,10 @@ class TestVFolderNodeCreation:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
-        )
-        assert node.usage is None
-
-    def test_round_trip_with_usage(self) -> None:
-        node = VFolderNode(
-            id=uuid.uuid4(),
-            status=VFolderOperationStatusField.READY,
-            host="nfs01",
-            metadata=_make_metadata_info(),
-            access_control=_make_access_control_info(),
-            ownership=_make_owner_info(),
-            usage=_make_usage_info(),
         )
         restored = VFolderNode.model_validate_json(node.model_dump_json())
         assert restored.metadata.name == node.metadata.name
         assert restored.metadata.cloneable == node.metadata.cloneable
-        assert restored.usage is not None
-        assert restored.usage.used_bytes.value == 1024
-
-    def test_round_trip_without_usage(self) -> None:
-        node = VFolderNode(
-            id=uuid.uuid4(),
-            status=VFolderOperationStatusField.READY,
-            host="nfs01",
-            metadata=_make_metadata_info(),
-            access_control=_make_access_control_info(),
-            ownership=_make_owner_info(),
-        )
-        restored = VFolderNode.model_validate_json(node.model_dump_json())
-        assert restored.usage is None
 
     def test_nested_structure_in_json(self) -> None:
         node = VFolderNode(

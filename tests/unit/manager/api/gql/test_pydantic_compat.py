@@ -370,38 +370,3 @@ class TestAdaptersRegistry:
             schedule_coordinator=MagicMock(),
         )
         assert isinstance(adapters.container_registry, ContainerRegistryAdapter)
-
-
-class TestResolverBackedFieldSkipping:
-    """from_pydantic must skip resolver-backed (init=False) fields.
-
-    A Strawberry field defined by a resolver is part of dataclasses.fields()
-    but is not a constructor argument. When the DTO carries a data field with
-    the same name, from_pydantic must not forward it — the resolver supersedes
-    the DTO value (e.g. the v2 VFolder ``usage`` field, where the resolver
-    serves live measurements while the DTO carries DB column values).
-    """
-
-    def test_resolver_field_with_same_named_dto_field_is_skipped(self) -> None:
-        class UsageItemNode(BaseModel):
-            id: str = Field(description="Unique ID")
-            name: str = Field(description="Item name")
-            usage: str | None = Field(default=None, description="DB-sourced value")
-
-        @strawberry.type(name="UsageItemV2")
-        class UsageItemGQL(PydanticNodeMixin[Any]):
-            id: NodeID[str] = strawberry.field(description="Relay ID")
-            name: str = strawberry.field(description="Item name")
-
-            @strawberry.field(description="Resolver-backed field")  # type: ignore[misc]
-            def usage(self) -> str | None:
-                return "live-value"
-
-        dto = UsageItemNode(id="u1", name="my-folder", usage="stale-db-value")
-
-        # Must not raise TypeError("unexpected keyword argument 'usage'").
-        gql = UsageItemGQL.from_pydantic(dto)
-
-        assert gql.id == "u1"
-        assert gql.name == "my-folder"
-        assert gql.usage() == "live-value"
