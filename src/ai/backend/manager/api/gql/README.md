@@ -283,7 +283,7 @@ async def admin_search_domains(
     limit: int | None = None,
     offset: int | None = None,
 ) -> AdminSearchDomainsPayloadGQL | None:
-    check_admin_only(info)
+    check_admin_only()
     return await fetch_admin_search_domains(
         info=info, filter=filter, order_by=order_by, limit=limit, offset=offset
     )

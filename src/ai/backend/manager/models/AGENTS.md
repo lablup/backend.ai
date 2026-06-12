@@ -5,7 +5,7 @@
 
 ## Directory structure (per domain)
 
-Every domain follows `models/{domain}/__init__.py` (re-export only) + `row.py` (ORM classes).
+Every domain follows `models/{domain}/__init__.py` + `row.py` (ORM classes).
 The single-file shorthand (`models/{domain}.py`) is legacy — do not add new ones.
 
 ## Row class rules
@@ -27,4 +27,5 @@ The single-file shorthand (`models/{domain}.py`) is legacy — do not add new on
 
 ## `__init__.py` rules
 
-- Re-export only the Row classes declared in `row.py` — nothing else.
+- Existing `__init__.py` re-export only the Row classes declared in `row.py` (nothing else) — the established pattern.
+- For new code, do not add `__init__.py` re-exports; import the module directly (root global rule).

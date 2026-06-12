@@ -12,7 +12,8 @@ This package does not allow SQLAlchemy, Pydantic, or aiohttp imports.
 
 ## Directory structure (per domain)
 
-Per domain: `data/{domain}/__init__.py` (re-export) + `types.py` (frozen dataclass).
+Per domain: `data/{domain}/__init__.py` + `types.py` (frozen dataclass). Existing `__init__.py` re-export the
+dataclasses (established pattern); for new code, do not add re-exports — import the module directly (root global rule).
 
 ## Type rules
 
