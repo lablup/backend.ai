@@ -125,6 +125,17 @@ class RoutingRow(Base):  # type: ignore[misc]
         "health_check", PydanticColumn(ModelHealthCheck), nullable=True, default=None
     )
 
+    # Termination grace period in seconds (copied from revision at creation).
+    # After traffic is drained the session stays alive this long so in-flight
+    # requests can finish.
+    termination_grace_period: Mapped[float] = mapped_column(
+        "termination_grace_period",
+        sa.Float,
+        nullable=False,
+        default=30.0,
+        server_default="30",
+    )
+
     # Revision reference without FK (relationship only)
     revision: Mapped[uuid.UUID] = mapped_column("revision", GUID, nullable=False)
     # Replica group this replica belongs to (``NULL`` until assigned). FK is SET NULL on group delete.

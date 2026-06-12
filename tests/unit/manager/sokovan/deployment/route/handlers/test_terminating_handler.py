@@ -1,9 +1,9 @@
 """Unit tests for TerminatingRouteHandler.
 
-The handler delegates termination — including the AppProxy drain step
-that must precede kernel destruction — to ``RouteExecutor.terminate_routes``.
-The drain ordering itself is exercised in the executor tests; here we
-only verify the handler stays a thin shim.
+The handler delegates session cleanup (gated by the termination grace
+period) to ``RouteExecutor.terminate_routes``; traffic removal happens
+earlier in the DRAINING stage. The grace gating itself is exercised in
+the executor tests; here we only verify the handler stays a thin shim.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
+    RouteSubStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -41,6 +42,7 @@ def _terminating_route() -> RouteData:
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
         health_check=None,
+        termination_grace_period=30.0,
         replica_host="10.0.0.1",
         replica_port=8000,
         created_at=datetime.now(tzutc()),
@@ -63,6 +65,12 @@ class TestTerminatingExecute:
 
         executor.terminate_routes.assert_awaited_once_with(routes)
         assert result is terminate_result
+
+    def test_targets_cooling_down_stage(self) -> None:
+        """RR-TERM-003: handler picks up TERMINATING routes in the COOLING_DOWN stage."""
+        target = TerminatingRouteHandler.target_statuses()
+        assert target.lifecycle == [RouteStatus.TERMINATING]
+        assert target.sub_status == [RouteSubStatus.COOLING_DOWN]
 
     async def test_post_process_logs_summary_only(self) -> None:
         """RR-TERM-002: post_process is a logging shim — no executor call here."""

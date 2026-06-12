@@ -45,6 +45,7 @@ def _make_route(health_check: ModelHealthCheck | None) -> RouteData:
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.ACTIVE,
         health_check=health_check,
+        termination_grace_period=30.0,
         replica_host="10.0.0.1",
         replica_port=8000,
     )

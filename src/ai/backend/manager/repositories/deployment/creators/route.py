@@ -36,6 +36,7 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     project_id: uuid.UUID
     revision_id: DeploymentRevisionID
     health_check: ModelHealthCheck | None
+    termination_grace_period: float
     replica_group_id: ReplicaGroupID
     traffic_ratio: float = 1.0
     traffic_status: RouteTrafficStatus = RouteTrafficStatus.INACTIVE
@@ -54,6 +55,7 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
             revision=self.revision_id,
             traffic_status=self.traffic_status,
             health_check=self.health_check,
+            termination_grace_period=self.termination_grace_period,
             replica_group_id=self.replica_group_id,
         )
 

@@ -184,6 +184,16 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
+    # Seconds to keep a route's session alive after its traffic is drained,
+    # so in-flight requests can finish before the kernel is killed.
+    termination_grace_period: Mapped[float] = mapped_column(
+        "termination_grace_period",
+        sa.Float,
+        nullable=False,
+        default=30.0,
+        server_default="30",
+    )
+
     # Mount configuration.
     # Stores only the fields that session creation actually consumes
     # (``vfolder_id``, ``mount_destination``, ``mount_perm``, ``subpath``);

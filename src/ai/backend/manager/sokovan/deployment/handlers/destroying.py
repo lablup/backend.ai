@@ -86,4 +86,5 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         log.info("Destroyed {} deployments", len(result.successes))
         if result.successes:
             # Clean up routes associated with destroyed deployments
-            await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.TERMINATING)
+            # (draining is the first stage of the termination pipeline)
+            await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.DRAINING)

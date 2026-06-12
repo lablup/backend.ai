@@ -1,4 +1,4 @@
-"""Handler for terminating routes."""
+"""Handler for TERMINATING+DRAINING routes: remove traffic from AppProxy."""
 
 import logging
 from collections.abc import Sequence
@@ -7,7 +7,6 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     RouteHandlerCategory,
-    RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
     RouteSubStatus,
@@ -24,12 +23,13 @@ from .base import RouteHandler
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-class TerminatingRouteHandler(RouteHandler):
-    """Handler for terminating routes (TERMINATING+COOLING_DOWN → TERMINATED).
+class DrainingRouteHandler(RouteHandler):
+    """Removes AppProxy traffic for routes entering termination.
 
-    Second stage of the TERMINATING pipeline: traffic was already removed
-    in the DRAINING stage; this stage waits out each route's termination
-    grace period and then cleans up the session.
+    First stage of the TERMINATING pipeline (DRAINING → COOLING_DOWN):
+    this stage only handles traffic removal; session cleanup happens in
+    the COOLING_DOWN stage once the termination grace period elapses,
+    counted from this stage's success transition.
     """
 
     def __init__(
@@ -43,11 +43,11 @@ class TerminatingRouteHandler(RouteHandler):
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
-        return "terminate-routes"
+        return "drain-routes"
 
     @property
     def lock_id(self) -> LockID | None:
-        """No lock needed for terminating routes."""
+        """No lock needed for draining routes."""
         return None
 
     @classmethod
@@ -58,40 +58,34 @@ class TerminatingRouteHandler(RouteHandler):
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.TERMINATING],
-            sub_status=[RouteSubStatus.COOLING_DOWN],
+            sub_status=[RouteSubStatus.DRAINING],
         )
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Terminating → TERMINATED on success, reset health to NOT_CHECKED.
-
-        Stale (still inside the termination grace period) has no target:
-        the route stays COOLING_DOWN and is re-checked on the next cycle.
-        """
+        """Drained → COOLING_DOWN; the transition history timestamps the
+        start of the termination grace period."""
         return RouteStatusTransitions(
             success=RouteTransitionTarget(
-                status=RouteStatus.TERMINATED,
-                health_status=RouteHealthStatus.NOT_CHECKED,
+                sub_status=RouteSubStatus.COOLING_DOWN,
             ),
             failure=None,
             stale=None,
         )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Execute termination for routes.
+        """Execute traffic draining for routes.
 
-        ``RouteExecutor.terminate_routes`` destroys only the sessions
-        whose termination grace period has elapsed, so this handler just
-        delegates to it.
+        ``RouteExecutor.drain_routes`` pushes a synchronous AppProxy
+        unregister; failures are logged but do not hold the route in
+        DRAINING (the AppProxy sync handler converges leftovers).
         """
-        log.debug("Terminating {} routes", len(routes))
-        return await self._route_executor.terminate_routes(routes)
+        log.debug("Draining {} routes", len(routes))
+        return await self._route_executor.drain_routes(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
-        """Handle post-processing after terminating routes."""
+        """Handle post-processing after draining routes."""
         log.info(
-            "Terminated {} routes successfully, {} failed, {} cooling down",
+            "Drained {} routes (→ cooling down)",
             len(result.successes),
-            len(result.errors),
-            len(result.stale),
         )

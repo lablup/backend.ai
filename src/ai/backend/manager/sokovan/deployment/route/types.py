@@ -15,6 +15,7 @@ class RouteLifecycleType(StrEnum):
     RUNNING = "running"
     HEALTH_CHECK = "health_check"
     ROUTE_EVICTION = "route_eviction"
+    DRAINING = "draining"
     TERMINATING = "terminating"
     SERVICE_DISCOVERY_SYNC = "service_discovery_sync"
     APPPROXY_SYNC = "appproxy_sync"

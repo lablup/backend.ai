@@ -42,6 +42,7 @@ def _make_route(
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
         health_check=health_check,
+        termination_grace_period=30.0,
         replica_host="10.0.0.1",
         replica_port=8000,
     )
@@ -158,6 +159,7 @@ class TestSyncReplicaProbeTargets:
             revision_id=DeploymentRevisionID(uuid4()),
             traffic_status=RouteTrafficStatus.INACTIVE,
             health_check=ModelHealthCheck(enable=True, path="/health", initial_delay=60.0),
+            termination_grace_period=30.0,
             replica_host=None,
             replica_port=None,
         )
@@ -194,6 +196,7 @@ class TestSyncReplicaProbeTargets:
             revision_id=DeploymentRevisionID(uuid4()),
             traffic_status=RouteTrafficStatus.INACTIVE,
             health_check=None,
+            termination_grace_period=30.0,
             replica_host=None,
             replica_port=None,
         )

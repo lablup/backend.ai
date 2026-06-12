@@ -50,6 +50,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     callback_url: str | None
     runtime_variant_id: RuntimeVariantID
     extra_mounts: Sequence[MountInfoEntry]
+    termination_grace_period: float = 30.0
     preset_values: Sequence[PresetValueEntry] = field(default_factory=list)
     revision_preset_id: DeploymentPresetID | None = None
     revision_number: int | None = None
@@ -81,6 +82,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             callback_url=self.callback_url,
             runtime_variant_id=self.runtime_variant_id,
             extra_mounts=list(self.extra_mounts),
+            termination_grace_period=self.termination_grace_period,
             preset_values=list(self.preset_values),
             revision_preset_id=self.revision_preset_id,
         )

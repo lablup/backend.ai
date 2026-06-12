@@ -55,6 +55,7 @@ def sample_route_data() -> RouteData:
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
         health_check=None,
+        termination_grace_period=30.0,
     )
 
 
@@ -401,6 +402,7 @@ class TestProcessRouteLifecycle:
                     revision_id=DeploymentRevisionID(uuid4()),
                     traffic_status=RouteTrafficStatus.ACTIVE,
                     health_check=None,
+                    termination_grace_period=30.0,
                 )
             ]
         )

@@ -66,6 +66,7 @@ class StartingRouteHandler(RouteHandler):
             ),
             failure=RouteTransitionTarget(
                 status=RouteStatus.TERMINATING,
+                sub_status=RouteSubStatus.DRAINING,
             ),
             stale=None,
         )

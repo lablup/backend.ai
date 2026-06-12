@@ -10,7 +10,6 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
@@ -21,6 +20,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupHandlerCategory,
     ReplicaGroupLifecycle,
     RouteStatus,
+    RouteSubStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -71,6 +71,7 @@ from ai.backend.manager.repositories.replica_group.types import (
     ReplicaGroupReconcileTransition,
     ReplicaGroupScalingReconcileApply,
     RevisionReplicaCount,
+    RevisionRouteConfig,
     ScalingReconcileFetch,
 )
 from ai.backend.manager.types import OptionalState, TriState
@@ -481,11 +482,11 @@ class ReplicaGroupDBSource:
         deployment_ids = {instruction.deployment_id for instruction in instructions}
         revision_ids = {instruction.revision_id for instruction in instructions}
         metadata = await self._deployment_route_metadata(db_sess, deployment_ids)
-        health_checks = await self._revision_health_checks(db_sess, revision_ids)
+        route_configs = await self._revision_route_configs(db_sess, revision_ids)
         creators: list[RBACEntityCreator[RoutingRow]] = []
         for instruction in instructions:
             session_owner_id, domain, project_id = metadata[instruction.deployment_id]
-            health_check = health_checks.get(instruction.revision_id)
+            route_config = route_configs[instruction.revision_id]
             for _ in range(instruction.count):
                 spec = RouteCreatorSpec(
                     deployment_id=instruction.deployment_id,
@@ -493,7 +494,8 @@ class ReplicaGroupDBSource:
                     domain=domain,
                     project_id=project_id,
                     revision_id=instruction.revision_id,
-                    health_check=health_check,
+                    health_check=route_config.health_check,
+                    termination_grace_period=route_config.termination_grace_period,
                     replica_group_id=instruction.replica_group_id,
                     traffic_status=RouteTrafficStatus.INACTIVE,
                 )
@@ -537,6 +539,7 @@ class ReplicaGroupDBSource:
             spec=RouteBatchUpdaterSpec(
                 status=OptionalState.update(RouteStatus.TERMINATING),
                 traffic_status=OptionalState.update(RouteTrafficStatus.INACTIVE),
+                sub_status=TriState.update(RouteSubStatus.DRAINING),
             ),
             conditions=[RouteConditions.by_ids(route_ids)],
         )
@@ -559,21 +562,27 @@ class ReplicaGroupDBSource:
             DeploymentID(row.id): (row.session_owner, row.domain, row.project) for row in result
         }
 
-    async def _revision_health_checks(
+    async def _revision_route_configs(
         self,
         db_sess: SASession,
         revision_ids: set[DeploymentRevisionID],
-    ) -> Mapping[DeploymentRevisionID, ModelHealthCheck | None]:
+    ) -> Mapping[DeploymentRevisionID, RevisionRouteConfig]:
         if not revision_ids:
             return {}
         query = sa.select(
             DeploymentRevisionRow.id,
             DeploymentRevisionRow.model_definition,
+            DeploymentRevisionRow.termination_grace_period,
         ).where(DeploymentRevisionRow.id.in_(revision_ids))
         result = await db_sess.execute(query)
         return {
-            DeploymentRevisionID(revision_id): (
-                model_definition.health_check_setting() if model_definition is not None else None
+            DeploymentRevisionID(revision_id): RevisionRouteConfig(
+                health_check=(
+                    model_definition.health_check_setting()
+                    if model_definition is not None
+                    else None
+                ),
+                termination_grace_period=termination_grace_period,
             )
-            for revision_id, model_definition in result.all()
+            for revision_id, model_definition, termination_grace_period in result.all()
         }

@@ -10,6 +10,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
+    RouteSubStatus,
     RouteTargetStatuses,
     RouteTransitionTarget,
 )
@@ -72,9 +73,12 @@ class RouteEvictionHandler(RouteHandler):
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Eviction: success → TERMINATING, failure → no change."""
+        """Eviction: success → TERMINATING (draining stage), failure → no change."""
         return RouteStatusTransitions(
-            success=RouteTransitionTarget(status=RouteStatus.TERMINATING),
+            success=RouteTransitionTarget(
+                status=RouteStatus.TERMINATING,
+                sub_status=RouteSubStatus.DRAINING,
+            ),
             failure=None,
             stale=None,
         )
