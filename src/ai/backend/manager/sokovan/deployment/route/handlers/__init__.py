@@ -2,6 +2,7 @@
 
 from .appproxy_sync import AppProxySyncRouteHandler
 from .base import RouteHandler
+from .draining import DrainingRouteHandler
 from .health_check import HealthCheckRouteHandler
 from .probe_target_sync import ReplicaProbeTargetSyncHandler
 from .provisioning import ProvisioningRouteHandler
@@ -14,6 +15,7 @@ from .warming_up import WarmingUpRouteHandler
 
 __all__ = [
     "AppProxySyncRouteHandler",
+    "DrainingRouteHandler",
     "HealthCheckRouteHandler",
     "ReplicaProbeTargetSyncHandler",
     "ProvisioningRouteHandler",

@@ -166,17 +166,24 @@ class RouteTrafficStatus(enum.StrEnum):
 
 
 class RouteSubStatus(enum.StrEnum):
-    """Sub-status for routes in the PROVISIONING lifecycle stage.
+    """Sub-status tracking fine-grained progress within a lifecycle stage.
 
-    Tracks fine-grained progress within the provisioning pipeline:
+    PROVISIONING stage:
     - PENDING: session has been enqueued, waiting for scheduler
     - STARTING: session is running, waiting for replica host/port
     - WARMING_UP: replica is up, waiting for health check to pass
+
+    TERMINATING stage:
+    - DRAINING: removing traffic from AppProxy
+    - COOLING_DOWN: traffic removed; waiting out the termination grace
+      period before the session is cleaned up
     """
 
     PENDING = "pending"
     STARTING = "starting"
     WARMING_UP = "warming_up"
+    DRAINING = "draining"
+    COOLING_DOWN = "cooling_down"
 
 
 class ReplicaGroupLifecycle(enum.StrEnum):

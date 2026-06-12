@@ -190,6 +190,7 @@ def _create_route_data(
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
         health_check=None,
+        termination_grace_period=30.0,
     )
 
 

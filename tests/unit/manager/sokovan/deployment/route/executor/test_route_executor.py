@@ -638,6 +638,7 @@ class TestCleanupRoutesByConfig:
             revision_id=DeploymentRevisionID(uuid4()),  # neither current nor deploying
             traffic_status=RouteTrafficStatus.ACTIVE,
             health_check=None,
+            termination_grace_period=30.0,
         )
 
         current_revision_mock = MagicMock()
@@ -688,6 +689,7 @@ class TestCleanupRoutesByConfig:
             revision_id=deploying_revision_id,
             traffic_status=RouteTrafficStatus.INACTIVE,
             health_check=None,
+            termination_grace_period=30.0,
         )
 
         deploying_revision_mock = MagicMock()
@@ -736,6 +738,7 @@ class TestCleanupRoutesByConfig:
             revision_id=DeploymentRevisionID(uuid4()),
             traffic_status=RouteTrafficStatus.ACTIVE,
             health_check=None,
+            termination_grace_period=30.0,
         )
 
         deployment = MagicMock()
@@ -991,6 +994,7 @@ def _route_for_endpoint(endpoint_id: DeploymentID) -> RouteData:
         created_at=datetime.now(tzutc()),
         traffic_status=RouteTrafficStatus.ACTIVE,
         health_check=None,
+        termination_grace_period=30.0,
     )
 
 

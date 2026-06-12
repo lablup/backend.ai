@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
@@ -86,6 +87,14 @@ class RevisionReplicaCount:
 
     live: int
     serving: int
+
+
+@dataclass
+class RevisionRouteConfig:
+    """Per-revision settings copied onto each route at creation."""
+
+    health_check: ModelHealthCheck | None
+    termination_grace_period: float
 
 
 @dataclass

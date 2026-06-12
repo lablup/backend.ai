@@ -155,40 +155,37 @@ class RouteExecutor:
             errors=errors,
         )
 
-    async def terminate_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Drain traffic via AppProxy unregister, then destroy sessions.
+    async def drain_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """Drain traffic for TERMINATING+DRAINING routes via AppProxy unregister.
 
-        The drain step pushes a synchronous unregister to AppProxy first
-        so no fresh request lands on a kernel that is about to die.
-        Unregister failures are logged but do not block kernel
-        termination — the AppProxy client's own retry policy already
-        attempted, and continuing to terminate avoids stuck TERMINATING
-        rows. The long-cycle ``AppProxySyncRouteHandler`` keeps state
-        convergent for any leftover drift.
+        The synchronous unregister runs before any kernel teardown so no
+        fresh request lands on a kernel that is about to die. Unregister
+        failures are logged but do not hold the route in DRAINING — the
+        AppProxy client's own retry policy already attempted, and the
+        long-cycle ``AppProxySyncRouteHandler`` keeps state convergent
+        for any leftover drift, so all routes advance to COOLING_DOWN.
 
         Args:
-            routes: Routes to terminate
+            routes: Routes in the DRAINING stage
 
         Returns:
-            Result containing successful and failed routes
+            Result with every route as success (→ COOLING_DOWN)
         """
         if not routes:
             return RouteExecutionResult(successes=[], errors=[])
 
-        # Phase 1: AppProxy unregister (drain traffic before kernel kill)
         with RouteRecorderContext.shared_phase("drain_appproxy_routes"):
             try:
                 unregister_result = await self.unregister_routes_now(routes)
             except Exception:
                 log.exception(
-                    "Synchronous AppProxy unregister failed for {} terminating routes",
+                    "Synchronous AppProxy unregister failed for {} draining routes",
                     len(routes),
                 )
             else:
                 if unregister_result.errors:
                     log.warning(
-                        "AppProxy unregister: {} succeeded, {} failed "
-                        "(proceeding with termination)",
+                        "AppProxy unregister: {} succeeded, {} failed (proceeding to cooling down)",
                         len(unregister_result.successes),
                         len(unregister_result.errors),
                     )
@@ -200,19 +197,53 @@ class RouteExecutor:
                         )
                 else:
                     log.debug(
-                        "Unregistered {} routes from AppProxy before termination",
+                        "Unregistered {} routes from AppProxy",
                         len(unregister_result.successes),
                     )
 
-        # Collect session IDs from routes (no phase - cannot fail)
-        target_session_ids: list[SessionId] = []
+        return RouteExecutionResult(
+            successes=list(routes),
+            errors=[],
+        )
+
+    async def terminate_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """Destroy sessions of COOLING_DOWN routes whose grace period elapsed.
+
+        Traffic was already removed in the DRAINING stage; this stage only
+        waits out each route's ``termination_grace_period`` (counted from
+        the DRAINING → COOLING_DOWN transition) so in-flight requests can
+        finish. Routes still inside their grace period are returned as
+        ``stale`` (no transition) and re-checked on the next cycle.
+
+        Args:
+            routes: Routes in the COOLING_DOWN stage
+
+        Returns:
+            Result with terminated routes as successes and grace-waiting
+            routes as stale
+        """
+        if not routes:
+            return RouteExecutionResult(successes=[], errors=[])
+
+        # Partition by termination grace (no phase - cannot fail)
+        now = await self._deployment_repo.get_db_now()
+        ready_routes: list[RouteData] = []
+        waiting_routes: list[RouteData] = []
         for route in routes:
+            if route.is_termination_grace_elapsed(now):
+                ready_routes.append(route)
+            else:
+                waiting_routes.append(route)
+
+        # Collect session IDs from grace-elapsed routes (no phase - cannot fail)
+        target_session_ids: list[SessionId] = []
+        for route in ready_routes:
             if not route.session_id:
                 log.debug("Route {} has no session, skipping termination", route.route_id)
                 continue
             target_session_ids.append(route.session_id)
 
-        # Phase 2: Terminate sessions
+        # Terminate sessions whose grace period elapsed
         with RouteRecorderContext.shared_phase("terminate_sessions"):
             with RouteRecorderContext.shared_step("mark_sessions_terminating"):
                 await self._scheduling_controller.mark_sessions_for_termination(
@@ -220,8 +251,9 @@ class RouteExecutor:
                 )
 
         return RouteExecutionResult(
-            successes=list(routes),
+            successes=ready_routes,
             errors=[],
+            stale=waiting_routes,
         )
 
     async def check_starting_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:

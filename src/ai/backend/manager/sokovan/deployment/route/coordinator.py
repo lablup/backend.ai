@@ -43,6 +43,7 @@ from ai.backend.manager.repositories.scheduling_history.creators import RouteHis
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers import (
     AppProxySyncRouteHandler,
+    DrainingRouteHandler,
     HealthCheckRouteHandler,
     ProvisioningRouteHandler,
     ReplicaProbeTargetSyncHandler,
@@ -177,6 +178,10 @@ class RouteCoordinator:
                 event_producer=self._event_producer,
             ),
             RouteLifecycleType.ROUTE_EVICTION: RouteEvictionHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.DRAINING: DrainingRouteHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
             ),
@@ -500,7 +505,16 @@ class RouteCoordinator:
                 long_interval=60.0,  # Every 1 minute
                 initial_delay=30.0,
             ),
-            # Terminate routes - only long cycle
+            # Drain traffic for routes entering termination - hint-driven short
+            # cycle so AppProxy unregister follows the TERMINATING mark quickly;
+            # long cycle is the safety net.
+            RouteTaskSpec(
+                RouteLifecycleType.DRAINING,
+                short_interval=5.0,
+                long_interval=30.0,
+                initial_delay=15.0,
+            ),
+            # Terminate routes (after grace period) - only long cycle
             RouteTaskSpec(
                 RouteLifecycleType.TERMINATING,
                 short_interval=None,  # No short-cycle for cleanup
