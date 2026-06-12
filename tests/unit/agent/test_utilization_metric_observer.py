@@ -35,45 +35,47 @@ def kernel_metric() -> FlattenedKernelMetric:
     )
 
 
-def test_observe_container_metric_exports_series(
-    observer: UtilizationMetricObserver,
-    kernel_metric: FlattenedKernelMetric,
-) -> None:
-    observer.observe_container_metric(metric=kernel_metric)
+class TestUtilizationMetricObserver:
+    def test_observe_container_metric_exports_series(
+        self,
+        observer: UtilizationMetricObserver,
+        kernel_metric: FlattenedKernelMetric,
+    ) -> None:
+        observer.observe_container_metric(metric=kernel_metric)
 
-    exposition = generate_latest(REGISTRY).decode("utf-8")
-    assert 'kernel_id="08ff18f9-e263-47b6-a0aa-d97f8ddfbd5b"' in exposition
-    assert 'value_type="capacity"' in exposition
-    assert "8.589934592e+09" in exposition
-    # None ownership labels are exported as "undefined"
-    assert 'project_id="undefined"' in exposition
+        exposition = generate_latest(REGISTRY).decode("utf-8")
+        assert 'kernel_id="08ff18f9-e263-47b6-a0aa-d97f8ddfbd5b"' in exposition
+        assert 'value_type="capacity"' in exposition
+        assert "8.589934592e+09" in exposition
+        # None ownership labels are exported as "undefined"
+        assert 'project_id="undefined"' in exposition
 
+    async def test_lazy_remove_container_metric_removes_series(
+        self,
+        observer: UtilizationMetricObserver,
+        kernel_metric: FlattenedKernelMetric,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "ai.backend.agent.metrics.metric.UTILIZATION_METRIC_DETENTION",
+            0.0,
+        )
+        observer.observe_container_metric(metric=kernel_metric)
+        kernel_metrics: dict[KernelId, dict[MetricKey, Metric]] = {kernel_metric.kernel_id: {}}
 
-async def test_lazy_remove_container_metric_removes_series(
-    observer: UtilizationMetricObserver,
-    kernel_metric: FlattenedKernelMetric,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        "ai.backend.agent.metrics.metric.UTILIZATION_METRIC_DETENTION",
-        0.0,
-    )
-    observer.observe_container_metric(metric=kernel_metric)
-    kernel_metrics: dict[KernelId, dict[MetricKey, Metric]] = {kernel_metric.kernel_id: {}}
+        await observer.lazy_remove_container_metric(
+            kernel_metrics,
+            agent_id=kernel_metric.agent_id,
+            kernel_id=kernel_metric.kernel_id,
+            session_id=kernel_metric.session_id,
+            owner_user_id=kernel_metric.owner_user_id,
+            project_id=kernel_metric.project_id,
+            keys=[kernel_metric.key],
+        )
+        await observer._removal_kernel_tasks[kernel_metric.kernel_id]
+        # Let the task's done-callback (which prunes the local caches) run.
+        await asyncio.sleep(0)
 
-    await observer.lazy_remove_container_metric(
-        kernel_metrics,
-        agent_id=kernel_metric.agent_id,
-        kernel_id=kernel_metric.kernel_id,
-        session_id=kernel_metric.session_id,
-        owner_user_id=kernel_metric.owner_user_id,
-        project_id=kernel_metric.project_id,
-        keys=[kernel_metric.key],
-    )
-    await observer._removal_kernel_tasks[kernel_metric.kernel_id]
-    # Let the task's done-callback (which prunes the local caches) run.
-    await asyncio.sleep(0)
-
-    exposition = generate_latest(REGISTRY).decode("utf-8")
-    assert 'kernel_id="08ff18f9-e263-47b6-a0aa-d97f8ddfbd5b"' not in exposition
-    assert kernel_metric.kernel_id not in kernel_metrics
+        exposition = generate_latest(REGISTRY).decode("utf-8")
+        assert 'kernel_id="08ff18f9-e263-47b6-a0aa-d97f8ddfbd5b"' not in exposition
+        assert kernel_metric.kernel_id not in kernel_metrics
