@@ -154,6 +154,26 @@ class TestNoAvailableAgentErrorAggregationFormat:
                 assert "x " not in head, f"unexpected count-prefix in: {line!r}"
 
 
+class TestNoAvailableAgentHeaderFormat:
+    """The header's requested-slots summary must be human-readable."""
+
+    def test_header_humanizes_byte_slots(self) -> None:
+        error = NoAvailableAgentError(
+            kernel_ids=[KernelId(uuid.uuid4())],
+            required_architecture="aarch64",
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1000"),
+                "mem": Decimal("1073741824"),
+            }),
+            agent_errors={},
+        )
+
+        header = (error.extra_msg or "").splitlines()[0]
+        assert "cpu=1000" in header
+        assert "mem=1g" in header
+        assert "1073741824" not in header
+
+
 class TestDesignatedAgentFailureFormat:
     """Designated-agent failure path must list each candidate reason on its own line."""
 

@@ -180,7 +180,7 @@ class SessionProvisioner:
 
         if not scheduling_data.snapshot_data:
             log.warning("Missing snapshot data for scaling group {}", scaling_group)
-            return ScheduleResult()
+            return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
 
         # Load per-session failed agents from Valkey for retry deprioritization.
         # Uses a single pipelined Batch request instead of N parallel round-trips.
@@ -298,6 +298,7 @@ class SessionProvisioner:
         await self._valkey_schedule.set_pending_queue(scaling_group, failure_ids)
         return ScheduleResult(
             scheduled_session_ids=scheduled_session_ids,
+            scheduling_failures=scheduling_failures,
         )
 
     async def _schedule_workload(

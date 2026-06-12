@@ -103,6 +103,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
 
         Returns:
         - successes: Sessions that were scheduled
+        - failures: Sessions whose scheduling attempt failed in the Provisioner
         - skipped: Sessions that were not attempted (priority-based, resource constraints)
         """
         result = SessionExecutionResult()
@@ -129,13 +130,22 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             scaling_group, scheduling_data, provision_time
         )
         scheduled_ids = set(schedule_result.scheduled_session_ids)
+        failure_map = {
+            failure.session_id: failure for failure in schedule_result.scheduling_failures
+        }
 
-        # Allocated sessions transition to SCHEDULED; the rest are skipped this
-        # cycle (priority/resource constraints). The coordinator owns the actual
-        # session status transition based on these reports.
+        # Allocated sessions transition to SCHEDULED; failed attempts are reported
+        # as failures so the coordinator can classify them (need_retry/expired/
+        # give_up); the rest were not attempted this cycle (priority/resource
+        # constraints) and are skipped. The coordinator owns the actual session
+        # status transition based on these reports.
         for session in sessions:
-            if session.session_info.identity.id in scheduled_ids:
+            session_id = session.session_info.identity.id
+            if session_id in scheduled_ids:
                 result.successes.append(self._to_transition_info(session, "triggered-by-scheduler"))
+            elif session_id in failure_map:
+                reason = failure_map[session_id].msg or "scheduling-failed"
+                result.failures.append(self._to_transition_info(session, reason))
             else:
                 result.skipped.append(self._to_transition_info(session, "not-scheduled-this-cycle"))
 

@@ -696,6 +696,57 @@ class TestScheduleCoordinatorStatusTransition:
         # Verify _apply_transition was called for give_up
         mock_coordinator._apply_transition.assert_awaited()
 
+    async def test_need_retry_without_transition_records_history(
+        self,
+        mock_coordinator: MagicMock,
+        status_transitions_success_only: StatusTransitions,
+    ) -> None:
+        """SC-CO-015b: need_retry failures without a declared transition record history only.
+
+        Given: Failures classified as need_retry and a handler declaring need_retry=None
+        When: Handle result is called
+        Then: No status transition is applied, and history is recorded as NEED_RETRY
+              so the phase attempt counter keeps incrementing
+        """
+        # Arrange
+        mock_handler = MagicMock()
+        mock_handler.name.return_value = "test_handler"
+        mock_handler.status_transitions.return_value = status_transitions_success_only
+
+        session_id = SessionId(uuid4())
+        failure_info = _create_session_transition_info(session_id=session_id)
+        result = SessionExecutionResult(
+            successes=[],
+            failures=[failure_info],
+            skipped=[],
+        )
+        session = _create_session_with_kernels(session_id=session_id)
+
+        mock_coordinator._classify_failures = MagicMock(
+            return_value=FailureClassificationResult(
+                give_up=[], expired=[], need_retry=[failure_info]
+            )
+        )
+        mock_coordinator._apply_transition = AsyncMock()
+        mock_coordinator._record_history_without_transition = AsyncMock()
+
+        # Act
+        classified = await ScheduleCoordinator._handle_result(
+            mock_coordinator,
+            handler=mock_handler,
+            result=result,
+            records={},
+            sessions=[session],
+        )
+
+        # Assert
+        assert classified is not None
+        assert len(classified.need_retry) == 1
+        mock_coordinator._apply_transition.assert_not_awaited()
+        mock_coordinator._record_history_without_transition.assert_awaited_once_with(
+            "test_handler", [failure_info], {}, SchedulingResult.NEED_RETRY
+        )
+
     async def test_skipped_recorded_without_status_change(
         self,
         mock_coordinator: MagicMock,
@@ -723,7 +774,7 @@ class TestScheduleCoordinatorStatusTransition:
             return_value=FailureClassificationResult(give_up=[], expired=[], need_retry=[])
         )
         mock_coordinator._apply_transition = AsyncMock()
-        mock_coordinator._record_skipped_history = AsyncMock()
+        mock_coordinator._record_history_without_transition = AsyncMock()
 
         # Act
         await ScheduleCoordinator._handle_result(
@@ -735,7 +786,7 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         # Assert
-        mock_coordinator._record_skipped_history.assert_awaited_once()
+        mock_coordinator._record_history_without_transition.assert_awaited_once()
 
     async def test_empty_result_no_transitions(
         self,
@@ -760,7 +811,7 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         mock_coordinator._apply_transition = AsyncMock()
-        mock_coordinator._record_skipped_history = AsyncMock()
+        mock_coordinator._record_history_without_transition = AsyncMock()
 
         # Act
         classified = await ScheduleCoordinator._handle_result(
@@ -773,7 +824,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         # Assert
         mock_coordinator._apply_transition.assert_not_awaited()
-        mock_coordinator._record_skipped_history.assert_not_awaited()
+        mock_coordinator._record_history_without_transition.assert_not_awaited()
         assert classified is None
 
     async def test_kernel_reset_on_pending_transition(

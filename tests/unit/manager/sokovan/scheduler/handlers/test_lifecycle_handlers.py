@@ -25,6 +25,7 @@ from ai.backend.manager.sokovan.data import (
     SessionsForStartWithImages,
     SessionWithKernels,
 )
+from ai.backend.manager.sokovan.data.allocation import SchedulingFailure
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
 )
@@ -52,7 +53,7 @@ class TestScheduleSessionsLifecycleHandler:
     """Tests for ScheduleSessionsLifecycleHandler.
 
     Verifies the handler correctly delegates to provisioner and categorizes
-    results into successes and skipped sessions.
+    results into successes, failures, and skipped sessions.
     """
 
     @pytest.fixture
@@ -117,7 +118,8 @@ class TestScheduleSessionsLifecycleHandler:
         first_session = pending_sessions_multiple[0]
         mock_repository.get_scheduling_data.return_value = MagicMock()
         mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
-            scheduled_session_ids=[first_session.session_info.identity.id]
+            scheduled_session_ids=[first_session.session_info.identity.id],
+            scheduling_failures=[],
         )
 
         # Act
@@ -140,16 +142,18 @@ class TestScheduleSessionsLifecycleHandler:
         mock_repository: AsyncMock,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
-        """SC-SS-003: Non-scheduled sessions are marked as skipped (not failures).
+        """SC-SS-003: Non-attempted sessions are marked as skipped (not failures).
 
         Given: Multiple PENDING sessions in the scaling group
-        When: Provisioner schedules none of them (resource constraints)
+        When: Provisioner schedules none of them without reporting failures
+              (not attempted this cycle: priority/queue constraints)
         Then: All sessions appear in result.skipped with reason
         """
-        # Arrange - No sessions scheduled
+        # Arrange - No sessions scheduled, no failures reported
         mock_repository.get_scheduling_data.return_value = MagicMock()
         mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
-            scheduled_session_ids=[]
+            scheduled_session_ids=[],
+            scheduling_failures=[],
         )
 
         # Act
@@ -161,6 +165,85 @@ class TestScheduleSessionsLifecycleHandler:
         assert len(result.failures) == 0
 
         # Verify all sessions are skipped with appropriate reason
+        for skipped in result.skipped:
+            assert skipped.reason == "not-scheduled-this-cycle"
+
+    async def test_failed_sessions_returned_as_failures(
+        self,
+        handler: ScheduleSessionsLifecycleHandler,
+        mock_provisioner: AsyncMock,
+        mock_repository: AsyncMock,
+        pending_sessions_multiple: list[SessionWithKernels],
+    ) -> None:
+        """SC-SS-006: Sessions reported as scheduling failures appear in result.failures.
+
+        Given: Multiple PENDING sessions in the scaling group
+        When: Provisioner reports them as scheduling failures (predicate failure,
+              no suitable agent, etc.)
+        Then: All sessions appear in result.failures with reason from the failure msg
+        """
+        # Arrange - All sessions fail scheduling
+        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
+            scheduled_session_ids=[],
+            scheduling_failures=[
+                SchedulingFailure(
+                    session_id=session.session_info.identity.id,
+                    msg="no suitable agent",
+                )
+                for session in pending_sessions_multiple
+            ],
+        )
+
+        # Act
+        result = await handler.execute("default", pending_sessions_multiple)
+
+        # Assert
+        assert len(result.successes) == 0
+        assert len(result.skipped) == 0
+        assert len(result.failures) == len(pending_sessions_multiple)
+        for failure in result.failures:
+            assert failure.reason == "no suitable agent"
+
+    async def test_mixed_results_categorized_correctly(
+        self,
+        handler: ScheduleSessionsLifecycleHandler,
+        mock_provisioner: AsyncMock,
+        mock_repository: AsyncMock,
+        pending_sessions_multiple: list[SessionWithKernels],
+    ) -> None:
+        """SC-SS-007: Scheduled, failed, and non-attempted sessions are categorized.
+
+        Given: Three PENDING sessions in the scaling group
+        When: Provisioner schedules the first, fails the second, and does not
+              attempt the third
+        Then: Each session lands in successes, failures, and skipped respectively
+        """
+        # Arrange
+        scheduled_session, failed_session, *rest = pending_sessions_multiple
+        mock_repository.get_scheduling_data.return_value = MagicMock()
+        mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
+            scheduled_session_ids=[scheduled_session.session_info.identity.id],
+            scheduling_failures=[
+                SchedulingFailure(
+                    session_id=failed_session.session_info.identity.id,
+                    msg="resource quota exceeded",
+                )
+            ],
+        )
+
+        # Act
+        result = await handler.execute("default", pending_sessions_multiple)
+
+        # Assert
+        assert [s.session_id for s in result.successes] == [
+            scheduled_session.session_info.identity.id
+        ]
+        assert [f.session_id for f in result.failures] == [failed_session.session_info.identity.id]
+        assert result.failures[0].reason == "resource quota exceeded"
+        assert {s.session_id for s in result.skipped} == {
+            session.session_info.identity.id for session in rest
+        }
         for skipped in result.skipped:
             assert skipped.reason == "not-scheduled-this-cycle"
 
