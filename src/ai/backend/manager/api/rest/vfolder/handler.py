@@ -176,7 +176,7 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
     GetFstabContentsAction,
     GetQuotaAction,
-    GetVFolderUsageAction,
+    GetVFolderUsageLegacyAction,
     GetVFolderUsedBytesAction,
     GetVolumePerfMetricAction,
     ListAllHostsAction,
@@ -644,8 +644,8 @@ class VFolderHandler:
             ctx.user_email,
             params.id,
         )
-        result = await self._vfolder.get_usage.wait_for_complete(
-            GetVFolderUsageAction(
+        result = await self._vfolder.get_usage_legacy.wait_for_complete(
+            GetVFolderUsageLegacyAction(
                 folder_host=params.folder_host,
                 vfolder_id=str(VFolderID(vfolder_row["quota_scope_id"], params.id)),
                 unmanaged_path=vfolder_row["unmanaged_path"],

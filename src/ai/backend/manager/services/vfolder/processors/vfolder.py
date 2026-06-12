@@ -79,8 +79,8 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GetFstabContentsActionResult,
     GetQuotaAction,
     GetQuotaActionResult,
-    GetVFolderUsageAction,
-    GetVFolderUsageActionResult,
+    GetVFolderUsageLegacyAction,
+    GetVFolderUsageLegacyActionResult,
     GetVFolderUsedBytesAction,
     GetVFolderUsedBytesActionResult,
     GetVolumePerfMetricAction,
@@ -150,7 +150,9 @@ class VFolderProcessors(AbstractProcessorPackage):
     get_volume_perf_metric: ActionProcessor[
         GetVolumePerfMetricAction, GetVolumePerfMetricActionResult
     ]
-    get_usage: ActionProcessor[GetVFolderUsageAction, GetVFolderUsageActionResult]
+    get_usage_legacy: ActionProcessor[
+        GetVFolderUsageLegacyAction, GetVFolderUsageLegacyActionResult
+    ]
     get_used_bytes: ActionProcessor[GetVFolderUsedBytesAction, GetVFolderUsedBytesActionResult]
     list_hosts: ActionProcessor[ListHostsAction, ListHostsActionResult]
     get_my_storage_host_permissions: ActionProcessor[
@@ -249,7 +251,7 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.get_volume_perf_metric = ActionProcessor(
             service.get_volume_perf_metric, action_monitors
         )
-        self.get_usage = ActionProcessor(service.get_usage, action_monitors)
+        self.get_usage_legacy = ActionProcessor(service.get_usage_legacy, action_monitors)
         self.get_used_bytes = ActionProcessor(service.get_used_bytes, action_monitors)
         self.list_hosts = ActionProcessor(service.list_hosts, action_monitors)
         self.get_my_storage_host_permissions = ActionProcessor(
@@ -320,7 +322,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             ListAllowedTypesAction.spec(),
             ListAllHostsAction.spec(),
             GetVolumePerfMetricAction.spec(),
-            GetVFolderUsageAction.spec(),
+            GetVFolderUsageLegacyAction.spec(),
             GetVFolderUsedBytesAction.spec(),
             ListHostsAction.spec(),
             GetMyStorageHostPermissionsAction.spec(),

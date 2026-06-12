@@ -147,8 +147,8 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GetFstabContentsActionResult,
     GetQuotaAction,
     GetQuotaActionResult,
-    GetVFolderUsageAction,
-    GetVFolderUsageActionResult,
+    GetVFolderUsageLegacyAction,
+    GetVFolderUsageLegacyActionResult,
     GetVFolderUsedBytesAction,
     GetVFolderUsedBytesActionResult,
     GetVolumePerfMetricAction,
@@ -979,13 +979,15 @@ class VFolderService:
         storage_reply = await manager_client.get_volume_performance_metric(volume_name)
         return GetVolumePerfMetricActionResult(data=dict(storage_reply))
 
-    async def get_usage(self, action: GetVFolderUsageAction) -> GetVFolderUsageActionResult:
+    async def get_usage_legacy(
+        self, action: GetVFolderUsageLegacyAction
+    ) -> GetVFolderUsageLegacyActionResult:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             action.folder_host, is_unmanaged(action.unmanaged_path)
         )
         client = self._storage_manager.get_manager_facing_client(proxy_name)
         usage = await client.get_folder_usage(volume_name, action.vfolder_id)
-        return GetVFolderUsageActionResult(data=dict(usage))
+        return GetVFolderUsageLegacyActionResult(data=dict(usage))
 
     async def get_used_bytes(
         self, action: GetVFolderUsedBytesAction

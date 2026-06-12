@@ -85,8 +85,14 @@ class GetVolumePerfMetricActionResult(BaseActionResult):
 
 
 @dataclass
-class GetVFolderUsageAction(VFolderAction):
-    """Get usage statistics for a specific vfolder from storage proxy."""
+class GetVFolderUsageLegacyAction(VFolderAction):
+    """Get usage statistics for a specific vfolder from storage proxy.
+
+    Legacy v1 action: the caller supplies ``folder_host`` / ``unmanaged_path``
+    from a pre-resolved row, and access control is performed separately at the
+    handler layer. New code should use ``GetVFolderLiveUsageAction``, which
+    takes only the vfolder UUID and enforces RBAC at the processor level.
+    """
 
     folder_host: str
     vfolder_id: str
@@ -103,7 +109,7 @@ class GetVFolderUsageAction(VFolderAction):
 
 
 @dataclass
-class GetVFolderUsageActionResult(BaseActionResult):
+class GetVFolderUsageLegacyActionResult(BaseActionResult):
     data: dict[str, Any]
 
     @override
