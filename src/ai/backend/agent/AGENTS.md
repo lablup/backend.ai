@@ -1,30 +1,30 @@
-# Agent — 가드레일
+# Agent — Guardrails
 
-> 컴포넌트 전체 개요는 `src/ai/backend/agent/README.md`.
+> For a full component overview, see `src/ai/backend/agent/README.md`.
 
-## 예외
+## Exceptions
 
-- 새 예외는 `agent/errors/`에 정의한다 — `agent/exception.py`는 legacy.
+- Define new exceptions in `agent/errors/` — `agent/exception.py` is legacy.
 
-## 컨테이너 라이프사이클
+## Container lifecycle
 
-- 컨테이너 상태 전이는 `agent/stage/`의 상태 머신을 거쳐야 한다.
-- 라이프사이클 핸들러 밖에서 컨테이너 상태를 바꾸는 직접 Docker/K8s API 호출 금지.
-- 헬스체크·하트비트 로직은 `agent/health/`에 둔다 — 메인 루프에 인라인 금지.
+- Container state transitions must go through the state machine in `agent/stage/`.
+- Do NOT make direct Docker/K8s API calls that change container state outside the lifecycle handlers.
+- Put health-check and heartbeat logic in `agent/health/` — do NOT inline it in the main loop.
 
-## 인프라 구현 (Docker / Kubernetes / Dummy)
+## Infrastructure implementations (Docker / Kubernetes / Dummy)
 
-- 구현 전 항상 `agent/`의 추상 베이스 클래스를 확인한다.
-- Dummy 구현은 Docker/Kubernetes 변경과 함께 갱신해야 한다.
-- 인프라별 신규 코드는 해당 하위 디렉터리(`agent/docker/`, `agent/kubernetes/`, `agent/dummy/`)에 둔다.
+- Always check the abstract base classes in `agent/` before implementing.
+- The Dummy implementation must be updated together with Docker/Kubernetes changes.
+- Put new infrastructure-specific code in the corresponding sub-directory (`agent/docker/`, `agent/kubernetes/`, `agent/dummy/`).
 
-## Manager 통신
+## Manager communication
 
-- Agent → Manager 통신은 이벤트 시스템만 쓴다.
-- Manager 직접 RPC 호출은 지정된 RPC Server 진입점에서만 허용.
-- Agent 비즈니스 로직 안에서 Manager로의 새 직접 HTTP 호출을 추가하지 않는다.
+- Agent → Manager communication uses the event system only.
+- Direct RPC calls to the Manager are allowed only from the designated RPC Server entry points.
+- Do NOT add new direct HTTP calls to the Manager inside Agent business logic.
 
-## 리소스 추적
+## Resource tracking
 
-- 리소스 할당/해제는 `alloc_map.py`를 거쳐야 한다.
-- `alloc_map.py` 밖에서 리소스 카운터를 직접 조작하지 않는다.
+- Resource allocation/deallocation must go through `alloc_map.py`.
+- Do NOT manipulate resource counters directly outside `alloc_map.py`.

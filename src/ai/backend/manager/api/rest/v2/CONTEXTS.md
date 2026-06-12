@@ -1,8 +1,8 @@
-# REST v2 API 레이어 — 컨텍스트
+# REST v2 API layer — Contexts
 
-> 규칙은 같은 디렉터리 `AGENTS.md`, 구현 패턴은 `/api-guide` 스킬.
+> For rules, see `AGENTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 
-## 핸들러 의존성 주입 예시
+## Handler dependency injection example
 
 ```python
 class V2DomainHandler:
@@ -16,20 +16,20 @@ class V2DomainHandler:
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 ```
 
-## scoped search URL 예시 (현재 패턴)
+## scoped search URL examples (current pattern)
 
-- `POST /v2/sessions/projects/{project_id}/search` — 프로젝트 내 세션
-- `POST /v2/sessions/agents/{agent_id}/search` — 에이전트 위 세션
-- `POST /v2/users/domains/{domain_name}/search` — 도메인 내 사용자
-- `POST /v2/users/projects/{project_id}/search` — 프로젝트 내 사용자
-- `POST /v2/users/roles/{role_id}/search` — 특정 role 사용자
+- `POST /v2/sessions/projects/{project_id}/search` — sessions within a project
+- `POST /v2/sessions/agents/{agent_id}/search` — sessions on an agent
+- `POST /v2/users/domains/{domain_name}/search` — users within a domain
+- `POST /v2/users/projects/{project_id}/search` — users within a project
+- `POST /v2/users/roles/{role_id}/search` — users with a specific role
 
-## 페이지네이션 모드 동작
+## Pagination mode behavior
 
-search 엔드포인트는 커서·오프셋 페이지네이션 인자를 모두 받는다.
+search endpoints accept both cursor and offset pagination arguments.
 
-- **기본(인자 없음):** 오프셋(`limit=10, offset=0`)으로 폴백.
-- **오프셋(`limit`/`offset`):** 사용자 지정 `order` 적용, 없으면 엔티티 기본 정렬. 커스텀 정렬이 필요할 때.
-- **커서(`first`/`after` 또는 `last`/`before`):** 정렬은 엔티티 커서 키(보통 `created_at` 또는 PK)로 고정.
-  사용자 지정 `order`는 무시한다 — 커서 일관성을 위해 고정 정렬이 필요. 무한 스크롤/"더 보기" UX에 적합.
-- 한 요청에 한 모드만. `first`+`limit` 혼용은 에러.
+- **Default (no args):** falls back to offset (`limit=10, offset=0`).
+- **Offset (`limit`/`offset`):** applies the user-specified `order`, or the entity's default ordering if absent. Use when custom ordering is needed.
+- **Cursor (`first`/`after` or `last`/`before`):** ordering is fixed to the entity's cursor key (usually `created_at` or the PK).
+  The user-specified `order` is ignored — a fixed ordering is required for cursor consistency. Suited to infinite scroll / "load more" UX.
+- Only one mode per request. Mixing `first`+`limit` is an error.

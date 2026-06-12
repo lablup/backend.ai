@@ -1,20 +1,21 @@
-# Manager GraphQL 레이어 — 컨텍스트
+# Manager GraphQL layer — Contexts
 
-> 규칙은 같은 디렉터리 `AGENTS.md`, 구현 패턴은 `/api-guide` 스킬.
+> For the rules, see `AGENTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 
-## Federation 이름 충돌 caveat
+## Federation name-collision caveat
 
-v2 Strawberry 스키마는 v1 Graphene 스키마와 함께 supergraph로 합성된다. `GQL` 접미를 뗀 스키마 이름이
-다른 shape의 기존 v1 Graphene 타입(예: `KeyPair`, `CreateContainerRegistryInput`)과 충돌하면 supergraph
-합성이 실패한다. 이 경우 `V2` 접미 스키마명을 쓴다(`name="KeyPairV2"`) — 기존 `DomainV2`/`UserV2` 규약과 일치.
-이름을 바꾼 뒤 `scripts/generate-graphql-schema.sh`로 합성을 검증한다.
+The v2 Strawberry schema is composed into a supergraph together with the v1 Graphene schema. If a schema name with the
+`GQL` suffix stripped collides with an existing v1 Graphene type of a different shape (e.g. `KeyPair`,
+`CreateContainerRegistryInput`), supergraph composition fails. In that case, use a `V2`-suffixed schema name
+(`name="KeyPairV2"`) — consistent with the existing `DomainV2`/`UserV2` convention. After renaming, verify composition with
+`scripts/generate-graphql-schema.sh`.
 
-## 페이지네이션 모드 동작
+## Pagination mode behavior
 
-search 쿼리는 커서·오프셋 인자를 모두 받는다.
+A search query accepts both cursor and offset arguments.
 
-- **기본(인자 없음):** 오프셋(`limit=10, offset=0`)으로 폴백.
-- **오프셋(`limit`/`offset`):** 사용자 지정 `order_by` 적용, 없으면 엔티티 기본 정렬. 커스텀 정렬이 필요할 때.
-- **커서(`first`/`after` 또는 `last`/`before`):** 정렬은 엔티티 커서 키(보통 `created_at` 또는 PK)로 고정.
-  사용자 지정 `order_by`는 무시한다 — 커서 일관성을 위해 고정 정렬이 필요. 무한 스크롤/"더 보기" UX에 적합.
-- 한 요청에 한 모드만. `first`+`limit` 혼용은 에러.
+- **Default (no arguments):** falls back to offset (`limit=10, offset=0`).
+- **Offset (`limit`/`offset`):** applies the user-specified `order_by`, or the entity's default sort if absent. For when custom sorting is needed.
+- **Cursor (`first`/`after` or `last`/`before`):** the sort is fixed to the entity's cursor key (usually `created_at` or the PK).
+  The user-specified `order_by` is ignored — a fixed sort is required for cursor consistency. Suited for infinite-scroll / "load more" UX.
+- Only one mode per request. Mixing `first`+`limit` is an error.

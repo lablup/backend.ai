@@ -1,33 +1,33 @@
-# Manager GraphQL 레이어 — 가드레일
+# Manager GraphQL layer — Guardrails
 
-> 배경(federation 충돌·페이지네이션 동작)은 같은 디렉터리 `CONTEXTS.md`, 구현 패턴은 `/api-guide` 스킬(GraphQL Patterns).
+> For background (federation collisions, pagination behavior), see `CONTEXTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill (GraphQL Patterns).
 
-## 타입 네이밍
+## Type naming
 
-- 모든 Strawberry 타입은 **Python 클래스 이름**에 `GQL` 접미를 붙인다: `DomainGQL`, `DomainFilterGQL`, `DomainScopeGQL`.
-- 출력/입력/connection 타입 모두 적용.
-- **스키마 노출 이름**에는 `GQL`이 없어야 한다. 데코레이터에 `name=`(클래스명에서 `GQL` 제거)을 항상 넘긴다
-  (예: `CreateDomainInputGQL` → `name="CreateDomainInput"`). `name=` 누락 시 SDL에 `GQL`이 샌다.
-- v1 Graphene 타입과 이름이 충돌하면 `V2` 접미 스키마명을 쓴다(`name="KeyPairV2"`). 배경은 `CONTEXTS.md`.
+- Every Strawberry type appends the `GQL` suffix to its **Python class name**: `DomainGQL`, `DomainFilterGQL`, `DomainScopeGQL`.
+- Applies to output, input, and connection types alike.
+- The **schema-exposed name** must NOT contain `GQL`. Always pass `name=` (the class name with `GQL` stripped) to the decorator
+  (e.g. `CreateDomainInputGQL` → `name="CreateDomainInput"`). Omitting `name=` leaks `GQL` into the SDL.
+- If the name collides with a v1 Graphene type, use a `V2`-suffixed schema name (`name="KeyPairV2"`). See `CONTEXTS.md` for background.
 
-## 데코레이터
+## Decorators
 
-- `@strawberry.type/input/field/enum/mutation`, `@strawberry.experimental.pydantic.*`를 직접 쓰지 않는다.
-- `decorators.py`의 커스텀 데코레이터만 쓴다:
-  - `@gql_node_type` — Relay Node 타입(`PydanticNodeMixin[DTO]` 상속)
-  - `@gql_pydantic_type(model=DTO)` — v2 Pydantic DTO 기반 출력 타입·payload
-  - `@gql_pydantic_input` — 입력 타입(`PydanticInputMixin[DTO]` 상속)
-  - `@gql_pydantic_interface(model=DTO)` — DTO 기반 interface
-  - `@gql_connection_type` — `Connection[T]`/`Edge[T]` 서브클래스
-  - `gql_field` / `gql_added_field` — 부모 타입과 함께 도입한 필드 / 이후 추가 필드(자체 버전)
-  - `@gql_root_field` — Query 타입의 루트 쿼리 필드(항상 버전 표기)
+- Do NOT use `@strawberry.type/input/field/enum/mutation` or `@strawberry.experimental.pydantic.*` directly.
+- Use only the custom decorators in `decorators.py`:
+  - `@gql_node_type` — Relay Node type (inherits `PydanticNodeMixin[DTO]`)
+  - `@gql_pydantic_type(model=DTO)` — output type / payload based on a v2 Pydantic DTO
+  - `@gql_pydantic_input` — input type (inherits `PydanticInputMixin[DTO]`)
+  - `@gql_pydantic_interface(model=DTO)` — DTO-based interface
+  - `@gql_connection_type` — `Connection[T]`/`Edge[T]` subclass
+  - `gql_field` / `gql_added_field` — a field introduced together with its parent type / a field added later (with its own version)
+  - `@gql_root_field` — a root query field on the Query type (always version-tagged)
   - `gql_enum` / `@gql_enum`, `@gql_mutation`, `@gql_subscription`, `@gql_federation_type`
-- Pydantic DTO 요구를 우회하려 새 데코레이터를 추가하지 않는다.
+- Do NOT add new decorators to bypass the Pydantic DTO requirement.
 
-## 버전 메타데이터
+## Version metadata
 
-- 새 타입·필드·enum·mutation 추가 시 `added_version`에 `NEXT_RELEASE_VERSION` 상수를 쓴다 — 버전 문자열을
-  하드코딩하지 않는다(릴리스 시 `scripts/release.sh`가 동결). 이미 릴리스된 리터럴 버전은 바꾸지 않는다.
+- When adding a new type, field, enum, or mutation, use the `NEXT_RELEASE_VERSION` constant for `added_version` — do NOT
+  hardcode the version string (`scripts/release.sh` freezes it at release time). Do not change literal versions that are already released.
   ```python
   from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
   @gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="..."))
@@ -36,77 +36,77 @@
 
 ## import
 
-- Strawberry 타입을 `TYPE_CHECKING` 블록 안에서 import하지 않는다 — Strawberry는 런타임에 타입을 평가하므로
-  조용히 실패하거나 에러난다. 항상 모듈 레벨에서 import한다.
+- Do NOT import Strawberry types inside a `TYPE_CHECKING` block — Strawberry evaluates types at runtime, so it will
+  silently fail or error. Always import at module level.
 
-## 교차 엔티티 참조
+## Cross-entity references
 
-- 순환 import를 피하려 교차 엔티티 node 참조에는 `strawberry.lazy()`를 쓴다
-  (`Annotated[T, lazy(...)] | None` 문법은 `/api-guide`).
+- Use `strawberry.lazy()` for cross-entity node references to avoid circular imports
+  (for the `Annotated[T, lazy(...)] | None` syntax, see `/api-guide`).
 
-## N+1 방지
+## N+1 prevention
 
-- resolver 안에서 관련 엔티티를 개별 fetch 함수로 가져오지 않는다.
-- 교차 엔티티 로딩은 항상 `info.context.data_loaders.*`를 쓴다.
+- Do NOT fetch related entities via individual fetch functions inside a resolver.
+- Always use `info.context.data_loaders.*` for cross-entity loading.
 
-## Service 호출
+## Calling services
 
-- resolver는 Adapter(`info.context.adapters.*`)를 통해서만 service를 호출한다 — Processor/Service 직접 호출 금지.
-- Adapter는 Pydantic DTO(`common/dto/manager/v2/`)를 받고 반환한다.
+- Resolvers call services only through the Adapter (`info.context.adapters.*`) — no direct Processor/Service calls.
+- The Adapter receives and returns Pydantic DTOs (`common/dto/manager/v2/`).
 
-## Pydantic DTO 통합
+## Pydantic DTO integration
 
-GQL 타입은 v2 DTO(`common/dto/manager/v2/`)의 얇은 래퍼다.
+GQL types are thin wrappers over the v2 DTOs (`common/dto/manager/v2/`).
 
-- Node: `PydanticNodeMixin[DTO]` 상속 + `@gql_node_type`. `FooGQL.from_pydantic(dto)`로 변환.
-- 중첩 출력/payload: `@gql_pydantic_type(model=DTO)`. `from_pydantic()` 자동 생성.
-- 입력: `PydanticInputMixin[DTO]` 상속 + `@gql_pydantic_input`. `input_gql.to_pydantic()`로 변환.
-- GQL enum 값은 DTO enum 값과 정확히 일치해야 한다(`.value`로 변환). GQL 필드명은 DTO 필드명과 일치.
-- GQL의 `strawberry.UNSET`은 `to_pydantic()`에서 DTO의 `SENTINEL` 기본값으로 자동 매핑.
+- Node: inherit `PydanticNodeMixin[DTO]` + `@gql_node_type`. Convert via `FooGQL.from_pydantic(dto)`.
+- Nested output/payload: `@gql_pydantic_type(model=DTO)`. `from_pydantic()` is auto-generated.
+- Input: inherit `PydanticInputMixin[DTO]` + `@gql_pydantic_input`. Convert via `input_gql.to_pydantic()`.
+- GQL enum values must exactly match the DTO enum values (converted via `.value`). GQL field names must match the DTO field names.
+- GQL's `strawberry.UNSET` is automatically mapped to the DTO's `SENTINEL` default in `to_pydantic()`.
 
-## 에러 처리 & nullable 스키마
+## Error handling & nullable schema
 
-- 객체를 못 찾을 수 있는 쿼리/resolver는 반환 타입을 **nullable**(`T | None`)로 선언한다.
-- `None`을 반환하려고 fetcher에서 도메인 예외(`NotFound` 등)를 잡지 않는다 — 예외를 전파한다.
-  Relay 스펙상 `resolve_nodes`만 `Iterable[Self | None]`을 반환할 수 있다.
+- For queries/resolvers that may not find an object, declare the return type as **nullable** (`T | None`).
+- Do NOT catch domain exceptions (`NotFound`, etc.) in the fetcher just to return `None` — propagate the exception.
+  Per the Relay spec, only `resolve_nodes` may return `Iterable[Self | None]`.
 
-## 쿼리 페이지네이션 인자
+## Query pagination arguments
 
-모든 search/list 쿼리는 아래 인자 그룹을 **전부** 제공한다 — 하나도 빼지 않는다:
+Every search/list query provides **all** of the argument groups below — do not omit any:
 - `filter: XxxFilterGQL | None`
 - `order_by: list[XxxOrderByGQL] | None`
-- `before/after: str | None`, `first/last: int | None` (커서)
-- `limit/offset: int | None` (오프셋)
+- `before/after: str | None`, `first/last: int | None` (cursor)
+- `limit/offset: int | None` (offset)
 
-클라이언트가 커서·오프셋을 자유롭게 선택할 수 있어야 한다. 모드별 동작은 `CONTEXTS.md`.
+The client must be free to choose cursor or offset. For per-mode behavior, see `CONTEXTS.md`.
 
-## Admin & 스코프
+## Admin & scope
 
-- superadmin 전용 resolver: 첫 줄에서 `check_admin_only(info)`를 호출한다.
+- superadmin-only resolvers: call `check_admin_only()` on the first line.
 
-**search — 세 변형:**
-- `adminFoosV2`: superadmin 전용, 스코프 없음 — 전체 시스템.
-- `scopedFoosV2`(예: `scopedSessionsV2`): non-admin, 스코프 필수 — 해당 스코프 내.
-- `myFoosV2`: self-service, adapter가 현재 사용자를 스코프로 내부 resolve.
-- non-admin에게 "스코프 없는 전체 조회"는 없다.
+**search — three variants:**
+- `adminFoosV2`: superadmin only, no scope — the entire system.
+- `scopedFoosV2` (e.g. `scopedSessionsV2`): non-admin, scope required — within that scope.
+- `myFoosV2`: self-service, the adapter resolves the current user as the scope internally.
+- There is no "unscoped system-wide query" for non-admins.
 
-**scoped search 규약:**
-- 쿼리명 `scopedFoosV2`(엔티티당 단일 루트 필드).
-- scope는 엔티티별 입력(`FooScopeGQL`, `api/gql/{entity}/types/scope.py`)으로 받는 **필수 인자** — bare ID 금지.
-  shape는 엔티티별(단일 ID / 엔티티 태그 ref 리스트 / 카테고리별 리스트).
-- 비어있지 않음 검증은 DTO의 Pydantic `model_validator`에 둔다 — GQL/REST 경계에서 균일하게 거부.
-- resolver는 scope를 search 입력 DTO와 함께 adapter에 넘긴다. 인가(RBAC)는 adapter/service 책임 — resolver가 아님.
-- 레거시 `{scope}FoosV2`(예: `projectSessionsV2`)는 이 규약 이전 — 새로 만들지 않는다.
+**scoped search convention:**
+- Query name `scopedFoosV2` (a single root field per entity).
+- The scope is a **required argument** received as a per-entity input (`FooScopeGQL`, `api/gql/{entity}/types/scope.py`) — no bare ID.
+  The shape is per-entity (single ID / list of entity-tag refs / per-category list).
+- Put non-empty validation in the DTO's Pydantic `model_validator` — uniformly rejected at the GQL/REST boundary.
+- The resolver passes the scope to the adapter together with the search input DTO. Authorization (RBAC) is the responsibility of the adapter/service — not the resolver.
+- Legacy `{scope}FoosV2` (e.g. `projectSessionsV2`) predates this convention — do not create new ones.
 
 **`myFoosV2` resolver:**
-- resolver는 `current_user()`를 호출하거나 스코프를 만들지 않는다 — search 입력 DTO만 adapter에 넘긴다.
-- adapter가 내부에서 `current_user()`로 스코프를 구성한다.
+- The resolver does NOT call `current_user()` or build a scope — it passes only the search input DTO to the adapter.
+- The adapter builds the scope internally via `current_user()`.
 
-**create / update / get / delete / purge — `admin_` 분리 기준:**
-- admin 전용 엔티티: 단일 `admin_` mutation/query.
-- admin·사용자 둘 다이고 동작 다름: `admin_`·non-admin 분리(서로 다른 입력 타입).
-- 권한 검사만 다름: 단일 — admin은 이미 접근 권한 있음.
+**create / update / get / delete / purge — criteria for splitting out `admin_`:**
+- admin-only entities: a single `admin_` mutation/query.
+- both admin and user, with different behavior: split `admin_` and non-admin (different input types).
+- differing only in permission checks: a single one — admins already have access.
 
-## 레거시
+## Legacy
 
-- `gql_legacy/`(Graphene) 패턴을 복사하지 않는다 — Strawberry로 이행 중.
+- Do NOT copy `gql_legacy/` (Graphene) patterns — migrating to Strawberry.

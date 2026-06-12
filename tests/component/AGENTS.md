@@ -1,32 +1,32 @@
-# 컴포넌트 테스트 — 가드레일
+# Component tests — Guardrails
 
-> 실제 aiohttp 서버 + 실제 DB로 HTTP API 레이어를 테스트한다.
-> 비즈니스 로직은 `tests/unit/`에서 검증한다 — 여기서 중복하지 않는다.
+> Test the HTTP API layer with a real aiohttp server + real DB.
+> Verify business logic in `tests/unit/` — do NOT duplicate it here.
 
-## 여기서 테스트할 것
+## What to test here
 
-- HTTP 라우팅, auth 데코레이터, 요청/응답 직렬화.
-- 역할별 동작 차이(superadmin vs 사용자 keypair).
-- API 경계에서 잘못된 입력에 대한 에러 응답.
+- HTTP routing, auth decorators, request/response serialization.
+- Per-role behavior differences (superadmin vs user keypair).
+- Error responses for invalid input at the API boundary.
 
-## 핵심 픽스처
+## Core fixtures
 
-`create_app_and_client`(`AppBuilder`) — 선택적 `cleanup_contexts`로 실제 aiohttp 서버를 띄운다.
-`AppBuilder` 프로토콜로 `(app, client)`를 반환:
+`create_app_and_client` (`AppBuilder`) — brings up a real aiohttp server with optional `cleanup_contexts`.
+Returns `(app, client)` via the `AppBuilder` protocol:
 ```python
 async def test_something(create_app_and_client: AppBuilder) -> None:
     app, client = await create_app_and_client(...)
 ```
 
-`get_headers(keypair, method, path, ...)` — 서명된 HMAC auth 헤더 생성.
-- auth 헤더를 직접 만들지 않는다 — 항상 이 픽스처를 쓴다.
+`get_headers(keypair, method, path, ...)` — generates signed HMAC auth headers.
+- Do NOT build auth headers yourself — always use this fixture.
 
-## BUILD 파일
+## BUILD files
 
-- 새 하위 디렉터리마다 `python_tests()`를 담은 `BUILD` 파일이 필요하다.
+- Every new subdirectory needs a `BUILD` file containing `python_tests()`.
 
-## 여기 속하지 않는 것
+## What does NOT belong here
 
-- 비즈니스 로직 단언(service 동작) → `tests/unit/`.
-- 전체 E2E 사용자 워크플로(create → list → delete) → `tests/integration/`.
-- raw `aiohttp.ClientSession` 사용 — 항상 제공된 픽스처를 거친다.
+- Business logic assertions (service behavior) → `tests/unit/`.
+- Full E2E user workflows (create → list → delete) → `tests/integration/`.
+- Using raw `aiohttp.ClientSession` — always go through the provided fixtures.

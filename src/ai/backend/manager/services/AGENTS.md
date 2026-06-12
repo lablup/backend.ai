@@ -1,37 +1,37 @@
-# Manager Services 레이어 — 가드레일
+# Manager Services layer — Guardrails
 
-> 구현 패턴은 `/service-guide` 스킬 참고.
+> For implementation patterns, see the `/service-guide` skill.
 
-## 디렉터리 구조 (도메인별)
+## Directory structure (per domain)
 
-도메인마다: `services/{domain}/types.py`, `service.py`, `processors.py`,
-그리고 `actions/{base,{operation}}.py` — `actions/` 아래 오퍼레이션당 한 파일.
+Per domain: `services/{domain}/types.py`, `service.py`, `processors.py`,
+and `actions/{base,{operation}}.py` — one file per operation under `actions/`.
 
-## Action 규칙
+## Action rules
 
-- Action과 ActionResult는 반드시 `@dataclass(frozen=True)`.
-- action 파일 하나에 `Action` + `ActionResult` 정확히 한 쌍.
-- 모든 구체 Action은 `entity_id()`와 `operation_type()`를 오버라이드해야 한다.
+- Action and ActionResult MUST be `@dataclass(frozen=True)`.
+- Exactly one `Action` + `ActionResult` pair per action file.
+- Every concrete Action MUST override `entity_id()` and `operation_type()`.
 
-## Service 메서드 규칙
+## Service method rules
 
-- 한 service 메서드에서 여러 repository를 호출하는 것은 비권장 — tx가 보장되지 않으면 수정한다.
-  단, 다른 레이어와 엮인 경우 service에서 다른 동작을 수행한 뒤 repository를 호출하는 것은 허용한다.
-- service 메서드는 DB 세션/트랜잭션을 생성하면 안 된다 — repository에 위임한다.
-- 각 메서드는 Action을 받아 ActionResult를 반환한다 — 그 외 반환 타입 금지.
+- Calling multiple repositories from a single service method is discouraged — fix it if the tx is not guaranteed.
+  However, when it is entangled with another layer, it is allowed to perform some other action in the service and then call a repository.
+- Service methods must NOT create DB sessions/transactions — delegate to the repository.
+- Each method takes an Action and returns an ActionResult — no other return type is allowed.
 
-## Processor 규칙
+## Processor rules
 
-- 모든 service 메서드는 `ActionProcessor`로 감싼다. raw service 메서드를 핸들러에 노출 금지.
-- `AbstractProcessorPackage`를 상속하고 `supported_actions()`를 오버라이드해야 한다.
+- Wrap every service method in an `ActionProcessor`. Do NOT expose raw service methods to handlers.
+- It MUST inherit from `AbstractProcessorPackage` and override `supported_actions()`.
 
-## 여기 속하는 것
+## What belongs here
 
-- 도메인 검증과 비즈니스 규칙.
-- 여러 repository에 걸친 오케스트레이션(예외적이며, 정당화가 필요).
+- Domain validation and business rules.
+- Orchestration across multiple repositories (exceptional, and requires justification).
 
-## 여기 속하지 않는 것
+## What does NOT belong here
 
-- SQL 쿼리나 ORM 연산.
-- HTTP 요청/응답 처리.
-- 직접 DB 세션 생성(`begin_session()` / `begin_readonly_session()`).
+- SQL queries or ORM operations.
+- HTTP request/response handling.
+- Direct DB session creation (`begin_session()` / `begin_readonly_session()`).

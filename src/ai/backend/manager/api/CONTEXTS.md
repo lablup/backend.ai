@@ -1,14 +1,14 @@
-# Manager API 레이어 — 컨텍스트
+# Manager API layer — Contexts
 
-> 규칙은 같은 디렉터리 `AGENTS.md`, 구현 패턴은 `/api-guide` 스킬.
+> For rules, see `AGENTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 
-## Adapter `my_` 패턴
+## Adapter `my_` pattern
 
-self-service(`my_`) 엔드포인트에서 인증은 Adapter가 내부에서 처리한다. Adapter가 `current_user()`를
-호출해 사용자 컨텍스트를 얻고 거기서 `SearchScope`를 구성한다. GQL resolver / REST 핸들러는 스코프를
-넘기지 않고 search 입력 DTO만 넘긴다. 인증 로직을 resolver마다 흩뿌리지 않고 adapter에 모으기 위함이다.
+For self-service (`my_`) endpoints, authentication is handled inside the Adapter. The Adapter calls `current_user()`
+to obtain the user context and builds the `SearchScope` from it. The GQL resolver / REST handler does not pass the scope —
+it only passes the search input DTO. This is to gather the auth logic into the adapter instead of scattering it across every resolver.
 
-## v2 엔드포인트 검증
+## v2 endpoint verification
 
-신규 API 엔드포인트는 커밋 전 라이브 서버로 검증한다. 서버 재시작·`./bai` 명령·로그 확인 절차는
-`/local-dev`, `/bai-cli`, `/observability` 스킬 참고.
+Verify new API endpoints against the live server before committing. For server restart, `./bai` commands, and log checks, see
+the `/local-dev`, `/bai-cli`, and `/observability` skills.

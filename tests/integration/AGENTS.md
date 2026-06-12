@@ -1,42 +1,42 @@
-# 통합 테스트 — 가드레일
+# Integration tests — Guardrails
 
-> Client SDK v2를 쓰는 풀스택 E2E 테스트. 사용자 대면 워크플로를 끝에서 끝까지 검증한다.
+> Full-stack E2E tests using Client SDK v2. Verify user-facing workflows end to end.
 
-## 여기서 테스트할 것
+## What to test here
 
-- 완전한 사용자 관점 시나리오: create → read → update → delete 흐름.
-- 역할 간 권한 경계(superadmin vs 일반 사용자).
-- 여러 API 호출이나 컴포넌트에 걸친 동작.
+- Complete user-perspective scenarios: create → read → update → delete flows.
+- Permission boundaries across roles (superadmin vs regular user).
+- Behavior spanning multiple API calls or components.
 
-## `@pytest.mark.integration` 마커
+## `@pytest.mark.integration` marker
 
-**클래스 레벨**에 붙인다 — 여기의 모든 테스트 클래스에 필수:
+Attach it at the **class level** — required on every test class here:
 ```python
 @pytest.mark.integration
 class TestUserLifecycle:
     async def test_full_user_lifecycle(self, admin_registry, ...) -> None:
 ```
 
-## 핵심 픽스처
+## Core fixtures
 
-`admin_registry` — superadmin keypair를 가진 `BackendAIClientRegistry`.
-`user_registry` — 일반 사용자 keypair를 가진 `BackendAIClientRegistry`.
+`admin_registry` — a `BackendAIClientRegistry` with a superadmin keypair.
+`user_registry` — a `BackendAIClientRegistry` with a regular user keypair.
 
-- raw `aiohttp.ClientSession`이나 손으로 만든 auth 헤더를 쓰지 않는다.
-- 항상 `BackendAIClientRegistry` 메서드로 API를 호출한다.
+- Do NOT use raw `aiohttp.ClientSession` or hand-built auth headers.
+- Always call the API through `BackendAIClientRegistry` methods.
 
-## 서버 셋업
+## Server setup
 
-통합 테스트는 풀스택 서버(`cleanup_contexts=None`, 모든 컨텍스트 포함)를 쓴다.
-`server_factory`에서 `cleanup_contexts`를 `None`에서 바꾸지 않는다 — 통합 테스트는 모든
-컨텍스트가 떠 있어야 한다.
+Integration tests use the full-stack server (`cleanup_contexts=None`, all contexts included).
+Do NOT change `cleanup_contexts` from `None` in `server_factory` — integration tests require all
+contexts to be up.
 
-## 디렉터리 구조
+## Directory structure
 
-도메인 기반 하위 디렉터리 구조를 유지한다: `integration/user/`, `integration/session/` 등.
-각 하위 디렉터리에 `python_tests()`를 담은 `BUILD`가 필요하다.
+Maintain a domain-based subdirectory structure: `integration/user/`, `integration/session/`, etc.
+Each subdirectory needs a `BUILD` containing `python_tests()`.
 
-## 여기 속하지 않는 것
+## What does NOT belong here
 
-- service 내부에 대한 유닛 레벨 단언 → `tests/unit/`.
-- HTTP 레이어만의 검사(라우팅, auth 데코레이터) → `tests/component/`.
+- Unit-level assertions about service internals → `tests/unit/`.
+- HTTP-layer-only checks (routing, auth decorators) → `tests/component/`.

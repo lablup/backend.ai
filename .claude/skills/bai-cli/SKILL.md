@@ -1,16 +1,16 @@
-# ./bai CLI 사용 가이드
+# ./bai CLI Usage Guide
 
-Backend.AI **v2 CLI**(`./bai`)로 API 엔드포인트를 테스트·검증하고 리소스를 관리하는 가이드.
+Guide for testing and verifying API endpoints and managing resources with the Backend.AI **v2 CLI** (`./bai`).
 
-**중요:**
-- `./bai`는 v2 REST API CLI다. 레거시 v1 CLI(`backend.ai` / `./backend.ai`)와 별개다.
-- v1 CLI 명령을 쓰지 않는다. 모든 테스트·검증은 `./bai`로 한다.
-- **`./bai` 명령 실행 전, 아래 Entity-Command Reference에서 명령 존재를 확인한다.** 추측·날조 금지, CLI 소스 탐색 금지.
-- 명령 트리는 `--help`로 검증한다(서버 없이 동작): `./bai {entity} --help`, `./bai admin {entity} --help`, `./bai my {entity} --help`.
+**IMPORTANT:**
+- `./bai` is the v2 REST API CLI. It is separate from the legacy v1 CLI (`backend.ai` / `./backend.ai`).
+- Do NOT use v1 CLI commands. Do all testing and verification with `./bai`.
+- **Before running a `./bai` command, confirm the command exists in the Entity-Command Reference below.** No guessing or fabrication, no searching the CLI source.
+- Verify the command tree with `--help` (works without a server): `./bai {entity} --help`, `./bai admin {entity} --help`, `./bai my {entity} --help`.
 
-### v1 → v2 용어
+### v1 → v2 terminology
 
-| v1 (레거시, 사용 금지) | v2 (`./bai`) |
+| v1 (legacy, do NOT use) | v2 (`./bai`) |
 |--------------------------|-------------|
 | `group` | `project` |
 | `backend.ai vfolder list` | `./bai vfolder my-search` |
@@ -21,31 +21,31 @@ Backend.AI **v2 CLI**(`./bai`)로 API 엔드포인트를 테스트·검증하고
 
 ## Entity-Command Reference
 
-문법: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
+Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 
-각 엔티티는 접근 레벨별로 표기한다 — **user**(사용자 대면) / **admin**(superadmin 전용) / **my**(본인 리소스).
-"(빈 그룹)"은 명령이 없는 placeholder 그룹이다(예: `./bai agent`는 비어 있고 실제 명령은 `./bai admin agent`).
-옵션은 `--help`로 확인한다.
+Each entity is marked by access level — **user** (user-facing) / **admin** (superadmin only) / **my** (own resources).
+"(empty group)" is a placeholder group with no commands (example: `./bai agent` is empty and the actual commands are under `./bai admin agent`).
+Check options with `--help`.
 
 ### Core
 
 - **domain**: user(get) · admin(search, create, update, delete, purge)
 - **user**: user(get, create, update, delete, search) · admin(create, delete, search)
 - **project**: user(get, assign-users, unassign-users · sub role: search) · admin(search, create, update, delete, purge)
-- **agent**: user(빈 그룹) · admin(search, total-resources)
-- **image**: user(빈 그룹) · admin(search, forget, purge, update · sub alias: create, remove, search)
+- **agent**: user(empty group) · admin(search, total-resources)
+- **image**: user(empty group) · admin(search, forget, purge, update · sub alias: create, remove, search)
 - **session**: user(enqueue, get, logs, project-search, start-service, shutdown-service, terminate, update) · admin(search · sub kernel: search) · my(search)
 
 ### Compute & Serving
 
 - **deployment**: user(create, get, update, delete, project-search, chat) · admin(search) · my(search)
-  - user sub: access-token(create, get, search, delete, bulk-delete), auto-scaling-rule(create, get, search, update, delete, bulk-delete), replica(search), revision(add, get, current, activate, search), revision-preset(get, search), options(get, replace), chat-cache(show, clear), chat-config(set, show, clear), chat-history(show, clear), policy(빈 그룹)
+  - user sub: access-token(create, get, search, delete, bulk-delete), auto-scaling-rule(create, get, search, update, delete, bulk-delete), replica(search), revision(add, get, current, activate, search), revision-preset(get, search), options(get, replace), chat-cache(show, clear), chat-config(set, show, clear), chat-history(show, clear), policy(empty group)
   - admin sub: policy(search), replica(search), revision(search, refresh), revision-preset(create, get, search, update, delete)
 - **model-card**: user(project-search, get, deploy, available-presets) · admin(search, get, create, update, delete, bulk-delete, scan)
-- **service-catalog**: user(빈 그룹) · admin(search)
+- **service-catalog**: user(empty group) · admin(search)
 - **runtime-variant**: user(get, search) · admin(get, search, create, update, delete, bulk-delete)
 - **runtime-variant-preset**: user(get, search) · admin(get, search, create, update, delete)
-- **scheduling-history**: sub session / deployment / route — 각 (search, search-scoped)
+- **scheduling-history**: sub session / deployment / route — each (search, search-scoped)
 - **scheduling-handler**: admin(list)
 
 ### Storage
@@ -58,10 +58,10 @@ Backend.AI **v2 CLI**(`./bai`)로 API 엔드포인트를 테스트·검증하고
 
 ### Registries & Artifacts
 
-- **container-registry**: user(빈 그룹) · admin(search, create, update, delete)
+- **container-registry**: user(empty group) · admin(search, create, update, delete)
 - **artifact**: user(get, update, delete, restore · sub revision: get, approve, reject, cancel-import, cleanup) · admin(search)
 - **artifact-registry**: user(get)
-- **huggingface-registry**: user(create, get, search, update, delete) — admin 변형 없음
+- **huggingface-registry**: user(create, get, search, update, delete) — no admin variant
 - **reservoir-registry**: user(create, get, search, update, delete)
 
 ### Access Control & Auth
@@ -79,53 +79,53 @@ Backend.AI **v2 CLI**(`./bai`)로 API 엔드포인트를 테스트·검증하고
 
 ### Resource Management
 
-- **resource-group**: user(빈 그룹) · admin(search, get, create, delete, resource-info, default-options, default-session-options, allow-domains, allowed-domains, allow-projects, allowed-projects, allow-for-domain, allowed-for-domain, allow-for-project, allowed-for-project)
+- **resource-group**: user(empty group) · admin(search, get, create, delete, resource-info, default-options, default-session-options, allow-domains, allowed-domains, allow-projects, allowed-projects, allow-for-domain, allowed-for-domain, allow-for-project, allowed-for-project)
 - **resource-allocation**: user(project-usage, resource-group-usage) · admin(domain-usage, effective) · my(effective, keypair-usage)
 - **resource-preset**: admin(search, get, create, update, delete, check-availability)
-- **resource-policy**: admin(sub keypair / project / user — 각 create, get, search, update, delete) · my(keypair, user)
+- **resource-policy**: admin(sub keypair / project / user — each create, get, search, update, delete) · my(keypair, user)
 - **resource-slot**: sub slot-type(search), agent-resource(search), allocation(search)
 - **resource-usage**: sub domain(search), project(search), user(search)
 
 ### Monitoring & Audit
 
 - **audit-log**: user(search)
-- **fair-share**: sub domain / project / user — 각 (get, search)
+- **fair-share**: sub domain / project / user — each (get, search)
 - **notification**: sub channel(get, search, delete), rule(get, search, delete)
 - **prometheus-query-definition**: user(get, search, execute) · admin(create, update, delete, preview)
 - **prometheus-query-definition-category**: user(get, search) · admin(create, delete)
 - **app-config**: user(get-domain, get-user, get-merged, delete-domain, delete-user)
 - **export**: admin(list-reports, get-report, audit-logs, keypairs, projects, sessions, sessions-by-project, users, users-by-domain) · my(keypairs, sessions)
 
-### 유틸리티 (엔티티 아님)
+### Utilities (not entities)
 
-`login`, `logout`, `config`, `gql` — 루트의 단일 명령.
+`login`, `logout`, `config`, `gql` — single commands at the root.
 
-> 새 CLI 명령을 추가하면 이 Reference도 갱신한다(`client/cli/v2/AGENTS.md`의 "새 엔티티 추가" 참고).
+> When adding a new CLI command, update this Reference as well (see "Adding a new entity" in `client/cli/v2/AGENTS.md`).
 
 ---
 
-## 셋업 (Webserver 세션 — 권장)
+## Setup (Webserver session — recommended)
 
 ```bash
 ./bai config set endpoint http://127.0.0.1:8090
 ./bai config set endpoint-type session
 ./bai login
 # User ID: admin@lablup.com
-# Password: (admin 비밀번호)
+# Password: (admin password)
 ./bai config show
 ```
 
-비대화 환경(CI, Claude Code):
+Non-interactive environments (CI, Claude Code):
 
 ```bash
 BACKEND_USER=admin@lablup.com BACKEND_PASSWORD=wJalrXUt ./bai login
 ```
 
-세션 쿠키는 `~/.backend.ai/session/cookie.dat`에 저장된다.
+The session cookie is stored in `~/.backend.ai/session/cookie.dat`.
 
-### Direct API (대안)
+### Direct API (alternative)
 
-웹서버 없이 매니저에 직접 접근(HMAC 서명 인증):
+Access the manager directly without the webserver (HMAC signature auth):
 
 ```bash
 ./bai config set endpoint http://127.0.0.1:8091
@@ -135,61 +135,61 @@ BACKEND_USER=admin@lablup.com BACKEND_PASSWORD=wJalrXUt ./bai login
 ./bai config show
 ```
 
-설정은 `~/.backend.ai/config.toml`, `credentials.toml`에 저장된다.
+The configuration is stored in `~/.backend.ai/config.toml` and `credentials.toml`.
 
-## 명령 패턴
+## Command pattern
 
 ```
 ./bai [admin|my] {entity} [{sub-entity}] {command} [options]
 ```
 
-- `admin` — superadmin 전용 연산
-- `my` — self-service(현재 사용자 본인 리소스)
-- 엔티티 이름은 **단수**(domain, user, agent)
-- sub-entity는 Click 서브그룹(revision, channel, role 등)
+- `admin` — superadmin-only operations
+- `my` — self-service (the current user's own resources)
+- Entity names are **singular** (domain, user, agent)
+- A sub-entity is a Click sub-group (revision, channel, role, etc.)
 
-표준 6개 연산: `create`, `get`, `search`, `update`, `delete`, `purge`(엔티티에 따라 일부만).
-특수 연산: `enqueue`/`terminate`(session), `revision add`/`revision activate`(deployment), `login`/`logout`.
+The standard 6 operations: `create`, `get`, `search`, `update`, `delete`, `purge` (only some, depending on the entity).
+Special operations: `enqueue`/`terminate` (session), `revision add`/`revision activate` (deployment), `login`/`logout`.
 
-## CLI 입력 스타일
+## CLI input style
 
-- **기본:** 필드마다 개별 `--option` 플래그.
-- **보조:** 복잡한 중첩 구조는 JSON 문자열이나 `@file` 경로(예: `--initial-revision`, `--config`).
-- create/update에 raw JSON을 위치 인자로 쓰지 않는다(일부 admin 명령 예외: `admin domain create`).
-- get/delete/purge는 엔티티 식별자(UUID, 이름)를 위치 인자로.
+- **Default:** an individual `--option` flag per field.
+- **Secondary:** a JSON string or an `@file` path for complex nested structures (example: `--initial-revision`, `--config`).
+- Do NOT use raw JSON as a positional argument for create/update (with some admin command exceptions: `admin domain create`).
+- For get/delete/purge, use the entity identifier (UUID, name) as a positional argument.
 
-## 검색 패턴
+## Search patterns
 
 ```bash
-# admin 검색 — 전체 시스템 (superadmin 전용)
+# admin search — whole system (superadmin only)
 ./bai admin {entity} search --limit 5
 
-# project 스코프 검색 — 스코프 ID는 위치 인자(옵션 아님)
+# project-scoped search — the scope ID is a positional argument (not an option)
 ./bai {entity} project-search {project_id} --limit 5
 
-# self-service 검색 — 본인 리소스
+# self-service search — own resources
 ./bai my {entity} search --limit 5
 ```
 
-옵션·필터는 엔티티마다 다르므로 `./bai {entity} {command} --help`로 확인한다.
+Options and filters differ per entity, so check with `./bai {entity} {command} --help`.
 
-### --order-by 문법
+### --order-by syntax
 
-`field:direction`로 다중 정렬:
+Multi-sort with `field:direction`:
 
 ```bash
 ./bai admin user search --order-by created_at:desc --order-by username:asc
 ```
 
-## 네이밍 규약
+## Naming conventions
 
-- CLI `--order-by`는 DTO `order` 필드에 매핑(전 엔티티 공통).
-- CLI `--kebab-case` 옵션은 DTO `snake_case` 필드에 매핑(Click 표준).
-- 스코프 검색: 스코프 ID는 `--scope-*` 옵션이 아니라 **위치 인자**.
+- The CLI `--order-by` maps to the DTO `order` field (common across all entities).
+- The CLI `--kebab-case` option maps to the DTO `snake_case` field (Click standard).
+- Scoped search: the scope ID is a **positional argument**, not a `--scope-*` option.
 
 ## Raw GraphQL
 
-`./bai gql`(`./bai admin gql` 아님)는 raw GraphQL 쿼리를 보낸다. GQL 스키마 변경 테스트나 REST CLI가 없을 때 유용:
+`./bai gql` (not `./bai admin gql`) sends a raw GraphQL query. Useful for testing GQL schema changes or when there is no REST CLI:
 
 ```bash
 ./bai gql '{ domain(name: "default") { name } }'
@@ -198,84 +198,84 @@ BACKEND_USER=admin@lablup.com BACKEND_PASSWORD=wJalrXUt ./bai login
 ./bai gql --var limit=5 '{ keypair_list(limit: $limit) { items { access_key } } }'
 ```
 
-- `--v2`: Strawberry v2 스키마 대상(direct API 모드에서만 필요, 세션 모드는 둘 다 제공)
-- `--var key=value`: 쿼리 변수(반복 가능)
-- `-f file`: 파일에서 쿼리 읽기
+- `--v2`: targets the Strawberry v2 schema (only needed in direct API mode; session mode provides both)
+- `--var key=value`: query variables (repeatable)
+- `-f file`: read the query from a file
 - stdin: `echo '{ ... }' | ./bai gql`
 
-## 자주 쓰는 명령
+## Common commands
 
 ```bash
-# admin 검색 + 필터 (superadmin 전용)
+# admin search + filter (superadmin only)
 ./bai admin domain search --limit 5 --name-contains default
 ./bai admin user search --status active --order-by created_at:desc
 ./bai admin agent search --limit 10
 ./bai admin image search --name-contains python
 ./bai admin session search --limit 5
 
-# 단일 엔티티 조회
+# single entity lookup
 ./bai domain get default
 ./bai user get <uuid>
 
-# 서브 엔티티 연산
+# sub-entity operations
 ./bai admin deployment revision search
 ./bai rbac role search
 ./bai notification channel search
 ./bai scheduling-history session search --limit 10
 ```
 
-## 테스트 워크플로
+## Testing workflow
 
-### 전제
+### Prerequisites
 
 ```bash
-./bai config show   # endpoint-type 확인
-./bai login         # 세션 만료 시 로그인
+./bai config show   # check endpoint-type
+./bai login         # log in if the session expired
 ```
 
-### 서버 코드 수정 후
+### After modifying server code
 
-로컬 개발은 서비스를 먼저 재시작한다 — `/local-dev` 스킬 참고.
+For local development, restart the service first — see the `/local-dev` skill.
 
 ```bash
-# 1. 기본 연결 확인
+# 1. confirm basic connectivity
 ./bai admin domain search --limit 1
 ./bai domain get default
 
-# 2. 수정한 엔티티 테스트 (해당 레벨에 맞는 명령으로)
-#    user 대면이면 ./bai {entity} ..., admin 전용이면 ./bai admin {entity} ...
+# 2. test the modified entity (with the command matching its level)
+#    if user-facing ./bai {entity} ..., if admin-only ./bai admin {entity} ...
 ./bai admin {entity} search --limit 1
 ./bai {entity} get {id}
 
-# 3. 권한 경계 테스트
-./bai admin {entity} search    # admin은 성공
-# 일반 사용자로 전환 후 같은 명령 → 403 실패해야 함
+# 3. test the permission boundary
+./bai admin {entity} search    # admin succeeds
+# after switching to a regular user, the same command → should fail with 403
 ```
 
-명령 후에는 Grafana MCP로 런타임 동작을 확인한다 — `/observability` 참고.
-CLI 응답에 안 드러나는 에러를 잡으려면 Loki(`{service_name="manager"} |= "error"`)를,
-요청 카운트 확인은 Prometheus(`backendai_api_request_count`)를 본다.
+After commands, verify the runtime behavior with the Grafana MCP — see `/observability`.
+To catch errors not surfaced in the CLI response, check Loki (`{service_name="manager"} |= "error"`);
+to check the request count, look at Prometheus (`backendai_api_request_count`).
 
-### 일반 사용자로 테스트
+### Testing as a regular user
 
-기본 계정은 `fixtures/manager/example-users.json`.
+The default accounts are in `fixtures/manager/example-users.json`.
 
 ```bash
-# 일반 사용자 세션 로그인
+# log in as a regular user session
 BACKEND_USER=user@lablup.com BACKEND_PASSWORD=C8qnIo29 ./bai login
 
-# 성공해야 함 (user 대면)
+# should succeed (user-facing)
 ./bai domain get default
 
-# 403 실패해야 함 (admin 전용)
+# should fail with 403 (admin only)
 ./bai admin domain search --limit 1
 ```
 
-테스트 후 admin 자격증명으로 되돌린다.
+After testing, revert to the admin credentials.
 
-## Smoke 테스트 스크립트
+## Smoke test script
 
-모두 admin 자격증명에서 실행. 각 명령이 JSON을 반환하면 OK.
+Run everything with admin credentials. OK if each command returns JSON.
 
 ```bash
 for cmd in \
@@ -294,17 +294,17 @@ for cmd in \
 done
 ```
 
-## CLI 명령이 없을 때
+## When a CLI command is unavailable
 
-엔티티/연산의 CLI 명령이 위 Reference에 없으면:
+If the CLI command for an entity/operation is not in the Reference above:
 
-1. 그 명령은 **미구현**이다.
-2. **사용자에게 보고**: "{entity} {operation}은 CLI로 제공되지 않습니다. 구현이 필요합니다."
-3. 임시 우회로 GraphQL 가능 연산은 `./bai gql` 시도.
-4. CLI 옵션을 추측하거나 명령을 날조하지 않는다 — 시간 낭비·오류 유발.
+1. That command is **not implemented**.
+2. **Report to the user**: "{entity} {operation} is not provided via the CLI. It needs to be implemented."
+3. As a temporary workaround, try `./bai gql` for operations available via GraphQL.
+4. Do NOT guess CLI options or fabricate commands — it wastes time and causes errors.
 
-## 관련 스킬
+## Related skills
 
-- `/local-dev` — CLI 테스트 전 로컬 서비스 재시작
-- `/observability` — CLI 테스트 후 Grafana MCP로 로그/메트릭 확인
-- `/cli-sdk-guide` — 새 CLI 명령 구현
+- `/local-dev` — restart local services before CLI testing
+- `/observability` — check logs/metrics with the Grafana MCP after CLI testing
+- `/cli-sdk-guide` — implement new CLI commands
