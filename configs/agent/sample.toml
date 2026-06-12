@@ -237,6 +237,16 @@
     # Added in 25.12.0
     interval = 30.0
 
+  # Configuration for utilization metric collection. Controls the collection
+  # interval and, derived from it, the Valkey expiration of stored utilization
+  # values.
+  # Added in 26.4.4
+  [agent.utilization-metric]
+    # Time interval in seconds between utilization metric collection cycles
+    # (per-node, per-container, and per-process statistics).
+    # Added in 26.7.0
+    interval = 30.0
+
 # Container runtime configuration including execution modes, user settings, and
 # networking. In multi-agent mode (when 'agents' field is populated), this
 # serves as the default configuration that individual agents inherit and can
