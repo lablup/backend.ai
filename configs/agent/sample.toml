@@ -244,7 +244,7 @@
   [agent.utilization-metric]
     # Time interval in seconds between utilization metric collection cycles
     # (per-node, per-container, and per-process statistics).
-    # Added in 26.7.0
+    # Added in 26.4.4
     interval = 30.0
 
 # Container runtime configuration including execution modes, user settings, and

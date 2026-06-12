@@ -131,7 +131,7 @@ class UtilizationMetricConfig(BaseConfigSchema):
                 "Time interval in seconds between utilization metric collection cycles "
                 "(per-node, per-container, and per-process statistics)."
             ),
-            added_version="26.7.0",
+            added_version="26.4.4",
             example=ConfigExample(local="30.0", prod="30.0"),
         ),
     ]
