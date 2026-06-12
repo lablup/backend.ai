@@ -94,7 +94,7 @@ For a minor patch update, follow the steps:
 Halfstack Containers
 --------------------
 
-Backend.AI uses a PostgreSQL database, an etcd cluster, and a Redis service as containers for its operation.
+Backend.AI uses a PostgreSQL database, an etcd cluster, and a Valkey (Redis-compatible) service as containers for its operation.
 We call this set of containers as *"halfstack"*.
 When making a new major release of Backend.AI or to address upstream issues, we update the versions of halfstack containers.
 
@@ -126,7 +126,7 @@ Here is the step-by-step guide to upgrade the halfstack containers.
 
       Currently, etcd is staying at the v3.5 release for multiple years and it is not anticipated to see its major upgrade in the foreseeable future.
       When it happens, refer to the official upgrade document like https://etcd.io/docs/v3.5/upgrades/upgrade_3_5/.
-      Redis is also same; its version is now pinned to v7.2 release and we expect only patch releases in the foreseeable future.
+      Valkey is also same; its version is now pinned to the v9.1 release and we expect only patch releases in the foreseeable future.
 
       You may *skip* the PostgreSQL-related steps if the postgres' major version did not change in the target verion's compose configuration.
       In that case, you may just do the step 3, 5, 6, and 8 only.

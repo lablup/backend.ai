@@ -139,7 +139,7 @@ To list a specific key from Etcd, for example, ``config`` key:
 
    $ backend.ai mgr etcd get --prefix config
 
-Now, configure Redis access information. This should be accessible from all
+Now, configure Valkey access information. This should be accessible from all
 nodes.
 
 .. code-block:: console

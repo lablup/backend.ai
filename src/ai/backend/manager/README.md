@@ -292,7 +292,7 @@ VFolders provide persistent storage:
   - `vfolders` - VFolder metadata
   - `scaling_groups` - Scaling group configuration
 
-#### Redis (Caching and Real-time Data)
+#### Valkey (Caching and Real-time Data)
 - **Purpose**:
   - Cache frequently accessed data
   - Distributed locking
@@ -358,8 +358,8 @@ See `configs/manager/halfstack.conf` for configuration file examples.
 - Connection pool size
 - Query timeout settings
 
-**Redis Settings**:
-- Redis connection information
+**Valkey Settings**:
+- Valkey connection information
 - Connection pool configuration
 
 **etcd Settings**:
@@ -700,9 +700,9 @@ sum(rate(backendai_graphql_request_count_total{service_group="$service_groups", 
 
 #### Layer Operation Performance
 
-**P95 Redis Operation Latency**
+**P95 Valkey Operation Latency**
 
-Monitor Redis operation latency (P95) by layer and operation. This helps identify slow Redis operations that may cause bottlenecks. Exclude broadcast/stream operations as they have different performance characteristics.
+Monitor Valkey operation latency (P95) by layer and operation. This helps identify slow Valkey operations that may cause bottlenecks. Exclude broadcast/stream operations as they have different performance characteristics.
 
 ```promql
 histogram_quantile(0.95,

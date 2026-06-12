@@ -13,7 +13,7 @@ The minimal instance configuration:
   - If you spawn multiple agents, it is recommended to use a placement group to improve locality for each availability zone.
 
 * 1x PostgreSQL instance (e.g., AWS RDS)
-* 1x Redis instance (e.g., AWS ElasticCache)
+* 1x Valkey or Redis instance (e.g., AWS ElastiCache)
 * 1x etcd cluster
 
   - For HA setup, it should consist of 5 separate instances distributed across availability zones.

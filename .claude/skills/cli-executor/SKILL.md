@@ -1,6 +1,6 @@
 ---
 name: cli-executor
-description: Execute Backend.AI component CLI commands (mgr start-server, ag start-server, storage start-server) with pre-flight checks (DB, Redis, etcd), health checks, and troubleshooting
+description: Execute Backend.AI component CLI commands (mgr start-server, ag start-server, storage start-server) with pre-flight checks (DB, Valkey, etcd), health checks, and troubleshooting
 invoke_method: automatic
 auto_execute: false
 enabled: true
@@ -50,7 +50,7 @@ Guide execution of Backend.AI component CLI commands with pre-flight checks, com
 
 **Pre-flight Checks:**
 - ✅ PostgreSQL database running
-- ✅ Redis running
+- ✅ Valkey running
 - ✅ etcd running
 - ✅ Database migrations up-to-date (`/db-status`)
 - ✅ Configuration file exists
@@ -182,7 +182,7 @@ Guide execution of Backend.AI component CLI commands with pre-flight checks, com
 
 **Pre-flight Checks:**
 - ✅ PostgreSQL database running
-- ✅ Redis running
+- ✅ Valkey running
 - ✅ Database migrations up-to-date (use `/db-status --component=appproxy`)
 - ✅ Configuration file exists
 
@@ -212,7 +212,7 @@ Guide execution of Backend.AI component CLI commands with pre-flight checks, com
 
 **Pre-flight Checks:**
 - ✅ Coordinator accessible
-- ✅ Redis running
+- ✅ Valkey running
 - ✅ Configuration file exists
 
 **Usage:**
@@ -262,7 +262,7 @@ Before executing command, verify:
 🔍 Pre-flight checks for Manager:
 
 ✅ PostgreSQL database running
-✅ Redis running
+✅ Valkey running
 ✅ etcd running
 ⚠️ Database migrations pending (2 migrations)
 ✅ Configuration file exists
@@ -345,7 +345,7 @@ Related documentation:
 ```
 ❌ Error: PostgreSQL connection failed
 
-Details: Connection refused to localhost:5432
+Details: Connection refused to localhost:8101
 
 Recommended actions:
 1. Check PostgreSQL is running:
@@ -366,27 +366,27 @@ Related skills:
 - /db-migrate - Apply database migrations
 ```
 
-**Redis not running:**
+**Valkey not running:**
 ```
-❌ Error: Redis connection failed
+❌ Error: Valkey connection failed
 
-Details: Connection refused to localhost:6379
+Details: Connection refused to localhost:8111
 
 Recommended actions:
-1. Check Redis is running:
-   docker ps | grep redis
+1. Check Valkey is running:
+   docker ps | grep valkey
 
 2. Start infrastructure:
    ./scripts/run-dev.sh
 
-3. Verify Redis configuration in config file
+3. Verify Valkey configuration in config file
 ```
 
 **etcd not running (Manager only):**
 ```
 ❌ Error: etcd connection failed
 
-Details: Cannot connect to etcd at localhost:2379
+Details: Cannot connect to etcd at localhost:8121
 
 Recommended actions:
 1. Check etcd is running:
@@ -480,7 +480,7 @@ Recommended actions:
 ```
 ❌ Error: Cannot connect to Manager
 
-Details: Connection refused to localhost:8081
+Details: Connection refused to localhost:8091
 
 Recommended actions:
 1. Check Manager is running:
@@ -498,7 +498,7 @@ Recommended actions:
 ```
 ❌ Error: Cannot connect to App Proxy Coordinator
 
-Details: Connection refused to localhost:6010
+Details: Connection refused to localhost:10200
 
 Recommended actions:
 1. Check Coordinator is running:
@@ -570,7 +570,7 @@ Use: /cli-executor --component=<name> to run a component
 🔍 Pre-flight checks for Manager:
 
 ✅ PostgreSQL database running
-✅ Redis running
+✅ Valkey running
 ✅ etcd running
 ✅ Database schema up-to-date
 ✅ Configuration file exists
@@ -594,7 +594,7 @@ Executing...
 **Agent workflow:**
 ```
 Step 1: Check infrastructure
-🔍 Checking Docker, PostgreSQL, Redis, etcd...
+🔍 Checking Docker, PostgreSQL, Valkey, etcd...
 ✅ All infrastructure running
 
 Step 2: Check database schema
@@ -613,7 +613,7 @@ Running: /cli-executor --component=mgr --subcommand=start-server
 📌 Manager starting...
 
 Manager is now running!
-- API: http://localhost:8081
+- API: http://localhost:8091
 - Press Ctrl+C to stop
 ```
 
@@ -638,7 +638,7 @@ Commands like `start-server` block the terminal:
 
 This starts:
 - PostgreSQL
-- Redis
+- Valkey
 - etcd
 - Other required infrastructure
 

@@ -25,9 +25,9 @@
 ```
 
 **Infrastructure Requirements:**
-- PostgreSQL (port 5432)
-- Redis (port 6379)
-- etcd (port 2379)
+- PostgreSQL (port 8101)
+- Valkey (port 8111)
+- etcd (port 8121)
 
 **Configuration:** `configs/manager.toml`
 
@@ -138,8 +138,8 @@
 ```
 
 **Infrastructure Requirements:**
-- PostgreSQL (port 5432, separate from manager DB)
-- Redis (port 6379)
+- PostgreSQL (port 8101, separate database from manager)
+- Valkey (port 8111)
 - Database migrations applied
 
 **Configuration:** `configs/app-proxy-coordinator.toml`
@@ -167,7 +167,7 @@
 
 **Infrastructure Requirements:**
 - App Proxy Coordinator accessible
-- Redis (port 6379)
+- Valkey (port 8111)
 
 **Configuration:** `configs/app-proxy-worker.toml`
 
@@ -183,7 +183,7 @@
 ```
 Manager
   ├─ PostgreSQL (manager DB)
-  ├─ Redis
+  ├─ Valkey
   └─ etcd
 
 Agent
@@ -199,11 +199,11 @@ Web Server
 
 App Proxy Coordinator
   ├─ PostgreSQL (appproxy DB)
-  └─ Redis
+  └─ Valkey
 
 App Proxy Worker
   ├─ App Proxy Coordinator
-  └─ Redis
+  └─ Valkey
 ```
 
 ---
@@ -214,7 +214,7 @@ For full Backend.AI stack:
 
 1. **Infrastructure:**
    ```bash
-   ./scripts/run-dev.sh  # Starts PostgreSQL, Redis, etcd
+   ./scripts/run-dev.sh  # Starts PostgreSQL, Valkey, etcd
    ```
 
 2. **Core Services:**

@@ -1,8 +1,8 @@
-Prepare Redis Service
-=====================
+Prepare Valkey Service
+======================
 
-Backend.AI makes use of Redis as the message queue (event bus) and the cache backend.
-Launch the service using docker compose by generating the file ``$HOME/halfstack/redis-cluster-default/docker-compose.yaml`` and populating it with the following YAML.
+Backend.AI makes use of Valkey (a Redis-compatible data store) as the message queue (event bus) and the cache backend.
+Launch the service using docker compose by generating the file ``$HOME/halfstack/valkey-cluster-default/docker-compose.yaml`` and populating it with the following YAML.
 Feel free to adjust the volume paths and port settings.
 Please refer `the latest configuration <https://github.com/lablup/backend.ai/blob/main/docker-compose.halfstack-main.yml>`_
 (it's a symbolic link so follow the filename in it) if needed.
@@ -20,16 +20,16 @@ Please refer `the latest configuration <https://github.com/lablup/backend.ai/blo
       backendai-half-redis:
          <<: *base
          container_name: backendai-halfstack-redis
-         image: redis:6.2-alpine
+         image: valkey/valkey:9.1.0-alpine
          restart: unless-stopped
          command: >
-            redis-server
+            valkey-server
             --requirepass develove
             --appendonly yes
          volumes:
             - "${HOME}/.data/backend.ai/redis-data:/data:rw"
          healthcheck:
-            test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+            test: ["CMD", "valkey-cli", "--raw", "incr", "ping"]
             interval: 10s
             timeout: 3s
             retries: 10
@@ -48,7 +48,7 @@ Execute the following command to start the service container. The project
 
 .. code-block:: console
 
-   $ cd ${HOME}/halfstack/redis-cluster-default
+   $ cd ${HOME}/halfstack/valkey-cluster-default
    $ docker compose up -d
    $ # -- To terminate the container:
    $ # docker compose down
