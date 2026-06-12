@@ -36,6 +36,7 @@ _CUSTOM_DEFINITION: dict[str, Any] = {
         {
             "name": "custom-model",
             "service": {
+                "port": 8080,
                 "health_check": {
                     "enable": False,
                     "path": "/health",

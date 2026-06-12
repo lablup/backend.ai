@@ -144,6 +144,7 @@
           {
             "name": "custom-model",
             "service": {
+              "port": 8080,
               "health_check": {
                 "enable": false,
                 "path": "/health",
