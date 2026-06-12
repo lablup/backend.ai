@@ -52,6 +52,10 @@ from ai.backend.manager.services.vfolder.actions.get_row import (
     GetVFolderLegacyRowAction,
     GetVFolderLegacyRowActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.get_usage import (
+    GetVFolderUsageAction,
+    GetVFolderUsageActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
@@ -75,8 +79,8 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GetFstabContentsActionResult,
     GetQuotaAction,
     GetQuotaActionResult,
-    GetVFolderUsageAction,
-    GetVFolderUsageActionResult,
+    GetVFolderUsageLegacyAction,
+    GetVFolderUsageLegacyActionResult,
     GetVFolderUsedBytesAction,
     GetVFolderUsedBytesActionResult,
     GetVolumePerfMetricAction,
@@ -146,7 +150,9 @@ class VFolderProcessors(AbstractProcessorPackage):
     get_volume_perf_metric: ActionProcessor[
         GetVolumePerfMetricAction, GetVolumePerfMetricActionResult
     ]
-    get_usage: ActionProcessor[GetVFolderUsageAction, GetVFolderUsageActionResult]
+    get_usage_legacy: ActionProcessor[
+        GetVFolderUsageLegacyAction, GetVFolderUsageLegacyActionResult
+    ]
     get_used_bytes: ActionProcessor[GetVFolderUsedBytesAction, GetVFolderUsedBytesActionResult]
     list_hosts: ActionProcessor[ListHostsAction, ListHostsActionResult]
     get_my_storage_host_permissions: ActionProcessor[
@@ -173,6 +179,9 @@ class VFolderProcessors(AbstractProcessorPackage):
         ResolveIdsByNamesActionResult,
     ]
     get_v2: SingleEntityActionProcessor[GetVFolderV2Action, GetVFolderV2ActionResult]
+    get_folder_usage: SingleEntityActionProcessor[
+        GetVFolderUsageAction, GetVFolderUsageActionResult
+    ]
     create_vfolder_v2: ActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
     create_upload_session_v2: ActionProcessor[
         CreateUploadSessionV2Action, CreateUploadSessionV2ActionResult
@@ -242,7 +251,7 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.get_volume_perf_metric = ActionProcessor(
             service.get_volume_perf_metric, action_monitors
         )
-        self.get_usage = ActionProcessor(service.get_usage, action_monitors)
+        self.get_usage_legacy = ActionProcessor(service.get_usage_legacy, action_monitors)
         self.get_used_bytes = ActionProcessor(service.get_used_bytes, action_monitors)
         self.list_hosts = ActionProcessor(service.list_hosts, action_monitors)
         self.get_my_storage_host_permissions = ActionProcessor(
@@ -273,6 +282,9 @@ class VFolderProcessors(AbstractProcessorPackage):
         # V2 actions
         self.get_v2 = SingleEntityActionProcessor(
             service.get_v2, action_monitors, validators=single_entity_rbac_validators
+        )
+        self.get_folder_usage = SingleEntityActionProcessor(
+            service.get_folder_usage, action_monitors, validators=single_entity_rbac_validators
         )
         self.create_vfolder_v2 = ActionProcessor(service.create_v2, action_monitors)
         self.create_upload_session_v2 = ActionProcessor(
@@ -310,7 +322,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             ListAllowedTypesAction.spec(),
             ListAllHostsAction.spec(),
             GetVolumePerfMetricAction.spec(),
-            GetVFolderUsageAction.spec(),
+            GetVFolderUsageLegacyAction.spec(),
             GetVFolderUsedBytesAction.spec(),
             ListHostsAction.spec(),
             GetMyStorageHostPermissionsAction.spec(),
@@ -328,6 +340,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             CreateVFolderV2Action.spec(),
             CreateUploadSessionV2Action.spec(),
             GetVFolderV2Action.spec(),
+            GetVFolderUsageAction.spec(),
             DeleteVFolderV2Action.spec(),
             PurgeVFolderV2Action.spec(),
             CloneVFolderV2Action.spec(),

@@ -194,6 +194,16 @@ class VFolderData:
 
 
 @dataclass
+class VFolderUsageData:
+    """
+    Usage measurements fetched live from the storage proxy.
+    """
+
+    num_files: int
+    used_bytes: int
+
+
+@dataclass
 class VFolderPermissionData:
     """
     VFolder permission data representing user-specific permissions on a VFolder.

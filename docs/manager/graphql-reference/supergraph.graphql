@@ -21014,6 +21014,16 @@ type VFolder implements Node
   """Path for unmanaged virtual folders."""
   unmanagedPath: String
 
+  """
+  Added in 26.4.4. Quota limits (maxSize, maxFiles) configured for the folder.
+  """
+  quota: VFolderQuotaInfo!
+
+  """
+  Added in 26.4.4. Usage statistics (numFiles, usedBytes) measured on demand through the storage proxy when this field is selected. This is a very slow operation: every selection makes a round-trip to the storage proxy, and the measurement cost depends on the storage backend (e.g., a full directory walk on vfs). Select only when needed. Null for unmanaged vfolders.
+  """
+  usage: VFolderUsageInfo
+
   """Added in 26.4.4. Model cards backed by this vfolder."""
   modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 }
@@ -21246,6 +21256,24 @@ Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribut
 """
 scalar VFolderPermissionValueField
   @join__type(graph: GRAPHENE)
+
+"""Added in 26.4.4. Quota limits configured for a virtual folder."""
+type VFolderQuotaInfo
+  @join__type(graph: STRAWBERRY)
+{
+  maxSize: BinarySizeInfo
+  maxFiles: Int!
+}
+
+"""
+Added in 26.4.4. Usage statistics for a virtual folder, measured live through the storage proxy.
+"""
+type VFolderUsageInfo
+  @join__type(graph: STRAWBERRY)
+{
+  numFiles: Int!
+  usedBytes: BinarySizeInfo!
+}
 
 """
 Added in 26.4.2. Usage mode of a virtual folder (GENERAL, MODEL, DATA).

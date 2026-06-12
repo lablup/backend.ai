@@ -19,7 +19,7 @@ from .types import (
     VFolderOperationStatusField,
     VFolderOwnershipInfo,
     VFolderPermissionField,
-    VFolderUsageInfo,
+    VFolderQuotaInfo,
 )
 
 __all__ = (
@@ -64,10 +64,7 @@ class VFolderNode(BaseResponseModel):
     metadata: VFolderMetadataInfo = Field(description="Descriptive metadata fields")
     access_control: VFolderAccessControlInfo = Field(description="Access control fields")
     ownership: VFolderOwnershipInfo = Field(description="Ownership context fields")
-    usage: VFolderUsageInfo | None = Field(
-        default=None,
-        description="Usage statistics; None for list responses where usage is not loaded",
-    )
+    quota: VFolderQuotaInfo = Field(description="Quota limits configured for the folder")
     unmanaged_path: str | None = Field(
         default=None, description="Path for unmanaged virtual folders"
     )
