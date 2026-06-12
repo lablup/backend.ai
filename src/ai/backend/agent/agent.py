@@ -911,6 +911,7 @@ class AbstractAgent[
         self.restarting_kernels = {}
         self.stat_ctx = StatContext(
             self,
+            local_config,
             mode=StatModes(local_config.container.stats_type.value)
             if local_config.container.stats_type
             else None,
@@ -1027,8 +1028,8 @@ class AbstractAgent[
             await self.scan_running_kernels()
 
         # Prepare stat collector tasks.
-        periodic_tasks.append(CollectContainerStatTask(self))
-        periodic_tasks.append(CollectProcessStatTask(self))
+        periodic_tasks.append(CollectContainerStatTask(self, self.local_config))
+        periodic_tasks.append(CollectProcessStatTask(self, self.local_config))
 
         # Prepare heartbeats.
         periodic_tasks.append(HeartbeatTask(self))

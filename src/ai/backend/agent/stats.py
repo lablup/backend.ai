@@ -17,6 +17,7 @@ from decimal import Decimal, DecimalException
 from typing import (
     TYPE_CHECKING,
     Any,
+    Final,
     cast,
 )
 
@@ -26,7 +27,6 @@ import attrs
 from ai.backend.common import msgpack
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.metrics.metric import StageObserver
-from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.types import (
     PID,
     ContainerId,
@@ -54,6 +54,7 @@ from .utils import remove_exponent
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
+    from .config.unified import AgentUnifiedConfig
     from .kernel import AbstractKernel
     from .resources import AbstractComputePlugin
 
@@ -69,7 +70,10 @@ __all__ = (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_PLUGIN_TIMEOUT: float = max(UTILIZATION_METRIC_INTERVAL - 1.0, 1.0)
+# Valkey expiration (TTL) of stored utilization values is derived from the configured
+# collection interval by this multiplier, so the TTL scales when the interval changes.
+# (e.g. the default 5.0s interval yields a 20s TTL.)
+_METRIC_TTL_FACTOR: Final[int] = 4
 
 
 def check_cgroup_available() -> bool:
@@ -345,19 +349,19 @@ class StatContext:
     device_metrics: dict[MetricKey, dict[DeviceId, Metric]]
     kernel_metrics: dict[KernelId, dict[MetricKey, Metric]]
     process_metrics: dict[ContainerId, dict[PID, dict[MetricKey, Metric]]]
+    _local_config: AgentUnifiedConfig
     _utilization_metric_observer: UtilizationMetricObserver
     _stage_observer: StageObserver
 
     def __init__(
         self,
         agent: AbstractAgent[Any, Any],
+        local_config: AgentUnifiedConfig,
         mode: StatModes | None = None,
-        *,
-        cache_lifespan: int = 120,
     ) -> None:
         self.agent = agent
+        self._local_config = local_config
         self.mode = mode if mode is not None else StatModes.get_preferred_mode()
-        self.cache_lifespan = cache_lifespan
 
         self.node_metrics = {}
         self.device_metrics = {}
@@ -367,6 +371,9 @@ class StatContext:
         self._timestamps: MutableMapping[str, float] = {}
         self._utilization_metric_observer = UtilizationMetricObserver.instance()
         self._stage_observer = StageObserver.instance()
+
+    def _metric_ttl(self) -> int:
+        return int(self._local_config.agent.utilization_metric.interval * _METRIC_TTL_FACTOR)
 
     def update_timestamp(self, timestamp_key: str) -> tuple[float, float]:
         """
@@ -624,7 +631,7 @@ class StatContext:
         # Use ValkeyStatClient set method with expiration
         agent_id = self.agent.id
         await self.agent.valkey_stat_client.set(
-            agent_id, serialized_agent_updates, expire_sec=self.cache_lifespan
+            agent_id, serialized_agent_updates, expire_sec=self._metric_ttl()
         )
 
     def _extract_slot_measurement_scale_factor(
@@ -740,7 +747,7 @@ class StatContext:
                 asyncio.create_task(
                     asyncio.wait_for(
                         computer.instance.gather_container_measures(self, container_ids),
-                        timeout=_PLUGIN_TIMEOUT,
+                        timeout=self._metric_ttl(),
                     ),
                 )
             )
@@ -995,4 +1002,6 @@ class StatContext:
             key_value_map[str(cid)] = serialized_metrics
 
         if key_value_map:
-            await self.agent.valkey_stat_client.set_multiple_keys(key_value_map, expire_sec=8)
+            await self.agent.valkey_stat_client.set_multiple_keys(
+                key_value_map, expire_sec=self._metric_ttl()
+            )

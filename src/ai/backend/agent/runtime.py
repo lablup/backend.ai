@@ -164,7 +164,7 @@ class AgentRuntime:
         self._stop_signal = signal.SIGTERM
         self._local_cron = LocalCron([
             UpdateSlotsTask(self),
-            CollectNodeStatTask(self),
+            CollectNodeStatTask(self, local_config),
         ])
 
     async def __aexit__(self, *exc_info: Any) -> None:
