@@ -17,6 +17,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.sokovan.data.allocation import SchedulingFailure
 
 __all__ = ["ScheduleResult"]
 
@@ -26,7 +27,10 @@ class ScheduleResult:
     """Result of a scheduling operation."""
 
     # Ids of the sessions that were actually allocated this pass.
-    scheduled_session_ids: list[SessionId] = field(default_factory=list)
+    scheduled_session_ids: list[SessionId]
+    # Sessions whose scheduling attempt failed this pass (predicate failure,
+    # no suitable agent, etc.), as reported by the provisioner.
+    scheduling_failures: list[SchedulingFailure]
 
     def success_count(self) -> int:
         """Get the count of successfully scheduled sessions."""

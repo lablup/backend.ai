@@ -72,7 +72,7 @@ class SessionTerminator:
         """
         if not terminating_sessions:
             log.debug("No sessions to terminate")
-            return ScheduleResult()
+            return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
 
         log.info("Processing {} sessions for termination", len(terminating_sessions))
 
@@ -106,7 +106,7 @@ class SessionTerminator:
         # Execute all termination tasks concurrently across all sessions
         if not all_tasks:
             log.debug("No kernels with agents to terminate")
-            return ScheduleResult()
+            return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
 
         log.info("Terminating {} kernels in parallel", len(all_tasks))
 
@@ -139,7 +139,7 @@ class SessionTerminator:
             failed_count,
         )
 
-        return ScheduleResult()
+        return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
 
     async def _terminate_kernel(
         self,
