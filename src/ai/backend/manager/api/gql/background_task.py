@@ -18,6 +18,7 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
+    BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
 )
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
@@ -93,6 +94,22 @@ class BackgroundTaskEventPayloadGQL:
         dto = BackgroundTaskEventPayloadNode(
             task_id=str(event.task_id),
             event_type=BgtaskEventTypeDTO.CANCELLED,
+            message=event.message or "",
+        )
+        return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
+
+    @classmethod
+    def from_partial_success_event(
+        cls, event: BgtaskPartialSuccessEvent
+    ) -> BackgroundTaskEventPayloadGQL:
+        """Create payload from BgtaskPartialSuccessEvent.
+
+        The payload event type stays DONE until the GQL schema exposes a
+        dedicated partial-success type.
+        """
+        dto = BackgroundTaskEventPayloadNode(
+            task_id=str(event.task_id),
+            event_type=BgtaskEventTypeDTO.DONE,
             message=event.message or "",
         )
         return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
@@ -189,6 +206,9 @@ async def background_task_events(
                 payload = BackgroundTaskEventPayloadGQL.from_updated_event(event)
             elif isinstance(event, BgtaskDoneEvent):
                 payload = BackgroundTaskEventPayloadGQL.from_done_event(event)
+                is_close_event = True
+            elif isinstance(event, BgtaskPartialSuccessEvent):
+                payload = BackgroundTaskEventPayloadGQL.from_partial_success_event(event)
                 is_close_event = True
             elif isinstance(event, BgtaskCancelledEvent):
                 payload = BackgroundTaskEventPayloadGQL.from_cancelled_event(event)

@@ -11,6 +11,7 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
+    BgtaskPartialSuccessEvent,
 )
 from ai.backend.common.exception import (
     BackendAIError,
@@ -56,22 +57,26 @@ class TaskSuccessResult[R: BaseBackgroundTaskResult | None](TaskResult):
     result: R
 
     def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
+        if self.result is None:
+            return BgtaskDoneEvent(task_id=task_id, message="Task completed successfully")
         # For now, convert the result to string for the message
         # This assumes the result has a meaningful string representation
-        message = (
-            self.result.model_dump_json()
-            if self.result is not None
-            else "Task completed successfully"
-        )
+        message = self.result.model_dump_json()
+        if errors := self.result.partial_errors():
+            return BgtaskPartialSuccessEvent(task_id=task_id, message=message, errors=errors)
         return BgtaskDoneEvent(task_id=task_id, message=message)
 
     def status(self) -> BgtaskStatus:
+        if self.result is not None and self.result.partial_errors():
+            return BgtaskStatus.PARTIAL_SUCCESS
         return BgtaskStatus.DONE
 
     def error_code(self) -> ErrorCode | None:
         return None
 
     def last_message(self) -> str:
+        if self.result is not None and (errors := self.result.partial_errors()):
+            return f"Task completed with {len(errors)} error(s)"
         return "Task completed successfully"
 
 

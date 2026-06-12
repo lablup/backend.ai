@@ -33,6 +33,14 @@ class BaseBackgroundTaskResult(BackendAISchema):
         frozen=True,
     )
 
+    def partial_errors(self) -> list[str]:
+        """
+        Return non-fatal errors collected during execution.
+        A non-empty list makes the finished task reported as a partial success
+        instead of a plain success.
+        """
+        return []
+
 
 class BaseBackgroundTaskHandler[
     TManifest: BaseBackgroundTaskManifest,

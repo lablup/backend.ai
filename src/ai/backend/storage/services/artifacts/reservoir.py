@@ -614,9 +614,9 @@ class ReservoirService:
                         "Some models failed to import in batch: failed_count={}", failed_models
                     )
                     return DispatchResult.partial_success(None, errors=errors)
-            except Exception as e:
-                log.error("Batch model import failed: {!s}", e)
-                return DispatchResult.error(f"Batch import failed: {e!s}")
+            except Exception:
+                log.exception("Batch model import failed")
+                raise
 
             return DispatchResult.success(None)
 

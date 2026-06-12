@@ -40,6 +40,10 @@ class PurgeImagesTaskResult(BaseBackgroundTaskResult):
     purged_images: list[PurgedImageData] = Field(description="List of successfully purged images")
     errors: list[str] = Field(description="List of errors encountered during the purge operation")
 
+    @override
+    def partial_errors(self) -> list[str]:
+        return self.errors
+
 
 class PurgeImageSpec(BackendAISchema):
     """Specification of a container image to purge."""

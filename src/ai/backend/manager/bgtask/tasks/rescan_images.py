@@ -35,6 +35,10 @@ class RescanImagesTaskResult(BaseBackgroundTaskResult):
     rescanned_image_ids: list[str] = Field(description="List of image IDs that were rescanned")
     errors: list[str] = Field(description="List of errors encountered during the rescan operation")
 
+    @override
+    def partial_errors(self) -> list[str]:
+        return self.errors
+
 
 class RescanImagesManifest(BaseBackgroundTaskManifest):
     """
