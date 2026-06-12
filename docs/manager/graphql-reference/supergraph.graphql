@@ -23,7 +23,7 @@ directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on
 
 directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
 
-"""Added in UNRELEASED. Input for accepting a role invitation."""
+"""Added in 26.4.4. Input for accepting a role invitation."""
 input AcceptRoleInvitationInput
   @join__type(graph: STRAWBERRY)
 {
@@ -180,9 +180,7 @@ input AddRevisionInput
   """Extra vfolder mounts"""
   extraMounts: [ExtraVFolderMountInput!] = null
 
-  """
-  Added in UNRELEASED. Additional options for the add revision operation.
-  """
+  """Added in 26.4.4. Additional options for the add revision operation."""
   options: AddRevisionOptions = null
 }
 
@@ -1526,7 +1524,7 @@ type AuditLogSchema
 }
 
 """
-Added in UNRELEASED. Scope for the scoped audit log query. All items are OR'd; raises an error if every field is empty.
+Added in 26.4.4. Scope for the scoped audit log query. All items are OR'd; raises an error if every field is empty.
 """
 input AuditLogScope
   @join__type(graph: STRAWBERRY)
@@ -1858,7 +1856,7 @@ input BlueGreenConfigInput
 }
 
 """
-Added in UNRELEASED. Failure detail for a single permission entry in bulk add
+Added in 26.4.4. Failure detail for a single permission entry in bulk add
 """
 type BulkAddRolePermissionFailureInfo
   @join__type(graph: STRAWBERRY)
@@ -1883,7 +1881,7 @@ type BulkAddRolePermissionFailureInfo
 }
 
 """
-Added in UNRELEASED. Failure detail for a single permission entry in a bulk add operation.
+Added in 26.4.4. Failure detail for a single permission entry in a bulk add operation.
 """
 type BulkAddRolePermissionPresetFailureInfo
   @join__type(graph: STRAWBERRY)
@@ -1899,7 +1897,7 @@ type BulkAddRolePermissionPresetFailureInfo
 }
 
 """
-Added in UNRELEASED. Input for bulk-adding permission entries to an existing role preset.
+Added in 26.4.4. Input for bulk-adding permission entries to an existing role preset.
 """
 input BulkAddRolePermissionPresetsInput
   @join__type(graph: STRAWBERRY)
@@ -1912,7 +1910,7 @@ input BulkAddRolePermissionPresetsInput
 }
 
 """
-Added in UNRELEASED. Payload returned after bulk-adding permission entries to a role preset.
+Added in 26.4.4. Payload returned after bulk-adding permission entries to a role preset.
 """
 type BulkAddRolePermissionPresetsPayload
   @join__type(graph: STRAWBERRY)
@@ -1925,7 +1923,7 @@ type BulkAddRolePermissionPresetsPayload
 }
 
 """
-Added in UNRELEASED. Input for bulk-inserting scoped permissions across one or more roles
+Added in 26.4.4. Input for bulk-inserting scoped permissions across one or more roles
 """
 input BulkAddRolePermissionsInput
   @join__type(graph: STRAWBERRY)
@@ -1933,7 +1931,7 @@ input BulkAddRolePermissionsInput
   permissions: [CreatePermissionInput!]!
 }
 
-"""Added in UNRELEASED. Payload for bulk role-permission insertion"""
+"""Added in 26.4.4. Payload for bulk role-permission insertion"""
 type BulkAddRolePermissionsPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -1991,7 +1989,7 @@ type BulkCreateUsersV2Payload
 }
 
 """
-Added in UNRELEASED. Payload for bulk user creation, including each user's generated keypair.
+Added in 26.4.4. Payload for bulk user creation, including each user's generated keypair.
 """
 type BulkCreateUsersWithKeypairV2Payload
   @join__type(graph: STRAWBERRY)
@@ -2030,7 +2028,7 @@ input BulkCreateUserV2Input
   users: [CreateUserV2Input!]!
 }
 
-"""Added in UNRELEASED. Input for bulk-deleting multiple model cards."""
+"""Added in 26.4.4. Input for bulk-deleting multiple model cards."""
 input BulkDeleteModelCardsV2Input
   @join__type(graph: STRAWBERRY)
 {
@@ -2041,7 +2039,7 @@ input BulkDeleteModelCardsV2Input
   options: DeleteModelCardV2Options = null
 }
 
-"""Added in UNRELEASED. Payload for bulk model card deletion."""
+"""Added in 26.4.4. Payload for bulk model card deletion."""
 type BulkDeleteModelCardsV2Payload
   @join__type(graph: STRAWBERRY)
 {
@@ -2053,7 +2051,7 @@ type BulkDeleteModelCardsV2Payload
 }
 
 """
-Added in UNRELEASED. Error information for a model card that failed during bulk deletion.
+Added in 26.4.4. Error information for a model card that failed during bulk deletion.
 """
 type BulkDeleteModelCardV2Error
   @join__type(graph: STRAWBERRY)
@@ -2065,7 +2063,7 @@ type BulkDeleteModelCardV2Error
   message: String!
 }
 
-"""Added in UNRELEASED. Input for bulk-soft-deleting role presets."""
+"""Added in 26.4.4. Input for bulk-soft-deleting role presets."""
 input BulkDeleteRolePresetsInput
   @join__type(graph: STRAWBERRY)
 {
@@ -2074,7 +2072,7 @@ input BulkDeleteRolePresetsInput
 }
 
 """
-Added in UNRELEASED. Payload returned after bulk-soft-deleting role presets.
+Added in 26.4.4. Payload returned after bulk-soft-deleting role presets.
 """
 type BulkDeleteRolePresetsPayload
   @join__type(graph: STRAWBERRY)
@@ -2102,7 +2100,7 @@ type BulkDeleteVFoldersV2Payload
   deletedCount: Int!
 }
 
-"""Added in UNRELEASED. Input for bulk-hard-deleting role presets."""
+"""Added in 26.4.4. Input for bulk-hard-deleting role presets."""
 input BulkPurgeRolePresetsInput
   @join__type(graph: STRAWBERRY)
 {
@@ -2111,7 +2109,7 @@ input BulkPurgeRolePresetsInput
 }
 
 """
-Added in UNRELEASED. Payload returned after bulk-hard-deleting role presets.
+Added in 26.4.4. Payload returned after bulk-hard-deleting role presets.
 """
 type BulkPurgeRolePresetsPayload
   @join__type(graph: STRAWBERRY)
@@ -2181,7 +2179,7 @@ input BulkPurgeVFoldersV2Input
   ids: [UUID!]!
 
   """
-  Added in UNRELEASED. Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
+  Added in 26.4.4. Optional behavior flags applied to every vfolder in the batch. Defaults to all-false when omitted.
   """
   options: PurgeVFolderOptionsInput
 }
@@ -2197,9 +2195,7 @@ type BulkPurgeVFoldersV2Payload
   failed: [BulkPurgeVFolderV2Error!]!
 }
 
-"""
-Added in UNRELEASED. Failure detail for a single vfolder in a bulk purge.
-"""
+"""Added in 26.4.4. Failure detail for a single vfolder in a bulk purge."""
 type BulkPurgeVFolderV2Error
   @join__type(graph: STRAWBERRY)
 {
@@ -2211,7 +2207,7 @@ type BulkPurgeVFolderV2Error
 }
 
 """
-Added in UNRELEASED. Failure detail for a single permission ID in bulk remove
+Added in 26.4.4. Failure detail for a single permission ID in bulk remove
 """
 type BulkRemoveRolePermissionFailureInfo
   @join__type(graph: STRAWBERRY)
@@ -2224,7 +2220,7 @@ type BulkRemoveRolePermissionFailureInfo
 }
 
 """
-Added in UNRELEASED. Input for bulk-removing permission entries from a role preset.
+Added in 26.4.4. Input for bulk-removing permission entries from a role preset.
 """
 input BulkRemoveRolePermissionPresetsInput
   @join__type(graph: STRAWBERRY)
@@ -2234,7 +2230,7 @@ input BulkRemoveRolePermissionPresetsInput
 }
 
 """
-Added in UNRELEASED. Payload returned after bulk-removing permission entries from a role preset.
+Added in 26.4.4. Payload returned after bulk-removing permission entries from a role preset.
 """
 type BulkRemoveRolePermissionPresetsPayload
   @join__type(graph: STRAWBERRY)
@@ -2247,7 +2243,7 @@ type BulkRemoveRolePermissionPresetsPayload
 }
 
 """
-Added in UNRELEASED. Input for bulk-deleting permission rows by primary key
+Added in 26.4.4. Input for bulk-deleting permission rows by primary key
 """
 input BulkRemoveRolePermissionsInput
   @join__type(graph: STRAWBERRY)
@@ -2255,7 +2251,7 @@ input BulkRemoveRolePermissionsInput
   permissionIds: [UUID!]!
 }
 
-"""Added in UNRELEASED. Payload for bulk role-permission deletion"""
+"""Added in 26.4.4. Payload for bulk role-permission deletion"""
 type BulkRemoveRolePermissionsPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -2266,9 +2262,7 @@ type BulkRemoveRolePermissionsPayload
   failed: [BulkRemoveRolePermissionFailureInfo!]!
 }
 
-"""
-Added in UNRELEASED. Input for bulk-restoring soft-deleted role presets.
-"""
+"""Added in 26.4.4. Input for bulk-restoring soft-deleted role presets."""
 input BulkRestoreRolePresetsInput
   @join__type(graph: STRAWBERRY)
 {
@@ -2277,7 +2271,7 @@ input BulkRestoreRolePresetsInput
 }
 
 """
-Added in UNRELEASED. Payload returned after bulk-restoring soft-deleted role presets.
+Added in 26.4.4. Payload returned after bulk-restoring soft-deleted role presets.
 """
 type BulkRestoreRolePresetsPayload
   @join__type(graph: STRAWBERRY)
@@ -2322,7 +2316,7 @@ type BulkRevokeRolePayload
 }
 
 """
-Added in UNRELEASED. Failure detail for a single permission entry in a bulk operation.
+Added in 26.4.4. Failure detail for a single permission entry in a bulk operation.
 """
 type BulkRolePermissionPresetFailureInfo
   @join__type(graph: STRAWBERRY)
@@ -2335,7 +2329,7 @@ type BulkRolePermissionPresetFailureInfo
 }
 
 """
-Added in UNRELEASED. Failure detail for a single role preset ID in a bulk operation.
+Added in 26.4.4. Failure detail for a single role preset ID in a bulk operation.
 """
 type BulkRolePresetFailureInfo
   @join__type(graph: STRAWBERRY)
@@ -2489,7 +2483,7 @@ type CancelImportArtifactPayload
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in UNRELEASED. Input for canceling a role invitation."""
+"""Added in 26.4.4. Input for canceling a role invitation."""
 input CancelRoleInvitationInput
   @join__type(graph: STRAWBERRY)
 {
@@ -3417,54 +3411,52 @@ input CreateDeploymentRevisionPresetInput
   """Default deployment strategy for deployments created from this preset."""
   deploymentStrategy: PresetDeploymentStrategyInput!
 
-  """Added in UNRELEASED. Container image to run the inference server."""
+  """Added in 26.4.4. Container image to run the inference server."""
   imageId: UUID!
 
   """
-  Added in UNRELEASED. Detailed explanation of when and why to use this preset configuration.
+  Added in 26.4.4. Detailed explanation of when and why to use this preset configuration.
   """
   description: String = null
 
   """
-  Added in UNRELEASED. Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint. Optional, but when provided it must be fully populated with at least one model.
+  Added in 26.4.4. Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint. Optional, but when provided it must be fully populated with at least one model.
   """
   modelDefinition: PresetModelDefinitionInput = null
 
   """
-  Added in UNRELEASED. Resource slot allocations (e.g. cpu, mem, cuda.device).
+  Added in 26.4.4. Resource slot allocations (e.g. cpu, mem, cuda.device).
   """
   resourceSlots: [ResourceSlotEntryInput!] = null
 
   """
-  Added in UNRELEASED. Additional resource options such as shared memory (shmem) size.
+  Added in 26.4.4. Additional resource options such as shared memory (shmem) size.
   """
   resourceOpts: [ResourceOptsEntryInput!] = null
 
-  """
-  Added in UNRELEASED. Deployment topology mode (single-node or multi-node).
-  """
+  """Added in 26.4.4. Deployment topology mode (single-node or multi-node)."""
   clusterMode: ClusterMode!
 
-  """Added in UNRELEASED. Number of worker nodes in the cluster."""
+  """Added in 26.4.4. Number of worker nodes in the cluster."""
   clusterSize: Int!
 
   """
-  Added in UNRELEASED. Command to start the inference server process inside the container.
+  Added in 26.4.4. Command to start the inference server process inside the container.
   """
   startupCommand: String = null
 
   """
-  Added in UNRELEASED. Script executed before the main process starts (e.g. to download model weights).
+  Added in 26.4.4. Script executed before the main process starts (e.g. to download model weights).
   """
   bootstrapScript: String = null
 
   """
-  Added in UNRELEASED. Environment variables injected into the inference container.
+  Added in 26.4.4. Environment variables injected into the inference container.
   """
   environ: [EnvironEntryInput!] = null
 
   """
-  Added in UNRELEASED. Runtime variant preset values applied when using this deployment preset.
+  Added in 26.4.4. Runtime variant preset values applied when using this deployment preset.
   """
   presetValues: [DeploymentRevisionPresetValueEntryInput!] = null
 }
@@ -3594,7 +3586,7 @@ type CreateKeyPair
 }
 
 """
-Added in UNRELEASED. A keypair returned at creation time, including its one-time secret key.
+Added in 26.4.4. A keypair returned at creation time, including its one-time secret key.
 """
 type CreateKeypairPayload
   @join__type(graph: STRAWBERRY)
@@ -4079,13 +4071,13 @@ input CreateRoleInput
   source: RoleSource! = CUSTOM
 
   """
-  Added in UNRELEASED. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  Added in 26.4.4. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean! = false
   scopes: [ScopeInput!] = null
 }
 
-"""Added in UNRELEASED. Input for creating role invitations."""
+"""Added in 26.4.4. Input for creating role invitations."""
 input CreateRoleInvitationInput
   @join__type(graph: STRAWBERRY)
 {
@@ -4093,7 +4085,7 @@ input CreateRoleInvitationInput
   emails: [String!]!
 }
 
-"""Added in UNRELEASED. Payload for role invitation creation."""
+"""Added in 26.4.4. Payload for role invitation creation."""
 type CreateRoleInvitationPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -4101,7 +4093,7 @@ type CreateRoleInvitationPayload
   items: [RoleInvitation!]!
 }
 
-"""Added in UNRELEASED. Input for creating a new role preset."""
+"""Added in 26.4.4. Input for creating a new role preset."""
 input CreateRolePresetInput
   @join__type(graph: STRAWBERRY)
 {
@@ -4120,7 +4112,7 @@ input CreateRolePresetInput
   permissions: [RolePermissionPresetEntryInput!]!
 }
 
-"""Added in UNRELEASED. Payload returned after creating a role preset."""
+"""Added in 26.4.4. Payload returned after creating a role preset."""
 type CreateRolePresetPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -4181,7 +4173,7 @@ input CreateRuntimeVariantPresetInput
   key: String!
 
   """
-  Added in UNRELEASED. Whether this preset parameter must be supplied when building a deployment revision.
+  Added in 26.4.4. Whether this preset parameter must be supplied when building a deployment revision.
   """
   required: Boolean! = false
 }
@@ -4398,7 +4390,7 @@ type CreateUserV2Payload
 }
 
 """
-Added in UNRELEASED. Scope-agnostic body for vfolder creation. The owning scope is supplied as a separate mutation argument.
+Added in 26.4.4. Scope-agnostic body for vfolder creation. The owning scope is supplied as a separate mutation argument.
 """
 input CreateVFolderInScopeInput
   @join__type(graph: STRAWBERRY)
@@ -4516,7 +4508,7 @@ scalar Decimal
   @join__type(graph: STRAWBERRY)
 
 """
-Added in UNRELEASED. A single (handler_name, options) entry response for session handler options.
+Added in 26.4.4. A single (handler_name, options) entry response for session handler options.
 """
 type DefaultSessionHandlerOptionsEntryInfo
   @join__type(graph: STRAWBERRY)
@@ -4534,7 +4526,7 @@ type DefaultSessionHandlerOptionsEntryInfo
 }
 
 """
-Added in UNRELEASED. A single (handler_name, options) entry for session handler options.
+Added in 26.4.4. A single (handler_name, options) entry for session handler options.
 """
 input DefaultSessionHandlerOptionsEntryInput
   @join__type(graph: STRAWBERRY)
@@ -4545,7 +4537,7 @@ input DefaultSessionHandlerOptionsEntryInput
 }
 
 """
-Added in UNRELEASED. Per-handler scheduler policy snapshot for session handler options.
+Added in 26.4.4. Per-handler scheduler policy snapshot for session handler options.
 """
 type DefaultSessionHandlerOptionsInfo
   @join__type(graph: STRAWBERRY)
@@ -4560,7 +4552,7 @@ type DefaultSessionHandlerOptionsInfo
 }
 
 """
-Added in UNRELEASED. Per-handler scheduler policy fields for session handler options.
+Added in 26.4.4. Per-handler scheduler policy fields for session handler options.
 """
 input DefaultSessionHandlerOptionsInput
   @join__type(graph: STRAWBERRY)
@@ -4569,7 +4561,7 @@ input DefaultSessionHandlerOptionsInput
   maxRetryCount: Int = null
 }
 
-"""Added in UNRELEASED. Session handler-options policy response."""
+"""Added in 26.4.4. Session handler-options policy response."""
 type DefaultSessionHandlerOptionsPolicyInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -4583,7 +4575,7 @@ type DefaultSessionHandlerOptionsPolicyInfo
 }
 
 """
-Added in UNRELEASED. Session handler-options input (timeout + retry, handler-keyed).
+Added in 26.4.4. Session handler-options input (timeout + retry, handler-keyed).
 """
 input DefaultSessionHandlerOptionsPolicyInput
   @join__type(graph: STRAWBERRY)
@@ -4592,7 +4584,7 @@ input DefaultSessionHandlerOptionsPolicyInput
   byHandler: [DefaultSessionHandlerOptionsEntryInput!] = null
 }
 
-"""Added in UNRELEASED. Baseline kernel execution spec response."""
+"""Added in 26.4.4. Baseline kernel execution spec response."""
 type DefaultSessionKernelExecutionSpecInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -4619,7 +4611,7 @@ type DefaultSessionKernelExecutionSpecInfo
 }
 
 """
-Added in UNRELEASED. Baseline kernel execution spec input used as the resource-group default.
+Added in 26.4.4. Baseline kernel execution spec input used as the resource-group default.
 """
 input DefaultSessionKernelExecutionSpecInput
   @join__type(graph: STRAWBERRY)
@@ -4633,7 +4625,7 @@ input DefaultSessionKernelExecutionSpecInput
   batchTimeoutSec: Int = null
 }
 
-"""Added in UNRELEASED. Resource-group default session options response."""
+"""Added in 26.4.4. Resource-group default session options response."""
 type DefaultSessionOptionsInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -4663,9 +4655,7 @@ type DefaultSessionOptionsInfo
   agentSelectionPolicy: SessionAgentSelectionPolicy!
 }
 
-"""
-Added in UNRELEASED. Resource-group default session options input payload.
-"""
+"""Added in 26.4.4. Resource-group default session options input payload."""
 input DefaultSessionOptionsInput
   @join__type(graph: STRAWBERRY)
 {
@@ -4678,7 +4668,7 @@ input DefaultSessionOptionsInput
   agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
-"""Added in UNRELEASED. Qualitative resource hints response."""
+"""Added in 26.4.4. Qualitative resource hints response."""
 type DefaultSessionResourceOptsInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -4689,7 +4679,7 @@ type DefaultSessionResourceOptsInfo
 }
 
 """
-Added in UNRELEASED. Qualitative resource hints for session-level defaults (shared memory, ...).
+Added in 26.4.4. Qualitative resource hints for session-level defaults (shared memory, ...).
 """
 input DefaultSessionResourceOptsInput
   @join__type(graph: STRAWBERRY)
@@ -4778,7 +4768,7 @@ type DelegateScanArtifactsPayload
   artifacts: [Artifact!]!
 }
 
-"""Added in UNRELEASED. Input for deleting an access token."""
+"""Added in 26.4.4. Input for deleting an access token."""
 input DeleteAccessTokenInput
   @join__type(graph: STRAWBERRY)
 {
@@ -4786,7 +4776,7 @@ input DeleteAccessTokenInput
   id: ID!
 }
 
-"""Added in UNRELEASED. Payload for deleting an access token."""
+"""Added in 26.4.4. Payload for deleting an access token."""
 type DeleteAccessTokenPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -5024,7 +5014,7 @@ type DeleteModelCardPayload
   id: UUID!
 }
 
-"""Added in UNRELEASED. Options for the model card delete operation."""
+"""Added in 26.4.4. Options for the model card delete operation."""
 input DeleteModelCardV2Options
   @join__type(graph: STRAWBERRY)
 {
@@ -5357,7 +5347,7 @@ input DeploymentFilter
   NOT: [DeploymentFilter!] = null
 }
 
-"""Added in UNRELEASED. Deployment handler-options policy response."""
+"""Added in 26.4.4. Deployment handler-options policy response."""
 type DeploymentHandlerOptionsInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -5368,7 +5358,7 @@ type DeploymentHandlerOptionsInfo
   byHandler: [HandlerOptionsEntryInfo!]!
 }
 
-"""Added in UNRELEASED. Deployment handler-options policy input."""
+"""Added in 26.4.4. Deployment handler-options policy input."""
 input DeploymentHandlerOptionsInput
   @join__type(graph: STRAWBERRY)
 {
@@ -5396,7 +5386,7 @@ type DeploymentHistory implements Node
   updatedAt: DateTime!
 
   """
-  Added in UNRELEASED. Handler category that produced this row. ``lifecycle`` for monotonic lifecycle transitions; ``scaling`` for replica-reconcile transitions; ``health`` is reserved.
+  Added in 26.4.4. Handler category that produced this row. ``lifecycle`` for monotonic lifecycle transitions; ``scaling`` for replica-reconcile transitions; ``health`` is reserved.
   """
   category: String!
 
@@ -5462,7 +5452,7 @@ enum DeploymentHistoryOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in UNRELEASED. Deployment options payload response."""
+"""Added in 26.4.4. Deployment options payload response."""
 type DeploymentOptionsInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -5470,7 +5460,7 @@ type DeploymentOptionsInfo
   handlerOptions: DeploymentHandlerOptionsInfo!
 }
 
-"""Added in UNRELEASED. Deployment options payload input."""
+"""Added in 26.4.4. Deployment options payload input."""
 input DeploymentOptionsInput
   @join__type(graph: STRAWBERRY)
 {
@@ -5571,7 +5561,7 @@ type DeploymentRevisionPreset implements Node
   runtimeVariant: RuntimeVariant
 
   """
-  Added in UNRELEASED. The container image used to run the inference server. None when the preset does not specify an image.
+  Added in 26.4.4. The container image used to run the inference server. None when the preset does not specify an image.
   """
   image: ImageV2
 
@@ -5619,7 +5609,7 @@ type DeploymentRevisionPresetEnvironEntry
 input DeploymentRevisionPresetFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Added in UNRELEASED. Filter by preset ID."""
+  """Added in 26.4.4. Filter by preset ID."""
   id: UUIDFilter = null
 
   """Name filter."""
@@ -5663,7 +5653,7 @@ type DeploymentRevisionPresetValueEntry
 }
 
 """
-Added in UNRELEASED. A mapping of a runtime variant preset to a concrete value, used to auto-configure runtime parameters when this deployment preset is applied.
+Added in 26.4.4. A mapping of a runtime variant preset to a concrete value, used to auto-configure runtime parameters when this deployment preset is applied.
 """
 input DeploymentRevisionPresetValueEntryInput
   @join__type(graph: STRAWBERRY)
@@ -6930,9 +6920,7 @@ type EntityTimestamps
   modifiedAt: DateTime
 }
 
-"""
-Added in UNRELEASED. Entity reference parametrized by RBAC element type.
-"""
+"""Added in 26.4.4. Entity reference parametrized by RBAC element type."""
 input EntityTypeScope
   @join__type(graph: STRAWBERRY)
 {
@@ -6944,7 +6932,7 @@ input EntityTypeScope
 }
 
 """
-Added in UNRELEASED. A single environment variable entry with key and value.
+Added in 26.4.4. A single environment variable entry with key and value.
 """
 input EnvironEntryInput
   @join__type(graph: STRAWBERRY)
@@ -7040,7 +7028,7 @@ type ExtraVFolderMountInfo
   mountPerm: MountPermission!
 
   """
-  Added in UNRELEASED. Subpath within the vfolder. ``None`` means the vfolder root.
+  Added in 26.4.4. Subpath within the vfolder. ``None`` means the vfolder root.
   """
   subpath: String
 }
@@ -7053,7 +7041,7 @@ input ExtraVFolderMountInput
   mountDestination: String
 
   """
-  Added in UNRELEASED. Subpath within the vfolder. ``null`` (default) mounts the vfolder root.
+  Added in 26.4.4. Subpath within the vfolder. ``null`` (default) mounts the vfolder root.
   """
   subpath: String = null
 }
@@ -7316,7 +7304,7 @@ scalar GroupPermissionField
   @join__type(graph: GRAPHENE)
 
 """
-Added in UNRELEASED. A single (handler_name, options) entry response for deployment handler options.
+Added in 26.4.4. A single (handler_name, options) entry response for deployment handler options.
 """
 type HandlerOptionsEntryInfo
   @join__type(graph: STRAWBERRY)
@@ -7334,7 +7322,7 @@ type HandlerOptionsEntryInfo
 }
 
 """
-Added in UNRELEASED. A single (handler_name, options) entry for deployment handler options.
+Added in 26.4.4. A single (handler_name, options) entry for deployment handler options.
 """
 input HandlerOptionsEntryInput
   @join__type(graph: STRAWBERRY)
@@ -7345,7 +7333,7 @@ input HandlerOptionsEntryInput
 }
 
 """
-Added in UNRELEASED. Per-handler scheduler policy snapshot for deployment handler options.
+Added in 26.4.4. Per-handler scheduler policy snapshot for deployment handler options.
 """
 type HandlerOptionsInfo
   @join__type(graph: STRAWBERRY)
@@ -7360,7 +7348,7 @@ type HandlerOptionsInfo
 }
 
 """
-Added in UNRELEASED. Per-handler scheduler policy fields for deployment handler options.
+Added in 26.4.4. Per-handler scheduler policy fields for deployment handler options.
 """
 input HandlerOptionsInput
   @join__type(graph: STRAWBERRY)
@@ -7721,7 +7709,7 @@ input ImageV2Filter
   name: StringFilter = null
   architecture: StringFilter = null
 
-  """Added in UNRELEASED. Filter by image UUID."""
+  """Added in 26.4.4. Filter by image UUID."""
   id: UUIDFilter = null
 
   """Added in 26.4.0. Filter by container registry ID."""
@@ -7960,7 +7948,7 @@ type InferenceSessionErrorInfo
 }
 
 """
-Added in UNRELEASED. Filter for integer array fields. Supports 'contains' (column contains this single value), 'contains_any' (column contains any of these values), and 'contains_all' (column contains all of these values).
+Added in 26.4.4. Filter for integer array fields. Supports 'contains' (column contains this single value), 'contains_any' (column contains any of these values), and 'contains_all' (column contains all of these values).
 """
 input IntArrayFilter
   @join__type(graph: STRAWBERRY)
@@ -8491,7 +8479,7 @@ input KeypairFilter
   accessKey: StringFilter = null
   resourcePolicy: StringFilter = null
 
-  """Added in UNRELEASED. Filter keypairs by the UUID of their owner."""
+  """Added in 26.4.4. Filter keypairs by the UUID of their owner."""
   userId: UUIDFilter = null
   createdAt: DateTimeFilter = null
   lastUsed: DateTimeFilter = null
@@ -8576,7 +8564,7 @@ type KeyPairResourcePolicy
 }
 
 """
-Added in UNRELEASED. Nested filter for keypairs assigned to a keypair resource policy. Filters policies linked to at least one keypair matching all specified conditions.
+Added in 26.4.4. Nested filter for keypairs assigned to a keypair resource policy. Filters policies linked to at least one keypair matching all specified conditions.
 """
 input KeypairResourcePolicyKeypairNestedFilter
   @join__type(graph: STRAWBERRY)
@@ -8632,7 +8620,7 @@ type KeypairResourcePolicyV2 implements Node
   """Allowed vfolder host permissions."""
   allowedVfolderHosts: [VFolderHostPermissionEntry!]!
 
-  """Added in UNRELEASED. Keypairs assigned to this resource policy."""
+  """Added in 26.4.4. Keypairs assigned to this resource policy."""
   keypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection
 }
 
@@ -8675,7 +8663,7 @@ input KeypairResourcePolicyV2Filter
   maxPendingSessionCount: IntFilter = null
 
   """
-  Added in UNRELEASED. Filter policies by their assigned keypairs. A policy matches if at least one of its keypairs satisfies the conditions.
+  Added in 26.4.4. Filter policies by their assigned keypairs. A policy matches if at least one of its keypairs satisfies the conditions.
   """
   keypair: KeypairResourcePolicyKeypairNestedFilter = null
 }
@@ -9593,7 +9581,7 @@ type ModelDeployment implements Node
   options: DeploymentOptionsInfo!
 
   """
-  Added in UNRELEASED. Endpoint-level replica scaling axis. Scaling is now reconciled per replica group, so this stays ``STABLE``; inspect each replica group's scaling status instead. Deprecated since UNRELEASED. Use per-replica-group scaling status.
+  Added in 26.4.4. Endpoint-level replica scaling axis. Scaling is now reconciled per replica group, so this stays ``STABLE``; inspect each replica group's scaling status instead. Deprecated since 26.4.4. Use per-replica-group scaling status.
   """
   scalingState: ScalingState!
 
@@ -9658,7 +9646,7 @@ type ModelDeploymentMetadata
   @join__type(graph: STRAWBERRY)
 {
   """
-  Added in UNRELEASED. The resource group this deployment runs in, resolved via DataLoader.
+  Added in 26.4.4. The resource group this deployment runs in, resolved via DataLoader.
   """
   resourceGroup: ResourceGroup
 
@@ -9876,7 +9864,7 @@ type ModelMountConfig
   definitionPath: String!
 
   """
-  Added in UNRELEASED. Subpath within the model vfolder. ``None`` means the vfolder root.
+  Added in 26.4.4. Subpath within the model vfolder. ``None`` means the vfolder root.
   """
   subpath: String
 }
@@ -9890,7 +9878,7 @@ input ModelMountConfigInput
   definitionPath: String = null
 
   """
-  Added in UNRELEASED. Subpath within the model vfolder. ``null`` (default) mounts the vfolder root.
+  Added in 26.4.4. Subpath within the model vfolder. ``null`` (default) mounts the vfolder root.
   """
   subpath: String = null
 }
@@ -9907,9 +9895,7 @@ type ModelReplica implements Node
   sessionId: ID
   revisionId: ID!
 
-  """
-  Added in UNRELEASED. ID of the model deployment this replica belongs to.
-  """
+  """Added in 26.4.4. ID of the model deployment this replica belongs to."""
   deploymentId: ID!
 
   """Whether the replica has been checked and its health state."""
@@ -9922,14 +9908,14 @@ type ModelReplica implements Node
   activenessStatus: ActivenessStatus!
 
   """
-  Added in UNRELEASED. Provisioning status of the replica (mirrors the underlying route status).
+  Added in 26.4.4. Provisioning status of the replica (mirrors the underlying route status).
   """
   status: ReplicaStatus!
 
-  """Added in UNRELEASED. Traffic status of the replica."""
+  """Added in 26.4.4. Traffic status of the replica."""
   trafficStatus: TrafficStatus!
 
-  """Added in UNRELEASED. Health check status of the replica."""
+  """Added in 26.4.4. Health check status of the replica."""
   healthStatus: ReplicaHealthStatus!
 
   """Timestamp when the replica was created."""
@@ -9948,7 +9934,7 @@ type ModelReplica implements Node
   """The revision of this entity."""
   revision: ModelRevision
 
-  """Added in UNRELEASED. The model deployment this replica belongs to."""
+  """Added in 26.4.4. The model deployment this replica belongs to."""
   deployment: ModelDeployment
 }
 
@@ -9989,7 +9975,7 @@ type ModelRevision implements Node
   imageId: ID!
 
   """
-  Added in UNRELEASED. Per-deployment sequential revision number assigned at insert time (UNIQUE per deployment). Use this to surface 'Revision #N' labels and to order revisions client-side.
+  Added in 26.4.4. Per-deployment sequential revision number assigned at insert time (UNIQUE per deployment). Use this to surface 'Revision #N' labels and to order revisions client-side.
   """
   revisionNumber: Int!
 
@@ -10012,12 +9998,12 @@ type ModelRevision implements Node
   extraMounts: [ExtraVFolderMountInfo!]!
 
   """
-  Added in UNRELEASED. ID of the deployment-level preset that produced this revision. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
+  Added in 26.4.4. ID of the deployment-level preset that produced this revision. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
   """
   revisionPresetId: UUID
 
   """
-  Added in UNRELEASED. ID of the parent deployment that owns this revision. Exposed alongside the resolved ``deployment`` node so clients can navigate without re-fetching.
+  Added in 26.4.4. ID of the parent deployment that owns this revision. Exposed alongside the resolved ``deployment`` node so clients can navigate without re-fetching.
   """
   deploymentId: ID!
 
@@ -10033,12 +10019,12 @@ type ModelRevision implements Node
   imageV2: ImageV2
 
   """
-  Added in UNRELEASED. The deployment-level preset that produced this revision, resolved via DataLoader. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
+  Added in 26.4.4. The deployment-level preset that produced this revision, resolved via DataLoader. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
   """
   revisionPreset: DeploymentRevisionPreset
 
   """
-  Added in UNRELEASED. The parent deployment owning this revision, resolved via DataLoader.
+  Added in 26.4.4. The parent deployment owning this revision, resolved via DataLoader.
   """
   deployment: ModelDeployment
 
@@ -10121,7 +10107,7 @@ type ModelRuntimeConfig
   @join__type(graph: STRAWBERRY)
 {
   """
-  Added in UNRELEASED. The runtime variant referenced by this runtime config.
+  Added in 26.4.4. The runtime variant referenced by this runtime config.
   """
   runtimeVariant: RuntimeVariant
   runtimeVariantId: UUID!
@@ -11338,7 +11324,7 @@ type Mutation
   """Added in 25.16.0. Create access token."""
   createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Delete access token."""
+  """Added in 26.4.4. Delete access token."""
   deleteAccessToken(input: DeleteAccessTokenInput!): DeleteAccessTokenPayload @join__field(graph: STRAWBERRY)
 
   """
@@ -11446,12 +11432,12 @@ type Mutation
   adminUpdateAllowedProjectsForResourceGroupV2(input: UpdateAllowedProjectsForResourceGroupInput!): AllowedProjectsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Fully replace a resource group's ``default_deployment_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New deployments created in this resource group snapshot the new default; existing deployments are not affected.
+  Added in 26.4.4. Fully replace a resource group's ``default_deployment_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New deployments created in this resource group snapshot the new default; existing deployments are not affected.
   """
   replaceResourceGroupDefaultDeploymentOptions(input: ReplaceResourceGroupDefaultDeploymentOptionsInput!): ReplaceResourceGroupDefaultDeploymentOptionsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Fully replace a resource group's ``default_session_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New sessions created in this resource group consult the new default via the scheduling controller's options resolver at enqueue time; already-enqueued sessions keep the frozen options they were enqueued with.
+  Added in 26.4.4. Fully replace a resource group's ``default_session_options`` (admin only). Replace semantics — the supplied payload is the complete new value. New sessions created in this resource group consult the new default via the scheduling controller's options resolver at enqueue time; already-enqueued sessions keep the frozen options they were enqueued with.
   """
   replaceResourceGroupDefaultSessionOptions(input: ReplaceResourceGroupDefaultSessionOptionsInput!): ReplaceResourceGroupDefaultSessionOptionsPayload @join__field(graph: STRAWBERRY)
 
@@ -11516,7 +11502,7 @@ type Mutation
   adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload @join__field(graph: STRAWBERRY) @deprecated(reason: "Use adminBulkCreateUsersWithKeypairV2 instead, which also returns each created user's generated keypair and secret key.")
 
   """
-  Added in UNRELEASED. Create multiple users in bulk (admin only). Requires superadmin privileges. Returns each created user together with its automatically generated keypair and secret key (the secret key is only returned at creation time).
+  Added in 26.4.4. Create multiple users in bulk (admin only). Requires superadmin privileges. Returns each created user together with its automatically generated keypair and secret key (the secret key is only returned at creation time).
   """
   adminBulkCreateUsersWithKeypairV2(input: BulkCreateUserV2Input!): BulkCreateUsersWithKeypairV2Payload @join__field(graph: STRAWBERRY)
 
@@ -11627,32 +11613,30 @@ type Mutation
   """Added in 26.3.0. Delete a query preset category (admin only)."""
   adminDeletePrometheusQueryPresetCategory(id: ID!): DeleteCategoryPayload @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Create a new role preset (admin only)."""
+  """Added in 26.4.4. Create a new role preset (admin only)."""
   adminCreateRolePreset(input: CreateRolePresetInput!): CreateRolePresetPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Update an existing role preset's metadata (admin only).
+  Added in 26.4.4. Update an existing role preset's metadata (admin only).
   """
   adminUpdateRolePreset(input: UpdateRolePresetInput!): UpdateRolePresetPayload @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Bulk-soft-delete role presets (admin only)."""
+  """Added in 26.4.4. Bulk-soft-delete role presets (admin only)."""
   adminDeleteRolePresets(input: BulkDeleteRolePresetsInput!): BulkDeleteRolePresetsPayload @join__field(graph: STRAWBERRY)
 
-  """
-  Added in UNRELEASED. Bulk-restore soft-deleted role presets (admin only).
-  """
+  """Added in 26.4.4. Bulk-restore soft-deleted role presets (admin only)."""
   adminRestoreRolePresets(input: BulkRestoreRolePresetsInput!): BulkRestoreRolePresetsPayload @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Bulk-hard-delete role presets (admin only)."""
+  """Added in 26.4.4. Bulk-hard-delete role presets (admin only)."""
   adminPurgeRolePresets(input: BulkPurgeRolePresetsInput!): BulkPurgeRolePresetsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Bulk-add permission entries to an existing role preset (admin only).
+  Added in 26.4.4. Bulk-add permission entries to an existing role preset (admin only).
   """
   adminBulkAddRolePresetPermissions(input: BulkAddRolePermissionPresetsInput!): BulkAddRolePermissionPresetsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Bulk-remove permission entries from a role preset (admin only).
+  Added in 26.4.4. Bulk-remove permission entries from a role preset (admin only).
   """
   adminBulkRemoveRolePresetPermissions(input: BulkRemoveRolePermissionPresetsInput!): BulkRemoveRolePermissionPresetsPayload @join__field(graph: STRAWBERRY)
 
@@ -11690,30 +11674,30 @@ type Mutation
   adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Bulk-insert scoped permission rows across one or more roles (admin only).
+  Added in 26.4.4. Bulk-insert scoped permission rows across one or more roles (admin only).
   """
   adminBulkAddRolePermissions(input: BulkAddRolePermissionsInput!): BulkAddRolePermissionsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Bulk-delete permission rows by primary key (admin only).
+  Added in 26.4.4. Bulk-delete permission rows by primary key (admin only).
   """
   adminBulkRemoveRolePermissions(input: BulkRemoveRolePermissionsInput!): BulkRemoveRolePermissionsPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Replace one role's entire scoped-permission set (admin only).
+  Added in 26.4.4. Replace one role's entire scoped-permission set (admin only).
   """
   adminReplaceRolePermissions(input: ReplaceRolePermissionsInput!): ReplaceRolePermissionsPayload @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Create role invitations by email."""
+  """Added in 26.4.4. Create role invitations by email."""
   createRoleInvitation(input: CreateRoleInvitationInput!): CreateRoleInvitationPayload @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Accept a pending role invitation."""
+  """Added in 26.4.4. Accept a pending role invitation."""
   acceptRoleInvitation(input: AcceptRoleInvitationInput!): RoleInvitation @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Reject a pending role invitation."""
+  """Added in 26.4.4. Reject a pending role invitation."""
   rejectRoleInvitation(input: RejectRoleInvitationInput!): RoleInvitation @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Cancel a pending role invitation (admin only)."""
+  """Added in 26.4.4. Cancel a pending role invitation (admin only)."""
   adminCancelRoleInvitation(input: CancelRoleInvitationInput!): RoleInvitation @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new keypair resource policy (admin only)."""
@@ -11807,7 +11791,7 @@ type Mutation
   adminDeleteModelCardV2(id: UUID!, options: DeleteModelCardV2Options = null): DeleteModelCardPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
+  Added in 26.4.4. Bulk-delete model cards (admin only) with per-card partial-failure reporting.
   """
   adminBulkDeleteModelCardsV2(input: BulkDeleteModelCardsV2Input!): BulkDeleteModelCardsV2Payload @join__field(graph: STRAWBERRY)
 
@@ -11825,7 +11809,7 @@ type Mutation
   createVfolderV2(input: CreateVFolderV2Input!): CreateVFolderV2Payload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Create a virtual folder owned by the specified project. Requires project-scoped CREATE permission.
+  Added in 26.4.4. Create a virtual folder owned by the specified project. Requires project-scoped CREATE permission.
   """
   createVFolderInProject(projectId: UUID!, input: CreateVFolderInScopeInput!): CreateVFolderV2Payload @join__field(graph: STRAWBERRY)
 
@@ -11836,7 +11820,7 @@ type Mutation
   purgeVfolderV2(vfolderId: UUID!, options: PurgeVFolderOptionsInput = null): PurgeVFolderV2Payload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Restore a trashed virtual folder. RBAC enforced via scope chain.
+  Added in 26.4.4. Restore a trashed virtual folder. RBAC enforced via scope chain.
   """
   restoreVFolder(vfolderId: UUID!): RestoreVFolderPayload @join__field(graph: STRAWBERRY)
 
@@ -11874,7 +11858,7 @@ type Mutation
   enqueueSession(input: EnqueueSessionInput!): EnqueueSessionPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
+  Added in 26.4.4. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload @join__field(graph: STRAWBERRY)
 }
@@ -12273,7 +12257,7 @@ enum OperationType
 }
 
 """
-Added in UNRELEASED. Filter for permission operation columns. Supports equals / in / not_equals / not_in.
+Added in 26.4.4. Filter for permission operation columns. Supports equals / in / not_equals / not_in.
 """
 input OperationTypeFilter
   @join__type(graph: STRAWBERRY)
@@ -12574,7 +12558,7 @@ type PresetExecutionSpec
 }
 
 """
-Added in UNRELEASED. Strict configuration for a single model within a preset model definition.
+Added in 26.4.4. Strict configuration for a single model within a preset model definition.
 """
 input PresetModelConfigInput
   @join__type(graph: STRAWBERRY)
@@ -12593,7 +12577,7 @@ input PresetModelConfigInput
 }
 
 """
-Added in UNRELEASED. Strict model definition for a preset. When provided on create it must be fully populated with at least one model.
+Added in 26.4.4. Strict model definition for a preset. When provided on create it must be fully populated with at least one model.
 """
 input PresetModelDefinitionInput
   @join__type(graph: STRAWBERRY)
@@ -12605,7 +12589,7 @@ input PresetModelDefinitionInput
 }
 
 """
-Added in UNRELEASED. Strict health check configuration for a preset model service.
+Added in 26.4.4. Strict health check configuration for a preset model service.
 """
 input PresetModelHealthCheckInput
   @join__type(graph: STRAWBERRY)
@@ -12634,7 +12618,7 @@ input PresetModelHealthCheckInput
   initialDelay: Float! = 1800
 }
 
-"""Added in UNRELEASED. Strict metadata describing a preset model entry."""
+"""Added in 26.4.4. Strict metadata describing a preset model entry."""
 input PresetModelMetadataInput
   @join__type(graph: STRAWBERRY)
 {
@@ -12679,7 +12663,7 @@ input PresetModelMetadataInput
 }
 
 """
-Added in UNRELEASED. Strict service configuration for a preset model entry.
+Added in 26.4.4. Strict service configuration for a preset model entry.
 """
 input PresetModelServiceConfigInput
   @join__type(graph: STRAWBERRY)
@@ -12779,7 +12763,7 @@ input PreStartActionInput
 }
 
 """
-Added in UNRELEASED. Input for previewing a prometheus query template (admin only).
+Added in 26.4.4. Input for previewing a prometheus query template (admin only).
 """
 input PreviewQueryDefinitionInput
   @join__type(graph: STRAWBERRY)
@@ -13709,9 +13693,7 @@ type PurgeUserV2Payload
   success: Boolean!
 }
 
-"""
-Added in UNRELEASED. Optional behavior flags for vfolder purge operations.
-"""
+"""Added in 26.4.4. Optional behavior flags for vfolder purge operations."""
 input PurgeVFolderOptionsInput
   @join__type(graph: STRAWBERRY)
 {
@@ -14212,7 +14194,7 @@ type Query
   adminResourceGroupV2(name: String!): ResourceGroup @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.handler_options.by_handler``.
+  Added in 26.4.4. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.handler_options.by_handler``.
   """
   schedulingHandlers: [SchedulingHandlerNode!] @join__field(graph: STRAWBERRY)
 
@@ -14311,7 +14293,7 @@ type Query
   adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Query audit logs within a scope (non-admin accessible, subject to RBAC). All scope items are OR'd; raises an error if every field is empty.
+  Added in 26.4.4. Query audit logs within a scope (non-admin accessible, subject to RBAC). All scope items are OR'd; raises an error if every field is empty.
   """
   scopedAuditLogsV2(scope: AuditLogScope!, filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection @join__field(graph: STRAWBERRY)
 
@@ -14382,7 +14364,7 @@ type Query
   prometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Preview a prometheus query template before saving it as a preset (admin only).
+  Added in 26.4.4. Preview a prometheus query template before saving it as a preset (admin only).
   """
   adminPreviewPrometheusQueryPreset(input: PreviewQueryDefinitionInput!): QueryDefinitionExecuteResult @join__field(graph: STRAWBERRY)
 
@@ -14396,11 +14378,11 @@ type Query
   """
   prometheusQueryPresetCategories(filter: CategoryFilter = null, orderBy: [CategoryOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [QueryPresetCategory!] @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. Get a single role preset by ID (admin only)."""
+  """Added in 26.4.4. Get a single role preset by ID (admin only)."""
   adminRolePreset(id: ID!): RolePreset @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. List role presets with filtering and pagination (admin only).
+  Added in 26.4.4. List role presets with filtering and pagination (admin only).
   """
   adminRolePresets(filter: RolePresetFilter = null, orderBy: [RolePresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePresetConnection @join__field(graph: STRAWBERRY)
 
@@ -14462,21 +14444,21 @@ type Query
   """
   myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. List the current user's role invitations."""
+  """Added in 26.4.4. List the current user's role invitations."""
   myRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. List role invitations sent by the current user."""
+  """Added in 26.4.4. List role invitations sent by the current user."""
   mySentRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. List all role invitations across the system (superadmin only).
+  Added in 26.4.4. List all role invitations across the system (superadmin only).
   """
   adminRoleInvitations(filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. List roles registered in a project scope."""
   projectRoles(projectId: UUID!, filter: RoleFilter = null, orderBy: [RoleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleConnection @join__field(graph: STRAWBERRY)
 
-  """Added in UNRELEASED. List invitations for a specific role."""
+  """Added in 26.4.4. List invitations for a specific role."""
   roleScopedRoleInvitations(roleId: UUID!, filter: RoleInvitationFilter = null, orderBy: [RoleInvitationOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleInvitationConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
@@ -14589,10 +14571,10 @@ type Query
   """
   Added in 25.16.0. Get configuration JSON Schemas for all inference runtimes.
   """
-  inferenceRuntimeConfigs: JSON @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since UNRELEASED. Use the runtime_variant resources instead.")
+  inferenceRuntimeConfigs: JSON @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.4.4. Use the runtime_variant resources instead.")
 
   """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
-  inferenceRuntimeConfig(name: String!): JSON @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since UNRELEASED. Use the runtime_variant resources instead.")
+  inferenceRuntimeConfig(name: String!): JSON @join__field(graph: STRAWBERRY) @deprecated(reason: "Deprecated since 26.4.4. Use the runtime_variant resources instead.")
 
   """Added in 25.19.0. Get a specific route by ID."""
   route(id: ID!): Route @join__field(graph: STRAWBERRY)
@@ -14891,21 +14873,21 @@ input QueryDefinitionFilter
   """Filter by name."""
   name: StringFilter = null
 
-  """Added in UNRELEASED. Filter by category ID."""
+  """Added in 26.4.4. Filter by category ID."""
   categoryId: UUIDFilter = null
 
   """
-  Added in UNRELEASED. Combine multiple filters with AND logic. All conditions must match.
+  Added in 26.4.4. Combine multiple filters with AND logic. All conditions must match.
   """
   AND: [QueryDefinitionFilter!] = null
 
   """
-  Added in UNRELEASED. Combine multiple filters with OR logic. At least one condition must match.
+  Added in 26.4.4. Combine multiple filters with OR logic. At least one condition must match.
   """
   OR: [QueryDefinitionFilter!] = null
 
   """
-  Added in UNRELEASED. Negate the specified filters. Records matching these conditions will be excluded.
+  Added in 26.4.4. Negate the specified filters. Records matching these conditions will be excluded.
   """
   NOT: [QueryDefinitionFilter!] = null
 }
@@ -15083,7 +15065,7 @@ enum RBACElementType
 }
 
 """
-Added in UNRELEASED. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
+Added in 26.4.4. Filter for RBAC element type fields (scope_type / entity_type). Supports equals / in / not_equals / not_in.
 """
 input RBACElementTypeFilter
   @join__type(graph: STRAWBERRY)
@@ -15151,7 +15133,7 @@ type RejectArtifactPayload
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in UNRELEASED. Input for rejecting a role invitation."""
+"""Added in 26.4.4. Input for rejecting a role invitation."""
 input RejectRoleInvitationInput
   @join__type(graph: STRAWBERRY)
 {
@@ -15159,7 +15141,7 @@ input RejectRoleInvitationInput
 }
 
 """
-Added in UNRELEASED. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
+Added in 26.4.4. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
 """
 input ReplaceResourceGroupDefaultDeploymentOptionsInput
   @join__type(graph: STRAWBERRY)
@@ -15172,7 +15154,7 @@ input ReplaceResourceGroupDefaultDeploymentOptionsInput
 }
 
 """
-Added in UNRELEASED. Payload returned after replacing a resource group's default_deployment_options surface.
+Added in 26.4.4. Payload returned after replacing a resource group's default_deployment_options surface.
 """
 type ReplaceResourceGroupDefaultDeploymentOptionsPayload
   @join__type(graph: STRAWBERRY)
@@ -15185,7 +15167,7 @@ type ReplaceResourceGroupDefaultDeploymentOptionsPayload
 }
 
 """
-Added in UNRELEASED. Input for the replaceResourceGroupDefaultSessionOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
+Added in 26.4.4. Input for the replaceResourceGroupDefaultSessionOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
 """
 input ReplaceResourceGroupDefaultSessionOptionsInput
   @join__type(graph: STRAWBERRY)
@@ -15198,7 +15180,7 @@ input ReplaceResourceGroupDefaultSessionOptionsInput
 }
 
 """
-Added in UNRELEASED. Payload returned after replacing a resource group's default_session_options surface.
+Added in 26.4.4. Payload returned after replacing a resource group's default_session_options surface.
 """
 type ReplaceResourceGroupDefaultSessionOptionsPayload
   @join__type(graph: STRAWBERRY)
@@ -15211,7 +15193,7 @@ type ReplaceResourceGroupDefaultSessionOptionsPayload
 }
 
 """
-Added in UNRELEASED. Failure detail for a single permission entry in replace
+Added in 26.4.4. Failure detail for a single permission entry in replace
 """
 type ReplaceRolePermissionFailureInfo
   @join__type(graph: STRAWBERRY)
@@ -15236,7 +15218,7 @@ type ReplaceRolePermissionFailureInfo
 }
 
 """
-Added in UNRELEASED. Input for replacing one role's entire scoped-permission set
+Added in 26.4.4. Input for replacing one role's entire scoped-permission set
 """
 input ReplaceRolePermissionsInput
   @join__type(graph: STRAWBERRY)
@@ -15246,7 +15228,7 @@ input ReplaceRolePermissionsInput
 }
 
 """
-Added in UNRELEASED. Payload for replacing a role's entire scoped-permission set
+Added in 26.4.4. Payload for replacing a role's entire scoped-permission set
 """
 type ReplaceRolePermissionsPayload
   @join__type(graph: STRAWBERRY)
@@ -15270,7 +15252,7 @@ input ReplicaFilter
 }
 
 """
-Added in UNRELEASED. This enum represents the health check status of a replica.
+Added in 26.4.4. This enum represents the health check status of a replica.
 """
 enum ReplicaHealthStatus
   @join__type(graph: STRAWBERRY)
@@ -15484,12 +15466,12 @@ type ResourceGroup implements Node
   scheduler: ResourceGroupSchedulerConfig!
 
   """
-  Added in UNRELEASED. Default deployment options (timeouts, etc.) snapshot-copied onto each new deployment created in this resource group.
+  Added in 26.4.4. Default deployment options (timeouts, etc.) snapshot-copied onto each new deployment created in this resource group.
   """
   defaultDeploymentOptions: DeploymentOptionsInfo!
 
   """
-  Added in UNRELEASED. Default session options used as the fallback layer for the scheduling controller's options resolver at session enqueue time.
+  Added in 26.4.4. Default session options used as the fallback layer for the scheduling controller's options resolver at session enqueue time.
   """
   defaultSessionOptions: DefaultSessionOptionsInfo!
 
@@ -16044,7 +16026,7 @@ type RestoreArtifactsPayload
 }
 
 """
-Added in UNRELEASED. Payload returned after restoring a virtual folder from trash.
+Added in 26.4.4. Payload returned after restoring a virtual folder from trash.
 """
 type RestoreVFolderPayload
   @join__type(graph: STRAWBERRY)
@@ -16208,7 +16190,7 @@ type Role implements Node
   deletedAt: DateTime
 
   """
-  Added in UNRELEASED. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  Added in 26.4.4. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean!
 
@@ -16354,7 +16336,7 @@ input RoleFilter
   NOT: [RoleFilter!] = null
 }
 
-"""Added in UNRELEASED. A role invitation."""
+"""Added in 26.4.4. A role invitation."""
 type RoleInvitation implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -16394,7 +16376,7 @@ type RoleInvitation implements Node
   role: Role
 }
 
-"""Added in UNRELEASED. Role invitation connection."""
+"""Added in 26.4.4. Role invitation connection."""
 type RoleInvitationConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -16417,7 +16399,7 @@ type RoleInvitationEdge
   node: RoleInvitation!
 }
 
-"""Added in UNRELEASED. Filter for role invitations."""
+"""Added in 26.4.4. Filter for role invitations."""
 input RoleInvitationFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -16431,7 +16413,7 @@ input RoleInvitationFilter
   NOT: [RoleInvitationFilter!] = null
 }
 
-"""Added in UNRELEASED. Order by specification for role invitations."""
+"""Added in 26.4.4. Order by specification for role invitations."""
 input RoleInvitationOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -16439,7 +16421,7 @@ input RoleInvitationOrderBy
   direction: OrderDirection! = DESC
 }
 
-"""Added in UNRELEASED. Role invitation ordering field."""
+"""Added in 26.4.4. Role invitation ordering field."""
 enum RoleInvitationOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -16449,7 +16431,7 @@ enum RoleInvitationOrderField
 }
 
 """
-Added in UNRELEASED. Nested filter for the role associated with an invitation.
+Added in 26.4.4. Nested filter for the role associated with an invitation.
 """
 input RoleInvitationRoleNestedFilter
   @join__type(graph: STRAWBERRY)
@@ -16457,7 +16439,7 @@ input RoleInvitationRoleNestedFilter
   name: StringFilter = null
 }
 
-"""Added in UNRELEASED. Role invitation state."""
+"""Added in 26.4.4. Role invitation state."""
 enum RoleInvitationState
   @join__type(graph: STRAWBERRY)
 {
@@ -16467,7 +16449,7 @@ enum RoleInvitationState
   CANCELED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in UNRELEASED. Filter for role invitation state."""
+"""Added in 26.4.4. Filter for role invitation state."""
 input RoleInvitationStateFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -16484,7 +16466,7 @@ input RoleInvitationStateFilter
 }
 
 """
-Added in UNRELEASED. Nested filter for a user (inviter or invitee) of an invitation.
+Added in 26.4.4. Nested filter for a user (inviter or invitee) of an invitation.
 """
 input RoleInvitationUserNestedFilter
   @join__type(graph: STRAWBERRY)
@@ -16509,7 +16491,7 @@ enum RoleOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in UNRELEASED. A stored permission entry under a role preset."""
+"""Added in 26.4.4. A stored permission entry under a role preset."""
 type RolePermissionPreset implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -16531,7 +16513,7 @@ type RolePermissionPreset implements Node
 }
 
 """
-Added in UNRELEASED. Paginated connection for role permission preset entries.
+Added in 26.4.4. Paginated connection for role permission preset entries.
 """
 type RolePermissionPresetConnection
   @join__type(graph: STRAWBERRY)
@@ -16558,7 +16540,7 @@ type RolePermissionPresetEdge
 }
 
 """
-Added in UNRELEASED. A single (entity_type, operation) pair carried by a role preset.
+Added in 26.4.4. A single (entity_type, operation) pair carried by a role preset.
 """
 input RolePermissionPresetEntryInput
   @join__type(graph: STRAWBERRY)
@@ -16571,7 +16553,7 @@ input RolePermissionPresetEntryInput
 }
 
 """
-Added in UNRELEASED. Filter input for role permission preset entries. Also used as the input for the `permission_presets` field resolver on a role preset (the resolver injects `role_preset_id` from its parent).
+Added in 26.4.4. Filter input for role permission preset entries. Also used as the input for the `permission_presets` field resolver on a role preset (the resolver injects `role_preset_id` from its parent).
 """
 input RolePermissionPresetFilter
   @join__type(graph: STRAWBERRY)
@@ -16601,7 +16583,7 @@ input RolePermissionPresetFilter
 }
 
 """
-Added in UNRELEASED. Specifies ordering for role permission preset entries.
+Added in 26.4.4. Specifies ordering for role permission preset entries.
 """
 input RolePermissionPresetOrderBy
   @join__type(graph: STRAWBERRY)
@@ -16614,7 +16596,7 @@ input RolePermissionPresetOrderBy
 }
 
 """
-Added in UNRELEASED. Fields available for ordering role permission preset entries.
+Added in 26.4.4. Fields available for ordering role permission preset entries.
 """
 enum RolePermissionPresetOrderField
   @join__type(graph: STRAWBERRY)
@@ -16625,7 +16607,7 @@ enum RolePermissionPresetOrderField
 }
 
 """
-Added in UNRELEASED. Role preset entity implementing the Relay Node pattern.
+Added in 26.4.4. Role preset entity implementing the Relay Node pattern.
 """
 type RolePreset implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -16656,11 +16638,11 @@ type RolePreset implements Node
   """Last modification timestamp."""
   updatedAt: DateTime!
 
-  """Added in UNRELEASED. Permission entries carried by this role preset."""
+  """Added in 26.4.4. Permission entries carried by this role preset."""
   permissionPresets(filter: RolePermissionPresetFilter = null, orderBy: [RolePermissionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RolePermissionPresetConnection
 }
 
-"""Added in UNRELEASED. Paginated connection for role preset records."""
+"""Added in 26.4.4. Paginated connection for role preset records."""
 type RolePresetConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -16685,7 +16667,7 @@ type RolePresetEdge
   node: RolePreset!
 }
 
-"""Added in UNRELEASED. Filter input for querying role presets."""
+"""Added in 26.4.4. Filter input for querying role presets."""
 input RolePresetFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -16715,7 +16697,7 @@ input RolePresetFilter
   NOT: [RolePresetFilter!] = null
 }
 
-"""Added in UNRELEASED. Specifies ordering for role preset results."""
+"""Added in 26.4.4. Specifies ordering for role preset results."""
 input RolePresetOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -16726,9 +16708,7 @@ input RolePresetOrderBy
   direction: OrderDirection! = ASC
 }
 
-"""
-Added in UNRELEASED. Fields available for ordering role preset results.
-"""
+"""Added in 26.4.4. Fields available for ordering role preset results."""
 enum RolePresetOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -16793,7 +16773,7 @@ input RoleStatusFilter
   notIn: [RoleStatus!] = null
 }
 
-"""Added in UNRELEASED. Filter roles by their user assignments."""
+"""Added in 26.4.4. Filter roles by their user assignments."""
 input RoleUserNestedFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -17188,7 +17168,7 @@ type RuntimeVariantPreset implements Node
   targetSpec: PresetTargetSpec!
 
   """
-  Added in UNRELEASED. Whether this preset parameter must be supplied when building a deployment revision.
+  Added in 26.4.4. Whether this preset parameter must be supplied when building a deployment revision.
   """
   required: Boolean!
 
@@ -17358,7 +17338,7 @@ type ScalingGroupNode implements Node
 }
 
 """
-Added in UNRELEASED. Replica scaling axis for a deployment, orthogonal to the lifecycle status. ``SCALING`` while the replica reconciler is adjusting replica count against desired_replica_count; ``STABLE`` once holding at the desired count.
+Added in 26.4.4. Replica scaling axis for a deployment, orthogonal to the lifecycle status. ``SCALING`` while the replica reconciler is adjusting replica count against desired_replica_count; ``STABLE`` once holding at the desired count.
 """
 enum ScalingState
   @join__type(graph: STRAWBERRY)
@@ -17474,7 +17454,7 @@ enum SchedulingHandlerCategory
 }
 
 """
-Added in UNRELEASED. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.handler_options.by_handler``.
+Added in 26.4.4. Metadata for a single registered deployment scheduling handler. Surfaces the stable ``name`` used in ``DeploymentOptions.handler_options.by_handler``.
 """
 type SchedulingHandlerNode
   @join__type(graph: STRAWBERRY)
@@ -17805,7 +17785,7 @@ type ServicePorts
 }
 
 """
-Added in UNRELEASED. Scheduling constraint applied to designated agents for a session.
+Added in 26.4.4. Scheduling constraint applied to designated agents for a session.
 """
 enum SessionAgentSelectionPolicy
   @join__type(graph: STRAWBERRY)
@@ -17837,7 +17817,7 @@ enum SessionClusterMode
 }
 
 """
-Added in UNRELEASED. Policy for how a kernel group's startup failures affect the owning session.
+Added in 26.4.4. Policy for how a kernel group's startup failures affect the owning session.
 """
 enum SessionFailurePolicy
   @join__type(graph: STRAWBERRY)
@@ -17861,7 +17841,7 @@ input SessionMountItemInput
   permission: String = null
 
   """
-  Added in UNRELEASED. Subpath within the vfolder to mount. Null mounts the vfolder root.
+  Added in 26.4.4. Subpath within the vfolder to mount. Null mounts the vfolder root.
   """
   subpath: String = null
 }
@@ -18037,7 +18017,7 @@ type SessionV2 implements Node
   projectId: ID!
 
   """
-  Added in UNRELEASED. UUID of the model deployment replica served by this session.
+  Added in 26.4.4. UUID of the model deployment replica served by this session.
   """
   replicaId: ID
 
@@ -18077,7 +18057,7 @@ type SessionV2 implements Node
   kernels: KernelV2Connection
 
   """
-  Added in UNRELEASED. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
+  Added in 26.4.4. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
   """
   replica: ModelReplica
 }
@@ -18959,7 +18939,7 @@ input UpdateDeploymentRevisionPresetInput
   id: UUID!
 
   """
-  Added in UNRELEASED. New runtime variant for the preset. Omit to leave unchanged.
+  Added in 26.4.4. New runtime variant for the preset. Omit to leave unchanged.
   """
   runtimeVariantId: UUID = null
 
@@ -18993,46 +18973,44 @@ input UpdateDeploymentRevisionPresetInput
   deploymentStrategy: PresetDeploymentStrategyInput
 
   """
-  Added in UNRELEASED. Container image for the inference server. Set to null to clear.
+  Added in 26.4.4. Container image for the inference server. Set to null to clear.
   """
   imageId: UUID
 
-  """Added in UNRELEASED. Parsed model definition. Set to null to clear."""
+  """Added in 26.4.4. Parsed model definition. Set to null to clear."""
   modelDefinition: ModelDefinitionInput
 
-  """Added in UNRELEASED. Container startup command. Set to null to clear."""
+  """Added in 26.4.4. Container startup command. Set to null to clear."""
   startupCommand: String
 
   """
-  Added in UNRELEASED. Bootstrap script run before the main process. Set to null to clear.
+  Added in 26.4.4. Bootstrap script run before the main process. Set to null to clear.
   """
   bootstrapScript: String
 
   """
-  Added in UNRELEASED. Replace resource slot allocations. Omit to leave unchanged.
+  Added in 26.4.4. Replace resource slot allocations. Omit to leave unchanged.
   """
   resourceSlots: [ResourceSlotEntryInput!] = null
 
   """
-  Added in UNRELEASED. Replace additional resource options. Omit to leave unchanged.
+  Added in 26.4.4. Replace additional resource options. Omit to leave unchanged.
   """
   resourceOpts: [ResourceOptsEntryInput!] = null
 
-  """
-  Added in UNRELEASED. New cluster topology mode. Omit to leave unchanged.
-  """
+  """Added in 26.4.4. New cluster topology mode. Omit to leave unchanged."""
   clusterMode: ClusterMode = null
 
-  """Added in UNRELEASED. New cluster size. Omit to leave unchanged."""
+  """Added in 26.4.4. New cluster size. Omit to leave unchanged."""
   clusterSize: Int = null
 
   """
-  Added in UNRELEASED. Replace environment variables. Omit to leave unchanged.
+  Added in 26.4.4. Replace environment variables. Omit to leave unchanged.
   """
   environ: [EnvironEntryInput!] = null
 
   """
-  Added in UNRELEASED. Replace runtime variant preset values. Omit to leave unchanged.
+  Added in 26.4.4. Replace runtime variant preset values. Omit to leave unchanged.
   """
   presetValues: [DeploymentRevisionPresetValueEntryInput!] = null
 }
@@ -19523,13 +19501,13 @@ input UpdateRoleInput
   status: RoleStatus
 
   """
-  Added in UNRELEASED. Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
+  Added in 26.4.4. Updated value for the `auto_assign` flag. When true, the role is automatically granted to a user when the user is added to a scope this role is registered in.
   """
   autoAssign: Boolean
 }
 
 """
-Added in UNRELEASED. Input for updating a role preset's metadata. Permission entries are managed via the dedicated add/remove mutations; the `deleted` flag via delete/restore mutations.
+Added in 26.4.4. Input for updating a role preset's metadata. Permission entries are managed via the dedicated add/remove mutations; the `deleted` flag via delete/restore mutations.
 """
 input UpdateRolePresetInput
   @join__type(graph: STRAWBERRY)
@@ -19546,7 +19524,7 @@ input UpdateRolePresetInput
   autoAssign: Boolean
 }
 
-"""Added in UNRELEASED. Payload returned after updating a role preset."""
+"""Added in 26.4.4. Payload returned after updating a role preset."""
 type UpdateRolePresetPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -19623,7 +19601,7 @@ input UpdateRuntimeVariantPresetInput
   """New key."""
   key: String = null
 
-  """Added in UNRELEASED. New required flag."""
+  """Added in 26.4.4. New required flag."""
   required: Boolean = null
 }
 
@@ -20784,42 +20762,40 @@ input UserV2Filter
   username: StringFilter = null
   email: StringFilter = null
 
-  """Added in UNRELEASED. Filter by full name."""
+  """Added in 26.4.4. Filter by full name."""
   fullName: StringFilter = null
 
-  """Added in UNRELEASED. Filter by description."""
+  """Added in 26.4.4. Filter by description."""
   description: StringFilter = null
   status: UserStatusV2EnumFilter = null
 
-  """Added in UNRELEASED. Filter by status info detail."""
+  """Added in 26.4.4. Filter by status info detail."""
   statusInfo: StringFilter = null
   domainName: StringFilter = null
 
   """Added in 26.4.2. Filter by external integration identifier."""
   integrationName: StringFilter = null
 
-  """Added in UNRELEASED. Filter by user resource policy name."""
+  """Added in 26.4.4. Filter by user resource policy name."""
   resourcePolicy: StringFilter = null
   role: UserRoleV2EnumFilter = null
 
-  """Added in UNRELEASED. Filter by whether a password change is required."""
+  """Added in 26.4.4. Filter by whether a password change is required."""
   needPasswordChange: Boolean = null
 
-  """
-  Added in UNRELEASED. Filter by whether TOTP two-factor auth is activated.
-  """
+  """Added in 26.4.4. Filter by whether TOTP two-factor auth is activated."""
   totpActivated: Boolean = null
 
-  """Added in UNRELEASED. Filter by whether sudo sessions are enabled."""
+  """Added in 26.4.4. Filter by whether sudo sessions are enabled."""
   sudoSessionEnabled: Boolean = null
 
-  """Added in UNRELEASED. Filter by container UID."""
+  """Added in 26.4.4. Filter by container UID."""
   containerUid: IntFilter = null
 
-  """Added in UNRELEASED. Filter by container main GID."""
+  """Added in 26.4.4. Filter by container main GID."""
   containerMainGid: IntFilter = null
 
-  """Added in UNRELEASED. Filter by container supplementary GIDs."""
+  """Added in 26.4.4. Filter by container supplementary GIDs."""
   containerGids: IntArrayFilter = null
   createdAt: DateTimeFilter = null
   domain: UserDomainNestedFilter = null
@@ -20964,7 +20940,7 @@ Verifies that the key is a UUID (represented as a string) and the value is a flo
 scalar UUIDFloatMap
   @join__type(graph: GRAPHENE)
 
-"""Added in UNRELEASED. Single-UUID scope item wrapper."""
+"""Added in 26.4.4. Single-UUID scope item wrapper."""
 input UUIDScope
   @join__type(graph: STRAWBERRY)
 {
@@ -21038,7 +21014,7 @@ type VFolder implements Node
   """Path for unmanaged virtual folders."""
   unmanagedPath: String
 
-  """Added in UNRELEASED. Model cards backed by this vfolder."""
+  """Added in 26.4.4. Model cards backed by this vfolder."""
   modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
 }
 
