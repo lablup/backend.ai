@@ -21,6 +21,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import BulkUpdaterResult, Updater
 from ai.backend.manager.repositories.replica_group.types import (
     ApplyWritesResult,
+    AutoscaleReconcileFetch,
     GroupRolloutSetup,
     LifecycleReconcileFetch,
     ReplicaGroupLifecycleReconcileApply,
@@ -91,6 +92,14 @@ class ReplicaGroupRepository:
         category: ReplicaGroupHandlerCategory,
     ) -> LifecycleReconcileFetch:
         return await self._db_source.fetch_lifecycle_reconcile_views(querier, category)
+
+    @replica_group_repository_resilience.apply()
+    async def fetch_autoscale_reconcile_views(
+        self,
+        querier: BatchQuerier,
+        category: ReplicaGroupHandlerCategory,
+    ) -> AutoscaleReconcileFetch:
+        return await self._db_source.fetch_autoscale_reconcile_views(querier, category)
 
     @replica_group_repository_resilience.apply()
     async def update_replica_groups(

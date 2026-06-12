@@ -6,15 +6,20 @@ import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
+    ReplicaGroupHandlerCategory,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
+    RouteStatus,
+    RouteTrafficStatus,
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -24,13 +29,16 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
+from ai.backend.manager.models.replica_group_history import ReplicaGroupHistoryRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
@@ -76,6 +84,9 @@ class TestReplicaGroupRepository:
                 GroupRow,
                 EndpointRow,
                 ReplicaGroupRow,
+                ReplicaGroupHistoryRow,
+                SessionRow,
+                RoutingRow,
             ],
         ):
             yield database_connection
@@ -285,6 +296,76 @@ class TestReplicaGroupRepository:
         lifecycle_by_id = {group.group_id: group.lifecycle for group in groups}
         assert lifecycle_by_id[first_id] is ReplicaGroupLifecycle.DRAINING
         assert lifecycle_by_id[second_id] is ReplicaGroupLifecycle.DRAINED
+
+    async def test_fetch_autoscale_reconcile_views_counts_live_and_serving_routes(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        replica_group_repository: ReplicaGroupRepository,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        group_id = ReplicaGroupID(uuid.uuid4())
+        current_revision_id = DeploymentRevisionID(uuid.uuid4())
+        other_revision_id = DeploymentRevisionID(uuid.uuid4())
+        route_specs = [
+            (current_revision_id, RouteStatus.RUNNING, RouteTrafficStatus.ACTIVE),
+            (current_revision_id, RouteStatus.RUNNING, RouteTrafficStatus.ACTIVE),
+            (current_revision_id, RouteStatus.PROVISIONING, RouteTrafficStatus.INACTIVE),
+            (current_revision_id, RouteStatus.RUNNING, RouteTrafficStatus.INACTIVE),
+            (current_revision_id, RouteStatus.TERMINATED, RouteTrafficStatus.INACTIVE),
+            (other_revision_id, RouteStatus.RUNNING, RouteTrafficStatus.ACTIVE),
+        ]
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint_row = (
+                await db_sess.execute(
+                    sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
+                )
+            ).scalar_one()
+            db_sess.add(
+                ReplicaGroupRow(
+                    id=group_id,
+                    deployment_id=test_endpoint_id,
+                    current_revision_id=current_revision_id,
+                    desired_current_replica_count=3,
+                    desired_target_replica_count=0,
+                    lifecycle=ReplicaGroupLifecycle.STABLE,
+                    scaling_status=ReplicaGroupScalingStatus.STABLE,
+                )
+            )
+            for revision_id, route_status, route_traffic_status in route_specs:
+                db_sess.add(
+                    RoutingRow(
+                        id=uuid.uuid4(),
+                        endpoint=test_endpoint_id,
+                        session=None,
+                        session_owner=endpoint_row.session_owner,
+                        domain=endpoint_row.domain,
+                        project=endpoint_row.project,
+                        traffic_ratio=1.0,
+                        revision=revision_id,
+                        replica_group_id=group_id,
+                        status=route_status,
+                        traffic_status=route_traffic_status,
+                    )
+                )
+            await db_sess.commit()
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10),
+            conditions=[ReplicaGroupConditions.by_ids([group_id])],
+        )
+        fetch = await replica_group_repository.fetch_autoscale_reconcile_views(
+            querier, ReplicaGroupHandlerCategory.LIFECYCLE
+        )
+
+        assert len(fetch.views) == 1
+        view = fetch.views[0]
+        assert view.group_id == group_id
+        assert view.desired_current_replica_count == 3
+        assert view.deployment_desired_replica_count == 1
+        # live = PROVISIONING or (RUNNING & ACTIVE); RUNNING+INACTIVE and TERMINATED are
+        # excluded, and so are routes of revisions other than the group's current one.
+        assert view.current_live_replica_count == 3
+        assert view.current_serving_replica_count == 2
 
     async def test_update_replica_groups_applies_per_id_scaling_values(
         self,

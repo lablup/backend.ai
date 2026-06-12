@@ -20,7 +20,7 @@ from ai.backend.manager.sokovan.deployment.group.lifecycle.applier import GroupL
 from ai.backend.manager.sokovan.deployment.group.lifecycle.handlers.autoscale import (
     GroupAutoscaleHandler,
 )
-from ai.backend.manager.sokovan.deployment.group.lifecycle.source import GroupLifecycleSource
+from ai.backend.manager.sokovan.deployment.group.lifecycle.source import GroupAutoscaleSource
 from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
     GroupLifecycleTargetStatuses,
     GroupReconcileStatus,
@@ -40,7 +40,8 @@ def build_group_autoscale_stage(
     metadata = ReconcilerStageMetadata(
         category=ReplicaGroupHandlerCategory.LIFECYCLE,
         kind=GroupReconcileKind.GROUP,
-        # Steady-state group at rest (scaling STABLE): sync its count to the deployment goal.
+        # Steady-state group at rest (scaling STABLE): sync its count to the deployment goal
+        # and re-arm scaling when the actual live routes drift from it (e.g. a route died).
         target_statuses=GroupLifecycleTargetStatuses(
             lifecycles=frozenset({ReplicaGroupLifecycle.STABLE}),
             scaling_statuses=frozenset({ReplicaGroupScalingStatus.STABLE}),
@@ -70,7 +71,7 @@ def build_group_autoscale_stage(
     )
     stage = ReconcilerStage(
         handler=GroupAutoscaleHandler(),
-        source=GroupLifecycleSource(replica_group_repository),
+        source=GroupAutoscaleSource(replica_group_repository),
         applier=GroupLifecycleApplier(replica_group_repository),
         metadata=metadata,
     )

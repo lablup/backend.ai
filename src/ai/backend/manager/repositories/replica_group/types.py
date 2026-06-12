@@ -16,6 +16,7 @@ from ai.backend.manager.repositories.scheduling_history.creators import (
     ReplicaGroupHistoryCreatorSpec,
 )
 from ai.backend.manager.views.replica_group import (
+    ReplicaGroupAutoscaleReconcileView,
     ReplicaGroupLifecycleReconcileView,
     ReplicaGroupScalingReconcileView,
 )
@@ -35,6 +36,14 @@ class LifecycleReconcileFetch:
     """One lifecycle-reconcile fetch: per-group views plus the DB-sourced current time."""
 
     views: list[ReplicaGroupLifecycleReconcileView]
+    now: datetime
+
+
+@dataclass
+class AutoscaleReconcileFetch:
+    """One autoscale-reconcile fetch: per-group views plus the DB-sourced current time."""
+
+    views: list[ReplicaGroupAutoscaleReconcileView]
     now: datetime
 
 

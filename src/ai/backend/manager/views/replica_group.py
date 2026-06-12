@@ -65,6 +65,28 @@ class ReplicaGroupScalingReconcileView:
 
 
 @dataclass
+class ReplicaGroupAutoscaleReconcileView:
+    """Autoscale-reconcile decision slice for one STABLE group: the desired count, the
+    deployment's desired replica count (the goal), and the actual live/serving counts of
+    the current revision so the handler can detect drift between desired and reality.
+    A STABLE group never holds a target revision (rollout promotion clears it), so only
+    the current revision is projected."""
+
+    group_id: ReplicaGroupID
+    deployment_id: DeploymentID
+    current_revision_id: DeploymentRevisionID | None
+    lifecycle: ReplicaGroupLifecycle
+    scaling_status: ReplicaGroupScalingStatus
+    desired_current_replica_count: int
+    deployment_desired_replica_count: int
+    # live = warming (PROVISIONING) or serving (RUNNING & ACTIVE); serving = RUNNING & ACTIVE.
+    current_live_replica_count: int
+    current_serving_replica_count: int
+    last_history: LastHistory | None
+    handler_options: DeploymentHandlerOptions
+
+
+@dataclass
 class ReplicaGroupLifecycleReconcileView:
     """Lifecycle-reconcile decision slice for one group: revision pointers, the current
     desired counts, the rollout step config, the deployment's desired replica count (the
