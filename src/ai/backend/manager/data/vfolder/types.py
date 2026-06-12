@@ -196,14 +196,11 @@ class VFolderData:
 @dataclass
 class VFolderUsageData:
     """
-    Usage measurements fetched live from the storage proxy,
-    combined with DB-side quota limits.
+    Usage measurements fetched live from the storage proxy.
     """
 
     num_files: int
     used_bytes: int
-    max_size: int | None
-    max_files: int
 
 
 @dataclass

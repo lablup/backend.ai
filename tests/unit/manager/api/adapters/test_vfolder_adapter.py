@@ -275,16 +275,14 @@ class TestVFolderAdapterGetFolderUsage:
         adapter: VFolderAdapter,
         mock_processors: MagicMock,
     ) -> None:
-        """Live measurements and quota limits are mapped into the DTO with
-        BinarySizeInfo conversion for byte values."""
+        """Live measurements are mapped into the DTO with BinarySizeInfo
+        conversion for byte values."""
         vfolder_uuid = uuid4()
         action_result = GetVFolderUsageActionResult(
             vfolder_uuid=vfolder_uuid,
             usage=VFolderUsageData(
                 num_files=2,
                 used_bytes=524308,
-                max_size=1073741824,
-                max_files=1000,
             ),
         )
         mock_processors.vfolder.get_folder_usage.wait_for_complete = AsyncMock(
@@ -296,34 +294,6 @@ class TestVFolderAdapterGetFolderUsage:
         assert dto is not None
         assert dto.num_files == 2
         assert dto.used_bytes.value == 524308
-        assert dto.max_size is not None
-        assert dto.max_size.value == 1073741824
-        assert dto.max_files == 1000
-
-    async def test_null_max_size_passes_through(
-        self,
-        adapter: VFolderAdapter,
-        mock_processors: MagicMock,
-    ) -> None:
-        """max_size=None (unlimited quota) maps to a null DTO field instead of
-        a zero-byte BinarySizeInfo."""
-        action_result = GetVFolderUsageActionResult(
-            vfolder_uuid=uuid4(),
-            usage=VFolderUsageData(
-                num_files=0,
-                used_bytes=0,
-                max_size=None,
-                max_files=1000,
-            ),
-        )
-        mock_processors.vfolder.get_folder_usage.wait_for_complete = AsyncMock(
-            return_value=action_result,
-        )
-
-        dto = await adapter.get_folder_usage(uuid4())
-
-        assert dto is not None
-        assert dto.max_size is None
 
     async def test_unmanaged_vfolder_returns_none(
         self,

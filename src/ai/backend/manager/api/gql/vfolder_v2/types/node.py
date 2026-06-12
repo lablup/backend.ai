@@ -80,18 +80,30 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         )
     )
     unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
+    max_size: BinarySizeInfoGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Capacity quota limit in bytes with human-readable display. Null if unlimited."
+            ),
+        )
+    )
+    max_files: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="File-count quota for the folder.",
+        )
+    )
 
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
-                "Usage and quota statistics resolved on demand when this field is "
-                "selected: the measurements (numFiles, usedBytes) are measured live "
-                "through the storage proxy, while the quota limits (maxSize, maxFiles) "
-                "are read from the manager database. This is a very slow operation: "
-                "every selection makes a round-trip to the storage proxy, and the "
-                "measurement cost depends on the storage backend (e.g., a full "
-                "directory walk on vfs). Select only when needed. "
+                "Usage statistics (numFiles, usedBytes) measured on demand through "
+                "the storage proxy when this field is selected. This is a very slow "
+                "operation: every selection makes a round-trip to the storage proxy, "
+                "and the measurement cost depends on the storage backend (e.g., a "
+                "full directory walk on vfs). Select only when needed. "
                 "Null for unmanaged vfolders."
             ),
         )
@@ -106,10 +118,6 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         return VFolderUsageInfoGQL(
             num_files=result.num_files,
             used_bytes=BinarySizeInfoGQL.from_pydantic(result.used_bytes),
-            max_size=BinarySizeInfoGQL.from_pydantic(result.max_size)
-            if result.max_size is not None
-            else None,
-            max_files=result.max_files,
         )
 
     @gql_added_field(

@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 
 from .types import (
     FileEntryType,
@@ -63,6 +64,10 @@ class VFolderNode(BaseResponseModel):
     metadata: VFolderMetadataInfo = Field(description="Descriptive metadata fields")
     access_control: VFolderAccessControlInfo = Field(description="Access control fields")
     ownership: VFolderOwnershipInfo = Field(description="Ownership context fields")
+    max_size: BinarySizeInfo | None = Field(
+        description="Capacity quota limit in bytes. Null if unlimited."
+    )
+    max_files: int = Field(description="File-count quota for the folder")
     unmanaged_path: str | None = Field(
         default=None, description="Path for unmanaged virtual folders"
     )

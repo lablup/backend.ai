@@ -357,7 +357,7 @@ class TestVFolderServiceGetFolderUsage:
     def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> GetVFolderUsageAction:
         return GetVFolderUsageAction(vfolder_uuid=sample_vfolder_uuid)
 
-    async def test_managed_vfolder_combines_measurements_and_quota(
+    async def test_managed_vfolder_returns_storage_proxy_measurements(
         self,
         vfolder_service: VFolderService,
         mock_vfolder_repository: MagicMock,
@@ -365,8 +365,7 @@ class TestVFolderServiceGetFolderUsage:
         sample_vfolder_data: VFolderData,
         sample_action: GetVFolderUsageAction,
     ) -> None:
-        """num_files/used_bytes come from the storage proxy reply; max_size/max_files
-        come from the vfolder row."""
+        """num_files/used_bytes come straight from the storage proxy reply."""
         mock_vfolder_repository.get_by_id = AsyncMock(return_value=sample_vfolder_data)
 
         result = await vfolder_service.get_folder_usage(sample_action)
@@ -375,8 +374,6 @@ class TestVFolderServiceGetFolderUsage:
         assert result.usage == VFolderUsageData(
             num_files=2,
             used_bytes=524308,
-            max_size=sample_vfolder_data.max_size,
-            max_files=sample_vfolder_data.max_files,
         )
 
     async def test_storage_proxy_receives_canonical_vfid(

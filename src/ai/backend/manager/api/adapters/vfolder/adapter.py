@@ -220,6 +220,8 @@ class VFolderAdapter(BaseAdapter):
                 creator_id=data.creator_id,
                 creator_email=data.creator,
             ),
+            max_size=_to_binary_size_info(data.max_size) if data.max_size is not None else None,
+            max_files=data.max_files,
             unmanaged_path=data.unmanaged_path,
         )
 
@@ -431,8 +433,6 @@ class VFolderAdapter(BaseAdapter):
         return VFolderUsageInfoDTO(
             num_files=usage.num_files,
             used_bytes=_to_binary_size_info(usage.used_bytes),
-            max_size=_to_binary_size_info(usage.max_size) if usage.max_size is not None else None,
-            max_files=usage.max_files,
         )
 
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:

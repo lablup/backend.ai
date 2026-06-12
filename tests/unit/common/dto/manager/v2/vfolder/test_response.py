@@ -77,6 +77,8 @@ class TestVFolderNodeCreation:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
+            max_size=None,
+            max_files=1000,
         )
         assert node.unmanaged_path is None
 
@@ -88,6 +90,8 @@ class TestVFolderNodeCreation:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
+            max_size=None,
+            max_files=1000,
         )
         restored = VFolderNode.model_validate_json(node.model_dump_json())
         assert restored.metadata.name == node.metadata.name
@@ -101,6 +105,8 @@ class TestVFolderNodeCreation:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
+            max_size=None,
+            max_files=1000,
         )
         data = json.loads(node.model_dump_json())
         assert "metadata" in data
@@ -177,6 +183,8 @@ class TestPayloadModels:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
+            max_size=None,
+            max_files=1000,
         )
         payload = CreateVFolderPayload(vfolder=node)
         assert payload.vfolder.metadata.name == "test-folder"
@@ -189,6 +197,8 @@ class TestPayloadModels:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
+            max_size=None,
+            max_files=1000,
         )
         payload = UpdateVFolderPayload(vfolder=node)
         assert payload.vfolder is not None
@@ -216,6 +226,8 @@ class TestPayloadModels:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
+            max_size=None,
+            max_files=1000,
         )
         payload = CloneVFolderPayload(vfolder=node, bgtask_id="task-123")
         assert payload.bgtask_id == "task-123"
@@ -270,6 +282,8 @@ class TestPayloadModels:
             metadata=_make_metadata_info(),
             access_control=_make_access_control_info(),
             ownership=_make_owner_info(),
+            max_size=None,
+            max_files=1000,
         )
         payload = CreateVFolderPayload(vfolder=node)
         restored = CreateVFolderPayload.model_validate_json(payload.model_dump_json())

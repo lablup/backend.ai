@@ -98,17 +98,14 @@ class VFolderAccessControlInfoGQL:
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Usage and quota statistics for a virtual folder. "
-            "The measurements (numFiles, usedBytes) are measured live through the "
-            "storage proxy, while the quota limits (maxSize, maxFiles) are read "
-            "from the manager database."
+            "Usage statistics for a virtual folder, measured live through the storage proxy."
         ),
     ),
     model=VFolderUsageInfoDTO,
     name="VFolderUsageInfo",
 )
 class VFolderUsageInfoGQL:
-    """Usage (storage-proxy-measured) and quota (DB-sourced) statistics for a virtual folder."""
+    """Usage statistics for a virtual folder, measured live through the storage proxy."""
 
     num_files: int = gql_field(
         description=(
@@ -121,15 +118,6 @@ class VFolderUsageInfoGQL:
             "Current used capacity in bytes with human-readable display, "
             "measured live through the storage proxy."
         )
-    )
-    max_size: BinarySizeInfoGQL | None = gql_field(
-        description=(
-            "Capacity quota limit in bytes with human-readable display, "
-            "read from the manager database. Null if unlimited."
-        )
-    )
-    max_files: int = gql_field(
-        description="File-count quota for the folder, read from the manager database."
     )
 
 

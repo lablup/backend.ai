@@ -1752,8 +1752,6 @@ class VFolderService:
             usage=VFolderUsageData(
                 num_files=int(usage["file_count"]),
                 used_bytes=int(usage["used_bytes"]),
-                max_size=vfolder_data.max_size,
-                max_files=vfolder_data.max_files,
             ),
         )
 

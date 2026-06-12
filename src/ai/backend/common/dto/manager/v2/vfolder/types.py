@@ -108,9 +108,7 @@ class VFolderOwnershipInfo(BaseResponseModel):
 
 
 class VFolderUsageInfo(BaseResponseModel):
-    """Usage statistics fields for a virtual folder."""
+    """Usage statistics for a virtual folder, measured live through the storage proxy."""
 
     num_files: int
     used_bytes: BinarySizeInfo
-    max_size: BinarySizeInfo | None
-    max_files: int
