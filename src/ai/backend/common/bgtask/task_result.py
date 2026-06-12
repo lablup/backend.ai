@@ -43,6 +43,11 @@ class TaskResult(ABC):
         """Get the error code if applicable."""
         raise NotImplementedError
 
+    @abstractmethod
+    def last_message(self) -> str:
+        """Get the last message describing the task result."""
+        raise NotImplementedError
+
 
 @dataclass
 class TaskSuccessResult[R: BaseBackgroundTaskResult | None](TaskResult):
@@ -66,6 +71,9 @@ class TaskSuccessResult[R: BaseBackgroundTaskResult | None](TaskResult):
     def error_code(self) -> ErrorCode | None:
         return None
 
+    def last_message(self) -> str:
+        return "Task completed successfully"
+
 
 @dataclass
 class TaskCancelledResult(TaskResult):
@@ -85,6 +93,9 @@ class TaskCancelledResult(TaskResult):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.CANCELED,
         )
+
+    def last_message(self) -> str:
+        return self.message
 
 
 @dataclass
@@ -107,3 +118,6 @@ class TaskFailedResult(TaskResult):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+    def last_message(self) -> str:
+        return f"Task failed with exception: {self.exception}"

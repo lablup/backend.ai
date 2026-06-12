@@ -30,6 +30,8 @@ from ai.backend.common.types import AgentId, ImageRegistry, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
+from ai.backend.manager.errors.kernel import SessionNotFound
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
@@ -111,29 +113,28 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
             # Get session and validate
             session = await self._session_repository.get_session_by_id(manifest.session_id)
             if not session:
-                error_msg = f"Session {manifest.session_id} not found"
-                log.error(error_msg)
-                return CommitSessionResult(error_message=error_msg)
+                raise SessionNotFound(f"Session {manifest.session_id} not found")
 
             # Get registry configuration
             registry_conf = await self._session_repository.get_container_registry(
                 manifest.registry_hostname, manifest.registry_project
             )
             if not registry_conf:
-                error_msg = f"Project {manifest.registry_project} not found in registry {manifest.registry_hostname}"
-                log.error(error_msg)
-                return CommitSessionResult(error_message=error_msg)
+                raise ContainerRegistryNotFound(
+                    f"Project {manifest.registry_project} not found in registry {manifest.registry_hostname}"
+                )
 
             # Resolve base image
             if not session.main_kernel.image or not session.main_kernel.architecture:
-                error_msg = (
-                    f"Session {manifest.session_id} main kernel has no image or architecture"
+                raise BgtaskFailedError(
+                    extra_msg=f"Session {manifest.session_id} main kernel has no image or architecture"
                 )
-                log.error(error_msg)
-                return CommitSessionResult(error_message=error_msg)
-            image_row = await self._session_repository.resolve_image([
-                ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
-            ])
+            # The base image may have been deleted while the session is still
+            # running, so include non-alive images when resolving it.
+            image_row = await self._session_repository.resolve_image(
+                [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)],
+                alive_only=False,
+            )
             base_image_ref = image_row.image_ref
 
             # Build new image canonical name
@@ -218,9 +219,9 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                     password=registry_conf.password,
                 )
                 if not session.main_kernel.agent:
-                    error_msg = f"Session {manifest.session_id} main kernel has no agent assigned"
-                    log.error(error_msg)
-                    return CommitSessionResult(error_message=error_msg)
+                    raise BgtaskFailedError(
+                        extra_msg=f"Session {manifest.session_id} main kernel has no agent assigned"
+                    )
                 resp = await self._agent_registry.push_image(
                     AgentId(session.main_kernel.agent),
                     new_image_ref,
@@ -239,11 +240,9 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
 
             if len(rescan_result.images) == 0:
                 rescan_errors = ",".join(rescan_result.errors)
-                error_msg = (
-                    f"Session commit succeeded, but no image was rescanned, Error: {rescan_errors}"
+                raise BgtaskFailedError(
+                    extra_msg=f"Session commit succeeded, but no image was rescanned, Error: {rescan_errors}"
                 )
-                log.error(error_msg)
-                return CommitSessionResult(error_message=error_msg)
             if len(rescan_result.images) > 1:
                 log.warning(
                     "More than two images were rescanned unexpectedly. Rescanned Images: {}",
@@ -254,9 +253,9 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
             log.info("Session commit completed successfully. Image ID: {}", result_image_id)
             return CommitSessionResult(image_id=result_image_id)
 
-        except Exception as e:
+        except Exception:
             log.exception("Failed to commit session {}", manifest.session_id)
-            return CommitSessionResult(error_message=str(e))
+            raise
 
     async def _wait_for_agent_bgtask(self, bgtask_id: uuid.UUID, operation_name: str) -> None:
         """Wait for an agent background task to complete."""
