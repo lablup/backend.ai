@@ -19,14 +19,14 @@ from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
-    VFolderLiveUsageData,
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
+    VFolderUsageData,
 )
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.vfolder.actions.get_live_usage import (
-    GetVFolderLiveUsageActionResult,
+from ai.backend.manager.services.vfolder.actions.get_usage import (
+    GetVFolderUsageActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectActionResult,
@@ -278,9 +278,9 @@ class TestVFolderAdapterGetFolderUsage:
         """Live measurements and quota limits are mapped into the DTO with
         BinarySizeInfo conversion for byte values."""
         vfolder_uuid = uuid4()
-        action_result = GetVFolderLiveUsageActionResult(
+        action_result = GetVFolderUsageActionResult(
             vfolder_uuid=vfolder_uuid,
-            usage=VFolderLiveUsageData(
+            usage=VFolderUsageData(
                 num_files=2,
                 used_bytes=524308,
                 max_size=1073741824,
@@ -307,9 +307,9 @@ class TestVFolderAdapterGetFolderUsage:
     ) -> None:
         """max_size=None (unlimited quota) maps to a null DTO field instead of
         a zero-byte BinarySizeInfo."""
-        action_result = GetVFolderLiveUsageActionResult(
+        action_result = GetVFolderUsageActionResult(
             vfolder_uuid=uuid4(),
-            usage=VFolderLiveUsageData(
+            usage=VFolderUsageData(
                 num_files=0,
                 used_bytes=0,
                 max_size=None,
@@ -331,7 +331,7 @@ class TestVFolderAdapterGetFolderUsage:
         mock_processors: MagicMock,
     ) -> None:
         """A None usage in the action result (unmanaged vfolder) yields None."""
-        action_result = GetVFolderLiveUsageActionResult(
+        action_result = GetVFolderUsageActionResult(
             vfolder_uuid=uuid4(),
             usage=None,
         )

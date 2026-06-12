@@ -44,10 +44,6 @@ from ai.backend.manager.services.vfolder.actions.file_v2 import (
     CloneVFolderV2Action,
     CloneVFolderV2ActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.get_live_usage import (
-    GetVFolderLiveUsageAction,
-    GetVFolderLiveUsageActionResult,
-)
 from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions import (
     GetMyStorageHostPermissionsAction,
     GetMyStorageHostPermissionsActionResult,
@@ -55,6 +51,10 @@ from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions
 from ai.backend.manager.services.vfolder.actions.get_row import (
     GetVFolderLegacyRowAction,
     GetVFolderLegacyRowActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.get_usage import (
+    GetVFolderUsageAction,
+    GetVFolderUsageActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
@@ -180,7 +180,7 @@ class VFolderProcessors(AbstractProcessorPackage):
     ]
     get_v2: SingleEntityActionProcessor[GetVFolderV2Action, GetVFolderV2ActionResult]
     get_folder_usage: SingleEntityActionProcessor[
-        GetVFolderLiveUsageAction, GetVFolderLiveUsageActionResult
+        GetVFolderUsageAction, GetVFolderUsageActionResult
     ]
     create_vfolder_v2: ActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
     create_upload_session_v2: ActionProcessor[
@@ -340,7 +340,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             CreateVFolderV2Action.spec(),
             CreateUploadSessionV2Action.spec(),
             GetVFolderV2Action.spec(),
-            GetVFolderLiveUsageAction.spec(),
+            GetVFolderUsageAction.spec(),
             DeleteVFolderV2Action.spec(),
             PurgeVFolderV2Action.spec(),
             CloneVFolderV2Action.spec(),

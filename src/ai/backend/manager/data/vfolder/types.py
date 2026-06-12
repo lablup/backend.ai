@@ -194,7 +194,7 @@ class VFolderData:
 
 
 @dataclass
-class VFolderLiveUsageData:
+class VFolderUsageData:
     """
     Usage measurements fetched live from the storage proxy,
     combined with DB-side quota limits.

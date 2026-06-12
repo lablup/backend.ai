@@ -8,12 +8,12 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.vfolder.types import VFolderLiveUsageData
+from ai.backend.manager.data.vfolder.types import VFolderUsageData
 from ai.backend.manager.services.vfolder.actions.base import VFolderSingleEntityAction
 
 
 @dataclass
-class GetVFolderLiveUsageAction(VFolderSingleEntityAction):
+class GetVFolderUsageAction(VFolderSingleEntityAction):
     vfolder_uuid: uuid.UUID
 
     @override
@@ -38,9 +38,9 @@ class GetVFolderLiveUsageAction(VFolderSingleEntityAction):
 
 
 @dataclass
-class GetVFolderLiveUsageActionResult(BaseSingleEntityActionResult):
+class GetVFolderUsageActionResult(BaseSingleEntityActionResult):
     vfolder_uuid: uuid.UUID
-    usage: VFolderLiveUsageData | None
+    usage: VFolderUsageData | None
 
     @override
     def entity_id(self) -> str | None:

@@ -17,10 +17,10 @@ from ai.backend.common.types import QuotaScopeID, VFolderID, VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import (
     ValidatedVFolderInfo,
     VFolderData,
-    VFolderLiveUsageData,
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
+    VFolderUsageData,
 )
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.storage import (
@@ -39,8 +39,8 @@ from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
     CreateArchiveDownloadSessionActionResult,
 )
-from ai.backend.manager.services.vfolder.actions.get_live_usage import (
-    GetVFolderLiveUsageAction,
+from ai.backend.manager.services.vfolder.actions.get_usage import (
+    GetVFolderUsageAction,
 )
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
@@ -354,8 +354,8 @@ class TestVFolderServiceGetFolderUsage:
         )
 
     @pytest.fixture
-    def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> GetVFolderLiveUsageAction:
-        return GetVFolderLiveUsageAction(vfolder_uuid=sample_vfolder_uuid)
+    def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> GetVFolderUsageAction:
+        return GetVFolderUsageAction(vfolder_uuid=sample_vfolder_uuid)
 
     async def test_managed_vfolder_combines_measurements_and_quota(
         self,
@@ -363,7 +363,7 @@ class TestVFolderServiceGetFolderUsage:
         mock_vfolder_repository: MagicMock,
         sample_vfolder_uuid: uuid.UUID,
         sample_vfolder_data: VFolderData,
-        sample_action: GetVFolderLiveUsageAction,
+        sample_action: GetVFolderUsageAction,
     ) -> None:
         """num_files/used_bytes come from the storage proxy reply; max_size/max_files
         come from the vfolder row."""
@@ -372,7 +372,7 @@ class TestVFolderServiceGetFolderUsage:
         result = await vfolder_service.get_folder_usage(sample_action)
 
         assert result.vfolder_uuid == sample_vfolder_uuid
-        assert result.usage == VFolderLiveUsageData(
+        assert result.usage == VFolderUsageData(
             num_files=2,
             used_bytes=524308,
             max_size=sample_vfolder_data.max_size,
@@ -385,7 +385,7 @@ class TestVFolderServiceGetFolderUsage:
         mock_vfolder_repository: MagicMock,
         mock_storage_client: MagicMock,
         sample_vfolder_data: VFolderData,
-        sample_action: GetVFolderLiveUsageAction,
+        sample_action: GetVFolderUsageAction,
     ) -> None:
         """The vfid must use the canonical VFolderID serialization
         (quota scope prefix + dash-less folder hex)."""
@@ -403,7 +403,7 @@ class TestVFolderServiceGetFolderUsage:
         mock_storage_manager: MagicMock,
         sample_vfolder_uuid: uuid.UUID,
         sample_vfolder_data: VFolderData,
-        sample_action: GetVFolderLiveUsageAction,
+        sample_action: GetVFolderUsageAction,
     ) -> None:
         """Unmanaged vfolders have no storage-proxy backing: usage is None and
         no storage client is consulted."""

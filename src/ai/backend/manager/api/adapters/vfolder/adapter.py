@@ -121,8 +121,8 @@ from ai.backend.manager.services.vfolder.actions.file_v2 import (
     MkdirV2Action,
     MoveFileV2Action,
 )
-from ai.backend.manager.services.vfolder.actions.get_live_usage import (
-    GetVFolderLiveUsageAction,
+from ai.backend.manager.services.vfolder.actions.get_usage import (
+    GetVFolderUsageAction,
 )
 from ai.backend.manager.services.vfolder.actions.get_v2 import GetVFolderV2Action
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
@@ -429,7 +429,7 @@ class VFolderAdapter(BaseAdapter):
         storage-proxy backing.
         """
         result = await self._processors.vfolder.get_folder_usage.wait_for_complete(
-            GetVFolderLiveUsageAction(vfolder_uuid=vfolder_id)
+            GetVFolderUsageAction(vfolder_uuid=vfolder_id)
         )
         usage = result.usage
         if usage is None:

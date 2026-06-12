@@ -90,7 +90,7 @@ class GetVFolderUsageLegacyAction(VFolderAction):
 
     Legacy v1 action: the caller supplies ``folder_host`` / ``unmanaged_path``
     from a pre-resolved row, and access control is performed separately at the
-    handler layer. New code should use ``GetVFolderLiveUsageAction``, which
+    handler layer. New code should use ``GetVFolderUsageAction``, which
     takes only the vfolder UUID and enforces RBAC at the processor level.
     """
 
