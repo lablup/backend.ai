@@ -222,9 +222,7 @@ class VFolderAdapter(BaseAdapter):
                 creator_email=data.creator,
             ),
             quota=VFolderQuotaInfo(
-                max_size=_to_binary_size_info(data.max_size)
-                if data.max_size is not None
-                else None,
+                max_size=_to_binary_size_info(data.max_size) if data.max_size is not None else None,
                 max_files=data.max_files,
             ),
             unmanaged_path=data.unmanaged_path,
