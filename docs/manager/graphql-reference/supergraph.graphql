@@ -3426,9 +3426,9 @@ input CreateDeploymentRevisionPresetInput
   description: String = null
 
   """
-  Added in UNRELEASED. Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.
+  Added in UNRELEASED. Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint. Optional, but when provided it must be fully populated with at least one model.
   """
-  modelDefinition: ModelDefinitionInput = null
+  modelDefinition: PresetModelDefinitionInput = null
 
   """
   Added in UNRELEASED. Resource slot allocations (e.g. cpu, mem, cuda.device).
@@ -12571,6 +12571,135 @@ type PresetExecutionSpec
 
   """Environment variables."""
   environ: [DeploymentRevisionPresetEnvironEntry!]!
+}
+
+"""
+Added in UNRELEASED. Strict configuration for a single model within a preset model definition.
+"""
+input PresetModelConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the model."""
+  name: String!
+
+  """Path to the model file."""
+  modelPath: String!
+
+  """Configuration for the model service."""
+  service: PresetModelServiceConfigInput!
+
+  """Metadata about the model."""
+  metadata: PresetModelMetadataInput = null
+}
+
+"""
+Added in UNRELEASED. Strict model definition for a preset. When provided on create it must be fully populated with at least one model.
+"""
+input PresetModelDefinitionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of models in the model definition. Must contain at least one model.
+  """
+  models: [PresetModelConfigInput!]!
+}
+
+"""
+Added in UNRELEASED. Strict health check configuration for a preset model service.
+"""
+input PresetModelHealthCheckInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Whether the route should be health-checked. When false the route activates immediately and the remaining fields are ignored.
+  """
+  enable: Boolean! = false
+
+  """Interval in seconds between health checks."""
+  interval: Float! = 10
+
+  """Path to check for health status."""
+  path: String! = "/health"
+
+  """Maximum number of retries for health check."""
+  maxRetries: Int! = 10
+
+  """Maximum time in seconds to wait for a health check response."""
+  maxWaitTime: Float! = 15
+
+  """Expected HTTP status code for a healthy response."""
+  expectedStatusCode: Int! = 200
+
+  """Initial delay in seconds before the first health check."""
+  initialDelay: Float! = 1800
+}
+
+"""Added in UNRELEASED. Strict metadata describing a preset model entry."""
+input PresetModelMetadataInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Author of the model."""
+  author: String = null
+
+  """Title of the model."""
+  title: String = null
+
+  """Version of the model."""
+  version: String = null
+
+  """Creation date of the model."""
+  created: String = null
+
+  """Last modified date of the model."""
+  lastModified: String = null
+
+  """Description of the model."""
+  description: String = null
+
+  """Task type of the model."""
+  task: String = null
+
+  """Category of the model."""
+  category: String = null
+
+  """Architecture of the model."""
+  architecture: String = null
+
+  """Frameworks used by the model."""
+  framework: [String!] = null
+
+  """Labels for the model."""
+  label: [String!] = null
+
+  """License of the model."""
+  license: String = null
+
+  """Minimum resource requirements for the model."""
+  minResource: JSON = null
+}
+
+"""
+Added in UNRELEASED. Strict service configuration for a preset model entry.
+"""
+input PresetModelServiceConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Pre-start actions to execute before starting the model service. Provide an empty list when no pre-start actions are needed.
+  """
+  preStartActions: [PreStartActionInput!]!
+
+  """Command to start the model service."""
+  startCommand: [String!]!
+
+  """Shell configured for the model service."""
+  shell: String! = "/bin/bash"
+
+  """Port number for the model service. Must be greater than 1."""
+  port: Int!
+
+  """Health check configuration for the model service."""
+  healthCheck: PresetModelHealthCheckInput = null
 }
 
 """

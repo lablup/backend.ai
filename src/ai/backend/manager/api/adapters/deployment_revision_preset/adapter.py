@@ -252,7 +252,11 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         resource_opts = self._convert_resource_opts_input(input.resource_opts)
         environ = self._convert_environ_input(input.environ)
         preset_values = self._convert_preset_values_input(input.preset_values)
-        model_def = input.model_definition
+        model_def = (
+            ModelDefinition.model_validate(input.model_definition.model_dump())
+            if input.model_definition is not None
+            else None
+        )
         strategy, strategy_spec = self._convert_required_strategy_input(input.deployment_strategy)
 
         spec = DeploymentRevisionPresetCreatorSpec(
