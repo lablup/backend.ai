@@ -62,6 +62,7 @@ from ai.backend.manager.repositories.ops.sokovan.provider import SokovanOpsProvi
 from ai.backend.manager.repositories.replica_group.creators import ReplicaGroupCreatorSpec
 from ai.backend.manager.repositories.replica_group.types import (
     ApplyWritesResult,
+    AutoscaleReconcileFetch,
     GroupRolloutSetup,
     GroupRouteCreateInstruction,
     GroupRouteDrainInstruction,
@@ -74,6 +75,7 @@ from ai.backend.manager.repositories.replica_group.types import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.manager.views.replica_group import (
+    ReplicaGroupAutoscaleReconcileView,
     ReplicaGroupDeploySchedulingView,
     ReplicaGroupLifecycleReconcileView,
     ReplicaGroupScalingReconcileView,
@@ -197,6 +199,51 @@ class ReplicaGroupDBSource:
                 for group_row in group_rows
             ]
             return LifecycleReconcileFetch(views=views, now=now)
+
+    async def fetch_autoscale_reconcile_views(
+        self,
+        querier: BatchQuerier,
+        category: ReplicaGroupHandlerCategory,
+    ) -> AutoscaleReconcileFetch:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            now = (await db_sess.execute(sa.select(sa.func.now()))).scalar_one()
+            group_result = await execute_batch_querier(db_sess, sa.select(ReplicaGroupRow), querier)
+            group_rows: list[ReplicaGroupRow] = [row.ReplicaGroupRow for row in group_result.rows]
+            group_ids = [group_row.id for group_row in group_rows]
+            deployment_ids = [group_row.deployment_id for group_row in group_rows]
+            counts = await self._count_live_serving_by_revision(db_sess, group_ids)
+            last_histories = await self._latest_history_by_group(db_sess, group_ids, category)
+            handler_options = await self._handler_options_by_deployment(db_sess, deployment_ids)
+            deployment_desired = await self._replicas_by_deployment(db_sess, deployment_ids)
+            empty = RevisionReplicaCount(live=0, serving=0)
+            views: list[ReplicaGroupAutoscaleReconcileView] = []
+            for group_row in group_rows:
+                group_counts = counts.get(group_row.id, {})
+                current_counts = (
+                    group_counts.get(group_row.current_revision_id, empty)
+                    if group_row.current_revision_id is not None
+                    else empty
+                )
+                views.append(
+                    ReplicaGroupAutoscaleReconcileView(
+                        group_id=group_row.id,
+                        deployment_id=group_row.deployment_id,
+                        current_revision_id=group_row.current_revision_id,
+                        lifecycle=group_row.lifecycle,
+                        scaling_status=group_row.scaling_status,
+                        desired_current_replica_count=group_row.desired_current_replica_count,
+                        deployment_desired_replica_count=deployment_desired.get(
+                            group_row.deployment_id, 0
+                        ),
+                        current_live_replica_count=current_counts.live,
+                        current_serving_replica_count=current_counts.serving,
+                        last_history=self._to_last_history(last_histories.get(group_row.id)),
+                        handler_options=handler_options.get(
+                            group_row.deployment_id, DeploymentHandlerOptions()
+                        ),
+                    )
+                )
+            return AutoscaleReconcileFetch(views=views, now=now)
 
     @staticmethod
     def _to_last_history(row: ReplicaGroupHistoryRow | None) -> LastHistory | None:

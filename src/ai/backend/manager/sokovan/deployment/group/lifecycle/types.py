@@ -25,7 +25,10 @@ from ai.backend.manager.sokovan.reconciler.base import (
     ReconcilerDecision,
 )
 from ai.backend.manager.types import TriState
-from ai.backend.manager.views.replica_group import ReplicaGroupLifecycleReconcileView
+from ai.backend.manager.views.replica_group import (
+    ReplicaGroupAutoscaleReconcileView,
+    ReplicaGroupLifecycleReconcileView,
+)
 
 
 @dataclass(frozen=True)
@@ -51,6 +54,20 @@ class GroupLifecycleReconcileInfo(BaseReconcilerInfo):
     """One fetch's worth of lifecycle-reconcile decision state (per-group views + DB now)."""
 
     views: list[ReplicaGroupLifecycleReconcileView]
+    current_time: datetime
+
+    def entity_ids(self) -> Sequence[UUID]:
+        return [view.group_id for view in self.views]
+
+    def now(self) -> datetime:
+        return self.current_time
+
+
+@dataclass
+class GroupAutoscaleReconcileInfo(BaseReconcilerInfo):
+    """One fetch's worth of autoscale-reconcile decision state (per-group views + DB now)."""
+
+    views: list[ReplicaGroupAutoscaleReconcileView]
     current_time: datetime
 
     def entity_ids(self) -> Sequence[UUID]:

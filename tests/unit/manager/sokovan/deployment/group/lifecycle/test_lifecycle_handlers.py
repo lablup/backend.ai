@@ -13,6 +13,9 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.data.reconciler.types import HandlerOutcome
+from ai.backend.manager.sokovan.deployment.group.lifecycle.handlers.autoscale import (
+    GroupAutoscaleHandler,
+)
 from ai.backend.manager.sokovan.deployment.group.lifecycle.handlers.draining import (
     GroupDrainingHandler,
 )
@@ -20,10 +23,15 @@ from ai.backend.manager.sokovan.deployment.group.lifecycle.handlers.rolling impo
     GroupRollingHandler,
 )
 from ai.backend.manager.sokovan.deployment.group.lifecycle.types import (
+    GroupAutoscaleReconcileInfo,
+    GroupLifecycleDecision,
     GroupLifecycleReconcileInfo,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
-from ai.backend.manager.views.replica_group import ReplicaGroupLifecycleReconcileView
+from ai.backend.manager.views.replica_group import (
+    ReplicaGroupAutoscaleReconcileView,
+    ReplicaGroupLifecycleReconcileView,
+)
 
 
 def _view(
@@ -58,6 +66,85 @@ def _view(
 
 def _info(view: ReplicaGroupLifecycleReconcileView) -> GroupLifecycleReconcileInfo:
     return GroupLifecycleReconcileInfo(views=[view], current_time=datetime(2026, 1, 1, tzinfo=UTC))
+
+
+def _autoscale_view(
+    *,
+    goal: int = 4,
+    desired_current: int = 4,
+    current_live: int = 4,
+    current_serving: int = 4,
+    current_revision_id: DeploymentRevisionID | None = None,
+) -> ReplicaGroupAutoscaleReconcileView:
+    return ReplicaGroupAutoscaleReconcileView(
+        group_id=ReplicaGroupID(uuid.uuid4()),
+        deployment_id=DeploymentID(uuid.uuid4()),
+        current_revision_id=current_revision_id,
+        lifecycle=ReplicaGroupLifecycle.STABLE,
+        scaling_status=ReplicaGroupScalingStatus.STABLE,
+        desired_current_replica_count=desired_current,
+        deployment_desired_replica_count=goal,
+        current_live_replica_count=current_live,
+        current_serving_replica_count=current_serving,
+        last_history=None,
+        handler_options=DeploymentHandlerOptions(),
+    )
+
+
+async def _autoscale_decision(view: ReplicaGroupAutoscaleReconcileView) -> GroupLifecycleDecision:
+    info = GroupAutoscaleReconcileInfo(views=[view], current_time=datetime(2026, 1, 1, tzinfo=UTC))
+    with RecorderContext[UUID].scope("group_autoscale", [view.group_id]):
+        result = await GroupAutoscaleHandler().execute(info)
+    return result.lifecycle_decisions[0]
+
+
+async def test_autoscale_steady_state_converged() -> None:
+    view = _autoscale_view(current_revision_id=DeploymentRevisionID(uuid.uuid4()))
+    decision = await _autoscale_decision(view)
+    assert decision.outcome() is HandlerOutcome.SUCCESS
+    assert decision.next_desired_current_replica_count == 4
+    assert decision.next_desired_target_replica_count == 0
+
+
+async def test_autoscale_rearms_scaling_when_live_routes_drop() -> None:
+    # A route died: desired still matches the goal but only 3 of 4 are actually live.
+    view = _autoscale_view(
+        current_live=3,
+        current_serving=3,
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+    )
+    decision = await _autoscale_decision(view)
+    assert decision.outcome() is HandlerOutcome.FAILURE
+    assert decision.next_desired_current_replica_count == 4
+
+
+async def test_autoscale_rearms_scaling_when_serving_short_of_live() -> None:
+    # A leftover PROVISIONING route counts as live but not serving yet.
+    view = _autoscale_view(
+        current_live=4,
+        current_serving=3,
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+    )
+    decision = await _autoscale_decision(view)
+    assert decision.outcome() is HandlerOutcome.FAILURE
+
+
+async def test_autoscale_rearms_scaling_when_goal_changes() -> None:
+    # The autoscaling rule moved the deployment goal; desired counts lag behind.
+    view = _autoscale_view(
+        goal=6,
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+    )
+    decision = await _autoscale_decision(view)
+    assert decision.outcome() is HandlerOutcome.FAILURE
+    assert decision.next_desired_current_replica_count == 6
+
+
+async def test_autoscale_skips_drift_check_without_current_revision() -> None:
+    # No current revision means the scaling reconcile has nothing to fill; do not re-arm.
+    view = _autoscale_view(current_live=0, current_serving=0, current_revision_id=None)
+    decision = await _autoscale_decision(view)
+    assert decision.outcome() is HandlerOutcome.SUCCESS
 
 
 async def test_rolling_steps_target_up_and_current_down() -> None:
