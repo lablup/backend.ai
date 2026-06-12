@@ -10,6 +10,16 @@ python_sources(
     ],
 )
 
+visibility_private_component(
+    allowed_dependents=[],
+    allowed_dependencies=[
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//src/ai/backend/appproxy/common/**",
+    ],
+)
+
 resources(
     name="resources",
     dependencies=[
