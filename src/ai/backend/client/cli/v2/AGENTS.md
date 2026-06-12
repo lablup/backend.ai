@@ -67,3 +67,4 @@ non-admin은 `{entity}/commands.py`에 둔다.
 4. `cli/v2/__init__.py`에 사용자 대면 그룹 등록
 5. `cli/v2/admin/__init__.py`에 admin 그룹 등록
 6. `cli/v2/my/__init__.py`에 my 그룹 등록(해당 시)
+7. `/bai-cli` 스킬의 Entity-Command Reference에 새 엔티티·명령을 등록한다(테스트가 무엇을 실행할지 알 수 있도록).
