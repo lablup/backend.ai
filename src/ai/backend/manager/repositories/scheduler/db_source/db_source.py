@@ -919,6 +919,15 @@ class ScheduleDBSource:
         """Cancel PENDING sessions and their kernels, and free the kernels'
         ``resource_allocations`` rows in the same transaction.
         """
+        # Capture from_statuses before update for history recording
+        status_query = sa.select(SessionRow.id, SessionRow.status).where(
+            sa.and_(SessionRow.id.in_(session_ids), SessionRow.status == SessionStatus.PENDING)
+        )
+        status_result = await db_sess.execute(status_query)
+        from_statuses: dict[SessionId, SessionStatus] = {
+            cast(SessionId, row.id): SessionStatus(row.status) for row in status_result
+        }
+
         cancel_stmt = (
             sa.update(SessionRow)
             .values(
@@ -958,6 +967,20 @@ class ScheduleDBSource:
             )
             cancelled_kernel_ids = [row.id for row in kernel_update_result]
             await self._free_kernel_allocations(db_sess, cancelled_kernel_ids, now)
+
+            # Record scheduling history for cancel transition
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=sid,
+                    phase="cancel",
+                    result=SchedulingResult.SUCCESS,
+                    message=reason,
+                    from_status=from_statuses.get(sid),
+                    to_status=SessionStatus.CANCELLED,
+                )
+                for sid in cancelled_sessions
+            ]
+            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
 
         return cancelled_sessions
 
