@@ -6,7 +6,7 @@ from typing import Any
 
 from ai.backend.common.types import BackendAISchema
 
-NEXT_RELEASE_VERSION = "UNRELEASED"
+NEXT_RELEASE_VERSION = "26.4.4"
 """Placeholder for the next release version.
 
 Used in GQL type decorators for newly added types/fields that have not yet

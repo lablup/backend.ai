@@ -16,6 +16,33 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.4rc9 (2026-06-12)
+
+### Features
+* Allow updating runtime_variant on a deployment revision preset ([#12145](https://github.com/lablup/backend.ai/issues/12145))
+* Validate the model definition when creating a deployment revision preset, requiring a fully-populated definition (exactly one model with name, model path, service, port, and start command) ([#12152](https://github.com/lablup/backend.ai/issues/12152))
+* Make the agent utilization metric collection interval configurable (`agent.utilization-metric.interval`) and derive the Valkey expiration of stored utilization values from it. ([#12162](https://github.com/lablup/backend.ai/issues/12162))
+* Decouple model-service traffic removal from session teardown: terminating replicas are first drained from AppProxy and their sessions are cleaned up only after the revision's termination grace period (default 30s), letting in-flight requests finish. ([#12163](https://github.com/lablup/backend.ai/issues/12163))
+
+### Improvements
+* Allow a vfolder referenced by UUID to be mounted at multiple distinct subpaths within a single session. A UUID-referenced mount request that resolves to no accessible vfolder now raises `VFolderNotFound` instead of being silently dropped. ([#11954](https://github.com/lablup/backend.ai/issues/11954))
+* Move `AppProxyStatusResponse` to `common/dto/appproxy_coordinator/v2/status/types.py` to remove the direct `manager` → `appproxy` package dependency. ([#12164](https://github.com/lablup/backend.ai/issues/12164))
+* Enforce strict component isolation in pants BUILD files by switching from deny-list to explicit allow-list visibility rules; add isolation rules to appproxy sub-packages for the first time. ([#12166](https://github.com/lablup/backend.ai/issues/12166))
+
+### Fixes
+* Fix internal server error when accepting a VFolder invitation for an entity the invitee already has access to ([#12146](https://github.com/lablup/backend.ai/issues/12146))
+* Fix custom runtime variant deployments failing with 'port: Field required' by seeding a default service port in the variant baseline ([#12151](https://github.com/lablup/backend.ai/issues/12151))
+* Fix terminated kernels' utilization metric series remaining in the agent's Prometheus `/metrics` output forever, which inflated capacity/usage values in dashboards summing per-kernel metrics across replaced deployment replicas. ([#12160](https://github.com/lablup/backend.ai/issues/12160))
+* Recover a stable replica group whose live routes dropped below the desired count (e.g. forced session termination or container crash) by re-arming the scaling reconcile from the group autoscale stage. ([#12161](https://github.com/lablup/backend.ai/issues/12161))
+* Fix the scheduler failure pipeline for pending sessions so repeated scheduling failures are retried, deprioritized, and recorded in the scheduling history with human-readable failure messages, including cancellation records ([#12165](https://github.com/lablup/backend.ai/issues/12165))
+
+### Documentation Updates
+* Restructure AI-agent guidance docs into `AGENTS.md` (rules, with `CLAUDE.md` symlinks) and `CONTEXTS.md` (on-demand background), and refresh the `/bai-cli` command reference. ([#12155](https://github.com/lablup/backend.ai/issues/12155))
+
+### Miscellaneous
+* Migrate the development halfstack Redis service to Valkey (image and `valkey-*` binaries) and update documentation to refer to Valkey. ([#11900](https://github.com/lablup/backend.ai/issues/11900))
+
+
 ## 26.4.4rc8 (2026-06-11)
 
 ### Features
