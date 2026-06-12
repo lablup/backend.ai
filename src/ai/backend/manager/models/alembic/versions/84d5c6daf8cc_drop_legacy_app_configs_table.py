@@ -8,7 +8,7 @@ new shape is incompatible with the old (different scope enum,
 different unique key) so no in-place data migration is attempted.
 
 Revision ID: 84d5c6daf8cc
-Revises: ce69b746304e
+Revises: f3a8c1d05e64
 Create Date: 2026-04-24
 
 """
@@ -21,7 +21,7 @@ from ai.backend.manager.models.base import IDColumn
 
 # revision identifiers, used by Alembic.
 revision = "84d5c6daf8cc"
-down_revision = "ce69b746304e"
+down_revision = "f3a8c1d05e64"
 # Part of: 26.5.0
 branch_labels = None
 depends_on = None
