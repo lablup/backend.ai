@@ -1704,6 +1704,12 @@ class ScheduleCoordinator:
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
+            SchedulerTaskSpec(
+                ScheduleType.DEPRIORITIZE,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
             # Sweep is a maintenance task - only needs long cycle task
             SchedulerTaskSpec(
                 ScheduleType.SWEEP,
