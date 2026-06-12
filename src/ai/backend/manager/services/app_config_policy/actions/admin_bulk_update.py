@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.permission.types import EntityType, RBACElementType
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_policy.types import (
@@ -11,10 +12,12 @@ from ai.backend.manager.data.app_config_policy.types import (
     AppConfigPolicyBulkUpdateItem,
     AppConfigPolicyData,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.services.app_config_policy.actions.base import AppConfigPolicyTarget
 
 
 @dataclass
-class AdminBulkUpdateAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyBulkUpdateItem]):
+class AdminBulkUpdateAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyTarget]):
     """`items` carries `(id, scope_sources)` pairs targeting existing
     policy rows. `config_name` is immutable and therefore not on the
     update payload."""
@@ -22,8 +25,8 @@ class AdminBulkUpdateAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyBulkU
     items: list[AppConfigPolicyBulkUpdateItem] = field(default_factory=list)
 
     @override
-    def typed_entity_ids(self) -> list[AppConfigPolicyBulkUpdateItem]:
-        return list(self.items)
+    def entity_id(self) -> str | None:
+        return None
 
     @override
     @classmethod
@@ -35,6 +38,10 @@ class AdminBulkUpdateAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyBulkU
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @override
+    def targets(self) -> Sequence[AppConfigPolicyTarget]:
+        return [AppConfigPolicyTarget(id=item.id) for item in self.items]
+
 
 @dataclass
 class AdminBulkUpdateAppConfigPoliciesActionResult(BaseBulkActionResult):
@@ -42,5 +49,11 @@ class AdminBulkUpdateAppConfigPoliciesActionResult(BaseBulkActionResult):
     failed: list[AppConfigPolicyBulkItemError]
 
     @override
-    def entity_ids(self) -> list[str]:
-        return [str(policy.id) for policy in self.updated]
+    def element_refs(self) -> list[RBACElementRef]:
+        return [
+            RBACElementRef(
+                element_type=RBACElementType.APP_CONFIG_POLICY,
+                element_id=str(policy.id),
+            )
+            for policy in self.updated
+        ]

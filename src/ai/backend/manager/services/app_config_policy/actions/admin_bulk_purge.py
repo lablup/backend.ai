@@ -1,22 +1,27 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.permission.types import EntityType, RBACElementType
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyBulkItemError
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.services.app_config_policy.actions.base import AppConfigPolicyTarget
 
 
 @dataclass
-class AdminBulkPurgeAppConfigPoliciesAction(BaseBulkAction[uuid.UUID]):
-    """`entity_ids` carries the row ids to purge."""
+class AdminBulkPurgeAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyTarget]):
+    """`ids` carries the policy row ids to purge."""
+
+    ids: list[uuid.UUID] = field(default_factory=list)
 
     @override
-    def typed_entity_ids(self) -> list[uuid.UUID]:
-        return [uuid.UUID(eid) for eid in self.entity_ids]
+    def entity_id(self) -> str | None:
+        return None
 
     @override
     @classmethod
@@ -28,6 +33,10 @@ class AdminBulkPurgeAppConfigPoliciesAction(BaseBulkAction[uuid.UUID]):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.PURGE
 
+    @override
+    def targets(self) -> Sequence[AppConfigPolicyTarget]:
+        return [AppConfigPolicyTarget(id=policy_id) for policy_id in self.ids]
+
 
 @dataclass
 class AdminBulkPurgeAppConfigPoliciesActionResult(BaseBulkActionResult):
@@ -35,5 +44,11 @@ class AdminBulkPurgeAppConfigPoliciesActionResult(BaseBulkActionResult):
     failed: list[AppConfigPolicyBulkItemError]
 
     @override
-    def entity_ids(self) -> list[str]:
-        return [str(i) for i in self.purged_ids]
+    def element_refs(self) -> list[RBACElementRef]:
+        return [
+            RBACElementRef(
+                element_type=RBACElementType.APP_CONFIG_POLICY,
+                element_id=str(policy_id),
+            )
+            for policy_id in self.purged_ids
+        ]

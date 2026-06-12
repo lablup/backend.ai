@@ -101,7 +101,7 @@ class AppConfigPolicyService:
         required-policy invariant)."""
         purged_ids = []
         failed: list[AppConfigPolicyBulkItemError] = []
-        for index, policy_id in enumerate(action.typed_entity_ids()):
+        for index, policy_id in enumerate(action.ids):
             try:
                 ok = await self._admin_repository.purge(policy_id)
                 if ok:

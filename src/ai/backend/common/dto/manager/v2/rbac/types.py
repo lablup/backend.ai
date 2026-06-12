@@ -100,6 +100,7 @@ class RBACElementTypeDTO(StrEnum):
     MODEL_CARD = "model_card"
 
     # Root-query-enabled entities (superadmin-only)
+    APP_CONFIG_POLICY = "app_config_policy"
     RESOURCE_PRESET = "resource_preset"
     USER_RESOURCE_POLICY = "user_resource_policy"
     KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"

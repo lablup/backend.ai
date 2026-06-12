@@ -82,11 +82,6 @@ class AppConfigPolicyAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    # Bulk processors return a `BulkProcessResult[T]` whose `.result` field is
-    # the underlying `*ActionResult` produced by the service. We discard the
-    # validator-decision trail here — RBAC reasons travel back through the
-    # per-item `failed` list.
-
     async def admin_bulk_create(
         self, input: AdminBulkCreateAppConfigPoliciesInput
     ) -> AdminBulkCreateAppConfigPoliciesPayload:
@@ -97,13 +92,9 @@ class AppConfigPolicyAdapter(BaseAdapter):
             )
             for item in input.items
         ]
-        wrapper = await self._processors.app_config_policy.admin_bulk_create.wait_for_complete(
-            AdminBulkCreateAppConfigPoliciesAction(
-                entity_ids=[item.config_name for item in items],
-                items=items,
-            )
+        result = await self._processors.app_config_policy.admin_bulk_create.wait_for_complete(
+            AdminBulkCreateAppConfigPoliciesAction(items=items)
         )
-        result = wrapper.result
         return AdminBulkCreateAppConfigPoliciesPayload(
             created=[self._data_to_dto(policy) for policy in result.created],
             failed=[self._bulk_error_to_dto(err) for err in result.failed],
@@ -119,13 +110,9 @@ class AppConfigPolicyAdapter(BaseAdapter):
             )
             for item in input.items
         ]
-        wrapper = await self._processors.app_config_policy.admin_bulk_update.wait_for_complete(
-            AdminBulkUpdateAppConfigPoliciesAction(
-                entity_ids=[str(item.id) for item in items],
-                items=items,
-            )
+        result = await self._processors.app_config_policy.admin_bulk_update.wait_for_complete(
+            AdminBulkUpdateAppConfigPoliciesAction(items=items)
         )
-        result = wrapper.result
         return AdminBulkUpdateAppConfigPoliciesPayload(
             updated=[self._data_to_dto(policy) for policy in result.updated],
             failed=[self._bulk_error_to_dto(err) for err in result.failed],
@@ -134,10 +121,9 @@ class AppConfigPolicyAdapter(BaseAdapter):
     async def admin_bulk_purge(
         self, input: AdminBulkPurgeAppConfigPoliciesInput
     ) -> AdminBulkPurgeAppConfigPoliciesPayload:
-        wrapper = await self._processors.app_config_policy.admin_bulk_purge.wait_for_complete(
-            AdminBulkPurgeAppConfigPoliciesAction(entity_ids=[str(i) for i in input.ids])
+        result = await self._processors.app_config_policy.admin_bulk_purge.wait_for_complete(
+            AdminBulkPurgeAppConfigPoliciesAction(ids=list(input.ids))
         )
-        result = wrapper.result
         return AdminBulkPurgeAppConfigPoliciesPayload(
             purged_ids=list(result.purged_ids),
             failed=[self._bulk_error_to_dto(err) for err in result.failed],
