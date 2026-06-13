@@ -146,7 +146,11 @@ _start_service() {
     return
   fi
   local cmd
-  cmd=$(_service_cmd "$svc")
+  # Raise the soft open-files limit before exec'ing the service. The long-lived
+  # tmux server inherits launchd's low default (256 on macOS), so services
+  # started here would otherwise hit "Too many open files". Best-effort: a
+  # failure on hosts with a low hard limit must not block startup.
+  cmd="ulimit -n 65536 2>/dev/null; $(_service_cmd "$svc")"
   if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
     local winname
     winname=$(_tmux_window_name "$svc")
