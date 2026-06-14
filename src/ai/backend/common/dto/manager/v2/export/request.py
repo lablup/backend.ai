@@ -230,6 +230,15 @@ class SessionExportFilter(BaseRequestModel):
             "Use this to export sessions created by a specific user/keypair."
         ),
     )
+    user_email: StringFilter | None = Field(
+        default=None,
+        description=(
+            "Filter sessions by the owning user's email address. Supports various match "
+            "modes: contains, equals, starts_with, ends_with. "
+            "Use this to export sessions belonging to a specific user (e.g., the currently "
+            "logged-in user in the WebUI)."
+        ),
+    )
     status: list[str] | None = Field(
         default=None,
         description=(
