@@ -29,7 +29,7 @@ __all__ = (
     "SessionExportFilter",
     "SessionExportOrder",
     "SessionExportOrderField",
-    "SessionExportUserFilter",
+    "SessionExportUserNestedFilter",
     "UserExportCSVInput",
     "UserExportFilter",
     "UserExportOrder",
@@ -180,7 +180,7 @@ class SessionExportOrderField(StrEnum):
     TERMINATED_AT = "terminated_at"
 
 
-class SessionExportUserFilter(BaseRequestModel):
+class SessionExportUserNestedFilter(BaseRequestModel):
     """Nested filter for the owning user of a session.
 
     Filters sessions by attributes of the joined users table. Used, for example, by
@@ -254,7 +254,7 @@ class SessionExportFilter(BaseRequestModel):
             "Use this to export sessions created by a specific user/keypair."
         ),
     )
-    user: SessionExportUserFilter | None = Field(
+    user: SessionExportUserNestedFilter | None = Field(
         default=None,
         description=(
             "Nested filter for the owning user's attributes (email, username). "

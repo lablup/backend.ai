@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.export.request import (
     SessionExportFilter,
-    SessionExportUserFilter,
+    SessionExportUserNestedFilter,
 )
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
 from ai.backend.manager.models.base import GUID, Base
@@ -515,7 +515,7 @@ class TestBuildSessionQueryUserFilter:
             report=SESSION_REPORT,
             fields=["id", "name"],
             filter=SessionExportFilter(
-                user=SessionExportUserFilter(email=StringFilter(equals="user@example.com"))
+                user=SessionExportUserNestedFilter(email=StringFilter(equals="user@example.com"))
             ),
             order=None,
             max_rows=1000,
@@ -535,7 +535,7 @@ class TestBuildSessionQueryUserFilter:
             report=SESSION_REPORT,
             fields=["id", "name"],
             filter=SessionExportFilter(
-                user=SessionExportUserFilter(
+                user=SessionExportUserNestedFilter(
                     email=StringFilter(equals="user@example.com"),
                     username=StringFilter(contains="admin"),
                 )

@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.export.request import (
     SessionExportFilter,
     SessionExportOrder,
     SessionExportOrderField,
-    SessionExportUserFilter,
+    SessionExportUserNestedFilter,
     UserExportCSVInput,
     UserExportFilter,
     UserExportOrder,
@@ -49,7 +49,7 @@ __all__ = (
     "SessionExportFilter",
     "SessionExportOrder",
     "SessionExportOrderField",
-    "SessionExportUserFilter",
+    "SessionExportUserNestedFilter",
     # Input models (request) -- Project
     "ProjectExportCSVInput",
     "ProjectExportFilter",
