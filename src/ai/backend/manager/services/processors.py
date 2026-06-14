@@ -45,11 +45,13 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.agent.processors import AgentProcessors
     from ai.backend.manager.services.agent.service import AgentService
+    from ai.backend.manager.services.app_config_policy.admin_processors import (
+        AppConfigPolicyAdminProcessors,
+    )
     from ai.backend.manager.services.app_config_policy.admin_service import (
         AppConfigPolicyAdminService,
     )
     from ai.backend.manager.services.app_config_policy.processors import (
-        AppConfigPolicyAdminProcessors,
         AppConfigPolicyProcessors,
     )
     from ai.backend.manager.services.app_config_policy.service import (
