@@ -76,11 +76,12 @@ class TestAppConfigPolicyRepository:
         assert fetched.config_name == "preferences"
         assert list(fetched.scope_sources) == [AppConfigScopeType.DOMAIN_USER_DEFAULTS, AppConfigScopeType.USER]
 
-    async def test_get_by_id_returns_none_for_missing(
+    async def test_get_by_id_raises_for_missing(
         self,
         repository: AppConfigPolicyRepository,
     ) -> None:
-        assert await repository.get_by_id(AppConfigPolicyID(uuid.uuid4())) is None
+        with pytest.raises(AppConfigPolicyNotFound):
+            await repository.get_by_id(AppConfigPolicyID(uuid.uuid4()))
 
 
 class TestAppConfigPolicyAdminRepository:
