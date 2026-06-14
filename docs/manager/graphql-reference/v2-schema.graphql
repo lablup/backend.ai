@@ -156,28 +156,6 @@ type AddRevisionPayload {
   revision: ModelRevision!
 }
 
-"""
-Added in UNRELEASED. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
-"""
-input AdminAppConfigPolicyCreateItemInput {
-  """Unique, immutable policy name."""
-  configName: String!
-
-  """Ordered scope chain."""
-  scopeSources: [String!]!
-}
-
-"""
-Added in UNRELEASED. Per-item input for admin bulk update — target row id + new `scope_sources`.
-"""
-input AdminAppConfigPolicyUpdateItemInput {
-  """Policy row id."""
-  id: UUID!
-
-  """Ordered scope chain."""
-  scopeSources: [String!]!
-}
-
 """Added in UNRELEASED. Payload for `adminBulkCreateAppConfigPolicies`."""
 type AdminBulkCreateAppConfigPoliciesPayload {
   """Created policies."""
@@ -190,7 +168,18 @@ type AdminBulkCreateAppConfigPoliciesPayload {
 """Added in UNRELEASED. Admin bulk create input for app-config policies."""
 input AdminBulkCreateAppConfigPolicyInput {
   """Policies to create."""
-  items: [AdminAppConfigPolicyCreateItemInput!]!
+  items: [AdminBulkCreateAppConfigPolicyItemInput!]!
+}
+
+"""
+Added in UNRELEASED. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
+"""
+input AdminBulkCreateAppConfigPolicyItemInput {
+  """Unique, immutable policy name."""
+  configName: String!
+
+  """Ordered scope chain."""
+  scopeSources: [String!]!
 }
 
 """Added in UNRELEASED. Payload for `adminBulkPurgeAppConfigPolicies`."""
@@ -222,7 +211,18 @@ type AdminBulkUpdateAppConfigPoliciesPayload {
 """Added in UNRELEASED. Admin bulk update input for app-config policies."""
 input AdminBulkUpdateAppConfigPolicyInput {
   """Policies to update."""
-  items: [AdminAppConfigPolicyUpdateItemInput!]!
+  items: [AdminBulkUpdateAppConfigPolicyItemInput!]!
+}
+
+"""
+Added in UNRELEASED. Per-item input for admin bulk update — target row id + new `scope_sources`.
+"""
+input AdminBulkUpdateAppConfigPolicyItemInput {
+  """Policy row id."""
+  id: UUID!
+
+  """Ordered scope chain."""
+  scopeSources: [String!]!
 }
 
 """Added in 26.4.2. Admin input for creating a keypair for a user."""

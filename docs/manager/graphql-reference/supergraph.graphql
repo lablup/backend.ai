@@ -202,32 +202,6 @@ type AddRevisionPayload
   revision: ModelRevision!
 }
 
-"""
-Added in UNRELEASED. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
-"""
-input AdminAppConfigPolicyCreateItemInput
-  @join__type(graph: STRAWBERRY)
-{
-  """Unique, immutable policy name."""
-  configName: String!
-
-  """Ordered scope chain."""
-  scopeSources: [String!]!
-}
-
-"""
-Added in UNRELEASED. Per-item input for admin bulk update — target row id + new `scope_sources`.
-"""
-input AdminAppConfigPolicyUpdateItemInput
-  @join__type(graph: STRAWBERRY)
-{
-  """Policy row id."""
-  id: UUID!
-
-  """Ordered scope chain."""
-  scopeSources: [String!]!
-}
-
 """Added in UNRELEASED. Payload for `adminBulkCreateAppConfigPolicies`."""
 type AdminBulkCreateAppConfigPoliciesPayload
   @join__type(graph: STRAWBERRY)
@@ -244,7 +218,20 @@ input AdminBulkCreateAppConfigPolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Policies to create."""
-  items: [AdminAppConfigPolicyCreateItemInput!]!
+  items: [AdminBulkCreateAppConfigPolicyItemInput!]!
+}
+
+"""
+Added in UNRELEASED. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
+"""
+input AdminBulkCreateAppConfigPolicyItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Unique, immutable policy name."""
+  configName: String!
+
+  """Ordered scope chain."""
+  scopeSources: [String!]!
 }
 
 """Added in UNRELEASED. Payload for `adminBulkPurgeAppConfigPolicies`."""
@@ -284,7 +271,20 @@ input AdminBulkUpdateAppConfigPolicyInput
   @join__type(graph: STRAWBERRY)
 {
   """Policies to update."""
-  items: [AdminAppConfigPolicyUpdateItemInput!]!
+  items: [AdminBulkUpdateAppConfigPolicyItemInput!]!
+}
+
+"""
+Added in UNRELEASED. Per-item input for admin bulk update — target row id + new `scope_sources`.
+"""
+input AdminBulkUpdateAppConfigPolicyItemInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Policy row id."""
+  id: UUID!
+
+  """Ordered scope chain."""
+  scopeSources: [String!]!
 }
 
 """Added in 26.4.2. Admin input for creating a keypair for a user."""
