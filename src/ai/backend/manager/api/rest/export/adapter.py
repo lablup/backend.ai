@@ -119,10 +119,12 @@ class ExportAdapter(BaseFilterAdapter):
         conditions = self._build_session_conditions(report, filter)
         orders = self._build_session_orders(report, order)
 
-        # Collect all required JOINs from selected fields and from filter fields
-        # (a filter like user_email may reference a joined column that is not selected).
-        filter_fields = self._collect_session_filter_fields(report, filter)
-        all_joins = self._collect_joins([*selected_fields, *filter_fields])
+        # JOINs come from the selected output fields. The nested user filter targets joined
+        # columns (users table); include those fields so the JOIN is present even when the
+        # user is filtered but not selected (otherwise it becomes a cartesian product).
+        join_source_fields = list(selected_fields)
+        join_source_fields.extend(self._collect_session_user_filter_fields(report, filter))
+        all_joins = self._collect_joins(join_source_fields)
 
         # Build select_from with dynamic JOINs
         select_from = self._build_select_from_with_joins(report.select_from, all_joins)
@@ -418,13 +420,20 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
-        # user_email filter (requires the user JOIN, collected in build_session_query)
-        if filter.user_email is not None:
-            field = report.get_field("user_email")
-            if field:
-                cond = self._build_string_condition(filter.user_email, field)
-                if cond:
-                    conditions.append(cond)
+        # user filter (nested; targets joined users columns, JOIN collected in build_session_query)
+        if filter.user is not None:
+            if filter.user.email is not None:
+                field = report.get_field("user_email")
+                if field:
+                    cond = self._build_string_condition(filter.user.email, field)
+                    if cond:
+                        conditions.append(cond)
+            if filter.user.username is not None:
+                field = report.get_field("user_username")
+                if field:
+                    cond = self._build_string_condition(filter.user.username, field)
+                    if cond:
+                        conditions.append(cond)
 
         # status filter (IN query)
         if filter.status is not None:
@@ -455,38 +464,30 @@ class ExportAdapter(BaseFilterAdapter):
 
         return conditions
 
-    def _collect_session_filter_fields(
+    def _collect_session_user_filter_fields(
         self,
         report: ReportDef,
         filter: SessionExportFilter | None,
     ) -> list[ExportFieldDef]:
-        """Collect report fields referenced by the session filter.
+        """Collect report fields referenced by the nested user filter.
 
-        Used to gather JOINs required by filter conditions on joined columns
-        (e.g. user_email) even when those columns are not part of the selected
-        export fields.
+        These fields live on the joined users table, so their JOINs must be applied
+        even when the user columns are not part of the selected export fields.
         """
-        if filter is None:
+        if filter is None or filter.user is None:
             return []
 
-        # Map filter attribute -> report field key (only fields whose filter is set).
-        filter_field_keys = {
-            "name": filter.name,
-            "session_type": filter.session_type,
-            "domain_name": filter.domain_name,
-            "access_key": filter.access_key,
-            "user_email": filter.user_email,
-            "status": filter.status,
-            "scaling_group_name": filter.scaling_group_name,
-            "created_at": filter.created_at,
-            "terminated_at": filter.terminated_at,
+        # Map nested user filter attribute -> report field key (only attributes that are set).
+        user_filter_field_keys = {
+            "user_email": filter.user.email,
+            "user_username": filter.user.username,
         }
 
         fields: list[ExportFieldDef] = []
-        for key, value in filter_field_keys.items():
+        for field_key, value in user_filter_field_keys.items():
             if value is None:
                 continue
-            field = report.get_field(key)
+            field = report.get_field(field_key)
             if field is not None:
                 fields.append(field)
         return fields

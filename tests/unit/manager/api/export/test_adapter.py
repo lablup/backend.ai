@@ -9,7 +9,10 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.export.request import SessionExportFilter
+from ai.backend.common.dto.manager.v2.export.request import (
+    SessionExportFilter,
+    SessionExportUserFilter,
+)
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.repositories.base.export import (
@@ -491,12 +494,12 @@ class TestBuildProjectQueryWithJoins:
         assert "test_child" in compiled
 
 
-class TestBuildSessionQueryUserEmailFilter:
-    """Tests for build_session_query user_email filtering (BA-6480).
+class TestBuildSessionQueryUserFilter:
+    """Tests for build_session_query nested user filtering (BA-6480).
 
-    The session CSV export must support filtering by the owning user's email,
-    which lives on the joined users table. The user JOIN must be applied even
-    when ``user_email`` is not among the selected export fields.
+    The session CSV export must support filtering by the owning user's email/username,
+    which live on the joined users table. The user JOIN must be applied even when no
+    user column is among the selected export fields.
     """
 
     @pytest.fixture
@@ -507,11 +510,13 @@ class TestBuildSessionQueryUserEmailFilter:
         self,
         adapter: ExportAdapter,
     ) -> None:
-        """Filtering by user_email must add the users JOIN even when the field is not selected."""
+        """Filtering by user.email must add the users JOIN even when no user field is selected."""
         query = adapter.build_session_query(
             report=SESSION_REPORT,
             fields=["id", "name"],
-            filter=SessionExportFilter(user_email=StringFilter(equals="user@example.com")),
+            filter=SessionExportFilter(
+                user=SessionExportUserFilter(email=StringFilter(equals="user@example.com"))
+            ),
             order=None,
             max_rows=1000,
             statement_timeout_sec=60,
@@ -521,11 +526,34 @@ class TestBuildSessionQueryUserEmailFilter:
         assert "users" in compiled
         assert len(query.conditions) == 1
 
-    def test_no_user_join_when_user_email_filter_absent(
+    def test_user_email_and_username_filters_apply_single_user_join(
         self,
         adapter: ExportAdapter,
     ) -> None:
-        """Without a user_email filter (and no user field selected), no users JOIN is added."""
+        """Both nested user filters share the single users JOIN and add two conditions."""
+        query = adapter.build_session_query(
+            report=SESSION_REPORT,
+            fields=["id", "name"],
+            filter=SessionExportFilter(
+                user=SessionExportUserFilter(
+                    email=StringFilter(equals="user@example.com"),
+                    username=StringFilter(contains="admin"),
+                )
+            ),
+            order=None,
+            max_rows=1000,
+            statement_timeout_sec=60,
+        )
+
+        compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
+        assert compiled.count("LEFT OUTER JOIN users") == 1
+        assert len(query.conditions) == 2
+
+    def test_no_user_join_when_user_filter_absent(
+        self,
+        adapter: ExportAdapter,
+    ) -> None:
+        """Without a user filter (and no user field selected), no users JOIN is added."""
         query = adapter.build_session_query(
             report=SESSION_REPORT,
             fields=["id", "name"],
