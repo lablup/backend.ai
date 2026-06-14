@@ -12,7 +12,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 
-from .types import AppConfigPolicyOrderField, OrderDirection
+from .types import AppConfigPolicyOrderField, AppConfigScopeType, OrderDirection
 
 __all__ = (
     "AdminAppConfigPolicyCreateItemInput",
@@ -55,7 +55,7 @@ class AdminAppConfigPolicyCreateItemInput(BaseRequestModel):
         max_length=128,
         description="Unique, immutable policy name.",
     )
-    scope_sources: list[str] = Field(
+    scope_sources: list[AppConfigScopeType] = Field(
         description="Ordered scope chain (low → high merge priority).",
     )
 
@@ -75,7 +75,7 @@ class AdminAppConfigPolicyUpdateItemInput(BaseRequestModel):
     not part of the update payload."""
 
     id: AppConfigPolicyID = Field(description="Policy row id.")
-    scope_sources: list[str] = Field(
+    scope_sources: list[AppConfigScopeType] = Field(
         description="Ordered scope chain (low → high merge priority).",
     )
 

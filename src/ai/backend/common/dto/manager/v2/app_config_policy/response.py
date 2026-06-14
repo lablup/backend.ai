@@ -9,6 +9,7 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 
 __all__ = (
@@ -27,7 +28,7 @@ class AppConfigPolicyNode(BaseResponseModel):
 
     id: AppConfigPolicyID = Field(description="Policy row ID")
     config_name: str = Field(description="Unique, immutable policy name.")
-    scope_sources: list[str] = Field(
+    scope_sources: list[AppConfigScopeType] = Field(
         description="Ordered scope chain (low → high merge priority).",
     )
     created_at: datetime = Field(description="Creation timestamp")
