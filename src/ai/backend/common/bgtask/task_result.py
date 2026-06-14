@@ -44,8 +44,8 @@ class TaskResult(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def last_message(self) -> str:
-        """Get the last message describing the task result."""
+    def result_message(self) -> str:
+        """Get the message describing the task result."""
         raise NotImplementedError
 
 
@@ -71,7 +71,7 @@ class TaskSuccessResult[R: BaseBackgroundTaskResult | None](TaskResult):
     def error_code(self) -> ErrorCode | None:
         return None
 
-    def last_message(self) -> str:
+    def result_message(self) -> str:
         return "Task completed successfully"
 
 
@@ -94,7 +94,7 @@ class TaskCancelledResult(TaskResult):
             error_detail=ErrorDetail.CANCELED,
         )
 
-    def last_message(self) -> str:
+    def result_message(self) -> str:
         return self.message
 
 
@@ -119,5 +119,5 @@ class TaskFailedResult(TaskResult):
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
-    def last_message(self) -> str:
+    def result_message(self) -> str:
         return f"Task failed with exception: {self.exception}"

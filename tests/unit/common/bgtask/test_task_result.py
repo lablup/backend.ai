@@ -41,23 +41,23 @@ class TestBgtaskStatusToTaskStatus:
         assert BgtaskStatus.CANCELLED.to_task_status() != TaskStatus.SUCCESS
 
 
-class TestTaskResultLastMessage:
-    """Regression tests for TaskResult.last_message().
+class TestTaskResultMessage:
+    """Regression tests for TaskResult.result_message().
 
     The failure reason must be carried into the recorded task message instead of
     being discarded (see PR #12168).
     """
 
-    def test_success_result_last_message(self) -> None:
+    def test_success_result_message(self) -> None:
         result = TaskSuccessResult(result=None)
-        assert result.last_message() == "Task completed successfully"
+        assert result.result_message() == "Task completed successfully"
 
-    def test_cancelled_result_last_message(self) -> None:
+    def test_cancelled_result_message(self) -> None:
         result = TaskCancelledResult(message="cancelled by user")
-        assert result.last_message() == "cancelled by user"
+        assert result.result_message() == "cancelled by user"
 
-    def test_failed_result_last_message_includes_exception(self) -> None:
+    def test_failed_result_message_includes_exception(self) -> None:
         result = TaskFailedResult(exception=ZeroDivisionError("boom"))
-        message = result.last_message()
+        message = result.result_message()
         assert "boom" in message
         assert message != "Task completed successfully"
