@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -12,6 +13,8 @@ from ai.backend.manager.bgtask.tasks.commit_session import (
     CommitSessionResult,
 )
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
+from ai.backend.manager.errors.image import ContainerRegistryNotFound
+from ai.backend.manager.errors.kernel import SessionNotFound
 
 
 class TestCommitSessionHandler:
@@ -112,3 +115,80 @@ class TestCommitSessionHandler:
         restored = CommitSessionResult.model_validate(data)
         assert restored.image_id is None
         assert restored.error_message == error_msg
+
+
+class TestCommitSessionExecute:
+    """Regression tests for CommitSessionHandler.execute() failure propagation.
+
+    Previously execute() swallowed every failure into a success-typed
+    CommitSessionResult carrying an error_message, so the bgtask framework
+    emitted bgtask_done and the WebUI reported a failed commit as successful.
+    Failures must now raise domain exceptions so bgtask_failed is emitted
+    (see PR #12168).
+    """
+
+    @pytest.fixture
+    def sample_manifest(self) -> CommitSessionManifest:
+        return CommitSessionManifest(
+            session_id=SessionId(uuid.uuid4()),
+            registry_hostname="registry.example.com",
+            registry_project="test-project",
+            image_name="test-image",
+            image_visibility=CustomizedImageVisibilityScope.USER,
+            image_owner_id="user-123",
+            user_email="test@example.com",
+        )
+
+    def _make_handler(self, session_repository: AsyncMock) -> CommitSessionHandler:
+        return CommitSessionHandler(
+            session_repository=session_repository,
+            image_repository=AsyncMock(),
+            agent_registry=AsyncMock(),
+            event_hub=MagicMock(),
+            event_fetcher=MagicMock(),
+        )
+
+    async def test_missing_session_raises_session_not_found(
+        self, sample_manifest: CommitSessionManifest
+    ) -> None:
+        session_repository = AsyncMock()
+        session_repository.get_session_by_id.return_value = None
+        handler = self._make_handler(session_repository)
+
+        with pytest.raises(SessionNotFound):
+            await handler.execute(sample_manifest)
+
+    async def test_missing_registry_raises_container_registry_not_found(
+        self, sample_manifest: CommitSessionManifest
+    ) -> None:
+        session_repository = AsyncMock()
+        session_repository.get_session_by_id.return_value = MagicMock()
+        session_repository.get_container_registry.return_value = None
+        handler = self._make_handler(session_repository)
+
+        with pytest.raises(ContainerRegistryNotFound):
+            await handler.execute(sample_manifest)
+
+    async def test_base_image_resolved_including_deleted(
+        self, sample_manifest: CommitSessionManifest
+    ) -> None:
+        # A running session's base image may have been deleted, so the base
+        # image must be resolved with alive_only=False (see PR #12168).
+        session = MagicMock()
+        session.main_kernel.image = "registry.example.com/base:latest"
+        session.main_kernel.architecture = "x86_64"
+
+        session_repository = AsyncMock()
+        session_repository.get_session_by_id.return_value = session
+        session_repository.get_container_registry.return_value = MagicMock()
+        # Stop execution right after resolve_image so the test stays focused on
+        # how the base image is resolved.
+        session_repository.resolve_image.side_effect = RuntimeError("stop here")
+        handler = self._make_handler(session_repository)
+
+        with pytest.raises(RuntimeError):
+            await handler.execute(sample_manifest)
+
+        session_repository.resolve_image.assert_awaited_once()
+        _, kwargs = session_repository.resolve_image.call_args
+        assert kwargs["alive_only"] is False
