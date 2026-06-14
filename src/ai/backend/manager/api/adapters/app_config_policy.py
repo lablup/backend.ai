@@ -6,6 +6,7 @@ from ai.backend.common.dto.manager.v2.app_config_policy.request import (
     AdminBulkCreateAppConfigPoliciesInput,
     AdminBulkPurgeAppConfigPoliciesInput,
     AdminBulkUpdateAppConfigPoliciesInput,
+    AdminSearchAppConfigPoliciesInput,
     AppConfigPolicyFilter,
     AppConfigPolicyOrder,
     ScopedSearchAppConfigPoliciesInput,
@@ -45,6 +46,9 @@ from ai.backend.manager.services.app_config_policy.actions.admin_bulk_purge impo
 from ai.backend.manager.services.app_config_policy.actions.admin_bulk_update import (
     AdminBulkUpdateAppConfigPoliciesAction,
 )
+from ai.backend.manager.services.app_config_policy.actions.admin_search import (
+    AdminSearchAppConfigPoliciesAction,
+)
 from ai.backend.manager.services.app_config_policy.actions.get import GetAppConfigPolicyAction
 from ai.backend.manager.services.app_config_policy.actions.scoped_search import (
     ConfigNameAppConfigPolicyTarget,
@@ -69,6 +73,20 @@ class AppConfigPolicyAdapter(BaseAdapter):
         )
         return GetAppConfigPolicyPayload(
             item=self._data_to_dto(result.policy) if result.policy is not None else None,
+        )
+
+    async def admin_search(
+        self, input: AdminSearchAppConfigPoliciesInput
+    ) -> SearchAppConfigPoliciesPayload:
+        querier = self._build_querier_from_input(input)
+        result = await self._processors.app_config_policy.admin_search.wait_for_complete(
+            AdminSearchAppConfigPoliciesAction(querier=querier)
+        )
+        return SearchAppConfigPoliciesPayload(
+            items=[self._data_to_dto(item) for item in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def scoped_search(
@@ -146,7 +164,10 @@ class AppConfigPolicyAdapter(BaseAdapter):
         tiebreaker_order=AppConfigPolicyRow.id.asc(),
     )
 
-    def _build_querier_from_input(self, input: ScopedSearchAppConfigPoliciesInput) -> BatchQuerier:
+    def _build_querier_from_input(
+        self,
+        input: AdminSearchAppConfigPoliciesInput | ScopedSearchAppConfigPoliciesInput,
+    ) -> BatchQuerier:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         return self._build_querier(

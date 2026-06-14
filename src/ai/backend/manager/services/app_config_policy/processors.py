@@ -17,6 +17,10 @@ from ai.backend.manager.services.app_config_policy.actions.admin_bulk_update imp
     AdminBulkUpdateAppConfigPoliciesAction,
     AdminBulkUpdateAppConfigPoliciesActionResult,
 )
+from ai.backend.manager.services.app_config_policy.actions.admin_search import (
+    AdminSearchAppConfigPoliciesAction,
+    AdminSearchAppConfigPoliciesActionResult,
+)
 from ai.backend.manager.services.app_config_policy.actions.get import (
     GetAppConfigPolicyAction,
     GetAppConfigPolicyActionResult,
@@ -30,6 +34,9 @@ from ai.backend.manager.services.app_config_policy.service import AppConfigPolic
 
 class AppConfigPolicyProcessors(AbstractProcessorPackage):
     get: ActionProcessor[GetAppConfigPolicyAction, GetAppConfigPolicyActionResult]
+    admin_search: ActionProcessor[
+        AdminSearchAppConfigPoliciesAction, AdminSearchAppConfigPoliciesActionResult
+    ]
     scoped_search: BulkActionProcessor[
         ScopedSearchAppConfigPoliciesAction, ScopedSearchAppConfigPoliciesActionResult
     ]
@@ -54,6 +61,7 @@ class AppConfigPolicyProcessors(AbstractProcessorPackage):
         validators: ActionValidators,
     ) -> None:
         self.get = ActionProcessor(service.get, action_monitors)
+        self.admin_search = ActionProcessor(service.admin_search, action_monitors)
         self.scoped_search = BulkActionProcessor(service.scoped_search, action_monitors)
         self.admin_bulk_create = BulkActionProcessor(service.admin_bulk_create, action_monitors)
         self.admin_bulk_update = BulkActionProcessor(service.admin_bulk_update, action_monitors)
@@ -63,6 +71,7 @@ class AppConfigPolicyProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             GetAppConfigPolicyAction.spec(),
+            AdminSearchAppConfigPoliciesAction.spec(),
             ScopedSearchAppConfigPoliciesAction.spec(),
             AdminBulkCreateAppConfigPoliciesAction.spec(),
             AdminBulkUpdateAppConfigPoliciesAction.spec(),

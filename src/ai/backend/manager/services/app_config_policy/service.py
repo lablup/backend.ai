@@ -20,6 +20,10 @@ from ai.backend.manager.services.app_config_policy.actions.admin_bulk_update imp
     AdminBulkUpdateAppConfigPoliciesAction,
     AdminBulkUpdateAppConfigPoliciesActionResult,
 )
+from ai.backend.manager.services.app_config_policy.actions.admin_search import (
+    AdminSearchAppConfigPoliciesAction,
+    AdminSearchAppConfigPoliciesActionResult,
+)
 from ai.backend.manager.services.app_config_policy.actions.get import (
     GetAppConfigPolicyAction,
     GetAppConfigPolicyActionResult,
@@ -47,6 +51,17 @@ class AppConfigPolicyService:
     async def get(self, action: GetAppConfigPolicyAction) -> GetAppConfigPolicyActionResult:
         policy = await self._repository.get_by_id(action.id)
         return GetAppConfigPolicyActionResult(policy=policy)
+
+    async def admin_search(
+        self, action: AdminSearchAppConfigPoliciesAction
+    ) -> AdminSearchAppConfigPoliciesActionResult:
+        result = await self._admin_repository.search(action.querier)
+        return AdminSearchAppConfigPoliciesActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def scoped_search(
         self, action: ScopedSearchAppConfigPoliciesAction

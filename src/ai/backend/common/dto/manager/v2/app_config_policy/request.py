@@ -20,6 +20,7 @@ __all__ = (
     "AdminBulkCreateAppConfigPoliciesInput",
     "AdminBulkPurgeAppConfigPoliciesInput",
     "AdminBulkUpdateAppConfigPoliciesInput",
+    "AdminSearchAppConfigPoliciesInput",
     "AppConfigPolicyFilter",
     "AppConfigPolicyOrder",
     "AppConfigPolicyScope",
@@ -89,6 +90,26 @@ class AdminBulkUpdateAppConfigPoliciesInput(BaseRequestModel):
 
 class AdminBulkPurgeAppConfigPoliciesInput(BaseRequestModel):
     ids: list[AppConfigPolicyID] = Field(description="Policy row ids to purge.")
+
+
+class AdminSearchAppConfigPoliciesInput(BaseRequestModel):
+    """Input for searching app-config policies system-wide (admin, no scope).
+
+    Supports two pagination modes (mutually exclusive):
+    - Cursor-based: first/after (forward) or last/before (backward)
+    - Offset-based: limit/offset
+    """
+
+    filter: AppConfigPolicyFilter | None = Field(default=None, description="Filter conditions")
+    order: list[AppConfigPolicyOrder] | None = Field(
+        default=None, description="Order specifications"
+    )
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Maximum items to return")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip")
 
 
 class AppConfigPolicyScope(BaseRequestModel):

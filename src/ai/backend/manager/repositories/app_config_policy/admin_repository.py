@@ -114,6 +114,10 @@ class AppConfigPolicyAdminRepository:
         return await self._db_source.purge(purger)
 
     @app_config_policy_admin_repository_resilience.apply()
+    async def search(self, querier: BatchQuerier) -> AppConfigPolicySearchResult:
+        return await self._db_source.search(querier)
+
+    @app_config_policy_admin_repository_resilience.apply()
     async def scoped_search(
         self,
         querier: BatchQuerier,
