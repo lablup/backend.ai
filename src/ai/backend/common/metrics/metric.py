@@ -417,6 +417,8 @@ class DomainType(enum.StrEnum):
 class LayerType(enum.StrEnum):
     # Repository layers with _REPOSITORY suffix
     AGENT_REPOSITORY = "agent_repository"
+    APP_CONFIG_POLICY_ADMIN_REPOSITORY = "app_config_policy_admin_repository"
+    APP_CONFIG_POLICY_REPOSITORY = "app_config_policy_repository"
     AUTH_REPOSITORY = "auth_repository"
     ARTIFACT_REPOSITORY = "artifact_repository"
     ARTIFACT_REGISTRY_REPOSITORY = "artifact_registry_repository"
@@ -459,6 +461,7 @@ class LayerType(enum.StrEnum):
     REPLICA_GROUP_REPOSITORY = "replica_group_repository"
 
     # DB Source layers
+    APP_CONFIG_POLICY_DB_SOURCE = "app_config_policy_db_source"
     AUDIT_LOG_DB_SOURCE = "audit_log_db_source"
     AUTH_DB_SOURCE = "auth_db_source"
     AGENT_DB_SOURCE = "agent_db_source"
