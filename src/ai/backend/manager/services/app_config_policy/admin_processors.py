@@ -30,10 +30,6 @@ class AppConfigPolicyAdminProcessors(AbstractProcessorPackage):
     admin_search: ActionProcessor[
         AdminSearchAppConfigPoliciesAction, AdminSearchAppConfigPoliciesActionResult
     ]
-    # Bulk mutations — wrapped by BulkActionProcessor so validators
-    # (RBAC, etc.) can filter entity_ids per-item before the service
-    # runs. No bulk validators are wired today; the processor simply
-    # forwards to the service.
     admin_bulk_create: BulkActionProcessor[
         AdminBulkCreateAppConfigPoliciesAction, AdminBulkCreateAppConfigPoliciesActionResult
     ]
