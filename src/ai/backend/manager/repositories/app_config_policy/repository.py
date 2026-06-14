@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -10,6 +12,11 @@ from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
 from ai.backend.manager.repositories.app_config_policy.db_source import (
     AppConfigPolicyDBSource,
 )
+from ai.backend.manager.repositories.app_config_policy.types import (
+    AppConfigPolicySearchResult,
+)
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.types import SearchScope
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 app_config_policy_repository_resilience = Resilience(
@@ -35,9 +42,9 @@ app_config_policy_repository_resilience = Resilience(
 class AppConfigPolicyRepository:
     """Non-admin repository for AppConfigPolicy.
 
-    Holds operations available to any authenticated user (currently a
-    single-policy lookup). Admin-only operations (create / update /
-    purge / search) live on `AppConfigPolicyAdminRepository`.
+    Holds operations available to any authenticated user (single-policy
+    lookup and scoped search). Admin-only operations (create / update /
+    purge / admin search) live on `AppConfigPolicyAdminRepository`.
     """
 
     _db_source: AppConfigPolicyDBSource
@@ -48,3 +55,11 @@ class AppConfigPolicyRepository:
     @app_config_policy_repository_resilience.apply()
     async def get_by_id(self, id: AppConfigPolicyID) -> AppConfigPolicyData:
         return await self._db_source.get_by_id(id)
+
+    @app_config_policy_repository_resilience.apply()
+    async def scoped_search(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> AppConfigPolicySearchResult:
+        return await self._db_source.scoped_search(querier, scopes)

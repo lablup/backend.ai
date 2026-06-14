@@ -27,7 +27,6 @@ from ai.backend.manager.repositories.app_config_policy.updaters import (
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.types import SearchScope
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
@@ -117,11 +116,3 @@ class AppConfigPolicyAdminRepository:
     @app_config_policy_admin_repository_resilience.apply()
     async def search(self, querier: BatchQuerier) -> AppConfigPolicySearchResult:
         return await self._db_source.search(querier)
-
-    @app_config_policy_admin_repository_resilience.apply()
-    async def scoped_search(
-        self,
-        querier: BatchQuerier,
-        scopes: Sequence[SearchScope],
-    ) -> AppConfigPolicySearchResult:
-        return await self._db_source.scoped_search(querier, scopes)
