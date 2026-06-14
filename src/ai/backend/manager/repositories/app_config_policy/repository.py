@@ -8,10 +8,10 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_policy.db_source import (
     AppConfigPolicyDBSource,
 )
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 app_config_policy_repository_resilience = Resilience(
     policies=[
@@ -43,8 +43,8 @@ class AppConfigPolicyRepository:
 
     _db_source: AppConfigPolicyDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = AppConfigPolicyDBSource(db)
+    def __init__(self, ops_provider: DBOpsProvider) -> None:
+        self._db_source = AppConfigPolicyDBSource(ops_provider)
 
     @app_config_policy_repository_resilience.apply()
     async def get_by_id(self, id: uuid.UUID) -> AppConfigPolicyData | None:

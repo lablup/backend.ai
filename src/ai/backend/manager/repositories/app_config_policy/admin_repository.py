@@ -11,7 +11,6 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
 from ai.backend.manager.errors.app_config import AppConfigPolicyNotFound
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_policy.creators import (
     AppConfigPolicyCreatorSpec,
 )
@@ -28,6 +27,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 app_config_policy_admin_repository_resilience = Resilience(
     policies=[
@@ -68,8 +68,8 @@ class AppConfigPolicyAdminRepository:
 
     _db_source: AppConfigPolicyDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = AppConfigPolicyDBSource(db)
+    def __init__(self, ops_provider: DBOpsProvider) -> None:
+        self._db_source = AppConfigPolicyDBSource(ops_provider)
 
     @app_config_policy_admin_repository_resilience.apply()
     async def create(

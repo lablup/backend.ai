@@ -18,6 +18,6 @@ class AppConfigPolicyRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
-            repository=AppConfigPolicyRepository(args.db),
-            admin_repository=AppConfigPolicyAdminRepository(args.db),
+            repository=AppConfigPolicyRepository(args.ops_provider),
+            admin_repository=AppConfigPolicyAdminRepository(args.ops_provider),
         )
