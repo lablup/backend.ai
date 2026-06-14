@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.app_config_policy.request import (
     AdminBulkCreateAppConfigPoliciesInput,
     AdminBulkPurgeAppConfigPoliciesInput,
     AdminBulkUpdateAppConfigPoliciesInput,
-    SearchAppConfigPoliciesInput,
+    AdminSearchAppConfigPoliciesInput,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import AppConfigPolicyIdPathParam
@@ -45,10 +45,10 @@ class V2AppConfigPolicyHandler:
 
     async def search(
         self,
-        body: BodyParam[SearchAppConfigPoliciesInput],
+        body: BodyParam[AdminSearchAppConfigPoliciesInput],
     ) -> APIResponse:
-        """Paginated policy search (any authenticated user)."""
-        result = await self._adapter.search(body.parsed)
+        """Paginated system-wide policy search (superadmin only)."""
+        result = await self._adapter.admin_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     # ── Admin bulk writes ────────────────────────────────────────

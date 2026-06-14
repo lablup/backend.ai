@@ -7,11 +7,12 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.common.identifier.role_preset import RolePresetID
 
 
 class AppConfigPolicyIdPathParam(BaseRequestModel):
-    policy_id: UUID = Field(description="App-config policy row UUID")
+    policy_id: AppConfigPolicyID = Field(description="App-config policy row UUID")
 
 
 class DomainNamePathParam(BaseRequestModel):
