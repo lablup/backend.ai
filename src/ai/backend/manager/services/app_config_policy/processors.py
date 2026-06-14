@@ -30,16 +30,38 @@ from ai.backend.manager.services.app_config_policy.actions.scoped_search import 
     ScopedSearchAppConfigPoliciesAction,
     ScopedSearchAppConfigPoliciesActionResult,
 )
+from ai.backend.manager.services.app_config_policy.admin_service import (
+    AppConfigPolicyAdminService,
+)
 from ai.backend.manager.services.app_config_policy.service import AppConfigPolicyService
 
 
 class AppConfigPolicyProcessors(AbstractProcessorPackage):
     get: SingleEntityActionProcessor[GetAppConfigPolicyAction, GetAppConfigPolicyActionResult]
-    admin_search: ActionProcessor[
-        AdminSearchAppConfigPoliciesAction, AdminSearchAppConfigPoliciesActionResult
-    ]
     scoped_search: BulkActionProcessor[
         ScopedSearchAppConfigPoliciesAction, ScopedSearchAppConfigPoliciesActionResult
+    ]
+
+    def __init__(
+        self,
+        service: AppConfigPolicyService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
+        self.get = SingleEntityActionProcessor(service.get, action_monitors)
+        self.scoped_search = BulkActionProcessor(service.scoped_search, action_monitors)
+
+    @override
+    def supported_actions(self) -> list[ActionSpec]:
+        return [
+            GetAppConfigPolicyAction.spec(),
+            ScopedSearchAppConfigPoliciesAction.spec(),
+        ]
+
+
+class AppConfigPolicyAdminProcessors(AbstractProcessorPackage):
+    admin_search: ActionProcessor[
+        AdminSearchAppConfigPoliciesAction, AdminSearchAppConfigPoliciesActionResult
     ]
     # Bulk mutations — wrapped by BulkActionProcessor so validators
     # (RBAC, etc.) can filter entity_ids per-item before the service
@@ -57,13 +79,11 @@ class AppConfigPolicyProcessors(AbstractProcessorPackage):
 
     def __init__(
         self,
-        service: AppConfigPolicyService,
+        service: AppConfigPolicyAdminService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.get = SingleEntityActionProcessor(service.get, action_monitors)
         self.admin_search = ActionProcessor(service.admin_search, action_monitors)
-        self.scoped_search = BulkActionProcessor(service.scoped_search, action_monitors)
         self.admin_bulk_create = BulkActionProcessor(service.admin_bulk_create, action_monitors)
         self.admin_bulk_update = BulkActionProcessor(service.admin_bulk_update, action_monitors)
         self.admin_bulk_purge = BulkActionProcessor(service.admin_bulk_purge, action_monitors)
@@ -71,9 +91,7 @@ class AppConfigPolicyProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
-            GetAppConfigPolicyAction.spec(),
             AdminSearchAppConfigPoliciesAction.spec(),
-            ScopedSearchAppConfigPoliciesAction.spec(),
             AdminBulkCreateAppConfigPoliciesAction.spec(),
             AdminBulkUpdateAppConfigPoliciesAction.spec(),
             AdminBulkPurgeAppConfigPoliciesAction.spec(),

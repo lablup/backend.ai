@@ -45,7 +45,11 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.agent.processors import AgentProcessors
     from ai.backend.manager.services.agent.service import AgentService
+    from ai.backend.manager.services.app_config_policy.admin_service import (
+        AppConfigPolicyAdminService,
+    )
     from ai.backend.manager.services.app_config_policy.processors import (
+        AppConfigPolicyAdminProcessors,
         AppConfigPolicyProcessors,
     )
     from ai.backend.manager.services.app_config_policy.service import (
@@ -370,6 +374,7 @@ class ServiceArgs:
 class Services:
     agent: AgentService
     app_config_policy: AppConfigPolicyService
+    app_config_policy_admin: AppConfigPolicyAdminService
     domain: DomainService
     dotfile: DotfileService
     error_log: ErrorLogService
@@ -436,6 +441,7 @@ class ProcessorArgs:
 class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
     app_config_policy: AppConfigPolicyProcessors
+    app_config_policy_admin: AppConfigPolicyAdminProcessors
     domain: DomainProcessors
     dotfile: DotfileProcessors
     error_log: ErrorLogProcessors
@@ -495,6 +501,7 @@ class Processors(AbstractProcessorPackage):
         return [
             *self.agent.supported_actions(),
             *self.app_config_policy.supported_actions(),
+            *self.app_config_policy_admin.supported_actions(),
             *self.domain.supported_actions(),
             *self.dotfile.supported_actions(),
             *self.error_log.supported_actions(),

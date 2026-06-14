@@ -6,7 +6,13 @@ from ai.backend.manager.repositories.resource_allocation.repository import (
 )
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
-from ai.backend.manager.services.app_config_policy.processors import AppConfigPolicyProcessors
+from ai.backend.manager.services.app_config_policy.admin_service import (
+    AppConfigPolicyAdminService,
+)
+from ai.backend.manager.services.app_config_policy.processors import (
+    AppConfigPolicyAdminProcessors,
+    AppConfigPolicyProcessors,
+)
 from ai.backend.manager.services.app_config_policy.service import AppConfigPolicyService
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
@@ -166,6 +172,8 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         app_config_policy=AppConfigPolicyService(
             repository=repositories.app_config_policy.repository,
+        ),
+        app_config_policy_admin=AppConfigPolicyAdminService(
             admin_repository=repositories.app_config_policy.admin_repository,
         ),
         domain=DomainService(repositories.domain.repository),
@@ -432,6 +440,9 @@ def create_processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
         app_config_policy=AppConfigPolicyProcessors(
             services.app_config_policy, action_monitors, validators
+        ),
+        app_config_policy_admin=AppConfigPolicyAdminProcessors(
+            services.app_config_policy_admin, action_monitors, validators
         ),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
