@@ -35,11 +35,6 @@ class TestBgtaskStatusToTaskStatus:
     ) -> None:
         assert bgtask_status.to_task_status() == expected
 
-    def test_failed_status_is_not_recorded_as_success(self) -> None:
-        # The core regression: a FAILED bgtask must never be recorded as SUCCESS.
-        assert BgtaskStatus.FAILED.to_task_status() != TaskStatus.SUCCESS
-        assert BgtaskStatus.CANCELLED.to_task_status() != TaskStatus.SUCCESS
-
 
 class TestTaskResultMessage:
     """Regression tests for TaskResult.result_message().
