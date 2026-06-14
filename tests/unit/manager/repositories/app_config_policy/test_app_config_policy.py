@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.manager.errors.app_config import AppConfigPolicyNotFound
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
@@ -50,15 +51,15 @@ class TestAppConfigPolicyRepository:
     ) -> None:
         created = await admin_repository.create(
             config_name="theme",
-            scope_sources=["domain"],
+            scope_sources=[AppConfigScopeType.DOMAIN],
         )
         assert created.config_name == "theme"
-        assert list(created.scope_sources) == ["domain"]
+        assert list(created.scope_sources) == [AppConfigScopeType.DOMAIN]
 
         fetched = await repository.get_by_id(created.id)
         assert fetched is not None
         assert fetched.id == created.id
-        assert list(fetched.scope_sources) == ["domain"]
+        assert list(fetched.scope_sources) == [AppConfigScopeType.DOMAIN]
 
     async def test_get_by_id_returns_full_record(
         self,
@@ -67,13 +68,13 @@ class TestAppConfigPolicyRepository:
     ) -> None:
         created = await admin_repository.create(
             config_name="preferences",
-            scope_sources=["domain_user_defaults", "user"],
+            scope_sources=[AppConfigScopeType.DOMAIN_USER_DEFAULTS, AppConfigScopeType.USER],
         )
 
         fetched = await repository.get_by_id(created.id)
         assert fetched is not None
         assert fetched.config_name == "preferences"
-        assert list(fetched.scope_sources) == ["domain_user_defaults", "user"]
+        assert list(fetched.scope_sources) == [AppConfigScopeType.DOMAIN_USER_DEFAULTS, AppConfigScopeType.USER]
 
     async def test_get_by_id_returns_none_for_missing(
         self,
@@ -106,14 +107,14 @@ class TestAppConfigPolicyAdminRepository:
     ) -> None:
         created = await admin_repository.create(
             config_name="theme",
-            scope_sources=["domain"],
+            scope_sources=[AppConfigScopeType.DOMAIN],
         )
         updated = await admin_repository.update(
             id=created.id,
-            scope_sources=["domain", "user"],
+            scope_sources=[AppConfigScopeType.DOMAIN, AppConfigScopeType.USER],
         )
         assert updated is not None
-        assert list(updated.scope_sources) == ["domain", "user"]
+        assert list(updated.scope_sources) == [AppConfigScopeType.DOMAIN, AppConfigScopeType.USER]
 
     async def test_update_raises_for_missing_id(
         self,
@@ -122,7 +123,7 @@ class TestAppConfigPolicyAdminRepository:
         with pytest.raises(AppConfigPolicyNotFound):
             await admin_repository.update(
                 id=AppConfigPolicyID(uuid.uuid4()),
-                scope_sources=["user"],
+                scope_sources=[AppConfigScopeType.USER],
             )
 
     async def test_purge_existing_policy_returns_true(
@@ -131,7 +132,7 @@ class TestAppConfigPolicyAdminRepository:
     ) -> None:
         created = await admin_repository.create(
             config_name="theme",
-            scope_sources=["domain"],
+            scope_sources=[AppConfigScopeType.DOMAIN],
         )
         assert await admin_repository.purge(created.id) is True
 
