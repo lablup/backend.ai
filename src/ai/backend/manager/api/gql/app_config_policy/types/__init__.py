@@ -1,9 +1,9 @@
 from .bulk_inputs import (
-    AdminAppConfigPolicyCreateItemInputGQL,
-    AdminAppConfigPolicyUpdateItemInputGQL,
     AdminBulkCreateAppConfigPolicyInputGQL,
+    AdminBulkCreateAppConfigPolicyItemInputGQL,
     AdminBulkPurgeAppConfigPolicyInputGQL,
     AdminBulkUpdateAppConfigPolicyInputGQL,
+    AdminBulkUpdateAppConfigPolicyItemInputGQL,
 )
 from .bulk_payloads import (
     AdminBulkCreateAppConfigPoliciesPayloadGQL,
@@ -23,8 +23,8 @@ from .node import (
 )
 
 __all__ = [
-    "AdminAppConfigPolicyCreateItemInputGQL",
-    "AdminAppConfigPolicyUpdateItemInputGQL",
+    "AdminBulkCreateAppConfigPolicyItemInputGQL",
+    "AdminBulkUpdateAppConfigPolicyItemInputGQL",
     "AdminBulkCreateAppConfigPoliciesPayloadGQL",
     "AdminBulkCreateAppConfigPolicyInputGQL",
     "AdminBulkPurgeAppConfigPoliciesPayloadGQL",
