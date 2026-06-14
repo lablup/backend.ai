@@ -79,7 +79,7 @@ class AppConfigPolicyAdapter(BaseAdapter):
         self, input: AdminSearchAppConfigPoliciesInput
     ) -> SearchAppConfigPoliciesPayload:
         querier = self._build_querier_from_input(input)
-        result = await self._processors.app_config_policy.admin_search.wait_for_complete(
+        result = await self._processors.app_config_policy_admin.admin_search.wait_for_complete(
             AdminSearchAppConfigPoliciesAction(querier=querier)
         )
         return SearchAppConfigPoliciesPayload(
@@ -117,7 +117,7 @@ class AppConfigPolicyAdapter(BaseAdapter):
             )
             for item in input.items
         ]
-        result = await self._processors.app_config_policy.admin_bulk_create.wait_for_complete(
+        result = await self._processors.app_config_policy_admin.admin_bulk_create.wait_for_complete(
             AdminBulkCreateAppConfigPoliciesAction(items=items)
         )
         return AdminBulkCreateAppConfigPoliciesPayload(
@@ -135,7 +135,7 @@ class AppConfigPolicyAdapter(BaseAdapter):
             )
             for item in input.items
         ]
-        result = await self._processors.app_config_policy.admin_bulk_update.wait_for_complete(
+        result = await self._processors.app_config_policy_admin.admin_bulk_update.wait_for_complete(
             AdminBulkUpdateAppConfigPoliciesAction(items=items)
         )
         return AdminBulkUpdateAppConfigPoliciesPayload(
@@ -146,7 +146,7 @@ class AppConfigPolicyAdapter(BaseAdapter):
     async def admin_bulk_purge(
         self, input: AdminBulkPurgeAppConfigPoliciesInput
     ) -> AdminBulkPurgeAppConfigPoliciesPayload:
-        result = await self._processors.app_config_policy.admin_bulk_purge.wait_for_complete(
+        result = await self._processors.app_config_policy_admin.admin_bulk_purge.wait_for_complete(
             AdminBulkPurgeAppConfigPoliciesAction(ids=list(input.ids))
         )
         return AdminBulkPurgeAppConfigPoliciesPayload(
