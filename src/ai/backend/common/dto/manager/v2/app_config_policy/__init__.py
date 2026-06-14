@@ -6,7 +6,8 @@ from .request import (
     AdminBulkUpdateAppConfigPoliciesInput,
     AppConfigPolicyFilter,
     AppConfigPolicyOrder,
-    SearchAppConfigPoliciesInput,
+    AppConfigPolicyScope,
+    ScopedSearchAppConfigPoliciesInput,
 )
 from .response import (
     AdminBulkCreateAppConfigPoliciesPayload,
@@ -33,8 +34,9 @@ __all__ = (
     "AppConfigPolicyNode",
     "AppConfigPolicyOrder",
     "AppConfigPolicyOrderField",
+    "AppConfigPolicyScope",
     "GetAppConfigPolicyPayload",
     "OrderDirection",
-    "SearchAppConfigPoliciesInput",
+    "ScopedSearchAppConfigPoliciesInput",
     "SearchAppConfigPoliciesPayload",
 )

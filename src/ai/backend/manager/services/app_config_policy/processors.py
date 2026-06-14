@@ -21,16 +21,18 @@ from ai.backend.manager.services.app_config_policy.actions.get import (
     GetAppConfigPolicyAction,
     GetAppConfigPolicyActionResult,
 )
-from ai.backend.manager.services.app_config_policy.actions.search import (
-    SearchAppConfigPoliciesAction,
-    SearchAppConfigPoliciesActionResult,
+from ai.backend.manager.services.app_config_policy.actions.scoped_search import (
+    ScopedSearchAppConfigPoliciesAction,
+    ScopedSearchAppConfigPoliciesActionResult,
 )
 from ai.backend.manager.services.app_config_policy.service import AppConfigPolicyService
 
 
 class AppConfigPolicyProcessors(AbstractProcessorPackage):
     get: ActionProcessor[GetAppConfigPolicyAction, GetAppConfigPolicyActionResult]
-    search: ActionProcessor[SearchAppConfigPoliciesAction, SearchAppConfigPoliciesActionResult]
+    scoped_search: BulkActionProcessor[
+        ScopedSearchAppConfigPoliciesAction, ScopedSearchAppConfigPoliciesActionResult
+    ]
     # Bulk mutations — wrapped by BulkActionProcessor so validators
     # (RBAC, etc.) can filter entity_ids per-item before the service
     # runs. No bulk validators are wired today; the processor simply
@@ -52,7 +54,7 @@ class AppConfigPolicyProcessors(AbstractProcessorPackage):
         validators: ActionValidators,
     ) -> None:
         self.get = ActionProcessor(service.get, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
+        self.scoped_search = BulkActionProcessor(service.scoped_search, action_monitors)
         self.admin_bulk_create = BulkActionProcessor(service.admin_bulk_create, action_monitors)
         self.admin_bulk_update = BulkActionProcessor(service.admin_bulk_update, action_monitors)
         self.admin_bulk_purge = BulkActionProcessor(service.admin_bulk_purge, action_monitors)
@@ -61,7 +63,7 @@ class AppConfigPolicyProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             GetAppConfigPolicyAction.spec(),
-            SearchAppConfigPoliciesAction.spec(),
+            ScopedSearchAppConfigPoliciesAction.spec(),
             AdminBulkCreateAppConfigPoliciesAction.spec(),
             AdminBulkUpdateAppConfigPoliciesAction.spec(),
             AdminBulkPurgeAppConfigPoliciesAction.spec(),

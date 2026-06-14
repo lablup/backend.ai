@@ -4,7 +4,9 @@ Request DTOs for app_config_policy DTO v2.
 
 from __future__ import annotations
 
-from pydantic import Field, field_validator
+from typing import Self
+
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
@@ -20,7 +22,8 @@ __all__ = (
     "AdminBulkUpdateAppConfigPoliciesInput",
     "AppConfigPolicyFilter",
     "AppConfigPolicyOrder",
-    "SearchAppConfigPoliciesInput",
+    "AppConfigPolicyScope",
+    "ScopedSearchAppConfigPoliciesInput",
 )
 
 
@@ -88,14 +91,31 @@ class AdminBulkPurgeAppConfigPoliciesInput(BaseRequestModel):
     ids: list[AppConfigPolicyID] = Field(description="Policy row ids to purge.")
 
 
-class SearchAppConfigPoliciesInput(BaseRequestModel):
-    """Input for searching app-config policies with filter / order / pagination.
+class AppConfigPolicyScope(BaseRequestModel):
+    """Scope for the scoped app-config-policy query.
+
+    Items are OR'd together; at least one ``config_name`` is required.
+    """
+
+    config_names: list[str] = Field(description="Policy config_names to scope the query to.")
+
+    @model_validator(mode="after")
+    def validate_non_empty(self) -> Self:
+        if not self.config_names:
+            raise ValueError("AppConfigPolicyScope requires a non-empty 'config_names'")
+        return self
+
+
+class ScopedSearchAppConfigPoliciesInput(BaseRequestModel):
+    """Input for searching app-config policies under a scope, with
+    filter / order / pagination.
 
     Supports two pagination modes (mutually exclusive):
     - Cursor-based: first/after (forward) or last/before (backward)
     - Offset-based: limit/offset
     """
 
+    scope: AppConfigPolicyScope = Field(description="Scope (OR across all config_names).")
     filter: AppConfigPolicyFilter | None = Field(default=None, description="Filter conditions")
     order: list[AppConfigPolicyOrder] | None = Field(
         default=None, description="Order specifications"

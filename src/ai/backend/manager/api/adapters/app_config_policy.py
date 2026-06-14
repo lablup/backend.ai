@@ -8,7 +8,7 @@ from ai.backend.common.dto.manager.v2.app_config_policy.request import (
     AdminBulkUpdateAppConfigPoliciesInput,
     AppConfigPolicyFilter,
     AppConfigPolicyOrder,
-    SearchAppConfigPoliciesInput,
+    ScopedSearchAppConfigPoliciesInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_policy.response import (
     AdminBulkCreateAppConfigPoliciesPayload,
@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.app_config_policy.types import (
     OrderDirection,
 )
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
+from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config_policy.types import (
     AppConfigPolicyBulkCreateItem,
@@ -45,8 +46,9 @@ from ai.backend.manager.services.app_config_policy.actions.admin_bulk_update imp
     AdminBulkUpdateAppConfigPoliciesAction,
 )
 from ai.backend.manager.services.app_config_policy.actions.get import GetAppConfigPolicyAction
-from ai.backend.manager.services.app_config_policy.actions.search import (
-    SearchAppConfigPoliciesAction,
+from ai.backend.manager.services.app_config_policy.actions.scoped_search import (
+    ConfigNameAppConfigPolicyTarget,
+    ScopedSearchAppConfigPoliciesAction,
 )
 
 from .base import BaseAdapter
@@ -69,10 +71,16 @@ class AppConfigPolicyAdapter(BaseAdapter):
             item=self._data_to_dto(result.policy) if result.policy is not None else None,
         )
 
-    async def search(self, input: SearchAppConfigPoliciesInput) -> SearchAppConfigPoliciesPayload:
+    async def scoped_search(
+        self, input: ScopedSearchAppConfigPoliciesInput
+    ) -> SearchAppConfigPoliciesPayload:
         querier = self._build_querier_from_input(input)
-        result = await self._processors.app_config_policy.search.wait_for_complete(
-            SearchAppConfigPoliciesAction(querier=querier)
+        targets: list[SearchableActionTarget] = [
+            ConfigNameAppConfigPolicyTarget(config_name=config_name)
+            for config_name in input.scope.config_names
+        ]
+        result = await self._processors.app_config_policy.scoped_search.wait_for_complete(
+            ScopedSearchAppConfigPoliciesAction(items=targets, querier=querier)
         )
         return SearchAppConfigPoliciesPayload(
             items=[self._data_to_dto(item) for item in result.items],
@@ -138,7 +146,7 @@ class AppConfigPolicyAdapter(BaseAdapter):
         tiebreaker_order=AppConfigPolicyRow.id.asc(),
     )
 
-    def _build_querier_from_input(self, input: SearchAppConfigPoliciesInput) -> BatchQuerier:
+    def _build_querier_from_input(self, input: ScopedSearchAppConfigPoliciesInput) -> BatchQuerier:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         return self._build_querier(

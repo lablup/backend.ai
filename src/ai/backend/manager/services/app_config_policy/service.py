@@ -24,9 +24,9 @@ from ai.backend.manager.services.app_config_policy.actions.get import (
     GetAppConfigPolicyAction,
     GetAppConfigPolicyActionResult,
 )
-from ai.backend.manager.services.app_config_policy.actions.search import (
-    SearchAppConfigPoliciesAction,
-    SearchAppConfigPoliciesActionResult,
+from ai.backend.manager.services.app_config_policy.actions.scoped_search import (
+    ScopedSearchAppConfigPoliciesAction,
+    ScopedSearchAppConfigPoliciesActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -48,15 +48,18 @@ class AppConfigPolicyService:
         policy = await self._repository.get_by_id(action.id)
         return GetAppConfigPolicyActionResult(policy=policy)
 
-    async def search(
-        self, action: SearchAppConfigPoliciesAction
-    ) -> SearchAppConfigPoliciesActionResult:
-        result = await self._admin_repository.search(action.querier)
-        return SearchAppConfigPoliciesActionResult(
+    async def scoped_search(
+        self, action: ScopedSearchAppConfigPoliciesAction
+    ) -> ScopedSearchAppConfigPoliciesActionResult:
+        targets = list(action.targets())
+        scopes = [t.to_search_scope() for t in targets]
+        result = await self._admin_repository.scoped_search(action.querier, scopes)
+        return ScopedSearchAppConfigPoliciesActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            queried_refs=[t.to_rbac_element_ref() for t in targets],
         )
 
     # ── Bulk mutations ──────────────────────────────────────────

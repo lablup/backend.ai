@@ -7,6 +7,8 @@ through the session-bound ops handed out by :class:`DBOpsProvider`.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
@@ -26,6 +28,7 @@ from ai.backend.manager.repositories.base import (
     Creator,
     Purger,
     Querier,
+    SearchScope,
     Updater,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
@@ -85,10 +88,15 @@ class AppConfigPolicyDBSource:
             result = await w.purge(purger)
             return result is not None
 
-    async def search(self, querier: BatchQuerier) -> AppConfigPolicySearchResult:
-        """Paginated search across all policies."""
+    async def scoped_search(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> AppConfigPolicySearchResult:
+        """Paginated search over policy rows matching any of ``scopes`` (OR),
+        narrowed by ``querier``."""
         async with self._ops.read_ops() as r:
-            result = await r.batch_query_in_global(sa.select(AppConfigPolicyRow), querier)
+            result = await r.batch_query_with_scopes(sa.select(AppConfigPolicyRow), querier, scopes)
             items = [row.AppConfigPolicyRow.to_data() for row in result.rows]
             return AppConfigPolicySearchResult(
                 items=items,
