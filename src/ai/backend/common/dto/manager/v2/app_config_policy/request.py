@@ -15,8 +15,8 @@ from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from .types import AppConfigPolicyOrderField, AppConfigScopeType, OrderDirection
 
 __all__ = (
-    "AdminAppConfigPolicyCreateItemInput",
-    "AdminAppConfigPolicyUpdateItemInput",
+    "AdminBulkCreateAppConfigPolicyItemInput",
+    "AdminBulkUpdateAppConfigPolicyItemInput",
     "AdminBulkCreateAppConfigPoliciesInput",
     "AdminBulkPurgeAppConfigPoliciesInput",
     "AdminBulkUpdateAppConfigPoliciesInput",
@@ -46,7 +46,7 @@ class AppConfigPolicyOrder(BaseRequestModel):
 # ── Bulk mutation inputs (bulk-only writes) ──────────────────────
 
 
-class AdminAppConfigPolicyCreateItemInput(BaseRequestModel):
+class AdminBulkCreateAppConfigPolicyItemInput(BaseRequestModel):
     """Per-item input for `adminBulkCreateAppConfigPolicies` —
     immutable `config_name` + initial `scope_sources`."""
 
@@ -69,7 +69,7 @@ class AdminAppConfigPolicyCreateItemInput(BaseRequestModel):
         return stripped
 
 
-class AdminAppConfigPolicyUpdateItemInput(BaseRequestModel):
+class AdminBulkUpdateAppConfigPolicyItemInput(BaseRequestModel):
     """Per-item input for `adminBulkUpdateAppConfigPolicies` — target
     row id + new `scope_sources`. `config_name` is immutable so it's
     not part of the update payload."""
@@ -81,11 +81,11 @@ class AdminAppConfigPolicyUpdateItemInput(BaseRequestModel):
 
 
 class AdminBulkCreateAppConfigPoliciesInput(BaseRequestModel):
-    items: list[AdminAppConfigPolicyCreateItemInput] = Field(description="Policies to create.")
+    items: list[AdminBulkCreateAppConfigPolicyItemInput] = Field(description="Policies to create.")
 
 
 class AdminBulkUpdateAppConfigPoliciesInput(BaseRequestModel):
-    items: list[AdminAppConfigPolicyUpdateItemInput] = Field(description="Policies to update.")
+    items: list[AdminBulkUpdateAppConfigPolicyItemInput] = Field(description="Policies to update.")
 
 
 class AdminBulkPurgeAppConfigPoliciesInput(BaseRequestModel):
