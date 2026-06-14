@@ -72,7 +72,7 @@ class AppConfigPolicyAdapter(BaseAdapter):
             GetAppConfigPolicyAction(id=id)
         )
         return GetAppConfigPolicyPayload(
-            item=self._data_to_dto(result.policy) if result.policy is not None else None,
+            item=self._data_to_dto(result.policy),
         )
 
     async def admin_search(
