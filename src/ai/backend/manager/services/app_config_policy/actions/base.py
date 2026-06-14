@@ -4,7 +4,11 @@ from typing import override
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.manager.actions.action import BaseAction
-from ai.backend.manager.actions.action.types import ActionTarget
+from ai.backend.manager.actions.action.single_entity import (
+    BaseSingleEntityAction,
+    BaseSingleEntityActionResult,
+)
+from ai.backend.manager.actions.action.types import ActionTarget, FieldData
 from ai.backend.manager.data.permission.types import RBACElementRef
 
 
@@ -14,6 +18,23 @@ class AppConfigPolicyAction(BaseAction):
     @classmethod
     def entity_type(cls) -> EntityType:
         return EntityType.APP_CONFIG_POLICY
+
+
+@dataclass
+class AppConfigPolicySingleEntityAction(BaseSingleEntityAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.APP_CONFIG_POLICY
+
+    @override
+    def field_data(self) -> FieldData | None:
+        return None
+
+
+@dataclass
+class AppConfigPolicySingleEntityActionResult(BaseSingleEntityActionResult):
+    pass
 
 
 @dataclass(frozen=True)

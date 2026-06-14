@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.app_config_policy.actions.admin_bulk_create import (
@@ -33,7 +34,7 @@ from ai.backend.manager.services.app_config_policy.service import AppConfigPolic
 
 
 class AppConfigPolicyProcessors(AbstractProcessorPackage):
-    get: ActionProcessor[GetAppConfigPolicyAction, GetAppConfigPolicyActionResult]
+    get: SingleEntityActionProcessor[GetAppConfigPolicyAction, GetAppConfigPolicyActionResult]
     admin_search: ActionProcessor[
         AdminSearchAppConfigPoliciesAction, AdminSearchAppConfigPoliciesActionResult
     ]
@@ -60,7 +61,7 @@ class AppConfigPolicyProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.get = ActionProcessor(service.get, action_monitors)
+        self.get = SingleEntityActionProcessor(service.get, action_monitors)
         self.admin_search = ActionProcessor(service.admin_search, action_monitors)
         self.scoped_search = BulkActionProcessor(service.scoped_search, action_monitors)
         self.admin_bulk_create = BulkActionProcessor(service.admin_bulk_create, action_monitors)
