@@ -84,45 +84,27 @@ class TestCommitSessionHandler:
         """Test result default values are None."""
         result = CommitSessionResult()
         assert result.image_id is None
-        assert result.error_message is None
 
     def test_result_success_serialization(self) -> None:
         """Test result can be serialized and deserialized with success case."""
         image_id = uuid.uuid4()
-        result = CommitSessionResult(image_id=image_id, error_message=None)
+        result = CommitSessionResult(image_id=image_id)
 
         # Serialize to dict
         data = result.model_dump(mode="json")
         assert data["image_id"] == str(image_id)
-        assert data["error_message"] is None
 
         # Deserialize back
         restored = CommitSessionResult.model_validate(data)
         assert restored.image_id == image_id
-        assert restored.error_message is None
-
-    def test_result_error_serialization(self) -> None:
-        """Test result can be serialized and deserialized with error case."""
-        error_msg = "Session not found"
-        result = CommitSessionResult(image_id=None, error_message=error_msg)
-
-        # Serialize to dict
-        data = result.model_dump(mode="json")
-        assert data["image_id"] is None
-        assert data["error_message"] == error_msg
-
-        # Deserialize back
-        restored = CommitSessionResult.model_validate(data)
-        assert restored.image_id is None
-        assert restored.error_message == error_msg
 
 
 class TestCommitSessionExecute:
     """Regression tests for CommitSessionHandler.execute() failure propagation.
 
     Previously execute() swallowed every failure into a success-typed
-    CommitSessionResult carrying an error_message, so the bgtask framework
-    emitted bgtask_done and the WebUI reported a failed commit as successful.
+    CommitSessionResult, so the bgtask framework emitted bgtask_done and the
+    WebUI reported a failed commit as successful.
     Failures must now raise domain exceptions so bgtask_failed is emitted
     (see PR #12168).
     """

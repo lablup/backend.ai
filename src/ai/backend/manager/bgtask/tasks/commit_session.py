@@ -46,14 +46,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class CommitSessionResult(BaseBackgroundTaskResult):
     """
-    Result of commit session background task.
-    Contains the rescanned image ID or error message.
+    Result of a successful commit session background task.
+
+    Failures are propagated by raising from ``execute()``, so this result only
+    carries success payload.
     """
 
     image_id: uuid.UUID | None = Field(
         default=None, description="ID of the rescanned image after commit"
     )
-    error_message: str | None = Field(default=None, description="Error message if task failed")
 
 
 class CommitSessionManifest(BaseBackgroundTaskManifest):
