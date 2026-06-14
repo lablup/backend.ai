@@ -46,5 +46,5 @@ class AppConfigPolicyRepository:
         self._db_source = AppConfigPolicyDBSource(ops_provider)
 
     @app_config_policy_repository_resilience.apply()
-    async def get_by_id(self, id: AppConfigPolicyID) -> AppConfigPolicyData | None:
+    async def get_by_id(self, id: AppConfigPolicyID) -> AppConfigPolicyData:
         return await self._db_source.get_by_id(id)

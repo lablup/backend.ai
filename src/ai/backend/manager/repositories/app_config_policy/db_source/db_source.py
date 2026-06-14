@@ -13,6 +13,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
+from ai.backend.manager.errors.app_config import AppConfigPolicyNotFound
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.repositories.app_config_policy.creators import (
     AppConfigPolicyCreatorSpec,
@@ -54,11 +55,14 @@ class AppConfigPolicyDBSource:
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._ops = ops_provider
 
-    async def get_by_id(self, id: AppConfigPolicyID) -> AppConfigPolicyData | None:
-        """Look up a policy by row id."""
+    async def get_by_id(self, id: AppConfigPolicyID) -> AppConfigPolicyData:
+        """Look up a policy by row id. Raises :class:`AppConfigPolicyNotFound`
+        when no row matches."""
         async with self._ops.read_ops() as r:
             result = await r.query(Querier(row_class=AppConfigPolicyRow, pk_value=id))
-            return result.row.to_data() if result is not None else None
+            if result is None:
+                raise AppConfigPolicyNotFound(extra_msg=f"id={id!s}")
+            return result.row.to_data()
 
     async def create(self, creator: Creator[AppConfigPolicyRow]) -> AppConfigPolicyData:
         """Insert a new policy via the shared Creator spec.
