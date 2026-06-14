@@ -33,11 +33,11 @@ app_config_policy_repository_resilience = Resilience(
 
 
 class AppConfigPolicyRepository:
-    """Read-side repository for AppConfigPolicy.
+    """Non-admin repository for AppConfigPolicy.
 
-    Any authenticated user may read a policy — admin operations
-    (create / update / purge / search) live on
-    `AppConfigPolicyAdminRepository`.
+    Holds operations available to any authenticated user (currently a
+    single-policy lookup). Admin-only operations (create / update /
+    purge / search) live on `AppConfigPolicyAdminRepository`.
     """
 
     _db_source: AppConfigPolicyDBSource
