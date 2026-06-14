@@ -6,9 +6,10 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
-from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.base import GUID, Base, StrEnumType
 
 
 class AppConfigPolicyRow(Base):  # type: ignore[misc]
@@ -35,11 +36,11 @@ class AppConfigPolicyRow(Base):  # type: ignore[misc]
         nullable=False,
     )
     # Ordered scope chain, low → high merge priority. Doubles as the
-    # write allow-list. Stored as `String[]` so adding a scope does
-    # not require a migration. Values mirror `AppConfigScopeType`.
-    scope_sources: Mapped[Sequence[str]] = mapped_column(
+    # write allow-list. `StrEnumType` stores as VARCHAR so adding a
+    # scope value does not require a migration.
+    scope_sources: Mapped[Sequence[AppConfigScopeType]] = mapped_column(
         "scope_sources",
-        sa.ARRAY(sa.String(length=64)),
+        sa.ARRAY(StrEnumType(AppConfigScopeType, length=64)),
         nullable=False,
         server_default="{}",
     )

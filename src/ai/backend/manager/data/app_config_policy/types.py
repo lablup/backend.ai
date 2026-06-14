@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 
 
@@ -11,7 +12,7 @@ from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 class AppConfigPolicyData:
     id: AppConfigPolicyID
     config_name: str
-    scope_sources: Sequence[str]
+    scope_sources: Sequence[AppConfigScopeType]
     created_at: datetime
     updated_at: datetime | None
 
@@ -22,7 +23,7 @@ class AppConfigPolicyBulkCreateItem:
     name + scope chain."""
 
     config_name: str
-    scope_sources: Sequence[str]
+    scope_sources: Sequence[AppConfigScopeType]
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,7 @@ class AppConfigPolicyBulkUpdateItem:
     the update payload."""
 
     id: AppConfigPolicyID
-    scope_sources: Sequence[str]
+    scope_sources: Sequence[AppConfigScopeType]
 
 
 @dataclass(frozen=True)
