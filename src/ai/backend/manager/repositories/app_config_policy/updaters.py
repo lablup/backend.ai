@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 
@@ -18,7 +19,7 @@ class AppConfigPolicyUpdaterSpec(UpdaterSpec[AppConfigPolicyRow]):
     therefore never appears in ``build_values()``.
     """
 
-    scope_sources: Sequence[str]
+    scope_sources: Sequence[AppConfigScopeType]
 
     @property
     @override

@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.manager.errors.app_config import AppConfigPolicyConflict
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
@@ -22,7 +23,7 @@ class AppConfigPolicyCreatorSpec(CreatorSpec[AppConfigPolicyRow]):
     """
 
     config_name: str
-    scope_sources: Sequence[str]
+    scope_sources: Sequence[AppConfigScopeType]
 
     @property
     @override

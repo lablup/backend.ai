@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -76,7 +77,7 @@ class AppConfigPolicyAdminRepository:
     async def create(
         self,
         config_name: str,
-        scope_sources: Sequence[str],
+        scope_sources: Sequence[AppConfigScopeType],
     ) -> AppConfigPolicyData:
         creator: Creator[AppConfigPolicyRow] = Creator(
             spec=AppConfigPolicyCreatorSpec(
@@ -90,7 +91,7 @@ class AppConfigPolicyAdminRepository:
     async def update(
         self,
         id: AppConfigPolicyID,
-        scope_sources: Sequence[str],
+        scope_sources: Sequence[AppConfigScopeType],
     ) -> AppConfigPolicyData:
         """Update a policy by id. Raises :class:`AppConfigPolicyNotFound`
         when the row is missing."""
