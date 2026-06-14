@@ -8,8 +8,9 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.app_config_policy.request import (
-    SearchAppConfigPoliciesInput,
+    AdminSearchAppConfigPoliciesInput,
 )
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.app_config_policy.types import (
     AppConfigPolicyConnectionGQL,
@@ -38,7 +39,7 @@ async def app_config_policy(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> AppConfigPolicyGQL | None:
-    payload = await info.context.adapters.app_config_policy.get(id)
+    payload = await info.context.adapters.app_config_policy.get(AppConfigPolicyID(id))
     if payload.item is None:
         return None
     return AppConfigPolicyGQL.from_pydantic(payload.item)
@@ -67,8 +68,8 @@ async def app_config_policies(
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
 
-    payload = await info.context.adapters.app_config_policy.search(
-        SearchAppConfigPoliciesInput(
+    payload = await info.context.adapters.app_config_policy.admin_search(
+        AdminSearchAppConfigPoliciesInput(
             filter=pydantic_filter,
             order=pydantic_order,
             first=first,
