@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -88,7 +88,7 @@ class AppConfigPolicyAdminRepository:
     @app_config_policy_admin_repository_resilience.apply()
     async def update(
         self,
-        id: uuid.UUID,
+        id: AppConfigPolicyID,
         scope_sources: Sequence[str],
     ) -> AppConfigPolicyData:
         """Update a policy by id. Raises :class:`AppConfigPolicyNotFound`
@@ -103,7 +103,7 @@ class AppConfigPolicyAdminRepository:
         return result
 
     @app_config_policy_admin_repository_resilience.apply()
-    async def purge(self, id: uuid.UUID) -> bool:
+    async def purge(self, id: AppConfigPolicyID) -> bool:
         """Delete a policy by id. Returns ``True`` only when a row was
         actually removed."""
         purger: Purger[AppConfigPolicyRow] = Purger(

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import uuid
-
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -47,5 +46,5 @@ class AppConfigPolicyRepository:
         self._db_source = AppConfigPolicyDBSource(ops_provider)
 
     @app_config_policy_repository_resilience.apply()
-    async def get_by_id(self, id: uuid.UUID) -> AppConfigPolicyData | None:
+    async def get_by_id(self, id: AppConfigPolicyID) -> AppConfigPolicyData | None:
         return await self._db_source.get_by_id(id)

@@ -1,8 +1,8 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.manager.actions.action import BaseAction
 from ai.backend.manager.actions.action.types import ActionTarget
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -20,7 +20,7 @@ class AppConfigPolicyAction(BaseAction):
 class AppConfigPolicyTarget(ActionTarget):
     """Bulk-action target identifying an existing policy row by id."""
 
-    id: uuid.UUID
+    id: AppConfigPolicyID
 
     @override
     def to_rbac_element_ref(self) -> RBACElementRef:

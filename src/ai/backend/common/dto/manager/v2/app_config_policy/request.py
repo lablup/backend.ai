@@ -4,12 +4,11 @@ Request DTOs for app_config_policy DTO v2.
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 
 from .types import AppConfigPolicyOrderField, OrderDirection
 
@@ -71,7 +70,7 @@ class AdminAppConfigPolicyUpdateItemInput(BaseRequestModel):
     row id + new `scope_sources`. `config_name` is immutable so it's
     not part of the update payload."""
 
-    id: UUID = Field(description="Policy row id.")
+    id: AppConfigPolicyID = Field(description="Policy row id.")
     scope_sources: list[str] = Field(
         description="Ordered scope chain (low → high merge priority).",
     )
@@ -86,7 +85,7 @@ class AdminBulkUpdateAppConfigPoliciesInput(BaseRequestModel):
 
 
 class AdminBulkPurgeAppConfigPoliciesInput(BaseRequestModel):
-    ids: list[UUID] = Field(description="Policy row ids to purge.")
+    ids: list[AppConfigPolicyID] = Field(description="Policy row ids to purge.")
 
 
 class SearchAppConfigPoliciesInput(BaseRequestModel):

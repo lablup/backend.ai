@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from ai.backend.common.dto.manager.v2.app_config_policy.request import (
     AdminBulkCreateAppConfigPoliciesInput,
     AdminBulkPurgeAppConfigPoliciesInput,
@@ -25,6 +23,7 @@ from ai.backend.common.dto.manager.v2.app_config_policy.types import (
     AppConfigPolicyOrderField,
     OrderDirection,
 )
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config_policy.types import (
     AppConfigPolicyBulkCreateItem,
@@ -62,7 +61,7 @@ class AppConfigPolicyAdapter(BaseAdapter):
 
     # ── Public surface ─────────────────────────────────────────────
 
-    async def get(self, id: UUID) -> GetAppConfigPolicyPayload:
+    async def get(self, id: AppConfigPolicyID) -> GetAppConfigPolicyPayload:
         result = await self._processors.app_config_policy.get.wait_for_complete(
             GetAppConfigPolicyAction(id=id)
         )

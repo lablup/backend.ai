@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyBulkItemError
@@ -17,7 +17,7 @@ from ai.backend.manager.services.app_config_policy.actions.base import AppConfig
 class AdminBulkPurgeAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyTarget]):
     """`ids` carries the policy row ids to purge."""
 
-    ids: list[uuid.UUID] = field(default_factory=list)
+    ids: list[AppConfigPolicyID] = field(default_factory=list)
 
     @override
     def entity_id(self) -> str | None:
@@ -40,7 +40,7 @@ class AdminBulkPurgeAppConfigPoliciesAction(BaseBulkAction[AppConfigPolicyTarget
 
 @dataclass
 class AdminBulkPurgeAppConfigPoliciesActionResult(BaseBulkActionResult):
-    purged_ids: list[uuid.UUID]
+    purged_ids: list[AppConfigPolicyID]
     failed: list[AppConfigPolicyBulkItemError]
 
     @override

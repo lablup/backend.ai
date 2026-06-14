@@ -1,7 +1,7 @@
-import uuid
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
@@ -10,7 +10,7 @@ from ai.backend.manager.services.app_config_policy.actions.base import AppConfig
 
 @dataclass
 class GetAppConfigPolicyAction(AppConfigPolicyAction):
-    id: uuid.UUID
+    id: AppConfigPolicyID
 
     @override
     def entity_id(self) -> str | None:

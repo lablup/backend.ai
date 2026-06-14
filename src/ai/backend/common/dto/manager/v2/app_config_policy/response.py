@@ -5,11 +5,11 @@ Response DTOs for app_config_policy DTO v2.
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 
 __all__ = (
     "AdminBulkCreateAppConfigPoliciesPayload",
@@ -25,7 +25,7 @@ __all__ = (
 class AppConfigPolicyNode(BaseResponseModel):
     """Node representing a single app-config policy."""
 
-    id: UUID = Field(description="Policy row ID")
+    id: AppConfigPolicyID = Field(description="Policy row ID")
     config_name: str = Field(description="Unique, immutable policy name.")
     scope_sources: list[str] = Field(
         description="Ordered scope chain (low → high merge priority).",
@@ -76,7 +76,7 @@ class AdminBulkUpdateAppConfigPoliciesPayload(BaseResponseModel):
 class AdminBulkPurgeAppConfigPoliciesPayload(BaseResponseModel):
     """Payload for `adminBulkPurgeAppConfigPolicies`."""
 
-    purged_ids: list[UUID] = Field(
+    purged_ids: list[AppConfigPolicyID] = Field(
         description="Ids of policies actually removed (absent ids no-oped).",
     )
     failed: list[AppConfigPolicyBulkError] = Field(description="Per-item failures.")

@@ -7,10 +7,9 @@ through the session-bound ops handed out by :class:`DBOpsProvider`.
 
 from __future__ import annotations
 
-import uuid
-
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
 from ai.backend.manager.data.app_config_policy.types import AppConfigPolicyData
 from ai.backend.manager.models.app_config_policy.row import AppConfigPolicyRow
 from ai.backend.manager.repositories.app_config_policy.creators import (
@@ -52,7 +51,7 @@ class AppConfigPolicyDBSource:
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._ops = ops_provider
 
-    async def get_by_id(self, id: uuid.UUID) -> AppConfigPolicyData | None:
+    async def get_by_id(self, id: AppConfigPolicyID) -> AppConfigPolicyData | None:
         """Look up a policy by row id."""
         async with self._ops.read_ops() as r:
             result = await r.query(Querier(row_class=AppConfigPolicyRow, pk_value=id))

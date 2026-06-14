@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
+from ai.backend.common.identifier.app_config_policy import AppConfigPolicyID
+
 
 @dataclass(frozen=True)
 class AppConfigPolicyData:
-    id: uuid.UUID
+    id: AppConfigPolicyID
     config_name: str
     scope_sources: Sequence[str]
     created_at: datetime
@@ -30,7 +31,7 @@ class AppConfigPolicyBulkUpdateItem:
     + new scope chain. `config_name` is immutable, so it's not part of
     the update payload."""
 
-    id: uuid.UUID
+    id: AppConfigPolicyID
     scope_sources: Sequence[str]
 
 

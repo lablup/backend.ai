@@ -23,7 +23,7 @@ class AppConfigPolicyConflict(BackendAIError, web.HTTPConflict):
 
 
 class AppConfigPolicyNotFound(ObjectNotFound):
-    object_name = "app-config policy"
+    object_name = "app config policy"
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
