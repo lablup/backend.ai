@@ -778,6 +778,642 @@
       "ui_option": {
         "ui_type": "text_input"
       }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "model",
+      "description": "HuggingFace model name or local path.",
+      "rank": 100,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--model-path",
+      "category": "model_loading",
+      "display_name": "Model",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "meta-llama/Llama-3.3-70B"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "dtype",
+      "description": "Data type for model weights and activations.",
+      "rank": 200,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "auto",
+      "key": "--dtype",
+      "category": "model_loading",
+      "display_name": "DType",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "auto",
+              "label": "Auto"
+            },
+            {
+              "value": "half",
+              "label": "Half"
+            },
+            {
+              "value": "float",
+              "label": "Float"
+            },
+            {
+              "value": "bfloat16",
+              "label": "BFloat16"
+            },
+            {
+              "value": "float16",
+              "label": "Float16"
+            },
+            {
+              "value": "float32",
+              "label": "Float32"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "quantization",
+      "description": "Quantization method.",
+      "rank": 300,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--quantization",
+      "category": "model_loading",
+      "display_name": "Quantization",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "awq / gptq / fp8"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "context-length",
+      "description": "Maximum context length.",
+      "rank": 400,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": null,
+      "key": "--context-length",
+      "category": "model_loading",
+      "display_name": "Context Length",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 256,
+          "max": 131072
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "served-model-name",
+      "description": "Overridden model name returned by the v1/models endpoint in the OpenAI API server.",
+      "rank": 500,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--served-model-name",
+      "category": "model_loading",
+      "display_name": "Served Model Name",
+      "ui_option": {
+        "ui_type": "text_input"
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "trust-remote-code",
+      "description": "Whether or not to allow for custom models defined on the Hub in their own modeling files.",
+      "rank": 600,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--trust-remote-code",
+      "category": "model_loading",
+      "display_name": "Trust Remote Code",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "gpu-memory-utilization",
+      "description": "Fraction of the memory used for static allocation.",
+      "rank": 700,
+      "preset_target": "args",
+      "value_type": "float",
+      "default_value": "0.9",
+      "key": "--mem-fraction-static",
+      "category": "resource_memory",
+      "display_name": "Memory Fraction Static",
+      "ui_option": {
+        "ui_type": "slider",
+        "slider": {
+          "min": 0.1,
+          "max": 1.0,
+          "step": 0.05
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "tensor-parallel-size",
+      "description": "Number of GPUs for tensor parallelism.",
+      "rank": 800,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": "1",
+      "key": "--tp-size",
+      "category": "resource_memory",
+      "display_name": "Tensor Parallel Size",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "1",
+              "label": "1"
+            },
+            {
+              "value": "2",
+              "label": "2"
+            },
+            {
+              "value": "4",
+              "label": "4"
+            },
+            {
+              "value": "8",
+              "label": "8"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "pipeline-parallel-size",
+      "description": "Pipeline parallel stage count.",
+      "rank": 900,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": "1",
+      "key": "--pp-size",
+      "category": "resource_memory",
+      "display_name": "Pipeline Parallel Size",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 1,
+          "max": 16
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "data-parallel-size",
+      "description": "Data parallel replica count.",
+      "rank": 1000,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": "1",
+      "key": "--dp-size",
+      "category": "resource_memory",
+      "display_name": "Data Parallel Size",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 1,
+          "max": 64
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "kv-cache-dtype",
+      "description": "Data type for kv cache storage.",
+      "rank": 1100,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "auto",
+      "key": "--kv-cache-dtype",
+      "category": "resource_memory",
+      "display_name": "KV Cache DType",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "auto",
+              "label": "Auto"
+            },
+            {
+              "value": "fp8_e5m2",
+              "label": "FP8 E5M2"
+            },
+            {
+              "value": "fp8_e4m3",
+              "label": "FP8 E4M3"
+            },
+            {
+              "value": "fp4_e2m1",
+              "label": "FP4 E2M1"
+            },
+            {
+              "value": "bf16",
+              "label": "BF16"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "disable-radix-cache",
+      "description": "Disable RadixAttention prefix caching.",
+      "rank": 1200,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--disable-radix-cache",
+      "category": "resource_memory",
+      "display_name": "Disable Prefix Caching",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "max-running-requests",
+      "description": "Maximum number of running requests.",
+      "rank": 1300,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": null,
+      "key": "--max-running-requests",
+      "category": "serving_performance",
+      "display_name": "Max Running Requests",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 1,
+          "max": 1024
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "max-total-tokens",
+      "description": "Maximum number of tokens in the memory pool.",
+      "rank": 1400,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": null,
+      "key": "--max-total-tokens",
+      "category": "serving_performance",
+      "display_name": "Max Total Tokens",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 256,
+          "max": 131072
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "chunked-prefill-size",
+      "description": "Maximum number of tokens in a chunk for chunked prefill. Use -1 to disable.",
+      "rank": 1500,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": null,
+      "key": "--chunked-prefill-size",
+      "category": "serving_performance",
+      "display_name": "Chunked Prefill Size",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": -1,
+          "max": 131072
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "scheduling-policy",
+      "description": "Scheduling policy for request handling.",
+      "rank": 1600,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "fcfs",
+      "key": "--schedule-policy",
+      "category": "serving_performance",
+      "display_name": "Scheduling Policy",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "fcfs",
+              "label": "FCFS"
+            },
+            {
+              "value": "lpm",
+              "label": "LPM"
+            },
+            {
+              "value": "priority",
+              "label": "Priority"
+            },
+            {
+              "value": "random",
+              "label": "Random"
+            },
+            {
+              "value": "dfs-weight",
+              "label": "DFS-Weight"
+            },
+            {
+              "value": "lof",
+              "label": "LOF"
+            },
+            {
+              "value": "routing-key",
+              "label": "Routing-Key"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "tool-call-parser",
+      "description": "Tool call parser implementation.",
+      "rank": 1700,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--tool-call-parser",
+      "category": "tool_reasoning",
+      "display_name": "Tool Call Parser",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "qwen / pythonic / deepseekv3 / glm / gpt-oss"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "reasoning-parser",
+      "description": "Parser for reasoning model output.",
+      "rank": 1800,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--reasoning-parser",
+      "category": "tool_reasoning",
+      "display_name": "Reasoning Parser",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "deepseek-r1",
+              "label": "DeepSeek R1"
+            },
+            {
+              "value": "deepseek-v3",
+              "label": "DeepSeek V3"
+            },
+            {
+              "value": "qwen3",
+              "label": "Qwen3"
+            },
+            {
+              "value": "qwen3-thinking",
+              "label": "Qwen3 Thinking"
+            },
+            {
+              "value": "kimi",
+              "label": "Kimi"
+            },
+            {
+              "value": "gpt-oss",
+              "label": "GPT-OSS"
+            },
+            {
+              "value": "glm45",
+              "label": "GLM 4.5"
+            },
+            {
+              "value": "step3",
+              "label": "STEP3"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "host",
+      "description": "Listen host.",
+      "rank": 1900,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "127.0.0.1",
+      "key": "--host",
+      "category": "network",
+      "display_name": "Host",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "127.0.0.1"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "port",
+      "description": "Listen port.",
+      "rank": 2000,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": "30000",
+      "key": "--port",
+      "category": "network",
+      "display_name": "Port",
+      "ui_option": {
+        "ui_type": "number_input",
+        "number": {
+          "min": 1,
+          "max": 65535
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "log-level",
+      "description": "The logging level of all loggers.",
+      "rank": 2400,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": "info",
+      "key": "--log-level",
+      "category": "monitoring",
+      "display_name": "Log Level",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "debug",
+              "label": "Debug"
+            },
+            {
+              "value": "info",
+              "label": "Info"
+            },
+            {
+              "value": "warning",
+              "label": "Warning"
+            },
+            {
+              "value": "error",
+              "label": "Error"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "log-requests",
+      "description": "Log metadata, inputs, outputs of all requests. The verbosity is decided by --log-requests-level.",
+      "rank": 2100,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--log-requests",
+      "category": "monitoring",
+      "display_name": "Log Requests",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "log-requests-level",
+      "description": "Request logging verbosity. 0: metadata only, 1: metadata and sampling parameters, 2: partial input/output, 3: full input/output.",
+      "rank": 2200,
+      "preset_target": "args",
+      "value_type": "int",
+      "default_value": null,
+      "key": "--log-requests-level",
+      "category": "monitoring",
+      "display_name": "Log Requests Level",
+      "ui_option": {
+        "ui_type": "select",
+        "choices": {
+          "items": [
+            {
+              "value": "0",
+              "label": "0 - Metadata only"
+            },
+            {
+              "value": "1",
+              "label": "1 - Metadata + sampling params"
+            },
+            {
+              "value": "2",
+              "label": "2 - Metadata + sampling params + Partial input/output"
+            },
+            {
+              "value": "3",
+              "label": "3 - Full input/output"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "enable-lora",
+      "description": "Enable LoRA support.",
+      "rank": 2300,
+      "preset_target": "args",
+      "value_type": "flag",
+      "default_value": null,
+      "key": "--enable-lora",
+      "category": "lora",
+      "display_name": "Enable LoRA",
+      "ui_option": {
+        "ui_type": "checkbox"
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "lora-modules",
+      "description": "LoRA adapter definitions. Each adapter must be specified in one of the following formats: <PATH> | <NAME>=<PATH> | JSON with schema {\"lora_name\": str, \"lora_path\": str, \"pinned\": bool}.",
+      "rank": 2400,
+      "preset_target": "args",
+      "value_type": "str",
+      "default_value": null,
+      "key": "--lora-paths",
+      "category": "lora",
+      "display_name": "LoRA Paths",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "adapter1=/path/to/adapter1"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "cuda-visible-devices",
+      "description": "CUDA device visibility override.",
+      "rank": 2500,
+      "preset_target": "env",
+      "value_type": "str",
+      "default_value": null,
+      "key": "CUDA_VISIBLE_DEVICES",
+      "category": "environment",
+      "display_name": "CUDA Visible Devices",
+      "ui_option": {
+        "ui_type": "text_input",
+        "text": {
+          "placeholder": "0,1,2,3"
+        }
+      }
+    },
+    {
+      "runtime_variant_name": "sglang",
+      "name": "hf-token-env",
+      "description": "HuggingFace token for gated model downloads.",
+      "rank": 2600,
+      "preset_target": "env",
+      "value_type": "str",
+      "default_value": null,
+      "key": "HF_TOKEN",
+      "category": "environment",
+      "display_name": "HF Token",
+      "ui_option": {
+        "ui_type": "text_input"
+      }
     }
   ]
 }
