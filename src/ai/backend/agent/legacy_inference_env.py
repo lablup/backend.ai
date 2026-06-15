@@ -3,6 +3,8 @@ from __future__ import annotations
 import shlex
 from collections.abc import Mapping
 
+from ai.backend.agent.errors.agent import InvalidArgumentError
+
 __all__ = ("LegacyInferenceEnvTranslator",)
 
 
@@ -36,5 +38,8 @@ class LegacyInferenceEnvTranslator:
         for env_key in LegacyInferenceEnvTranslator._RAW_ARG_ENVS:
             value = environ.get(env_key)
             if value:
-                args.extend(shlex.split(value))
+                try:
+                    args.extend(shlex.split(value))
+                except ValueError as e:
+                    raise InvalidArgumentError(f"Malformed quoting in {env_key}: {e}") from e
         return args

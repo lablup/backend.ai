@@ -220,10 +220,15 @@ class ServiceArgumentInterpolator:
                     case TokenType.EXPR:
                         try:
                             tokens.append(("{" + token + "}").format_map(variables))
-                        except (KeyError, ValueError, IndexError) as e:
+                        except (KeyError, IndexError) as e:
+                            raise InvalidServiceDefinition(
+                                f"Cannot interpolate service argument {part!r}: "
+                                f"undefined template variable {e}."
+                            ) from e
+                        except ValueError as e:
                             raise InvalidServiceDefinition(
                                 f"Cannot interpolate service argument {part!r}: {e}. "
-                                "Literal braces arguments (e.g. JSON like vLLM '--hf-overrides') "
+                                "Literal braces (e.g. JSON like vLLM '--hf-overrides') "
                                 "are not supported."
                             ) from e
             processed_parts.append("".join(tokens))
