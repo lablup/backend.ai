@@ -6,6 +6,7 @@ from uuid import UUID
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.user.types import (
@@ -145,14 +146,14 @@ class UserService:
         # and project memberships (user creation only provisions user-scope roles).
         # action.scope_id() is the user's domain name (the action's DOMAIN scope).
         await self._user_repository.assign_users_to_scope(
-            user_data_result.user.uuid,
+            UserID(user_data_result.user.uuid),
             user_data_result.user.domain_name,
             [ProjectID(UUID(gid)) for gid in action.group_ids] if action.group_ids else [],
         )
         # The user is also a member of its domain's model-store project at
         # creation, so grant that project scope's auto_assign roles too.
         await self._user_repository.assign_user_to_model_store(
-            user_data_result.user.uuid, user_data_result.user.domain_name
+            UserID(user_data_result.user.uuid), user_data_result.user.domain_name
         )
         return CreateUserActionResult(
             data=user_data_result,
@@ -169,12 +170,12 @@ class UserService:
         for created in result.successes:
             group_ids = group_ids_by_email.get(created.user.email)
             await self._user_repository.assign_users_to_scope(
-                created.user.uuid,
+                UserID(created.user.uuid),
                 created.user.domain_name,
                 [ProjectID(UUID(gid)) for gid in group_ids] if group_ids else [],
             )
             await self._user_repository.assign_user_to_model_store(
-                created.user.uuid, created.user.domain_name
+                UserID(created.user.uuid), created.user.domain_name
             )
         return BulkCreateUserActionResult(data=result)
 

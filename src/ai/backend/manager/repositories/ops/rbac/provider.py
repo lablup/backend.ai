@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import asynccontextmanager
 
@@ -10,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RelationType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.models.base import Base
@@ -44,7 +44,7 @@ class RBACWriteOps(WriteOps):
     async def add_users_to_scope(
         self,
         scope_id: ScopeId,
-        user_ids: Collection[uuid.UUID],
+        user_ids: Collection[UserID],
     ) -> None:
         """Bind users to a scope and grant the scope's ``auto_assign`` roles.
 

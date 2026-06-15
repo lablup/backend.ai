@@ -13,6 +13,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -108,13 +109,13 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def assign_users_to_scope(
-        self, user_uuid: UUID, domain_name: str | None, project_ids: Collection[ProjectID]
+        self, user_uuid: UserID, domain_name: str | None, project_ids: Collection[ProjectID]
     ) -> None:
         """Grant the auto_assign roles of a new user's initial domain/project scopes."""
         await self._db_source.assign_users_to_scope(user_uuid, domain_name, project_ids)
 
     @user_repository_resilience.apply()
-    async def assign_user_to_model_store(self, user_uuid: UUID, domain_name: str | None) -> None:
+    async def assign_user_to_model_store(self, user_uuid: UserID, domain_name: str | None) -> None:
         """Add a user to its domain's model-store project and grant its auto_assign roles."""
         await self._db_source.assign_user_to_model_store(user_uuid, domain_name)
 

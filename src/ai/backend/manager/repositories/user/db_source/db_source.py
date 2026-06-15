@@ -18,6 +18,7 @@ from sqlalchemy.sql.expression import bindparam
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.common.types import SearchResult
@@ -372,7 +373,7 @@ class UserDBSource:
 
     async def assign_users_to_scope(
         self,
-        user_uuid: UUID,
+        user_uuid: UserID,
         domain_name: str | None,
         project_ids: Collection[ProjectID],
     ) -> None:
@@ -395,7 +396,7 @@ class UserDBSource:
                     [user_uuid],
                 )
 
-    async def assign_user_to_model_store(self, user_uuid: UUID, domain_name: str | None) -> None:
+    async def assign_user_to_model_store(self, user_uuid: UserID, domain_name: str | None) -> None:
         """Add a user to its domain's model-store project scope and grant its roles.
 
         Resolves the model-store project(s) of the domain and maps the user to
