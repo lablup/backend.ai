@@ -276,9 +276,9 @@ def export_sessions(
     field_list = [f.strip() for f in fields.split(",")] if fields else None
 
     # Build nested user filter
-    user_filter: SessionExportUserNestedFilter | None = None
+    filter_user: SessionExportUserNestedFilter | None = None
     if filter_user_email or filter_user_username:
-        user_filter = SessionExportUserNestedFilter(
+        filter_user = SessionExportUserNestedFilter(
             email=StringFilter(contains=filter_user_email) if filter_user_email else None,
             username=StringFilter(contains=filter_user_username) if filter_user_username else None,
         )
@@ -290,7 +290,7 @@ def export_sessions(
         filter_type,
         filter_domain,
         filter_access_key,
-        user_filter,
+        filter_user,
         filter_status,
         filter_scaling_group,
         filter_created_after,
@@ -303,7 +303,7 @@ def export_sessions(
             session_type=[filter_type] if filter_type else None,
             domain_name=StringFilter(contains=filter_domain) if filter_domain else None,
             access_key=StringFilter(contains=filter_access_key) if filter_access_key else None,
-            user=user_filter,
+            user=filter_user,
             status=[filter_status] if filter_status else None,
             scaling_group_name=StringFilter(contains=filter_scaling_group)
             if filter_scaling_group
