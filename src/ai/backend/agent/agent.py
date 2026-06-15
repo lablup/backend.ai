@@ -67,6 +67,7 @@ from ai.backend.agent.errors import (
 )
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.health.heartbeat import HeartbeatTask
+from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
 from ai.backend.agent.metrics.metric import (
     StatScope,
     StatTaskObserver,
@@ -2482,6 +2483,22 @@ class AbstractAgent[
             model.service.start_command = list(image_command)
         return models
 
+    def _append_legacy_inference_env_args(
+        self,
+        models: list[ModelConfig],
+        environ: Mapping[str, str],
+    ) -> list[ModelConfig]:
+        """Append legacy env-derived CLI args (e.g. VLLM_EXTRA_ARGS) to start_command."""
+        extra_args = LegacyInferenceEnvTranslator.to_cli_args(environ)
+        if not extra_args:
+            return models
+        for model in models:
+            service = model.service
+            if service is None or not service.start_command:
+                continue
+            service.start_command = [*service.start_command, *extra_args]
+        return models
+
     async def create_kernel(
         self,
         ownership_data: KernelOwnershipData,
@@ -3177,6 +3194,10 @@ class AbstractAgent[
                         populated_models = await self._apply_image_cmd_fallback(
                             model_definition.models,
                             ctx.image_ref.canonical,
+                        )
+                        populated_models = self._append_legacy_inference_env_args(
+                            populated_models,
+                            environ,
                         )
                         for model in populated_models:
                             if model.service is None:
