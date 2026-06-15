@@ -26,6 +26,15 @@ class BgtaskStatus(enum.StrEnum):
     def finished(self) -> bool:
         return self in {self.DONE, self.CANCELLED, self.FAILED, self.PARTIAL_SUCCESS}
 
+    def to_task_status(self) -> TaskStatus:
+        match self:
+            case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
+                return TaskStatus.SUCCESS
+            case BgtaskStatus.CANCELLED | BgtaskStatus.FAILED:
+                return TaskStatus.FAILURE
+            case _:
+                return TaskStatus.ONGOING
+
 
 class BgtaskNameBase(Protocol):
     """
