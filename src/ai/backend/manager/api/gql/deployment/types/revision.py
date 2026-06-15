@@ -880,20 +880,24 @@ class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckInputDTO]):
         default=False,
     )
     interval: float | None = gql_field(
-        description="Interval in seconds between health checks.", default=None
+        description="Interval in seconds between health checks.", default=strawberry.UNSET
     )
-    path: str | None = gql_field(description="Path to check for health status.", default=None)
+    path: str | None = gql_field(
+        description="Path to check for health status.", default=strawberry.UNSET
+    )
     max_retries: int | None = gql_field(
-        description="Maximum number of retries for health check.", default=None
+        description="Maximum number of retries for health check.", default=strawberry.UNSET
     )
     max_wait_time: float | None = gql_field(
-        description="Maximum time in seconds to wait for a health check response.", default=None
+        description="Maximum time in seconds to wait for a health check response.",
+        default=strawberry.UNSET,
     )
     expected_status_code: int | None = gql_field(
-        description="Expected HTTP status code for a healthy response.", default=None
+        description="Expected HTTP status code for a healthy response.", default=strawberry.UNSET
     )
     initial_delay: float | None = gql_field(
-        description="Initial delay in seconds before the first health check.", default=None
+        description="Initial delay in seconds before the first health check.",
+        default=strawberry.UNSET,
     )
 
 
@@ -907,17 +911,19 @@ class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckInputDTO]):
 class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO]):
     pre_start_actions: list[PreStartActionInputGQL] | None = gql_field(
         description="List of pre-start actions to execute before starting the model service.",
-        default=None,
+        default=strawberry.UNSET,
     )
     start_command: list[str] | None = gql_field(
-        description="Command to start the model service.", default=None
+        description="Command to start the model service.", default=strawberry.UNSET
     )
     shell: str | None = gql_field(
-        description="Shell configured for the model service.", default=None
+        description="Shell configured for the model service.", default=strawberry.UNSET
     )
-    port: int | None = gql_field(description="Port number for the model service.", default=None)
+    port: int | None = gql_field(
+        description="Port number for the model service.", default=strawberry.UNSET
+    )
     health_check: ModelHealthCheckInputGQL | None = gql_field(
-        description="Health check configuration for the model service.", default=None
+        description="Health check configuration for the model service.", default=strawberry.UNSET
     )
 
 
@@ -929,24 +935,32 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
     name="ModelMetadataInput",
 )
 class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataInputDTO]):
-    author: str | None = gql_field(description="Author of the model.", default=None)
-    title: str | None = gql_field(description="Title of the model.", default=None)
-    version: str | None = gql_field(description="Version of the model.", default=None)
-    created: str | None = gql_field(description="Creation date of the model.", default=None)
+    author: str | None = gql_field(description="Author of the model.", default=strawberry.UNSET)
+    title: str | None = gql_field(description="Title of the model.", default=strawberry.UNSET)
+    version: str | None = gql_field(description="Version of the model.", default=strawberry.UNSET)
+    created: str | None = gql_field(
+        description="Creation date of the model.", default=strawberry.UNSET
+    )
     last_modified: str | None = gql_field(
-        description="Last modified date of the model.", default=None
+        description="Last modified date of the model.", default=strawberry.UNSET
     )
-    description: str | None = gql_field(description="Description of the model.", default=None)
-    task: str | None = gql_field(description="Task type of the model.", default=None)
-    category: str | None = gql_field(description="Category of the model.", default=None)
-    architecture: str | None = gql_field(description="Architecture of the model.", default=None)
+    description: str | None = gql_field(
+        description="Description of the model.", default=strawberry.UNSET
+    )
+    task: str | None = gql_field(description="Task type of the model.", default=strawberry.UNSET)
+    category: str | None = gql_field(description="Category of the model.", default=strawberry.UNSET)
+    architecture: str | None = gql_field(
+        description="Architecture of the model.", default=strawberry.UNSET
+    )
     framework: list[str] | None = gql_field(
-        description="Frameworks used by the model.", default=None
+        description="Frameworks used by the model.", default=strawberry.UNSET
     )
-    label: list[str] | None = gql_field(description="Labels for the model.", default=None)
-    license: str | None = gql_field(description="License of the model.", default=None)
+    label: list[str] | None = gql_field(
+        description="Labels for the model.", default=strawberry.UNSET
+    )
+    license: str | None = gql_field(description="License of the model.", default=strawberry.UNSET)
     min_resource: JSON | None = gql_field(
-        description="Minimum resource requirements for the model.", default=None
+        description="Minimum resource requirements for the model.", default=strawberry.UNSET
     )
 
 
@@ -958,13 +972,15 @@ class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataInputDTO]):
     name="ModelConfigInput",
 )
 class ModelConfigInputGQL(PydanticInputMixin[ModelConfigInputDTO]):
-    name: str | None = gql_field(description="Name of the model.", default=None)
-    model_path: str | None = gql_field(description="Path to the model file.", default=None)
+    name: str | None = gql_field(description="Name of the model.", default=strawberry.UNSET)
+    model_path: str | None = gql_field(
+        description="Path to the model file.", default=strawberry.UNSET
+    )
     service: ModelServiceConfigInputGQL | None = gql_field(
-        description="Configuration for the model service.", default=None
+        description="Configuration for the model service.", default=strawberry.UNSET
     )
     metadata: ModelMetadataInputGQL | None = gql_field(
-        description="Metadata about the model.", default=None
+        description="Metadata about the model.", default=strawberry.UNSET
     )
 
 
@@ -977,7 +993,7 @@ class ModelConfigInputGQL(PydanticInputMixin[ModelConfigInputDTO]):
 )
 class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionInputDTO]):
     models: list[ModelConfigInputGQL] | None = gql_field(
-        description="List of models in the model definition.", default=None
+        description="List of models in the model definition.", default=strawberry.UNSET
     )
 
 
