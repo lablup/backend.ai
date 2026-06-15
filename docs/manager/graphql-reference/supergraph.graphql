@@ -9484,16 +9484,16 @@ input ModelConfigInput
   @join__type(graph: STRAWBERRY)
 {
   """Name of the model."""
-  name: String = null
+  name: String
 
   """Path to the model file."""
-  modelPath: String = null
+  modelPath: String
 
   """Configuration for the model service."""
-  service: ModelServiceConfigInput = null
+  service: ModelServiceConfigInput
 
   """Metadata about the model."""
-  metadata: ModelMetadataInput = null
+  metadata: ModelMetadataInput
 }
 
 """
@@ -9513,7 +9513,7 @@ input ModelDefinitionInput
   @join__type(graph: STRAWBERRY)
 {
   """List of models in the model definition."""
-  models: [ModelConfigInput!] = null
+  models: [ModelConfigInput!]
 }
 
 """
@@ -9697,22 +9697,22 @@ input ModelHealthCheckInput
   enable: Boolean! = false
 
   """Interval in seconds between health checks."""
-  interval: Float = null
+  interval: Float
 
   """Path to check for health status."""
-  path: String = null
+  path: String
 
   """Maximum number of retries for health check."""
-  maxRetries: Int = null
+  maxRetries: Int
 
   """Maximum time in seconds to wait for a health check response."""
-  maxWaitTime: Float = null
+  maxWaitTime: Float
 
   """Expected HTTP status code for a healthy response."""
-  expectedStatusCode: Int = null
+  expectedStatusCode: Int
 
   """Initial delay in seconds before the first health check."""
-  initialDelay: Float = null
+  initialDelay: Float
 }
 
 """Added in 26.4.2. Metadata describing a model entry."""
@@ -9766,43 +9766,43 @@ input ModelMetadataInput
   @join__type(graph: STRAWBERRY)
 {
   """Author of the model."""
-  author: String = null
+  author: String
 
   """Title of the model."""
-  title: String = null
+  title: String
 
   """Version of the model."""
-  version: String = null
+  version: String
 
   """Creation date of the model."""
-  created: String = null
+  created: String
 
   """Last modified date of the model."""
-  lastModified: String = null
+  lastModified: String
 
   """Description of the model."""
-  description: String = null
+  description: String
 
   """Task type of the model."""
-  task: String = null
+  task: String
 
   """Category of the model."""
-  category: String = null
+  category: String
 
   """Architecture of the model."""
-  architecture: String = null
+  architecture: String
 
   """Frameworks used by the model."""
-  framework: [String!] = null
+  framework: [String!]
 
   """Labels for the model."""
-  label: [String!] = null
+  label: [String!]
 
   """License of the model."""
-  license: String = null
+  license: String
 
   """Minimum resource requirements for the model."""
-  minResource: JSON = null
+  minResource: JSON
 }
 
 """
@@ -10110,19 +10110,19 @@ input ModelServiceConfigInput
   """
   List of pre-start actions to execute before starting the model service.
   """
-  preStartActions: [PreStartActionInput!] = null
+  preStartActions: [PreStartActionInput!]
 
   """Command to start the model service."""
-  startCommand: [String!] = null
+  startCommand: [String!]
 
   """Shell configured for the model service."""
-  shell: String = null
+  shell: String
 
   """Port number for the model service."""
-  port: Int = null
+  port: Int
 
   """Health check configuration for the model service."""
-  healthCheck: ModelHealthCheckInput = null
+  healthCheck: ModelHealthCheckInput
 }
 
 """
