@@ -67,7 +67,7 @@ from ai.backend.agent.errors import (
 )
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.health.heartbeat import HeartbeatTask
-from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvArgs
+from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
 from ai.backend.agent.metrics.metric import (
     StatScope,
     StatTaskObserver,
@@ -2489,7 +2489,7 @@ class AbstractAgent[
         environ: Mapping[str, str],
     ) -> list[ModelConfig]:
         """Append legacy env-derived CLI args (e.g. VLLM_EXTRA_ARGS) to start_command."""
-        extra_args = LegacyInferenceEnvArgs.to_cli_args(environ)
+        extra_args = LegacyInferenceEnvTranslator.to_cli_args(environ)
         if not extra_args:
             return models
         for model in models:

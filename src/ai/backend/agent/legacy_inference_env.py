@@ -3,10 +3,10 @@ from __future__ import annotations
 import shlex
 from collections.abc import Mapping
 
-__all__ = ("LegacyInferenceEnvArgs",)
+__all__ = ("LegacyInferenceEnvTranslator",)
 
 
-class LegacyInferenceEnvArgs:
+class LegacyInferenceEnvTranslator:
     """Translate legacy ``VLLM_*`` / ``SGLANG_*`` env vars into CLI args the baseline lost.
 
     Replaces the image ``start-*.sh`` wrapper the baseline ``start_command`` overrides.
@@ -28,12 +28,12 @@ class LegacyInferenceEnvArgs:
     @staticmethod
     def to_cli_args(environ: Mapping[str, str]) -> list[str]:
         args: list[str] = []
-        for env_key, flag in LegacyInferenceEnvArgs._FLAG_BY_ENV.items():
+        for env_key, flag in LegacyInferenceEnvTranslator._FLAG_BY_ENV.items():
             value = environ.get(env_key)
             if value:
                 args.append(flag)
                 args.append(value)
-        for env_key in LegacyInferenceEnvArgs._RAW_ARG_ENVS:
+        for env_key in LegacyInferenceEnvTranslator._RAW_ARG_ENVS:
             value = environ.get(env_key)
             if value:
                 args.extend(shlex.split(value))

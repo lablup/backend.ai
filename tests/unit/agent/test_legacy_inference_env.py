@@ -6,7 +6,7 @@ from typing import Any, cast
 import pytest
 
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvArgs
+from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
 from ai.backend.common.config import ModelConfig
 
 
@@ -17,7 +17,7 @@ class CollectScenario:
     expected: list[str]
 
 
-class TestLegacyInferenceEnvArgsToCliArgs:
+class TestLegacyInferenceEnvTranslatorToCliArgs:
     @pytest.mark.parametrize(
         "scenario",
         [
@@ -116,7 +116,7 @@ class TestLegacyInferenceEnvArgsToCliArgs:
         self,
         scenario: CollectScenario,
     ) -> None:
-        assert LegacyInferenceEnvArgs.to_cli_args(scenario.environ) == scenario.expected
+        assert LegacyInferenceEnvTranslator.to_cli_args(scenario.environ) == scenario.expected
 
 
 def _model(name: str, start_command: list[str] | None) -> ModelConfig:
@@ -131,7 +131,7 @@ def _model(name: str, start_command: list[str] | None) -> ModelConfig:
     })
 
 
-class TestAppendLegacyInferenceEnvArgs:
+class TestAppendLegacyInferenceEnvTranslator:
     def test_appends_to_existing_start_command(self) -> None:
         models = [_model("vllm", ["vllm", "serve", "/models"])]
         environ = {"VLLM_EXTRA_ARGS": "--trust-remote-code", "VLLM_TP_SIZE": "4"}
