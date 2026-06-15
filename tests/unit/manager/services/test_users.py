@@ -183,7 +183,7 @@ class TestCreateUser:
         assert sample_user_data.username is not None
         assert sample_user_data.need_password_change is not None
         assert sample_user_data.domain_name is not None
-        group_ids = ["group1", "group2"]
+        group_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
         action = CreateUserAction(
             creator=Creator(
                 spec=UserCreatorSpec(
