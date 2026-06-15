@@ -477,17 +477,13 @@ class ExportAdapter(BaseFilterAdapter):
         if filter is None or filter.user is None:
             return []
 
-        # Map nested user filter attribute -> report field key (only attributes that are set).
-        user_filter_field_keys = {
-            "user_email": filter.user.email,
-            "user_username": filter.user.username,
-        }
-
         fields: list[ExportFieldDef] = []
-        for field_key, value in user_filter_field_keys.items():
-            if value is None:
-                continue
-            field = report.get_field(field_key)
+        if filter.user.email is not None:
+            field = report.get_field("user_email")
+            if field is not None:
+                fields.append(field)
+        if filter.user.username is not None:
+            field = report.get_field("user_username")
             if field is not None:
                 fields.append(field)
         return fields
