@@ -83,7 +83,7 @@ access to exactly one deployment.
 
 ### Coordinator → worker propagation
 
-Two mechanisms exist (`coordinator/types.py:CircuitManager`):
+Two mechanisms exist (`src/ai/backend/appproxy/coordinator/types.py:CircuitManager`):
 
 - **Legacy (aiohttp worker) mode.** Circuit changes are broadcast as Redis
   Pub/Sub events carrying the **full per-entity state**
