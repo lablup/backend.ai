@@ -1,7 +1,7 @@
 """add permission bitmask column to permissions
 
 Revision ID: c6648c039bd4
-Revises: a3f1c7e2b9d4
+Revises: e7b3a1f9c2d4
 Create Date: 2026-06-11 01:51:27.442017
 
 """
@@ -11,8 +11,8 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "c6648c039bd4"
-down_revision = "a3f1c7e2b9d4"
-# Part of: 26.6.0
+down_revision = "e7b3a1f9c2d4"
+
 branch_labels = None
 depends_on = None
 
