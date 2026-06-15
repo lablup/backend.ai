@@ -91,7 +91,7 @@ Two mechanisms exist (`src/ai/backend/appproxy/coordinator/types.py:CircuitManag
   Circuit creation blocks up to 15 s for the **first** worker ack
   (`initialize_legacy_circuit`, raising `E10001` on timeout); route updates
   and removals are fire-and-forget. The worker pulls the circuit snapshot
-  exactly once, at startup (`worker/server.py:worker_registration_ctx`).
+  exactly once, at startup (`src/ai/backend/appproxy/worker/server.py:worker_registration_ctx`).
 - **Traefik mode.** The coordinator writes each circuit's full desired state
   into etcd (`atomic_replace_prefixes`) and a leader-elected
   `reconcile_traefik_routes` task re-publishes every circuit and drops
