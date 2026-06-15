@@ -1,11 +1,12 @@
 """add app_config_policies table
 
-Adds the per-document policy table — `config_name` (UNIQUE, immutable)
-and `scope_sources` (ordered scope chain) drive the merge order and
-the write allow-list.
+Adds the per-document policy table — `config_name` (UNIQUE) and
+`scope_sources` (ordered scope chain). These are intended to drive the
+merge order and write allow-list; the enforcing logic lands in a
+follow-up PR (this migration only creates the table).
 
-Sister migration BA-5827 stacks on top with the
-`app_config_fragments` table (which FKs to `config_name`).
+A sister migration (BA-5827) will stack on top with the
+`app_config_fragments` table, which is planned to FK to `config_name`.
 
 Revision ID: 5df264862995
 Revises: 5d08e1164834
@@ -46,7 +47,8 @@ def upgrade() -> None:
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
-            nullable=True,
+            nullable=False,
+            server_default=sa.func.now(),
         ),
         sa.UniqueConstraint(
             "config_name",

@@ -14,7 +14,7 @@ class AppConfigPolicyData:
     config_name: str
     scope_sources: Sequence[AppConfigScopeType]
     created_at: datetime
-    updated_at: datetime | None
+    updated_at: datetime
 
 
 @dataclass(frozen=True)

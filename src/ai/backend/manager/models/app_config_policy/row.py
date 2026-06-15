@@ -49,10 +49,11 @@ class AppConfigPolicyRow(Base):  # type: ignore[misc]
         nullable=False,
         server_default=sa.func.now(),
     )
-    updated_at: Mapped[datetime | None] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         "updated_at",
         sa.DateTime(timezone=True),
-        nullable=True,
+        nullable=False,
+        server_default=sa.func.now(),
         onupdate=sa.func.current_timestamp(),
     )
 
