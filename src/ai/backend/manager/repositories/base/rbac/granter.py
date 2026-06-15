@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import (
     OperationType,
+    Permission,
     RBACElementType,
     RelationType,
 )
@@ -104,6 +105,7 @@ async def execute_rbac_granter(
             "scope_id": entity_id.entity_id,
             "entity_type": entity_id.entity_type,
             "operation": operation,
+            "permission": Permission.from_operation(operation),
         }
         for role_id in role_ids
         for operation in granter.operations

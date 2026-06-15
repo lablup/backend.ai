@@ -14,6 +14,7 @@ import pytest
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     RBACElementType,
     ScopeType,
 )
@@ -109,6 +110,7 @@ class TestSearchPermissions:
                     scope_id="test-domain",
                     entity_type=entity_type,
                     operation=operation,
+                    permission=Permission.from_operation(operation),
                 )
                 db_sess.add(perm)
                 await db_sess.flush()

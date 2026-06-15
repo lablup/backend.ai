@@ -24,6 +24,7 @@ from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     RBACElementType,
     ScopeType,
 )
@@ -240,6 +241,7 @@ async def _grant_permission(
                 scope_id=scope_id,
                 entity_type=entity_type,
                 operation=operation,
+                permission=Permission.from_operation(operation),
             )
         )
         await db_sess.flush()

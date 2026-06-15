@@ -14,6 +14,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     RBACElementType,
 )
 from ai.backend.manager.data.permission.id import ObjectId
@@ -116,6 +117,7 @@ class TestRevokerBasic:
                     scope_id=entity_id.entity_id,
                     entity_type=entity_id.entity_type,
                     operation=op,
+                    permission=Permission.from_operation(op),
                 )
                 db_sess.add(perm)
             await db_sess.flush()
@@ -264,6 +266,7 @@ class TestRevokerMultipleRoles:
                     scope_id=entity_id.entity_id,
                     entity_type=entity_id.entity_type,
                     operation=OperationType.READ,
+                    permission=Permission.READ,
                 )
                 db_sess.add(perm)
             await db_sess.flush()
@@ -354,6 +357,7 @@ class TestRevokerIdempotent:
                 scope_id=entity_id.entity_id,
                 entity_type=entity_id.entity_type,
                 operation=OperationType.READ,
+                permission=Permission.READ,
             )
             db_sess.add(perm)
             await db_sess.flush()

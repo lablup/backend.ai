@@ -17,7 +17,12 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
 from ai.backend.common.dto.manager.v2.group.request import PurgeProjectInput
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    Permission,
+    ScopeType,
+)
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -104,6 +109,7 @@ async def project_with_rbac_rows(
                     "scope_id": scope_id,
                     "entity_type": EntityType.PROJECT,
                     "operation": OperationType.UPDATE,
+                    "permission": Permission.UPDATE,
                 },
                 {
                     "role_id": member_role_id,
@@ -111,6 +117,7 @@ async def project_with_rbac_rows(
                     "scope_id": scope_id,
                     "entity_type": EntityType.PROJECT,
                     "operation": OperationType.READ,
+                    "permission": Permission.READ,
                 },
             ])
         )

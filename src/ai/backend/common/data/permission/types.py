@@ -571,3 +571,25 @@ class Permission(enum.IntFlag):
     def full(cls) -> Permission:
         """The full permission cap — every operation allowed."""
         return cls.READ | cls.UPDATE | cls.CREATE | cls.SOFT_DELETE | cls.HARD_DELETE
+
+    @classmethod
+    def from_operation(cls, operation: OperationType) -> Permission:
+        """Map a single :class:`OperationType` to its corresponding bit.
+
+        Grant operations (``GRANT_*``) have no dedicated bit and map to
+        :attr:`NONE`; grant authority is still carried by the legacy
+        ``permissions.operation`` column during the transition.
+        """
+        match operation:
+            case OperationType.READ:
+                return cls.READ
+            case OperationType.UPDATE:
+                return cls.UPDATE
+            case OperationType.CREATE:
+                return cls.CREATE
+            case OperationType.SOFT_DELETE:
+                return cls.SOFT_DELETE
+            case OperationType.HARD_DELETE:
+                return cls.HARD_DELETE
+            case _:
+                return cls.NONE

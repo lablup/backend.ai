@@ -13,7 +13,12 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    Permission,
+    ScopeType,
+)
 from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -100,6 +105,7 @@ class TestBulkRolePermissions:
                         scope_id=seed_permission.scope_id,
                         entity_type=EntityType(seed_permission.entity_type.value),
                         operation=seed_permission.operation,
+                        permission=Permission.from_operation(seed_permission.operation),
                     )
                 )
             await session.commit()
@@ -120,6 +126,7 @@ class TestBulkRolePermissions:
                     scope_id=spec.scope_id,
                     entity_type=EntityType(spec.entity_type.value),
                     operation=spec.operation,
+                    permission=Permission.from_operation(spec.operation),
                 )
             )
             await session.commit()

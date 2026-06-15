@@ -21,6 +21,7 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     RBACElementRef,
     RoleSource,
     ScopeType,
@@ -133,6 +134,7 @@ class RoleManager:
                     scope_id=data.scope_id().scope_id,
                     entity_type=element_type.to_entity_type(),
                     operation=operation,
+                    permission=Permission.from_operation(operation),
                 )
                 permission_rows.append(PermissionRow.from_input(creator))
         db_session.add_all(permission_rows)
@@ -226,6 +228,7 @@ class RoleManager:
                     scope_id=scope_id.scope_id,
                     entity_type=preset_permission.entity_type,
                     operation=preset_permission.operation,
+                    permission=Permission.from_operation(preset_permission.operation),
                 )
             )
             for preset_permission in permission_presets

@@ -47,6 +47,21 @@ OWNER_OPS: tuple[str, ...] = (
 )
 MEMBER_OPS: tuple[str, ...] = ("read",)
 
+# Bit values mirror ai.backend.common.data.permission.types.Permission (IntFlag).
+# Grant operations (grant:*) have no dedicated bit and map to 0 (NONE);
+# grant authority remains carried by the legacy `operation` column.
+OPERATION_PERMISSION_BIT: dict[str, int] = {
+    "read": 1,
+    "update": 2,
+    "create": 4,
+    "soft-delete": 8,
+    "hard-delete": 16,
+}
+
+
+def permission_bit(operation: str) -> int:
+    return OPERATION_PERMISSION_BIT.get(operation, 0)
+
 RESOURCE_ENTITY_TYPES: tuple[str, ...] = (
     "session",
     "agent",
@@ -94,11 +109,16 @@ def main() -> int:
     ]
     stripped = len(data["permissions"]) - len(base_permissions)
 
+    # Backfill the bitmask column on pass-through (base) rows so every emitted
+    # permission row carries `permission` derived from its `operation`.
+    for p in base_permissions:
+        p["permission"] = permission_bit(p["operation"])
+
     role_scopes: set[tuple[str, str, str]] = {
         (p["role_id"], p["scope_type"], p["scope_id"]) for p in base_permissions
     }
 
-    new_rows: list[dict[str, str]] = []
+    new_rows: list[dict[str, str | int]] = []
     for role_id, scope_type, scope_id in sorted(role_scopes):
         role = roles_by_id.get(role_id)
         if role is None:
@@ -116,6 +136,7 @@ def main() -> int:
                     "scope_id": scope_id,
                     "entity_type": entity_type,
                     "operation": op,
+                    "permission": permission_bit(op),
                 })
 
     data["permissions"] = base_permissions + new_rows
