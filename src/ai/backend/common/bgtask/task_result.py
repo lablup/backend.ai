@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import TypeVar, override
 
 from ai.backend.common.bgtask.task.base import BaseBackgroundTaskResult
 from ai.backend.common.events.event_types.bgtask.broadcast import (
@@ -43,6 +43,11 @@ class TaskResult(ABC):
         """Get the error code if applicable."""
         raise NotImplementedError
 
+    @abstractmethod
+    def result_message(self) -> str:
+        """Get the message describing the task result."""
+        raise NotImplementedError
+
 
 @dataclass
 class TaskSuccessResult[R: BaseBackgroundTaskResult | None](TaskResult):
@@ -50,6 +55,7 @@ class TaskSuccessResult[R: BaseBackgroundTaskResult | None](TaskResult):
 
     result: R
 
+    @override
     def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
         # For now, convert the result to string for the message
         # This assumes the result has a meaningful string representation
@@ -60,11 +66,17 @@ class TaskSuccessResult[R: BaseBackgroundTaskResult | None](TaskResult):
         )
         return BgtaskDoneEvent(task_id=task_id, message=message)
 
+    @override
     def status(self) -> BgtaskStatus:
         return BgtaskStatus.DONE
 
+    @override
     def error_code(self) -> ErrorCode | None:
         return None
+
+    @override
+    def result_message(self) -> str:
+        return "Task completed successfully"
 
 
 @dataclass
@@ -73,18 +85,25 @@ class TaskCancelledResult(TaskResult):
 
     message: str = "Task cancelled"
 
+    @override
     def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
         return BgtaskCancelledEvent(task_id, self.message)
 
+    @override
     def status(self) -> BgtaskStatus:
         return BgtaskStatus.CANCELLED
 
+    @override
     def error_code(self) -> ErrorCode | None:
         return ErrorCode(
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.CANCELED,
         )
+
+    @override
+    def result_message(self) -> str:
+        return self.message
 
 
 @dataclass
@@ -93,12 +112,15 @@ class TaskFailedResult(TaskResult):
 
     exception: BaseException
 
+    @override
     def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
         return BgtaskFailedEvent(task_id, repr(self.exception))
 
+    @override
     def status(self) -> BgtaskStatus:
         return BgtaskStatus.FAILED
 
+    @override
     def error_code(self) -> ErrorCode | None:
         if isinstance(self.exception, BackendAIError):
             return self.exception.error_code()
@@ -107,3 +129,7 @@ class TaskFailedResult(TaskResult):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+    @override
+    def result_message(self) -> str:
+        return f"Task failed with exception: {self.exception}"

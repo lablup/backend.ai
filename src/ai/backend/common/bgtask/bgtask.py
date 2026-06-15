@@ -509,6 +509,8 @@ class BackgroundTaskManager:
             try:
                 task_result = await self._try_to_execute_new_task(task_name, manifest)
                 context.result = task_result
+                task_status = task_result.status().to_task_status()
+                last_message = task_result.result_message()
             except Exception as e:
                 task_status = TaskStatus.FAILURE
                 last_message = f"Task failed with exception: {e}"
@@ -536,6 +538,8 @@ class BackgroundTaskManager:
             try:
                 task_result = await self._try_to_revive_task(task_name, task_info)
                 context.result = task_result
+                task_status = task_result.status().to_task_status()
+                last_message = task_result.result_message()
             except Exception as e:
                 task_status = TaskStatus.FAILURE
                 last_message = f"Task failed with exception: {e}"
