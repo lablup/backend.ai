@@ -86,6 +86,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
         RuntimeVariantGQL,
     )
+    from ai.backend.manager.api.gql.runtime_variant_preset.types import (  # pants: no-infer-dep
+        RuntimeVariantPresetGQL,
+    )
     from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
         DeploymentHistory,
         RouteHistory,
@@ -826,6 +829,22 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [RV.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def runtime_variant_preset_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, RuntimeVariantPresetGQL | None]:
+        adapter = self._adapters.runtime_variant_preset
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[RuntimeVariantPresetGQL | None]:
+            from ai.backend.manager.api.gql.runtime_variant_preset.types import (  # pants: no-infer-dep
+                RuntimeVariantPresetGQL as RVP,
+            )
+
+            nodes = await adapter.batch_load_by_ids(ids)
+            return [RVP.from_pydantic(node) if node is not None else None for node in nodes]
 
         return DataLoader(load_fn=load_fn)
 

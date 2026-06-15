@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -19,6 +20,13 @@ __all__ = ("RuntimeVariantPresetConditions",)
 
 
 class RuntimeVariantPresetConditions:
+    @staticmethod
+    def by_ids(ids: Collection[UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RuntimeVariantPresetRow.id.in_(ids)
+
+        return inner
+
     @staticmethod
     def by_runtime_variant_id(variant_id: UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:

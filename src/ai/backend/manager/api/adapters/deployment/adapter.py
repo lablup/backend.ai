@@ -122,6 +122,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RollingUpdateConfigInfo,
     RollingUpdateStrategySpecInfo,
     RouteOrderField,
+    RuntimeVariantPresetValueInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AllocatedResourceSlotFilter,
@@ -2346,6 +2347,10 @@ class DeploymentAdapter(BaseAdapter):
                     else None
                 ),
                 environ=environ_dto,
+                runtime_variant_preset_values=[
+                    RuntimeVariantPresetValueInfoDTO(preset_id=pv.preset_id, value=pv.value)
+                    for pv in data.preset.values
+                ],
             ),
             model_mount_config=model_mount_config_dto,
             model_definition=(

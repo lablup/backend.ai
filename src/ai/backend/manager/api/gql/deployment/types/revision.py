@@ -102,6 +102,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelServiceConfigInfoDTO,
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
+    RuntimeVariantPresetValueInfoDTO,
 )
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
@@ -234,6 +235,24 @@ class ResourceConfig:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A runtime variant preset value materialised on a revision.",
+    ),
+    model=RuntimeVariantPresetValueInfoDTO,
+    name="RuntimeVariantPresetValue",
+)
+class RuntimeVariantPresetValueGQL:
+    preset_id: UUID = gql_field(description="The preset this value is bound to.")
+    value: str = gql_field(description="Value bound to the preset.")
+
+    @gql_field(description="The preset's key (env var name or CLI flag).")  # type: ignore[misc]
+    async def key(self, info: Info[StrawberryGQLContext]) -> str | None:
+        node = await info.context.data_loaders.runtime_variant_preset_loader.load(self.preset_id)
+        return node.target_spec.key if node is not None else None
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="25.19.0",
         description="Runtime configuration for the inference framework. Includes the runtime variant, framework-specific configuration, and environment variables.",
     ),
@@ -249,6 +268,12 @@ class ModelRuntimeConfig:
     environ: EnvironmentVariablesGQL | None = gql_field(
         description="Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0.",
         default=None,
+    )
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Preset values materialised on this revision.",
+        ),
     )
 
     @gql_added_field(
