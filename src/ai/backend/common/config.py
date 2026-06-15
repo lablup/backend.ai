@@ -351,6 +351,18 @@ def _pick(base_val: Any, override_val: Any, override_set: bool) -> Any:
     return override_val
 
 
+def _pick_non_null_override(base_val: Any, override_val: Any, override_set: bool) -> Any:
+    """Return a non-null draft override, otherwise keep the base value.
+
+    Draft model definitions are patch layers from several sources. In that
+    patch context ``None`` means the field was not supplied with a concrete
+    value, even when an input adapter materializes optional fields as null.
+    """
+    if not override_set or override_val is None:
+        return base_val
+    return override_val
+
+
 def _merge_metadata(base: ModelMetadata, override: ModelMetadata) -> ModelMetadata:
     """Merge two ModelMetadata instances. All fields are atomic."""
     s = override.model_fields_set
@@ -592,15 +604,21 @@ def _merge_health_check_draft(
 ) -> ModelHealthCheckDraft:
     s = override.model_fields_set
     return ModelHealthCheckDraft.model_construct(
-        enable=_pick(base.enable, override.enable, "enable" in s),
-        interval=_pick(base.interval, override.interval, "interval" in s),
-        path=_pick(base.path, override.path, "path" in s),
-        max_retries=_pick(base.max_retries, override.max_retries, "max_retries" in s),
-        max_wait_time=_pick(base.max_wait_time, override.max_wait_time, "max_wait_time" in s),
-        expected_status_code=_pick(
+        enable=_pick_non_null_override(base.enable, override.enable, "enable" in s),
+        interval=_pick_non_null_override(base.interval, override.interval, "interval" in s),
+        path=_pick_non_null_override(base.path, override.path, "path" in s),
+        max_retries=_pick_non_null_override(
+            base.max_retries, override.max_retries, "max_retries" in s
+        ),
+        max_wait_time=_pick_non_null_override(
+            base.max_wait_time, override.max_wait_time, "max_wait_time" in s
+        ),
+        expected_status_code=_pick_non_null_override(
             base.expected_status_code, override.expected_status_code, "expected_status_code" in s
         ),
-        initial_delay=_pick(base.initial_delay, override.initial_delay, "initial_delay" in s),
+        initial_delay=_pick_non_null_override(
+            base.initial_delay, override.initial_delay, "initial_delay" in s
+        ),
     )
 
 
@@ -613,14 +631,18 @@ def _merge_service_config_draft(
     if "health_check" in s and base.health_check is not None and override.health_check is not None:
         health_check = _merge_health_check_draft(base.health_check, override.health_check)
     else:
-        health_check = _pick(base.health_check, override.health_check, "health_check" in s)
+        health_check = _pick_non_null_override(
+            base.health_check, override.health_check, "health_check" in s
+        )
     return ModelServiceConfigDraft.model_construct(
-        pre_start_actions=_pick(
+        pre_start_actions=_pick_non_null_override(
             base.pre_start_actions, override.pre_start_actions, "pre_start_actions" in s
         ),
-        start_command=_pick(base.start_command, override.start_command, "start_command" in s),
-        shell=_pick(base.shell, override.shell, "shell" in s),
-        port=_pick(base.port, override.port, "port" in s),
+        start_command=_pick_non_null_override(
+            base.start_command, override.start_command, "start_command" in s
+        ),
+        shell=_pick_non_null_override(base.shell, override.shell, "shell" in s),
+        port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
     )
 
@@ -634,14 +656,14 @@ def _merge_config_draft(
     if "service" in s and base.service is not None and override.service is not None:
         service = _merge_service_config_draft(base.service, override.service)
     else:
-        service = _pick(base.service, override.service, "service" in s)
+        service = _pick_non_null_override(base.service, override.service, "service" in s)
     metadata: ModelMetadata | None
     if "metadata" in s and base.metadata is not None and override.metadata is not None:
         metadata = _merge_metadata(base.metadata, override.metadata)
     else:
-        metadata = _pick(base.metadata, override.metadata, "metadata" in s)
+        metadata = _pick_non_null_override(base.metadata, override.metadata, "metadata" in s)
     return ModelConfigDraft.model_construct(
-        name=_pick(base.name, override.name, "name" in s),
+        name=_pick_non_null_override(base.name, override.name, "name" in s),
         model_path=override.model_path if override.model_path is not None else base.model_path,
         service=service,
         metadata=metadata,
