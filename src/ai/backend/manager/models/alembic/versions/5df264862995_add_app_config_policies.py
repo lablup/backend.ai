@@ -9,7 +9,7 @@ A sister migration (BA-5827) will stack on top with the
 `app_config_fragments` table, which is planned to FK to `config_name`.
 
 Revision ID: 5df264862995
-Revises: 5d08e1164834
+Revises: c6648c039bd4
 Create Date: 2026-04-24
 
 """
@@ -21,7 +21,7 @@ from ai.backend.manager.models.base import IDColumn
 
 # revision identifiers, used by Alembic.
 revision = "5df264862995"
-down_revision = "5d08e1164834"
+down_revision = "c6648c039bd4"
 # Part of: 26.6.0
 branch_labels = None
 depends_on = None
