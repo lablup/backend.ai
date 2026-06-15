@@ -322,12 +322,7 @@ class TestHealthCheckEnable:
         assert service.health_check.enable is False
 
     def test_explicit_none_port_does_not_clobber_baseline(self) -> None:
-        """BA-6490: a higher-priority draft with ``port=None`` keeps the base port.
-
-        The GQL layer materializes an omitted ``port`` as an explicit ``None``;
-        the merge must treat that as "no change" instead of overriding the
-        baseline's port (which would later fail strict ``port`` validation).
-        """
+        """BA-6490: an override draft with ``port=None`` keeps the base port."""
         base = ModelServiceConfigDraft.model_validate({"port": 8000})
         override = ModelServiceConfigDraft.model_validate({
             "port": None,
