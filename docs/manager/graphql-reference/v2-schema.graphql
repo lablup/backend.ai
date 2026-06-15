@@ -6263,16 +6263,16 @@ Added in 26.4.0. Configuration for a single model within a model definition.
 """
 input ModelConfigInput {
   """Name of the model."""
-  name: String
+  name: String = null
 
   """Path to the model file."""
-  modelPath: String
+  modelPath: String = null
 
   """Configuration for the model service."""
-  service: ModelServiceConfigInput
+  service: ModelServiceConfigInput = null
 
   """Metadata about the model."""
-  metadata: ModelMetadataInput
+  metadata: ModelMetadataInput = null
 }
 
 """
@@ -6288,7 +6288,7 @@ Added in 26.4.0. Model definition containing a list of model configurations.
 """
 input ModelDefinitionInput {
   """List of models in the model definition."""
-  models: [ModelConfigInput!]
+  models: [ModelConfigInput!] = null
 }
 
 """
@@ -6453,22 +6453,22 @@ input ModelHealthCheckInput {
   enable: Boolean! = false
 
   """Interval in seconds between health checks."""
-  interval: Float
+  interval: Float = null
 
   """Path to check for health status."""
-  path: String
+  path: String = null
 
   """Maximum number of retries for health check."""
-  maxRetries: Int
+  maxRetries: Int = null
 
   """Maximum time in seconds to wait for a health check response."""
-  maxWaitTime: Float
+  maxWaitTime: Float = null
 
   """Expected HTTP status code for a healthy response."""
-  expectedStatusCode: Int
+  expectedStatusCode: Int = null
 
   """Initial delay in seconds before the first health check."""
-  initialDelay: Float
+  initialDelay: Float = null
 }
 
 """Added in 26.4.2. Metadata describing a model entry."""
@@ -6518,43 +6518,43 @@ Added in 26.4.0. Metadata about a model such as author, title, and resource requ
 """
 input ModelMetadataInput {
   """Author of the model."""
-  author: String
+  author: String = null
 
   """Title of the model."""
-  title: String
+  title: String = null
 
   """Version of the model."""
-  version: String
+  version: String = null
 
   """Creation date of the model."""
-  created: String
+  created: String = null
 
   """Last modified date of the model."""
-  lastModified: String
+  lastModified: String = null
 
   """Description of the model."""
-  description: String
+  description: String = null
 
   """Task type of the model."""
-  task: String
+  task: String = null
 
   """Category of the model."""
-  category: String
+  category: String = null
 
   """Architecture of the model."""
-  architecture: String
+  architecture: String = null
 
   """Frameworks used by the model."""
-  framework: [String!]
+  framework: [String!] = null
 
   """Labels for the model."""
-  label: [String!]
+  label: [String!] = null
 
   """License of the model."""
-  license: String
+  license: String = null
 
   """Minimum resource requirements for the model."""
-  minResource: JSON
+  minResource: JSON = null
 }
 
 """
@@ -6830,19 +6830,19 @@ input ModelServiceConfigInput {
   """
   List of pre-start actions to execute before starting the model service.
   """
-  preStartActions: [PreStartActionInput!]
+  preStartActions: [PreStartActionInput!] = null
 
   """Command to start the model service."""
-  startCommand: [String!]
+  startCommand: [String!] = null
 
   """Shell configured for the model service."""
-  shell: String
+  shell: String = null
 
   """Port number for the model service."""
-  port: Int
+  port: Int = null
 
   """Health check configuration for the model service."""
-  healthCheck: ModelHealthCheckInput
+  healthCheck: ModelHealthCheckInput = null
 }
 
 """
