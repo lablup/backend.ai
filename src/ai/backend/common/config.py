@@ -341,14 +341,19 @@ class ModelConfig(BaseConfigModel):
 
 
 def _pick(base_val: Any, override_val: Any, override_set: bool) -> Any:
-    """Return the override value if explicitly set, otherwise the base.
+    """Return the override value only when it carries a concrete value.
 
-    Distinguishes between unset (not in model_fields_set → keep base)
-    and explicitly set to None (in model_fields_set → replace with None).
+    A field overrides the base only if it is both explicitly set
+    (in ``model_fields_set``) and non-``None``. An unset field or one
+    explicitly set to ``None`` means "no change" and keeps the base —
+    so a partial higher-priority draft (e.g. a request enabling a health
+    check but omitting ``port``) never clobbers a lower-priority source's
+    value with ``None``. This matches the non-``None`` override semantics
+    already used by the ``RevisionDraft`` scalar merge.
     """
-    if not override_set:
-        return base_val
-    return override_val
+    if override_set and override_val is not None:
+        return override_val
+    return base_val
 
 
 def _merge_metadata(base: ModelMetadata, override: ModelMetadata) -> ModelMetadata:

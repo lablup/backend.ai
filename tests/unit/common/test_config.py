@@ -12,11 +12,13 @@ from ai.backend.common.config import (
     ModelHealthCheckDraft,
     ModelMetadata,
     ModelServiceConfig,
+    ModelServiceConfigDraft,
     _merge_config,
     _merge_config_draft,
     _merge_definition,
     _merge_metadata,
     _merge_service_config,
+    _merge_service_config_draft,
     merge,
     override_key,
 )
@@ -318,6 +320,25 @@ class TestHealthCheckEnable:
         assert service is not None
         assert service.health_check is not None
         assert service.health_check.enable is False
+
+    def test_explicit_none_port_does_not_clobber_baseline(self) -> None:
+        """BA-6490: a higher-priority draft with ``port=None`` keeps the base port.
+
+        The GQL layer materializes an omitted ``port`` as an explicit ``None``;
+        the merge must treat that as "no change" instead of overriding the
+        baseline's port (which would later fail strict ``port`` validation).
+        """
+        base = ModelServiceConfigDraft.model_validate({"port": 8000})
+        override = ModelServiceConfigDraft.model_validate({
+            "port": None,
+            "health_check": {"enable": True, "initial_delay": 1.0},
+        })
+        merged = _merge_service_config_draft(base, override)
+        assert merged.port == 8000
+        resolved = merged.to_resolved()
+        assert resolved.port == 8000
+        assert resolved.health_check is not None
+        assert resolved.health_check.enable is True
 
     def test_merge_override_enables_from_request(self) -> None:
         """A disabled baseline is opted in when a higher-priority draft sets enable=True."""

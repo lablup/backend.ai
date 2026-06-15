@@ -1,10 +1,10 @@
-"""Regression tests for GQL revision input → draft conversion (BA-6490).
+"""Regression tests for GQL revision input → draft merge (BA-6490).
 
 When a client enables a health check but omits ``port`` (because the port is
-supplied by the runtime-variant baseline), the omitted ``port`` must NOT
-materialize as an explicit ``None`` during the GQL → DTO → draft conversion.
-An explicit ``None`` would enter ``model_fields_set`` and clobber the
-baseline's port during the merge, producing a spurious
+supplied by the runtime-variant baseline), the GQL input materializes the
+omitted ``port`` as an explicit ``None``. The draft merge must treat that
+``None`` as "no change" and preserve the lower-priority baseline's port,
+rather than clobbering it and raising a spurious
 ``ModelServiceConfig.port`` "field required" validation error.
 """
 
@@ -50,13 +50,8 @@ def test_health_check_without_port_preserves_baseline_port() -> None:
 
     request_draft = request_input.to_pydantic().to_draft()
 
-    # ``port`` must stay unset on the request draft so it does not override
-    # the baseline during the merge.
-    assert request_draft.models is not None
-    request_service = request_draft.models[0].service
-    assert request_service is not None
-    assert "port" not in request_service.model_fields_set
-
+    # The GQL layer materializes the omitted ``port`` as an explicit ``None``;
+    # the merge must still keep the baseline's port (no clobber by ``None``).
     merged = _variant_baseline_draft().merge(request_draft)
     resolved = merged.to_resolved()
 
