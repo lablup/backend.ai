@@ -29,15 +29,14 @@ class AppConfigPolicyRow(Base):  # type: ignore[misc]
     )
     # `config_name` is the FK target referenced by `app_config_fragments.name`.
     # It is immutable — updates that attempt to change it are rejected at the
-    # service layer; the FK's ON UPDATE NO ACTION default is the backstop.
+    # service layer.
     config_name: Mapped[str] = mapped_column(
         "config_name",
         sa.String(length=128),
         nullable=False,
     )
-    # Ordered scope chain, low → high merge priority. Doubles as the
-    # write allow-list. `StrEnumType` stores as VARCHAR so adding a
-    # scope value does not require a migration.
+    # Ordered scope chain intended to drive merge priority (low → high) and to
+    # double as the per-scope write allow-list.
     scope_sources: Mapped[Sequence[AppConfigScopeType]] = mapped_column(
         "scope_sources",
         sa.ARRAY(StrEnumType(AppConfigScopeType, length=64)),
