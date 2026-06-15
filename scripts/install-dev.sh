@@ -1020,6 +1020,16 @@ setup_environment() {
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel03/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
+
+    # macOS only (BA-6289): Docker Desktop's bridge IPs aren't routable from the
+    # host, so uncomment announce-hostnames to reach master/replicas by hostname
+    # (node01-03) via /etc/hosts. Linux routes bridge IPs directly, so it stays
+    # commented.
+    if [ "$DISTRO" = "Darwin" ]; then
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel01_cfg_path"
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel02_cfg_path"
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel03_cfg_path"
+    fi
   else
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
     SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"
