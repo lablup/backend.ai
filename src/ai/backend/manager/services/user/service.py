@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -16,6 +16,7 @@ from ai.backend.manager.data.user.types import (
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
@@ -159,6 +160,22 @@ class UserService:
 
     async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUserActionResult:
         result = await self._user_repository.bulk_create_users_validated(action.items)
+        # Grant the scope-level auto_assign roles for each created user's initial
+        # domain/project memberships, the same as the single-user create path.
+        # group_ids are not carried in the result, so correlate them by email.
+        group_ids_by_email = {
+            cast(UserCreatorSpec, item.creator.spec).email: item.group_ids for item in action.items
+        }
+        for created in result.successes:
+            group_ids = group_ids_by_email.get(created.user.email)
+            await self._user_repository.assign_users_to_scope(
+                created.user.uuid,
+                created.user.domain_name,
+                [ProjectID(UUID(gid)) for gid in group_ids] if group_ids else [],
+            )
+            await self._user_repository.assign_user_to_model_store(
+                created.user.uuid, created.user.domain_name
+            )
         return BulkCreateUserActionResult(data=result)
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
