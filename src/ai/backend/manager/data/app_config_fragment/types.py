@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.user import UserID
 
 __all__ = (
+    "AppConfigData",
     "AppConfigFragmentData",
     "AppConfigFragmentKey",
     "AppConfigFragmentSearchResult",
     "AppConfigScopeType",
+    "ScopedAppConfigSearchResult",
 )
 
 
@@ -50,6 +53,31 @@ class AppConfigFragmentSearchResult:
     """Result from searching raw `app_config_fragments` rows."""
 
     items: list[AppConfigFragmentData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class AppConfigData:
+    """Service-layer return type for the merged AppConfig view.
+
+    `fragments` are ordered low → high merge priority (by fragment
+    `rank`). `config` is the deep-merged result, projected to `None`
+    when every contributing fragment is empty.
+    """
+
+    user_id: UserID
+    name: str
+    fragments: Sequence[AppConfigFragmentData]
+    config: Mapping[str, Any] | None
+
+
+@dataclass(frozen=True)
+class ScopedAppConfigSearchResult:
+    """Result from searching merged `AppConfig` views."""
+
+    items: list[AppConfigData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
