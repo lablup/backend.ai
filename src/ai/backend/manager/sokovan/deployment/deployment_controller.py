@@ -450,7 +450,7 @@ class DeploymentController:
             callback_url=str(merged.callback_url) if merged.callback_url else None,
             runtime_variant_id=runtime_variant_id,
             extra_mounts=list(merged.mounts.extra_mounts),
-            preset_values=[
+            runtime_variant_preset_values=[
                 RuntimeVariantPresetValueEntry(preset_id=pv.preset_id, value=pv.value)
                 for pv in (merged.runtime_variant_preset_values or [])
             ],

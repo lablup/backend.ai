@@ -51,7 +51,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
-    DeploymentRevisionPresetValueData,
     ResourceSlotEntryData,
 )
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
@@ -1130,7 +1129,7 @@ class PresetAttributionData:
 
     preset_id: DeploymentPresetID | None
     # value fields are not used, currently dead code
-    values: list[DeploymentRevisionPresetValueData]
+    values: list[RuntimeVariantPresetValueData]
 
 
 @dataclass

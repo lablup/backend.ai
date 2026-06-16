@@ -57,7 +57,7 @@ class TestDeploymentFromPreset:
             startup_command=None,
             bootstrap_script=None,
             environ=[],
-            preset_values=[],
+            runtime_variant_preset_values=[],
             replica_count=3,
             deployment_strategy=DeploymentStrategy.ROLLING,
             deployment_strategy_spec={},

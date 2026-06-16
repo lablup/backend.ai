@@ -143,6 +143,7 @@ class RevisionDraftReader:
             bootstrap_script=preset.bootstrap_script,
             environ=environ or None,
             model_definition=model_definition,
+            runtime_variant_preset_values=preset.runtime_variant_preset_values,
         )
 
     def _model_mount_path_default_draft(
