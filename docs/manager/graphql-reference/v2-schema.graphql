@@ -156,6 +156,131 @@ type AddRevisionPayload {
   revision: ModelRevision!
 }
 
+"""Added in 26.4.4. Per-item input for admin bulk create / update."""
+input AdminAppConfigFragmentItemInput {
+  """Natural-key identifier."""
+  key: AppConfigFragmentKeyInput!
+
+  """Raw configuration payload."""
+  config: JSON!
+}
+
+"""Added in 26.4.4. Admin bulk create input — items carry any scope."""
+input AdminBulkCreateAppConfigFragmentInput {
+  """Rows to create."""
+  items: [AdminAppConfigFragmentItemInput!]!
+}
+
+"""Added in 26.4.4. Payload for `adminBulkCreateAppConfigFragments`."""
+type AdminBulkCreateAppConfigFragmentsPayload {
+  """Created fragments."""
+  created: [AppConfigFragment!]!
+
+  """Per-item failures."""
+  failed: [AppConfigFragmentBulkError!]!
+}
+
+"""Added in 26.4.4. Payload for `adminBulkCreateAppConfigPolicies`."""
+type AdminBulkCreateAppConfigPoliciesPayload {
+  """Created policies."""
+  created: [AppConfigPolicy!]!
+
+  """Per-item failures."""
+  failed: [AppConfigPolicyBulkError!]!
+}
+
+"""Added in 26.4.4. Admin bulk create input for app-config policies."""
+input AdminBulkCreateAppConfigPolicyInput {
+  """Policies to create."""
+  items: [AdminBulkCreateAppConfigPolicyItemInput!]!
+}
+
+"""
+Added in 26.4.4. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
+"""
+input AdminBulkCreateAppConfigPolicyItemInput {
+  """Unique, immutable policy name."""
+  configName: String!
+
+  """Ordered scope chain."""
+  scopeSources: [String!]!
+}
+
+"""
+Added in 26.4.4. Admin bulk purge input — keyed on `AppConfigFragmentKey`.
+"""
+input AdminBulkPurgeAppConfigFragmentInput {
+  """Natural keys to purge."""
+  keys: [AppConfigFragmentKeyInput!]!
+}
+
+"""Added in 26.4.4. Payload for `adminBulkPurgeAppConfigFragments`."""
+type AdminBulkPurgeAppConfigFragmentsPayload {
+  """Keys of rows actually removed (absent keys are no-oped)."""
+  purged: [PurgeAppConfigFragmentKey!]!
+
+  """Per-item failures."""
+  failed: [AppConfigFragmentBulkError!]!
+}
+
+"""Added in 26.4.4. Payload for `adminBulkPurgeAppConfigPolicies`."""
+type AdminBulkPurgeAppConfigPoliciesPayload {
+  """Ids of policies actually removed (absent ids no-oped)."""
+  purgedIds: [UUID!]!
+
+  """Per-item failures."""
+  failed: [AppConfigPolicyBulkError!]!
+}
+
+"""
+Added in 26.4.4. Admin bulk purge input for app-config policies (keyed on row id).
+"""
+input AdminBulkPurgeAppConfigPolicyInput {
+  """Policy row ids to purge."""
+  ids: [UUID!]!
+}
+
+"""Added in 26.4.4. Admin bulk update input."""
+input AdminBulkUpdateAppConfigFragmentInput {
+  """Rows to update."""
+  items: [AdminAppConfigFragmentItemInput!]!
+}
+
+"""Added in 26.4.4. Payload for `adminBulkUpdateAppConfigFragments`."""
+type AdminBulkUpdateAppConfigFragmentsPayload {
+  """Updated fragments."""
+  updated: [AppConfigFragment!]!
+
+  """Per-item failures."""
+  failed: [AppConfigFragmentBulkError!]!
+}
+
+"""Added in 26.4.4. Payload for `adminBulkUpdateAppConfigPolicies`."""
+type AdminBulkUpdateAppConfigPoliciesPayload {
+  """Updated policies."""
+  updated: [AppConfigPolicy!]!
+
+  """Per-item failures."""
+  failed: [AppConfigPolicyBulkError!]!
+}
+
+"""Added in 26.4.4. Admin bulk update input for app-config policies."""
+input AdminBulkUpdateAppConfigPolicyInput {
+  """Policies to update."""
+  items: [AdminBulkUpdateAppConfigPolicyItemInput!]!
+}
+
+"""
+Added in 26.4.4. Per-item input for admin bulk update — target row id + new `scope_sources`.
+"""
+input AdminBulkUpdateAppConfigPolicyItemInput {
+  """Policy row id."""
+  id: UUID!
+
+  """Ordered scope chain."""
+  scopeSources: [String!]!
+}
+
 """Added in 26.4.2. Admin input for creating a keypair for a user."""
 input AdminCreateKeypairInput {
   """UUID of the target user."""
@@ -602,6 +727,215 @@ type AllowedProjectsPayload {
 type AllowedResourceGroupsPayload {
   """Allowed resource group names."""
   items: [String!]!
+}
+
+"""
+Added in 26.4.4. Merged per-user AppConfig view. `fragments` are ordered low → high merge priority; `config` is the deep-merge result and is null when every contributing fragment is empty.
+"""
+type AppConfig {
+  """Target user's UUID."""
+  userId: UUID!
+
+  """Policy / config name."""
+  name: String!
+
+  """Contributing fragments in merge order (low → high)."""
+  fragments: [AppConfigFragment!]!
+
+  """Deep-merged configuration, or null when every fragment is empty."""
+  config: JSON
+}
+
+"""Added in 26.4.4. Filter input for querying merged AppConfigs."""
+input AppConfigFilter {
+  """Filter by policy name."""
+  name: StringFilter = null
+
+  """Filter by target user id (admin cross-user search only)."""
+  userId: UUIDFilter = null
+
+  """Filter by the oldest contributing fragment's creation timestamp."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by the latest contributing fragment's update timestamp."""
+  updatedAt: DateTimeFilter = null
+}
+
+"""Added in 26.4.4. Raw per-scope app-config fragment."""
+type AppConfigFragment {
+  """Row ID."""
+  id: UUID!
+
+  """Scope type."""
+  scopeType: AppConfigScopeType!
+
+  """Scope id."""
+  scopeId: String!
+
+  """Policy name (FK target)."""
+  name: String!
+
+  """Raw configuration payload, or null."""
+  config: JSON
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in 26.4.4. Per-item failure info for bulk Fragment mutations."""
+type AppConfigFragmentBulkError {
+  """Original position in the input list."""
+  index: Int!
+
+  """Scope type of the failed row."""
+  scopeType: AppConfigScopeType!
+
+  """Scope id of the failed row."""
+  scopeId: String!
+
+  """Policy name of the failed row."""
+  name: String!
+
+  """Reason for the failure."""
+  message: String!
+}
+
+"""Added in 26.4.4. Filter input for querying app-config fragments."""
+input AppConfigFragmentFilter {
+  """Filter by policy name."""
+  name: StringFilter = null
+
+  """Filter by scope_id."""
+  scopeId: StringFilter = null
+}
+
+"""Added in 26.4.4. Natural key for an app-config fragment row."""
+input AppConfigFragmentKeyInput {
+  """Scope type."""
+  scopeType: AppConfigScopeType!
+
+  """Scope id."""
+  scopeId: String!
+
+  """Policy name."""
+  name: String!
+}
+
+"""Added in 26.4.4. Specifies ordering for app-config fragment results."""
+input AppConfigFragmentOrderBy {
+  """The field to order by."""
+  field: AppConfigFragmentOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.4.4. Fields available for ordering app-config fragments."""
+enum AppConfigFragmentOrderField {
+  SCOPE_TYPE
+  SCOPE_ID
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Added in 26.4.4. Specifies ordering for merged AppConfig results."""
+input AppConfigOrderBy {
+  """The field to order by."""
+  field: AppConfigOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.4.4. Fields available for ordering merged AppConfigs."""
+enum AppConfigOrderField {
+  USER_ID
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Added in 26.4.4. Scoped app-config policy."""
+type AppConfigPolicy implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Unique, immutable policy name."""
+  configName: String!
+
+  """Ordered scope chain (low → high merge priority)."""
+  scopeSources: [String!]!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime
+}
+
+"""Added in 26.4.4. Per-item failure info for bulk Policy mutations."""
+type AppConfigPolicyBulkError {
+  """Original position in the input list."""
+  index: Int!
+
+  """Reason for the failure."""
+  message: String!
+}
+
+"""
+Added in 26.4.4. Connection type for paginated app-config policy results.
+"""
+type AppConfigPolicyConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AppConfigPolicyEdge!]!
+
+  """Total number of policies matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AppConfigPolicyEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AppConfigPolicy!
+}
+
+"""Added in 26.4.4. Filter input for querying app-config policies."""
+input AppConfigPolicyFilter {
+  """Filter by config_name."""
+  configName: StringFilter = null
+}
+
+"""Added in 26.4.4. Specifies ordering for app-config policy results."""
+input AppConfigPolicyOrderBy {
+  """The field to order by."""
+  field: AppConfigPolicyOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.4.4. Fields available for ordering app-config policies."""
+enum AppConfigPolicyOrderField {
+  CONFIG_NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+enum AppConfigScopeType {
+  PUBLIC
+  DOMAIN
+  DOMAIN_USER_DEFAULTS
+  USER
 }
 
 """
@@ -7406,6 +7740,46 @@ type Mutation {
   """
   updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload
 
+  """
+  Added in 26.4.4. Strict insert keyed on `configName` (admin only, per-item transaction).
+  """
+  adminBulkCreateAppConfigPolicies(input: AdminBulkCreateAppConfigPolicyInput!): AdminBulkCreateAppConfigPoliciesPayload!
+
+  """
+  Added in 26.4.4. Replace `scope_sources`; `config_name` is immutable. Admin only, per-item transaction.
+  """
+  adminBulkUpdateAppConfigPolicies(input: AdminBulkUpdateAppConfigPolicyInput!): AdminBulkUpdateAppConfigPoliciesPayload!
+
+  """
+  Added in 26.4.4. Hard-delete policies by row id; rows still referenced by fragments surface in `failed`. Admin only.
+  """
+  adminBulkPurgeAppConfigPolicies(input: AdminBulkPurgeAppConfigPolicyInput!): AdminBulkPurgeAppConfigPoliciesPayload!
+
+  """
+  Added in 26.4.4. Strict insert across any scope; each item runs in its own transaction and failures are collected per-item (admin only).
+  """
+  adminBulkCreateAppConfigFragments(input: AdminBulkCreateAppConfigFragmentInput!): AdminBulkCreateAppConfigFragmentsPayload!
+
+  """
+  Added in 26.4.4. Wholesale JSON replacement; items with no existing row are returned as failures (admin only).
+  """
+  adminBulkUpdateAppConfigFragments(input: AdminBulkUpdateAppConfigFragmentInput!): AdminBulkUpdateAppConfigFragmentsPayload!
+
+  """
+  Added in 26.4.4. Cleanup-only deletion; absent keys are no-oped (admin only).
+  """
+  adminBulkPurgeAppConfigFragments(input: AdminBulkPurgeAppConfigFragmentInput!): AdminBulkPurgeAppConfigFragmentsPayload!
+
+  """
+  Added in 26.4.4. Strict insert on the caller's USER row; duplicates fail per-item. Returns recomputed merged `AppConfig` views.
+  """
+  myBulkCreateAppConfigFragments(input: MyBulkCreateAppConfigFragmentInput!): MyBulkCreateAppConfigFragmentsPayload!
+
+  """
+  Added in 26.4.4. Wholesale replacement on the caller's USER row; missing rows are returned as failures. Returns recomputed merged `AppConfig` views.
+  """
+  myBulkUpdateAppConfigFragments(input: MyBulkUpdateAppConfigFragmentInput!): MyBulkUpdateAppConfigFragmentsPayload!
+
   """Added in 26.3.0. Create a new query definition (admin only)"""
   adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload
 
@@ -7669,6 +8043,53 @@ type Mutation {
   Added in 26.4.4. Terminate one or more sessions by ID. Per-session RBAC permission is enforced by the bulk validator; any denial fails the whole request.
   """
   terminateSessionsV2(sessionIds: [ID!]!, forced: Boolean! = false): TerminateSessionsPayload
+}
+
+"""Added in 26.4.4. Per-item input for self-service (`my`) bulk."""
+input MyAppConfigFragmentItemInput {
+  """Policy name."""
+  name: String!
+
+  """Raw configuration payload."""
+  config: JSON!
+}
+
+"""
+Added in 26.4.4. Self-service bulk create — scope is `USER` / `current_user`.
+"""
+input MyBulkCreateAppConfigFragmentInput {
+  """USER-scope rows to create."""
+  items: [MyAppConfigFragmentItemInput!]!
+}
+
+"""
+Added in 26.4.4. Payload for `myBulkCreateAppConfigFragments` (recomputed views).
+"""
+type MyBulkCreateAppConfigFragmentsPayload {
+  """Recomputed merged AppConfig views for each created USER fragment."""
+  created: [AppConfig!]!
+
+  """Per-item failures."""
+  failed: [AppConfigFragmentBulkError!]!
+}
+
+"""
+Added in 26.4.4. Self-service bulk update — scope is `USER` / `current_user`.
+"""
+input MyBulkUpdateAppConfigFragmentInput {
+  """USER-scope rows to update."""
+  items: [MyAppConfigFragmentItemInput!]!
+}
+
+"""
+Added in 26.4.4. Payload for `myBulkUpdateAppConfigFragments` (recomputed views).
+"""
+type MyBulkUpdateAppConfigFragmentsPayload {
+  """Recomputed merged AppConfig views for each updated USER fragment."""
+  updated: [AppConfig!]!
+
+  """Per-item failures."""
+  failed: [AppConfigFragmentBulkError!]!
 }
 
 """
@@ -9023,6 +9444,18 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
+"""Added in 26.4.4. Natural key of a purged fragment row."""
+type PurgeAppConfigFragmentKey {
+  """Scope type."""
+  scopeType: AppConfigScopeType!
+
+  """Scope id."""
+  scopeId: String!
+
+  """Policy name."""
+  name: String!
+}
+
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""
 type PurgeDomainPayload {
   """Whether the purge was successful."""
@@ -9339,6 +9772,41 @@ type Query {
   Added in 26.2.0. Query image aliases with optional filtering, ordering, and pagination. Returns image aliases that provide alternative names for container images. Use filters to search by alias string. Supports both cursor-based and offset-based pagination.
   """
   adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
+
+  """
+  Added in 26.4.4. Get a single app-config policy by row id. Available to any authenticated user.
+  """
+  appConfigPolicy(id: UUID!): AppConfigPolicy
+
+  """
+  Added in 26.4.4. List app-config policies with filtering and pagination. Available to any authenticated user.
+  """
+  appConfigPolicies(filter: AppConfigPolicyFilter = null, orderBy: [AppConfigPolicyOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigPolicyConnection!
+
+  """
+  Added in 26.4.4. Get a single app-config fragment by natural key `(scope_type, scope_id, name)`. Available to any authenticated user — service-layer authorization gates cross-scope reads.
+  """
+  appConfigFragment(scopeType: AppConfigScopeType!, scopeId: String!, name: String!): AppConfigFragment
+
+  """
+  Added in 26.4.4. Cross-scope admin search across all app-config fragments (admin only).
+  """
+  adminAppConfigFragments(filter: AppConfigFragmentFilter = null, orderBy: [AppConfigFragmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [AppConfigFragment!]!
+
+  """
+  Added in 26.4.4. Public (no-auth) `PUBLIC`-scope app-config fragments — the subset of raw fragments that carry no personally-scoped data.
+  """
+  publicAppConfigFragments(filter: AppConfigFragmentFilter = null, orderBy: [AppConfigFragmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [AppConfigFragment!]!
+
+  """
+  Added in 26.4.4. Caller's own merged AppConfig list (auth required). Chain per policy ; the adapter pins `(USER, current_user)` internally.
+  """
+  myAppConfigs(filter: AppConfigFilter = null, orderBy: [AppConfigOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [AppConfig!]!
+
+  """
+  Added in 26.4.4. Cross-user merged-view search (admin only). Resolves any user's AppConfig for audit / support. Pin to a single user with `filter.userId`; otherwise paginates across all users.
+  """
+  adminAppConfigs(filter: AppConfigFilter = null, orderBy: [AppConfigOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): [AppConfig!]!
 
   """
   Added in 26.4.2. Get a single prometheus query preset by ID. Available to any authenticated user since presets are a shared catalog of metric query templates.
@@ -9977,6 +10445,7 @@ enum RBACElementType {
   SESSION_TEMPLATE
   APP_CONFIG
   MODEL_CARD
+  APP_CONFIG_POLICY
   RESOURCE_PRESET
   USER_RESOURCE_POLICY
   KEYPAIR_RESOURCE_POLICY

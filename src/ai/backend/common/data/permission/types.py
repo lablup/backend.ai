@@ -268,7 +268,6 @@ class EntityType(enum.StrEnum):
             cls.ARTIFACT,
             cls.ARTIFACT_REGISTRY,
             cls.APP_CONFIG,
-            cls.APP_CONFIG_FRAGMENT,
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
             cls.MODEL_DEPLOYMENT,
@@ -406,7 +405,6 @@ class RBACElementType(enum.StrEnum):
     ARTIFACT_REGISTRY = "artifact_registry"
     SESSION_TEMPLATE = "session_template"
     APP_CONFIG = "app_config"
-    APP_CONFIG_FRAGMENT = "app_config_fragment"
     MODEL_CARD = "model_card"
 
     # === Root-query-enabled entities (superadmin-only) ===

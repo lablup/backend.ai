@@ -21,6 +21,10 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
     AdminSearchAppConfigFragmentsAction,
     AdminSearchAppConfigFragmentsActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.admin_search_app_configs import (
+    AdminSearchAppConfigsAction,
+    AdminSearchAppConfigsActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.admin_service import (
     AppConfigFragmentAdminService,
 )
@@ -29,6 +33,9 @@ from ai.backend.manager.services.app_config_fragment.admin_service import (
 class AppConfigFragmentAdminProcessors(AbstractProcessorPackage):
     admin_search: ActionProcessor[
         AdminSearchAppConfigFragmentsAction, AdminSearchAppConfigFragmentsActionResult
+    ]
+    admin_search_app_configs: ActionProcessor[
+        AdminSearchAppConfigsAction, AdminSearchAppConfigsActionResult
     ]
     # Bulk mutations — wrapped by BulkActionProcessor so validators
     # (RBAC, etc.) can filter entity_ids per-item before the service
@@ -51,6 +58,9 @@ class AppConfigFragmentAdminProcessors(AbstractProcessorPackage):
         validators: ActionValidators,
     ) -> None:
         self.admin_search = ActionProcessor(service.admin_search, action_monitors)
+        self.admin_search_app_configs = ActionProcessor(
+            service.admin_search_app_configs, action_monitors
+        )
         self.admin_bulk_create = BulkActionProcessor(service.admin_bulk_create, action_monitors)
         self.admin_bulk_update = BulkActionProcessor(service.admin_bulk_update, action_monitors)
         self.admin_bulk_purge = BulkActionProcessor(service.admin_bulk_purge, action_monitors)
@@ -59,6 +69,7 @@ class AppConfigFragmentAdminProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             AdminSearchAppConfigFragmentsAction.spec(),
+            AdminSearchAppConfigsAction.spec(),
             AdminBulkCreateAppConfigFragmentsAction.spec(),
             AdminBulkUpdateAppConfigFragmentsAction.spec(),
             AdminBulkPurgeAppConfigFragmentsAction.spec(),

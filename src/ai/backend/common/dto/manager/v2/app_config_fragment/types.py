@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
@@ -13,15 +14,6 @@ __all__ = (
     "AppConfigScopeType",
     "OrderDirection",
 )
-
-
-class AppConfigScopeType(StrEnum):
-    """Scope types for app-config fragments."""
-
-    PUBLIC = "public"
-    DOMAIN = "domain"
-    DOMAIN_USER_DEFAULTS = "domain_user_defaults"
-    USER = "user"
 
 
 class AppConfigFragmentOrderField(StrEnum):

@@ -9,6 +9,10 @@ from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
     GetAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.get_user_app_config import (
+    GetUserAppConfigAction,
+    GetUserAppConfigActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.my_bulk_create import (
     MyBulkCreateAppConfigFragmentsAction,
     MyBulkCreateAppConfigFragmentsActionResult,
@@ -21,12 +25,20 @@ from ai.backend.manager.services.app_config_fragment.actions.search import (
     SearchAppConfigFragmentsAction,
     SearchAppConfigFragmentsActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.scoped_search_app_configs import (
+    ScopedSearchAppConfigsAction,
+    ScopedSearchAppConfigsActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.service import AppConfigFragmentService
 
 
 class AppConfigFragmentProcessors(AbstractProcessorPackage):
     get: ActionProcessor[GetAppConfigFragmentAction, GetAppConfigFragmentActionResult]
     search: ActionProcessor[SearchAppConfigFragmentsAction, SearchAppConfigFragmentsActionResult]
+    get_user_app_config: ActionProcessor[GetUserAppConfigAction, GetUserAppConfigActionResult]
+    scoped_search_app_configs: BulkActionProcessor[
+        ScopedSearchAppConfigsAction, ScopedSearchAppConfigsActionResult
+    ]
     # Bulk mutations — wrapped by BulkActionProcessor so validators
     # (RBAC, etc.) can filter entity_ids per-item before the service
     # runs. No bulk validators are wired today; the processor simply
@@ -46,6 +58,10 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     ) -> None:
         self.get = ActionProcessor(service.get, action_monitors)
         self.search = ActionProcessor(service.search, action_monitors)
+        self.get_user_app_config = ActionProcessor(service.get_user_app_config, action_monitors)
+        self.scoped_search_app_configs = BulkActionProcessor(
+            service.scoped_search_app_configs, action_monitors
+        )
         self.my_bulk_create = BulkActionProcessor(service.my_bulk_create, action_monitors)
         self.my_bulk_update = BulkActionProcessor(service.my_bulk_update, action_monitors)
 
@@ -54,6 +70,8 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         return [
             GetAppConfigFragmentAction.spec(),
             SearchAppConfigFragmentsAction.spec(),
+            GetUserAppConfigAction.spec(),
+            ScopedSearchAppConfigsAction.spec(),
             MyBulkCreateAppConfigFragmentsAction.spec(),
             MyBulkUpdateAppConfigFragmentsAction.spec(),
         ]

@@ -19,9 +19,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    UserAppConfigSearchScope,
-)
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.types import SearchScope
 
@@ -86,9 +83,9 @@ class AppConfigFragmentRepository:
         return await self._db_source.get_user_app_config(user_id, config_name)
 
     @app_config_fragment_repository_resilience.apply()
-    async def search_app_configs(
+    async def scoped_search_app_configs(
         self,
-        scope: UserAppConfigSearchScope,
         querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
     ) -> AppConfigSearchResult:
-        return await self._db_source.search_user_app_configs(scope, querier)
+        return await self._db_source.scoped_search_app_configs(querier, scopes)

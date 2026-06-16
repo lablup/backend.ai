@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.rbac.response import EntityNode  # pants: no-infer-dep
     from ai.backend.manager.api.adapters.registry import Adapters  # pants: no-infer-dep
     from ai.backend.manager.api.gql.agent.types import AgentV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.app_config_fragment.types import (  # pants: no-infer-dep
+        AppConfigFragmentGQL,
+    )
     from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
         ArtifactRevision,
     )
@@ -115,6 +118,38 @@ class DataLoaders:
 
     def __init__(self, adapters: Adapters) -> None:
         self._adapters = adapters
+
+    @cached_property
+    def app_config_fragment_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, AppConfigFragmentGQL | None]:
+        adapter = self._adapters.app_config_fragment
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[AppConfigFragmentGQL | None]:
+            from ai.backend.common.dto.manager.query import UUIDFilter  # pants: no-infer-dep
+            from ai.backend.common.dto.manager.v2.app_config_fragment.request import (  # pants: no-infer-dep
+                AppConfigFragmentFilter,
+                SearchAppConfigFragmentsInput,
+            )
+            from ai.backend.common.identifier.app_config_fragment import (  # pants: no-infer-dep
+                AppConfigFragmentID,
+            )
+            from ai.backend.manager.api.gql.app_config_fragment.types import (  # pants: no-infer-dep
+                AppConfigFragmentGQL as F,
+            )
+
+            if not ids:
+                return []
+            payload = await adapter.admin_search(
+                SearchAppConfigFragmentsInput(
+                    filter=AppConfigFragmentFilter(id=UUIDFilter.model_validate({"in": list(ids)})),
+                    limit=len(ids),
+                ),
+            )
+            by_id = {dto.id: F.from_pydantic(dto) for dto in payload.items}
+            return [by_id.get(AppConfigFragmentID(fragment_id)) for fragment_id in ids]
+
+        return DataLoader(load_fn=load_fn)
 
     @cached_property
     def audit_log_loader(

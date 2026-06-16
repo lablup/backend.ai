@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 
@@ -40,17 +41,21 @@ class AppConfigFragmentSearchScope(SearchScope):
 
 @dataclass(frozen=True)
 class UserAppConfigSearchScope(SearchScope):
-    """Pin merged-view search to a target `user_id`."""
+    """Pin merged-view search to a target `user_id`.
+
+    The merged-view query joins `users`, so this matches `UserRow.uuid`.
+    `execute_batch_querier` ORs multiple scopes together and the
+    `(user_id, name)` grouping downstream deduplicates any overlap
+    between scopes — a user reached via two scopes yields one AppConfig.
+    """
 
     user_id: uuid.UUID
 
     def to_condition(self) -> QueryCondition:
-        # Merge search joins multiple scope rows per user; the per-user
-        # restriction is applied by the merge-specific SQL builder rather
-        # than this generic predicate. Returning a `True` condition keeps
-        # this scope BatchQuerier-compatible without double-filtering.
+        user_id = self.user_id
+
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.true()
+            return UserRow.uuid == user_id
 
         return inner
 

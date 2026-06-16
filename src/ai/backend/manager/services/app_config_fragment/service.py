@@ -20,6 +20,10 @@ from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
     GetAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.get_user_app_config import (
+    GetUserAppConfigAction,
+    GetUserAppConfigActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.my_bulk_create import (
     MyBulkCreateAppConfigFragmentsAction,
     MyBulkCreateAppConfigFragmentsActionResult,
@@ -32,6 +36,10 @@ from ai.backend.manager.services.app_config_fragment.actions.search import (
     SearchAppConfigFragmentsAction,
     SearchAppConfigFragmentsActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.scoped_search_app_configs import (
+    ScopedSearchAppConfigsAction,
+    ScopedSearchAppConfigsActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -39,8 +47,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class AppConfigFragmentService:
     """Non-admin operations available to any authenticated user.
 
-    Self-service writes (`my_bulk_*`) target the caller's own `USER`
-    scope; the actual row write goes through the shared admin repository
+    Covers raw-fragment reads, the per-user merged `AppConfig` views,
+    and self-service writes (`my_bulk_*`) on the caller's own `USER`
+    scope. The actual row write goes through the shared admin repository
     while reads use the non-admin repository.
     """
 
@@ -69,6 +78,30 @@ class AppConfigFragmentService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    # ── Merged-view reads (AppConfig) ─────────────────────────────
+
+    async def get_user_app_config(
+        self, action: GetUserAppConfigAction
+    ) -> GetUserAppConfigActionResult:
+        app_config = await self._repository.app_config(action.user_id, action.config_name)
+        return GetUserAppConfigActionResult(app_config=app_config)
+
+    async def scoped_search_app_configs(
+        self, action: ScopedSearchAppConfigsAction
+    ) -> ScopedSearchAppConfigsActionResult:
+        targets = list(action.targets())
+        scopes = [t.to_search_scope() for t in targets]
+        result = await self._repository.scoped_search_app_configs(action.querier, scopes)
+        return ScopedSearchAppConfigsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            queried_refs=[t.to_rbac_element_ref() for t in targets],
+        )
+
+    # ── Self-service bulk mutations (per-item transaction) ────────
 
     async def my_bulk_create(
         self, action: MyBulkCreateAppConfigFragmentsAction

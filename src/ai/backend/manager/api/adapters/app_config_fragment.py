@@ -1,4 +1,8 @@
-"""AppConfigFragment domain adapter — Pydantic-in / Pydantic-out transport layer."""
+"""AppConfigFragment domain adapter — Pydantic-in / Pydantic-out transport layer.
+
+Raw fragment-row operations only. The merged-view (AppConfig) surface
+and the self-service `my_bulk_*` writes live on `AppConfigAdapter`.
+"""
 
 from __future__ import annotations
 
@@ -26,7 +30,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     OrderDirection,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
-    AppConfigScopeType as AppConfigScopeTypeDTO,
+    AppConfigScopeType as DTOAppConfigScopeType,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config_fragment.bulk_types import (
@@ -41,9 +45,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigFragmentSearchScope,
-)
+from ai.backend.manager.repositories.app_config_fragment.types import AppConfigFragmentSearchScope
 from ai.backend.manager.repositories.base import BatchQuerier, QueryCondition, QueryOrder
 from ai.backend.manager.services.app_config_fragment.actions.admin_bulk_create import (
     AdminBulkCreateAppConfigFragmentsAction,
@@ -64,21 +66,14 @@ from ai.backend.manager.services.app_config_fragment.actions.search import (
 
 from .base import BaseAdapter
 
-_PAGINATION_SPEC = PaginationSpec(
-    forward_order=AppConfigFragmentOrders.created_at(ascending=False),
-    backward_order=AppConfigFragmentOrders.created_at(ascending=True),
-    forward_condition_factory=AppConfigFragmentConditions.by_cursor_forward,
-    backward_condition_factory=AppConfigFragmentConditions.by_cursor_backward,
-    tiebreaker_order=AppConfigFragmentRow.id.asc(),
-)
-
 
 class AppConfigFragmentAdapter(BaseAdapter):
-    """Adapter for AppConfigFragment domain operations.
+    """Adapter for AppConfigFragment raw-row operations.
 
-    Writes are bulk-only; single-item create / update / purge entry
-    points are intentionally absent. Self-service my_bulk methods are
-    added with the merged-view DTOs in BA-5829.
+    Writes are bulk-only; single-item create / update /
+    purge entry points are intentionally absent. Self-service my_bulk
+    writes (which return the recomputed merged view) live on
+    `AppConfigAdapter` alongside the merged-view reads.
     """
 
     async def get(self, key_input: AppConfigFragmentKeyInput) -> GetAppConfigFragmentPayload:
@@ -131,13 +126,21 @@ class AppConfigFragmentAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
+    _PAGINATION_SPEC = PaginationSpec(
+        forward_order=AppConfigFragmentOrders.created_at(ascending=False),
+        backward_order=AppConfigFragmentOrders.created_at(ascending=True),
+        forward_condition_factory=AppConfigFragmentConditions.by_cursor_forward,
+        backward_condition_factory=AppConfigFragmentConditions.by_cursor_backward,
+        tiebreaker_order=AppConfigFragmentRow.id.asc(),
+    )
+
     def _build_querier_from_input(self, input: SearchAppConfigFragmentsInput) -> BatchQuerier:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         return self._build_querier(
             conditions=conditions,
             orders=orders,
-            pagination_spec=_PAGINATION_SPEC,
+            pagination_spec=self._PAGINATION_SPEC,
             first=input.first,
             after=input.after,
             last=input.last,
@@ -214,7 +217,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
     def _data_to_dto(data: AppConfigFragmentData) -> AppConfigFragmentNode:
         return AppConfigFragmentNode(
             id=data.id,
-            scope_type=AppConfigScopeTypeDTO(data.scope_type.value),
+            scope_type=DTOAppConfigScopeType(data.scope_type.value),
             scope_id=data.scope_id,
             name=data.name,
             rank=data.rank,
@@ -223,7 +226,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             updated_at=data.updated_at,
         )
 
-    # ── Bulk mutations ─────────────────────────────────────────────
+    # ── Bulk mutations ───────────────────────────────
 
     async def admin_bulk_create(
         self, input: AdminBulkCreateAppConfigFragmentsInput
@@ -268,7 +271,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
     async def admin_bulk_purge(
         self, input: AdminBulkPurgeAppConfigFragmentsInput
     ) -> AdminBulkPurgeAppConfigFragmentsPayload:
-        keys = [self._input_to_key(key) for key in input.keys]
+        keys = [self._input_to_key(key_input) for key_input in input.keys]
         result = (
             await self._processors.app_config_fragment_admin.admin_bulk_purge.wait_for_complete(
                 AdminBulkPurgeAppConfigFragmentsAction(keys=keys)
@@ -277,7 +280,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         return AdminBulkPurgeAppConfigFragmentsPayload(
             purged=[
                 PurgeAppConfigFragmentKey(
-                    scope_type=AppConfigScopeTypeDTO(key.scope_type.value),
+                    scope_type=DTOAppConfigScopeType(key.scope_type.value),
                     scope_id=key.scope_id,
                     name=key.name,
                 )
@@ -287,10 +290,13 @@ class AppConfigFragmentAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _bulk_error_to_dto(err: AppConfigFragmentBulkItemError) -> AppConfigFragmentBulkError:
+    def _bulk_error_to_dto(
+        err: AppConfigFragmentBulkItemError,
+    ) -> AppConfigFragmentBulkError:
+        """Convert the service-layer error dataclass to its DTO mirror."""
         return AppConfigFragmentBulkError(
             index=err.index,
-            scope_type=AppConfigScopeTypeDTO(err.scope_type),
+            scope_type=DTOAppConfigScopeType(err.scope_type),
             scope_id=err.scope_id,
             name=err.name,
             message=err.message,
