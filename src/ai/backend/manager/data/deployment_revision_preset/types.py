@@ -12,7 +12,7 @@ from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
 @dataclass(frozen=True)
-class PresetValueData:
+class DeploymentRevisionPresetValueData:
     preset_id: DeploymentPresetID
     value: str
 
@@ -50,7 +50,7 @@ class DeploymentRevisionPresetData:
     startup_command: str | None
     bootstrap_script: str | None
     environ: list[EnvironEntryData]
-    preset_values: list[PresetValueData]
+    preset_values: list[DeploymentRevisionPresetValueData]
     replica_count: int
     deployment_strategy: DeploymentStrategy
     deployment_strategy_spec: dict[str, Any]

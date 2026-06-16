@@ -6,9 +6,9 @@ from typing import Any, override
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
+    UIOption,
 )
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.models.runtime_variant_preset.types import UIOption
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 

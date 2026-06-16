@@ -632,7 +632,7 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
                 bootstrap_script=None,
                 callback_url=None,
             ),
-            preset=PresetAttributionData(preset_id=None, values=[]),
+            revision_preset=PresetAttributionData(preset_id=None, values=[]),
         )
 
     async def test_existing_revision_returns_data(

@@ -10077,6 +10077,11 @@ input ModelRuntimeConfigInput
 
   """Environment variables for the service."""
   environ: EnvironmentVariablesInput = null
+
+  """
+  Added in 26.4.4. Concrete values for the runtime variant's configurable presets, each keyed by the runtime variant preset ID. Overrides matching presets from a revision_preset_id template (merged by preset_id).
+  """
+  runtimeVariantPresetValues: [RuntimeVariantPresetValueInput!] = null
 }
 
 """Added in 26.4.2. Service configuration for a model entry."""
@@ -17144,6 +17149,23 @@ enum RuntimeVariantPresetOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
   RANK @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.4.4. A concrete value for one of a runtime variant's configurable presets, keyed by the runtime variant preset ID (from the runtimeVariantPresets query). Distinct from a DeploymentRevisionPreset, which is a saved template selected via revision_preset_id.
+"""
+input RuntimeVariantPresetValueInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  The runtime variant preset (from runtimeVariantPresets) this value applies to.
+  """
+  presetId: UUID!
+
+  """
+  The concrete value to set for the referenced runtime variant preset parameter.
+  """
+  value: String!
 }
 
 type ScalingGroup

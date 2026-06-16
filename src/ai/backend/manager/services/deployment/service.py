@@ -410,8 +410,8 @@ def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionC
             inference_runtime_config=data.model_runtime_config.inference_runtime_config,
         ),
         model_definition=None,
-        revision_preset_id=data.preset.preset_id,
-        preset_values=list(data.preset.values),
+        revision_preset_id=data.revision_preset.preset_id,
+        runtime_variant_preset_values=data.model_runtime_config.runtime_variant_preset_values,
     )
 
 

@@ -14,8 +14,8 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
+    DeploymentRevisionPresetValueData,
     EnvironEntryData,
-    PresetValueData,
     ResourceOptsEntryData,
 )
 from ai.backend.manager.models.base import (
@@ -26,7 +26,9 @@ from ai.backend.manager.models.base import (
     ResourceOptsEntry,
     StrEnumType,
 )
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.deployment_revision_preset.types import (
+    DeploymentRevisionPresetValueEntry,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
@@ -75,8 +77,11 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
     environ: Mapped[dict[str, str]] = mapped_column(
         "environ", pgsql.JSONB(), nullable=False, default={}, server_default="{}"
     )
-    preset_values: Mapped[list[PresetValueEntry]] = mapped_column(
-        "preset_values", PydanticListColumn(PresetValueEntry), nullable=False, server_default="[]"
+    preset_values: Mapped[list[DeploymentRevisionPresetValueEntry]] = mapped_column(
+        "preset_values",
+        PydanticListColumn(DeploymentRevisionPresetValueEntry),
+        nullable=False,
+        server_default="[]",
     )
 
     # Deployment-level preset fields. ``open_to_public`` and
@@ -145,7 +150,7 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
             bootstrap_script=self.bootstrap_script,
             environ=[EnvironEntryData(key=k, value=v) for k, v in (self.environ or {}).items()],
             preset_values=[
-                PresetValueData(preset_id=pv.preset_id, value=pv.value)
+                DeploymentRevisionPresetValueData(preset_id=pv.preset_id, value=pv.value)
                 for pv in (self.preset_values or [])
             ],
             open_to_public=self.open_to_public,

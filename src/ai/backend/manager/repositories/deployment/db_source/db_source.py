@@ -2164,7 +2164,7 @@ class DeploymentDBSource:
             )
             image_row = await ImageRow.resolve(db_sess, [image_identifier])
 
-            # Resolve preset_values from revision
+            # Resolve runtime variant preset values from revision
             resolved_presets: ResolvedPresetValues | None = None
             if revision_row.preset_values:
                 preset_ids = [pv.preset_id for pv in revision_row.preset_values]

@@ -18,8 +18,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
+from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -51,7 +51,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     runtime_variant_id: RuntimeVariantID
     extra_mounts: Sequence[MountInfoEntry]
     termination_grace_period: float = 30.0
-    preset_values: Sequence[PresetValueEntry] = field(default_factory=list)
+    preset_values: Sequence[RuntimeVariantPresetValueEntry] = field(default_factory=list)
     revision_preset_id: DeploymentPresetID | None = None
     revision_number: int | None = None
 
