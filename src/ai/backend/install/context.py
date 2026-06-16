@@ -190,7 +190,7 @@ class Context(metaclass=ABCMeta):
         except asyncio.CancelledError:
             p.terminate()
             try:
-                exit_code = await p.wait()
+                exit_code = await asyncio.wait_for(p.wait(), timeout=5.0)
             except TimeoutError:
                 p.kill()
                 exit_code = await p.wait()
@@ -856,7 +856,7 @@ class Context(metaclass=ABCMeta):
         self.log_header("Generating self-signed SSL certificate for storage-proxy (manager API)...")
         public_addr = self.install_variable.public_facing_address
         subj = f"/C=KR/ST=Seoul/L=Seoul/O=BackendAI/OU=StorageProxy/CN={public_addr}"
-        await asyncio.create_subprocess_exec(
+        proc = await asyncio.create_subprocess_exec(
             "openssl",
             "req",
             "-x509",
@@ -871,7 +871,15 @@ class Context(metaclass=ABCMeta):
             "-nodes",
             "-subj",
             subj,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"Failed to generate the storage-proxy self-signed certificate "
+                f"(openssl exit {proc.returncode}):\n{stderr.decode(errors='replace')}"
+            )
         self.log.write(Text.from_markup(f"Created SSL cert/key under {ssl_dir}"))
 
         with toml_path.open("r") as fp:
