@@ -151,6 +151,7 @@ from .resource_slot import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.image.types import ImageV2GQL
     from ai.backend.manager.api.gql.runtime_variant.types import RuntimeVariantGQL
+    from ai.backend.manager.api.gql.runtime_variant_preset.types import RuntimeVariantPresetGQL
 
     from .deployment import ModelDeployment
     from .policy import DeploymentPolicyGQL
@@ -245,10 +246,19 @@ class RuntimeVariantPresetValueGQL:
     preset_id: UUID = gql_field(description="The preset this value is bound to.")
     value: str = gql_field(description="Value bound to the preset.")
 
-    @gql_field(description="The preset's key (env var name or CLI flag).")  # type: ignore[misc]
-    async def key(self, info: Info[StrawberryGQLContext]) -> str | None:
-        node = await info.context.data_loaders.runtime_variant_preset_loader.load(self.preset_id)
-        return node.target_spec.key if node is not None else None
+    @gql_field(
+        description="The runtime variant preset this value is bound to, resolved via DataLoader."
+    )  # type: ignore[misc]
+    async def preset(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            RuntimeVariantPresetGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.runtime_variant_preset.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.runtime_variant_preset_loader.load(self.preset_id)
 
 
 @gql_pydantic_type(
