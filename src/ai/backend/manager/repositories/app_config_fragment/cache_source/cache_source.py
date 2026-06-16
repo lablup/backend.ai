@@ -31,8 +31,7 @@ from glide import Batch, ExpirySet, ExpiryType
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.valkey_client.valkey_cache import ValkeyCache
-from ai.backend.manager.data.app_config.types import AppConfigData
-from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
+from ai.backend.manager.data.app_config_fragment.types import AppConfigData, AppConfigScopeType
 from ai.backend.manager.repositories.utils import suppress_with_log
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
