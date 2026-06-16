@@ -978,6 +978,35 @@ class StatContext:
             upper_layer="collect_per_container_process_stat",
         )
 
+        # Prune metrics for PIDs that are no longer alive.
+        active_pids_by_cid: dict[ContainerId, set[PID]] = {}
+        for live_pid, live_cid in pid_map.items():
+            active_pids_by_cid.setdefault(live_cid, set()).add(live_pid)
+        agent_id = self.agent.id
+        for tracked_cid, metrics_per_pid in self.process_metrics.items():
+            active_pids_set = active_pids_by_cid[tracked_cid]
+            tracked_kid = kernel_id_map.get(tracked_cid)
+            if tracked_kid is None:
+                continue
+            dead_pids = [pid for pid in metrics_per_pid if pid not in active_pids_set]
+            if not dead_pids:
+                continue
+            session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(
+                tracked_kid
+            )
+            for dead_pid in dead_pids:
+                await self._utilization_metric_observer.lazy_remove_process_metric(
+                    self.process_metrics,
+                    agent_id=agent_id,
+                    kernel_id=tracked_kid,
+                    session_id=session_id,
+                    owner_user_id=owner_user_id,
+                    project_id=project_id,
+                    container_id=tracked_cid,
+                    pid=dead_pid,
+                    keys=list(metrics_per_pid.get(dead_pid, {}).keys()),
+                )
+
         # Use ValkeyStatClient set_multiple_keys for batch operations
         key_value_map: dict[str, bytes] = {}
         for cid in updated_cids:
