@@ -40,8 +40,6 @@ async def app_config_policy(
     id: UUID,
 ) -> AppConfigPolicyGQL | None:
     payload = await info.context.adapters.app_config_policy.get(AppConfigPolicyID(id))
-    if payload.item is None:
-        return None
     return AppConfigPolicyGQL.from_pydantic(payload.item)
 
 

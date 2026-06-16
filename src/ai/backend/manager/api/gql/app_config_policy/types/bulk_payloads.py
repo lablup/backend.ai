@@ -5,13 +5,13 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.app_config_policy.response import (
-    AdminBulkCreateAppConfigPoliciesPayload as AdminBulkCreatePayloadDTO,
+    AdminBulkCreateAppConfigPoliciesPayload as AdminBulkCreateAppConfigPoliciesPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_policy.response import (
-    AdminBulkPurgeAppConfigPoliciesPayload as AdminBulkPurgePayloadDTO,
+    AdminBulkPurgeAppConfigPoliciesPayload as AdminBulkPurgeAppConfigPoliciesPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_policy.response import (
-    AdminBulkUpdateAppConfigPoliciesPayload as AdminBulkUpdatePayloadDTO,
+    AdminBulkUpdateAppConfigPoliciesPayload as AdminBulkUpdateAppConfigPoliciesPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_policy.response import (
     AppConfigPolicyBulkError as AppConfigPolicyBulkErrorDTO,
@@ -44,10 +44,12 @@ class AppConfigPolicyBulkErrorGQL(PydanticOutputMixin[AppConfigPolicyBulkErrorDT
         added_version=NEXT_RELEASE_VERSION,
         description="Payload for `adminBulkCreateAppConfigPolicies`.",
     ),
-    model=AdminBulkCreatePayloadDTO,
+    model=AdminBulkCreateAppConfigPoliciesPayloadDTO,
     name="AdminBulkCreateAppConfigPoliciesPayload",
 )
-class AdminBulkCreateAppConfigPoliciesPayloadGQL(PydanticOutputMixin[AdminBulkCreatePayloadDTO]):
+class AdminBulkCreateAppConfigPoliciesPayloadGQL(
+    PydanticOutputMixin[AdminBulkCreateAppConfigPoliciesPayloadDTO]
+):
     created: list[AppConfigPolicyGQL] = gql_field(description="Created policies.")
     failed: list[AppConfigPolicyBulkErrorGQL] = gql_field(description="Per-item failures.")
 
@@ -57,10 +59,12 @@ class AdminBulkCreateAppConfigPoliciesPayloadGQL(PydanticOutputMixin[AdminBulkCr
         added_version=NEXT_RELEASE_VERSION,
         description="Payload for `adminBulkUpdateAppConfigPolicies`.",
     ),
-    model=AdminBulkUpdatePayloadDTO,
+    model=AdminBulkUpdateAppConfigPoliciesPayloadDTO,
     name="AdminBulkUpdateAppConfigPoliciesPayload",
 )
-class AdminBulkUpdateAppConfigPoliciesPayloadGQL(PydanticOutputMixin[AdminBulkUpdatePayloadDTO]):
+class AdminBulkUpdateAppConfigPoliciesPayloadGQL(
+    PydanticOutputMixin[AdminBulkUpdateAppConfigPoliciesPayloadDTO]
+):
     updated: list[AppConfigPolicyGQL] = gql_field(description="Updated policies.")
     failed: list[AppConfigPolicyBulkErrorGQL] = gql_field(description="Per-item failures.")
 
@@ -70,10 +74,12 @@ class AdminBulkUpdateAppConfigPoliciesPayloadGQL(PydanticOutputMixin[AdminBulkUp
         added_version=NEXT_RELEASE_VERSION,
         description="Payload for `adminBulkPurgeAppConfigPolicies`.",
     ),
-    model=AdminBulkPurgePayloadDTO,
+    model=AdminBulkPurgeAppConfigPoliciesPayloadDTO,
     name="AdminBulkPurgeAppConfigPoliciesPayload",
 )
-class AdminBulkPurgeAppConfigPoliciesPayloadGQL(PydanticOutputMixin[AdminBulkPurgePayloadDTO]):
+class AdminBulkPurgeAppConfigPoliciesPayloadGQL(
+    PydanticOutputMixin[AdminBulkPurgeAppConfigPoliciesPayloadDTO]
+):
     purged_ids: list[UUID] = gql_field(
         description="Ids of policies actually removed (absent ids no-oped).",
     )
