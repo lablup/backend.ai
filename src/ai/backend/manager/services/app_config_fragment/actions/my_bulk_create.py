@@ -7,11 +7,11 @@ from typing import override
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.bulk_types import (
     AppConfigFragmentBulkItemError,
     MyAppConfigFragmentBulkItem,
 )
+from ai.backend.manager.data.app_config_fragment.types import AppConfigData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.app_config_fragment.actions.base import MyAppConfigFragmentTarget
 
