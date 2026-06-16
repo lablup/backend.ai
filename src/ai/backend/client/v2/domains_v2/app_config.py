@@ -32,9 +32,7 @@ _FRAGMENT_PATH = "/v2/app-config-fragments"
 class V2AppConfigClient(BaseDomainClient):
     """SDK client for the merged AppConfig view + self-service writes."""
 
-    async def scoped_search(
-        self, request: ScopedSearchAppConfigsInput
-    ) -> SearchAppConfigsPayload:
+    async def scoped_search(self, request: ScopedSearchAppConfigsInput) -> SearchAppConfigsPayload:
         """Scoped merged-view search; `scope.user_ids` are OR'd and
         RBAC-gated. Self-service is a USER-scoped search over the caller's
         own id."""
