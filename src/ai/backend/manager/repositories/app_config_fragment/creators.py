@@ -6,28 +6,30 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.manager.data.app_config_fragment.types import default_rank_for_scope_type
 from ai.backend.manager.errors.app_config import AppConfigFragmentConflict
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass
-class AppConfigFragmentCreatorSpec(CreatorSpec[AppConfigFragmentRow]):
+class AppConfigFragmentCreatorSpec(DependentCreatorSpec[int, AppConfigFragmentRow]):
     """CreatorSpec for `app_config_fragments`.
 
+    `rank` (merge priority within `name`) is assigned by the ops layer
+    (next-value: ``MAX(rank) + gap`` within the `name`) at execution — the
+    same pattern as DeploymentRevisionPreset; ``build_row`` receives the
+    computed next rank as its dependency.
+
     Maps the natural-key UNIQUE violation to a typed domain error
-    (:class:`AppConfigFragmentConflict`). `rank` (merge priority) defaults
-    to a per-scope_type tier when not explicitly provided.
+    (:class:`AppConfigFragmentConflict`).
     """
 
     scope_type: str
     scope_id: str
     name: str
     config: Mapping[str, Any]
-    rank: int | None = None
 
     @property
     @override
@@ -44,12 +46,11 @@ class AppConfigFragmentCreatorSpec(CreatorSpec[AppConfigFragmentRow]):
         )
 
     @override
-    def build_row(self) -> AppConfigFragmentRow:
-        rank = self.rank if self.rank is not None else default_rank_for_scope_type(self.scope_type)
+    def build_row(self, next_rank: int) -> AppConfigFragmentRow:
         return AppConfigFragmentRow(
             scope_type=self.scope_type,
             scope_id=self.scope_id,
             name=self.name,
-            rank=rank,
+            rank=next_rank,
             config=dict(self.config),
         )

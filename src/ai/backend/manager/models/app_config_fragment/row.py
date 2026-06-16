@@ -47,8 +47,8 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
         sa.String(length=128),
         nullable=False,
     )
-    # Merge priority within a `name` (low → high). Defaults to a per-scope_type
-    # tier on create (see `default_rank_for_scope_type`); overridable.
+    # Merge priority within a `name` (low → high). Assigned by next-value
+    # (`MAX(rank) + gap` within the `name`) on create, like DeploymentRevisionPreset.
     rank: Mapped[int] = mapped_column(
         "rank",
         sa.Integer,

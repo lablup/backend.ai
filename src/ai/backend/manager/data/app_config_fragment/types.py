@@ -9,27 +9,11 @@ from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 __all__ = (
-    "DEFAULT_RANK_BY_SCOPE_TYPE",
     "AppConfigFragmentData",
     "AppConfigFragmentKey",
     "AppConfigFragmentSearchResult",
     "AppConfigScopeType",
-    "default_rank_for_scope_type",
 )
-
-# Tier-based default merge `rank` per scope_type (low → high merge priority).
-# Gaps of 100 leave room for explicit overrides between tiers.
-DEFAULT_RANK_BY_SCOPE_TYPE: Mapping[AppConfigScopeType, int] = {
-    AppConfigScopeType.PUBLIC: 100,
-    AppConfigScopeType.DOMAIN: 200,
-    AppConfigScopeType.DOMAIN_USER_DEFAULTS: 300,
-    AppConfigScopeType.USER: 400,
-}
-
-
-def default_rank_for_scope_type(scope_type: AppConfigScopeType | str) -> int:
-    """Merge `rank` default derived from `scope_type` (low → high priority)."""
-    return DEFAULT_RANK_BY_SCOPE_TYPE[AppConfigScopeType(scope_type)]
 
 
 @dataclass(frozen=True, slots=True)
