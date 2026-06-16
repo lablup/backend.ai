@@ -12,6 +12,7 @@ import logging
 import sys
 import time
 import uuid
+from collections import defaultdict
 from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from decimal import Decimal, DecimalException
 from typing import (
@@ -979,9 +980,9 @@ class StatContext:
         )
 
         # Prune metrics for PIDs that are no longer alive.
-        active_pids_by_cid: dict[ContainerId, set[PID]] = {}
+        active_pids_by_cid: defaultdict[ContainerId, set[PID]] = defaultdict(set)
         for live_pid, live_cid in pid_map.items():
-            active_pids_by_cid.setdefault(live_cid, set()).add(live_pid)
+            active_pids_by_cid[live_cid].add(live_pid)
         agent_id = self.agent.id
         for tracked_cid, metrics_per_pid in self.process_metrics.items():
             active_pids_set = active_pids_by_cid[tracked_cid]
