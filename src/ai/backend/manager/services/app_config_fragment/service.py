@@ -85,9 +85,7 @@ class AppConfigFragmentService:
     async def get_user_app_config(
         self, action: GetUserAppConfigAction
     ) -> GetUserAppConfigActionResult:
-        app_config = await self._repository.app_config(
-            UserID(action.user_id), action.config_name
-        )
+        app_config = await self._repository.app_config(UserID(action.user_id), action.config_name)
         return GetUserAppConfigActionResult(app_config=app_config)
 
     async def scoped_search_app_configs(
