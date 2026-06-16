@@ -6,6 +6,14 @@ from ai.backend.manager.repositories.resource_allocation.repository import (
 )
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.app_config_fragment.admin_processors import (
+    AppConfigFragmentAdminProcessors,
+)
+from ai.backend.manager.services.app_config_fragment.admin_service import (
+    AppConfigFragmentAdminService,
+)
+from ai.backend.manager.services.app_config_fragment.processors import AppConfigFragmentProcessors
+from ai.backend.manager.services.app_config_fragment.service import AppConfigFragmentService
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
@@ -161,6 +169,13 @@ def create_services(args: ServiceArgs) -> Services:
             args.hook_plugin_ctx,
             args.event_producer,
             args.agent_cache,
+        ),
+        app_config_fragment=AppConfigFragmentService(
+            repository=repositories.app_config_fragment.repository,
+            admin_repository=repositories.app_config_fragment.admin_repository,
+        ),
+        app_config_fragment_admin=AppConfigFragmentAdminService(
+            admin_repository=repositories.app_config_fragment.admin_repository,
         ),
         domain=DomainService(repositories.domain.repository),
         dotfile=DotfileService(
@@ -424,6 +439,12 @@ def create_processors(
     services = create_services(args.service_args)
     return Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
+        app_config_fragment=AppConfigFragmentProcessors(
+            services.app_config_fragment, action_monitors, validators
+        ),
+        app_config_fragment_admin=AppConfigFragmentAdminProcessors(
+            services.app_config_fragment_admin, action_monitors, validators
+        ),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
         error_log=ErrorLogProcessors(services.error_log, action_monitors, validators),
