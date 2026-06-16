@@ -37,6 +37,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigScopeType as DTOAppConfigScopeType,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.bulk_types import (
@@ -46,7 +47,6 @@ from ai.backend.manager.data.app_config_fragment.bulk_types import (
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
-from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.repositories.base import BatchQuerier, QueryCondition, QueryOrder
 from ai.backend.manager.services.app_config_fragment.actions.admin_search_app_configs import (
@@ -260,6 +260,7 @@ class AppConfigAdapter(BaseAdapter):
             scope_type=DTOAppConfigScopeType(data.scope_type.value),
             scope_id=data.scope_id,
             name=data.name,
+            rank=data.rank,
             config=dict(data.config) if data.config is not None else None,
             created_at=data.created_at,
             updated_at=data.updated_at,

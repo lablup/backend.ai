@@ -33,13 +33,13 @@ from ai.backend.manager.services.app_config_fragment.actions.my_bulk_update impo
     MyBulkUpdateAppConfigFragmentsAction,
     MyBulkUpdateAppConfigFragmentsActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.search import (
-    SearchAppConfigFragmentsAction,
-    SearchAppConfigFragmentsActionResult,
-)
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search_app_configs import (
     ScopedSearchAppConfigsAction,
     ScopedSearchAppConfigsActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.search import (
+    SearchAppConfigFragmentsAction,
+    SearchAppConfigFragmentsActionResult,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
