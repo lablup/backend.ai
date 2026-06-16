@@ -21,7 +21,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, TypedDict
 
 import aiofiles
 import aiotools
@@ -80,6 +80,21 @@ PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
 )
 
 
+class _ExtraServiceKwargs(TypedDict, total=False):
+    """Optional ServiceConfig fields that only DEVELOP installs populate
+    (harbor + dedicated SFTP agent). PACKAGE installs pass an empty dict."""
+
+    harbor_enabled: bool
+    harbor_hostname: str
+    harbor_http_port: int
+    harbor_admin_password: str
+    sftp_agent_enabled: bool
+    sftp_agent_rpc_addr: ServerAddr
+    sftp_agent_watcher_addr: ServerAddr
+    sftp_agent_var_base_path: str
+    sftp_agent_scaling_group: str
+
+
 class PostGuide(enum.Enum):
     UPDATE_ETC_HOSTS = 10
 
@@ -120,7 +135,7 @@ class Context(metaclass=ABCMeta):
         base_path: Path,
         local_proxy_port: int,
         loopback_aliases: tuple[str, ...],
-        extra_service_kwargs: dict[str, Any],
+        extra_service_kwargs: _ExtraServiceKwargs,
     ) -> InstallInfo:
         # TODO: customize addr/user/password options
         # TODO: multi-node setup
