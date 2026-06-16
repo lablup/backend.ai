@@ -202,7 +202,7 @@ type AddRevisionPayload
   revision: ModelRevision!
 }
 
-"""Added in UNRELEASED. Payload for `adminBulkCreateAppConfigPolicies`."""
+"""Added in 26.4.4. Payload for `adminBulkCreateAppConfigPolicies`."""
 type AdminBulkCreateAppConfigPoliciesPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -213,7 +213,7 @@ type AdminBulkCreateAppConfigPoliciesPayload
   failed: [AppConfigPolicyBulkError!]!
 }
 
-"""Added in UNRELEASED. Admin bulk create input for app-config policies."""
+"""Added in 26.4.4. Admin bulk create input for app-config policies."""
 input AdminBulkCreateAppConfigPolicyInput
   @join__type(graph: STRAWBERRY)
 {
@@ -222,7 +222,7 @@ input AdminBulkCreateAppConfigPolicyInput
 }
 
 """
-Added in UNRELEASED. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
+Added in 26.4.4. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
 """
 input AdminBulkCreateAppConfigPolicyItemInput
   @join__type(graph: STRAWBERRY)
@@ -234,7 +234,7 @@ input AdminBulkCreateAppConfigPolicyItemInput
   scopeSources: [String!]!
 }
 
-"""Added in UNRELEASED. Payload for `adminBulkPurgeAppConfigPolicies`."""
+"""Added in 26.4.4. Payload for `adminBulkPurgeAppConfigPolicies`."""
 type AdminBulkPurgeAppConfigPoliciesPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -246,7 +246,7 @@ type AdminBulkPurgeAppConfigPoliciesPayload
 }
 
 """
-Added in UNRELEASED. Admin bulk purge input for app-config policies (keyed on row id).
+Added in 26.4.4. Admin bulk purge input for app-config policies (keyed on row id).
 """
 input AdminBulkPurgeAppConfigPolicyInput
   @join__type(graph: STRAWBERRY)
@@ -255,7 +255,7 @@ input AdminBulkPurgeAppConfigPolicyInput
   ids: [UUID!]!
 }
 
-"""Added in UNRELEASED. Payload for `adminBulkUpdateAppConfigPolicies`."""
+"""Added in 26.4.4. Payload for `adminBulkUpdateAppConfigPolicies`."""
 type AdminBulkUpdateAppConfigPoliciesPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -266,7 +266,7 @@ type AdminBulkUpdateAppConfigPoliciesPayload
   failed: [AppConfigPolicyBulkError!]!
 }
 
-"""Added in UNRELEASED. Admin bulk update input for app-config policies."""
+"""Added in 26.4.4. Admin bulk update input for app-config policies."""
 input AdminBulkUpdateAppConfigPolicyInput
   @join__type(graph: STRAWBERRY)
 {
@@ -275,7 +275,7 @@ input AdminBulkUpdateAppConfigPolicyInput
 }
 
 """
-Added in UNRELEASED. Per-item input for admin bulk update — target row id + new `scope_sources`.
+Added in 26.4.4. Per-item input for admin bulk update — target row id + new `scope_sources`.
 """
 input AdminBulkUpdateAppConfigPolicyItemInput
   @join__type(graph: STRAWBERRY)
@@ -970,7 +970,7 @@ type AllowedResourceGroupsPayload
   items: [String!]!
 }
 
-"""Added in UNRELEASED. Scoped app-config policy."""
+"""Added in 26.4.4. Scoped app-config policy."""
 type AppConfigPolicy implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -991,7 +991,7 @@ type AppConfigPolicy implements Node
   updatedAt: DateTime
 }
 
-"""Added in UNRELEASED. Per-item failure info for bulk Policy mutations."""
+"""Added in 26.4.4. Per-item failure info for bulk Policy mutations."""
 type AppConfigPolicyBulkError
   @join__type(graph: STRAWBERRY)
 {
@@ -1003,7 +1003,7 @@ type AppConfigPolicyBulkError
 }
 
 """
-Added in UNRELEASED. Connection type for paginated app-config policy results.
+Added in 26.4.4. Connection type for paginated app-config policy results.
 """
 type AppConfigPolicyConnection
   @join__type(graph: STRAWBERRY)
@@ -1029,7 +1029,7 @@ type AppConfigPolicyEdge
   node: AppConfigPolicy!
 }
 
-"""Added in UNRELEASED. Filter input for querying app-config policies."""
+"""Added in 26.4.4. Filter input for querying app-config policies."""
 input AppConfigPolicyFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -1037,7 +1037,7 @@ input AppConfigPolicyFilter
   configName: StringFilter = null
 }
 
-"""Added in UNRELEASED. Specifies ordering for app-config policy results."""
+"""Added in 26.4.4. Specifies ordering for app-config policy results."""
 input AppConfigPolicyOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -1048,9 +1048,7 @@ input AppConfigPolicyOrderBy
   direction: OrderDirection! = DESC
 }
 
-"""
-Added in UNRELEASED. Fields available for ordering app-config policies.
-"""
+"""Added in 26.4.4. Fields available for ordering app-config policies."""
 enum AppConfigPolicyOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -11697,17 +11695,17 @@ type Mutation
   updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Strict insert keyed on `configName` (admin only, per-item transaction).
+  Added in 26.4.4. Strict insert keyed on `configName` (admin only, per-item transaction).
   """
   adminBulkCreateAppConfigPolicies(input: AdminBulkCreateAppConfigPolicyInput!): AdminBulkCreateAppConfigPoliciesPayload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Replace `scope_sources`; `config_name` is immutable. Admin only, per-item transaction.
+  Added in 26.4.4. Replace `scope_sources`; `config_name` is immutable. Admin only, per-item transaction.
   """
   adminBulkUpdateAppConfigPolicies(input: AdminBulkUpdateAppConfigPolicyInput!): AdminBulkUpdateAppConfigPoliciesPayload! @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Hard-delete policies by row id; rows still referenced by fragments surface in `failed`. Admin only.
+  Added in 26.4.4. Hard-delete policies by row id; rows still referenced by fragments surface in `failed`. Admin only.
   """
   adminBulkPurgeAppConfigPolicies(input: AdminBulkPurgeAppConfigPolicyInput!): AdminBulkPurgeAppConfigPoliciesPayload! @join__field(graph: STRAWBERRY)
 
@@ -14447,12 +14445,12 @@ type Query
   adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. Get a single app-config policy by row id. Available to any authenticated user.
+  Added in 26.4.4. Get a single app-config policy by row id. Available to any authenticated user.
   """
   appConfigPolicy(id: UUID!): AppConfigPolicy @join__field(graph: STRAWBERRY)
 
   """
-  Added in UNRELEASED. List app-config policies with filtering and pagination. Available to any authenticated user.
+  Added in 26.4.4. List app-config policies with filtering and pagination. Available to any authenticated user.
   """
   appConfigPolicies(filter: AppConfigPolicyFilter = null, orderBy: [AppConfigPolicyOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigPolicyConnection! @join__field(graph: STRAWBERRY)
 
