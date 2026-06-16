@@ -39,12 +39,11 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
-from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.bulk_types import (
     AppConfigFragmentBulkItemError,
     MyAppConfigFragmentBulkItem,
 )
-from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
+from ai.backend.manager.data.app_config_fragment.types import AppConfigData, AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
