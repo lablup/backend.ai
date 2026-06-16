@@ -88,7 +88,7 @@ A single `app_config_fragments` table, keyed by the natural composite
 | `scope_type` | `scope_id`              | Meaning of `config`              |
 |--------------|-------------------------|----------------------------------|
 | `public`     | literal `"public"`      | pre-login value of the document  |
-| `domain`     | `domain_name`           | the domain's value / default     |
+| `domain`     | `domain_id`             | the domain's value / default     |
 | `user`       | `user_id` (UUID string) | the user's own value             |
 
 A fragment can be created in any allowed scope for any `name` — no
@@ -167,12 +167,6 @@ Those fragments are ordered by `rank` (low → high) and deep-merged: nested
 objects recurse, scalars and lists are wholesale-replaced, and the higher
 `rank` wins on conflict.
 
-### Null projection
-
-When every contributing fragment is empty, the merged `config` projects
-to `null` (never a bare `{}`), so clients can fall back to built-in
-defaults. Each raw fragment's `config` follows the same rule.
-
 ### Read variants
 
 - **Single** — resolve one `(user, name)` to its `AppConfig`.
@@ -213,10 +207,3 @@ defaults. Each raw fragment's `config` follows the same rule.
 - **Admin reorders contributions** — adjust fragment `rank`s.
 - **Admin audit** — cross-scope fragment search and cross-user merged
   search for support.
-
----
-
-## 6. Future considerations
-
-- Automatic seeding of `user` fragments for overridable documents (e.g.
-  on first read or at user creation) to avoid per-user admin seeding.
