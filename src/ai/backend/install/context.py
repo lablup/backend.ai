@@ -114,9 +114,23 @@ class Context(metaclass=ABCMeta):
     def hydrate_install_info(self) -> InstallInfo:
         raise NotImplementedError
 
-    @abstractmethod
     async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
-        raise NotImplementedError
+        """
+        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+        """
+        mapping = {
+            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
+            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
+            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
+        }
+
+        src = mapping.get(accelerator)
+        if not src:
+            return
+
+        dst = Path("mock-accelerator.toml")
+        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
+        shutil.copy(src, dst)
 
     def add_post_guide(self, guide: PostGuide) -> None:
         self._post_guides.append(guide)
@@ -1942,24 +1956,6 @@ class DevContext(Context):
         await install_editable_webui(self)
         await self.install_halfstack()
 
-    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
-        """
-        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
-        """
-        mapping = {
-            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
-            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
-            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
-        }
-
-        src = mapping.get(accelerator)
-        if not src:
-            return
-
-        dst = Path("mock-accelerator.toml")
-        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
-        shutil.copy(src, dst)
-
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
         await self.configure_manager()
@@ -2249,24 +2245,6 @@ class PackageContext(Context):
             vpane.remove()
         self.log_header("Installing databases (halfstack)...")
         await self.install_halfstack()
-
-    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
-        """
-        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
-        """
-        mapping = {
-            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
-            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
-            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
-        }
-
-        src = mapping.get(accelerator)
-        if not src:
-            return
-
-        dst = Path("mock-accelerator.toml")
-        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
-        shutil.copy(src, dst)
 
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
