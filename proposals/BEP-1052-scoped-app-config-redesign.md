@@ -79,12 +79,9 @@ A single `app_config_fragments` table, keyed by the natural composite
 - `scope_id` — the scope's identifier (see convention below).
 - `name` — the document name (unique within the scope).
 - `rank` — integer merge priority within a `name` (low → high; higher
-  wins). Assigned by next-value on insert (see §2).
-- `config` — schema-less JSON payload (PostgreSQL `jsonb`).
+  wins). Assigned on create (see §2).
+- `config` — schema-less JSON payload.
 - `created_at` / `updated_at`.
-
-A composite index on `(name, rank)` backs the "fetch a name's fragments
-in merge order" access pattern.
 
 ### Scope-ID convention
 
@@ -133,22 +130,17 @@ users to *modifying existing* rows, the admin controls overridability:
 
 ## 2. `rank` — merge priority
 
-`rank` orders the fragments that share a `name` when they are merged:
-each fragment carries an integer priority, and the merge applies them in
-that order.
+`rank` is the integer priority a fragment carries within a `name`; the
+merge applies fragments in `rank` order (low → high, higher wins).
 
-- **Assignment.** On create, a fragment gets the **next value** —
-  `MAX(rank) + gap` among existing fragments of the same `name` —
-  computed race-free inside the write transaction. This mirrors how
-  `DeploymentRevisionPreset` assigns its rank. Insertion order thus
-  determines priority by default; admins re-order by setting `rank`
-  explicitly or via `update`. (Seeding the `domain` default before the
-  `user` copy naturally gives the user copy the higher rank.)
-- **Gaps.** Ranks are spaced (e.g. steps of 100) so a fragment can be
-  inserted between two existing ones without renumbering.
+- **Assignment.** A new fragment is placed after the existing ones for
+  the same `name`, so by default a later-created fragment outranks earlier
+  ones. Admins re-order by setting `rank` explicitly. (Seeding the
+  `domain` default before a `user` copy naturally gives the user copy the
+  higher rank, so the user value wins.)
 - **No tier defaults.** Priority is not derived from `scope_type`; a
   `user` fragment does not *automatically* outrank a `domain` fragment —
-  it outranks because it is created later (higher next-value rank).
+  it outranks only because it was created later.
 
 ---
 
@@ -173,9 +165,7 @@ whose scope applies to them:
 
 Those fragments are ordered by `rank` (low → high) and deep-merged: nested
 objects recurse, scalars and lists are wholesale-replaced, and the higher
-`rank` wins on conflict. The whole set is gathered in a single SQL query
-(scope matching expressed as a CASE over the user's domain/id); the
-chain is **not** pre-computed in service code.
+`rank` wins on conflict.
 
 ### Null projection
 
@@ -187,10 +177,9 @@ defaults. Each raw fragment's `config` follows the same rule.
 
 - **Single** — resolve one `(user, name)` to its `AppConfig`.
 - **Search (self)** — paginate the user's own `AppConfig`s, grouped by
-  `(user_id, name)`; each name's merge is evaluated independently in SQL.
-- **Search (admin, cross-user)** — the same query joined against `users`
-  to resolve any user's `AppConfig` for audit / support; scoped by the
-  search filter and gated admin-only at the service layer.
+  `(user_id, name)`; each name's merge is evaluated independently.
+- **Search (admin, cross-user)** — resolve any user's `AppConfig` for
+  audit / support; admin-only.
 
 ---
 
@@ -221,8 +210,7 @@ defaults. Each raw fragment's `config` follows the same rule.
   then edit their own copy.
 - **Promote fixed → user-customizable** — no schema change: the admin
   seeds the missing `user` fragments; users can now modify them.
-- **Admin reorders contributions** — adjust fragment `rank`s (or insert
-  one in a gap).
+- **Admin reorders contributions** — adjust fragment `rank`s.
 - **Admin audit** — cross-scope fragment search and cross-user merged
   search for support.
 
