@@ -19,7 +19,7 @@ domain, one user) can hold **multiple named configuration documents**
 
 A user's effective configuration for a given `name` is the **deep
 merge of the fragments that apply to them**, combined in **`rank`
-order**. There is no separate policy object: every fragment carries its
+order**. Every fragment carries its
 own merge priority, and which fragments participate is decided by scope
 matching alone.
 
@@ -59,11 +59,9 @@ Three scopes cover the use cases (plus `public` for the pre-login shell):
 - **Named documents within a scope.** Each row is identified by the
   natural key `(scope_type, scope_id, name)`. Clients address documents
   explicitly by name — no hierarchical fall-through lookup.
-- **Merge by `rank`, not by policy.** A fragment's `rank` is its merge
-  priority within a `name`. Participation in a user's merge is decided
-  by scope matching; ordering is decided by `rank`. There is no
-  `AppConfigPolicy` table, no required-policy invariant, and no per-name
-  allow-list of scopes.
+- **Merge by `rank`.** A fragment's `rank` is its merge priority within a
+  `name`. Every fragment whose scope applies to the user participates;
+  their order is decided by `rank`.
 - **Users read and modify; admins create.** All `create` (including
   `user` scope) is admin-only; the self-service path is **update-only**.
   See [Write model](#write-model).
@@ -102,8 +100,8 @@ in merge order" access pattern.
 | `domain`     | `domain_name`           | the domain's value / default     |
 | `user`       | `user_id` (UUID string) | the user's own value             |
 
-There is **no policy table and no FK**: a fragment can be created in any
-allowed scope for any `name`. The merge (§3) always resolves from
+A fragment can be created in any allowed scope for any `name` — no
+pre-registration step is required. The merge (§3) always resolves from
 whatever fragments exist.
 
 <a id="write-model"></a>
@@ -141,10 +139,9 @@ users to *modifying existing* rows, the admin controls overridability:
 
 ## 2. `rank` — merge priority
 
-`rank` orders the fragments that share a `name` when they are merged.
-It replaces the earlier `AppConfigPolicy.scope_sources` chain: instead of
-an admin-curated, per-name ordered list of scopes, each fragment simply
-carries an integer priority.
+`rank` orders the fragments that share a `name` when they are merged:
+each fragment carries an integer priority, and the merge applies them in
+that order.
 
 - **Assignment.** On create, a fragment gets the **next value** —
   `MAX(rank) + gap` among existing fragments of the same `name` —
@@ -231,7 +228,7 @@ defaults. Each raw fragment's `config` follows the same rule.
 - **Promote fixed → user-customizable** — no schema change: the admin
   seeds the missing `user` fragments; users can now modify them.
 - **Admin reorders contributions** — adjust fragment `rank`s (or insert
-  one in a gap) instead of editing a policy's scope list.
+  one in a gap).
 - **Admin audit** — cross-scope fragment search and cross-user merged
   search for support.
 
