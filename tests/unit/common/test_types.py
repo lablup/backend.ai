@@ -447,6 +447,27 @@ _FOLDER_UUID = uuid.uuid4()
 _QUOTA_SCOPE_STR = f"user:{uuid.uuid4().hex}"
 
 
+class TestMountPermissionExceeds:
+    @pytest.mark.parametrize(
+        ("requested", "other", "expected"),
+        [
+            (MountPermission.READ_WRITE, MountPermission.READ_ONLY, True),
+            (MountPermission.RW_DELETE, MountPermission.READ_WRITE, True),
+            (MountPermission.RW_DELETE, MountPermission.READ_ONLY, True),
+            (MountPermission.READ_ONLY, MountPermission.READ_ONLY, False),
+            (MountPermission.READ_ONLY, MountPermission.READ_WRITE, False),
+            (MountPermission.READ_WRITE, MountPermission.RW_DELETE, False),
+        ],
+    )
+    def test_exceeds(
+        self,
+        requested: MountPermission,
+        other: MountPermission,
+        expected: bool,
+    ) -> None:
+        assert requested.exceeds(other) is expected
+
+
 class TestMountInfoEntryLegacyShape:
     @pytest.mark.parametrize(
         "case",

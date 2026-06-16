@@ -525,6 +525,7 @@ class DeploymentAdapter(BaseAdapter):
                     )
                     for m in (initial_revision.extra_mounts or [])
                 ],
+                model_mount_perm=initial_revision.model_mount_config.mount_perm,
                 vfolder_subpath=initial_revision.model_mount_config.subpath,
             )
             model_revision_creator = ModelRevisionCreator(
@@ -1147,6 +1148,7 @@ class DeploymentAdapter(BaseAdapter):
             model_definition_path=input.model_mount_config.definition_path,
             model_mount_destination=input.model_mount_config.mount_destination,
             extra_mounts=extra_mounts,
+            model_mount_perm=input.model_mount_config.mount_perm,
             vfolder_subpath=input.model_mount_config.subpath,
         )
 

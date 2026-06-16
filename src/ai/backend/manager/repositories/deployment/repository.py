@@ -538,6 +538,21 @@ class DeploymentRepository:
         return await self._db_source.resolve_vfolder_permissions(vfolder_ids)
 
     @deployment_repository_resilience.apply()
+    async def resolve_user_vfolder_permissions(
+        self,
+        user_id: uuid.UUID,
+        vfolder_ids: Sequence[VFolderUUID],
+    ) -> dict[VFolderUUID, MountPermission]:
+        """Resolve the requester's effective permission on each vfolder.
+
+        Used at revision-write time to ground the model vfolder mount
+        permission into the requesting user's own permission (and to reject
+        a request exceeding it) — see
+        ``DeploymentDBSource.resolve_user_vfolder_permissions``.
+        """
+        return await self._db_source.resolve_user_vfolder_permissions(user_id, vfolder_ids)
+
+    @deployment_repository_resilience.apply()
     async def fetch_deployment_config(
         self,
         vfolder_id: VFolderUUID,

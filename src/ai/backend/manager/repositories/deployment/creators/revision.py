@@ -14,6 +14,7 @@ from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MountInfoEntry,
+    MountPermission,
     ResourceSlot,
 )
 from ai.backend.manager.errors.common import InternalServerError
@@ -41,6 +42,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     cluster_size: int
     model_vfolder_id: VFolderUUID
     model_mount_destination: str
+    model_mount_perm: MountPermission
     vfolder_subpath: str | None
     model_definition_path: str | None
     model_definition: ModelDefinition | None
@@ -71,6 +73,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             image=self.image_id,
             model=self.model_vfolder_id,
             model_mount_destination=self.model_mount_destination,
+            model_mount_perm=self.model_mount_perm,
             vfolder_subpath=self.vfolder_subpath,
             model_definition_path=self.model_definition_path,
             model_definition=self.model_definition,

@@ -17,9 +17,11 @@ from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
     MountInfoEntry,
+    MountPermission,
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -52,6 +54,7 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import EndpointNotFound
+from ai.backend.manager.errors.storage import VFolderPermissionError
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
@@ -288,6 +291,8 @@ class DeploymentController:
                 model_definition_path=model_revision_spec.mounts.model_definition_path,
                 model_mount_destination=model_revision_spec.mounts.model_mount_destination,
                 extra_mounts=legacy_extra_mounts,
+                # Legacy model serving keeps the model vfolder read-only.
+                model_mount_perm=MountPermission.READ_ONLY,
                 vfolder_subpath=model_revision_spec.mounts.vfolder_subpath,
             ),
             execution=model_revision_spec.execution,
@@ -441,6 +446,7 @@ class DeploymentController:
             cluster_size=merged.cluster_size or 1,
             model_vfolder_id=merged.mounts.model_vfolder_id,
             model_mount_destination=merged.mounts.model_mount_destination,
+            model_mount_perm=merged.mounts.model_mount_perm or MountPermission.READ_ONLY,
             vfolder_subpath=merged.mounts.vfolder_subpath,
             model_definition_path=merged.mounts.model_definition_path,
             model_definition=resolved_model_definition,
@@ -474,11 +480,35 @@ class DeploymentController:
         )
         return revision_data
 
+    @staticmethod
+    def _ground_model_mount_perm(
+        vfolder_id: VFolderUUID,
+        requested: MountPermission | None,
+        effective: MountPermission,
+    ) -> MountPermission:
+        """Resolve the model vfolder permission against the requester's own.
+
+        ``requested is None`` (deployment create / revision add with no
+        explicit permission) adopts the requester's effective permission.
+        A concrete request — ``READ_ONLY`` forced by vfolder/model-card
+        deploy, or a user-supplied value — passes through unless it exceeds
+        the requester's permission, in which case it is rejected fail-fast.
+        """
+        if requested is None:
+            return effective
+        if requested.exceeds(effective):
+            raise VFolderPermissionError(
+                f"Requested model mount permission '{requested.value}' on vfolder "
+                f"{vfolder_id} exceeds the requester's permission '{effective.value}'"
+            )
+        return requested
+
     async def add_deployment_revision(
         self,
         deployment_id: DeploymentID,
         revision: ModelRevisionCreator,
         *,
+        requester_id: uuid.UUID,
         auto_activate: bool,
     ) -> ModelRevisionData:
         """Add a revision derived from a ``ModelRevisionCreator`` and optionally activate it.
@@ -510,9 +540,25 @@ class DeploymentController:
             )
             for m in revision.mounts.extra_mounts
         ]
+        # Resolve and freeze the model vfolder permission at revision-write
+        # time against the requester's own effective permission: vfolder /
+        # model-card deploy forces READ_ONLY, deployment create / revision
+        # add adopts the requester's permission (or a user-supplied value
+        # capped by it, fail-fast on excess).
+        model_vfolder_id = revision.mounts.model_vfolder_id
+        model_vfolder_perms = await self._deployment_repository.resolve_user_vfolder_permissions(
+            requester_id, [model_vfolder_id]
+        )
+        resolved_model_mount_perm = self._ground_model_mount_perm(
+            model_vfolder_id,
+            revision.mounts.model_mount_perm,
+            model_vfolder_perms[model_vfolder_id],
+        )
         revision_data = await self.add_revision(
             endpoint_id=deployment_id,
-            overrides=revision.to_draft_with_extra_mount(extra_mount_entries),
+            overrides=revision.to_draft_with_extra_mount(
+                extra_mount_entries, resolved_model_mount_perm
+            ),
             preset_id=revision.revision_preset_id,
         )
         if auto_activate:

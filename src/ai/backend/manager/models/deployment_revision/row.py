@@ -19,6 +19,7 @@ from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
     MountInfoEntry,
+    MountPermission,
     ResourceSlot,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -37,6 +38,7 @@ from ai.backend.manager.models.base import (
     Base,
     PydanticColumn,
     PydanticListColumn,
+    StrEnumType,
     URLColumn,
 )
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
@@ -144,6 +146,15 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     )
     model_definition: Mapped[ModelDefinition | None] = mapped_column(
         "model_definition", PydanticColumn(ModelDefinition), nullable=True
+    )
+    # Resolved permission for the model vfolder mount, frozen at
+    # revision-write time. Never NULL: legacy rows are backfilled to ``ro``
+    # and every write path supplies a concrete permission.
+    model_mount_perm: Mapped[MountPermission] = mapped_column(
+        "model_mount_perm",
+        StrEnumType(MountPermission),
+        nullable=False,
+        server_default=MountPermission.READ_ONLY.value,
     )
 
     # Resource configuration
@@ -304,6 +315,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 subpath=self.vfolder_subpath,
                 definition_path=self.model_definition_path or "",
                 extra_mounts=list(self.extra_mounts),
+                model_mount_perm=self.model_mount_perm,
             ),
             revision_preset=PresetAttributionData(
                 preset_id=self.revision_preset_id,

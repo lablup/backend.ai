@@ -128,6 +128,7 @@ class TestDeploymentFromPreset:
                     model_definition_path=None,
                     model_mount_destination="/models",
                     extra_mounts=[],
+                    model_mount_perm=None,
                 ),
                 revision_preset_id=preset_data.id,
             ),

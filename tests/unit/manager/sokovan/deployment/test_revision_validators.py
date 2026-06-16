@@ -10,7 +10,7 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.common.types import ClusterMode, ResourceSlot, SlotName
+from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot, SlotName
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     ModelRevisionSpec,
@@ -38,6 +38,7 @@ def _creator_spec(resource_slots: dict[str, int]) -> DeploymentRevisionCreatorSp
         cluster_size=1,
         model_vfolder_id=VFolderUUID(uuid4()),
         model_mount_destination="/models",
+        model_mount_perm=MountPermission.READ_ONLY,
         vfolder_subpath=None,
         model_definition_path=None,
         model_definition=None,
@@ -64,6 +65,7 @@ def _legacy_spec(resource_slots: dict[str, int]) -> ModelRevisionSpec:
             model_definition_path=None,
             model_mount_destination="/models",
             extra_mounts=[],
+            model_mount_perm=None,
         ),
         execution=ExecutionSpec(runtime_variant_id=RuntimeVariantID(uuid4())),
         model_definition=None,
