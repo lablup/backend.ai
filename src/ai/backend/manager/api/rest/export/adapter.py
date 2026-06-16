@@ -120,9 +120,7 @@ class ExportAdapter(BaseFilterAdapter):
         conditions = self._build_session_conditions(report, filter)
         orders = self._build_session_orders(report, order)
 
-        # Collect all required JOINs from selected output fields. The nested user filter does
-        # not need a JOIN: it is expressed as a subquery on sessions.user_uuid (see
-        # _build_session_conditions), so filtering by user never restructures the FROM clause.
+        # Collect all required JOINs from selected output fields
         all_joins = self._collect_joins(selected_fields)
 
         # Build select_from with dynamic JOINs
@@ -471,28 +469,28 @@ class ExportAdapter(BaseFilterAdapter):
         Returns None when the filter contributes no condition.
         """
         user_conditions: list[QueryCondition] = []
-        user_field: ExportFieldDef | None = None
+        user_joins: set[JoinDef] = set()
         if user_filter.email is not None:
             field = report.get_field("user_email")
             if field:
-                user_field = field
+                user_joins.update(field.joins or ())
                 cond = self._build_string_condition(user_filter.email, field)
                 if cond:
                     user_conditions.append(cond)
         if user_filter.username is not None:
             field = report.get_field("user_username")
             if field:
-                user_field = field
+                user_joins.update(field.joins or ())
                 cond = self._build_string_condition(user_filter.username, field)
                 if cond:
                     user_conditions.append(cond)
 
-        if not user_conditions or user_field is None or not user_field.joins:
+        if not user_conditions or not user_joins:
             return None
 
-        joins = list(user_field.joins)
+        joins = list(user_joins)
 
-        def condition() -> sa.sql.expression.ColumnElement[bool]:
+        def owning_user_exists() -> sa.sql.expression.ColumnElement[bool]:
             where_clauses = [join.condition for join in joins]
             where_clauses.extend(cond() for cond in user_conditions)
             # correlate_except keeps the joined table(s) in the subquery's own FROM so that
@@ -507,7 +505,7 @@ class ExportAdapter(BaseFilterAdapter):
             )
             return subquery.exists()
 
-        return condition
+        return owning_user_exists
 
     def _build_session_orders(
         self,
