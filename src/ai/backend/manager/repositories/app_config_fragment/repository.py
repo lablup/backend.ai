@@ -17,6 +17,9 @@ from ai.backend.manager.data.app_config_fragment.types import (
     ScopedAppConfigSearchResult,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.app_config_fragment.cache_source import (
+    AppConfigFragmentCacheSource,
+)
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
@@ -52,9 +55,16 @@ class AppConfigFragmentRepository:
     """
 
     _db_source: AppConfigFragmentDBSource
+    _cache_source: AppConfigFragmentCacheSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: DBOpsProvider) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        ops_provider: DBOpsProvider,
+        cache_source: AppConfigFragmentCacheSource,
+    ) -> None:
         self._db_source = AppConfigFragmentDBSource(db, ops_provider)
+        self._cache_source = cache_source
 
     # ── Raw fragment reads ────────────────────────────────────────
 
@@ -82,7 +92,11 @@ class AppConfigFragmentRepository:
         user_id: UserID,
         config_name: str,
     ) -> AppConfigData:
-        return await self._db_source.get_user_app_config(user_id, config_name)
+        result = await self._db_source.get_user_app_config(user_id, config_name)
+        # Write-through populate. Read-through is a follow-up: the cache
+        # stores only the merged `config`, not the contributing fragments.
+        await self._cache_source.set_merged_config(result)
+        return result
 
     @app_config_fragment_repository_resilience.apply()
     async def scoped_search_app_configs(

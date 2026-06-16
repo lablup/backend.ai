@@ -6,6 +6,10 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import ValkeyTarget
+from ai.backend.manager.clients.valkey_client.valkey_cache import ValkeyCache
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentKey,
     AppConfigScopeType,
@@ -16,11 +20,34 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.admin_repository import (
     AppConfigFragmentAdminRepository,
 )
+from ai.backend.manager.repositories.app_config_fragment.cache_source import (
+    AppConfigFragmentCacheSource,
+)
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
+
+
+@pytest.fixture
+async def cache_source(
+    redis_container: tuple[str, HostPortPairModel],
+) -> AsyncGenerator[AppConfigFragmentCacheSource, None]:
+    """Real Valkey-backed cache source (write-through populate + invalidate)."""
+    redis_addr = redis_container[1]
+    valkey_target = ValkeyTarget(
+        addr=f"{redis_addr.host}:{redis_addr.port}",
+        sentinel=None,
+        service_name=None,
+    )
+    valkey_stat = await ValkeyStatClient.create(
+        valkey_target=valkey_target,
+        db_id=0,
+        human_readable_name="test-app-config-fragment-cache",
+    )
+    yield AppConfigFragmentCacheSource(ValkeyCache(valkey_stat._client))
+    await valkey_stat.close()
 
 
 class TestAppConfigFragmentRepository:
@@ -40,12 +67,20 @@ class TestAppConfigFragmentRepository:
             yield database_connection
 
     @pytest.fixture
-    def repository(self, db: ExtendedAsyncSAEngine) -> AppConfigFragmentRepository:
-        return AppConfigFragmentRepository(db, DBOpsProvider(db))
+    def repository(
+        self,
+        db: ExtendedAsyncSAEngine,
+        cache_source: AppConfigFragmentCacheSource,
+    ) -> AppConfigFragmentRepository:
+        return AppConfigFragmentRepository(db, DBOpsProvider(db), cache_source=cache_source)
 
     @pytest.fixture
-    def admin_repository(self, db: ExtendedAsyncSAEngine) -> AppConfigFragmentAdminRepository:
-        return AppConfigFragmentAdminRepository(db, DBOpsProvider(db))
+    def admin_repository(
+        self,
+        db: ExtendedAsyncSAEngine,
+        cache_source: AppConfigFragmentCacheSource,
+    ) -> AppConfigFragmentAdminRepository:
+        return AppConfigFragmentAdminRepository(db, DBOpsProvider(db), cache_source=cache_source)
 
     async def test_create_and_get_by_key(
         self,
@@ -128,8 +163,12 @@ class TestAppConfigFragmentAdminRepository:
             yield database_connection
 
     @pytest.fixture
-    def admin_repository(self, db: ExtendedAsyncSAEngine) -> AppConfigFragmentAdminRepository:
-        return AppConfigFragmentAdminRepository(db, DBOpsProvider(db))
+    def admin_repository(
+        self,
+        db: ExtendedAsyncSAEngine,
+        cache_source: AppConfigFragmentCacheSource,
+    ) -> AppConfigFragmentAdminRepository:
+        return AppConfigFragmentAdminRepository(db, DBOpsProvider(db), cache_source=cache_source)
 
     async def test_update_replaces_config(
         self,

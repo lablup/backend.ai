@@ -17,6 +17,9 @@ from ai.backend.manager.data.app_config_fragment.types import (
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.app_config_fragment.cache_source import (
+    AppConfigFragmentCacheSource,
+)
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
@@ -66,9 +69,16 @@ class AppConfigFragmentAdminRepository:
     """
 
     _db_source: AppConfigFragmentDBSource
+    _cache_source: AppConfigFragmentCacheSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: DBOpsProvider) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        ops_provider: DBOpsProvider,
+        cache_source: AppConfigFragmentCacheSource,
+    ) -> None:
         self._db_source = AppConfigFragmentDBSource(db, ops_provider)
+        self._cache_source = cache_source
 
     # ── Mutations ─────────────────────────────────────────────────
 
@@ -86,7 +96,9 @@ class AppConfigFragmentAdminRepository:
             name=key.name,
             config=config,
         )
-        return await self._db_source.create(spec)
+        result = await self._db_source.create(spec)
+        await self._cache_source.invalidate_for_scope(key.scope_type, key.scope_id)
+        return result
 
     @app_config_fragment_admin_repository_resilience.apply()
     async def update(
@@ -110,7 +122,9 @@ class AppConfigFragmentAdminRepository:
             spec=AppConfigFragmentUpdaterSpec(config=config),
             pk_value=pk_value,
         )
-        return await self._db_source.update(updater)
+        result = await self._db_source.update(updater)
+        await self._cache_source.invalidate_for_scope(key.scope_type, key.scope_id)
+        return result
 
     @app_config_fragment_admin_repository_resilience.apply()
     async def purge(self, key: AppConfigFragmentKey) -> bool:
@@ -124,7 +138,10 @@ class AppConfigFragmentAdminRepository:
             row_class=AppConfigFragmentRow,
             pk_value=pk_value,
         )
-        return await self._db_source.purge(purger)
+        removed = await self._db_source.purge(purger)
+        if removed:
+            await self._cache_source.invalidate_for_scope(key.scope_type, key.scope_id)
+        return removed
 
     # ── Cross-scope reads ────────────────────────────────────────
 
