@@ -343,6 +343,20 @@ class Metric:
         }
 
 
+async def _packb_many_in_executor(
+    loop: asyncio.AbstractEventLoop,
+    mapping: dict[str, Any],
+) -> dict[str, bytes]:
+    """
+    msgpack-pack each value of ``mapping`` off the event loop in a single hop.
+    """
+
+    def _pack(m: dict[str, Any]) -> dict[str, bytes]:
+        return {key: msgpack.packb(value) for key, value in m.items()}
+
+    return await loop.run_in_executor(None, _pack, mapping)
+
+
 class StatContext:
     agent: AbstractAgent[Any, Any]
     mode: StatModes
@@ -804,7 +818,7 @@ class StatContext:
                         self.kernel_metrics[kernel_id][metric_key].update(measure)
 
         kernel_updates: list[FlattenedKernelMetric] = []
-        kernel_serialized_updates: list[tuple[KernelId, bytes]] = []
+        serializable_by_kernel: dict[str, dict[MetricKey, MetricValue]] = {}
         agent_id = self.agent.id
         for kernel_id in updated_kernel_ids:
             session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
@@ -839,7 +853,7 @@ class StatContext:
             if self.agent.local_config.debug.log_stats:
                 log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
 
-            kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
+            serializable_by_kernel[str(kernel_id)] = serializable_metrics
 
         self._stage_observer.observe_stage(
             stage="before_report_to_redis",
@@ -847,7 +861,8 @@ class StatContext:
         )
 
         # Use ValkeyStatClient set_multiple_keys for batch operations
-        key_value_map = {str(kernel_id): update for kernel_id, update in kernel_serialized_updates}
+        loop = asyncio.get_running_loop()
+        key_value_map = await _packb_many_in_executor(loop, serializable_by_kernel)
         if key_value_map:
             await self.agent.valkey_stat_client.set_multiple_keys(key_value_map)
 
@@ -1009,12 +1024,11 @@ class StatContext:
                 )
 
         # Use ValkeyStatClient set_multiple_keys for batch operations
-        key_value_map: dict[str, bytes] = {}
+        serializable_by_cid: dict[str, dict[PID, dict[str, MetricValue]]] = {}
         for cid in updated_cids:
-            serializable_table = {}
-            for pid in self.process_metrics[cid].keys():
-                metrics = self.process_metrics[cid][pid]
-                serializable_metrics = {}
+            serializable_table: dict[PID, dict[str, MetricValue]] = {}
+            for pid, metrics in self.process_metrics[cid].items():
+                serializable_metrics: dict[str, MetricValue] = {}
                 for key, obj in metrics.items():
                     try:
                         serializable_metrics[str(key)] = obj.to_serializable_dict()
@@ -1028,9 +1042,11 @@ class StatContext:
                     cid,
                     serializable_table,
                 )
-            serialized_metrics = msgpack.packb(serializable_table)
-            key_value_map[str(cid)] = serialized_metrics
+            serializable_by_cid[str(cid)] = serializable_table
 
+        # Use ValkeyStatClient set_multiple_keys for batch operations.
+        loop = asyncio.get_running_loop()
+        key_value_map = await _packb_many_in_executor(loop, serializable_by_cid)
         if key_value_map:
             await self.agent.valkey_stat_client.set_multiple_keys(
                 key_value_map, expire_sec=self._metric_ttl()
