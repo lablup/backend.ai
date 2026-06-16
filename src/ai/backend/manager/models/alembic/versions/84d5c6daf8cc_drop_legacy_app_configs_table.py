@@ -1,7 +1,7 @@
 """drop legacy app_configs table
 
 Removes the predecessor `app_configs` table and its enum type as
-preparation for BEP-1052 (Scoped App Config Redesign). The
+preparation for the scoped app-config redesign. The
 replacement tables (`app_config_fragments`, `app_config_policies`)
 are introduced in a follow-up migration on top of this one — the
 new shape is incompatible with the old (different scope enum,

@@ -28,6 +28,10 @@ def build_v2_routes(
     # Lazy imports to avoid circular dependencies at module level
     from .agent.handler import V2AgentHandler
     from .agent.registry import register_v2_agent_routes
+    from .app_config.handler import V2AppConfigHandler
+    from .app_config.registry import register_v2_app_config_routes
+    from .app_config_fragment.handler import V2AppConfigFragmentHandler
+    from .app_config_fragment.registry import register_v2_app_config_fragment_routes
     from .artifact.handler import V2ArtifactHandler
     from .artifact.registry import register_v2_artifact_routes
     from .artifact_registry.handler import V2ArtifactRegistryHandler
@@ -117,6 +121,11 @@ def build_v2_routes(
 
     # Build all handlers (each takes its individual adapter)
     agent_handler = V2AgentHandler(adapter=adapters.agent)
+    app_config_handler = V2AppConfigHandler(adapter=adapters.app_config)
+    app_config_fragment_handler = V2AppConfigFragmentHandler(
+        adapter=adapters.app_config_fragment,
+        app_config_adapter=adapters.app_config,
+    )
     artifact_handler = V2ArtifactHandler(adapter=adapters.artifact)
     artifact_registry_handler = V2ArtifactRegistryHandler(adapter=adapters.artifact_registry)
     audit_log_handler = V2AuditLogHandler(adapter=adapters.audit_log)
@@ -174,6 +183,10 @@ def build_v2_routes(
 
     # Add all domain sub-registries
     v2_reg.add_subregistry(register_v2_agent_routes(agent_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_app_config_routes(app_config_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_app_config_fragment_routes(app_config_fragment_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_artifact_routes(artifact_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_artifact_registry_routes(artifact_registry_handler, route_deps)

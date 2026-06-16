@@ -10,6 +10,17 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.identifier.role_preset import RolePresetID
 
 
+class AppConfigFragmentScopePathParam(BaseRequestModel):
+    scope_type: str = Field(description="App-config scope type (public/domain/user/...).")
+    scope_id: str = Field(description="Scope id (domain name, user id, or `public`).")
+
+
+class AppConfigUserNamePathParam(BaseRequestModel):
+    user_id: UUID = Field(description="Target user's UUID (admin only).")
+    name: str = Field(description="Config name.")
+
+
+
 class DomainNamePathParam(BaseRequestModel):
     domain_name: str = Field(description="Domain name")
 
