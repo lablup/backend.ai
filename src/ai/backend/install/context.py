@@ -53,7 +53,6 @@ from .docker import (
     get_preferred_pants_local_exec_root,
 )
 from .http import wget
-from .python import check_python
 from .types import (
     Accelerator,
     DistInfo,
@@ -1947,7 +1946,6 @@ class DevContext(Context):
         await super().check_prerequisites()
         await install_git_lfs(self)
         await install_git_hooks(self)
-        await check_python(self)
         local_execution_root_dir = await get_preferred_pants_local_exec_root(self)
         await bootstrap_pants(self, local_execution_root_dir)
 
