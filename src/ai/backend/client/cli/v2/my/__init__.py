@@ -82,3 +82,12 @@ def resource_policy() -> None:
 )
 def storage_host() -> None:
     """My storage host commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.app_config:app_config",
+    name="app-config",
+)
+def app_config() -> None:
+    """My merged AppConfig commands."""
