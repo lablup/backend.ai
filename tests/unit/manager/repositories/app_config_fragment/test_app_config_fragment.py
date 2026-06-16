@@ -63,12 +63,12 @@ class TestAppConfigFragmentRepository:
         assert created.scope_type == AppConfigScopeType.DOMAIN
         assert created.scope_id == "default"
         assert created.name == "theme"
-        # rank defaults to the DOMAIN tier when not explicitly provided.
-        assert created.rank == 200
+        # First fragment for `theme` gets the base next-value rank.
+        assert created.rank == 100
         assert created.config is not None
         assert dict(created.config) == {"color": "blue"}
 
-        fetched = await repository.get(key)
+        fetched = await repository.get_by_key(key)
         assert fetched is not None
         assert fetched.id == created.id
         assert fetched.config is not None
@@ -87,7 +87,7 @@ class TestAppConfigFragmentRepository:
             ),
             config={"density": "comfortable"},
         )
-        # rank defaults to the PUBLIC tier.
+        # First fragment for `theme` gets the base next-value rank.
         assert created.rank == 100
 
         fetched = await repository.get_by_id(created.id)
@@ -101,7 +101,7 @@ class TestAppConfigFragmentRepository:
         repository: AppConfigFragmentRepository,
     ) -> None:
         with pytest.raises(AppConfigFragmentNotFound):
-            await repository.get(
+            await repository.get_by_key(
                 AppConfigFragmentKey(
                     scope_type=AppConfigScopeType.DOMAIN,
                     scope_id="missing",
@@ -187,3 +187,29 @@ class TestAppConfigFragmentAdminRepository:
             )
             is False
         )
+
+    async def test_rank_assigned_by_next_value(
+        self,
+        admin_repository: AppConfigFragmentAdminRepository,
+    ) -> None:
+        # Fragments sharing a `name` get a monotonic next-value rank
+        # (MAX + gap within the name), like DeploymentRevisionPreset —
+        # not a per-scope_type tier.
+        first = await admin_repository.create(
+            key=AppConfigFragmentKey(
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id="public",
+                name="theme",
+            ),
+            config={"density": "comfortable"},
+        )
+        second = await admin_repository.create(
+            key=AppConfigFragmentKey(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id="default",
+                name="theme",
+            ),
+            config={"color": "blue"},
+        )
+        assert first.rank == 100
+        assert second.rank == 200

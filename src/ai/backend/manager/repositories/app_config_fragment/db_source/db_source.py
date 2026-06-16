@@ -25,14 +25,18 @@ from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.app_config_fragment.creators import (
+    AppConfigFragmentCreatorSpec,
+)
 from ai.backend.manager.repositories.app_config_fragment.types import (
     UserAppConfigSearchScope,
 )
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.creator import NextValuePolicy
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.types import SearchScope
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 app_config_fragment_db_source_resilience = Resilience(
     policies=[
@@ -52,6 +56,8 @@ app_config_fragment_db_source_resilience = Resilience(
         ),
     ]
 )
+
+RANK_GAP = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,9 +84,11 @@ class AppConfigFragmentDBSource:
     """
 
     _db: ExtendedAsyncSAEngine
+    _ops: DBOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._ops = DBOpsProvider(db)
 
     # ── Raw fragment CRUD ──────────────────────────────────────────
 
@@ -114,18 +122,27 @@ class AppConfigFragmentDBSource:
             return row.to_data() if row is not None else None
 
     @app_config_fragment_db_source_resilience.apply()
-    async def create(self, creator: Creator[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        """Insert a new fragment via the shared Creator helper.
+    async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
+        """Insert a fragment, assigning the next-value `rank`
+        (``MAX(rank) + gap`` within the `name`) race-free — the same
+        pattern as DeploymentRevisionPreset.
 
-        The natural-key UNIQUE violation translates to
-        :class:`AppConfigFragmentConflict` via the spec's
-        ``integrity_error_checks``. The required-policy invariant
-        (FK on ``name``) is enforced upstream by the service layer;
-        a bypass here surfaces as a generic integrity error.
+        Concurrent inserts for an existing `name` are serialized by
+        locking that name's rows. The natural-key UNIQUE violation
+        translates to :class:`AppConfigFragmentConflict` via the spec's
+        ``integrity_error_checks``.
         """
-        async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
-            return result.row.to_data()
+        policy = NextValuePolicy(
+            column=AppConfigFragmentRow.rank,
+            scope_condition=lambda: AppConfigFragmentRow.name == spec.name,
+            lock_selector=sa.select(AppConfigFragmentRow).where(
+                AppConfigFragmentRow.name == spec.name
+            ),
+            gap=RANK_GAP,
+        )
+        async with self._ops.write_ops() as w:
+            created = await w.create_with_next_value(policy, spec)
+            return created.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
     async def resolve_pk_by_key(

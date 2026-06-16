@@ -26,7 +26,6 @@ from ai.backend.manager.repositories.app_config_fragment.db_source import (
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
 )
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
@@ -58,14 +57,11 @@ class AppConfigFragmentAdminRepository:
     reads (`admin_search` raw, `admin_search_app_configs` merged)
     live here — read-side scope-bound operations are on
     `AppConfigFragmentRepository`. Authorization is enforced at the
-    service layer before reaching either repository. The required-
-    policy invariant is enforced upstream by the service layer; the
-    DB-level FK on ``app_config_fragments.name`` is the defense-in-
-    depth backstop and surfaces as a generic integrity error.
+    service layer before reaching either repository.
 
-    Mutations are routed through the shared Creator / Updater / Purger
-    helpers so the same execution / resilience plumbing applies as in
-    sister repositories.
+    Mutations are routed through the shared ops helpers (next-value
+    creator / Updater / Purger) so the same execution / resilience
+    plumbing applies as in sister repositories.
     """
 
     _db_source: AppConfigFragmentDBSource
@@ -81,15 +77,15 @@ class AppConfigFragmentAdminRepository:
         key: AppConfigFragmentKey,
         config: Mapping[str, Any],
     ) -> AppConfigFragmentData:
-        creator: Creator[AppConfigFragmentRow] = Creator(
-            spec=AppConfigFragmentCreatorSpec(
-                scope_type=key.scope_type,
-                scope_id=key.scope_id,
-                name=key.name,
-                config=config,
-            ),
+        """Insert a fragment; its `rank` is assigned by next-value
+        (``MAX(rank) + gap`` within the `name`) in the DB source."""
+        spec = AppConfigFragmentCreatorSpec(
+            scope_type=key.scope_type,
+            scope_id=key.scope_id,
+            name=key.name,
+            config=config,
         )
-        return await self._db_source.create(creator)
+        return await self._db_source.create(spec)
 
     @app_config_fragment_admin_repository_resilience.apply()
     async def update(
