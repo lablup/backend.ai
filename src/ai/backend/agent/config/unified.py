@@ -135,6 +135,24 @@ class UtilizationMetricConfig(BaseConfigSchema):
             example=ConfigExample(local="30.0", prod="30.0"),
         ),
     ]
+    enable_process_metric: Annotated[
+        bool,
+        Field(
+            default=True,
+            validation_alias=AliasChoices("enable-process-metric", "enable_process_metric"),
+            serialization_alias="enable-process-metric",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to collect per-process utilization metrics for each container. "
+                "When disabled, the agent skips listing container processes and reporting "
+                "per-process statistics, while per-node and per-container metrics are "
+                "still collected."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
 
 
 class CoreDumpConfig(BaseConfigSchema):

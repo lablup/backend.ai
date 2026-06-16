@@ -1368,6 +1368,9 @@ class AbstractAgent[
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self) -> None:
+        if not self.local_config.agent.utilization_metric.enable_process_metric:
+            log.debug("skipping process stat collection as it's disabled in config")
+            return
         if self.local_config.debug.log_stats:
             log.debug("collecting process statistics in container")
         container_ids: set[ContainerId] = set()
