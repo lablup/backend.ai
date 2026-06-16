@@ -43,7 +43,7 @@ class V2AppConfigPolicyHandler:
         result = await self._adapter.get(path.parsed.policy_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def search(
+    async def admin_search(
         self,
         body: BodyParam[AdminSearchAppConfigPoliciesInput],
     ) -> APIResponse:
