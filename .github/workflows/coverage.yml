@@ -29,7 +29,7 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       with:
         gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}

@@ -107,7 +107,7 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
@@ -205,7 +205,7 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       with:
         gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -300,11 +300,15 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
     - name: Bootstrap Pants
       if: steps.filter.outputs.models == 'true' || startsWith(github.ref, 'refs/tags/')
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       with:
         gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        # ``pants export`` builds a venv into the named caches; caching the
+        # lmdb_store (process cache) here desyncs from the named-caches cache
+        # (lmdb hit + named-caches miss -> dangling venv python). The other
+        # export jobs (build-scies/wheels/supergraph) already disable it.
+        cache-lmdb-store: 'false'
     - name: Prepare DB
       if: steps.filter.outputs.models == 'true' || startsWith(github.ref, 'refs/tags/')
       run: docker compose -f docker-compose.halfstack-main.yml up -d backendai-half-db --wait
@@ -378,7 +382,7 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       with:
         gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -457,7 +461,7 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       with:
         gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -540,7 +544,7 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       with:
         gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -654,7 +658,7 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       with:
         gha-cache-key: v0-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -711,7 +715,7 @@ jobs:
       run: |
         pip install -U 'packaging>=21.3'
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       with:
         gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -758,7 +762,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       with:
         gha-cache-key: v0
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
