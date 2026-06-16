@@ -20,7 +20,6 @@ class AppConfigUserNamePathParam(BaseRequestModel):
     name: str = Field(description="Config name.")
 
 
-
 class DomainNamePathParam(BaseRequestModel):
     domain_name: str = Field(description="Domain name")
 
