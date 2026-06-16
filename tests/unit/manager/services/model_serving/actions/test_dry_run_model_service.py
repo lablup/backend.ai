@@ -137,6 +137,7 @@ class TestDryRunModelService:
                 model_definition_path=None,
                 model_mount_destination="/models",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
                 runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
@@ -438,6 +439,7 @@ class TestDryRunModelServiceActionWithRevision:
                 model_definition_path=None,
                 model_mount_destination="/models",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
                 runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
@@ -547,6 +549,7 @@ class TestDryRunModelServiceActionWithRevision:
                 model_definition_path=None,
                 model_mount_destination="/models",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
                 runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
@@ -641,6 +644,7 @@ class TestDryRunWithDeploymentConfigOverrides:
                 model_definition_path=None,
                 model_mount_destination="/models",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
                 runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
@@ -948,6 +952,7 @@ class TestDryRunExtraMountsHandling:
                 model_definition_path=None,
                 model_mount_destination="/models",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
                 runtime_variant_id=RuntimeVariantID(uuid.uuid4()),

@@ -58,7 +58,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import BackendAIError, UnreachableError
-from ai.backend.common.types import BinarySize, VFolderUsageMode
+from ai.backend.common.types import BinarySize, MountPermission, VFolderUsageMode
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment.creator import (
@@ -530,6 +530,8 @@ class VFolderAdapter(BaseAdapter):
                     model_definition_path=None,
                     model_mount_destination="/models",
                     extra_mounts=[],
+                    # vfolder deploy always mounts the model read-only.
+                    model_mount_perm=MountPermission.READ_ONLY,
                 ),
                 revision_preset_id=input.revision_preset_id,
             ),

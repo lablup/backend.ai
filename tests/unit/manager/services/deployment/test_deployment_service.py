@@ -7,7 +7,7 @@ Tests verify service layer business logic using mocked repositories.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
@@ -15,8 +15,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     MintEndpointTokenResponse,
 )
@@ -409,6 +411,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 model_definition_path="model-definition.yaml",
                 model_mount_destination="/models",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
                 startup_command="python serve.py",
@@ -442,6 +445,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             image_id=ImageID(image_id),
             execution=ExecutionData(
@@ -471,6 +475,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 model_definition_path=None,
                 model_mount_destination="/models",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
                 runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
@@ -483,19 +488,37 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
 class TestAddModelRevision(ModelRevisionFixtures):
     """Tests for DeploymentService.add_model_revision — now delegates to controller."""
 
+    @pytest.fixture
+    def requester(self) -> UserData:
+        return UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+
+    @pytest.fixture(autouse=True)
+    def set_user_context(self, requester: UserData) -> Iterator[None]:
+        with with_user(requester):
+            yield
+
     async def test_add_model_revision_delegates_to_controller(
         self,
         processors: DeploymentProcessors,
         mock_deployment_controller: MagicMock,
         deployment_id: uuid.UUID,
+        requester: UserData,
         revision_creator: ModelRevisionCreator,
         revision_data: ModelRevisionData,
     ) -> None:
-        """add_model_revision should delegate to controller.add_deployment_revision.
+        """add_model_revision delegates to the controller with the current user as requester.
 
-        The service forwards the ``ModelRevisionCreator`` and ``auto_activate``
-        flag directly; the controller owns the projection onto ``RevisionDraft``
-        + ``MountMetadata`` + ``preset_id`` and the optional activation step.
+        The service resolves the requesting user from the request context and
+        forwards it as ``requester_id``; the controller owns the projection onto
+        ``RevisionDraft`` + ``MountMetadata`` + ``preset_id`` and the optional
+        activation step.
         """
         mock_deployment_controller.add_deployment_revision = AsyncMock(return_value=revision_data)
 
@@ -510,6 +533,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
         mock_deployment_controller.add_deployment_revision.assert_awaited_once_with(
             deployment_id=deployment_id,
             revision=revision_creator,
+            requester_id=requester.user_id,
             auto_activate=False,
         )
 
@@ -688,6 +712,7 @@ class TestConvertDeploymentInfoToData:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                     extra_mounts=[],
+                    model_mount_perm=None,
                 ),
                 created_at=datetime(2024, 1, 1, tzinfo=UTC),
                 image_id=ImageID(uuid.uuid4()),

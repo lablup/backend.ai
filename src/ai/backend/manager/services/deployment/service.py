@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -45,6 +46,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import RoutingNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
 )
@@ -395,6 +397,9 @@ def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionC
                 )
                 for m in data.model_mount_config.extra_mounts
             ],
+            # Preserve the existing revision's resolved model mount permission
+            # on refresh so the rebuilt revision keeps it.
+            model_mount_perm=data.model_mount_config.model_mount_perm,
             vfolder_subpath=data.model_mount_config.subpath,
         ),
         execution=ExecutionSpec(
@@ -458,6 +463,7 @@ class DeploymentService:
             await self._deployment_controller.add_deployment_revision(
                 deployment_id=DeploymentID(deployment_info.id),
                 revision=action.creator.model_revision,
+                requester_id=action.creator.metadata.created_user,
                 auto_activate=action.auto_activate,
             )
         updated_deployment_info = await self._deployment_repository.get_endpoint_info(
@@ -486,6 +492,7 @@ class DeploymentService:
         await self._deployment_controller.add_deployment_revision(
             deployment_id=DeploymentID(deployment_info.id),
             revision=revision,
+            requester_id=creator.metadata.created_user,
             auto_activate=True,
         )
         deployment_info = await self._deployment_repository.get_endpoint_info(deployment_info.id)
@@ -681,9 +688,13 @@ class DeploymentService:
         RBAC-checked revision create → history pruning), and optionally
         activates the new revision based on ``action.auto_activate``.
         """
+        requester = current_user()
+        if requester is None:
+            raise UserNotFound("User not found in context")
         revision_data = await self._deployment_controller.add_deployment_revision(
             deployment_id=DeploymentID(action.model_deployment_id),
             revision=action.adder,
+            requester_id=requester.user_id,
             auto_activate=action.auto_activate,
         )
         return AddModelRevisionActionResult(revision=revision_data)
@@ -761,9 +772,11 @@ class DeploymentService:
             try:
                 data = await self._deployment_repository.get_current_revision(deployment_id)
                 creator = _build_creator_from_revision_data(data)
+                endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
                 new_revision = await self._deployment_controller.add_deployment_revision(
                     deployment_id=deployment_id,
                     revision=creator,
+                    requester_id=endpoint_info.metadata.created_user,
                     auto_activate=True,
                 )
                 results.append(

@@ -184,7 +184,11 @@ class DeploymentSessionDraftBuilder:
                 mount_destination=(
                     target_revision.model_mount_config.mount_destination or "/models"
                 ),
-                mount_perm=MountPermission.READ_ONLY,
+                # Use the permission frozen at revision-write time; fall back
+                # to READ_ONLY for legacy rows written before the column existed.
+                mount_perm=(
+                    target_revision.model_mount_config.model_mount_perm or MountPermission.READ_ONLY
+                ),
                 subpath=target_revision.model_mount_config.subpath,
             ),
             *target_revision.model_mount_config.extra_mounts,

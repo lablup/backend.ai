@@ -58,6 +58,7 @@ class RefreshRevisionBaseFixtures:
             *,
             extra_mounts: list[MountInfoEntry] | None = None,
             vfolder_subpath: str | None = None,
+            model_mount_perm: MountPermission | None = MountPermission.READ_WRITE,
         ) -> ModelRevisionData:
             return ModelRevisionData(
                 id=DeploymentRevisionID(uuid.uuid4()),
@@ -83,6 +84,7 @@ class RefreshRevisionBaseFixtures:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                     extra_mounts=extra_mounts or [],
+                    model_mount_perm=model_mount_perm,
                     subpath=vfolder_subpath,
                 ),
                 revision_preset=PresetAttributionData(preset_id=None, values=[]),

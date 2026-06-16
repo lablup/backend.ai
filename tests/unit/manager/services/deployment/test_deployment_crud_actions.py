@@ -624,6 +624,7 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             image_id=ImageID(uuid.uuid4()),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),

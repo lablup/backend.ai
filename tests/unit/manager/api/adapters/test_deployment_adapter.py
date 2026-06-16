@@ -54,6 +54,7 @@ class TestRevisionDataToDTO:
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             model_definition=ModelDefinition(
                 models=[

@@ -30,6 +30,7 @@ def _mounts(model_mount_destination: str = "/models") -> MountMetadata:
         model_definition_path=None,
         model_mount_destination=model_mount_destination,
         extra_mounts=[],
+        model_mount_perm=None,
     )
 
 

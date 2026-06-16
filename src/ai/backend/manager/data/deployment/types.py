@@ -419,6 +419,12 @@ class MountMetadata:
     model_definition_path: str | None
     model_mount_destination: str
     extra_mounts: list[MountInfoEntry]
+    # Resolved permission for the model vfolder mount, frozen at
+    # revision-write time (READ_ONLY for vfolder/model-card deploy, the
+    # requester's own effective permission for deployment create/revision
+    # add). ``None`` means "not yet resolved"; the draft builder falls back
+    # to READ_ONLY so legacy rows keep their historical behavior.
+    model_mount_perm: MountPermission | None
     # Subpath within the model vfolder. ``None`` means the vfolder root.
     vfolder_subpath: str | None = None
 
@@ -778,6 +784,7 @@ def _merge_mounts(
             model_definition_path=upper.model_definition_path,
             model_mount_destination=upper.model_mount_destination,
             extra_mounts=list(upper.extra_mounts),
+            model_mount_perm=upper.model_mount_perm,
             vfolder_subpath=upper.vfolder_subpath,
         )
     return MountMetadata(
@@ -787,6 +794,9 @@ def _merge_mounts(
         else lower.model_definition_path,
         model_mount_destination=upper.model_mount_destination,
         extra_mounts=list(upper.extra_mounts),
+        model_mount_perm=upper.model_mount_perm
+        if upper.model_mount_perm is not None
+        else lower.model_mount_perm,
         vfolder_subpath=upper.vfolder_subpath if upper.vfolder_subpath else lower.vfolder_subpath,
     )
 
@@ -1089,6 +1099,10 @@ class ModelMountConfigData:
     # this data-layer projection — keeps ``mount_perm`` visible end-to-end
     # so modify flows can carry it over without information loss.
     extra_mounts: list[MountInfoEntry]
+    # Resolved permission of the model vfolder mount, frozen on the revision.
+    # ``None`` for legacy rows written before this field existed; the draft
+    # builder falls back to READ_ONLY.
+    model_mount_perm: MountPermission | None
     # Subpath within the model vfolder. ``None`` means the vfolder root.
     subpath: str | None = None
 
@@ -1187,6 +1201,7 @@ class ModelRevisionData:
                     model_definition_path=self.model_mount_config.definition_path or None,
                     model_mount_destination=self.model_mount_config.mount_destination or "/models",
                     extra_mounts=list(self.model_mount_config.extra_mounts),
+                    model_mount_perm=self.model_mount_config.model_mount_perm,
                     vfolder_subpath=self.model_mount_config.subpath,
                 )
                 if self.model_mount_config.vfolder_id is not None
