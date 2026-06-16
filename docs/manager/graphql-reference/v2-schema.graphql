@@ -6793,6 +6793,9 @@ type ModelRuntimeConfig {
   runtimeVariantId: UUID!
   inferenceRuntimeConfig: JSON
   environ: EnvironmentVariables
+
+  """Preset values materialised on this revision."""
+  runtimeVariantPresetValues: [RuntimeVariantPresetValue!]!
 }
 
 """Added in 25.19.0. """
@@ -11786,6 +11789,22 @@ enum RuntimeVariantPresetOrderField {
   NAME
   RANK
   CREATED_AT
+}
+
+"""
+Added in 26.4.4. A runtime variant preset value materialised on a revision.
+"""
+type RuntimeVariantPresetValue {
+  """
+  The runtime variant preset this value is bound to, resolved via DataLoader.
+  """
+  preset: RuntimeVariantPreset
+
+  """Runtime variant preset ID."""
+  presetId: UUID!
+
+  """Value bound to the preset."""
+  value: String!
 }
 
 """

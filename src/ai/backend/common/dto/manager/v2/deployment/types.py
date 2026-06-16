@@ -57,6 +57,7 @@ __all__ = (
     "ModelMountConfigInfoDTO",
     "ModelMetadataInfoDTO",
     "ModelRuntimeConfigInfoDTO",
+    "RuntimeVariantPresetValueInfoDTO",
     "ModelServiceConfigInfoDTO",
     "NetworkConfigInfo",
     "OrderDirection",
@@ -378,6 +379,13 @@ class ResourceConfigInfoDTO(BaseResponseModel):
     resource_opts: ResourceOptsInfoDTO | None = None
 
 
+class RuntimeVariantPresetValueInfoDTO(BaseResponseModel):
+    """A runtime variant preset value materialised on a revision (``{preset_id, value}``)."""
+
+    preset_id: UUID = Field(description="Runtime variant preset ID.")
+    value: str = Field(description="Value bound to the preset.")
+
+
 class ModelRuntimeConfigInfoDTO(BaseResponseModel):
     """Runtime configuration backing DTO for ModelRuntimeConfig GQL type.
 
@@ -389,6 +397,10 @@ class ModelRuntimeConfigInfoDTO(BaseResponseModel):
     runtime_variant_id: RuntimeVariantID
     inference_runtime_config: dict[str, Any] | None = None
     environ: EnvironmentVariablesInfoDTO | None = None
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueInfoDTO] = Field(
+        default_factory=list,
+        description="Preset values materialised on this revision.",
+    )
 
 
 class ModelMountConfigInfoDTO(BaseResponseModel):
