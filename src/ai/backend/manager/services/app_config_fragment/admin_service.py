@@ -24,6 +24,10 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
     AdminSearchAppConfigFragmentsAction,
     AdminSearchAppConfigFragmentsActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.admin_search_app_configs import (
+    AdminSearchAppConfigsAction,
+    AdminSearchAppConfigsActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -41,6 +45,17 @@ class AppConfigFragmentAdminService:
     ) -> AdminSearchAppConfigFragmentsActionResult:
         result = await self._admin_repository.admin_search(action.querier)
         return AdminSearchAppConfigFragmentsActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def admin_search_app_configs(
+        self, action: AdminSearchAppConfigsAction
+    ) -> AdminSearchAppConfigsActionResult:
+        result = await self._admin_repository.admin_search_app_configs(action.querier)
+        return AdminSearchAppConfigsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

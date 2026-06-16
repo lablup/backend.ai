@@ -13,7 +13,7 @@ class AppConfigFragmentAction(BaseAction):
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.APP_CONFIG_FRAGMENT
+        return EntityType.APP_CONFIG
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,7 @@ class AppConfigFragmentTarget(ActionTarget):
     @override
     def to_rbac_element_ref(self) -> RBACElementRef:
         return RBACElementRef(
-            element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+            element_type=RBACElementType.APP_CONFIG,
             element_id=f"{self.key.scope_type}:{self.key.scope_id}:{self.key.name}",
         )
 
@@ -40,6 +40,6 @@ class MyAppConfigFragmentTarget(ActionTarget):
     @override
     def to_rbac_element_ref(self) -> RBACElementRef:
         return RBACElementRef(
-            element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+            element_type=RBACElementType.APP_CONFIG,
             element_id=self.name,
         )
