@@ -5,7 +5,7 @@ import base64
 import json
 import logging
 import random
-from typing import Final, Iterable, Optional, Tuple, Union, cast
+from typing import Any, Final, Iterable, Optional, Tuple, Union, cast
 
 import aiohttp
 from aiohttp import web
@@ -32,6 +32,9 @@ HTTP_HEADERS_TO_FORWARD = [
 ]
 
 CHUNK_SIZE: Final[int] = 64 * 1024
+
+DOWNSTREAM_SERVICE_ERROR: Final[str] = "DOWNSTREAM_SERVICE_ERROR"
+DEFAULT_BACKEND_ERROR_CODE: Final[str] = "backendai_generic_internal-error"
 
 HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
     ("Connection", 1),
@@ -274,6 +277,138 @@ async def web_handler(
         )
     except Exception:
         log.exception("web_handler: unexpected error")
+        return web.HTTPInternalServerError(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/internal-server-error",
+                "title": "Something has gone wrong.",
+            }),
+            content_type="application/problem+json",
+        )
+    finally:
+        await api_session.close()
+
+
+def _transform_downstream_service_errors(
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    """Transform DOWNSTREAM_SERVICE_ERROR codes in GraphQL error responses.
+
+    When GraphQL errors pass through Hive Gateway, the gateway rewrites
+    ``extensions.code`` to ``DOWNSTREAM_SERVICE_ERROR``.  The WebUI does not
+    recognise this code and the page breaks.  Replace it with the default
+    Backend.AI error code so the frontend falls back to message-based handling.
+    """
+    errors = data.get("errors")
+    if not errors or not isinstance(errors, list):
+        return data
+    for error in errors:
+        extensions = error.get("extensions")
+        if not isinstance(extensions, dict):
+            continue
+        if extensions.get("code") == DOWNSTREAM_SERVICE_ERROR:
+            extensions["code"] = DEFAULT_BACKEND_ERROR_CODE
+            extensions.pop("serviceName", None)
+    return data
+
+
+async def graphql_gateway_handler(
+    frontend_rqst: web.Request,
+    *,
+    api_endpoint: Optional[str] = None,
+) -> web.Response:
+    """Handle GraphQL requests routed through a federated gateway.
+
+    Unlike :func:`web_handler` which streams the response, this handler buffers
+    the full response body so it can transform ``DOWNSTREAM_SERVICE_ERROR``
+    codes injected by the Hive Gateway before returning the response to the
+    frontend.
+    """
+    stats: WebStats = frontend_rqst.app["stats"]
+    stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
+    path = frontend_rqst.match_info.get("path", "")
+    api_session = await asyncio.shield(get_api_session(frontend_rqst, api_endpoint))
+    try:
+        async with api_session:
+            backend_rqst_hdrs = extra_config_headers.check(frontend_rqst.headers)
+            request_api_version = backend_rqst_hdrs.get("X-BackendAI-Version", None)
+            secure_context = backend_rqst_hdrs.get("X-BackendAI-Encoded", None)
+            decrypted_payload_length = 0
+            content: RequestContent = None
+            if frontend_rqst.body_exists:
+                if secure_context:
+                    content = cast(bytes, frontend_rqst["payload"])
+                    decrypted_payload_length = len(content)
+                else:
+                    content = frontend_rqst.content
+            fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
+            api_session.aiohttp_session.cookie_jar.update_cookies(frontend_rqst.cookies)
+            backend_rqst = Request(
+                frontend_rqst.method,
+                path,
+                content,
+                params=frontend_rqst.query,
+                override_api_version=request_api_version,
+                session_mode=SessionMode.PROXY if api_session.proxy_mode else SessionMode.CLIENT,
+            )
+            if "Content-Type" in frontend_rqst.headers:
+                backend_rqst.content_type = frontend_rqst.content_type
+                backend_rqst.headers["Content-Type"] = frontend_rqst.headers["Content-Type"]
+            if "Content-Length" in frontend_rqst.headers and not secure_context:
+                backend_rqst.headers["Content-Length"] = frontend_rqst.headers["Content-Length"]
+            if "Content-Length" in frontend_rqst.headers and secure_context:
+                backend_rqst.headers["Content-Length"] = str(decrypted_payload_length)
+            for key in HTTP_HEADERS_TO_FORWARD:
+                if key in backend_rqst.headers:
+                    continue
+                if (value := frontend_rqst.headers.get(key)) is not None:
+                    backend_rqst.headers[key] = value
+            async with backend_rqst.fetch() as backend_resp:
+                body = b""
+                while True:
+                    chunk = await backend_resp.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    body += chunk
+                frontend_resp_hdrs = {
+                    key: value
+                    for key, value in backend_resp.headers.items()
+                    if key not in HOP_ONLY_HEADERS
+                }
+                try:
+                    data = json.loads(body)
+                    data = _transform_downstream_service_errors(data)
+                    return web.json_response(
+                        data,
+                        status=backend_resp.status,
+                        headers=frontend_resp_hdrs,
+                    )
+                except json.JSONDecodeError:
+                    return web.Response(
+                        body=body,
+                        status=backend_resp.status,
+                        headers=frontend_resp_hdrs,
+                        content_type=backend_resp.content_type,
+                    )
+    except asyncio.CancelledError:
+        raise
+    except BackendAPIError as e:
+        return web.Response(
+            body=json.dumps(e.data),
+            content_type="application/problem+json",
+            status=e.status,
+            reason=e.reason,
+        )
+    except BackendClientError:
+        log.exception("graphql_gateway_handler: BackendClientError")
+        return web.HTTPBadGateway(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+            }),
+            content_type="application/problem+json",
+        )
+    except Exception:
+        log.exception("graphql_gateway_handler: unexpected error")
         return web.HTTPInternalServerError(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/internal-server-error",
