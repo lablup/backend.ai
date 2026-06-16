@@ -125,6 +125,20 @@ class AppConfigFragmentDBSource:
             return row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
+    async def get_user_domain_name(self, user_id: uuid.UUID) -> str | None:
+        """Single-column lookup of a user's `domain_name`.
+
+        Used by the cache layer to tag merged-view entries with their
+        owning domain so domain-scoped fragment writes can target a
+        bounded user set during invalidation.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            domain_name: str | None = await db_sess.scalar(
+                sa.select(UserRow.domain_name).where(UserRow.uuid == user_id)
+            )
+            return domain_name
+
+    @app_config_fragment_db_source_resilience.apply()
     async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
         """Insert a fragment, assigning the next-value `rank`
         (``MAX(rank) + gap`` within the `name`) race-free — the same
