@@ -50,7 +50,7 @@ jobs:
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        gha-cache-key: v0
+        gha-cache-key: v1
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         # ``pants export`` fails when a stale PEX from the pex->uv lockfile
         # migration is restored from the lmdb_store cache; disable it here

@@ -31,7 +31,7 @@ jobs:
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v11
       with:
-        gha-cache-key: v0
+        gha-cache-key: v1
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Run the full test suite
