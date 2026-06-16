@@ -337,7 +337,7 @@ class IntFlagType[T_IntFlag: enum.IntFlag](TypeDecorator[T_IntFlag]):
 
     def process_bind_param(
         self,
-        value: T_IntFlag | int | None,
+        value: T_IntFlag | None,
         dialect: Dialect,
     ) -> int | None:
         if value is None:
