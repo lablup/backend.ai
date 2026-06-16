@@ -298,12 +298,17 @@ class Context(metaclass=ABCMeta):
                 tg.create_task(read_stderr(p.stderr))
                 exit_code = await p.wait()
         except asyncio.CancelledError:
+            # Cancellation here is always a global abort (Ctrl-C / app shutdown /
+            # parent-task cancel) -- no caller wraps run_exec in a timeout. Reap
+            # the child, then re-raise so the abort propagates instead of silently
+            # continuing to the next install step.
             p.terminate()
             try:
-                exit_code = await p.wait()
+                await asyncio.wait_for(p.wait(), timeout=5.0)
             except TimeoutError:
                 p.kill()
-                exit_code = await p.wait()
+                await p.wait()
+            raise
         return exit_code
 
     async def run_shell(self, script: str, **kwargs: Any) -> int:
