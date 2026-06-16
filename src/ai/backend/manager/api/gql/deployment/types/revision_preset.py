@@ -152,7 +152,7 @@ class EnvironEntryGQL(PydanticOutputMixin[EnvironEntryInfoDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.2",
+        added_version=NEXT_RELEASE_VERSION,
         description="A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.",
     ),
     model=PresetValueInfoDTO,

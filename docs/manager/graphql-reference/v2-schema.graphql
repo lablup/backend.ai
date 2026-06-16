@@ -11786,7 +11786,7 @@ type RuntimeVariantPresetValue {
 }
 
 """
-Added in 26.4.2. A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.
+Added in 26.4.4. A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.
 """
 type RuntimeVariantPresetValueEntry {
   """Runtime variant preset ID."""
