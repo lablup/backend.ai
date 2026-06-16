@@ -18,6 +18,6 @@ class AppConfigFragmentRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
-            repository=AppConfigFragmentRepository(args.db),
-            admin_repository=AppConfigFragmentAdminRepository(args.db),
+            repository=AppConfigFragmentRepository(args.db, args.ops_provider),
+            admin_repository=AppConfigFragmentAdminRepository(args.db, args.ops_provider),
         )

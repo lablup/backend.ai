@@ -84,9 +84,9 @@ class AppConfigFragmentDBSource:
     _db: ExtendedAsyncSAEngine
     _ops: DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: DBOpsProvider) -> None:
         self._db = db
-        self._ops = DBOpsProvider(db)
+        self._ops = ops_provider
 
     # ── Raw fragment CRUD ──────────────────────────────────────────
 

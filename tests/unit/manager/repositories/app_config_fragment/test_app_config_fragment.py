@@ -19,6 +19,7 @@ from ai.backend.manager.repositories.app_config_fragment.admin_repository import
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -40,11 +41,11 @@ class TestAppConfigFragmentRepository:
 
     @pytest.fixture
     def repository(self, db: ExtendedAsyncSAEngine) -> AppConfigFragmentRepository:
-        return AppConfigFragmentRepository(db)
+        return AppConfigFragmentRepository(db, DBOpsProvider(db))
 
     @pytest.fixture
     def admin_repository(self, db: ExtendedAsyncSAEngine) -> AppConfigFragmentAdminRepository:
-        return AppConfigFragmentAdminRepository(db)
+        return AppConfigFragmentAdminRepository(db, DBOpsProvider(db))
 
     async def test_create_and_get_by_key(
         self,
@@ -128,7 +129,7 @@ class TestAppConfigFragmentAdminRepository:
 
     @pytest.fixture
     def admin_repository(self, db: ExtendedAsyncSAEngine) -> AppConfigFragmentAdminRepository:
-        return AppConfigFragmentAdminRepository(db)
+        return AppConfigFragmentAdminRepository(db, DBOpsProvider(db))
 
     async def test_update_replaces_config(
         self,

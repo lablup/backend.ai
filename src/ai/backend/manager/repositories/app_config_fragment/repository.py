@@ -21,6 +21,7 @@ from ai.backend.manager.repositories.app_config_fragment.db_source import (
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.types import SearchScope
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 app_config_fragment_repository_resilience = Resilience(
     policies=[
@@ -51,8 +52,8 @@ class AppConfigFragmentRepository:
 
     _db_source: AppConfigFragmentDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = AppConfigFragmentDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: DBOpsProvider) -> None:
+        self._db_source = AppConfigFragmentDBSource(db, ops_provider)
 
     # ── Raw fragment reads ────────────────────────────────────────
 

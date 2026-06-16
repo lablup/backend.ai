@@ -29,6 +29,7 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 app_config_fragment_admin_repository_resilience = Resilience(
     policies=[
@@ -66,8 +67,8 @@ class AppConfigFragmentAdminRepository:
 
     _db_source: AppConfigFragmentDBSource
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = AppConfigFragmentDBSource(db)
+    def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: DBOpsProvider) -> None:
+        self._db_source = AppConfigFragmentDBSource(db, ops_provider)
 
     # ── Mutations ─────────────────────────────────────────────────
 
