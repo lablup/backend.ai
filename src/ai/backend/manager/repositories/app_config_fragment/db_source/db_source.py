@@ -363,7 +363,7 @@ class AppConfigFragmentDBSource:
             merged = self._merge_chain(rows)
             items.append(
                 AppConfigData(
-                    user_id=user_id,
+                    user_id=UserID(user_id),
                     name=name,
                     fragments=merged.fragments,
                     config=merged.config,
