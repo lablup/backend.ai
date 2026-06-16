@@ -8,11 +8,11 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.app_config.types import AppConfigSearchResult
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentKey,
     AppConfigFragmentSearchResult,
+    ScopedAppConfigSearchResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -139,5 +139,5 @@ class AppConfigFragmentAdminRepository:
     async def admin_search_app_configs(
         self,
         querier: BatchQuerier,
-    ) -> AppConfigSearchResult:
+    ) -> ScopedAppConfigSearchResult:
         return await self._db_source.admin_search_app_configs(querier)

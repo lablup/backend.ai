@@ -9,11 +9,12 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigSearchResult
 from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigData,
     AppConfigFragmentData,
     AppConfigFragmentKey,
     AppConfigFragmentSearchResult,
+    ScopedAppConfigSearchResult,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
@@ -88,5 +89,5 @@ class AppConfigFragmentRepository:
         self,
         querier: BatchQuerier,
         scopes: Sequence[SearchScope],
-    ) -> AppConfigSearchResult:
+    ) -> ScopedAppConfigSearchResult:
         return await self._db_source.scoped_search_app_configs(querier, scopes)

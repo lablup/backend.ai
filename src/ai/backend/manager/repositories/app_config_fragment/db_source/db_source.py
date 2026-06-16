@@ -15,12 +15,13 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.utils import deep_merge
-from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigSearchResult
 from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigData,
     AppConfigFragmentData,
     AppConfigFragmentKey,
     AppConfigFragmentSearchResult,
     AppConfigScopeType,
+    ScopedAppConfigSearchResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -301,7 +302,7 @@ class AppConfigFragmentDBSource:
         self,
         querier: BatchQuerier,
         scopes: Sequence[SearchScope] | None,
-    ) -> AppConfigSearchResult:
+    ) -> ScopedAppConfigSearchResult:
         """Cross-user merged search shared by the scoped and admin paths.
 
         Joins `users` so each `(user_id, name)` view is produced, then
@@ -369,7 +370,7 @@ class AppConfigFragmentDBSource:
                 )
             )
 
-        return AppConfigSearchResult(
+        return ScopedAppConfigSearchResult(
             items=items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -381,7 +382,7 @@ class AppConfigFragmentDBSource:
         self,
         querier: BatchQuerier,
         scopes: Sequence[SearchScope],
-    ) -> AppConfigSearchResult:
+    ) -> ScopedAppConfigSearchResult:
         """Merged-view search restricted to `scopes` (OR across users)."""
         return await self._search_merged_app_configs(querier, scopes)
 
@@ -389,6 +390,6 @@ class AppConfigFragmentDBSource:
     async def admin_search_app_configs(
         self,
         querier: BatchQuerier,
-    ) -> AppConfigSearchResult:
+    ) -> ScopedAppConfigSearchResult:
         """Cross-user merged search (admin only) — no scope restriction."""
         return await self._search_merged_app_configs(querier, None)
