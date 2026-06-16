@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.export import (
     ProjectExportOrder,
     SessionExportFilter,
     SessionExportOrder,
+    SessionExportUserNestedFilter,
     UserExportFilter,
     UserExportOrder,
 )
@@ -119,12 +120,10 @@ class ExportAdapter(BaseFilterAdapter):
         conditions = self._build_session_conditions(report, filter)
         orders = self._build_session_orders(report, order)
 
-        # JOINs come from the selected output fields. The nested user filter targets joined
-        # columns (users table); include those fields so the JOIN is present even when the
-        # user is filtered but not selected (otherwise it becomes a cartesian product).
-        join_source_fields = list(selected_fields)
-        join_source_fields.extend(self._collect_session_user_filter_fields(report, filter))
-        all_joins = self._collect_joins(join_source_fields)
+        # Collect all required JOINs from selected output fields. The nested user filter does
+        # not need a JOIN: it is expressed as a subquery on sessions.user_uuid (see
+        # _build_session_conditions), so filtering by user never restructures the FROM clause.
+        all_joins = self._collect_joins(selected_fields)
 
         # Build select_from with dynamic JOINs
         select_from = self._build_select_from_with_joins(report.select_from, all_joins)
@@ -420,20 +419,12 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
-        # user filter (nested; targets joined users columns, JOIN collected in build_session_query)
+        # user filter (nested): filter by the owning user's columns without joining users
+        # into the main FROM clause.
         if filter.user is not None:
-            if filter.user.email is not None:
-                field = report.get_field("user_email")
-                if field:
-                    cond = self._build_string_condition(filter.user.email, field)
-                    if cond:
-                        conditions.append(cond)
-            if filter.user.username is not None:
-                field = report.get_field("user_username")
-                if field:
-                    cond = self._build_string_condition(filter.user.username, field)
-                    if cond:
-                        conditions.append(cond)
+            user_cond = self._build_session_user_filter_condition(report, filter.user)
+            if user_cond is not None:
+                conditions.append(user_cond)
 
         # status filter (IN query)
         if filter.status is not None:
@@ -464,29 +455,54 @@ class ExportAdapter(BaseFilterAdapter):
 
         return conditions
 
-    def _collect_session_user_filter_fields(
+    def _build_session_user_filter_condition(
         self,
         report: ReportDef,
-        filter: SessionExportFilter | None,
-    ) -> list[ExportFieldDef]:
-        """Collect report fields referenced by the nested user filter.
+        user_filter: SessionExportUserNestedFilter,
+    ) -> QueryCondition | None:
+        """Build the nested user filter as a correlated EXISTS over the users table.
 
-        These fields live on the joined users table, so their JOINs must be applied
-        even when the user columns are not part of the selected export fields.
+        Filters sessions by the owning user's columns (email/username) without joining
+        users into the main FROM clause — which would risk a cartesian product when the
+        user is filtered but not selected. The users table and the correlation condition
+        come from the user field's declared joins (ReportDef metadata), so this needs no
+        ORM model imports.
+
+        Returns None when the filter contributes no condition.
         """
-        if filter is None or filter.user is None:
-            return []
-
-        fields: list[ExportFieldDef] = []
-        if filter.user.email is not None:
+        user_conditions: list[QueryCondition] = []
+        user_field: ExportFieldDef | None = None
+        if user_filter.email is not None:
             field = report.get_field("user_email")
-            if field is not None:
-                fields.append(field)
-        if filter.user.username is not None:
+            if field:
+                user_field = field
+                cond = self._build_string_condition(user_filter.email, field)
+                if cond:
+                    user_conditions.append(cond)
+        if user_filter.username is not None:
             field = report.get_field("user_username")
-            if field is not None:
-                fields.append(field)
-        return fields
+            if field:
+                user_field = field
+                cond = self._build_string_condition(user_filter.username, field)
+                if cond:
+                    user_conditions.append(cond)
+
+        if not user_conditions or user_field is None or not user_field.joins:
+            return None
+
+        joins = list(user_field.joins)
+
+        def condition() -> sa.sql.expression.ColumnElement[bool]:
+            where_clauses = [join.condition for join in joins]
+            where_clauses.extend(cond() for cond in user_conditions)
+            subquery = (
+                sa.select(sa.literal(1))
+                .select_from(*(join.table for join in joins))
+                .where(sa.and_(*where_clauses))
+            )
+            return subquery.exists()
+
+        return condition
 
     def _build_session_orders(
         self,

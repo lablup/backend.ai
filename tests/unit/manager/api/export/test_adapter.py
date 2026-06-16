@@ -498,19 +498,20 @@ class TestBuildSessionQueryUserFilter:
     """Tests for build_session_query nested user filtering (BA-6480).
 
     The session CSV export must support filtering by the owning user's email/username,
-    which live on the joined users table. The user JOIN must be applied even when no
-    user column is among the selected export fields.
+    which live on the users table. Filtering is expressed as a correlated EXISTS subquery
+    over the users table, so users is never JOINed into the main FROM clause (no cartesian
+    product) even when no user column is among the selected export fields.
     """
 
     @pytest.fixture
     def adapter(self) -> ExportAdapter:
         return ExportAdapter()
 
-    def test_user_email_filter_applies_user_join_without_selecting_field(
+    def test_user_email_filter_builds_exists_without_join(
         self,
         adapter: ExportAdapter,
     ) -> None:
-        """Filtering by user.email must add the users JOIN even when no user field is selected."""
+        """Filtering by user.email adds a correlated EXISTS subquery, not a users JOIN."""
         query = adapter.build_session_query(
             report=SESSION_REPORT,
             fields=["id", "name"],
@@ -522,15 +523,22 @@ class TestBuildSessionQueryUserFilter:
             statement_timeout_sec=60,
         )
 
-        compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        assert "users" in compiled
-        assert len(query.conditions) == 1
+        # No JOIN: the FROM clause stays the sessions table only.
+        from_clause = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
+        assert "users" not in from_clause
 
-    def test_user_email_and_username_filters_apply_single_user_join(
+        # A single correlated EXISTS condition over the users table.
+        assert len(query.conditions) == 1
+        condition = str(query.conditions[0]().compile(compile_kwargs={"literal_binds": True}))
+        assert "EXISTS (SELECT" in condition
+        assert "sessions.user_uuid = users.uuid" in condition
+        assert "users.email" in condition
+
+    def test_user_email_and_username_filters_share_single_exists(
         self,
         adapter: ExportAdapter,
     ) -> None:
-        """Both nested user filters share the single users JOIN and add two conditions."""
+        """Both nested user filters combine (AND) inside a single EXISTS subquery."""
         query = adapter.build_session_query(
             report=SESSION_REPORT,
             fields=["id", "name"],
@@ -545,15 +553,20 @@ class TestBuildSessionQueryUserFilter:
             statement_timeout_sec=60,
         )
 
-        compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        assert compiled.count("LEFT OUTER JOIN users") == 1
-        assert len(query.conditions) == 2
+        from_clause = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
+        assert "users" not in from_clause
 
-    def test_no_user_join_when_user_filter_absent(
+        assert len(query.conditions) == 1
+        condition = str(query.conditions[0]().compile(compile_kwargs={"literal_binds": True}))
+        assert "EXISTS (SELECT" in condition
+        assert "users.email" in condition
+        assert "users.username" in condition
+
+    def test_no_user_condition_when_user_filter_absent(
         self,
         adapter: ExportAdapter,
     ) -> None:
-        """Without a user filter (and no user field selected), no users JOIN is added."""
+        """Without a user filter (and no user field selected), no users reference is added."""
         query = adapter.build_session_query(
             report=SESSION_REPORT,
             fields=["id", "name"],
@@ -563,5 +576,6 @@ class TestBuildSessionQueryUserFilter:
             statement_timeout_sec=60,
         )
 
-        compiled = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
-        assert "users" not in compiled
+        from_clause = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
+        assert "users" not in from_clause
+        assert len(query.conditions) == 0
