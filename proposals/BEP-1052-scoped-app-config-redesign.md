@@ -17,7 +17,7 @@ live at the scope level, not at the field level. A single scope (e.g. one
 domain, one user) can hold **multiple named configuration documents**
 (`theme`, `menu`, `preferences`, …), each managed independently.
 
-A reader's effective configuration for a given `name` is the **deep
+A user's effective configuration for a given `name` is the **deep
 merge of the fragments that apply to them**, combined in **`rank`
 order**. There is no separate policy object: every fragment carries its
 own merge priority, and which fragments participate is decided by scope
@@ -60,7 +60,7 @@ Three scopes cover the use cases (plus `public` for the pre-login shell):
   natural key `(scope_type, scope_id, name)`. Clients address documents
   explicitly by name — no hierarchical fall-through lookup.
 - **Merge by `rank`, not by policy.** A fragment's `rank` is its merge
-  priority within a `name`. Participation in a reader's merge is decided
+  priority within a `name`. Participation in a user's merge is decided
   by scope matching; ordering is decided by `rank`. There is no
   `AppConfigPolicy` table, no required-policy invariant, and no per-name
   allow-list of scopes.
@@ -173,17 +173,17 @@ Two read shapes exist:
 
 ### How a merge is resolved
 
-For a reader resolving `name`, the **applicable** fragments are those
+For a user resolving `name`, the **applicable** fragments are those
 whose scope applies to them:
 
 - every `public` fragment (`scope_id = "public"`),
-- the reader's `domain` fragment (`scope_id = the reader's domain`),
-- the reader's `user` fragment (`scope_id = the reader's id`).
+- the user's `domain` fragment (`scope_id = the user's domain`),
+- the user's `user` fragment (`scope_id = the user's id`).
 
 Those fragments are ordered by `rank` (low → high) and deep-merged: nested
 objects recurse, scalars and lists are wholesale-replaced, and the higher
 `rank` wins on conflict. The whole set is gathered in a single SQL query
-(scope matching expressed as a CASE over the reader's domain/id); the
+(scope matching expressed as a CASE over the user's domain/id); the
 chain is **not** pre-computed in service code.
 
 ### Null projection
@@ -194,8 +194,8 @@ defaults. Each raw fragment's `config` follows the same rule.
 
 ### Read variants
 
-- **Single** — resolve one `(reader, name)` to its `AppConfig`.
-- **Search (self)** — paginate the reader's own `AppConfig`s, grouped by
+- **Single** — resolve one `(user, name)` to its `AppConfig`.
+- **Search (self)** — paginate the user's own `AppConfig`s, grouped by
   `(user_id, name)`; each name's merge is evaluated independently in SQL.
 - **Search (admin, cross-user)** — the same query joined against `users`
   to resolve any user's `AppConfig` for audit / support; scoped by the
