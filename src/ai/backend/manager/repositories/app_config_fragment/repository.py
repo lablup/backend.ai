@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -18,9 +18,6 @@ from ai.backend.manager.data.app_config_fragment.types import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
-)
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    UserAppConfigSearchScope,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.types import SearchScope
@@ -64,7 +61,7 @@ class AppConfigFragmentRepository:
         return await self._db_source.get_by_key(key)
 
     @app_config_fragment_repository_resilience.apply()
-    async def get_by_id(self, id: AppConfigFragmentID) -> AppConfigFragmentData | None:
+    async def get_by_id(self, id: AppConfigFragmentID) -> AppConfigFragmentData:
         return await self._db_source.get_by_id(id)
 
     @app_config_fragment_repository_resilience.apply()
@@ -80,15 +77,15 @@ class AppConfigFragmentRepository:
     @app_config_fragment_repository_resilience.apply()
     async def app_config(
         self,
-        user_id: uuid.UUID,
+        user_id: UserID,
         config_name: str,
     ) -> AppConfigData:
         return await self._db_source.get_user_app_config(user_id, config_name)
 
     @app_config_fragment_repository_resilience.apply()
-    async def search_app_configs(
+    async def scoped_search_app_configs(
         self,
-        scope: UserAppConfigSearchScope,
         querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
     ) -> AppConfigSearchResult:
-        return await self._db_source.search_user_app_configs(scope, querier)
+        return await self._db_source.scoped_search_app_configs(querier, scopes)

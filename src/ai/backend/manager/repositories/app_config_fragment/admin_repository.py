@@ -109,15 +109,7 @@ class AppConfigFragmentAdminRepository:
             spec=AppConfigFragmentUpdaterSpec(config=config),
             pk_value=pk_value,
         )
-        result = await self._db_source.update(updater)
-        if result is None:
-            raise AppConfigFragmentNotFound(
-                extra_msg=(
-                    f"scope_type={key.scope_type.value!r}, "
-                    f"scope_id={key.scope_id!r}, name={key.name!r}"
-                ),
-            )
-        return result
+        return await self._db_source.update(updater)
 
     @app_config_fragment_admin_repository_resilience.apply()
     async def purge(self, key: AppConfigFragmentKey) -> bool:

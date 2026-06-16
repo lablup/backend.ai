@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -9,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 
@@ -34,4 +36,30 @@ class AppConfigFragmentSearchScope(SearchScope):
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
         # Scope existence (domain / user) is validated upstream by RBAC.
+        return []
+
+
+@dataclass(frozen=True)
+class UserAppConfigSearchScope(SearchScope):
+    """Pin merged-view search to a target `user_id`.
+
+    The merged-view query joins `users`, so this matches `UserRow.uuid`.
+    `execute_batch_querier` ORs multiple scopes together and the
+    `(user_id, name)` grouping downstream deduplicates any overlap
+    between scopes — a user reached via two scopes yields one AppConfig.
+    """
+
+    user_id: uuid.UUID
+
+    def to_condition(self) -> QueryCondition:
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRow.uuid == user_id
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[uuid.UUID]]:
+        # User existence is guaranteed by RBAC authentication upstream.
         return []

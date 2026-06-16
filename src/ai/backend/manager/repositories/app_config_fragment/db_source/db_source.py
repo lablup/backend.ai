@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -27,9 +28,6 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
-)
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    UserAppConfigSearchScope,
 )
 from ai.backend.manager.repositories.base.creator import NextValuePolicy
 from ai.backend.manager.repositories.base.purger import Purger, execute_purger
@@ -57,7 +55,7 @@ app_config_fragment_db_source_resilience = Resilience(
     ]
 )
 
-RANK_GAP = 100
+_RANK_GAP = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,12 +112,16 @@ class AppConfigFragmentDBSource:
             return row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
-    async def get_by_id(self, id: AppConfigFragmentID) -> AppConfigFragmentData | None:
+    async def get_by_id(self, id: AppConfigFragmentID) -> AppConfigFragmentData:
+        """Look up a fragment by id. Raises
+        :class:`AppConfigFragmentNotFound` when no row matches."""
         async with self._db.begin_readonly_session() as db_sess:
             row = await db_sess.scalar(
                 sa.select(AppConfigFragmentRow).where(AppConfigFragmentRow.id == id)
             )
-            return row.to_data() if row is not None else None
+            if row is None:
+                raise AppConfigFragmentNotFound(extra_msg=f"id={id!r}")
+            return row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
     async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
@@ -138,7 +140,7 @@ class AppConfigFragmentDBSource:
             lock_selector=sa.select(AppConfigFragmentRow).where(
                 AppConfigFragmentRow.name == spec.name
             ),
-            gap=RANK_GAP,
+            gap=_RANK_GAP,
         )
         async with self._ops.write_ops() as w:
             created = await w.create_with_next_value(policy, spec)
@@ -163,13 +165,15 @@ class AppConfigFragmentDBSource:
             return pk
 
     @app_config_fragment_db_source_resilience.apply()
-    async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData | None:
-        """Apply a pre-built Updater. Returns ``None`` when the row
-        vanished between PK resolution and write; the caller maps this
-        to :class:`AppConfigFragmentNotFound`."""
+    async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        """Apply a pre-built Updater. Raises
+        :class:`AppConfigFragmentNotFound` when the row vanished between
+        PK resolution and write."""
         async with self._db.begin_session() as db_sess:
             result = await execute_updater(db_sess, updater)
-            return result.row.to_data() if result is not None else None
+            if result is None:
+                raise AppConfigFragmentNotFound(extra_msg=f"id={updater.pk_value!r}")
+            return result.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
     async def purge(self, purger: Purger[AppConfigFragmentRow]) -> bool:
@@ -240,7 +244,7 @@ class AppConfigFragmentDBSource:
     @app_config_fragment_db_source_resilience.apply()
     async def get_user_app_config(
         self,
-        user_id: uuid.UUID,
+        user_id: UserID,
         config_name: str,
     ) -> AppConfigData:
         """Resolve a single AppConfig view for `(user_id, config_name)`.
@@ -293,85 +297,26 @@ class AppConfigFragmentDBSource:
             config=merged.config,
         )
 
-    @app_config_fragment_db_source_resilience.apply()
-    async def search_user_app_configs(
-        self,
-        scope: UserAppConfigSearchScope,
-        querier: BatchQuerier,
-    ) -> AppConfigSearchResult:
-        """Connection counterpart of `get_user_app_config`. Groups the
-        scoped page of applicable fragments by `name` and feeds each group
-        through `_merge_chain` (rank-ordered) to produce one `AppConfigData`.
-
-        Filtering / ordering / pagination run through the shared
-        scoped-search helper (`execute_batch_querier`); the per-user
-        restriction lives in the `scope_id_match` predicate while
-        `UserAppConfigSearchScope` stays a passthrough so it composes
-        with the `BatchQuerier` without double-filtering.
-        """
-        user_id = scope.user_id
-        user_domain_sq = (
-            sa.select(UserRow.domain_name).where(UserRow.uuid == user_id).scalar_subquery()
-        )
-        scope_id_match = sa.case(
-            (
-                AppConfigFragmentRow.scope_type == AppConfigScopeType.PUBLIC,
-                sa.literal("public"),
-            ),
-            (
-                AppConfigFragmentRow.scope_type.in_([
-                    AppConfigScopeType.DOMAIN,
-                    AppConfigScopeType.DOMAIN_USER_DEFAULTS,
-                ]),
-                user_domain_sq,
-            ),
-            (
-                AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
-                sa.literal(str(user_id)),
-            ),
-        )
-        query = sa.select(AppConfigFragmentRow).where(
-            AppConfigFragmentRow.scope_id == scope_id_match,
-        )
-        async with self._db.begin_readonly_session() as db_sess:
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
-
-        groups: dict[str, list[AppConfigFragmentRow]] = {}
-        for row in result.rows:
-            fragment_row = row.AppConfigFragmentRow
-            groups.setdefault(fragment_row.name, []).append(fragment_row)
-
-        items: list[AppConfigData] = []
-        for name, rows in groups.items():
-            merged = self._merge_chain(rows)
-            items.append(
-                AppConfigData(
-                    user_id=user_id,
-                    name=name,
-                    fragments=merged.fragments,
-                    config=merged.config,
-                )
-            )
-
-        return AppConfigSearchResult(
-            items=items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    @app_config_fragment_db_source_resilience.apply()
-    async def admin_search_app_configs(
+    async def _search_merged_app_configs(
         self,
         querier: BatchQuerier,
+        scopes: Sequence[SearchScope] | None,
     ) -> AppConfigSearchResult:
-        """Cross-user merged search (admin only). Joins `users` so each
-        `(user_id, name)` combination is produced; the scoped page of rows
-        is grouped and rank-merged the same way as `search_user_app_configs`.
+        """Cross-user merged search shared by the scoped and admin paths.
+
+        Joins `users` so each `(user_id, name)` view is produced, then
+        groups the scoped page of applicable fragments by `(user_id, name)`
+        and feeds each group through `_merge_chain` (rank-ordered) to
+        produce one `AppConfigData`.
+
+        When `scopes` is given the user set is the OR-union of those scopes
+        (each `UserAppConfigSearchScope` matches `UserRow.uuid`); `None` is
+        the global admin path. `execute_batch_querier` ORs the scopes and
+        the `(user_id, name)` grouping deduplicates any overlap — a user
+        reached via two scopes still yields exactly one AppConfig.
 
         Filtering / ordering / pagination run through the shared
-        scoped-search helper (`execute_batch_querier`) on the global
-        (unscoped) admin path.
+        scoped-search helper (`execute_batch_querier`).
         """
         scope_id_match = sa.case(
             (
@@ -402,7 +347,10 @@ class AppConfigFragmentDBSource:
             )
         )
         async with self._db.begin_readonly_session() as db_sess:
-            result = await execute_batch_querier(db_sess, query, querier)
+            if scopes is not None:
+                result = await execute_batch_querier(db_sess, query, querier, scopes=scopes)
+            else:
+                result = await execute_batch_querier(db_sess, query, querier)
 
         groups: dict[tuple[uuid.UUID, str], list[AppConfigFragmentRow]] = {}
         for row in result.rows:
@@ -427,3 +375,20 @@ class AppConfigFragmentDBSource:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def scoped_search_app_configs(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> AppConfigSearchResult:
+        """Merged-view search restricted to `scopes` (OR across users)."""
+        return await self._search_merged_app_configs(querier, scopes)
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def admin_search_app_configs(
+        self,
+        querier: BatchQuerier,
+    ) -> AppConfigSearchResult:
+        """Cross-user merged search (admin only) — no scope restriction."""
+        return await self._search_merged_app_configs(querier, None)
