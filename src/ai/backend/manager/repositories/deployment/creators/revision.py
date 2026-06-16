@@ -42,7 +42,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     cluster_size: int
     model_vfolder_id: VFolderUUID
     model_mount_destination: str
-    model_mount_perm: MountPermission | None
+    model_mount_perm: MountPermission
     vfolder_subpath: str | None
     model_definition_path: str | None
     model_definition: ModelDefinition | None

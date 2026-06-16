@@ -27,12 +27,19 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Existing revisions were always mounted read-only (the model mount
+    # permission used to be hard-coded at session build time). Add the column
+    # as NOT NULL with a ``ro`` server default so every existing row is
+    # backfilled to read-only and no row can ever hold NULL — otherwise a
+    # refresh/rebuild of a legacy revision would re-resolve a NULL into the
+    # deployment owner's (possibly read-write) effective permission.
     op.add_column(
         "deployment_revisions",
         sa.Column(
             "model_mount_perm",
             sa.String(length=64),
-            nullable=True,
+            nullable=False,
+            server_default="ro",
         ),
     )
 

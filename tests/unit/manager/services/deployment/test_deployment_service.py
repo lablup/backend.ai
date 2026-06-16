@@ -29,7 +29,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.common.types import ClusterMode, ResourceSlot
+from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -445,7 +445,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
                 extra_mounts=[],
-                model_mount_perm=None,
+                model_mount_perm=MountPermission.READ_ONLY,
             ),
             image_id=ImageID(image_id),
             execution=ExecutionData(
@@ -712,7 +712,7 @@ class TestConvertDeploymentInfoToData:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                     extra_mounts=[],
-                    model_mount_perm=None,
+                    model_mount_perm=MountPermission.READ_ONLY,
                 ),
                 created_at=datetime(2024, 1, 1, tzinfo=UTC),
                 image_id=ImageID(uuid.uuid4()),

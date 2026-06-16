@@ -1100,9 +1100,9 @@ class ModelMountConfigData:
     # so modify flows can carry it over without information loss.
     extra_mounts: list[MountInfoEntry]
     # Resolved permission of the model vfolder mount, frozen on the revision.
-    # ``None`` for legacy rows written before this field existed; the draft
-    # builder falls back to READ_ONLY.
-    model_mount_perm: MountPermission | None
+    # Always concrete (the row column is NOT NULL; legacy rows backfilled to
+    # ``ro``), so refresh/rebuild flows preserve the original permission.
+    model_mount_perm: MountPermission
     # Subpath within the model vfolder. ``None`` means the vfolder root.
     subpath: str | None = None
 

@@ -148,10 +148,13 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         "model_definition", PydanticColumn(ModelDefinition), nullable=True
     )
     # Resolved permission for the model vfolder mount, frozen at
-    # revision-write time. ``NULL`` for rows written before this column
-    # existed; the draft builder falls back to READ_ONLY for those.
-    model_mount_perm: Mapped[MountPermission | None] = mapped_column(
-        "model_mount_perm", StrEnumType(MountPermission), nullable=True
+    # revision-write time. Never NULL: legacy rows are backfilled to ``ro``
+    # and every write path supplies a concrete permission.
+    model_mount_perm: Mapped[MountPermission] = mapped_column(
+        "model_mount_perm",
+        StrEnumType(MountPermission),
+        nullable=False,
+        server_default=MountPermission.READ_ONLY.value,
     )
 
     # Resource configuration

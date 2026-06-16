@@ -13,7 +13,7 @@ from ai.backend.common.identifier.deployment_revision import DeploymentRevisionI
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.common.types import ClusterMode, ResourceSlot
+from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.api.adapters.deployment.adapter import (
     DeploymentAdapter,
     _tristate_from_input,
@@ -54,7 +54,7 @@ class TestRevisionDataToDTO:
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
                 extra_mounts=[],
-                model_mount_perm=None,
+                model_mount_perm=MountPermission.READ_ONLY,
             ),
             model_definition=ModelDefinition(
                 models=[

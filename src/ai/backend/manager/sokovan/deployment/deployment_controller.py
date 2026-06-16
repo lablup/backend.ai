@@ -446,7 +446,7 @@ class DeploymentController:
             cluster_size=merged.cluster_size or 1,
             model_vfolder_id=merged.mounts.model_vfolder_id,
             model_mount_destination=merged.mounts.model_mount_destination,
-            model_mount_perm=merged.mounts.model_mount_perm,
+            model_mount_perm=merged.mounts.model_mount_perm or MountPermission.READ_ONLY,
             vfolder_subpath=merged.mounts.vfolder_subpath,
             model_definition_path=merged.mounts.model_definition_path,
             model_definition=resolved_model_definition,

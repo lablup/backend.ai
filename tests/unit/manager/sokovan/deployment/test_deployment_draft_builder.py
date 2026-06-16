@@ -177,11 +177,10 @@ class TestKernelGroups:
 
 
 class TestResolveMounts:
-    """The model vfolder mount uses the permission frozen on the revision,
-    falling back to READ_ONLY for legacy rows where it is NULL."""
+    """The model vfolder mount uses the permission frozen on the revision."""
 
     @staticmethod
-    def _revision(model_mount_perm: MountPermission | None) -> ModelRevisionData:
+    def _revision(model_mount_perm: MountPermission) -> ModelRevisionData:
         revision = MagicMock(spec=ModelRevisionData)
         mount_config = MagicMock()
         mount_config.vfolder_id = VFolderUUID(uuid4())
@@ -198,6 +197,8 @@ class TestResolveMounts:
         )
         assert mounts[0].mount_perm == MountPermission.READ_WRITE
 
-    def test_falls_back_to_read_only_when_none(self) -> None:
-        mounts = DeploymentSessionDraftBuilder._resolve_mounts(self._revision(None))
+    def test_read_only_revision_mounts_read_only(self) -> None:
+        mounts = DeploymentSessionDraftBuilder._resolve_mounts(
+            self._revision(MountPermission.READ_ONLY)
+        )
         assert mounts[0].mount_perm == MountPermission.READ_ONLY

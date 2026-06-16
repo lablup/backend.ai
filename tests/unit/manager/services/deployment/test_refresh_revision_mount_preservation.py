@@ -58,7 +58,7 @@ class RefreshRevisionBaseFixtures:
             *,
             extra_mounts: list[MountInfoEntry] | None = None,
             vfolder_subpath: str | None = None,
-            model_mount_perm: MountPermission | None = MountPermission.READ_WRITE,
+            model_mount_perm: MountPermission = MountPermission.READ_WRITE,
         ) -> ModelRevisionData:
             return ModelRevisionData(
                 id=DeploymentRevisionID(uuid.uuid4()),
