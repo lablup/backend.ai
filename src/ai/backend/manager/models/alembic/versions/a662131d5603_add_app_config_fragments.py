@@ -20,7 +20,7 @@ from ai.backend.manager.models.base import IDColumn
 
 # revision identifiers, used by Alembic.
 revision = "a662131d5603"
-down_revision = "c6648c039bd4"
+down_revision = "f3a8c2d51b94"
 # Part of: 26.6.0
 branch_labels = None
 depends_on = None
