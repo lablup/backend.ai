@@ -2278,6 +2278,12 @@ class PackageContext(Context):
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
         await self.configure_manager()
+
+        # Manager schema must exist before fixtures and the app-proxy DB step
+        # update scaling_groups (mirrors the DevContext.configure() order).
+        self.log_header("Initializing manager database schema...")
+        await self.run_manager_cli(["mgr", "schema", "oneshot"])
+
         self.log_header("Configuring agent...")
         await self.configure_agent()
         self.log_header("Configuring storage-proxy...")
