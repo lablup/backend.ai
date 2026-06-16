@@ -206,7 +206,13 @@ class ModelHealthCheck(BaseConfigModel):
     )
     initial_delay: float = Field(
         default=60.0,
-        description="Initial delay in seconds before the first health check.",
+        description=(
+            "Grace period in seconds for a warming-up route to pass its first "
+            "health check. Probing starts immediately; the route stays "
+            "WARMING_UP until a probe passes (then it activates) or this period "
+            "elapses without a passing probe (then it is terminated). This does "
+            "not delay the first probe."
+        ),
         examples=[60.0],
         ge=0,
     )
