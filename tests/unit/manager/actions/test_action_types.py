@@ -67,13 +67,14 @@ class TestEntityType:
             EntityType.ARTIFACT,
             EntityType.ARTIFACT_REGISTRY,
             EntityType.APP_CONFIG,
+            EntityType.APP_CONFIG_FRAGMENT,
             EntityType.NOTIFICATION_CHANNEL,
             EntityType.NOTIFICATION_RULE,
             EntityType.MODEL_DEPLOYMENT,
             EntityType.MODEL_CARD,
         }
         assert resource_types == expected
-        assert len(resource_types) == 10
+        assert len(resource_types) == 11
 
     def test_scope_and_resource_types_no_overlap(self) -> None:
         scope_types = EntityType._scope_types()
