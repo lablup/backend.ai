@@ -203,67 +203,7 @@ defaults. Each raw fragment's `config` follows the same rule.
 
 ---
 
-## 4. Exposure — GraphQL
-
-Two GQL types only: `AppConfigFragment` (raw row, any scope) and
-`AppConfig` (merged per-user view, implementing `Node`). No per-scope
-wrapper types.
-
-**Queries**
-
-- `publicAppConfigFragments` — public documents, no auth.
-- Scoped fragment reads — a domain's or a user's fragments, gated to
-  same-domain users / the owner (admin always).
-- `adminAppConfigFragments` — cross-scope admin search.
-- Merged view — the caller's own `AppConfig`s, and an admin cross-user
-  variant for any user.
-
-**Mutations** (all bulk-only, partial-success):
-
-- **Admin path** — `create` / `update` / `purge` across any scope. Items
-  carry the full `(scopeType, scopeId, name)` key, so scopes may be mixed
-  in one call.
-- **Self-service (`my`) path** — **`update` only**, on the caller's own
-  `user` rows; `scope = USER` and `scopeId = current_user` are injected
-  server-side. The response returns the recomputed merged `AppConfig`.
-  No create, no purge (see §1 Write model).
-
-**Permission matrix**
-
-| Operation                                | Anonymous | User             | Admin |
-|------------------------------------------|-----------|------------------|-------|
-| `publicAppConfigFragments`               | ✅        | ✅               | ✅    |
-| merged `AppConfig` (own)                 | ❌        | ✅ (self)        | ✅    |
-| domain fragments                         | ❌        | ✅ (same domain) | ✅    |
-| user fragments                           | ❌        | ✅ (self)        | ✅    |
-| `adminAppConfigFragments` / admin merged | ❌        | ❌               | ✅    |
-| bulk **create** / **purge** (any scope)  | ❌        | ❌               | ✅    |
-| `my` bulk **update** (own user rows)     | ❌        | ✅ (self)        | ✅    |
-
-Admins acting on another user's `user` row use the admin path with an
-explicit key — the `my` path can only target the caller.
-
----
-
-## 5. Exposure — REST v2
-
-REST mirrors the GraphQL surface under two prefix trees:
-
-- `/v2/app-config-fragments/…` — raw fragment operations (admin CRUD,
-  cross-scope and per-scope search, single reads, `my` update).
-- `/v2/app-config/…` — the **merged `AppConfig` view** (read-only; writes
-  go through the fragment prefix).
-
-Conventions: lists are `POST …/search` with a typed body (filter + order
-+ `limit`/`offset`, cursor for admin cross-scope) — no `GET` list
-endpoints, no unbounded pages. Single-resource reads stay `GET …/{name}`.
-Bulk writes are `POST …/bulk-create | bulk-update | bulk-purge` (the
-`my` subtree exposes `bulk-update` only). Bodies are the snake_case
-projection of the GraphQL inputs/payloads.
-
----
-
-## 6. Caching
+## 4. Caching
 
 The merged-view read path is fronted by a Valkey cache keyed per
 `(user, name)`. Writes invalidate the affected scope so stale merges are
@@ -273,7 +213,7 @@ per-scope reads are uncached.
 
 ---
 
-## 7. Client integration (WebUI)
+## 5. Client integration (WebUI)
 
 - **Before login**, the WebUI fetches `public` documents (theme,
   branding) anonymously so the shell can render.
@@ -285,7 +225,7 @@ per-scope reads are uncached.
 
 ---
 
-## 8. User scenarios
+## 6. User scenarios
 
 - **Pre-login public config** — anonymous read of `public` `theme`.
 - **Bootstrap after login** — read merged `AppConfig`s in one round of
@@ -307,7 +247,7 @@ per-scope reads are uncached.
 
 ---
 
-## 9. Future considerations
+## 7. Future considerations
 
 - Automatic seeding of `user` fragments for overridable documents (e.g.
   on first read or at user creation) to avoid per-user admin seeding.
