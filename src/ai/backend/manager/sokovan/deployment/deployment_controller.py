@@ -53,10 +53,10 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -451,8 +451,8 @@ class DeploymentController:
             runtime_variant_id=runtime_variant_id,
             extra_mounts=list(merged.mounts.extra_mounts),
             preset_values=[
-                PresetValueEntry(preset_id=pv.preset_id, value=pv.value)
-                for pv in (merged.preset_values or [])
+                RuntimeVariantPresetValueEntry(preset_id=pv.preset_id, value=pv.value)
+                for pv in (merged.runtime_variant_preset_values or [])
             ],
             revision_preset_id=preset_id,
         )

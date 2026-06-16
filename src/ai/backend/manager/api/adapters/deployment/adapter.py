@@ -137,6 +137,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -184,6 +185,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import EndpointTokenNotFound
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
@@ -554,6 +556,15 @@ class DeploymentAdapter(BaseAdapter):
                     if initial_revision.model_runtime_config.environ
                     else None,
                 ),
+                runtime_variant_preset_values=[
+                    RuntimeVariantPresetValueData(
+                        preset_id=RuntimeVariantPresetID(preset_input.preset_id),
+                        value=preset_input.value,
+                    )
+                    for preset_input in (
+                        initial_revision.model_runtime_config.runtime_variant_preset_values or []
+                    )
+                ],
             )
         strategy = input.default_deployment_strategy
         policy: DeploymentPolicyConfig | None = None
@@ -1173,6 +1184,19 @@ class DeploymentAdapter(BaseAdapter):
             input.model_definition.to_draft() if input.model_definition is not None else None
         )
 
+        runtime_variant_preset_values = (
+            [
+                RuntimeVariantPresetValueData(
+                    preset_id=RuntimeVariantPresetID(preset_value_input.preset_id),
+                    value=preset_value_input.value,
+                )
+                for preset_value_input in (
+                    input.model_runtime_config.runtime_variant_preset_values or []
+                )
+            ]
+            if input.model_runtime_config is not None
+            else []
+        )
         adder = ModelRevisionCreator(
             image_id=image_id,
             resource_spec=resource_spec,
@@ -1180,6 +1204,7 @@ class DeploymentAdapter(BaseAdapter):
             execution=execution,
             model_definition=model_definition,
             revision_preset_id=input.revision_preset_id,
+            runtime_variant_preset_values=runtime_variant_preset_values,
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(
@@ -2340,7 +2365,7 @@ class DeploymentAdapter(BaseAdapter):
                 )
                 for m in data.model_mount_config.extra_mounts
             ],
-            revision_preset_id=data.preset.preset_id,
+            revision_preset_id=data.revision_preset.preset_id,
         )
 
     @staticmethod

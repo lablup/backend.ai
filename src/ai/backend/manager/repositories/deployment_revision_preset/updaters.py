@@ -9,7 +9,9 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.deployment_revision_preset.types import (
+    DeploymentRevisionPresetValueEntry,
+)
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -36,8 +38,8 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     environ: OptionalState[dict[str, str]] = field(
         default_factory=OptionalState[dict[str, str]].nop
     )
-    preset_values: OptionalState[list[PresetValueEntry]] = field(
-        default_factory=OptionalState[list[PresetValueEntry]].nop
+    preset_values: OptionalState[list[DeploymentRevisionPresetValueEntry]] = field(
+        default_factory=OptionalState[list[DeploymentRevisionPresetValueEntry]].nop
     )
     open_to_public: TriState[bool] = field(default_factory=TriState[bool].nop)
     replica_count: TriState[int] = field(default_factory=TriState[int].nop)

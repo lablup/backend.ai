@@ -74,7 +74,7 @@ class TestRevisionDataToDTO:
                 bootstrap_script=None,
                 callback_url=None,
             ),
-            preset=PresetAttributionData(preset_id=None, values=[]),
+            revision_preset=PresetAttributionData(preset_id=None, values=[]),
         )
 
         dto = DeploymentAdapter._revision_data_to_dto(revision)

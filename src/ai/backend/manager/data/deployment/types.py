@@ -30,6 +30,7 @@ from ai.backend.common.identifier.deployment_revision import DeploymentRevisionI
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.data.session.options import HandlerOptions
@@ -50,10 +51,11 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
-    PresetValueData,
+    DeploymentRevisionPresetValueData,
     ResourceSlotEntryData,
 )
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 
 
 class DeploymentConfig(BackendAISchema):
@@ -586,10 +588,10 @@ class ExecutionSpec(ConfiguredModel):
     inference_runtime_config: Mapping[str, Any] | None = None
 
 
-class PresetValueSpec(ConfiguredModel):
+class RuntimeVariantPresetValueSpec(ConfiguredModel):
     """A runtime variant preset value binding stored in a deployment revision."""
 
-    preset_id: DeploymentPresetID
+    preset_id: RuntimeVariantPresetID
     value: str
 
 
@@ -604,7 +606,7 @@ class ModelRevisionSpec(ConfiguredModel):
     mounts: MountMetadata
     execution: ExecutionSpec
     model_definition: ModelDefinition | None = None
-    preset_values: list[PresetValueSpec] = Field(default_factory=list)
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueSpec] = Field(default_factory=list)
     # Original deployment-level preset selection used to build this revision.
     # ``None`` for legacy rows and revisions created without a preset; the
     # materialised effects still live on ``preset_values`` and the resolved
@@ -689,8 +691,8 @@ class RevisionDraft:
     # Model definition (draft form — partial fields allowed; merged then resolved
     # to a strict ``ModelDefinition`` at the persistence boundary).
     model_definition: ModelDefinitionDraft | None = None
-    # Preset values (carried alongside; not field-merged)
-    preset_values: list[PresetValueData] | None = None
+    # Runtime variant preset values (carried alongside; merged by ``preset_id``)
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueData] | None = None
 
     def merge(self, other: RevisionDraft) -> RevisionDraft:
         """Return a new draft with ``other`` layered on top of ``self``."""
@@ -722,9 +724,9 @@ class RevisionDraft:
             if other.inference_runtime_config is not None
             else self.inference_runtime_config,
             model_definition=_merge_model_definition(self.model_definition, other.model_definition),
-            preset_values=list(other.preset_values)
-            if other.preset_values is not None
-            else (list(self.preset_values) if self.preset_values is not None else None),
+            runtime_variant_preset_values=_merge_preset_values(
+                self.runtime_variant_preset_values, other.runtime_variant_preset_values
+            ),
         )
 
     def to_model_revision_spec(self) -> ModelRevisionSpec:
@@ -802,6 +804,28 @@ def _merge_mappings(
     if upper is not None:
         merged.update(upper)
     return merged or None
+
+
+def _merge_preset_values(
+    lower: list[RuntimeVariantPresetValueData] | None,
+    upper: list[RuntimeVariantPresetValueData] | None,
+) -> list[RuntimeVariantPresetValueData] | None:
+    """Merge runtime-variant preset values by ``preset_id``.
+
+    ``upper`` (higher-priority source, e.g. the user request) overrides
+    ``lower`` (e.g. the revision-preset template) per ``preset_id``; preset_ids
+    only present in ``lower`` are preserved. ``None`` on a side means "this
+    source supplied no values" and is skipped. Returns ``None`` only when both
+    sides are ``None``.
+    """
+    if lower is None and upper is None:
+        return None
+    merged: dict[RuntimeVariantPresetID, RuntimeVariantPresetValueData] = {}
+    for pv in lower or []:
+        merged[pv.preset_id] = pv
+    for pv in upper or []:
+        merged[pv.preset_id] = pv
+    return list(merged.values())
 
 
 def _merge_model_definition(
@@ -1054,6 +1078,7 @@ class ModelRuntimeConfigData:
     runtime_variant_id: RuntimeVariantID
     inference_runtime_config: Mapping[str, Any] | None = None
     environ: dict[str, Any] | None = None
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueData] = field(default_factory=list)
 
 
 @dataclass
@@ -1104,7 +1129,8 @@ class PresetAttributionData:
     """
 
     preset_id: DeploymentPresetID | None
-    values: list[PresetValueData]
+    # value fields are not used, currently dead code
+    values: list[DeploymentRevisionPresetValueData]
 
 
 @dataclass
@@ -1127,7 +1153,7 @@ class ModelRevisionData:
     # Mount
     model_mount_config: ModelMountConfigData
     # Preset attribution
-    preset: PresetAttributionData
+    revision_preset: PresetAttributionData
     # Model definition (resolved against the model vfolder at
     # persistence time; ``None`` if the source had none).
     model_definition: ModelDefinition | None = None
@@ -1142,7 +1168,7 @@ class ModelRevisionData:
         ``model_runtime_config`` (runtime variant + environ +
         inference_runtime_config), ``execution`` (startup_command /
         bootstrap_script / callback_url), and ``model_definition`` —
-        flows back into the draft as the baseline; preset /
+        flows back into the draft as the baseline; revision_preset /
         ``deployment-config.yaml`` / ``model-definition.yaml`` / user
         request layers then override on top via ``merge_revision_drafts``.
         """
@@ -1178,6 +1204,10 @@ class ModelRevisionData:
             callback_url=self.execution.callback_url,
             inference_runtime_config=self.model_runtime_config.inference_runtime_config,
             model_definition=model_definition_draft,
+            runtime_variant_preset_values=list(
+                self.model_runtime_config.runtime_variant_preset_values
+            )
+            or None,
         )
 
 

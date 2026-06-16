@@ -69,7 +69,9 @@ from ai.backend.manager.models.deployment_revision_preset.orders import (
     DeploymentRevisionPresetOrders,
 )
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.deployment_revision_preset.types import (
+    DeploymentRevisionPresetValueEntry,
+)
 from ai.backend.manager.models.resource_slot.conditions import PresetResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
     ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
@@ -300,7 +302,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if input.environ is not None
             else OptionalState.nop()
         )
-        preset_values_state: OptionalState[list[PresetValueEntry]] = (
+        preset_values_state: OptionalState[list[DeploymentRevisionPresetValueEntry]] = (
             OptionalState.update(self._convert_preset_values_input(input.preset_values))
             if input.preset_values is not None
             else OptionalState.nop()
@@ -548,10 +550,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
     @staticmethod
     def _convert_preset_values_input(
         preset_values: list[Any] | None,
-    ) -> list[PresetValueEntry]:
+    ) -> list[DeploymentRevisionPresetValueEntry]:
         if not preset_values:
             return []
-        return [PresetValueEntry(preset_id=pv.preset_id, value=pv.value) for pv in preset_values]
+        return [
+            DeploymentRevisionPresetValueEntry(preset_id=pv.preset_id, value=pv.value)
+            for pv in preset_values
+        ]
 
     @staticmethod
     def _convert_model_definition_state(

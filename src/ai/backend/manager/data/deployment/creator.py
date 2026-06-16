@@ -23,7 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpec,
     RevisionDraft,
 )
-from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 
@@ -65,7 +65,7 @@ class ModelRevisionCreator:
     execution: ExecutionSpec | None = None
     model_definition: ModelDefinitionDraft | None = None
     revision_preset_id: DeploymentPresetID | None = None
-    preset_values: list[PresetValueData] = field(default_factory=list)
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueData] = field(default_factory=list)
 
     def to_draft_with_extra_mount(self, extra_mounts: list[MountInfoEntry]) -> RevisionDraft:
         """Project this v2 creator onto a ``RevisionDraft`` layer.
@@ -97,6 +97,7 @@ class ModelRevisionCreator:
             callback_url=ex.callback_url if ex is not None else None,
             inference_runtime_config=ex.inference_runtime_config if ex is not None else None,
             model_definition=self.model_definition,
+            runtime_variant_preset_values=self.runtime_variant_preset_values or None,
         )
 
 

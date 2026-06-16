@@ -449,7 +449,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 bootstrap_script=None,
                 callback_url=None,
             ),
-            preset=PresetAttributionData(preset_id=None, values=[]),
+            revision_preset=PresetAttributionData(preset_id=None, values=[]),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
@@ -696,7 +696,7 @@ class TestConvertDeploymentInfoToData:
                     bootstrap_script=None,
                     callback_url=None,
                 ),
-                preset=PresetAttributionData(preset_id=None, values=[]),
+                revision_preset=PresetAttributionData(preset_id=None, values=[]),
             )
 
         return make
