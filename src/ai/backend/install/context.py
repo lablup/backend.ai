@@ -1795,7 +1795,7 @@ class Context(metaclass=ABCMeta):
                     else:
                         await self.alias_image(
                             "python",
-                            "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64",
+                            "cr.backend.ai/stable/python:3.13-ubuntu24.04-amd64",
                             "x86_64",
                         )
 
