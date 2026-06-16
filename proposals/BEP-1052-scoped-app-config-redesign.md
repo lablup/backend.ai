@@ -65,14 +65,8 @@ Three scopes cover the use cases (plus `public` for the pre-login shell):
 - **Users read and modify; admins create.** All `create` (including
   `user` scope) is admin-only; the self-service path is **update-only**.
   See [Write model](#write-model).
-- **Bulk-only writes.** No single-item mutations: callers pass a list
-  (even of length one) and get a partial-success payload. Each item runs
-  in its own transaction, so one failure does not abort the rest. Rows
-  are addressed by natural key, never by Relay id; the self-service path
-  injects `scope`/`scopeId` server-side.
 - **Single source-of-truth table.** One `app_config_fragments` table
   holds every scope; only the exposure layer is split.
-- **Relay conventions.** Node interface, Connection/Edge, Input/Payload.
 
 ---
 
@@ -107,7 +101,7 @@ whatever fragments exist.
 <a id="write-model"></a>
 ### Write model
 
-Two write paths, both bulk-only:
+Two write paths:
 
 - **Admin path** — `create` / `update` / `purge`, **any scope**. This is
   the *only* way a row comes into existence, including `user`-scope rows.
@@ -206,7 +200,7 @@ defaults. Each raw fragment's `config` follows the same rule.
   branding) anonymously so the shell can render.
 - **After login**, it reads its merged `AppConfig`s (`theme`, `menu`,
   `preferences`, …) — already combining public + domain + user fragments
-  in `rank` order — and persists user changes through the `my` bulk
+  in `rank` order — and persists user changes through the `my`
   **update**, which returns the recomputed merged view. (A user only sees
   an editable value where the admin has seeded a `user` fragment.)
 
@@ -217,9 +211,9 @@ defaults. Each raw fragment's `config` follows the same rule.
 - **Pre-login public config** — anonymous read of `public` `theme`.
 - **Bootstrap after login** — read merged `AppConfig`s in one round of
   queries; no per-scope stitching on the client.
-- **User edits a document** — `my` bulk update on the caller's seeded
+- **User edits a document** — `my` update on the caller's seeded
   `user` row; the response is the recomputed merge.
-- **Admin publishes a fixed domain value** — admin bulk create/update a
+- **Admin publishes a fixed domain value** — admin create/update a
   `domain` (or `public`) fragment; no `user` fragments seeded, so users
   cannot override it.
 - **Admin makes a value user-overridable** — admin keeps the `domain`
