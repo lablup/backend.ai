@@ -9,12 +9,7 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-
-
-@dataclass(frozen=True)
-class DeploymentRevisionPresetValueData:
-    preset_id: DeploymentPresetID
-    value: str
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 
 
 @dataclass(frozen=True)
@@ -50,7 +45,7 @@ class DeploymentRevisionPresetData:
     startup_command: str | None
     bootstrap_script: str | None
     environ: list[EnvironEntryData]
-    preset_values: list[DeploymentRevisionPresetValueData]
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueData]
     replica_count: int
     deployment_strategy: DeploymentStrategy
     deployment_strategy_spec: dict[str, Any]

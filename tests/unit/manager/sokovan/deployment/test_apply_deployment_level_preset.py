@@ -70,7 +70,7 @@ def _make_preset(
         startup_command=None,
         bootstrap_script=None,
         environ=[],
-        preset_values=[],
+        runtime_variant_preset_values=[],
         open_to_public=open_to_public,
         replica_count=replica_count,
         revision_history_limit=revision_history_limit,

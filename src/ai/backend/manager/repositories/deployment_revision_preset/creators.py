@@ -16,10 +16,10 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetConflict
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.deployment_revision_preset.types import (
-    DeploymentRevisionPresetValueEntry,
-)
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
+from ai.backend.manager.models.runtime_variant_preset.types import (
+    RuntimeVariantPresetValueEntry,
+)
 from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
@@ -49,7 +49,7 @@ class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRe
     startup_command: str | None
     bootstrap_script: str | None
     environ: dict[str, str]
-    preset_values: list[DeploymentRevisionPresetValueEntry]
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueEntry]
     replica_count: int
     deployment_strategy: DeploymentStrategy
     deployment_strategy_spec: dict[str, Any]
@@ -83,7 +83,7 @@ class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRe
             startup_command=self.startup_command,
             bootstrap_script=self.bootstrap_script,
             environ=self.environ,
-            preset_values=self.preset_values,
+            preset_values=self.runtime_variant_preset_values,
             open_to_public=self.open_to_public,
             replica_count=self.replica_count,
             revision_history_limit=self.revision_history_limit,
