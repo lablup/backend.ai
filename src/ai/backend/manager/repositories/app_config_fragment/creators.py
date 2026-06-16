@@ -20,7 +20,10 @@ class AppConfigFragmentCreatorSpec(DependentCreatorSpec[int, AppConfigFragmentRo
     `rank` (merge priority within `name`) is assigned by the ops layer
     (next-value: ``MAX(rank) + gap`` within the `name`) at execution — the
     same pattern as DeploymentRevisionPreset; ``build_row`` receives the
-    computed next rank as its dependency.
+    computed next rank as its dependency. The dependency is an ``int``
+    because `create_with_next_value` / `execute_next_value_creator` are
+    typed `DependentCreatorSpec[int, TRow]` and pass the computed value
+    directly.
 
     Maps the natural-key UNIQUE violation to a typed domain error
     (:class:`AppConfigFragmentConflict`).

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
+from uuid import UUID
 
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 
@@ -17,7 +17,7 @@ class AppConfigData:
     when every contributing fragment is empty.
     """
 
-    user_id: uuid.UUID
+    user_id: UUID
     name: str
     fragments: Sequence[AppConfigFragmentData]
     config: Mapping[str, Any] | None

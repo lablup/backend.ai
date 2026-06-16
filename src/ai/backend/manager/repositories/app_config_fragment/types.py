@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -35,26 +34,4 @@ class AppConfigFragmentSearchScope(SearchScope):
     @property
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
         # Scope existence (domain / user) is validated upstream by RBAC.
-        return []
-
-
-@dataclass(frozen=True)
-class UserAppConfigSearchScope(SearchScope):
-    """Pin merged-view search to a target `user_id`."""
-
-    user_id: uuid.UUID
-
-    def to_condition(self) -> QueryCondition:
-        # Merge search joins multiple scope rows per user; the per-user
-        # restriction is applied by the merge-specific SQL builder rather
-        # than this generic predicate. Returning a `True` condition keeps
-        # this scope BatchQuerier-compatible without double-filtering.
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.true()
-
-        return inner
-
-    @property
-    def existence_checks(self) -> Sequence[ExistenceCheck[uuid.UUID]]:
-        # User existence is guaranteed by RBAC authentication upstream.
         return []
