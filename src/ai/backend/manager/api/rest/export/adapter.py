@@ -495,10 +495,15 @@ class ExportAdapter(BaseFilterAdapter):
         def condition() -> sa.sql.expression.ColumnElement[bool]:
             where_clauses = [join.condition for join in joins]
             where_clauses.extend(cond() for cond in user_conditions)
+            # correlate_except keeps the joined table(s) in the subquery's own FROM so that
+            # auto-correlation only pulls in the base table. Without it, selecting a user
+            # column (which LEFT JOINs users into the outer query) makes the subquery's users
+            # auto-correlate out, leaving it with no FROM clause.
             subquery = (
                 sa.select(sa.literal(1))
                 .select_from(*(join.table for join in joins))
                 .where(sa.and_(*where_clauses))
+                .correlate_except(*(join.table for join in joins))
             )
             return subquery.exists()
 

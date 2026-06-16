@@ -579,3 +579,34 @@ class TestBuildSessionQueryUserFilter:
         from_clause = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
         assert "users" not in from_clause
         assert len(query.conditions) == 0
+
+    def test_user_filter_with_user_column_selected_compiles(
+        self,
+        adapter: ExportAdapter,
+    ) -> None:
+        """Filtering by user.email while also selecting a user column must compile.
+
+        Selecting a user column LEFT JOINs users into the outer query. The EXISTS subquery
+        must keep its own users in FROM (via correlate_except); otherwise users auto-correlates
+        out and the subquery is left with no FROM clause ("returned no FROM clauses").
+        """
+        query = adapter.build_session_query(
+            report=SESSION_REPORT,
+            fields=["name", "status", "user_email"],
+            filter=SessionExportFilter(
+                user=SessionExportUserNestedFilter(email=StringFilter(contains="admin@lablup.com"))
+            ),
+            order=None,
+            max_rows=1000,
+            statement_timeout_sec=60,
+        )
+
+        # users is LEFT JOINed into the outer query because user_email is selected.
+        from_clause = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
+        assert from_clause.count("LEFT OUTER JOIN users") == 1
+
+        # The full statement (outer join + correlated EXISTS) must compile without raising.
+        stmt = sa.select(sa.literal(1)).select_from(query.select_from).where(query.conditions[0]())
+        compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+        assert "EXISTS (SELECT" in compiled
+        assert "users.email" in compiled
