@@ -15,9 +15,9 @@ from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
     EnvironEntryData,
-    PresetValueData,
     ResourceOptsEntryData,
 )
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -26,7 +26,9 @@ from ai.backend.manager.models.base import (
     ResourceOptsEntry,
     StrEnumType,
 )
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.runtime_variant_preset.types import (
+    RuntimeVariantPresetValueEntry,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
@@ -75,8 +77,11 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
     environ: Mapped[dict[str, str]] = mapped_column(
         "environ", pgsql.JSONB(), nullable=False, default={}, server_default="{}"
     )
-    preset_values: Mapped[list[PresetValueEntry]] = mapped_column(
-        "preset_values", PydanticListColumn(PresetValueEntry), nullable=False, server_default="[]"
+    preset_values: Mapped[list[RuntimeVariantPresetValueEntry]] = mapped_column(
+        "preset_values",
+        PydanticListColumn(RuntimeVariantPresetValueEntry),
+        nullable=False,
+        server_default="[]",
     )
 
     # Deployment-level preset fields. ``open_to_public`` and
@@ -144,8 +149,8 @@ class DeploymentRevisionPresetRow(Base):  # type: ignore[misc]
             startup_command=self.startup_command,
             bootstrap_script=self.bootstrap_script,
             environ=[EnvironEntryData(key=k, value=v) for k, v in (self.environ or {}).items()],
-            preset_values=[
-                PresetValueData(preset_id=pv.preset_id, value=pv.value)
+            runtime_variant_preset_values=[
+                RuntimeVariantPresetValueData(preset_id=pv.preset_id, value=pv.value)
                 for pv in (self.preset_values or [])
             ],
             open_to_public=self.open_to_public,

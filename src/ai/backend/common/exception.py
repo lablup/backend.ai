@@ -513,6 +513,18 @@ class InvalidResourceSlotQuantity(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class UnknownResourceSlotType(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/unknown-resource-slot-type"
+    error_title = "Unknown resource slot type."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class ResourcePresetConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-resource"
     error_title = "Duplicate Resource Preset"

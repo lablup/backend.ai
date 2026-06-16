@@ -6,6 +6,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -22,15 +23,15 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    AutoScalingMetricComparator,
-    AutoScalingMetricSource,
     BinarySize,
     ClusterMode,
+    MountPermission,
     QuotaScopeID,
     ResourceSlot,
     ServicePort,
@@ -39,22 +40,21 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
+    DeploymentLifecycleSubStep,
     DeploymentOptions,
     DeploymentPolicyData,
     ModelRevisionData,
+    ReplicaGroupLifecycle,
+    ReplicaGroupScalingStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
-from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
+from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import (
-    DeploymentAutoScalingPolicyData,
-    DeploymentAutoScalingPolicyRow,
-)
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     DeploymentPolicyRow,
@@ -74,6 +74,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -96,7 +97,6 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -105,7 +105,6 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
-    DeploymentAutoScalingPolicyCreatorSpec,
     DeploymentCreatorSpec,
     DeploymentMetadataFields,
     DeploymentNetworkFields,
@@ -114,7 +113,6 @@ from ai.backend.manager.repositories.deployment.creators import (
     RouteCreatorSpec,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentAutoScalingPolicyUpdaterSpec,
     DeploymentMetadataUpdaterSpec,
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
@@ -122,7 +120,7 @@ from ai.backend.manager.repositories.deployment.updaters import (
     RouteUpdaterSpec,
 )
 from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
-from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
@@ -134,6 +132,34 @@ def create_test_password_info(password: str) -> PasswordInfo:
         rounds=100_000,
         salt_size=32,
     )
+
+
+def attach_primary_replica_group(
+    db_sess: Any,
+    endpoint: EndpointRow,
+    *,
+    current_revision_id: uuid.UUID | None = None,
+    target_revision_id: uuid.UUID | None = None,
+) -> ReplicaGroupRow:
+    """Create the primary replica group for a hand-built endpoint and wire its
+    revision pointers, mirroring what ``create_endpoint`` does at runtime.
+
+    Revision pointers now live on the replica group, so tests that construct
+    ``EndpointRow`` directly must attach a group for the revision-resolution
+    paths to see ``current``/``deploying`` revisions.
+    """
+    group_id = uuid.uuid4()
+    group = ReplicaGroupRow(
+        id=ReplicaGroupID(group_id),
+        deployment_id=endpoint.id,
+        current_revision_id=current_revision_id,
+        target_revision_id=target_revision_id,
+    )
+    db_sess.add(group)
+    endpoint.primary_replica_group_id = ReplicaGroupID(group_id)
+    if target_revision_id is not None:
+        endpoint.target_replica_group_id = ReplicaGroupID(group_id)
+    return group
 
 
 class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
@@ -167,6 +193,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 SessionRow,
                 KernelRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 RuntimeVariantRow,
                 DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
@@ -645,9 +672,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.READY,
-                current_revision=revision_id,
             )
             db_sess.add(endpoint)
+            attach_primary_replica_group(db_sess, endpoint, current_revision_id=revision_id)
             await db_sess.flush()
 
             # Create revision for endpoint
@@ -882,9 +909,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     url=f"http://test{i}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.READY,
-                    current_revision=revision_id,
                 )
                 db_sess.add(endpoint)
+                attach_primary_replica_group(db_sess, endpoint, current_revision_id=revision_id)
                 revision = DeploymentRevisionRow(
                     id=revision_id,
                     endpoint=endpoint_id,
@@ -1371,6 +1398,7 @@ class TestDeploymentRevisionOperations:
                 ImageRow,
                 ResourceSlotTypeRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
                 AssociationScopesEntitiesRow,  # RBACEntityCreator dependency
                 RuntimeVariantRow,
@@ -1590,9 +1618,9 @@ class TestDeploymentRevisionOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
+            attach_primary_replica_group(db_sess, endpoint)
             await db_sess.commit()
 
         return endpoint_id
@@ -1681,6 +1709,7 @@ class TestDeploymentRevisionOperations:
             cluster_size=1,
             model_vfolder_id=test_vfolder_id,
             model_mount_destination="/models",
+            model_mount_perm=MountPermission.READ_ONLY,
             vfolder_subpath=None,
             model_definition_path=None,
             model_definition=None,
@@ -1726,6 +1755,7 @@ class TestDeploymentRevisionOperations:
                 cluster_size=1,
                 model_vfolder_id=test_vfolder_id,
                 model_mount_destination="/models",
+                model_mount_perm=MountPermission.READ_ONLY,
                 vfolder_subpath=None,
                 model_definition_path=None,
                 model_definition=None,
@@ -1773,6 +1803,7 @@ class TestDeploymentRevisionOperations:
                 cluster_size=1,
                 model_vfolder_id=test_vfolder_id,
                 model_mount_destination="/models",
+                model_mount_perm=MountPermission.READ_ONLY,
                 vfolder_subpath=None,
                 model_definition_path=None,
                 model_definition=None,
@@ -1817,6 +1848,7 @@ class TestDeploymentRevisionOperations:
             cluster_size=1,
             model_vfolder_id=test_vfolder_id,
             model_mount_destination="/models",
+            model_mount_perm=MountPermission.READ_ONLY,
             vfolder_subpath=None,
             model_definition_path=None,
             model_definition=None,
@@ -1916,10 +1948,11 @@ class TestDeploymentRevisionOperations:
         latest_revision = test_multiple_revisions[-1]
 
         async with db_with_cleanup.begin_session() as db_sess:
+            # Current revision now lives on the primary replica group.
             await db_sess.execute(
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == test_endpoint_id)
-                .values(current_revision=first_revision.id)
+                sa.update(ReplicaGroupRow)
+                .where(ReplicaGroupRow.deployment_id == test_endpoint_id)
+                .values(current_revision_id=first_revision.id)
             )
             await db_sess.commit()
 
@@ -2044,381 +2077,73 @@ class TestDeploymentRevisionOperations:
             assert endpoint.name == new_name
             assert endpoint.replicas == new_replica_count
 
-
-class TestDeploymentAutoScalingPolicyOperations:
-    """Test cases for deployment auto-scaling policy repository operations."""
-
-    @pytest.fixture
-    async def db_with_cleanup(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
-        async with with_tables(
-            database_connection,
-            [
-                DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
-                UserResourcePolicyRow,
-                ProjectResourcePolicyRow,
-                RoleRow,
-                UserRoleRow,  # UserRow relationship dependency
-                UserRow,
-                GroupRow,
-                VFolderRow,
-                EndpointRow,
-                DeploymentAutoScalingPolicyRow,
-            ],
-        ):
-            yield database_connection
-
-    @pytest.fixture
-    async def test_domain_name(
+    async def test_retire_replica_groups_on_destroy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test domain and return domain name."""
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                name=domain_name,
-                description="Test domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-            )
-            db_sess.add(domain)
-            await db_sess.commit()
-
-        return domain_name
-
-    @pytest.fixture
-    async def test_scaling_group_name(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test scaling group and return name."""
-        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
-                name=sgroup_name,
-                description="Test scaling group",
-                is_active=True,
-                driver="static",
-                driver_opts={},
-                scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
-            )
-            db_sess.add(sgroup)
-            await db_sess.commit()
-
-        return sgroup_name
-
-    @pytest.fixture
-    async def test_resource_policy_name(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test resource policy and return policy name."""
-        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            policy = UserResourcePolicyRow(
-                name=policy_name,
-                max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
-                max_session_count_per_model_session=5,
-                max_customized_image_count=3,
-            )
-            db_sess.add(policy)
-            await db_sess.commit()
-
-        return policy_name
-
-    @pytest.fixture
-    async def test_project_resource_policy_name(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test project resource policy and return policy name."""
-        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            policy = ProjectResourcePolicyRow(
-                name=policy_name,
-                max_vfolder_count=10,
-                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
-                max_network_count=5,
-            )
-            db_sess.add(policy)
-            await db_sess.commit()
-
-        return policy_name
-
-    @pytest.fixture
-    async def test_user_uuid(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_resource_policy_name: str,
-    ) -> uuid.UUID:
-        """Create test user and return user UUID."""
-        user_uuid = uuid.uuid4()
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            user = UserRow(
-                uuid=user_uuid,
-                username=f"testuser-{user_uuid.hex[:8]}",
-                email=f"test-{user_uuid.hex[:8]}@example.com",
-                password=create_test_password_info("test_password"),
-                need_password_change=False,
-                status=UserStatus.ACTIVE,
-                status_info="active",
-                domain_name=test_domain_name,
-                role=UserRole.USER,
-                resource_policy=test_resource_policy_name,
-            )
-            db_sess.add(user)
-            await db_sess.commit()
-
-        return user_uuid
-
-    @pytest.fixture
-    async def test_group_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_project_resource_policy_name: str,
-    ) -> uuid.UUID:
-        """Create test group and return group ID."""
-        group_id = uuid.uuid4()
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
-                id=group_id,
-                name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
-                resource_policy=test_project_resource_policy_name,
-            )
-            db_sess.add(group)
-            await db_sess.commit()
-
-        return group_id
-
-    @pytest.fixture
-    async def test_endpoint_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_scaling_group_name: str,
-        test_user_uuid: uuid.UUID,
-        test_group_id: uuid.UUID,
-    ) -> DeploymentID:
-        """Create test endpoint and return endpoint ID."""
-        endpoint_id = DeploymentID(uuid.uuid4())
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            endpoint = EndpointRow(
-                id=endpoint_id,
-                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
-                created_user=test_user_uuid,
-                session_owner=test_user_uuid,
-                domain=test_domain_name,
-                project=test_group_id,
-                resource_group=test_scaling_group_name,
-                desired_replicas=1,
-                url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
-                open_to_public=False,
-                lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
-            )
-            db_sess.add(endpoint)
-            await db_sess.commit()
-
-        return endpoint_id
-
-    @pytest.fixture
-    def deployment_repository(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> DeploymentRepository:
-        """Create DeploymentRepository instance."""
-        storage_manager = MagicMock()
-        valkey_stat = MagicMock()
-        valkey_live = MagicMock()
-        valkey_schedule = MagicMock()
-
-        return DeploymentRepository(
-            db=db_with_cleanup,
-            storage_manager=storage_manager,
-            valkey_stat=valkey_stat,
-            valkey_live=valkey_live,
-            valkey_schedule=valkey_schedule,
-        )
-
-    @pytest.fixture
-    async def test_auto_scaling_policy_data(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_endpoint_id: DeploymentID,
-    ) -> DeploymentAutoScalingPolicyData:
-        """Create a single test auto-scaling policy."""
-        spec = DeploymentAutoScalingPolicyCreatorSpec(
-            deployment_id=test_endpoint_id,
-            min_replicas=1,
-            max_replicas=10,
-            metric_source=AutoScalingMetricSource.KERNEL,
-            metric_name="cpu_utilization",
-            comparator=AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL,
-            scale_up_threshold=Decimal("80"),
-            scale_down_threshold=Decimal("20"),
-            scale_up_step_size=2,
-            scale_down_step_size=1,
-            cooldown_seconds=300,
-        )
-        return await deployment_repository.create_auto_scaling_policy(Creator(spec=spec))
-
-    async def test_create_auto_scaling_policy(
-        self,
         deployment_repository: DeploymentRepository,
         test_endpoint_id: DeploymentID,
     ) -> None:
-        """Test creating an auto-scaling policy using Creator."""
-        spec = DeploymentAutoScalingPolicyCreatorSpec(
-            deployment_id=test_endpoint_id,
-            min_replicas=2,
-            max_replicas=20,
-            metric_source=AutoScalingMetricSource.KERNEL,
-            metric_name="cpu_utilization",
-            comparator=AutoScalingMetricComparator.GREATER_THAN,
-            scale_up_threshold=Decimal("70"),
-            scale_down_threshold=Decimal("30"),
-            scale_up_step_size=3,
-            scale_down_step_size=2,
-            cooldown_seconds=600,
-        )
-        creator = Creator(spec=spec)
+        """Drains live groups to DRAINING with zeroed desired counts and clears the endpoint's
+        deploy pointer, leaving already-DRAINED groups untouched."""
+        drained_group_id = ReplicaGroupID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            # The endpoint's primary group is live and still requesting replicas.
+            await db_sess.execute(
+                sa.update(ReplicaGroupRow)
+                .where(ReplicaGroupRow.deployment_id == test_endpoint_id)
+                .values(
+                    lifecycle=ReplicaGroupLifecycle.ROLLING,
+                    desired_current_replica_count=1,
+                    desired_target_replica_count=1,
+                    scaling_status=ReplicaGroupScalingStatus.SCALING,
+                )
+            )
+            # A second group that has already finished draining.
+            db_sess.add(
+                ReplicaGroupRow(
+                    id=drained_group_id,
+                    deployment_id=test_endpoint_id,
+                    lifecycle=ReplicaGroupLifecycle.DRAINED,
+                    desired_current_replica_count=0,
+                    desired_target_replica_count=0,
+                )
+            )
+            await db_sess.execute(
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == test_endpoint_id)
+                .values(sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING)
+            )
 
-        result = await deployment_repository.create_auto_scaling_policy(creator)
+        await deployment_repository.retire_replica_groups_on_destroy({test_endpoint_id})
 
-        assert result.id is not None
-        assert result.endpoint == test_endpoint_id
-        assert result.min_replicas == 2
-        assert result.max_replicas == 20
-        assert result.metric_source == AutoScalingMetricSource.KERNEL
-        assert result.metric_name == "cpu_utilization"
-        assert result.comparator == AutoScalingMetricComparator.GREATER_THAN
-        assert result.scale_up_threshold == Decimal("70")
-        assert result.scale_down_threshold == Decimal("30")
-        assert result.scale_up_step_size == 3
-        assert result.scale_down_step_size == 2
-        assert result.cooldown_seconds == 600
-
-    async def test_get_auto_scaling_policy(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_endpoint_id: DeploymentID,
-        test_auto_scaling_policy_data: DeploymentAutoScalingPolicyData,
-    ) -> None:
-        """Test getting an auto-scaling policy by endpoint ID."""
-        result = await deployment_repository.get_auto_scaling_policy(test_endpoint_id)
-
-        assert result.id == test_auto_scaling_policy_data.id
-        assert result.endpoint == test_endpoint_id
-        assert result.min_replicas == 1
-        assert result.max_replicas == 10
-        assert result.metric_source == AutoScalingMetricSource.KERNEL
-        assert result.metric_name == "cpu_utilization"
-
-    async def test_get_auto_scaling_policy_not_found(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_endpoint_id: DeploymentID,
-    ) -> None:
-        """Test that get_auto_scaling_policy raises AutoScalingPolicyNotFound."""
-        with pytest.raises(AutoScalingPolicyNotFound):
-            await deployment_repository.get_auto_scaling_policy(test_endpoint_id)
-
-    async def test_update_auto_scaling_policy(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_auto_scaling_policy_data: DeploymentAutoScalingPolicyData,
-    ) -> None:
-        """Test updating an auto-scaling policy using Updater."""
-        updater = Updater(
-            spec=DeploymentAutoScalingPolicyUpdaterSpec(
-                min_replicas=OptionalState.update(5),
-                max_replicas=OptionalState.update(50),
-                scale_up_threshold=TriState.update(Decimal("90")),
-            ),
-            pk_value=test_auto_scaling_policy_data.id,
-        )
-
-        result = await deployment_repository.update_auto_scaling_policy(updater)
-
-        assert result.id == test_auto_scaling_policy_data.id
-        assert result.min_replicas == 5
-        assert result.max_replicas == 50
-        assert result.scale_up_threshold == Decimal("90")
-        # Unchanged fields should remain the same
-        assert result.scale_down_threshold == Decimal("20")
-        assert result.cooldown_seconds == 300
-
-    async def test_update_auto_scaling_policy_not_found(
-        self,
-        deployment_repository: DeploymentRepository,
-    ) -> None:
-        """Test that update_auto_scaling_policy raises AutoScalingPolicyNotFound."""
-        nonexistent_id = uuid.uuid4()
-        updater = Updater(
-            spec=DeploymentAutoScalingPolicyUpdaterSpec(
-                min_replicas=OptionalState.update(5),
-            ),
-            pk_value=nonexistent_id,
-        )
-
-        with pytest.raises(AutoScalingPolicyNotFound):
-            await deployment_repository.update_auto_scaling_policy(updater)
-
-    async def test_delete_auto_scaling_policy(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_endpoint_id: DeploymentID,
-        test_auto_scaling_policy_data: DeploymentAutoScalingPolicyData,
-    ) -> None:
-        """Test deleting an auto-scaling policy using Purger."""
-        purger = Purger(
-            row_class=DeploymentAutoScalingPolicyRow,
-            pk_value=test_auto_scaling_policy_data.id,
-        )
-
-        result = await deployment_repository.delete_auto_scaling_policy(purger)
-
-        assert result is not None
-        assert result.row.id == test_auto_scaling_policy_data.id
-
-        # Verify the policy no longer exists
-        with pytest.raises(AutoScalingPolicyNotFound):
-            await deployment_repository.get_auto_scaling_policy(test_endpoint_id)
-
-    async def test_delete_auto_scaling_policy_not_found(
-        self,
-        deployment_repository: DeploymentRepository,
-    ) -> None:
-        """Test that delete_auto_scaling_policy returns None for nonexistent policy."""
-        nonexistent_id = uuid.uuid4()
-        purger = Purger(
-            row_class=DeploymentAutoScalingPolicyRow,
-            pk_value=nonexistent_id,
-        )
-
-        result = await deployment_repository.delete_auto_scaling_policy(purger)
-
-        assert result is None
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            groups = (
+                (
+                    await db_sess.execute(
+                        sa.select(ReplicaGroupRow).where(
+                            ReplicaGroupRow.deployment_id == test_endpoint_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            by_id = {group.id: group for group in groups}
+            live = next(group for group in groups if group.id != drained_group_id)
+            # Live group is driven to DRAINING with zeroed desired counts.
+            assert live.lifecycle is ReplicaGroupLifecycle.DRAINING
+            assert live.desired_current_replica_count == 0
+            assert live.desired_target_replica_count == 0
+            assert live.scaling_status is ReplicaGroupScalingStatus.SCALING
+            # The already-DRAINED group is left as-is.
+            assert by_id[drained_group_id].lifecycle is ReplicaGroupLifecycle.DRAINED
+            # The endpoint's deploy pointer/sub-step is cleared.
+            endpoint = (
+                await db_sess.execute(
+                    sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
+                )
+            ).scalar_one()
+            assert endpoint.sub_step is None
 
 
 class TestDeploymentPolicyOperations:
@@ -2444,6 +2169,7 @@ class TestDeploymentPolicyOperations:
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 DeploymentPolicyRow,
             ],
         ):
@@ -2610,7 +2336,6 @@ class TestDeploymentPolicyOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -2781,6 +2506,7 @@ class TestSearchDeploymentPolicies:
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 DeploymentPolicyRow,
             ],
         ):
@@ -2930,7 +2656,6 @@ class TestSearchDeploymentPolicies:
                     url=f"http://test-{eid.hex[:8]}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 db_sess.add(endpoint)
                 endpoint_ids.append(eid)
@@ -3164,6 +2889,7 @@ class TestRouteOperations:
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 AssociationScopesEntitiesRow,
             ],
@@ -3331,7 +3057,6 @@ class TestRouteOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -3357,6 +3082,24 @@ class TestRouteOperations:
             valkey_schedule=valkey_schedule,
         )
 
+    @pytest.fixture
+    async def test_replica_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: DeploymentID,
+    ) -> ReplicaGroupID:
+        """Create a replica group for the test endpoint and return its ID."""
+        group_id = ReplicaGroupID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ReplicaGroupRow(
+                    id=group_id,
+                    deployment_id=test_endpoint_id,
+                )
+            )
+            await db_sess.commit()
+        return group_id
+
     async def test_create_route(
         self,
         deployment_repository: DeploymentRepository,
@@ -3364,6 +3107,7 @@ class TestRouteOperations:
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_replica_group_id: ReplicaGroupID,
     ) -> None:
         """Test creating a route using Creator with RouteCreatorSpec."""
         spec = RouteCreatorSpec(
@@ -3373,6 +3117,8 @@ class TestRouteOperations:
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
             health_check=None,
+            termination_grace_period=30.0,
+            replica_group_id=test_replica_group_id,
             traffic_ratio=1.0,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
@@ -3398,6 +3144,7 @@ class TestRouteOperations:
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_replica_group_id: ReplicaGroupID,
     ) -> None:
         """Test updating route status using RouteStatusUpdaterSpec."""
         # Create a route first
@@ -3408,6 +3155,8 @@ class TestRouteOperations:
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
             health_check=None,
+            termination_grace_period=30.0,
+            replica_group_id=test_replica_group_id,
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3447,6 +3196,7 @@ class TestRouteOperations:
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_replica_group_id: ReplicaGroupID,
     ) -> None:
         """Test updating route using unified RouteUpdaterSpec."""
         # Create a route first
@@ -3457,6 +3207,8 @@ class TestRouteOperations:
             project_id=test_group_id,
             revision_id=DeploymentRevisionID(uuid.uuid4()),
             health_check=None,
+            termination_grace_period=30.0,
+            replica_group_id=test_replica_group_id,
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3537,6 +3289,7 @@ class TestDeploymentRepositoryDuplicateName:
                 ImageRow,
                 ResourceSlotTypeRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 EndpointTokenRow,
                 RuntimeVariantRow,
                 DeploymentRevisionPresetRow,
@@ -3930,7 +3683,7 @@ class TestDeploymentRepositoryDuplicateName:
             ).scalar_one()
             assert target_stage == EndpointLifecycle.DESTROYING
 
-    async def test_set_deploying_revision_overrides_in_flight(
+    async def test_activate_revision_overrides_in_flight(
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -3938,11 +3691,12 @@ class TestDeploymentRepositoryDuplicateName:
         test_group: GroupRow,
         test_scaling_group: ScalingGroupRow,
     ) -> None:
-        """``set_deploying_revision`` overwrites a non-NULL deploying_revision.
+        """``activate_revision`` records the deploy intent on the endpoint.
 
-        A previous rollout's ``deploying_revision`` no longer guards
-        against re-activation; orphan routes from the preempted rollout
-        are cleaned up by ``RouteEvictionHandler``'s orphan branch.
+        Writes ``endpoints.deploying_revision_id`` and transitions to
+        DEPLOYING / DEPLOYING_INITIALIZING, overwriting any previous
+        deploy intent. Orphan routes from a preempted rollout are cleaned
+        up by ``RouteEvictionHandler``'s orphan branch.
         """
         endpoint_id = DeploymentID(uuid.uuid4())
         previous_deploying = DeploymentRevisionID(uuid.uuid4())
@@ -3950,26 +3704,26 @@ class TestDeploymentRepositoryDuplicateName:
         user_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                EndpointRow(
-                    id=endpoint_id,
-                    name=f"override-{uuid.uuid4().hex[:8]}",
-                    created_user=user_id,
-                    session_owner=user_id,
-                    domain=test_domain.name,
-                    project=test_group.id,
-                    resource_group=test_scaling_group.name,
-                    replicas=1,
-                    desired_replicas=1,
-                    url=None,
-                    open_to_public=False,
-                    lifecycle_stage=EndpointLifecycle.DEPLOYING,
-                    deploying_revision=previous_deploying,
-                )
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"override-{uuid.uuid4().hex[:8]}",
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.name,
+                project=test_group.id,
+                resource_group=test_scaling_group.name,
+                replicas=1,
+                desired_replicas=1,
+                url=None,
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                deploying_revision_id=previous_deploying,
             )
+            db_sess.add(endpoint)
+            attach_primary_replica_group(db_sess, endpoint)
             await db_sess.commit()
 
-        previous_current, updated = await deployment_repository.set_deploying_revision(
+        previous_current, updated = await deployment_repository.activate_revision(
             endpoint_id, new_deploying
         )
 
@@ -3979,25 +3733,92 @@ class TestDeploymentRepositoryDuplicateName:
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             row = (
                 await db_sess.execute(
-                    sa.select(EndpointRow.deploying_revision, EndpointRow.lifecycle_stage).where(
-                        EndpointRow.id == endpoint_id
-                    )
+                    sa.select(
+                        EndpointRow.deploying_revision_id,
+                        EndpointRow.lifecycle_stage,
+                        EndpointRow.sub_step,
+                    ).where(EndpointRow.id == endpoint_id)
                 )
             ).one()
-            assert row.deploying_revision == new_deploying
+            assert row.deploying_revision_id == new_deploying
             assert row.lifecycle_stage == EndpointLifecycle.DEPLOYING
+            assert row.sub_step == DeploymentLifecycleSubStep.DEPLOYING_INITIALIZING
 
-    async def test_set_deploying_revision_returns_false_for_missing_endpoint(
+    async def test_activate_revision_returns_false_for_missing_endpoint(
         self,
         deployment_repository: DeploymentRepository,
     ) -> None:
-        """``set_deploying_revision`` returns updated=False when the endpoint id
+        """``activate_revision`` returns updated=False when the endpoint id
         does not match any row, instead of raising."""
-        previous_current, updated = await deployment_repository.set_deploying_revision(
+        previous_current, updated = await deployment_repository.activate_revision(
             DeploymentID(uuid.uuid4()), DeploymentRevisionID(uuid.uuid4())
         )
         assert updated is False
         assert previous_current is None
+
+    async def test_clear_deploying_revision_clears_intent(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> None:
+        """``clear_deploying_revision`` wipes the deploy intent: the endpoint's
+        ``deploying_revision_id`` / ``target_replica_group_id`` / ``sub_step`` and
+        the primary group's ``target_revision_id``."""
+        endpoint_id = DeploymentID(uuid.uuid4())
+        deploying = DeploymentRevisionID(uuid.uuid4())
+        target_revision = uuid.uuid4()
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"clear-{uuid.uuid4().hex[:8]}",
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.name,
+                project=test_group.id,
+                resource_group=test_scaling_group.name,
+                replicas=1,
+                desired_replicas=1,
+                url=None,
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONED,
+                deploying_revision_id=deploying,
+            )
+            db_sess.add(endpoint)
+            group = attach_primary_replica_group(
+                db_sess, endpoint, target_revision_id=target_revision
+            )
+            await db_sess.commit()
+            group_id = group.id
+
+        await deployment_repository.clear_deploying_revision({endpoint_id})
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(
+                        EndpointRow.deploying_revision_id,
+                        EndpointRow.target_replica_group_id,
+                        EndpointRow.sub_step,
+                    ).where(EndpointRow.id == endpoint_id)
+                )
+            ).one()
+            assert row.deploying_revision_id is None
+            assert row.target_replica_group_id is None
+            assert row.sub_step is None
+            group_target = (
+                await db_sess.execute(
+                    sa.select(ReplicaGroupRow.target_revision_id).where(
+                        ReplicaGroupRow.id == group_id
+                    )
+                )
+            ).scalar_one()
+            assert group_target is None
 
     async def test_destroy_endpoint_deletes_associated_tokens(
         self,

@@ -31,6 +31,7 @@ from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     RBACElementRef,
     RBACElementType,
     RelationType,
@@ -53,6 +54,7 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.permission import UserSystemRoleNotProvisioned
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     RepositoryIntegrityError,
@@ -178,7 +180,7 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def get_by_id_validated(
-        self, vfolder_id: uuid.UUID, user_id: uuid.UUID, domain_name: str
+        self, vfolder_id: uuid.UUID, user_id: uuid.UUID, domain_name: str | None
     ) -> VFolderData:
         """
         Get a VFolder by ID with ownership/permission validation.
@@ -189,6 +191,9 @@ class VfolderRepository:
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_id)
             if not vfolder_row:
                 raise VFolderNotFound()
+
+            if vfolder_row.user == user_id:
+                return self._vfolder_row_to_data(vfolder_row)
 
             # Check access permissions
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
@@ -910,23 +915,26 @@ class VfolderRepository:
         Get all invitations for a VFolder.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(VFolderInvitationRow).where(
-                VFolderInvitationRow.vfolder == vfolder_id
+            query = (
+                sa.select(VFolderInvitationRow, UserRow.username)
+                .outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
+                .where(VFolderInvitationRow.vfolder == vfolder_id)
             )
             result = await session.execute(query)
-            invitation_rows = result.scalars().all()
+            rows = result.all()
 
             return [
                 VFolderInvitationData(
                     id=row.id,
                     vfolder=row.vfolder,
                     inviter=row.inviter or "",
+                    inviter_username=inviter_username,
                     invitee=row.invitee,
                     permission=row.permission or VFolderMountPermission.READ_ONLY,
                     created_at=row.created_at or datetime.now(UTC),
                     modified_at=row.modified_at,
                 )
-                for row in invitation_rows
+                for row, inviter_username in rows
             ]
 
     @vfolder_repository_resilience.apply()
@@ -1129,7 +1137,8 @@ class VfolderRepository:
         Get the system role_id associated with a user.
 
         Looks up the UserRoleRow joined with RoleRow where the role source is SYSTEM.
-        Raises ObjectNotFound if the user's system role is not found.
+        Raises UserSystemRoleNotProvisioned (5xx) if the user's system role is not found,
+        as a missing SYSTEM role is a server-side data-integrity condition.
         """
         stmt = (
             sa.select(UserRoleRow.role_id)
@@ -1143,7 +1152,7 @@ class VfolderRepository:
         )
         result = await session.scalar(stmt)
         if result is None:
-            raise ObjectNotFound(object_name="user system role", extra_msg=str(user_id))
+            raise UserSystemRoleNotProvisioned(extra_msg=str(user_id))
         return result
 
     def _get_vfolder_scope(self, vfolder: VFolderData) -> ScopeId:
@@ -1236,16 +1245,15 @@ class VfolderRepository:
             return (count or 0) > 0
 
     @vfolder_repository_resilience.apply()
-    async def get_user_by_email(self, email: str) -> tuple[uuid.UUID, str] | None:
+    async def get_user_by_email(self, email: str) -> tuple[uuid.UUID, str | None] | None:
         """
         Get user info by email.
         Returns (user_id, domain_name) or None if user not found.
+        domain_name may be None.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             user_row = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
             if not user_row:
-                return None
-            if user_row.domain_name is None:
                 return None
             return user_row.uuid, user_row.domain_name
 
@@ -1345,18 +1353,24 @@ class VfolderRepository:
         Returns VFolderInvitationData or None if not found.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            query = sa.select(VFolderInvitationRow).where(
-                (VFolderInvitationRow.id == invitation_id)
-                & (VFolderInvitationRow.state == VFolderInvitationState.PENDING),
+            query = (
+                sa.select(VFolderInvitationRow, UserRow.username)
+                .outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
+                .where(
+                    (VFolderInvitationRow.id == invitation_id)
+                    & (VFolderInvitationRow.state == VFolderInvitationState.PENDING),
+                )
             )
-            invitation_row = await session.scalar(query)
-            if not invitation_row:
+            row = (await session.execute(query)).one_or_none()
+            if not row:
                 return None
+            invitation_row, inviter_username = row
 
             return VFolderInvitationData(
                 id=invitation_row.id,
                 vfolder=invitation_row.vfolder,
                 inviter=invitation_row.inviter or "",
+                inviter_username=inviter_username,
                 invitee=invitation_row.invitee,
                 permission=invitation_row.permission or VFolderMountPermission.READ_ONLY,
                 created_at=invitation_row.created_at or datetime.now(UTC),
@@ -1430,9 +1444,9 @@ class VfolderRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             j = sa.join(
                 VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
-            )
+            ).outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
             query = (
-                sa.select(VFolderInvitationRow)
+                sa.select(VFolderInvitationRow, UserRow.username)
                 .select_from(j)
                 .where(
                     sa.and_(
@@ -1444,15 +1458,16 @@ class VfolderRepository:
                     contains_eager(VFolderInvitationRow.vfolder_row),
                 )
             )
-            result = await session.scalars(query)
-            invitation_rows = list(result.all())
+            result = await session.execute(query)
+            rows = result.all()
 
             results = []
-            for inv_row in invitation_rows:
+            for inv_row, inviter_username in rows:
                 invitation_data = VFolderInvitationData(
                     id=inv_row.id,
                     vfolder=inv_row.vfolder,
                     inviter=inv_row.inviter or "",
+                    inviter_username=inviter_username,
                     invitee=inv_row.invitee,
                     permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
                     created_at=inv_row.created_at or datetime.now(UTC),
@@ -1473,9 +1488,9 @@ class VfolderRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             j = sa.join(
                 VFolderInvitationRow, VFolderRow, VFolderInvitationRow.vfolder == VFolderRow.id
-            )
+            ).outerjoin(UserRow, UserRow.email == VFolderInvitationRow.inviter)
             query = (
-                sa.select(VFolderInvitationRow)
+                sa.select(VFolderInvitationRow, UserRow.username)
                 .select_from(j)
                 .where(
                     sa.and_(
@@ -1487,15 +1502,16 @@ class VfolderRepository:
                     contains_eager(VFolderInvitationRow.vfolder_row),
                 )
             )
-            result = await session.scalars(query)
-            invitation_rows = list(result.all())
+            result = await session.execute(query)
+            rows = result.all()
 
             results = []
-            for inv_row in invitation_rows:
+            for inv_row, inviter_username in rows:
                 invitation_data = VFolderInvitationData(
                     id=inv_row.id,
                     vfolder=inv_row.vfolder,
                     inviter=inv_row.inviter or "",
+                    inviter_username=inviter_username,
                     invitee=inv_row.invitee,
                     permission=inv_row.permission or VFolderMountPermission.READ_ONLY,
                     created_at=inv_row.created_at or datetime.now(UTC),
@@ -2255,6 +2271,7 @@ class VfolderRepository:
                         scope_id=str(vfolder_id),
                         entity_type=EntityType.VFOLDER,
                         operation=OperationType.READ,
+                        permission=Permission.READ,
                     )
                     .on_conflict_do_nothing(
                         constraint="uq_permissions_role_scope_entity_op",

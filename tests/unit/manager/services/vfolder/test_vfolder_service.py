@@ -4,6 +4,7 @@ Tests for VFolderService and VFolderFileService functionality.
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
@@ -19,6 +20,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
+    VFolderUsageData,
 )
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.storage import (
@@ -36,6 +38,9 @@ from ai.backend.manager.services.vfolder.actions.base import (
 from ai.backend.manager.services.vfolder.actions.file import (
     CreateArchiveDownloadSessionAction,
     CreateArchiveDownloadSessionActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.get_usage import (
+    GetVFolderUsageAction,
 )
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
@@ -309,3 +314,101 @@ class TestVFolderFileServiceCreateArchiveDownload:
         mock_client = mock_storage_manager.get_manager_facing_client.return_value
         call_kwargs = mock_client.create_archive_download_token.call_args.kwargs
         assert call_kwargs["filename"] is None
+
+
+class TestVFolderServiceGetFolderUsage:
+    """Tests for VFolderService.get_folder_usage().
+
+    Verifies the contract: measurements come live from the storage proxy,
+    quota limits come from the vfolder row, and unmanaged vfolders skip
+    the storage proxy entirely.
+    """
+
+    @pytest.fixture
+    def mock_storage_client(self) -> MagicMock:
+        client = MagicMock()
+        client.get_folder_usage = AsyncMock(return_value={"file_count": 2, "used_bytes": 524308})
+        return client
+
+    @pytest.fixture
+    def mock_storage_manager(self, mock_storage_client: MagicMock) -> MagicMock:
+        manager = MagicMock()
+        manager.get_proxy_and_volume = MagicMock(return_value=("local", "volume1"))
+        manager.get_manager_facing_client = MagicMock(return_value=mock_storage_client)
+        return manager
+
+    @pytest.fixture
+    def vfolder_service(
+        self,
+        mock_vfolder_repository: MagicMock,
+        mock_storage_manager: MagicMock,
+    ) -> VFolderService:
+        return VFolderService(
+            config_provider=MagicMock(),
+            etcd=MagicMock(),
+            storage_manager=mock_storage_manager,
+            background_task_manager=MagicMock(),
+            vfolder_repository=mock_vfolder_repository,
+            user_repository=MagicMock(),
+            valkey_stat_client=MagicMock(),
+        )
+
+    @pytest.fixture
+    def sample_action(self, sample_vfolder_uuid: uuid.UUID) -> GetVFolderUsageAction:
+        return GetVFolderUsageAction(vfolder_uuid=sample_vfolder_uuid)
+
+    async def test_managed_vfolder_returns_storage_proxy_measurements(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        sample_vfolder_uuid: uuid.UUID,
+        sample_vfolder_data: VFolderData,
+        sample_action: GetVFolderUsageAction,
+    ) -> None:
+        """num_files/used_bytes come straight from the storage proxy reply."""
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=sample_vfolder_data)
+
+        result = await vfolder_service.get_folder_usage(sample_action)
+
+        assert result.vfolder_uuid == sample_vfolder_uuid
+        assert result.usage == VFolderUsageData(
+            num_files=2,
+            used_bytes=524308,
+        )
+
+    async def test_storage_proxy_receives_canonical_vfid(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        mock_storage_client: MagicMock,
+        sample_vfolder_data: VFolderData,
+        sample_action: GetVFolderUsageAction,
+    ) -> None:
+        """The vfid must use the canonical VFolderID serialization
+        (quota scope prefix + dash-less folder hex)."""
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=sample_vfolder_data)
+
+        await vfolder_service.get_folder_usage(sample_action)
+
+        expected_vfid = str(VFolderID(sample_vfolder_data.quota_scope_id, sample_vfolder_data.id))
+        mock_storage_client.get_folder_usage.assert_awaited_once_with("volume1", expected_vfid)
+
+    async def test_unmanaged_vfolder_returns_none_without_storage_call(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        mock_storage_manager: MagicMock,
+        sample_vfolder_uuid: uuid.UUID,
+        sample_vfolder_data: VFolderData,
+        sample_action: GetVFolderUsageAction,
+    ) -> None:
+        """Unmanaged vfolders have no storage-proxy backing: usage is None and
+        no storage client is consulted."""
+        unmanaged_data = dataclasses.replace(sample_vfolder_data, unmanaged_path="/mnt/external")
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=unmanaged_data)
+
+        result = await vfolder_service.get_folder_usage(sample_action)
+
+        assert result.vfolder_uuid == sample_vfolder_uuid
+        assert result.usage is None
+        mock_storage_manager.get_manager_facing_client.assert_not_called()

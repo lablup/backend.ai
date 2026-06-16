@@ -51,6 +51,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
     RevokeMyKeypairActionResult,
+    SearchKeypairsByResourcePolicyAction,
+    SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
     SwitchMyMainAccessKeyAction,
@@ -107,6 +109,9 @@ class UserProcessors(AbstractProcessorPackage):
         SearchUsersByProjectAction, SearchUsersByProjectActionResult
     ]
     search_users_by_role: ActionProcessor[SearchUsersByRoleAction, SearchUsersByRoleActionResult]
+    search_keypairs_by_resource_policy: ScopeActionProcessor[
+        SearchKeypairsByResourcePolicyAction, SearchKeypairsByResourcePolicyActionResult
+    ]
     # Single entity actions with RBAC
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
     modify_user: SingleEntityActionProcessor[ModifyUserAction, ModifyUserActionResult]
@@ -179,6 +184,11 @@ class UserProcessors(AbstractProcessorPackage):
         )
         self.search_users_by_role = ActionProcessor(
             user_service.search_users_by_role, action_monitors
+        )
+        self.search_keypairs_by_resource_policy = ScopeActionProcessor(
+            user_service.search_keypairs_by_resource_policy,
+            action_monitors,
+            validators=[validators.rbac.scope],
         )
         # Single entity actions with RBAC
         self.get_user = SingleEntityActionProcessor(
@@ -277,6 +287,7 @@ class UserProcessors(AbstractProcessorPackage):
             SwitchMyMainAccessKeyAction.spec(),
             UpdateMyKeypairAction.spec(),
             SearchMyKeypairsAction.spec(),
+            SearchKeypairsByResourcePolicyAction.spec(),
             AdminCreateKeypairAction.spec(),
             AdminUpdateKeypairAction.spec(),
             AdminDeleteKeypairAction.spec(),

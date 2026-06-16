@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import (
     OperationType,
+    Permission,
     RBACElementType,
     RelationType,
 )
@@ -94,16 +95,24 @@ async def execute_rbac_granter(
     await db_sess.execute(ref_edge_stmt)
 
     # 2. Insert entity-scope permissions (access control)
-    perms = [
-        PermissionRow(
-            role_id=role_id,
-            scope_type=granter.granted_entity_scope_type.to_scope_type(),
-            scope_id=entity_id.entity_id,
-            entity_type=entity_id.entity_type,
-            operation=operation,
-        )
+    #    Use ON CONFLICT DO NOTHING to safely handle repeated grants for the
+    #    same (role_id, scope_type, scope_id, entity_type, operation) tuple.
+    scope_type = granter.granted_entity_scope_type.to_scope_type()
+    perm_values = [
+        {
+            "role_id": role_id,
+            "scope_type": scope_type,
+            "scope_id": entity_id.entity_id,
+            "entity_type": entity_id.entity_type,
+            "operation": operation,
+            "permission": Permission.from_operation(operation),
+        }
         for role_id in role_ids
         for operation in granter.operations
     ]
-    db_sess.add_all(perms)
-    await db_sess.flush()
+    perm_stmt = (
+        pg_insert(PermissionRow)
+        .values(perm_values)
+        .on_conflict_do_nothing(constraint="uq_permissions_role_scope_entity_op")
+    )
+    await db_sess.execute(perm_stmt)

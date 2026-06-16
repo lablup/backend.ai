@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -21,13 +22,17 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.data.session.options import HandlerOptions
 
 if TYPE_CHECKING:
@@ -46,10 +51,10 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
-    PresetValueData,
     ResourceSlotEntryData,
 )
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 
 
 class DeploymentConfig(BackendAISchema):
@@ -162,17 +167,48 @@ class RouteTrafficStatus(enum.StrEnum):
 
 
 class RouteSubStatus(enum.StrEnum):
-    """Sub-status for routes in the PROVISIONING lifecycle stage.
+    """Sub-status tracking fine-grained progress within a lifecycle stage.
 
-    Tracks fine-grained progress within the provisioning pipeline:
+    PROVISIONING stage:
     - PENDING: session has been enqueued, waiting for scheduler
     - STARTING: session is running, waiting for replica host/port
     - WARMING_UP: replica is up, waiting for health check to pass
+
+    TERMINATING stage:
+    - DRAINING: removing traffic from AppProxy
+    - COOLING_DOWN: traffic removed; waiting out the termination grace
+      period before the session is cleaned up
     """
 
     PENDING = "pending"
     STARTING = "starting"
     WARMING_UP = "warming_up"
+    DRAINING = "draining"
+    COOLING_DOWN = "cooling_down"
+
+
+class ReplicaGroupLifecycle(enum.StrEnum):
+    """Lifecycle of a replica group: rollout progress and retirement."""
+
+    ROLLING = "rolling"
+    STABLE = "stable"
+    FAILED = "failed"
+    DRAINING = "draining"
+    DRAINED = "drained"
+
+
+class ReplicaGroupScalingStatus(enum.StrEnum):
+    """Whether the group's actual replica count matches its desired count."""
+
+    SCALING = "scaling"
+    STABLE = "stable"
+
+
+class ReplicaGroupHandlerCategory(BaseReconcilerCategory):
+    """Category of replica-group handler for history separation; also the reconcile-stage category."""
+
+    SCALING = "scaling"
+    LIFECYCLE = "lifecycle"
 
 
 # ========== Status Transition Types (BEP-1030) ==========
@@ -186,17 +222,21 @@ class DeploymentLifecycleSubStep(enum.StrEnum):
     """
 
     # -- DEPLOYING phase --
+    DEPLOYING_INITIALIZING = "deploying_initializing"
+    """Pre-deploy cleanup of stale replica groups and creation of the target
+    replica group for the selected revision."""
     DEPLOYING_PROVISIONING = "deploying_provisioning"
-    """New revision routes are being provisioned and old routes are being drained."""
+    """The target replica group is being set up (created or reused) for the deploying revision."""
+    DEPLOYING_PROVISIONED = "deploying_provisioned"
+    """Waiting for the target replica group to reach STABLE (its replicas are coming up)."""
+    DEPLOYING_PROMOTING = "deploying_promoting"
+    """Traffic is being shifted to the (STABLE) target replica group per the strategy."""
+    DEPLOYING_FINALIZING = "deploying_finalizing"
+    """Traffic shift is complete; the target group is being swapped in as primary."""
+    DEPLOYING_DRAINING = "deploying_draining"
+    """The superseded replica group is being drained and removed."""
     DEPLOYING_ROLLING_BACK = "deploying_rolling_back"
     """Clearing deploying_revision and transitioning to READY."""
-    DEPLOYING_COMPLETED = "deploying_completed"
-    """All strategy conditions satisfied; triggers revision swap."""
-
-    @classmethod
-    def deploying_handler_sub_steps(cls) -> tuple[DeploymentLifecycleSubStep, ...]:
-        """Sub-steps that have their own deploying handler (excludes COMPLETED, which is an evaluator outcome)."""
-        return (cls.DEPLOYING_PROVISIONING, cls.DEPLOYING_ROLLING_BACK)
 
 
 @dataclass(frozen=True)
@@ -379,6 +419,12 @@ class MountMetadata:
     model_definition_path: str | None
     model_mount_destination: str
     extra_mounts: list[MountInfoEntry]
+    # Resolved permission for the model vfolder mount, frozen at
+    # revision-write time (READ_ONLY for vfolder/model-card deploy, the
+    # requester's own effective permission for deployment create/revision
+    # add). ``None`` means "not yet resolved"; the draft builder falls back
+    # to READ_ONLY so legacy rows keep their historical behavior.
+    model_mount_perm: MountPermission | None
     # Subpath within the model vfolder. ``None`` means the vfolder root.
     vfolder_subpath: str | None = None
 
@@ -411,6 +457,25 @@ class ConfiguredModel(BackendAISchema):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
+def _default_deploy_handler_default() -> HandlerOptions:
+    # Generous phase timeout (2h) covers hour-scale model-service startup; waits
+    # never give up by count, only time out.
+    return HandlerOptions(timeout=7200, max_retry_count=None)
+
+
+def _default_deploy_by_handler() -> dict[str, HandlerOptions]:
+    # Action sub-steps (vs. the PROVISIONED/DRAINING waits) keep the retry-count
+    # budget so a broken deploy rolls back fast instead of churning for the full
+    # timeout. Keyed by the sokovan handler names (this layer cannot import them).
+    return {
+        "deploying-initializing": HandlerOptions(max_retry_count=5),
+        "deploying-provisioning": HandlerOptions(max_retry_count=5),
+        "deploying-promoting": HandlerOptions(max_retry_count=5),
+        "deploying-finalizing": HandlerOptions(max_retry_count=5),
+        "deploying-rolling-back": HandlerOptions(max_retry_count=5),
+    }
+
+
 class DeploymentHandlerOptions(ConfiguredModel):
     """Handler-keyed deployment scheduler policy.
 
@@ -420,14 +485,14 @@ class DeploymentHandlerOptions(ConfiguredModel):
     2. ``default`` otherwise.
 
     Each ``HandlerOptions`` field falls back to ``default``'s value
-    when the per-handler override leaves it ``None``. The
-    ``HandlerOptions`` field defaults (timeout=None, max_retry_count=5)
-    flow through here so a freshly-constructed
-    ``DeploymentHandlerOptions()`` keeps the legacy retry budget.
+    when the per-handler override leaves it ``None``. The default policy
+    is a generous 2h timeout with no retry-count limit (for the long
+    PROVISIONED/DRAINING waits); action sub-steps override with a
+    max_retry_count of 5 via ``by_handler``.
     """
 
-    default: HandlerOptions = Field(default_factory=HandlerOptions)
-    by_handler: dict[str, HandlerOptions] = Field(default_factory=dict)
+    default: HandlerOptions = Field(default_factory=_default_deploy_handler_default)
+    by_handler: dict[str, HandlerOptions] = Field(default_factory=_default_deploy_by_handler)
 
     def resolve(self, handler_name: str) -> HandlerOptions:
         override = self.by_handler.get(handler_name)
@@ -456,6 +521,62 @@ class DeploymentOptions(ConfiguredModel):
     handler_options: DeploymentHandlerOptions = Field(default_factory=DeploymentHandlerOptions)
 
 
+class ReplicaGroupRolloutSpec(ConfiguredModel):
+    """Per-group rollout step config snapshot from the deployment strategy at
+    DEPLOYING_INITIALIZING; bounds how fast routes move toward the group's desired counts."""
+
+    max_surge: IntOrPercent
+    max_unavailable: IntOrPercent
+
+    def resolve_max_surge(self, total: int) -> int:
+        """Extra target replicas allowed above the goal (rounds up for percentages)."""
+        return self._resolve(self.max_surge, total, round_up=True)
+
+    def resolve_max_unavailable(self, total: int) -> int:
+        """Replicas allowed unavailable below the goal (rounds down for percentages)."""
+        return self._resolve(self.max_unavailable, total, round_up=False)
+
+    @staticmethod
+    def _resolve(value: IntOrPercent, total: int, *, round_up: bool) -> int:
+        if value.count is not None:
+            return value.count
+        result = total * (value.percent or 0.0)
+        return math.ceil(result) if round_up else math.floor(result)
+
+
+@dataclass(frozen=True)
+class TargetGroupSpec:
+    """How the deploying revision's target group is chosen. ``use_primary_group`` True rolls out
+    in place into the deployment's primary group (rolling) — the setup reads that group at creation
+    time and creates a fresh one if none exists yet. When False, a fresh group is always created
+    (blue-green/canary).
+
+    No traffic weight here: a freshly rolled-out group serves no traffic until PROMOTING shifts
+    it over, so PROVISIONING creates it at weight 0 and leaves a reused group's weight untouched."""
+
+    use_primary_group: bool
+    rollout: ReplicaGroupRolloutSpec
+
+
+@dataclass(frozen=True)
+class TrafficStepInput:
+    """Current traffic split + timing for one PROMOTING tick (step is relative to current)."""
+
+    target_traffic_weight: int
+    serving_traffic_weight: int
+    last_changed_at: datetime
+    now: datetime
+
+
+@dataclass(frozen=True)
+class TrafficStep:
+    """The next traffic split (target/serving) and whether promotion is complete."""
+
+    target_traffic_weight: int
+    serving_traffic_weight: int
+    completed: bool
+
+
 class ResourceSpec(ConfiguredModel):
     cluster_mode: ClusterMode
     cluster_size: int
@@ -472,10 +593,10 @@ class ExecutionSpec(ConfiguredModel):
     inference_runtime_config: Mapping[str, Any] | None = None
 
 
-class PresetValueSpec(ConfiguredModel):
+class RuntimeVariantPresetValueSpec(ConfiguredModel):
     """A runtime variant preset value binding stored in a deployment revision."""
 
-    preset_id: DeploymentPresetID
+    preset_id: RuntimeVariantPresetID
     value: str
 
 
@@ -490,7 +611,7 @@ class ModelRevisionSpec(ConfiguredModel):
     mounts: MountMetadata
     execution: ExecutionSpec
     model_definition: ModelDefinition | None = None
-    preset_values: list[PresetValueSpec] = Field(default_factory=list)
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueSpec] = Field(default_factory=list)
     # Original deployment-level preset selection used to build this revision.
     # ``None`` for legacy rows and revisions created without a preset; the
     # materialised effects still live on ``preset_values`` and the resolved
@@ -575,8 +696,8 @@ class RevisionDraft:
     # Model definition (draft form — partial fields allowed; merged then resolved
     # to a strict ``ModelDefinition`` at the persistence boundary).
     model_definition: ModelDefinitionDraft | None = None
-    # Preset values (carried alongside; not field-merged)
-    preset_values: list[PresetValueData] | None = None
+    # Runtime variant preset values (carried alongside; merged by ``preset_id``)
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueData] | None = None
 
     def merge(self, other: RevisionDraft) -> RevisionDraft:
         """Return a new draft with ``other`` layered on top of ``self``."""
@@ -608,9 +729,9 @@ class RevisionDraft:
             if other.inference_runtime_config is not None
             else self.inference_runtime_config,
             model_definition=_merge_model_definition(self.model_definition, other.model_definition),
-            preset_values=list(other.preset_values)
-            if other.preset_values is not None
-            else (list(self.preset_values) if self.preset_values is not None else None),
+            runtime_variant_preset_values=_merge_preset_values(
+                self.runtime_variant_preset_values, other.runtime_variant_preset_values
+            ),
         )
 
     def to_model_revision_spec(self) -> ModelRevisionSpec:
@@ -663,6 +784,7 @@ def _merge_mounts(
             model_definition_path=upper.model_definition_path,
             model_mount_destination=upper.model_mount_destination,
             extra_mounts=list(upper.extra_mounts),
+            model_mount_perm=upper.model_mount_perm,
             vfolder_subpath=upper.vfolder_subpath,
         )
     return MountMetadata(
@@ -672,6 +794,9 @@ def _merge_mounts(
         else lower.model_definition_path,
         model_mount_destination=upper.model_mount_destination,
         extra_mounts=list(upper.extra_mounts),
+        model_mount_perm=upper.model_mount_perm
+        if upper.model_mount_perm is not None
+        else lower.model_mount_perm,
         vfolder_subpath=upper.vfolder_subpath if upper.vfolder_subpath else lower.vfolder_subpath,
     )
 
@@ -688,6 +813,28 @@ def _merge_mappings(
     if upper is not None:
         merged.update(upper)
     return merged or None
+
+
+def _merge_preset_values(
+    lower: list[RuntimeVariantPresetValueData] | None,
+    upper: list[RuntimeVariantPresetValueData] | None,
+) -> list[RuntimeVariantPresetValueData] | None:
+    """Merge runtime-variant preset values by ``preset_id``.
+
+    ``upper`` (higher-priority source, e.g. the user request) overrides
+    ``lower`` (e.g. the revision-preset template) per ``preset_id``; preset_ids
+    only present in ``lower`` are preserved. ``None`` on a side means "this
+    source supplied no values" and is skipped. Returns ``None`` only when both
+    sides are ``None``.
+    """
+    if lower is None and upper is None:
+        return None
+    merged: dict[RuntimeVariantPresetID, RuntimeVariantPresetValueData] = {}
+    for pv in lower or []:
+        merged[pv.preset_id] = pv
+    for pv in upper or []:
+        merged[pv.preset_id] = pv
+    return list(merged.values())
 
 
 def _merge_model_definition(
@@ -753,6 +900,13 @@ class DeploymentInfo:
     replica: ReplicaData
     network: DeploymentNetworkData
     options: DeploymentOptions
+    primary_replica_group_id: ReplicaGroupID | None = None
+    target_replica_group_id: ReplicaGroupID | None = None
+    current_revision_id: DeploymentRevisionID | None = None
+    deploying_revision_id: DeploymentRevisionID | None = None
+    # Full revision data, populated only by the legacy (REST v1) / engine
+    # read paths that eagerly load the revision rows. ``None`` on the modern
+    # read path even when ``current_revision_id`` is set.
     current_revision: ModelRevisionData | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision: ModelRevisionData | None = None
@@ -843,6 +997,7 @@ class RouteInfo:
     revision_id: UUID
     traffic_status: RouteTrafficStatus
     health_check: ModelHealthCheck | None
+    replica_group_id: ReplicaGroupID | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -901,6 +1056,7 @@ class ModelDeploymentAccessTokenData:
 @dataclass
 class ModelReplicaData:
     id: UUID
+    deployment_id: UUID
     revision_id: UUID
     session_id: UUID | None
     readiness_status: ReadinessStatus
@@ -931,6 +1087,7 @@ class ModelRuntimeConfigData:
     runtime_variant_id: RuntimeVariantID
     inference_runtime_config: Mapping[str, Any] | None = None
     environ: dict[str, Any] | None = None
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueData] = field(default_factory=list)
 
 
 @dataclass
@@ -942,6 +1099,10 @@ class ModelMountConfigData:
     # this data-layer projection — keeps ``mount_perm`` visible end-to-end
     # so modify flows can carry it over without information loss.
     extra_mounts: list[MountInfoEntry]
+    # Resolved permission of the model vfolder mount, frozen on the revision.
+    # Always concrete (the row column is NOT NULL; legacy rows backfilled to
+    # ``ro``), so refresh/rebuild flows preserve the original permission.
+    model_mount_perm: MountPermission
     # Subpath within the model vfolder. ``None`` means the vfolder root.
     subpath: str | None = None
 
@@ -981,7 +1142,8 @@ class PresetAttributionData:
     """
 
     preset_id: DeploymentPresetID | None
-    values: list[PresetValueData]
+    # value fields are not used, currently dead code
+    values: list[RuntimeVariantPresetValueData]
 
 
 @dataclass
@@ -1004,7 +1166,7 @@ class ModelRevisionData:
     # Mount
     model_mount_config: ModelMountConfigData
     # Preset attribution
-    preset: PresetAttributionData
+    revision_preset: PresetAttributionData
     # Model definition (resolved against the model vfolder at
     # persistence time; ``None`` if the source had none).
     model_definition: ModelDefinition | None = None
@@ -1019,7 +1181,7 @@ class ModelRevisionData:
         ``model_runtime_config`` (runtime variant + environ +
         inference_runtime_config), ``execution`` (startup_command /
         bootstrap_script / callback_url), and ``model_definition`` —
-        flows back into the draft as the baseline; preset /
+        flows back into the draft as the baseline; revision_preset /
         ``deployment-config.yaml`` / ``model-definition.yaml`` / user
         request layers then override on top via ``merge_revision_drafts``.
         """
@@ -1039,6 +1201,7 @@ class ModelRevisionData:
                     model_definition_path=self.model_mount_config.definition_path or None,
                     model_mount_destination=self.model_mount_config.mount_destination or "/models",
                     extra_mounts=list(self.model_mount_config.extra_mounts),
+                    model_mount_perm=self.model_mount_config.model_mount_perm,
                     vfolder_subpath=self.model_mount_config.subpath,
                 )
                 if self.model_mount_config.vfolder_id is not None
@@ -1055,6 +1218,10 @@ class ModelRevisionData:
             callback_url=self.execution.callback_url,
             inference_runtime_config=self.model_runtime_config.inference_runtime_config,
             model_definition=model_definition_draft,
+            runtime_variant_preset_values=list(
+                self.model_runtime_config.runtime_variant_preset_values
+            )
+            or None,
         )
 
 
@@ -1078,10 +1245,17 @@ class ReplicaStateData:
 
 @dataclass
 class ModelDeploymentData:
+    """Modern (v2 / GraphQL) deployment projection.
+
+    Carries revisions as ids only (``current_revision_id`` /
+    ``deploying_revision_id``); the full revision is resolved on demand by
+    the GraphQL DataLoader. The REST v1 surface, which embeds the full
+    revision, uses :class:`LegacyDeploymentData` instead.
+    """
+
     id: DeploymentID
     metadata: ModelDeploymentMetadataInfo
     network_access: DeploymentNetworkData
-    revision: ModelRevisionData | None
     current_revision_id: DeploymentRevisionID | None
     deploying_revision_id: DeploymentRevisionID | None
     revision_history_ids: list[DeploymentRevisionID]
@@ -1096,6 +1270,27 @@ class ModelDeploymentData:
     scaling_state: ScalingState
     policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
+
+
+@dataclass
+class LegacyDeploymentData:
+    """Legacy v1 deployment projection — DO NOT USE in new code.
+
+    Backs the REST v1 ``DeploymentDTO`` response only, which embeds the full
+    current ``revision``. v2 / GraphQL use :class:`ModelDeploymentData`
+    (revision ids only). Built independently from ``DeploymentInfo``; it is
+    never converted to or from :class:`ModelDeploymentData`.
+    """
+
+    id: DeploymentID
+    metadata: ModelDeploymentMetadataInfo
+    network_access: DeploymentNetworkData
+    revision: ModelRevisionData | None
+    replica_state: ReplicaStateData
+    default_deployment_strategy: DeploymentStrategy
+    created_user_id: UUID
+    policy: DeploymentPolicyData | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
 
 
@@ -1198,6 +1393,30 @@ class RouteHistoryData:
     to_status: str | None
     from_sub_status: str | None
     to_sub_status: str | None
+
+    result: SchedulingResult
+    error_code: str | None
+    message: str
+
+    sub_steps: list[SubStepResult]
+
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class ReplicaGroupHistoryData:
+    """Domain model for replica-group history."""
+
+    id: UUID
+    replica_group_id: ReplicaGroupID
+    deployment_id: DeploymentID
+
+    category: ReplicaGroupHandlerCategory
+    phase: str
+    from_status: str | None
+    to_status: str | None
 
     result: SchedulingResult
     error_code: str | None

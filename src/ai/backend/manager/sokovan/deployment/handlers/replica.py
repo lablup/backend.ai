@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
-    DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
 )
@@ -16,7 +15,6 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import Deployme
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionResult,
-    DeploymentLifecycleType,
     DeploymentWithHistory,
 )
 
@@ -72,28 +70,17 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
-        """Define state transitions for check replica deployment handler.
-
-        - success: ``scaling_state=SCALING`` only — lifecycle axis is
-          preserved so a DEPLOYING endpoint remains DEPLOYING while the
-          scaling handler picks up its replica adjustment.
-        - failure: None (stays in current state for all failure categories).
-        """
-        return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(scaling_state=ScalingState.SCALING),
-        )
+        """No status transition: this handler only records the deployment's desired replica count.
+        The group autoscale reconcile reads that count and scales the serving group."""
+        return DeploymentStatusTransitions()
 
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        """Check and manage deployment replicas.
+        """Record each deployment's desired replica count.
 
-        Skips deployments without a ``current_revision_id`` — scaling is
-        only meaningful once an initial revision has been deployed.
-        Those endpoints are still in the initial rollout handled by the
-        DEPLOYING lifecycle; flipping them into ``scaling_state=SCALING``
-        here would misclassify initial provisioning as scaling work.
-        """
+        Skips deployments without a ``current_revision`` — scaling is only meaningful once an
+        initial revision has been deployed; those are still in the DEPLOYING rollout."""
         log.debug("Checking deployment replicas")
 
         scalable = [d for d in deployments if d.deployment_info.current_revision is not None]
@@ -109,7 +96,6 @@ class CheckReplicaDeploymentHandler(DeploymentHandler):
         # Calculate desired replicas and adjust
         return await self._deployment_executor.calculate_desired_replicas(scalable)
 
-    async def post_process(self, _result: DeploymentExecutionResult) -> None:
-        """Handle post-processing after checking replicas."""
-        log.debug("Post-processing after checking deployment replicas")
-        await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.SCALING)
+    async def post_process(self, result: DeploymentExecutionResult) -> None:
+        """No follow-up: the group autoscale reconcile picks up the recorded desired count."""
+        return

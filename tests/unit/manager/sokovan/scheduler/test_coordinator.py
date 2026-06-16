@@ -32,9 +32,11 @@ from ai.backend.manager.data.session.types import (
 from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
 from ai.backend.manager.sokovan.scheduler.coordinator import (
     FailureClassificationResult,
+    HookExecutionResult,
     ScheduleCoordinator,
 )
 from ai.backend.manager.sokovan.scheduler.post_processors import PostProcessorContext
+from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
     KernelExecutionResult,
     KernelTransitionInfo,
@@ -694,6 +696,57 @@ class TestScheduleCoordinatorStatusTransition:
         # Verify _apply_transition was called for give_up
         mock_coordinator._apply_transition.assert_awaited()
 
+    async def test_need_retry_without_transition_records_history(
+        self,
+        mock_coordinator: MagicMock,
+        status_transitions_success_only: StatusTransitions,
+    ) -> None:
+        """SC-CO-015b: need_retry failures without a declared transition record history only.
+
+        Given: Failures classified as need_retry and a handler declaring need_retry=None
+        When: Handle result is called
+        Then: No status transition is applied, and history is recorded as NEED_RETRY
+              so the phase attempt counter keeps incrementing
+        """
+        # Arrange
+        mock_handler = MagicMock()
+        mock_handler.name.return_value = "test_handler"
+        mock_handler.status_transitions.return_value = status_transitions_success_only
+
+        session_id = SessionId(uuid4())
+        failure_info = _create_session_transition_info(session_id=session_id)
+        result = SessionExecutionResult(
+            successes=[],
+            failures=[failure_info],
+            skipped=[],
+        )
+        session = _create_session_with_kernels(session_id=session_id)
+
+        mock_coordinator._classify_failures = MagicMock(
+            return_value=FailureClassificationResult(
+                give_up=[], expired=[], need_retry=[failure_info]
+            )
+        )
+        mock_coordinator._apply_transition = AsyncMock()
+        mock_coordinator._record_history_without_transition = AsyncMock()
+
+        # Act
+        classified = await ScheduleCoordinator._handle_result(
+            mock_coordinator,
+            handler=mock_handler,
+            result=result,
+            records={},
+            sessions=[session],
+        )
+
+        # Assert
+        assert classified is not None
+        assert len(classified.need_retry) == 1
+        mock_coordinator._apply_transition.assert_not_awaited()
+        mock_coordinator._record_history_without_transition.assert_awaited_once_with(
+            "test_handler", [failure_info], {}, SchedulingResult.NEED_RETRY
+        )
+
     async def test_skipped_recorded_without_status_change(
         self,
         mock_coordinator: MagicMock,
@@ -721,7 +774,7 @@ class TestScheduleCoordinatorStatusTransition:
             return_value=FailureClassificationResult(give_up=[], expired=[], need_retry=[])
         )
         mock_coordinator._apply_transition = AsyncMock()
-        mock_coordinator._record_skipped_history = AsyncMock()
+        mock_coordinator._record_history_without_transition = AsyncMock()
 
         # Act
         await ScheduleCoordinator._handle_result(
@@ -733,7 +786,7 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         # Assert
-        mock_coordinator._record_skipped_history.assert_awaited_once()
+        mock_coordinator._record_history_without_transition.assert_awaited_once()
 
     async def test_empty_result_no_transitions(
         self,
@@ -758,7 +811,7 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         mock_coordinator._apply_transition = AsyncMock()
-        mock_coordinator._record_skipped_history = AsyncMock()
+        mock_coordinator._record_history_without_transition = AsyncMock()
 
         # Act
         classified = await ScheduleCoordinator._handle_result(
@@ -771,7 +824,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         # Assert
         mock_coordinator._apply_transition.assert_not_awaited()
-        mock_coordinator._record_skipped_history.assert_not_awaited()
+        mock_coordinator._record_history_without_transition.assert_not_awaited()
         assert classified is None
 
     async def test_kernel_reset_on_pending_transition(
@@ -1104,3 +1157,70 @@ class TestScheduleCoordinatorPostProcessors:
         assert SessionStatus.SCHEDULED in target_statuses  # Success transition
         assert SessionStatus.CANCELLED in target_statuses  # give_up and expired transition
         assert SessionStatus.PENDING in target_statuses  # need_retry transition
+
+
+class TestScheduleCoordinatorPromotionRecordOrdering:
+    """Promotion records must be built AFTER hooks run (BA-6282).
+
+    Transition hooks (e.g. RunningTransitionHook triggering batch execution)
+    record sub-steps into the scope's pool while executing. If the coordinator
+    builds records before the hooks run, those sub-steps are lost from the
+    persisted scheduling history.
+    """
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid4())
+
+    @pytest.fixture
+    def mock_coordinator(self) -> MagicMock:
+        coordinator = MagicMock(spec=ScheduleCoordinator)
+        coordinator._hook_registry = MagicMock()
+        coordinator._repository = AsyncMock()
+        coordinator._repository.get_db_now = AsyncMock(return_value=datetime.now(tzutc()))
+        coordinator._apply_transition = AsyncMock()
+        coordinator._broadcast_transition_events = AsyncMock()
+        return coordinator
+
+    @pytest.fixture
+    def promotion_spec(self) -> MagicMock:
+        spec = MagicMock()
+        spec.success_status = SessionStatus.RUNNING
+        spec.name = "promote-to-running"
+        spec.reason = "started"
+        return spec
+
+    async def test_hook_recorded_substep_reaches_apply_transition(
+        self,
+        mock_coordinator: MagicMock,
+        promotion_spec: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        # Arrange: hooks record finalize_start into the pool while running,
+        # then report the session as passed (collaborator is mocked, not re-run).
+        async def run_hooks(sessions: list[Any], _status: SessionStatus) -> HookExecutionResult:
+            recorder = SessionRecorderContext.current_pool().recorder(session_id)
+            with recorder.phase("finalize_start"):
+                with recorder.step("trigger_batch_execution"):
+                    pass
+            return HookExecutionResult(successful_sessions=sessions, full_session_data=[])
+
+        mock_coordinator._hook_registry.get_hook.return_value = MagicMock()
+        mock_coordinator._execute_transition_hooks = AsyncMock(side_effect=run_hooks)
+
+        # One success carries the path past the early-return into _apply_transition;
+        # its contents are opaque here since both collaborators are mocked.
+        result = SessionExecutionResult(successes=[_create_session_transition_info()])
+
+        # Act
+        with SessionRecorderContext.scope("promote", entity_ids=[session_id]) as pool:
+            await ScheduleCoordinator._handle_promotion_status_transitions(
+                mock_coordinator, promotion_spec, result, pool
+            )
+
+        # Assert: records passed to _apply_transition include the sub-step recorded
+        # during hook execution, proving the build happened after hooks ran.
+        records = mock_coordinator._apply_transition.await_args.args[4]
+        (finalize,) = records[session_id].phases
+        assert finalize.name == "finalize_start"
+        assert [step.name for step in finalize.steps] == ["trigger_batch_execution"]

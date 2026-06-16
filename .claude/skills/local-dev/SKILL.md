@@ -10,10 +10,13 @@ Tools for managing Backend.AI services locally via tmux sessions.
 ./dev restart all                    # Restart all services
 ./dev stop <service|all>             # Stop service(s)
 ./dev start <service|all>            # Start service(s)
-./dev log <service>                  # Show recent log output
 ```
 
 **Services:** `mgr`, `agent`, `storage`, `web`, `proxy-coordinator`, `proxy-worker`
+
+**Logs & metrics:** view runtime logs and metrics through the Grafana MCP — see
+`/observability`. Query Loki by `service_name` (e.g. `{service_name="manager"}`) after a
+restart rather than reading console output.
 
 ## Debugging Startup Crashes
 
@@ -58,6 +61,7 @@ docker compose -f docker-compose.halfstack.current.yml restart backendai-half-ap
 
 ## Related Skills
 
+- `/observability` — Inspect logs/metrics via Grafana MCP after a restart
 - `/bai-cli` — Verify changes via CLI after restarting services
-- `/halfstack` — Docker Compose infrastructure (DB, Redis, etcd, Hive Gateway)
+- `/halfstack` — Docker Compose infrastructure (DB, Valkey, etcd, Hive Gateway)
 - `/cli-executor` — Run Backend.AI component servers directly

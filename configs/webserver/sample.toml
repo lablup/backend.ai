@@ -217,7 +217,10 @@
 
   # Content Security Policy configuration. When set, adds CSP headers to
   # responses to protect against XSS and other injection attacks. Leave unset
-  # (None) to skip CSP headers entirely.
+  # (None) to skip CSP headers entirely. When script-src and/or style-src are
+  # set, the webserver appends a per-request "'nonce-<random>'" to those
+  # directives and renders the same value into index.html (the {{nonce}}
+  # placeholders / globalThis.baiNonce).
   # Added in 25.12.0
   [security.csp]
     # CSP default-src directive. Serves as the fallback for other resource types
@@ -247,12 +250,16 @@
     ## font-src = []
     # CSP script-src directive. Specifies valid sources for JavaScript.
     # "'unsafe-inline'" allows inline scripts (less secure but often required).
-    # "'strict-dynamic'" can be used with nonces for better security.
+    # When set, the webserver appends a per-request "'nonce-<random>'" so inline
+    # scripts in index.html are allowed; keep "'self'" and avoid "'strict-
+    # dynamic'" so the bundled module script keeps loading.
     # Added in 25.12.0
     ## script-src = []
     # CSP style-src directive. Specifies valid sources for stylesheets.
     # "'unsafe-inline'" is often needed for frameworks that inject styles
-    # dynamically. Consider using hashes or nonces for stricter security.
+    # dynamically. When set, the webserver appends a per-request
+    # "'nonce-<random>'" so nonce-aware style injectors (e.g. antd via
+    # globalThis.baiNonce) are allowed.
     # Added in 25.12.0
     ## style-src = []
     # CSP frame-src directive. Specifies valid sources for nested browsing
@@ -467,31 +474,31 @@
   # route — it requires the Manager's gating dependencies (DB, etcd, Redis) to
   # be up, so the webserver does not forward requests to a half-broken Manager.
   # Use '/health/livez' if you only want a liveness signal.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   health-check-probe-path = "/health/readyz"
   # Seconds between background liveness probes per Manager endpoint. Smaller
   # values detect upstream failures faster at the cost of probe traffic.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   health-check-interval = 10.0
   # Consecutive probe (or caller-reported) failures required before an endpoint
   # flips from healthy to unhealthy.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   health-check-failure-threshold = 3
   # Seconds the unhealthy_since timestamp is retained after an endpoint is
   # marked unhealthy. Reserved for future eviction policies; the endpoint itself
   # flips back to healthy on the next successful probe.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   health-check-recovery-timeout = 60.0
   # Per-endpoint HTTP probe timeout in seconds. Independent of health-check-
   # interval: the probe must finish within this window or it counts as a
   # failure.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   health-check-probe-timeout = 2.0
   # Selection policy ManagerClientPool uses to pick an endpoint per request.
   # 'round_robin' rotates across the healthy set; 'random' picks uniformly;
   # 'least_connections' favors the endpoint with the fewest in-flight
   # acquisitions.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   endpoint-selection-policy = "least_connections"
 
 # JWT authentication configuration shared between Manager and Web Server for
@@ -807,25 +814,25 @@
   # does not forward GraphQL traffic to a gateway that is still starting up.
   # Apollo Router (Rust) deployments typically expose '/health/readiness'
   # instead; switch via this option.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   health-check-probe-path = "/readiness"
   # Seconds between background liveness probes per Apollo Router endpoint.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   health-check-interval = 10.0
   # Consecutive probe (or caller-reported) failures required before an Apollo
   # Router endpoint flips from healthy to unhealthy.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   health-check-failure-threshold = 3
   # Seconds the unhealthy_since timestamp is retained after an Apollo Router
   # endpoint is marked unhealthy.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   health-check-recovery-timeout = 60.0
   # Per-endpoint HTTP probe timeout in seconds for Apollo Router.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   health-check-probe-timeout = 2.0
   # Selection policy ApolloRouterClientPool uses to pick an Apollo Router
   # endpoint per request.
-  # Added in UNRELEASED
+  # Added in 26.4.4
   endpoint-selection-policy = "least_connections"
 
 # Logging configuration for log levels, formats, and destinations.

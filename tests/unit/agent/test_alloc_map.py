@@ -13,7 +13,7 @@ from ai.backend.agent.alloc_map import (
     FractionAllocMap,
     round_down,
 )
-from ai.backend.agent.exception import (
+from ai.backend.agent.errors import (
     FractionalResourceFragmented,
     InsufficientResource,
     InvalidResourceArgument,

@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from typing import Any, cast
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
@@ -151,83 +150,6 @@ class PermissionDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-
-    @staticmethod
-    async def _sync_user_scopes_on_assign(
-        db_session: SASession,
-        user_ids: Collection[uuid.UUID],
-    ) -> None:
-        """Ensure user-scope membership entries exist for all assigned roles.
-
-        For each user, finds every scope bound to any of their assigned roles
-        and inserts the corresponding user-scope entries.  Executed as a single
-        ``INSERT … SELECT`` so the role lookup and insert share the same snapshot.
-        """
-        if not user_ids:
-            return
-        ase = AssociationScopesEntitiesRow
-        source = (
-            sa.select(
-                ase.scope_type,
-                ase.scope_id,
-                sa.literal(EntityType.USER.value).label("entity_type"),
-                sa.cast(UserRoleRow.user_id, sa.String).label("entity_id"),
-                sa.literal(RelationType.AUTO.value).label("relation_type"),
-            )
-            .join(
-                UserRoleRow,
-                sa.cast(UserRoleRow.role_id, sa.String) == ase.entity_id,
-            )
-            .where(
-                ase.entity_type == EntityType.ROLE,
-                UserRoleRow.user_id.in_(user_ids),
-            )
-        )
-        await db_session.execute(
-            pg_insert(ase)
-            .from_select(
-                ["scope_type", "scope_id", "entity_type", "entity_id", "relation_type"],
-                source,
-            )
-            .on_conflict_do_nothing()
-        )
-
-    @staticmethod
-    async def _sync_user_scopes_on_revoke(
-        db_session: SASession,
-        user_ids: Collection[uuid.UUID],
-    ) -> None:
-        """Remove user-scope entries no longer covered by any assigned role.
-
-        Deletes user-scope rows for *user_ids* when no assigned role binds
-        the user to that scope.  Executed as a single ``DELETE`` statement
-        so the coverage check and deletion share the same snapshot.
-        """
-        if not user_ids:
-            return
-        ase = AssociationScopesEntitiesRow
-        str_user_ids = [str(uid) for uid in user_ids]
-        ase_remaining = sa.orm.aliased(ase, flat=True)
-        await db_session.execute(
-            sa.delete(ase).where(
-                ase.entity_type == EntityType.USER,
-                ase.entity_id.in_(str_user_ids),
-                ~sa.exists(
-                    sa.select(sa.literal(1))
-                    .select_from(ase_remaining)
-                    .join(
-                        UserRoleRow,
-                        sa.cast(UserRoleRow.role_id, sa.String) == ase_remaining.entity_id,
-                    )
-                    .where(
-                        ase_remaining.entity_type == EntityType.ROLE,
-                        ase_remaining.scope_type == ase.scope_type,
-                        ase_remaining.scope_id == ase.scope_id,
-                        sa.cast(UserRoleRow.user_id, sa.String) == ase.entity_id,
-                    )
-                ),
-            )
-        )
 
     # ------------------------------------------------------------------ role CRUD
 
@@ -403,7 +325,6 @@ class PermissionDBSource:
             )
         )
         result = await execute_creator(db_session, creator)
-        await self._sync_user_scopes_on_assign(db_session, [data.user_id])
         return result.row
 
     async def revoke_role(self, data: UserRoleRevocationInput) -> RoleRevocationResult:
@@ -426,8 +347,6 @@ class PermissionDBSource:
             user_role_id = user_role_row.id
             await db_session.delete(user_role_row)
             await db_session.flush()
-
-            await self._sync_user_scopes_on_revoke(db_session, [data.user_id])
 
             # Used by PermissionControllerService.revoke_role() to decide whether
             # to call GroupDBSource.unbind_user_from_project().
@@ -1246,10 +1165,7 @@ class PermissionDBSource:
         self, bulk_creator: BulkCreator[UserRoleRow]
     ) -> BulkCreatorResultWithFailures[UserRoleRow]:
         async with self._db.begin_session() as db_session:
-            result = await execute_bulk_creator_partial(db_session, bulk_creator)
-            all_user_ids = [row.user_id for row in result.successes]
-            await self._sync_user_scopes_on_assign(db_session, all_user_ids)
-            return result
+            return await execute_bulk_creator_partial(db_session, bulk_creator)
 
     async def bulk_revoke_role(
         self, data: BulkUserRoleRevocationInput
@@ -1289,8 +1205,6 @@ class PermissionDBSource:
                         str(e),
                     )
                     failures.append(BulkRoleRevocationFailure(user_id=user_id, message=str(e)))
-            revoked_user_ids = [s.user_id for s in successes]
-            await self._sync_user_scopes_on_revoke(db_session, revoked_user_ids)
 
         return BulkRoleRevocationResultData(successes=successes, failures=failures)
 

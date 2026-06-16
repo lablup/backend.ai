@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
@@ -41,6 +42,8 @@ from ai.backend.manager.models.runtime_variant_preset.conditions import (
 from ai.backend.manager.models.runtime_variant_preset.orders import RuntimeVariantPresetOrders
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    OffsetPagination,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
@@ -140,6 +143,20 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             raise RuntimeVariantPresetNotFound()
         return self._data_to_node(result.items[0])
 
+    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[RuntimeVariantPresetNode | None]:
+        """Batch-load presets by id, aligned to ``ids`` order (``None`` for missing)."""
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[RuntimeVariantPresetConditions.by_ids(ids)],
+        )
+        result = await self._processors.runtime_variant_preset.search.wait_for_complete(
+            SearchRuntimeVariantPresetsAction(querier=querier)
+        )
+        node_map = {item.id: self._data_to_node(item) for item in result.items}
+        return [node_map.get(preset_id) for preset_id in ids]
+
     async def create(
         self,
         input: CreateRuntimeVariantPresetInput,
@@ -154,6 +171,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 value_type=input.value_type,
                 default_value=input.default_value,
                 key=input.key,
+                required=input.required,
                 category=input.category,
                 display_name=input.display_name,
                 ui_option=input.ui_option,
@@ -200,6 +218,11 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 else TriState.update(input.default_value)
             ),
             key=(OptionalState.update(input.key) if input.key is not None else OptionalState.nop()),
+            required=(
+                OptionalState.update(input.required)
+                if input.required is not None
+                else OptionalState.nop()
+            ),
             category=(
                 TriState.nop()
                 if input.category is SENTINEL
@@ -299,6 +322,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
                 default_value=data.default_value,
                 key=data.key,
             ),
+            required=data.required,
             category=data.category,
             ui_type=data.ui_type,
             display_name=data.display_name,

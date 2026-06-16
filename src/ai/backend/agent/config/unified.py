@@ -122,6 +122,21 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
     ]
 
 
+class UtilizationMetricConfig(BaseConfigSchema):
+    interval: Annotated[
+        float,
+        Field(default=30.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Time interval in seconds between utilization metric collection cycles "
+                "(per-node, per-container, and per-process statistics)."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+
+
 class CoreDumpConfig(BaseConfigSchema):
     enabled: Annotated[
         bool,
@@ -1189,6 +1204,22 @@ class OverridableAgentConfig(BaseConfigSchema):
                 "Ensures container states are consistent across the system."
             ),
             added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    utilization_metric: Annotated[
+        UtilizationMetricConfig,
+        Field(
+            default_factory=UtilizationMetricConfig,
+            validation_alias=AliasChoices("utilization-metric", "utilization_metric"),
+            serialization_alias="utilization-metric",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Configuration for utilization metric collection. Controls the collection "
+                "interval and, derived from it, the Valkey expiration of stored utilization values."
+            ),
+            added_version="26.4.4",
             composite=CompositeType.FIELD,
         ),
     ]

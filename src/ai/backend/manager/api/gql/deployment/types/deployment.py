@@ -201,6 +201,7 @@ ScalingStateGQL: type[ScalingState] = gql_enum(
         description="Represents the deployment strategy configuration that determines how updates are rolled out to replicas (e.g., rolling update, blue-green).",
     ),
     model=DeploymentStrategyInfoDTO,
+    name="DeploymentStrategy",
 )
 class DeploymentStrategyGQL:
     type: DeploymentStrategyTypeGQL
@@ -344,10 +345,12 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     scaling_state: ScalingStateGQL = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
+            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecation_hint="per-replica-group scaling status",
             description=(
-                "Replica scaling axis, orthogonal to ``metadata.status`` (lifecycle)."
-                " ``SCALING`` while the replica reconciler is adjusting replica count;"
-                " ``STABLE`` once holding at the desired count."
+                "Endpoint-level replica scaling axis. Scaling is now reconciled per replica"
+                " group, so this stays ``STABLE``; inspect each replica group's scaling status"
+                " instead."
             ),
         )
     )

@@ -33,6 +33,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -93,6 +94,7 @@ class TestEndpointSearchInProject:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -235,7 +237,6 @@ class TestEndpointSearchInProject:
                         project=project_a_id,
                         resource_group=sgroup_name,
                         lifecycle_stage=EndpointLifecycle.CREATED,
-                        current_revision=uuid.uuid4(),
                         replicas=1,
                     )
                 )
@@ -253,7 +254,6 @@ class TestEndpointSearchInProject:
                     project=project_b_id,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.CREATED,
-                    current_revision=uuid.uuid4(),
                     replicas=1,
                 )
             )

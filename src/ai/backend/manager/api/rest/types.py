@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from ai.backend.common.metrics.metric import GraphQLMetricObserver
     from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
-    from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
     from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.idle import IdleCheckerHost
@@ -81,7 +80,6 @@ class GQLContextDeps:
     user_repository: UserRepository
     agent_repository: AgentRepository
     strawberry_gql_adapter: BaseGQLAdapter
-    strawberry_data_loaders: DataLoaders
     adapters: Adapters
 
 

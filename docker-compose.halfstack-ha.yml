@@ -97,14 +97,14 @@ services:
 
   # Initial master is redis-node01.
   backendai-half-redis-node01:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: node01
     networks:
     - half
     ports:
     - 0.0.0.0:${REDIS_MASTER_PORT}:${REDIS_MASTER_PORT}
     command: >
-      redis-server
+      valkey-server
       --port ${REDIS_MASTER_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
@@ -117,14 +117,14 @@ services:
     # network partitioning.
 
   backendai-half-redis-node02:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: node02
     networks:
     - half
     ports:
     - 0.0.0.0:${REDIS_SLAVE1_PORT}:${REDIS_SLAVE1_PORT}
     command: >
-      redis-server
+      valkey-server
       --port ${REDIS_SLAVE1_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
@@ -135,14 +135,14 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-node03:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: node03
     ports:
     - 0.0.0.0:${REDIS_SLAVE2_PORT}:${REDIS_SLAVE2_PORT}
     networks:
     - half
     command: >
-      redis-server
+      valkey-server
       --port ${REDIS_SLAVE2_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
@@ -153,7 +153,7 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-sentinel01:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: sentinel01
     networks:
     - half
@@ -168,12 +168,12 @@ services:
     - backendai-half-redis-node02
     - backendai-half-redis-node03
     command: >
-      redis-sentinel /config/sentinel01.conf
+      valkey-sentinel /config/sentinel01.conf
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel02:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: sentinel02
     networks:
     - half
@@ -188,12 +188,12 @@ services:
     - backendai-half-redis-node02
     - backendai-half-redis-node03
     command: >
-      redis-sentinel /config/sentinel02.conf
+      valkey-sentinel /config/sentinel02.conf
     environment:
     - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel03:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: sentinel03
     networks:
     - half
@@ -208,7 +208,7 @@ services:
     - backendai-half-redis-node02
     - backendai-half-redis-node03
     command: >
-      redis-sentinel /config/sentinel03.conf
+      valkey-sentinel /config/sentinel03.conf
     environment:
     - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 

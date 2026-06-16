@@ -57,6 +57,7 @@ __all__ = (
     "ModelMountConfigInfoDTO",
     "ModelMetadataInfoDTO",
     "ModelRuntimeConfigInfoDTO",
+    "RuntimeVariantPresetValueInfoDTO",
     "ModelServiceConfigInfoDTO",
     "NetworkConfigInfo",
     "OrderDirection",
@@ -278,6 +279,10 @@ class PreStartActionInfoDTO(BaseResponseModel):
 class ModelHealthCheckInfoDTO(BaseResponseModel):
     """Output DTO for model health check configuration."""
 
+    enable: bool = Field(
+        default=False,
+        description="Whether the route is health-checked. When false the route activates immediately.",
+    )
     interval: float = Field(description="Interval in seconds between health checks.")
     path: str = Field(description="Path to check for health status.")
     max_retries: int = Field(description="Maximum number of retries for health check.")
@@ -374,6 +379,13 @@ class ResourceConfigInfoDTO(BaseResponseModel):
     resource_opts: ResourceOptsInfoDTO | None = None
 
 
+class RuntimeVariantPresetValueInfoDTO(BaseResponseModel):
+    """A runtime variant preset value materialised on a revision (``{preset_id, value}``)."""
+
+    preset_id: UUID = Field(description="Runtime variant preset ID.")
+    value: str = Field(description="Value bound to the preset.")
+
+
 class ModelRuntimeConfigInfoDTO(BaseResponseModel):
     """Runtime configuration backing DTO for ModelRuntimeConfig GQL type.
 
@@ -385,6 +397,10 @@ class ModelRuntimeConfigInfoDTO(BaseResponseModel):
     runtime_variant_id: RuntimeVariantID
     inference_runtime_config: dict[str, Any] | None = None
     environ: EnvironmentVariablesInfoDTO | None = None
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueInfoDTO] = Field(
+        default_factory=list,
+        description="Preset values materialised on this revision.",
+    )
 
 
 class ModelMountConfigInfoDTO(BaseResponseModel):

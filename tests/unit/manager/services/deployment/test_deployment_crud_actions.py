@@ -22,9 +22,10 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId
+from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot, SessionId
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -137,6 +138,7 @@ class DeploymentCRUDBaseFixtures:
     @pytest.fixture
     def endpoint_info(self, endpoint_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
             id=DeploymentID(endpoint_id),
             metadata=DeploymentMetadata(
                 name="test-deployment",
@@ -333,6 +335,7 @@ class TestGetReplicaById(DeploymentCRUDBaseFixtures):
 
         assert result.data is not None
         assert result.data.id == route_info.route_id
+        assert result.data.deployment_id == route_info.deployment_id
         assert result.data.readiness_status == ReadinessStatus.HEALTHY
         assert result.data.liveness_status == LivenessStatus.HEALTHY
         assert result.data.activeness_status == ActivenessStatus.ACTIVE
@@ -621,6 +624,7 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
                 extra_mounts=[],
+                model_mount_perm=MountPermission.READ_ONLY,
             ),
             image_id=ImageID(uuid.uuid4()),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
@@ -629,7 +633,7 @@ class TestGetRevisionById(DeploymentCRUDBaseFixtures):
                 bootstrap_script=None,
                 callback_url=None,
             ),
-            preset=PresetAttributionData(preset_id=None, values=[]),
+            revision_preset=PresetAttributionData(preset_id=None, values=[]),
         )
 
     async def test_existing_revision_returns_data(

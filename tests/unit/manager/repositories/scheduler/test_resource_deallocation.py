@@ -395,6 +395,7 @@ class TestForceTerminateResourceDeallocation:
                     slot_name="cpu",
                     requested=cpu_used,
                     used=cpu_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             db_sess.add(
@@ -403,6 +404,7 @@ class TestForceTerminateResourceDeallocation:
                     slot_name="mem",
                     requested=mem_used,
                     used=mem_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             await db_sess.flush()
@@ -939,6 +941,7 @@ class TestBulkTerminateResourceDeallocation:
                     slot_name="cpu",
                     requested=cpu_used,
                     used=cpu_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             db_sess.add(
@@ -947,6 +950,7 @@ class TestBulkTerminateResourceDeallocation:
                     slot_name="mem",
                     requested=mem_used,
                     used=mem_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             await db_sess.flush()
@@ -1371,6 +1375,7 @@ class TestNegativeValueGuard:
                     slot_name="cpu",
                     requested=cpu_used,
                     used=cpu_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             db_sess.add(
@@ -1379,6 +1384,7 @@ class TestNegativeValueGuard:
                     slot_name="mem",
                     requested=mem_used,
                     used=mem_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             await db_sess.flush()

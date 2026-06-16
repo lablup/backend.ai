@@ -50,13 +50,13 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
-from ai.backend.agent.errors.resources import PortPoolExhaustedError
-from ai.backend.agent.etcd import AgentEtcdClientView
-from ai.backend.agent.exception import (
+from ai.backend.agent.errors import (
     ContainerCreationError,
     InvalidArgumentError,
     UnsupportedResource,
 )
+from ai.backend.agent.errors.resources import PortPoolExhaustedError
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
 from ai.backend.agent.kernel_registry.adapter import (
@@ -271,14 +271,14 @@ async def _clean_scratch(
 def _DockerError_reduce(self: DockerError) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
-        (self.status, {"message": self.message}, *self.args),
+        (self.status, self.message, *self.args),
     )
 
 
 def _DockerContainerError_reduce(self: DockerContainerError) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
-        (self.status, {"message": self.message}, self.container_id, *self.args),
+        (self.status, self.message, self.container_id, *self.args),
     )
 
 
@@ -1295,7 +1295,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         container_id="",
                         message="Docker API returned None when creating container",
                     )
-                cid = cast(str, container._id)
+                cid = container._id
                 async with AsyncFileWriter(
                     target_filename=self.config_dir / "resource.txt",
                     access_mode="a",

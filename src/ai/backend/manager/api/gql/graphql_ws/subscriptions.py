@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Final
 from strawberry.types.execution import ExecutionResult, PreExecutionError
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .connection import WSSender
@@ -50,7 +51,7 @@ class SubscriptionExecutor:
             event_hub=deps.processors.events.event_hub,
             event_fetcher=deps.processors.events.event_fetcher,
             gql_adapter=deps.strawberry_gql_adapter,
-            data_loaders=deps.strawberry_data_loaders,
+            data_loaders=DataLoaders(deps.adapters),
             metric_observer=deps.metric_observer,
             adapters=deps.adapters,
         )

@@ -15,11 +15,14 @@ import pytest
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     RBACElementType,
     RelationType,
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
+from ai.backend.manager.actions.action.rbac import RBACActionName
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
@@ -49,6 +52,9 @@ from ai.backend.manager.services.permission_contoller.actions.create_role import
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
     GetEntityTypesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.get_permission_matrix import (
+    GetPermissionMatrixAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
@@ -681,6 +687,7 @@ class TestCreatePermission:
             scope_id="test-domain",
             entity_type=EntityType.USER,
             operation=OperationType.READ,
+            permission=Permission.READ,
             created_at=datetime.now(UTC),
         )
         mock_repository.create_permission.return_value = perm_data
@@ -704,6 +711,7 @@ class TestCreatePermission:
             scope_id="global",
             entity_type=EntityType.USER,
             operation=OperationType.CREATE,
+            permission=Permission.CREATE,
             created_at=datetime.now(UTC),
         )
         mock_repository.create_permission.return_value = perm_data
@@ -743,6 +751,7 @@ class TestDeletePermission:
             scope_id="test-domain",
             entity_type=EntityType.USER,
             operation=OperationType.READ,
+            permission=Permission.READ,
             created_at=datetime.now(UTC),
         )
         mock_repository.delete_permission.return_value = perm_data
@@ -784,6 +793,7 @@ class TestSearchPermissions:
             scope_id="test-domain",
             entity_type=EntityType.USER,
             operation=OperationType.READ,
+            permission=Permission.READ,
             created_at=datetime.now(UTC),
         )
         mock_result = SearchResult(
@@ -975,6 +985,7 @@ class TestSearchElementAssociations:
             scope_id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id="test-domain"),
             object_id=ObjectId(entity_type=EntityType.USER, entity_id="user-1"),
             relation_type=RelationType.AUTO,
+            permission_cap=Permission.full(),
             registered_at=datetime.now(tz=UTC),
         )
         mock_result = SearchResult(
@@ -1010,3 +1021,67 @@ class TestSearchElementAssociations:
 
         assert result.result.total_count == 30
         assert result.result.has_next_page is True
+
+
+class TestGetPermissionMatrix:
+    _GRANT_OPERATIONS = {
+        OperationType.GRANT_ALL,
+        OperationType.GRANT_READ,
+        OperationType.GRANT_UPDATE,
+        OperationType.GRANT_SOFT_DELETE,
+        OperationType.GRANT_HARD_DELETE,
+    }
+    _GRANT_ACTION_NAMES = {
+        RBACActionName.GRANT_ALL,
+        RBACActionName.GRANT_READ,
+        RBACActionName.GRANT_UPDATE,
+        RBACActionName.GRANT_SOFT_DELETE,
+        RBACActionName.GRANT_HARD_DELETE,
+    }
+
+    @pytest.fixture
+    def service(self) -> PermissionControllerService:
+        return PermissionControllerService(
+            repository=MagicMock(),
+            group_repository=MagicMock(),
+            rbac_action_registry=RBAC_ACTION_REGISTRY,
+        )
+
+    async def test_matrix_excludes_grant_operations(
+        self,
+        service: PermissionControllerService,
+    ) -> None:
+        result = await service.get_permission_matrix(GetPermissionMatrixAction())
+
+        for entity_map in result.matrix.values():
+            for actions in entity_map.values():
+                for action_name, perm in actions.items():
+                    assert perm.operation not in self._GRANT_OPERATIONS
+                    assert action_name not in self._GRANT_ACTION_NAMES
+
+    async def test_matrix_keeps_non_grant_registry_entries(
+        self,
+        service: PermissionControllerService,
+    ) -> None:
+        result = await service.get_permission_matrix(GetPermissionMatrixAction())
+
+        # Flatten matrix into (scope, entity, action_name) triples.
+        result_triples: set[tuple[RBACElementType, RBACElementType, RBACActionName]] = set()
+        for scope, entity_map in result.matrix.items():
+            for entity, actions in entity_map.items():
+                for action_name in actions:
+                    result_triples.add((scope, entity, action_name))
+
+        expected_non_grant = {
+            (
+                action_cls.permission_scope(),
+                action_cls.required_permission().element_type,
+                action_cls.action_name(),
+            )
+            for action_cls in RBAC_ACTION_REGISTRY
+            if action_cls.required_permission().operation not in self._GRANT_OPERATIONS
+        }
+
+        # Every non-grant registry entry is present, and nothing extra leaked in.
+        assert result_triples == expected_non_grant
+        assert len(result_triples) > 0

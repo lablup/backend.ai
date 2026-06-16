@@ -10,6 +10,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
+    RouteSubStatus,
     RouteTargetStatuses,
     RouteTransitionTarget,
 )
@@ -62,6 +63,7 @@ class RunningRouteHandler(RouteHandler):
             failure=RouteTransitionTarget(
                 status=RouteStatus.TERMINATING,
                 health_status=RouteHealthStatus.NOT_CHECKED,
+                sub_status=RouteSubStatus.DRAINING,
             ),
             stale=None,
         )

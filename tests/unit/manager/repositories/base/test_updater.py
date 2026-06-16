@@ -15,6 +15,7 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
+    RepositoryIntegrityError,
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.models.base import Base
@@ -22,10 +23,13 @@ from ai.backend.manager.repositories.base import (
     BatchUpdater,
     BatchUpdaterResult,
     BatchUpdaterSpec,
+    BulkUpdaterError,
+    BulkUpdaterResult,
     Updater,
     UpdaterResult,
     UpdaterSpec,
     execute_batch_updater,
+    execute_bulk_updater_partial,
     execute_updater,
 )
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
@@ -908,3 +912,214 @@ class TestBatchUpdaterIntegrityError:
             )
             with pytest.raises(UniqueConstraintViolationError):
                 await execute_batch_updater(db_sess, updater)
+
+
+# =============================================================================
+# Bulk Updater Partial Tests (savepoint-based partial failure support)
+# =============================================================================
+
+
+class BulkUpdaterPartialTestRow(Base):  # type: ignore[misc]
+    """ORM model for bulk updater partial testing.
+
+    ``name`` carries a UNIQUE constraint so an update colliding with another row's
+    name triggers a per-row integrity error.
+    """
+
+    __tablename__ = "test_bulk_updater_partial"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False, unique=True)
+    value: Mapped[str | None] = mapped_column(sa.String(50), nullable=True)
+
+
+class _FieldUpdaterSpec(UpdaterSpec[BulkUpdaterPartialTestRow]):
+    """UpdaterSpec that applies the given column values to the target row."""
+
+    def __init__(self, **values: Any) -> None:
+        self._values = values
+
+    @property
+    def row_class(self) -> type[BulkUpdaterPartialTestRow]:
+        return BulkUpdaterPartialTestRow
+
+    def build_values(self) -> dict[str, Any]:
+        return dict(self._values)
+
+
+class TestBulkUpdaterPartial:
+    """Tests for execute_bulk_updater_partial with savepoint-based partial failure support."""
+
+    @pytest.fixture
+    async def bulk_partial_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[BulkUpdaterPartialTestRow], None]:
+        """Create the test table and return the row class."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(c, [BulkUpdaterPartialTestRow.__table__])
+            )
+
+        yield BulkUpdaterPartialTestRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_bulk_updater_partial CASCADE"))
+
+    @pytest.fixture
+    async def rows_for_success(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_partial_row_class: type[BulkUpdaterPartialTestRow],
+    ) -> None:
+        """Seed three rows (name-1..name-3) with no value set."""
+        async with database_connection.begin_session() as db_sess:
+            for i in range(1, 4):
+                db_sess.add(BulkUpdaterPartialTestRow(id=i, name=f"name-{i}", value=None))
+
+    @pytest.fixture
+    async def rows_abc(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_partial_row_class: type[BulkUpdaterPartialTestRow],
+    ) -> None:
+        """Seed rows id=1..3 with unique names alpha/beta/gamma."""
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(BulkUpdaterPartialTestRow(id=1, name="alpha", value=None))
+            db_sess.add(BulkUpdaterPartialTestRow(id=2, name="beta", value=None))
+            db_sess.add(BulkUpdaterPartialTestRow(id=3, name="gamma", value=None))
+
+    @pytest.fixture
+    async def rows_1_and_3(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_partial_row_class: type[BulkUpdaterPartialTestRow],
+    ) -> None:
+        """Seed only rows id=1 (alpha) and id=3 (gamma); id=2 is absent."""
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(BulkUpdaterPartialTestRow(id=1, name="alpha", value=None))
+            db_sess.add(BulkUpdaterPartialTestRow(id=3, name="gamma", value=None))
+
+    @pytest.fixture
+    async def rows_alpha_to_epsilon(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_partial_row_class: type[BulkUpdaterPartialTestRow],
+    ) -> None:
+        """Seed rows id=1..5 with unique names alpha..epsilon."""
+        async with database_connection.begin_session() as db_sess:
+            for i, name in enumerate(["alpha", "beta", "gamma", "delta", "epsilon"], start=1):
+                db_sess.add(BulkUpdaterPartialTestRow(id=i, name=name, value=None))
+
+    async def test_all_updaters_succeed(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        rows_for_success: None,
+    ) -> None:
+        """3 updaters targeting existing rows → all 3 rows updated, errors is empty."""
+        async with database_connection.begin_session() as db_sess:
+            updaters = [
+                Updater(spec=_FieldUpdaterSpec(value="v1"), pk_value=1),
+                Updater(spec=_FieldUpdaterSpec(value="v2"), pk_value=2),
+                Updater(spec=_FieldUpdaterSpec(value="v3"), pk_value=3),
+            ]
+            result = await execute_bulk_updater_partial(db_sess, updaters)
+
+            assert isinstance(result, BulkUpdaterResult)
+            assert result.success_count() == 3
+            assert len(result.successes) == 3
+            assert len(result.errors) == 0
+            assert not result.has_failures()
+
+            assert result.successes[0].id == 1
+            assert result.successes[0].value == "v1"
+            assert result.successes[2].id == 3
+            assert result.successes[2].value == "v3"
+
+            # Verify persisted values
+            rows = (
+                (
+                    await db_sess.execute(
+                        sa.select(BulkUpdaterPartialTestRow).order_by(BulkUpdaterPartialTestRow.id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert [r.value for r in rows] == ["v1", "v2", "v3"]
+
+    async def test_partial_failure_with_unique_constraint(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        rows_abc: None,
+    ) -> None:
+        """1 updater collides with an existing unique name → 2 successes + 1 error."""
+        async with database_connection.begin_session() as db_sess:
+            updaters = [
+                Updater(spec=_FieldUpdaterSpec(value="v1"), pk_value=1),
+                # Renaming beta → gamma collides with row 3's unique name
+                Updater(spec=_FieldUpdaterSpec(name="gamma"), pk_value=2),
+                Updater(spec=_FieldUpdaterSpec(value="v3"), pk_value=3),
+            ]
+            result = await execute_bulk_updater_partial(db_sess, updaters)
+
+            assert result.success_count() == 2
+            assert len(result.successes) == 2
+            assert len(result.errors) == 1
+            assert result.has_failures()
+
+            assert result.successes[0].id == 1
+            assert result.successes[0].value == "v1"
+            assert result.successes[1].id == 3
+            assert result.successes[1].value == "v3"
+
+            error = result.errors[0]
+            assert isinstance(error, BulkUpdaterError)
+            assert error.index == 1  # Second updater in the list
+            assert isinstance(error.exception, RepositoryIntegrityError)
+
+            # The failed row keeps its original name
+            row_2 = (
+                await db_sess.execute(
+                    sa.select(BulkUpdaterPartialTestRow).where(BulkUpdaterPartialTestRow.id == 2)
+                )
+            ).scalar_one()
+            assert row_2.name == "beta"
+
+    async def test_non_existent_pk_is_skipped(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        rows_1_and_3: None,
+    ) -> None:
+        """An updater targeting a non-existent PK is skipped (not an error)."""
+        async with database_connection.begin_session() as db_sess:
+            updaters = [
+                Updater(spec=_FieldUpdaterSpec(value="v1"), pk_value=1),
+                Updater(spec=_FieldUpdaterSpec(value="v2"), pk_value=2),  # Non-existent PK
+                Updater(spec=_FieldUpdaterSpec(value="v3"), pk_value=3),
+            ]
+            result = await execute_bulk_updater_partial(db_sess, updaters)
+
+            assert result.success_count() == 2
+            assert len(result.successes) == 2
+            assert len(result.errors) == 0
+            assert not result.has_failures()
+
+            assert result.successes[0].id == 1
+            assert result.successes[1].id == 3
+
+    async def test_empty_updater_list(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        bulk_partial_row_class: type[BulkUpdaterPartialTestRow],
+    ) -> None:
+        """An empty updater list returns an empty result."""
+        async with database_connection.begin_session() as db_sess:
+            updaters: list[Updater[BulkUpdaterPartialTestRow]] = []
+            result = await execute_bulk_updater_partial(db_sess, updaters)
+
+            assert isinstance(result, BulkUpdaterResult)
+            assert result.success_count() == 0
+            assert len(result.errors) == 0
+            assert not result.has_failures()

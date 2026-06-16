@@ -69,13 +69,15 @@ from ai.backend.manager.models.deployment_revision_preset.orders import (
     DeploymentRevisionPresetOrders,
 )
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.resource_slot.conditions import PresetResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
     ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
     ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
     ALLOCATED_SLOT_PRESET_TIEBREAKER,
     resolve_allocated_slot_preset_order,
+)
+from ai.backend.manager.models.runtime_variant_preset.types import (
+    RuntimeVariantPresetValueEntry,
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -135,6 +137,7 @@ def _pre_start_action_to_dto(action: PreStartAction) -> PreStartActionInfoDTO:
 
 def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoDTO:
     return ModelHealthCheckInfoDTO(
+        enable=check.enable,
         interval=check.interval,
         path=check.path,
         max_retries=check.max_retries,
@@ -251,7 +254,11 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         resource_opts = self._convert_resource_opts_input(input.resource_opts)
         environ = self._convert_environ_input(input.environ)
         preset_values = self._convert_preset_values_input(input.preset_values)
-        model_def = input.model_definition
+        model_def = (
+            ModelDefinition.model_validate(input.model_definition.model_dump())
+            if input.model_definition is not None
+            else None
+        )
         strategy, strategy_spec = self._convert_required_strategy_input(input.deployment_strategy)
 
         spec = DeploymentRevisionPresetCreatorSpec(
@@ -266,7 +273,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             startup_command=input.startup_command,
             bootstrap_script=input.bootstrap_script,
             environ=environ,
-            preset_values=preset_values,
+            runtime_variant_preset_values=preset_values,
             open_to_public=input.open_to_public,
             replica_count=input.replica_count,
             revision_history_limit=input.revision_history_limit,
@@ -295,7 +302,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if input.environ is not None
             else OptionalState.nop()
         )
-        preset_values_state: OptionalState[list[PresetValueEntry]] = (
+        preset_values_state: OptionalState[list[RuntimeVariantPresetValueEntry]] = (
             OptionalState.update(self._convert_preset_values_input(input.preset_values))
             if input.preset_values is not None
             else OptionalState.nop()
@@ -305,6 +312,11 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         )
 
         spec = DeploymentRevisionPresetUpdaterSpec(
+            runtime_variant=(
+                OptionalState.update(input.runtime_variant_id)
+                if input.runtime_variant_id is not None
+                else OptionalState.nop()
+            ),
             name=(
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
@@ -356,7 +368,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 else TriState.update(input.bootstrap_script)
             ),
             environ=environ_state,
-            preset_values=preset_values_state,
+            runtime_variant_preset_values=preset_values_state,
             open_to_public=self._convert_tri_state(input.open_to_public),
             replica_count=self._convert_tri_state(input.replica_count),
             revision_history_limit=self._convert_tri_state(input.revision_history_limit),
@@ -538,10 +550,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
     @staticmethod
     def _convert_preset_values_input(
         preset_values: list[Any] | None,
-    ) -> list[PresetValueEntry]:
+    ) -> list[RuntimeVariantPresetValueEntry]:
         if not preset_values:
             return []
-        return [PresetValueEntry(preset_id=pv.preset_id, value=pv.value) for pv in preset_values]
+        return [
+            RuntimeVariantPresetValueEntry(preset_id=pv.preset_id, value=pv.value)
+            for pv in preset_values
+        ]
 
     @staticmethod
     def _convert_model_definition_state(
@@ -636,7 +651,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         ]
         preset_value_entries = [
             PresetValueInfo(preset_id=pv.preset_id, value=pv.value)
-            for pv in (data.preset_values or [])
+            for pv in (data.runtime_variant_preset_values or [])
         ]
         return DeploymentRevisionPresetNode(
             id=data.id,

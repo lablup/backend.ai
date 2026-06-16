@@ -12,6 +12,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.dto.manager.v2.keypair.response import CreateKeypairPayload
 from ai.backend.common.dto.manager.v2.user.types import UserRole, UserStatus
 from ai.backend.common.types import BackendAISchema
 
@@ -19,6 +20,7 @@ __all__ = (
     "AdminSearchUsersPayload",
     "BulkCreateUserV2Error",
     "BulkCreateUsersPayload",
+    "BulkCreateUsersWithKeypairPayload",
     "BulkPurgeUserV2Error",
     "BulkPurgeUsersPayload",
     "BulkUpdateUserV2Error",
@@ -281,6 +283,12 @@ class CreateUserPayload(BaseResponseModel):
     """Payload for single user creation mutation."""
 
     user: UserNode = Field(description="The newly created user.")
+    keypair: CreateKeypairPayload = Field(
+        description=(
+            "The default keypair automatically generated for the user, "
+            "including its one-time secret key."
+        )
+    )
 
 
 class UpdateUserPayload(BaseResponseModel):
@@ -293,6 +301,17 @@ class BulkCreateUsersPayload(BaseResponseModel):
     """Payload for bulk user creation mutation."""
 
     created_users: list[UserNode] = Field(description="List of successfully created users.")
+    failed: list[BulkCreateUserV2Error] = Field(
+        description="List of errors for users that failed to create."
+    )
+
+
+class BulkCreateUsersWithKeypairPayload(BaseResponseModel):
+    """Payload for bulk user creation, including each user's generated keypair."""
+
+    created: list[CreateUserPayload] = Field(
+        description="List of successfully created users with their generated keypairs."
+    )
     failed: list[BulkCreateUserV2Error] = Field(
         description="List of errors for users that failed to create."
     )

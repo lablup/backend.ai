@@ -11,10 +11,12 @@ import sqlalchemy as sa
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -29,6 +31,7 @@ from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -45,6 +48,7 @@ from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
+from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.testutils.db import with_tables
 
 
@@ -87,6 +91,7 @@ class TestRoleAssignment:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -380,3 +385,157 @@ class TestRoleAssignment:
                 )
             )
             assert len(assoc.fetchall()) == 0
+
+    # --- RoleManager.assign_auto_assign_roles ---
+
+    @pytest.fixture
+    def role_manager(self) -> RoleManager:
+        return RoleManager()
+
+    @pytest.fixture
+    def project_scope(self, test_project: uuid.UUID) -> ScopeId:
+        return ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(test_project))
+
+    async def _bind_auto_assign_role(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scope_id: ScopeId,
+        *,
+        auto_assign: bool = True,
+        status: RoleStatus = RoleStatus.ACTIVE,
+    ) -> uuid.UUID:
+        role_id = uuid.uuid4()
+        async with db.begin_session() as session:
+            session.add(
+                RoleRow(
+                    id=role_id,
+                    name=f"auto-role-{role_id.hex[:8]}",
+                    auto_assign=auto_assign,
+                    status=status,
+                )
+            )
+            session.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=scope_id.scope_type,
+                    scope_id=scope_id.scope_id,
+                    entity_type=EntityType.ROLE,
+                    entity_id=str(role_id),
+                )
+            )
+            await session.commit()
+        return role_id
+
+    async def _user_ids_for_role(
+        self, db: ExtendedAsyncSAEngine, role_id: uuid.UUID
+    ) -> list[uuid.UUID]:
+        async with db.begin_readonly_session() as session:
+            return list(
+                await session.scalars(
+                    sa.select(UserRoleRow.user_id).where(UserRoleRow.role_id == role_id)
+                )
+            )
+
+    @pytest.fixture
+    async def joined_users(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: str,
+        user_resource_policy: str,
+        test_password_info: PasswordInfo,
+    ) -> list[uuid.UUID]:
+        return [
+            await self._create_user(
+                db_with_cleanup, test_domain, user_resource_policy, test_password_info
+            )
+            for _ in range(3)
+        ]
+
+    @pytest.fixture
+    async def auto_assign_role(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, project_scope: ScopeId
+    ) -> uuid.UUID:
+        """An active, auto_assign role bound to the target scope."""
+        return await self._bind_auto_assign_role(db_with_cleanup, project_scope)
+
+    @pytest.fixture
+    async def role_with_one_existing_member(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        auto_assign_role: uuid.UUID,
+        joined_users: list[uuid.UUID],
+    ) -> uuid.UUID:
+        """The auto_assign role with its first joined user already mapped."""
+        async with db_with_cleanup.begin_session() as session:
+            session.add(UserRoleRow(user_id=joined_users[0], role_id=auto_assign_role))
+            await session.commit()
+        return auto_assign_role
+
+    @pytest.fixture
+    async def ineligible_roles(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, project_scope: ScopeId
+    ) -> list[uuid.UUID]:
+        """Roles that must NOT be granted: not auto_assign, inactive, or bound elsewhere."""
+        not_auto_assign = await self._bind_auto_assign_role(
+            db_with_cleanup, project_scope, auto_assign=False
+        )
+        inactive = await self._bind_auto_assign_role(
+            db_with_cleanup, project_scope, status=RoleStatus.INACTIVE
+        )
+        other_scope = ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(uuid.uuid4()))
+        bound_to_other_scope = await self._bind_auto_assign_role(db_with_cleanup, other_scope)
+        return [not_auto_assign, inactive, bound_to_other_scope]
+
+    async def test_assign_auto_assign_roles_grants_to_all_users_when_none_mapped(
+        self,
+        role_manager: RoleManager,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        project_scope: ScopeId,
+        auto_assign_role: uuid.UUID,
+        joined_users: list[uuid.UUID],
+    ) -> None:
+        """Every joining user is mapped to an active auto_assign role bound to the scope."""
+        async with db_with_cleanup.begin_session() as session:
+            await role_manager.assign_auto_assign_roles(session, joined_users, project_scope)
+
+        mapped_user_ids = await self._user_ids_for_role(db_with_cleanup, auto_assign_role)
+        assert set(mapped_user_ids) == set(joined_users)
+
+    async def test_assign_auto_assign_roles_skips_already_mapped_users(
+        self,
+        role_manager: RoleManager,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        project_scope: ScopeId,
+        role_with_one_existing_member: uuid.UUID,
+        joined_users: list[uuid.UUID],
+    ) -> None:
+        """A pre-mapped (user, role) pair is not re-inserted; only new users are added."""
+        async with db_with_cleanup.begin_session() as session:
+            await role_manager.assign_auto_assign_roles(session, joined_users, project_scope)
+
+        mapped_user_ids = await self._user_ids_for_role(
+            db_with_cleanup, role_with_one_existing_member
+        )
+        # Exactly one row per user: the pre-mapped user is neither duplicated nor dropped.
+        assert sorted(mapped_user_ids) == sorted(joined_users)
+
+    async def test_assign_auto_assign_roles_skips_non_eligible_roles(
+        self,
+        role_manager: RoleManager,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        project_scope: ScopeId,
+        auto_assign_role: uuid.UUID,
+        ineligible_roles: list[uuid.UUID],
+        user_1: uuid.UUID,
+    ) -> None:
+        """Only active, auto_assign roles bound to the target scope are granted."""
+        async with db_with_cleanup.begin_session() as session:
+            await role_manager.assign_auto_assign_roles(session, [user_1], project_scope)
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            granted_role_ids = list(
+                await session.scalars(
+                    sa.select(UserRoleRow.role_id).where(UserRoleRow.user_id == user_1)
+                )
+            )
+        # Only the eligible role is granted; none of the ineligible roles appear.
+        assert granted_role_ids == [auto_assign_role]

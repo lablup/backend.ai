@@ -39,6 +39,7 @@ import aiotools
 import click
 import tomlkit
 from aiohttp import web
+from aiohttp.typedefs import Handler
 from aiotools import aclosing
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
@@ -48,7 +49,11 @@ from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.errors import AgentInitializationError, InvalidAgentConfigError
+from ai.backend.agent.errors import (
+    AgentInitializationError,
+    InvalidAgentConfigError,
+    ResourceError,
+)
 from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
@@ -94,10 +99,8 @@ from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.json import pretty_json
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
-    build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
@@ -142,7 +145,6 @@ from .config.unified import (
     EventLoopType,
     KernelLifecyclesConfig,
 )
-from .exception import ResourceError
 from .types import (
     KernelLifecycleStatus,
     KernelOwnershipData,
@@ -1359,6 +1361,24 @@ async def check_readyz(request: web.Request) -> web.Response:
     return _build_agent_probe_response(connectivity)
 
 
+def build_singleprocess_prometheus_metrics_handler(
+    metric_registry: CommonMetricRegistry,
+) -> Handler:
+    async def prometheus_metrics_handler(_request: web.Request) -> web.Response:
+        """
+        Returns the Prometheus metrics from the process-local registry.
+
+        The agent runs a single worker and must NOT use the multiprocess
+        exposition: gauge series stored in multiprocess mmap files cannot be
+        removed individually, so terminated kernels' utilization metrics
+        would be exported forever.
+        """
+        metrics = metric_registry.to_prometheus_singleprocess()
+        return web.Response(text=metrics, content_type="text/plain")
+
+    return prometheus_metrics_handler
+
+
 def build_root_server() -> web.Application:
     metric_registry = CommonMetricRegistry.instance()
     app = web.Application(
@@ -1378,7 +1398,9 @@ def build_root_server() -> web.Application:
     cors.add(app.router.add_route("GET", r"/livez", check_livez))
     cors.add(app.router.add_route("GET", r"/readyz", check_readyz))
     cors.add(
-        app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
+        app.router.add_route(
+            "GET", r"/metrics", build_singleprocess_prometheus_metrics_handler(metric_registry)
+        )
     )
     return app
 
@@ -1790,16 +1812,13 @@ def main(
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
-                try:
-                    aiotools.start_server(
-                        server_main_logwrapper,
-                        num_workers=1,
-                        args=(server_config, log_endpoint),
-                        wait_timeout=5.0,
-                        runner=runner,
-                    )
-                finally:
-                    cleanup_prometheus_multiprocess_dir()
+                aiotools.start_server(
+                    server_main_logwrapper,
+                    num_workers=1,
+                    args=(server_config, log_endpoint),
+                    wait_timeout=5.0,
+                    runner=runner,
+                )
                 log.info("exit.")
         finally:
             if server_config.agent_common.pid_file.is_file():

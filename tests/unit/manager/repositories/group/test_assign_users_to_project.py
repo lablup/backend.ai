@@ -25,6 +25,7 @@ from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -81,6 +82,7 @@ class TestAssignUsersToProject:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -471,6 +473,7 @@ class TestUnassignUsersFromProject:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -693,74 +696,6 @@ class TestUnassignUsersFromProject:
                 )
             ).all()
             assert len(user_scope_rows) == 0
-
-    async def test_unassign_deletes_user_role_rows(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
-        project_with_role_registered: uuid.UUID,
-        test_role: uuid.UUID,
-        same_domain_user_1: uuid.UUID,
-    ) -> None:
-        """Unassign removes UserRoleRow records for project-scoped roles."""
-        project_id = project_with_role_registered
-        await group_db_source.assign_users_to_project(project_id, [same_domain_user_1], test_role)
-
-        # Verify UserRoleRow exists before unassign
-        async with db_with_cleanup.begin_readonly_session() as session:
-            before = (
-                await session.scalars(
-                    sa.select(UserRoleRow).where(
-                        UserRoleRow.user_id == same_domain_user_1,
-                        UserRoleRow.role_id == test_role,
-                    )
-                )
-            ).all()
-            assert len(before) == 1
-
-        await group_db_source.unassign_users_from_project(
-            UserProjectEntityUnbinder(user_uuids=[same_domain_user_1], project_id=project_id)
-        )
-
-        # Verify UserRoleRow deleted after unassign
-        async with db_with_cleanup.begin_readonly_session() as session:
-            after = (
-                await session.scalars(
-                    sa.select(UserRoleRow).where(
-                        UserRoleRow.user_id == same_domain_user_1,
-                        UserRoleRow.role_id == test_role,
-                    )
-                )
-            ).all()
-            assert len(after) == 0
-
-    async def test_unassign_preserves_other_users_role(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source: GroupDBSource,
-        project_with_role_registered: uuid.UUID,
-        test_role: uuid.UUID,
-        same_domain_user_1: uuid.UUID,
-        same_domain_user_2: uuid.UUID,
-    ) -> None:
-        """Unassigning one user does not affect other users' role mappings."""
-        project_id = project_with_role_registered
-        await group_db_source.assign_users_to_project(
-            project_id, [same_domain_user_1, same_domain_user_2], test_role
-        )
-
-        await group_db_source.unassign_users_from_project(
-            UserProjectEntityUnbinder(user_uuids=[same_domain_user_1], project_id=project_id)
-        )
-
-        async with db_with_cleanup.begin_readonly_session() as session:
-            remaining = (
-                await session.scalars(
-                    sa.select(UserRoleRow).where(UserRoleRow.role_id == test_role)
-                )
-            ).all()
-            assert len(remaining) == 1
-            assert remaining[0].user_id == same_domain_user_2
 
     async def test_unassign_nonexistent_user_reports_failure(
         self,

@@ -132,30 +132,25 @@ class CircuitManager:
         if not self.traefik_etcd:
             raise ServerMisconfiguredError("proxy-coordinator.traefik")
 
+        # Publish each circuit's router / service / middleware subtrees via the same
+        # atomic per-subtree replace used by the route-update path, keeping both etcd
+        # write paths consistent. Each top-level traefik object (one router, one
+        # service, each middleware) maps to its own ``.../{kind}/{name}`` subtree so a
+        # re-publish only rewrites that object and never disturbs sibling circuits.
         for circuit_chunk in itertools.batched(circuits, 5):
-            total_map: defaultdict[str, Any] = defaultdict(
-                lambda: defaultdict(lambda: {"services": {}, "routers": {}, "middlewares": {}})
-            )
+            replacements: dict[str, Any] = {}
             for circuit in circuit_chunk:
                 worker_authority = circuit.worker_row.authority
+                etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
+                for name, body in circuit.traefik_routers.items():
+                    replacements[f"{etcd_prefix}/routers/{name}"] = convert_to_etcd_dict(body)
+                for name, body in circuit.traefik_services.items():
+                    replacements[f"{etcd_prefix}/services/{name}"] = convert_to_etcd_dict(body)
+                for name, body in circuit.get_traefik_middlewares(self.local_config).items():
+                    replacements[f"{etcd_prefix}/middlewares/{name}"] = convert_to_etcd_dict(body)
 
-                routers = circuit.traefik_routers
-                middlewares = circuit.get_traefik_middlewares(self.local_config)
-                services = circuit.traefik_services
-
-                total_map[f"worker_{worker_authority}"][circuit.protocol.value.lower()][
-                    "services"
-                ].update(services)
-                total_map[f"worker_{worker_authority}"][circuit.protocol.value.lower()][
-                    "routers"
-                ].update(routers)
-                if middlewares:
-                    total_map[f"worker_{worker_authority}"][circuit.protocol.value.lower()][
-                        "middlewares"
-                    ].update(middlewares)
-
-            log.debug("traefik_etcd put_prefix {}", convert_to_etcd_dict(total_map))
-            await self.traefik_etcd.put_prefix("", convert_to_etcd_dict(total_map))
+            log.debug("traefik_etcd atomic_replace_prefixes {}", replacements)
+            await self.traefik_etcd.atomic_replace_prefixes(replacements)
             log.debug("initialize_traefik_circuits(): end")
 
     async def initialize_legacy_circuit(self, circuit: Circuit) -> None:
@@ -225,28 +220,21 @@ class CircuitManager:
         if not self.traefik_etcd:
             raise ServerMisconfiguredError("proxy-coordinator.traefik")
 
-        # Drop the per-circuit service prefixes first; ``put_prefix``
-        # below re-publishes the new config in one round-trip.
-        # ``Circuit.traefik_services`` emits a single
-        # ``bai_service_{circuit.id}`` entry per circuit, so the prefix
-        # set we delete is exactly one per item.
+        # Replace each circuit's ``bai_service_{id}`` subtree in a single etcd
+        # transaction so Traefik never observes a revision where the service was
+        # deleted but the new one not yet published (which would briefly leave the
+        # router pointing at a missing backend and drop requests). A circuit whose
+        # service shrinks (fewer routes) has its stale ``servers/N`` keys removed
+        # by the diff; a circuit with no routes yields an empty subtree that is
+        # fully removed, matching the previous delete-then-empty-put behaviour.
+        replacements: dict[str, Any] = {}
         for item in items:
             worker_authority = item.circuit.worker_row.authority
             etcd_prefix = f"worker_{worker_authority}/{item.circuit.protocol.value.lower()}"
-            await self.traefik_etcd.delete_prefix(
-                f"{etcd_prefix}/services/bai_service_{item.circuit.id}"
-            )
-
-        total_map: defaultdict[str, Any] = defaultdict(
-            lambda: defaultdict(lambda: {"services": {}})
-        )
-        for item in items:
-            worker_authority = item.circuit.worker_row.authority
-            new_services = item.circuit.traefik_services
-            total_map[f"worker_{worker_authority}"][item.circuit.protocol.value.lower()][
-                "services"
-            ].update(new_services)
-        await self.traefik_etcd.put_prefix("", convert_to_etcd_dict(total_map))
+            service_prefix = f"{etcd_prefix}/services/bai_service_{item.circuit.id}"
+            service_body = item.circuit.traefik_services.get(f"bai_service_{item.circuit.id}", {})
+            replacements[service_prefix] = convert_to_etcd_dict(service_body)
+        await self.traefik_etcd.atomic_replace_prefixes(replacements)
 
     async def _update_legacy_circuit_routes_bulk(
         self, items: Sequence[CircuitRouteUpdateItem]

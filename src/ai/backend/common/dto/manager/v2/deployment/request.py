@@ -91,6 +91,7 @@ __all__ = (
     "ModelMountConfigInput",
     "ModelRuntimeConfigInput",
     "ModelServiceConfigInput",
+    "PresetValueInput",
     "ReplicaFilter",
     "ReplicaOrder",
     "ReplicaStatusFilter",
@@ -122,6 +123,7 @@ __all__ = (
 
 
 class ModelHealthCheckInput(BaseRequestModel):
+    enable: bool = False
     interval: float | None = None
     path: str | None = None
     max_retries: int | None = None
@@ -244,6 +246,18 @@ class EnvironmentVariablesInput(BaseRequestModel):
     )
 
 
+class PresetValueInput(BaseRequestModel):
+    """A concrete value bound to a runtime variant preset (by ``preset_id``).
+
+    Shared by the deployment-revision flow (``ModelRuntimeConfigInput``) and the
+    DeploymentRevisionPreset template flow. Defined here, the lower-level module,
+    so ``deployment_revision_preset.request`` can import it without a cycle.
+    """
+
+    preset_id: UUID = Field(description="Runtime variant preset ID.")
+    value: str = Field(description="Value for this preset.")
+
+
 class ModelRuntimeConfigInput(BaseRequestModel):
     """Runtime configuration input for a revision."""
 
@@ -257,6 +271,13 @@ class ModelRuntimeConfigInput(BaseRequestModel):
     environ: EnvironmentVariablesInput | None = Field(
         default=None, description="Environment variables for the service"
     )
+    runtime_variant_preset_values: list[PresetValueInput] | None = Field(
+        default=None,
+        description=(
+            "Concrete values for the runtime variant's configurable presets, each keyed by the"
+            " runtime variant preset ID. Distinct from 'revision_preset_id' which selects a saved DeploymentRevisionPreset template, "
+        ),
+    )
 
 
 class ModelMountConfigInput(BaseRequestModel):
@@ -264,6 +285,15 @@ class ModelMountConfigInput(BaseRequestModel):
 
     vfolder_id: VFolderUUID = Field(description="VFolder ID for the model")
     mount_destination: str = Field(description="Mount destination path inside container")
+    mount_perm: MountPermission | None = Field(
+        default=None,
+        description=(
+            "Optional permission for the model vfolder mount. ``null`` (default) uses "
+            "the requester's own effective permission on the vfolder; a concrete value "
+            "(e.g. ``ro``) forces that permission. A value stronger than the requester's "
+            "own permission is rejected."
+        ),
+    )
     definition_path: str | None = Field(
         default=None,
         min_length=1,

@@ -9,7 +9,6 @@ from uuid import uuid4
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
-    ReplicaHealthResult,
     ReplicaProbeTarget,
 )
 from ai.backend.common.config import ModelHealthCheck
@@ -24,9 +23,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.repositories.deployment.types import RouteData, RouteSessionKernelInfo
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
-from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
-    RouteHealthObserver,
-)
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 
 
@@ -46,6 +42,7 @@ def _make_route(
         revision_id=DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
         health_check=health_check,
+        termination_grace_period=30.0,
         replica_host="10.0.0.1",
         replica_port=8000,
     )
@@ -65,7 +62,9 @@ class TestRegisterReplicaProbeTargets:
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """health_path comes from route.health_check when present."""
-        route = _make_route(health_check=ModelHealthCheck(path="/healthz", initial_delay=60.0))
+        route = _make_route(
+            health_check=ModelHealthCheck(enable=True, path="/healthz", initial_delay=60.0)
+        )
         replica_id = ReplicaID(route.route_id)
 
         await route_executor._register_route_probe_targets(
@@ -103,7 +102,7 @@ class TestRegisterReplicaProbeTargets:
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """Multiple routes with health_check produce multiple ReplicaProbeTarget entries."""
-        health_check = ModelHealthCheck(path="/health", initial_delay=60.0)
+        health_check = ModelHealthCheck(enable=True, path="/health", initial_delay=60.0)
         routes = [_make_route(health_check=health_check) for _ in range(3)]
         replica_infos = {
             ReplicaID(r.route_id): RouteSessionKernelInfo(
@@ -128,7 +127,9 @@ class TestSyncReplicaProbeTargets:
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """Routes with health_check, replica_host and replica_port are synced."""
-        route = _make_route(health_check=ModelHealthCheck(path="/health", initial_delay=60.0))
+        route = _make_route(
+            health_check=ModelHealthCheck(enable=True, path="/health", initial_delay=60.0)
+        )
 
         with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
             result = await route_executor.sync_route_probe_targets([route])
@@ -143,7 +144,9 @@ class TestSyncReplicaProbeTargets:
         mock_valkey_schedule: AsyncMock,
     ) -> None:
         """Routes missing health_check or replica info are silently skipped."""
-        route = _make_route(health_check=ModelHealthCheck(path="/health", initial_delay=60.0))
+        route = _make_route(
+            health_check=ModelHealthCheck(enable=True, path="/health", initial_delay=60.0)
+        )
         route_no_health_check = _make_route(health_check=None)
         route_no_replica = RouteData(
             route_id=ReplicaID(uuid4()),
@@ -155,7 +158,8 @@ class TestSyncReplicaProbeTargets:
             created_at=datetime.fromtimestamp(1000, tz=tzutc()),
             revision_id=DeploymentRevisionID(uuid4()),
             traffic_status=RouteTrafficStatus.INACTIVE,
-            health_check=ModelHealthCheck(path="/health", initial_delay=60.0),
+            health_check=ModelHealthCheck(enable=True, path="/health", initial_delay=60.0),
+            termination_grace_period=30.0,
             replica_host=None,
             replica_port=None,
         )
@@ -192,6 +196,7 @@ class TestSyncReplicaProbeTargets:
             revision_id=DeploymentRevisionID(uuid4()),
             traffic_status=RouteTrafficStatus.INACTIVE,
             health_check=None,
+            termination_grace_period=30.0,
             replica_host=None,
             replica_port=None,
         )
@@ -201,98 +206,3 @@ class TestSyncReplicaProbeTargets:
         mock_valkey_schedule.register_route_probe_targets_batch.assert_not_awaited()
         assert result.successes == []
         assert result.errors == []
-
-
-# =============================================================================
-# RouteHealthObserver: probe target based observation
-# =============================================================================
-
-
-class TestObserverSetsHealthStatus:
-    """Tests for RouteHealthObserver writing RouteHealthStatus to Valkey."""
-
-    async def test_observer_writes_success_result(self) -> None:
-        """ID-005: Observer writes healthy=True on successful probe.
-
-        Given: ReplicaProbeTarget exists in Valkey, HTTP check succeeds
-        When: Observer runs
-        Then: record_route_health_status called with (replica_id, True)
-        """
-        mock_deployment_repo = AsyncMock()
-        mock_valkey = AsyncMock()
-
-        route = _make_route()
-        probe_target = ReplicaProbeTarget(
-            replica_id=route.route_id,
-            health_path="/health",
-            inference_port=8000,
-            replica_host="10.0.0.1",
-        )
-        mock_valkey.get_route_probe_targets_batch.return_value = {route.route_id: probe_target}
-
-        observer = RouteHealthObserver(
-            deployment_repository=mock_deployment_repo,
-            valkey_schedule=mock_valkey,
-        )
-        observer._http_health_check = AsyncMock(return_value=True)  # type: ignore[method-assign]
-
-        await observer.observe([route])
-
-        mock_valkey.record_route_health_statuses_batch.assert_awaited_once_with([
-            ReplicaHealthResult(replica_id=route.route_id, healthy=True)
-        ])
-
-    async def test_observer_writes_failure_result(self) -> None:
-        """ID-006: Observer writes healthy=False on failed probe.
-
-        Given: ReplicaProbeTarget exists in Valkey, HTTP check fails
-        When: Observer runs
-        Then: record_route_health_status called with (replica_id, False)
-        """
-        mock_deployment_repo = AsyncMock()
-        mock_valkey = AsyncMock()
-
-        route = _make_route()
-        probe_target = ReplicaProbeTarget(
-            replica_id=route.route_id,
-            health_path="/health",
-            inference_port=8000,
-            replica_host="10.0.0.1",
-        )
-        mock_valkey.get_route_probe_targets_batch.return_value = {route.route_id: probe_target}
-
-        observer = RouteHealthObserver(
-            deployment_repository=mock_deployment_repo,
-            valkey_schedule=mock_valkey,
-        )
-        observer._http_health_check = AsyncMock(return_value=False)  # type: ignore[method-assign]
-
-        await observer.observe([route])
-
-        mock_valkey.record_route_health_statuses_batch.assert_awaited_once_with([
-            ReplicaHealthResult(replica_id=route.route_id, healthy=False)
-        ])
-
-    async def test_observer_skips_route_without_probe_target(self) -> None:
-        """ID-007: Observer skips route when no probe target in Valkey.
-
-        Given: No ReplicaProbeTarget in Valkey
-        When: Observer runs
-        Then: record_route_health_status NOT called, observed_count=0
-        """
-        mock_deployment_repo = AsyncMock()
-        mock_valkey = AsyncMock()
-
-        route = _make_route()
-        mock_valkey.get_route_probe_targets_batch.return_value = {route.route_id: None}
-
-        observer = RouteHealthObserver(
-            deployment_repository=mock_deployment_repo,
-            valkey_schedule=mock_valkey,
-        )
-        observer._http_health_check = AsyncMock(return_value=True)  # type: ignore[method-assign]
-
-        result = await observer.observe([route])
-
-        mock_valkey.record_route_health_statuses_batch.assert_not_awaited()
-        assert result.observed_count == 0

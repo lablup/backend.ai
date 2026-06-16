@@ -1,0 +1,3 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/ChangePasswordView-B2f-yozn.js","assets/index-DUzRNOsy.js","assets/index-CDgRDCYd.css"])))=>i.map(i=>d[i]);
+import{j as s,dz as r,r as o,h as n,bf as i,cZ as c}from"./index-DUzRNOsy.js";import{u as l}from"./useApiEndpoint-CFVeVGcc.js";const p=i.lazy(()=>c(()=>import("./ChangePasswordView-B2f-yozn.js"),__vite__mapDeps([0,1,2]))),x=()=>s.jsxs(s.Fragment,{children:[s.jsx(r,{}),s.jsx(o.Suspense,{fallback:null,children:s.jsx(u,{})})]}),u=()=>{"use memo";const e=n.c(2),a=l();let t;return e[0]!==a?(t=s.jsx(p,{apiEndpoint:a,active:!0}),e[0]=a,e[1]=t):t=e[1],t};export{x as default};
+//# sourceMappingURL=ChangePasswordPage-feqgSmmn.js.map

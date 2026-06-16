@@ -16,6 +16,11 @@ body.dark-theme {
   background-color: #191919;
 }
 
+/* ── Splash / loading curtain (Diagonal Weave) ─────────────────────────────
+   A minimal backdrop (body + #splash background) is inlined in index.html so
+   the page paints its background immediately. The full splash styling lives
+   here; webui.css is a render-blocking <head> stylesheet, so these rules are in
+   effect on first paint (no flash of unstyled splash). */
 .splash {
   position: fixed;
   top: 0;
@@ -26,12 +31,36 @@ body.dark-theme {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   background-color: var(--token-colorBgBase, rgba(247, 247, 246, 1));
-  transition: opacity 0.2s ease-out;
+  transition: opacity 0.3s ease-out;
+  font-family:
+    "Ubuntu",
+    "Roboto",
+    "Noto Sans KR",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* Diagonal Weave tokens — light */
+  --splash-fg: #141414;
+  --splash-msg: #8c8c8c;
+  --splash-line: rgba(20, 20, 20, 0.055);
+  --splash-warm: rgba(255, 122, 0, 0.16);
+  --splash-accent: #ff7a00;
+  --splash-veil: rgba(247, 247, 246, 1);
+  --splash-logo: url("/manifest/backend.ai-text.svg");
 }
 
 body.dark-theme .splash {
   background-color: #191919;
+  /* Diagonal Weave tokens — dark */
+  --splash-fg: #dcdcdc;
+  --splash-line: rgba(255, 255, 255, 0.05);
+  --splash-warm: rgba(232, 138, 40, 0.18);
+  --splash-accent: #e88a28;
+  --splash-veil: #191919;
+  --splash-logo: url("/manifest/backend.ai-text-bgdark.svg");
 }
 
 .splash-drag-area {
@@ -42,6 +71,7 @@ body.dark-theme .splash {
   height: 80px;
   -webkit-app-region: drag;
   background-color: transparent;
+  z-index: 5;
 }
 
 .splash-hidden {
@@ -49,190 +79,206 @@ body.dark-theme .splash {
   pointer-events: none;
 }
 
-.splash-card {
+/* Woven line background (two layers rotated ±23deg, drifting slowly) */
+.splash-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.splash-weave line {
+  stroke: var(--splash-line);
+  stroke-width: 1;
+}
+.splash-weave line.warm {
+  stroke: var(--splash-warm);
+  stroke-width: 1.3;
+}
+.splash-drift {
+  animation: splash-drift 16s linear infinite;
+}
+.splash-driftB {
+  animation: splash-driftB 22s linear infinite;
+}
+@keyframes splash-drift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(28px);
+  }
+}
+@keyframes splash-driftB {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-28px);
+  }
+}
+
+/* Radial veil keeps the logo/loader area clean over the weave. The veil element
+   is centered and sized with max() floors (math functions are reliable in
+   width/height — but NOT inside a radial-gradient size, where they get dropped),
+   so the cleared area never shrinks below the logo (≤296px) + login modal
+   (400px) footprint on small screens. The gradient uses plain percentages of
+   this element. */
+.splash-veil {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: max(88%, 800px);
+  height: max(100%, 640px);
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 50% 50% at 50% 50%,
+    var(--splash-veil) 0%,
+    var(--splash-veil) 26%,
+    transparent 60%
+  );
+}
+
+/* Logo + loader lockup (centered on screen, left-aligned internally per the
+   brand guide: the loader row aligns to the logo's left edge; the gap is kept
+   proportional to the logo height ~0.38x). */
+.splash-center {
   position: relative;
-  width: 340px;
-  min-height: 260px;
-  border: 1px solid var(--token-colorBorder, #ccc);
-  border-radius: 10px;
-  background-color: #ffffff;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: min(18px, 2.7vmin);
 }
-
-body.dark-theme .splash-card {
-  background-color: #191919;
-  border: 1px solid var(--token-colorBorder, #444);
-  color: #dcdcdc;
-}
-
-.splash-header {
-  width: 340px;
-  min-height: 80px;
-  background-size: contain;
+.splash-logo {
+  width: min(296px, 44vmin);
+  aspect-ratio: 720 / 118;
+  background-image: var(--splash-logo);
   background-repeat: no-repeat;
-  background-position: left top;
-  background-color: RGB(246, 253, 247);
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
-  font-size: 28px;
+  background-position: center;
+  background-size: contain;
+}
+.splash-loader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.splash-msg {
+  font-size: clamp(13px, 1.7vmin, 16px);
   font-weight: 400;
-  line-height: 60px;
-  overflow: hidden;
-}
-.splash-header .logo {
-  background-image: url("/manifest/backend.ai-text.svg");
-  width: 300px;
-  height: 50px;
-  margin: 15px 20px;
-  background-repeat: no-repeat;
-  background-size: contain;
+  color: var(--splash-msg);
+  letter-spacing: 0.01em;
 }
 
-body.dark-theme .splash-header .logo {
-  background-image: url("/manifest/backend.ai-text-bgdark.svg");
+/* Wire-cube loader — spiral draw of the 180deg session-icon cube */
+.splash-cube {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.splash-cube .edge {
+  fill: none;
+  stroke: var(--splash-accent);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: splash-cube-draw 1.8s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 0.1s);
+}
+@keyframes splash-cube-draw {
+  0% {
+    stroke-dashoffset: var(--L);
+  }
+  26% {
+    stroke-dashoffset: 0;
+  }
+  72% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: calc(var(--L) * -1);
+  }
 }
 
-body.dark-theme .splash-header {
-  background-color: var(--token-colorBgContainer, #141414);
+/* Corner metadata — version/build bottom-left, copyright bottom-right */
+.splash-meta {
+  position: fixed;
+  left: 30px;
+  right: 30px;
+  bottom: 24px;
+  z-index: 3;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  color: var(--splash-msg);
+  pointer-events: none;
+}
+.splash-meta-id {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.splash-meta-main {
+  font-size: 12.5px;
+  color: var(--splash-fg);
+  opacity: 0.72;
+}
+.splash-meta-main .splash-ver {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  opacity: 0.92;
+}
+.splash-meta-sub {
+  font-size: 11px;
+  opacity: 0.6;
+  letter-spacing: 0.01em;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+.splash-meta-foot {
+  font-size: 11px;
+  opacity: 0.55;
+  text-align: right;
+}
+
+/* Login backdrop mode: keep the weave + corner metadata as the login screen
+   background, hide the loading logo/loader. The login modal (with its mask)
+   renders above this, so the metadata shows behind the mask. */
+.splash.splash-backdrop {
+  pointer-events: none;
+}
+.splash-backdrop .splash-center {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .splash-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .splash-meta-foot {
+    text-align: left;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-drift,
+  .splash-driftB {
+    animation: none;
+  }
+  .splash-cube .edge {
+    /* !important overrides the JS-set inline stroke-dashoffset (= full path
+       length, which hides the edge), so the cube stays fully drawn and visible
+       when the draw animation is disabled. */
+    animation: none;
+    stroke-dashoffset: 0 !important;
+  }
 }
 
 ul {
   list-style-type: none;
-}
-
-.splash-information .detail {
-  font-weight: 400;
-  font-size: 13px;
-}
-
-.splash-loading {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  justify-content: center;
-  margin-top: 32px;
-}
-
-.loading-message {
-  font-size: 16px;
-}
-
-.sk-folding-cube {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
-  -webkit-transform: rotateZ(45deg);
-  transform: rotateZ(45deg);
-}
-
-.sk-folding-cube .sk-cube {
-  float: left;
-  width: 50%;
-  height: 50%;
-  position: relative;
-  -webkit-transform: scale(1.1);
-  -ms-transform: scale(1.1);
-  transform: scale(1.1);
-}
-
-.sk-folding-cube .sk-cube:before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: #3e872d;
-  -webkit-animation: sk-foldCubeAngle 2.4s infinite linear both;
-  animation: sk-foldCubeAngle 2.4s infinite linear both;
-  -webkit-transform-origin: 100% 100%;
-  -ms-transform-origin: 100% 100%;
-  transform-origin: 100% 100%;
-}
-
-.sk-folding-cube .sk-cube2 {
-  -webkit-transform: scale(1.1) rotateZ(90deg);
-  transform: scale(1.1) rotateZ(90deg);
-}
-
-.sk-folding-cube .sk-cube3 {
-  -webkit-transform: scale(1.1) rotateZ(180deg);
-  transform: scale(1.1) rotateZ(180deg);
-}
-
-.sk-folding-cube .sk-cube4 {
-  -webkit-transform: scale(1.1) rotateZ(270deg);
-  transform: scale(1.1) rotateZ(270deg);
-}
-
-.sk-folding-cube .sk-cube2:before {
-  -webkit-animation-delay: 0.3s;
-  animation-delay: 0.3s;
-}
-
-.sk-folding-cube .sk-cube3:before {
-  -webkit-animation-delay: 0.6s;
-  animation-delay: 0.6s;
-}
-
-.sk-folding-cube .sk-cube4:before {
-  -webkit-animation-delay: 0.9s;
-  animation-delay: 0.9s;
-}
-
-@-webkit-keyframes sk-foldCubeAngle {
-  0%,
-  10% {
-    -webkit-transform: perspective(140px) rotateX(-180deg);
-    transform: perspective(140px) rotateX(-180deg);
-    opacity: 0;
-  }
-  25%,
-  75% {
-    -webkit-transform: perspective(140px) rotateX(0deg);
-    transform: perspective(140px) rotateX(0deg);
-    opacity: 1;
-  }
-  90%,
-  100% {
-    -webkit-transform: perspective(140px) rotateY(180deg);
-    transform: perspective(140px) rotateY(180deg);
-    opacity: 0;
-  }
-}
-
-@keyframes sk-foldCubeAngle {
-  0%,
-  10% {
-    -webkit-transform: perspective(140px) rotateX(-180deg);
-    transform: perspective(140px) rotateX(-180deg);
-    opacity: 0;
-  }
-  25%,
-  75% {
-    -webkit-transform: perspective(140px) rotateX(0deg);
-    transform: perspective(140px) rotateX(0deg);
-    opacity: 1;
-  }
-  90%,
-  100% {
-    -webkit-transform: perspective(140px) rotateY(180deg);
-    transform: perspective(140px) rotateY(180deg);
-    opacity: 0;
-  }
-}
-
-.copyright {
-  font-size: 12px;
-}
-
-/* Global Vaadin components */
-
-vaadin-combo-box-item[selected],
-vaadin-select-item[selected] {
-  background-color: rgba(232, 247, 232, 1);
-}
-
-vaadin-combo-box-item:hover,
-vaadin-select-item:hover {
-  background-color: rgba(247, 247, 246, 1);
 }

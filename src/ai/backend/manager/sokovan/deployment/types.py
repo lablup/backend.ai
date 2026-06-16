@@ -25,8 +25,6 @@ if TYPE_CHECKING:
 
 class DeploymentLifecycleType(StrEnum):
     CHECK_REPLICA = "check_replica"
-    SCALING = "scaling"
-    RECONCILE = "reconcile"
     DEPLOYING = "deploying"
     DESTROYING = "destroying"
 
@@ -51,6 +49,15 @@ class DeploymentExecutionResult:
     successes: list[DeploymentWithHistory] = field(default_factory=list)
     failures: list[DeploymentExecutionError] = field(default_factory=list)
     skipped: list[DeploymentWithHistory] = field(default_factory=list)
+
+
+@dataclass
+class EndpointRegistrationResult:
+    """Outcome of registering appproxy endpoints: which deployments registered and which failed.
+    The caller composes its own lifecycle result from this."""
+
+    registered: list[DeploymentWithHistory] = field(default_factory=list)
+    failures: list[DeploymentExecutionError] = field(default_factory=list)
 
 
 @dataclass

@@ -7,7 +7,7 @@ Tests verify service layer business logic using mocked repositories.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
@@ -15,8 +15,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     MintEndpointTokenResponse,
 )
@@ -24,9 +26,10 @@ from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.common.types import ClusterMode, ResourceSlot
+from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
@@ -84,6 +87,7 @@ from ai.backend.manager.services.deployment.processors import DeploymentProcesso
 from ai.backend.manager.services.deployment.service import (
     DeploymentService,
     _convert_deployment_info_to_data,
+    _convert_deployment_info_to_legacy_data,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
 
@@ -366,6 +370,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     @pytest.fixture
     def deployment_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
             id=DeploymentID(deployment_id),
             metadata=DeploymentMetadata(
                 name="test-deployment",
@@ -406,6 +411,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 model_definition_path="model-definition.yaml",
                 model_mount_destination="/models",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
                 startup_command="python serve.py",
@@ -439,6 +445,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
                 extra_mounts=[],
+                model_mount_perm=MountPermission.READ_ONLY,
             ),
             image_id=ImageID(image_id),
             execution=ExecutionData(
@@ -446,7 +453,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 bootstrap_script=None,
                 callback_url=None,
             ),
-            preset=PresetAttributionData(preset_id=None, values=[]),
+            revision_preset=PresetAttributionData(preset_id=None, values=[]),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
@@ -468,6 +475,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 model_definition_path=None,
                 model_mount_destination="/models",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
                 runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
@@ -480,19 +488,37 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
 class TestAddModelRevision(ModelRevisionFixtures):
     """Tests for DeploymentService.add_model_revision — now delegates to controller."""
 
+    @pytest.fixture
+    def requester(self) -> UserData:
+        return UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+
+    @pytest.fixture(autouse=True)
+    def set_user_context(self, requester: UserData) -> Iterator[None]:
+        with with_user(requester):
+            yield
+
     async def test_add_model_revision_delegates_to_controller(
         self,
         processors: DeploymentProcessors,
         mock_deployment_controller: MagicMock,
         deployment_id: uuid.UUID,
+        requester: UserData,
         revision_creator: ModelRevisionCreator,
         revision_data: ModelRevisionData,
     ) -> None:
-        """add_model_revision should delegate to controller.add_deployment_revision.
+        """add_model_revision delegates to the controller with the current user as requester.
 
-        The service forwards the ``ModelRevisionCreator`` and ``auto_activate``
-        flag directly; the controller owns the projection onto ``RevisionDraft``
-        + ``MountMetadata`` + ``preset_id`` and the optional activation step.
+        The service resolves the requesting user from the request context and
+        forwards it as ``requester_id``; the controller owns the projection onto
+        ``RevisionDraft`` + ``MountMetadata`` + ``preset_id`` and the optional
+        activation step.
         """
         mock_deployment_controller.add_deployment_revision = AsyncMock(return_value=revision_data)
 
@@ -507,6 +533,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
         mock_deployment_controller.add_deployment_revision.assert_awaited_once_with(
             deployment_id=deployment_id,
             revision=revision_creator,
+            requester_id=requester.user_id,
             auto_activate=False,
         )
 
@@ -541,6 +568,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         project_id: uuid.UUID,
     ) -> DeploymentInfo:
         return DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
             id=DeploymentID(deployment_id),
             metadata=DeploymentMetadata(
                 name="ba5881-test",
@@ -684,6 +712,7 @@ class TestConvertDeploymentInfoToData:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                     extra_mounts=[],
+                    model_mount_perm=MountPermission.READ_ONLY,
                 ),
                 created_at=datetime(2024, 1, 1, tzinfo=UTC),
                 image_id=ImageID(uuid.uuid4()),
@@ -692,7 +721,7 @@ class TestConvertDeploymentInfoToData:
                     bootstrap_script=None,
                     callback_url=None,
                 ),
-                preset=PresetAttributionData(preset_id=None, values=[]),
+                revision_preset=PresetAttributionData(preset_id=None, values=[]),
             )
 
         return make
@@ -706,6 +735,7 @@ class TestConvertDeploymentInfoToData:
         current_data = make_revision_data(2)
 
         deployment_info = DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
             id=DeploymentID(uuid.uuid4()),
             metadata=DeploymentMetadata(
                 name="ba5963-test",
@@ -727,6 +757,8 @@ class TestConvertDeploymentInfoToData:
                 open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
             ),
             options=DeploymentOptions(),
+            current_revision_id=current_data.id,
+            deploying_revision_id=deploying_data.id,
             current_revision=current_data,
             deploying_revision=deploying_data,
         )
@@ -736,5 +768,8 @@ class TestConvertDeploymentInfoToData:
         assert deployment_data.current_revision_id == current_data.id
         assert deployment_data.deploying_revision_id == deploying_data.id
         assert deployment_data.current_revision_id != deployment_data.deploying_revision_id
-        assert deployment_data.revision is not None
-        assert deployment_data.revision.id == current_data.id
+
+        # The full current revision now lives on the legacy (REST v1) projection.
+        legacy_data = _convert_deployment_info_to_legacy_data(deployment_info)
+        assert legacy_data.revision is not None
+        assert legacy_data.revision.id == current_data.id

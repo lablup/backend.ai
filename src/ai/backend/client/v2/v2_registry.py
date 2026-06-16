@@ -16,7 +16,6 @@ from .config import ClientConfig
 
 if TYPE_CHECKING:
     from .domains_v2.agent import V2AgentClient
-    from .domains_v2.app_config import V2AppConfigClient
     from .domains_v2.artifact import V2ArtifactClient
     from .domains_v2.artifact_registry import V2ArtifactRegistryClient
     from .domains_v2.audit_log import V2AuditLogClient
@@ -48,6 +47,7 @@ if TYPE_CHECKING:
     from .domains_v2.resource_slot import V2ResourceSlotClient
     from .domains_v2.resource_usage import V2ResourceUsageClient
     from .domains_v2.role_invitation import V2RoleInvitationClient
+    from .domains_v2.role_preset import V2RolePresetClient
     from .domains_v2.runtime_variant import V2RuntimeVariantClient
     from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
     from .domains_v2.scheduling_handler import V2SchedulingHandlerClient
@@ -88,12 +88,6 @@ class V2ClientRegistry:
         from .domains_v2.agent import V2AgentClient
 
         return V2AgentClient(self._client)
-
-    @cached_property
-    def app_config(self) -> V2AppConfigClient:
-        from .domains_v2.app_config import V2AppConfigClient
-
-        return V2AppConfigClient(self._client)
 
     @cached_property
     def artifact(self) -> V2ArtifactClient:
@@ -214,6 +208,12 @@ class V2ClientRegistry:
         from .domains_v2.role_invitation import V2RoleInvitationClient
 
         return V2RoleInvitationClient(self._client)
+
+    @cached_property
+    def role_preset(self) -> V2RolePresetClient:
+        from .domains_v2.role_preset import V2RolePresetClient
+
+        return V2RolePresetClient(self._client)
 
     @cached_property
     def prometheus_query_preset(self) -> V2PrometheusQueryPresetClient:

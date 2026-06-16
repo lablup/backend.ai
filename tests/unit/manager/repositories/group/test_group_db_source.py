@@ -29,6 +29,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -103,6 +104,7 @@ class TestGroupDBSourceDeleteEndpoints:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -262,7 +264,6 @@ class TestGroupDBSourceDeleteEndpoints:
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)
@@ -323,7 +324,6 @@ class TestGroupDBSourceDeleteEndpoints:
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
 
@@ -401,7 +401,6 @@ class TestGroupDBSourceDeleteEndpoints:
                 project=test_group,
                 resource_group=sgroup_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
             await session.commit()
@@ -450,7 +449,6 @@ class TestGroupDBSourceDeleteEndpoints:
                     project=test_group,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 session.add(endpoint)
                 endpoint_ids.append(endpoint_id)

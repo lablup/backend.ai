@@ -47,6 +47,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
 from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.notification import NotificationCenter
 from ai.backend.manager.registry import AgentRegistry
@@ -63,6 +64,7 @@ from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory, SMTPTriggerPolicy
@@ -97,6 +99,7 @@ class ProcessingInput:
     scheduling_controller: SchedulingController
     deployment_coordinator: DeploymentCoordinator
     route_coordinator: RouteCoordinator
+    reconciler_coordinator: ReconcilerCoordinator
     scheduler_repository: SchedulerRepository
     event_hub: EventHub
     agent_registry: AgentRegistry
@@ -223,6 +226,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         prometheus_monitor = PrometheusMonitor()
         audit_log_monitor = AuditLogMonitor(setup_input.repositories.audit_log.repository)
 
+        ssh_key_validator = SSHKeyValidator()
+
         service_args = ServiceArgs(
             db=setup_input.db,
             repositories=setup_input.repositories,
@@ -249,6 +254,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             notification_center=setup_input.notification_center,
             appproxy_client_pool=setup_input.appproxy_client_pool,
             prometheus_client=setup_input.prometheus_client,
+            ssh_key_validator=ssh_key_validator,
             registry_quota_service=setup_input.registry_quota_service,
         )
 
@@ -290,6 +296,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 scheduling_controller=setup_input.scheduling_controller,
                 deployment_coordinator=setup_input.deployment_coordinator,
                 route_coordinator=setup_input.route_coordinator,
+                reconciler_coordinator=setup_input.reconciler_coordinator,
                 scheduler_repository=setup_input.scheduler_repository,
                 event_hub=setup_input.event_hub,
                 agent_registry=setup_input.agent_registry,

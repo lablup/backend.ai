@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
+    UIOption,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import (
     ChoiceItemData,
@@ -21,7 +22,6 @@ from ai.backend.manager.data.runtime_variant_preset.types import (
     UIOptionData,
 )
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn
-from ai.backend.manager.models.runtime_variant_preset.types import UIOption
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -60,6 +60,9 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
         "default_value", sa.String(length=512), nullable=True
     )
     key: Mapped[str] = mapped_column("key", sa.String(length=256), nullable=False)
+    required: Mapped[bool] = mapped_column(
+        "required", sa.Boolean, nullable=False, server_default=sa.false()
+    )
 
     # UI metadata
     category: Mapped[str | None] = mapped_column("category", sa.String(length=64), nullable=True)
@@ -121,6 +124,7 @@ class RuntimeVariantPresetRow(Base):  # type: ignore[misc]
             value_type=PresetValueType(self.value_type),
             default_value=self.default_value,
             key=self.key,
+            required=self.required,
             category=self.category,
             ui_type=ui_option_data.ui_type if ui_option_data is not None else None,
             display_name=self.display_name,

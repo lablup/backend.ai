@@ -41,7 +41,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
     SlotName,
-    SlotQuantity,
     SlotTypes,
     VFolderMount,
     VFolderMountOptions,
@@ -53,12 +52,12 @@ from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, S
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.resource.types import SlotTypePolicy
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
@@ -156,7 +155,6 @@ from ai.backend.manager.sokovan.data import (
     KeypairOccupancy,
     KeyPairResourcePolicy,
     ResourceOccupancySnapshot,
-    SchedulingFailure,
     SessionAllocation,
     SessionDataForPull,
     SessionDataForStart,
@@ -170,7 +168,7 @@ from ai.backend.manager.sokovan.data import (
 )
 from ai.backend.manager.types import UserScope
 
-from .types import KeypairConcurrencyData, SessionRowCache
+from .types import KeypairConcurrencyData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -345,12 +343,22 @@ class ScheduleDBSource:
             active_slot_types=active_slot_types,
         )
 
-    async def _fetch_required_slot_names(self, db_sess: SASession) -> frozenset[SlotName]:
-        stmt = sa.select(ResourceSlotTypeRow.slot_name).where(
-            ResourceSlotTypeRow.required.is_(True)
+    async def _fetch_slot_type_policy(self, db_sess: SASession) -> SlotTypePolicy:
+        stmt = sa.select(
+            ResourceSlotTypeRow.slot_name,
+            ResourceSlotTypeRow.enabled,
+            ResourceSlotTypeRow.required,
+        ).where(
+            sa.or_(
+                ResourceSlotTypeRow.enabled.is_(True),
+                ResourceSlotTypeRow.required.is_(True),
+            )
         )
-        rows = (await db_sess.execute(stmt)).scalars().all()
-        return frozenset(SlotName(slot_name) for slot_name in rows)
+        rows = (await db_sess.execute(stmt)).all()
+        return SlotTypePolicy(
+            enabled=frozenset(SlotName(row.slot_name) for row in rows if row.enabled),
+            required=frozenset(SlotName(row.slot_name) for row in rows if row.required),
+        )
 
     async def _fetch_scaling_group(
         self, db_sess: SASession, scaling_group: str
@@ -911,6 +919,15 @@ class ScheduleDBSource:
         """Cancel PENDING sessions and their kernels, and free the kernels'
         ``resource_allocations`` rows in the same transaction.
         """
+        # Capture from_statuses before update for history recording
+        status_query = sa.select(SessionRow.id, SessionRow.status).where(
+            sa.and_(SessionRow.id.in_(session_ids), SessionRow.status == SessionStatus.PENDING)
+        )
+        status_result = await db_sess.execute(status_query)
+        from_statuses: dict[SessionId, SessionStatus] = {
+            cast(SessionId, row.id): SessionStatus(row.status) for row in status_result
+        }
+
         cancel_stmt = (
             sa.update(SessionRow)
             .values(
@@ -950,6 +967,20 @@ class ScheduleDBSource:
             )
             cancelled_kernel_ids = [row.id for row in kernel_update_result]
             await self._free_kernel_allocations(db_sess, cancelled_kernel_ids, now)
+
+            # Record scheduling history for cancel transition
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=sid,
+                    phase="cancel",
+                    result=SchedulingResult.SUCCESS,
+                    message=reason,
+                    from_status=from_statuses.get(sid),
+                    to_status=SessionStatus.CANCELLED,
+                )
+                for sid in cancelled_sessions
+            ]
+            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
 
         return cancelled_sessions
 
@@ -1074,14 +1105,15 @@ class ScheduleDBSource:
 
         # Mark kernels as TERMINATED directly
         if force_terminated_sessions:
-            # Fetch kernel_id and agent_id before updating status
-            kernel_agent_query = sa.select(KernelRow.id, KernelRow.agent).where(
+            # Capture kernel ids before updating status so their allocations can
+            # be freed afterwards.
+            kernel_id_query = sa.select(KernelRow.id).where(
                 sa.and_(
                     KernelRow.session_id.in_(force_terminated_sessions),
                     KernelRow.status.in_(KernelStatus.force_terminatable_statuses()),
                 )
             )
-            kernel_agent_rows = (await db_sess.execute(kernel_agent_query)).all()
+            force_terminated_kernel_ids = (await db_sess.execute(kernel_id_query)).scalars().all()
 
             await db_sess.execute(
                 sa.update(KernelRow)
@@ -1107,30 +1139,8 @@ class ScheduleDBSource:
                 )
             )
 
-            # Free resource allocations and decrement agent_resources for each kernel
-            ar = AgentResourceRow.__table__
-            for kernel_id, agent_id in kernel_agent_rows:
-                released = (
-                    await db_sess.execute(
-                        sa.update(ResourceAllocationRow)
-                        .where(
-                            ResourceAllocationRow.kernel_id == kernel_id,
-                            ResourceAllocationRow.free_at.is_(None),
-                        )
-                        .values(free_at=sa.func.now())
-                        .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
-                    )
-                ).all()
-                if agent_id and released:
-                    for r in released:
-                        if r.used is None:
-                            continue
-                        new_used = sa.func.greatest(ar.c.used - r.used, 0)
-                        await db_sess.execute(
-                            sa.update(ar)
-                            .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
-                            .values(used=new_used)
-                        )
+            # Free allocations and release each kernel's reserved/used hold.
+            await self._free_allocations_and_release(db_sess, force_terminated_kernel_ids, now)
 
             # Record scheduling history for force-terminate transition
             history_specs = [
@@ -1527,7 +1537,7 @@ class ScheduleDBSource:
             rg_defaults = None
             resource_group_allow_fractional = False
             known_slot_types: Mapping[SlotName, SlotTypes] = {}
-            required_slot_names = await self._fetch_required_slot_names(db_sess)
+            slot_type_policy = await self._fetch_slot_type_policy(db_sess)
             if resource_group_name:
                 rg_bundle = await self._fetch_scaling_group_with_slot_inventory(
                     db_sess, resource_group_name
@@ -1699,7 +1709,7 @@ class ScheduleDBSource:
             active_session_count=active_session_count,
             keypair_resource_policy=keypair_policy,
             known_slot_types=known_slot_types,
-            required_slot_names=required_slot_names,
+            slot_type_policy=slot_type_policy,
         )
 
     async def pick_default_resource_group(
@@ -1949,106 +1959,32 @@ class ScheduleDBSource:
             for sg in allowed_sgroups
         ]
 
-    async def allocate_sessions(
-        self, allocation_batch: AllocationBatch
-    ) -> list[ScheduledSessionData]:
+    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> list[SessionId]:
+        """Reserve and assign sessions in the batch to their agents.
+
+        Reserves each session's kernels on their chosen agents and assigns the
+        agent + kernel SCHEDULED status, all in one batch transaction. Session
+        status is NOT changed here — the coordinator transitions the returned
+        sessions to SCHEDULED.
+
+        Returns the ids of the sessions that were actually allocated. If a
+        reservation loses a capacity race (rare: the in-memory selector already
+        filtered on capacity), the whole batch transaction is rolled back and an
+        empty list is returned; the sessions stay PENDING and are retried next
+        tick.
         """
-        Allocate resources for sessions in the batch.
-        Updates session/kernel statuses and syncs agent occupied slots.
-
-        This method handles:
-        1. Pre-fetching all necessary session and kernel data
-        2. Processing successful allocations by updating session/kernel statuses
-        3. Processing scheduling failures by updating their status data
-        4. Syncing agent occupied slots to AgentRow
-
-        Returns:
-            List of ScheduledSessionData for allocated sessions
-        """
-        # Collect all affected agents
-        affected_agent_ids: set[AgentId] = set()
-        scheduled_sessions: list[ScheduledSessionData] = []
-
-        for allocation in allocation_batch.allocations:
-            for kernel_alloc in allocation.kernel_allocations:
-                if kernel_alloc.agent_id:
-                    affected_agent_ids.add(kernel_alloc.agent_id)
-
-        async with self._begin_session_read_committed() as db_sess:
-            now = await self._get_db_now_in_session(db_sess)
-            # First, fetch session data to get creation_id and access_key
-            session_ids = {alloc.session_id for alloc in allocation_batch.allocations}
-            if session_ids:
-                query = sa.select(
-                    SessionRow.id, SessionRow.creation_id, SessionRow.access_key
-                ).where(SessionRow.id.in_(session_ids))
-                result = await db_sess.execute(query)
-                session_data_map = {row.id: (row.creation_id, row.access_key) for row in result}
-
-                # Create SessionEventData for each allocated session
+        scheduled_session_ids: list[SessionId] = []
+        try:
+            async with self._begin_session_read_committed() as db_sess:
+                now = await self._get_db_now_in_session(db_sess)
                 for allocation in allocation_batch.allocations:
-                    if session_data := session_data_map.get(allocation.session_id):
-                        creation_id, access_key = session_data
-                        scheduled_sessions.append(
-                            ScheduledSessionData(
-                                session_id=allocation.session_id,
-                                creation_id=creation_id,
-                                access_key=access_key,
-                                reason="triggered-by-scheduler",
-                            )
-                        )
-
-            # Process successful allocations
-            for allocation in allocation_batch.allocations:
-                try:
                     await self._allocate_single_session(db_sess, allocation, now)
-                except Exception as e:
-                    log.error(
-                        "Error allocating session {}: {}",
-                        allocation.session_id,
-                        e,
-                    )
-                    # Continue with next session allocation
+                    scheduled_session_ids.append(allocation.session_id)
+        except AgentResourceCapacityExceeded as e:
+            log.warning("Allocation batch rolled back on capacity gate: {}", e)
+            return []
 
-            # Process scheduling failures in the same transaction
-            if allocation_batch.failures:
-                # Pre-fetch session rows only for failure status updates (needed for retry counts)
-                failure_session_ids = {failure.session_id for failure in allocation_batch.failures}
-                session_cache = await self._prefetch_session_rows(db_sess, failure_session_ids)
-
-                for failure in allocation_batch.failures:
-                    try:
-                        await self._update_session_failure_status(db_sess, session_cache, failure)
-                    except SessionNotFound as e:
-                        log.warning(
-                            "Session {} not found for failure status update: {}",
-                            failure.session_id,
-                            e,
-                        )
-                        # Continue with next failure update
-                    except Exception as e:
-                        log.error(
-                            "Unexpected error updating failure status for session {}: {}",
-                            failure.session_id,
-                            e,
-                        )
-                        # Continue with next failure update
-
-        return scheduled_sessions
-
-    async def _prefetch_session_rows(
-        self, db_sess: SASession, session_ids: set[SessionId]
-    ) -> SessionRowCache:
-        """Pre-fetch all session rows for the given session IDs."""
-        if not session_ids:
-            return SessionRowCache({})
-
-        query = sa.select(SessionRow).where(SessionRow.id.in_(session_ids))
-        result = await db_sess.execute(query)
-        sessions = result.scalars().all()
-
-        prefetched = {session.id: session for session in sessions}
-        return SessionRowCache(prefetched)
+        return scheduled_session_ids
 
     async def _allocate_single_session(
         self,
@@ -2056,47 +1992,25 @@ class ScheduleDBSource:
         allocation: SessionAllocation,
         now: datetime,
     ) -> None:
+        """Reserve and assign each kernel of a session to its chosen agent.
+
+        Runs in the caller's batch transaction. Per kernel, the PENDING ->
+        SCHEDULED update doubles as the idempotency gate: a matched row (rowcount
+        1) means this pass owns the transition and reserves the kernel's slots; a
+        kernel already SCHEDULED (rowcount 0, reserved on a previous pass) is
+        skipped so the reservation never double-counts. Order is safe because the
+        whole batch is one transaction — a capacity-exceeded reservation rolls
+        back the kernel update along with everything else.
+
+        Session status is NOT changed here: the coordinator owns session status
+        transitions. Only resource-assignment metadata (scaling_group_name,
+        agent_ids) is written on the session.
+
+        Raises AgentResourceCapacityExceeded if any kernel cannot be reserved;
+        the caller rolls back the whole batch transaction and retries next tick.
         """
-        Allocate resources for a single session.
-        Updates session first, then its kernels.
-        Only updates if session is in PENDING status.
-        """
-
-        # Update session status and metadata first
-        session_update_query = (
-            sa.update(SessionRow)
-            .where(
-                sa.and_(
-                    SessionRow.id == allocation.session_id,
-                    SessionRow.status == SessionStatus.PENDING,
-                )
-            )
-            .values(
-                status=SessionStatus.SCHEDULED,
-                status_info="scheduled",
-                status_data={},
-                status_history=sql_json_merge(
-                    SessionRow.__table__.c.status_history,
-                    (),
-                    {SessionStatus.SCHEDULED.name: now.isoformat()},
-                ),
-                scaling_group_name=allocation.scaling_group,
-                agent_ids=allocation.unique_agent_ids(),
-            )
-        )
-        result = await db_sess.execute(session_update_query)
-
-        # Check if session was actually updated
-        if cast(CursorResult[Any], result).rowcount == 0:
-            log.warning(
-                "Session {} was not in PENDING status, skipping allocation",
-                allocation.session_id,
-            )
-            return
-
-        # Update kernels only if session was successfully updated
         for kernel_alloc in allocation.kernel_allocations:
-            await db_sess.execute(
+            promoted = await db_sess.execute(
                 sa.update(KernelRow)
                 .where(
                     sa.and_(
@@ -2119,72 +2033,21 @@ class ScheduleDBSource:
                     scaling_group=kernel_alloc.scaling_group,
                 )
             )
+            if cast(CursorResult[Any], promoted).rowcount == 0:
+                continue
+            await self._reserve_kernel_resources(
+                db_sess, KernelId(kernel_alloc.kernel_id), kernel_alloc.agent_id
+            )
 
-    async def _update_session_failure_status(
-        self, db_sess: SASession, session_cache: SessionRowCache, failure: SchedulingFailure
-    ) -> None:
-        """
-        Update session status for a scheduling failure.
-        Increments retries count from existing status_data.
-        Only updates if session is in PENDING status.
-        """
-        # Get existing session to retrieve current retries count
-        session_row = await session_cache.get_or_fetch(db_sess, failure.session_id)
-
-        # Get current retries count from existing status_data
-        current_status_data = session_row.status_data or {}
-        scheduler_data = current_status_data.get("scheduler", {})
-        current_retries = scheduler_data.get("retries", 0)
-
-        # Prepare status data using the failure's to_status_data method
-        status_data = failure.to_status_data(current_retries)
-
-        # Update session status data first
-        session_query = (
+        # Resource-assignment metadata on the session (not status).
+        await db_sess.execute(
             sa.update(SessionRow)
-            .where(
-                sa.and_(
-                    SessionRow.id == failure.session_id,
-                    SessionRow.status == SessionStatus.PENDING,
-                )
-            )
+            .where(SessionRow.id == allocation.session_id)
             .values(
-                status_info=failure.msg,
-                status_data=sql_json_merge(
-                    SessionRow.__table__.c.status_data,
-                    ("scheduler",),
-                    obj=status_data,
-                ),
+                scaling_group_name=allocation.scaling_group,
+                agent_ids=allocation.unique_agent_ids(),
             )
         )
-        result = await db_sess.execute(session_query)
-
-        # Check if session was actually updated
-        if cast(CursorResult[Any], result).rowcount == 0:
-            log.warning(
-                "Session {} was not in PENDING status, skipping failure status update",
-                failure.session_id,
-            )
-            return
-
-        # Update kernel status data only if session was updated
-        kernel_query = (
-            sa.update(KernelRow)
-            .where(
-                sa.and_(
-                    KernelRow.session_id == failure.session_id,
-                    KernelRow.status == KernelStatus.PENDING,
-                )
-            )
-            .values(
-                status_data=sql_json_merge(
-                    KernelRow.__table__.c.status_data,
-                    ("scheduler",),
-                    obj=status_data,
-                ),
-            )
-        )
-        await db_sess.execute(kernel_query)
 
     async def update_kernel_status_pulling(self, kernel_id: UUID, reason: str) -> bool:
         """
@@ -2346,18 +2209,25 @@ class ScheduleDBSource:
         agent_id: AgentId | None,
         occupied_slots: ResourceSlot,
     ) -> None:
-        """Activate resource allocations and increment agent resource usage.
+        """Activate a kernel's allocations on its RUNNING transition.
+
+        Moves the kernel's hold from ``reserved`` to ``used`` on the agent: for
+        each slot, mark the pending allocation row as used (recording the actual
+        amount) and, in one atomic statement, decrement ``reserved`` by the
+        originally-requested amount and increment ``used`` by the actual amount.
+
+        This is a net-zero move (when actual == requested) of an amount already
+        admitted by the SCHEDULED-time ``reserved + used <= capacity`` guard, so
+        it never rejects — the kernel is already physically running.
 
         Must be called within an existing DB session/transaction.
         Idempotent: rows where used_at is already set are skipped.
         No-op if agent_id is None or occupied_slots is empty.
-
-        Raises:
-            AgentResourceCapacityExceeded: If any slot would exceed agent capacity.
         """
         if not agent_id or not occupied_slots:
             return
-        slots = resource_slot_to_quantities(occupied_slots)
+        ar = AgentResourceRow.__table__
+        slots = sorted(resource_slot_to_quantities(occupied_slots), key=lambda s: s.slot_name)
         for s in slots:
             alloc_result = await db_sess.execute(
                 sa.update(ResourceAllocationRow)
@@ -2368,28 +2238,138 @@ class ScheduleDBSource:
                     ResourceAllocationRow.used_at.is_(None),
                 )
                 .values(used=s.quantity, used_at=sa.func.now())
+                .returning(ResourceAllocationRow.requested)
             )
-            if cast(CursorResult[Any], alloc_result).rowcount == 0:
+            alloc_row = alloc_result.first()
+            if alloc_row is None:
                 continue
-            new_used = AgentResourceRow.used + s.quantity
-            agent_result = await db_sess.execute(
-                sa.update(AgentResourceRow)
-                .where(
-                    AgentResourceRow.agent_id == agent_id,
-                    AgentResourceRow.slot_name == s.slot_name,
-                    new_used <= AgentResourceRow.capacity,
+            await db_sess.execute(
+                sa.update(ar)
+                .where(ar.c.agent_id == agent_id, ar.c.slot_name == s.slot_name)
+                .values(
+                    reserved=sa.func.greatest(ar.c.reserved - alloc_row.requested, 0),
+                    used=ar.c.used + s.quantity,
                 )
-                .values(used=new_used)
             )
-            if cast(CursorResult[Any], agent_result).rowcount == 0:
-                raise AgentResourceCapacityExceeded(
-                    f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
-                )
         log.debug(
-            "[DBSource] Allocated resources for kernel {} on agent {}",
+            "[DBSource] Activated resources for kernel {} on agent {}",
             kernel_id,
             agent_id,
         )
+
+    async def _reserve_kernel_resources(
+        self,
+        db_sess: SASession,
+        kernel_id: KernelId,
+        agent_id: AgentId,
+    ) -> None:
+        """Reserve a kernel's requested slots on its agent (SCHEDULED gate).
+
+        Reads the kernel's per-slot ``requested`` from its active
+        ``resource_allocations`` rows -- the same source the RUNNING and free
+        paths use -- and, for each slot, atomically increments the agent's
+        ``reserved`` only while ``reserved + used + requested <= capacity`` still
+        holds. A non-matching row (capacity would be exceeded, or the agent has
+        no row for the slot) raises ``AgentResourceCapacityExceeded`` so the
+        caller can roll back the whole session allocation. Slots are visited in
+        a stable order to avoid deadlocks with concurrent releases.
+        """
+        ar = AgentResourceRow.__table__
+        requested_rows = (
+            await db_sess.execute(
+                sa.select(ResourceAllocationRow.slot_name, ResourceAllocationRow.requested)
+                .where(
+                    ResourceAllocationRow.kernel_id == kernel_id,
+                    ResourceAllocationRow.free_at.is_(None),
+                    ResourceAllocationRow.used_at.is_(None),
+                )
+                .order_by(ResourceAllocationRow.slot_name)
+            )
+        ).all()
+        for r in requested_rows:
+            new_reserved = ar.c.reserved + r.requested
+            result = await db_sess.execute(
+                sa.update(ar)
+                .where(
+                    ar.c.agent_id == agent_id,
+                    ar.c.slot_name == r.slot_name,
+                    new_reserved + ar.c.used <= ar.c.capacity,
+                )
+                .values(reserved=new_reserved)
+            )
+            if cast(CursorResult[Any], result).rowcount == 0:
+                raise AgentResourceCapacityExceeded(
+                    f"Agent {agent_id}: capacity exceeded for slot '{r.slot_name}'"
+                )
+
+    async def _free_allocations_and_release(
+        self,
+        db_sess: SASession,
+        kernel_ids: Sequence[UUID],
+        now: datetime,
+    ) -> int:
+        """Free the given kernels' active allocations and release their hold on
+        ``agent_resources``.
+
+        Rows that were only reserved (``used_at IS NULL``) decrement the agent's
+        ``reserved`` by ``requested``; rows that were running (``used_at`` set)
+        decrement ``used`` by the recorded amount. ``greatest(…, 0)`` guards
+        against drift-induced negatives. Idempotent via the ``free_at IS NULL``
+        guard. Returns the number of allocation rows freed.
+        """
+        if not kernel_ids:
+            return 0
+        ar = AgentResourceRow.__table__
+        agent_rows = (
+            await db_sess.execute(
+                sa.select(KernelRow.id, KernelRow.agent).where(KernelRow.id.in_(kernel_ids))
+            )
+        ).all()
+        agent_by_kernel: dict[UUID, str | None] = {row.id: row.agent for row in agent_rows}
+
+        freed = (
+            await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(
+                    ResourceAllocationRow.kernel_id.in_(kernel_ids),
+                    ResourceAllocationRow.free_at.is_(None),
+                )
+                .values(free_at=now)
+                .returning(
+                    ResourceAllocationRow.kernel_id,
+                    ResourceAllocationRow.slot_name,
+                    ResourceAllocationRow.requested,
+                    ResourceAllocationRow.used,
+                    ResourceAllocationRow.used_at,
+                )
+            )
+        ).all()
+        if not freed:
+            return 0
+
+        reserved_delta: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
+        used_delta: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
+        for r in freed:
+            agent_id = agent_by_kernel.get(r.kernel_id)
+            if not agent_id:
+                continue
+            key = (agent_id, r.slot_name)
+            if r.used_at is None:
+                reserved_delta[key] += r.requested
+            elif r.used is not None:
+                used_delta[key] += r.used
+
+        for key in sorted(set(reserved_delta) | set(used_delta)):
+            agent_id, slot_name = key
+            await db_sess.execute(
+                sa.update(ar)
+                .where(ar.c.agent_id == agent_id, ar.c.slot_name == slot_name)
+                .values(
+                    reserved=sa.func.greatest(ar.c.reserved - reserved_delta[key], 0),
+                    used=sa.func.greatest(ar.c.used - used_delta[key], 0),
+                )
+            )
+        return len(freed)
 
     async def update_kernel_status_preparing(self, kernel_id: UUID) -> bool:
         """
@@ -2465,14 +2445,10 @@ class ScheduleDBSource:
             updated = cast(CursorResult[Any], result).rowcount > 0
 
             if updated:
-                await db_sess.execute(
-                    sa.update(ResourceAllocationRow)
-                    .where(
-                        ResourceAllocationRow.kernel_id == kernel_id,
-                        ResourceAllocationRow.free_at.is_(None),
-                    )
-                    .values(free_at=sa.func.now())
-                )
+                # Free allocations and release the kernel's reserved hold. A
+                # cancelled kernel was never RUNNING, so only ``reserved`` is
+                # released (a PENDING kernel has no agent and is a no-op).
+                await self._free_allocations_and_release(db_sess, [kernel_id], now)
         return updated
 
     async def update_kernel_status_terminated(
@@ -2481,7 +2457,8 @@ class ScheduleDBSource:
         """
         Update kernel status to TERMINATED.
         Uses UPDATE WHERE to ensure atomic state transition.
-        Also frees normalized resource allocations and decrements agent_resources.used.
+        Also frees normalized resource allocations and releases the kernel's
+        reserved/used hold on agent_resources.
 
         :param kernel_id: Kernel ID to update
         :param reason: Termination reason
@@ -2511,37 +2488,15 @@ class ScheduleDBSource:
                         {KernelStatus.TERMINATED.name: now.isoformat()},
                     ),
                 )
-                .returning(KernelRow.agent)
+                .returning(KernelRow.id)
             )
             result = await db_sess.execute(stmt)
             row = result.first()
             if row is None:
                 return False
-            agent_id: str | None = row[0]
 
-            # Free resource allocations in the same transaction
-            ar = AgentResourceRow.__table__
-            released = (
-                await db_sess.execute(
-                    sa.update(ResourceAllocationRow)
-                    .where(
-                        ResourceAllocationRow.kernel_id == kernel_id,
-                        ResourceAllocationRow.free_at.is_(None),
-                    )
-                    .values(free_at=sa.func.now())
-                    .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
-                )
-            ).all()
-            if agent_id and released:
-                for r in released:
-                    if r.used is None:
-                        continue
-                    new_used = sa.func.greatest(ar.c.used - r.used, 0)
-                    await db_sess.execute(
-                        sa.update(ar)
-                        .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
-                        .values(used=new_used)
-                    )
+            # Free allocations and release the kernel's reserved/used hold.
+            await self._free_allocations_and_release(db_sess, [kernel_id], now)
         return True
 
     async def reset_kernels_to_pending_for_sessions(
@@ -2682,12 +2637,6 @@ class ScheduleDBSource:
         async with self._begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
 
-            # Fetch kernel_id and agent_id before updating status
-            kernel_agent_query = sa.select(KernelRow.id, KernelRow.agent).where(
-                KernelRow.id.in_(kernel_uuids),
-            )
-            kernel_agent_rows = (await db_sess.execute(kernel_agent_query)).all()
-
             stmt = (
                 sa.update(KernelRow)
                 .where(KernelRow.id.in_(kernel_uuids))
@@ -2705,30 +2654,8 @@ class ScheduleDBSource:
             )
             result = await db_sess.execute(stmt)
 
-            # Free resource allocations and decrement agent_resources for each kernel
-            ar = AgentResourceRow.__table__
-            for kernel_id, agent_id in kernel_agent_rows:
-                released = (
-                    await db_sess.execute(
-                        sa.update(ResourceAllocationRow)
-                        .where(
-                            ResourceAllocationRow.kernel_id == kernel_id,
-                            ResourceAllocationRow.free_at.is_(None),
-                        )
-                        .values(free_at=sa.func.now())
-                        .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
-                    )
-                ).all()
-                if agent_id and released:
-                    for r in released:
-                        if r.used is None:
-                            continue
-                        new_used = sa.func.greatest(ar.c.used - r.used, 0)
-                        await db_sess.execute(
-                            sa.update(ar)
-                            .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
-                            .values(used=new_used)
-                        )
+            # Free allocations and release each kernel's reserved/used hold.
+            await self._free_allocations_and_release(db_sess, kernel_uuids, now)
 
             return cast(CursorResult[Any], result).rowcount
 
@@ -2889,7 +2816,9 @@ class ScheduleDBSource:
             cancelled_rows = result.all()
             cancelled_kernel_ids = [row.id for row in cancelled_rows]
 
-            await self._free_kernel_allocations(db_sess, cancelled_kernel_ids, now)
+            # SCHEDULED/PULLING/PREPARING kernels hold a reservation, so release
+            # their agent_resources hold (decrements per used_at), not just free_at.
+            await self._free_allocations_and_release(db_sess, cancelled_kernel_ids, now)
 
             return {row.session_id for row in cancelled_rows}
 
@@ -3530,21 +3459,13 @@ class ScheduleDBSource:
                         {KernelStatus.CANCELLED.name: now.isoformat()},
                     ),
                 )
+                .returning(KernelRow.id)
             )
-            await db_sess.execute(kernel_stmt)
+            cancelled_kernel_ids = [row.id for row in await db_sess.execute(kernel_stmt)]
 
-            # Mark resource allocations as freed for all kernels in this session
-            kernel_ids_subq = (
-                sa.select(KernelRow.id).where(KernelRow.session_id == session_id).scalar_subquery()
-            )
-            await db_sess.execute(
-                sa.update(ResourceAllocationRow)
-                .where(
-                    ResourceAllocationRow.kernel_id.in_(kernel_ids_subq),
-                    ResourceAllocationRow.free_at.is_(None),
-                )
-                .values(free_at=sa.func.now())
-            )
+            # Free the kernels' allocations and release their reserved/used hold on
+            # agent_resources (decrements per used_at), not just set free_at.
+            await self._free_allocations_and_release(db_sess, cancelled_kernel_ids, now)
 
     async def update_session_error_info(
         self, session_id: SessionId, error_info: ErrorStatusInfo
@@ -3690,215 +3611,6 @@ class ScheduleDBSource:
             total_free_slots=total_free_slots,
             total_capacity_slots=total_capacity_slots,
         )
-
-    # =========================================================================
-    # Normalized resource allocation write operations
-    # =========================================================================
-
-    async def allocate_kernel_resources(
-        self,
-        kernel_id: UUID,
-        agent_id: str,
-        slots: Sequence[SlotQuantity],
-    ) -> int:
-        """Set used values on allocations and increment agent_resources.used.
-
-        This method is idempotent: re-calling with the same kernel_id + slot_name
-        will not double-increment agent_resources.used because only allocation rows
-        where used_at IS NULL are updated.
-
-        Returns:
-            Number of slots actually allocated (0 if already allocated).
-
-        Raises:
-            AgentResourceCapacityExceeded: If any slot would exceed agent capacity.
-        """
-        if not slots:
-            return 0
-        ar = AgentResourceRow.__table__
-        allocated_count = 0
-        async with self._begin_session_read_committed() as db_sess:
-            for s in slots:
-                # Only update allocations that haven't been activated yet.
-                # used_at IS NULL ensures idempotency: re-calls are no-ops.
-                alloc_result = await db_sess.execute(
-                    sa.update(ResourceAllocationRow)
-                    .where(
-                        ResourceAllocationRow.kernel_id == kernel_id,
-                        ResourceAllocationRow.slot_name == s.slot_name,
-                        ResourceAllocationRow.free_at.is_(None),
-                        ResourceAllocationRow.used_at.is_(None),
-                    )
-                    .values(used=s.quantity, used_at=sa.func.now())
-                )
-                if cast(CursorResult[Any], alloc_result).rowcount == 0:
-                    # Already allocated or no matching row — skip agent_resources update
-                    continue
-                new_used = ar.c.used + s.quantity
-                result = await db_sess.execute(
-                    sa.update(ar)
-                    .where(
-                        ar.c.agent_id == agent_id,
-                        ar.c.slot_name == s.slot_name,
-                        new_used <= ar.c.capacity,
-                    )
-                    .values(used=new_used)
-                )
-                if cast(CursorResult[Any], result).rowcount == 0:
-                    raise AgentResourceCapacityExceeded(
-                        f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
-                    )
-                allocated_count += 1
-            return allocated_count
-
-    async def allocate_session_kernel_resources(
-        self,
-        allocations: Sequence[tuple[UUID, str, Sequence[SlotQuantity]]],
-    ) -> int:
-        """Allocate resources for multiple kernels in a single transaction.
-
-        This ensures all-or-nothing semantics: if any kernel's allocation fails,
-        all allocations in this batch are rolled back.
-
-        Each individual kernel allocation is idempotent (used_at IS NULL guard).
-
-        Args:
-            allocations: List of (kernel_id, agent_id, slots) tuples.
-
-        Returns:
-            Total number of slots allocated across all kernels.
-
-        Raises:
-            AgentResourceCapacityExceeded: If any slot would exceed agent capacity.
-        """
-        if not allocations:
-            return 0
-        ar = AgentResourceRow.__table__
-        total_allocated = 0
-        async with self._begin_session_read_committed() as db_sess:
-            for kernel_id, agent_id, slots in allocations:
-                for s in slots:
-                    alloc_result = await db_sess.execute(
-                        sa.update(ResourceAllocationRow)
-                        .where(
-                            ResourceAllocationRow.kernel_id == kernel_id,
-                            ResourceAllocationRow.slot_name == s.slot_name,
-                            ResourceAllocationRow.free_at.is_(None),
-                            ResourceAllocationRow.used_at.is_(None),
-                        )
-                        .values(used=s.quantity, used_at=sa.func.now())
-                    )
-                    if cast(CursorResult[Any], alloc_result).rowcount == 0:
-                        continue
-                    new_used = ar.c.used + s.quantity
-                    result = await db_sess.execute(
-                        sa.update(ar)
-                        .where(
-                            ar.c.agent_id == agent_id,
-                            ar.c.slot_name == s.slot_name,
-                            new_used <= ar.c.capacity,
-                        )
-                        .values(used=new_used)
-                    )
-                    if cast(CursorResult[Any], result).rowcount == 0:
-                        raise AgentResourceCapacityExceeded(
-                            f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
-                        )
-                    total_allocated += 1
-            return total_allocated
-
-    async def update_running_and_allocate_resources(
-        self,
-        sessions_data: list[SessionRunningData],
-        allocations: Sequence[tuple[UUID, str, Sequence[SlotQuantity]]],
-    ) -> int:
-        """Atomically update session occupying_slots AND allocate kernel resources.
-
-        Single transaction guarantees:
-        - If allocation fails, session update is also rolled back.
-        - Idempotent per kernel (used_at IS NULL guard).
-
-        Returns:
-            Total number of slots allocated across all kernels.
-
-        Raises:
-            AgentResourceCapacityExceeded: If any slot would exceed agent capacity.
-        """
-        ar = AgentResourceRow.__table__
-        total_allocated = 0
-        async with self._begin_session_read_committed() as db_sess:
-            # Phase 3 (BA-4308): Legacy JSONB write to sessions.occupying_slots
-            # removed.  The sessions.occupying_slots column is retained for
-            # historical audit but no longer written to.  Resource allocations
-            # are tracked via the normalized tables below.
-
-            # Allocate kernel resources
-            for kernel_id, agent_id, slots in allocations:
-                for s in slots:
-                    alloc_result = await db_sess.execute(
-                        sa.update(ResourceAllocationRow)
-                        .where(
-                            ResourceAllocationRow.kernel_id == kernel_id,
-                            ResourceAllocationRow.slot_name == s.slot_name,
-                            ResourceAllocationRow.free_at.is_(None),
-                            ResourceAllocationRow.used_at.is_(None),
-                        )
-                        .values(used=s.quantity, used_at=sa.func.now())
-                    )
-                    if cast(CursorResult[Any], alloc_result).rowcount == 0:
-                        continue
-                    new_used = ar.c.used + s.quantity
-                    result = await db_sess.execute(
-                        sa.update(ar)
-                        .where(
-                            ar.c.agent_id == agent_id,
-                            ar.c.slot_name == s.slot_name,
-                            new_used <= ar.c.capacity,
-                        )
-                        .values(used=new_used)
-                    )
-                    if cast(CursorResult[Any], result).rowcount == 0:
-                        raise AgentResourceCapacityExceeded(
-                            f"Agent {agent_id}: capacity exceeded for slot '{s.slot_name}'"
-                        )
-                    total_allocated += 1
-            return total_allocated
-
-    async def free_kernel_resources(
-        self,
-        kernel_id: UUID,
-        agent_id: str,
-    ) -> int:
-        """Set free_at on allocations and decrement agent_resources.used.
-
-        Returns:
-            Number of allocation rows freed.
-        """
-        ar = AgentResourceRow.__table__
-        async with self._begin_session_read_committed() as db_sess:
-            released = (
-                await db_sess.execute(
-                    sa.update(ResourceAllocationRow)
-                    .where(
-                        ResourceAllocationRow.kernel_id == kernel_id,
-                        ResourceAllocationRow.free_at.is_(None),
-                    )
-                    .values(free_at=sa.func.now())
-                    .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
-                )
-            ).all()
-            if not released:
-                return 0
-            for r in released:
-                if r.used is None:
-                    continue
-                new_used = sa.func.greatest(ar.c.used - r.used, 0)
-                await db_sess.execute(
-                    sa.update(ar)
-                    .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
-                    .values(used=new_used)
-                )
-            return len(released)
 
     # =========================================================================
     # Handler-specific methods for SessionLifecycleHandler pattern

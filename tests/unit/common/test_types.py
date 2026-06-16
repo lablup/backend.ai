@@ -10,6 +10,7 @@ from typeguard import TypeCheckError
 from ai.backend.common.exception import (
     BackendAISchemaValidationFailed,
     InvalidResourceSlotQuantity,
+    UnknownResourceSlotType,
 )
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -201,7 +202,7 @@ def test_resource_slot_serialization() -> None:
     r1 = ResourceSlot.from_user_input({"a": "1", "b": "2g"}, st_user_input)
     r2 = ResourceSlot.from_user_input({"a": "2", "b": "1g"}, st_user_input)
     r3 = ResourceSlot.from_user_input({"a": "1"}, st_user_input)
-    with pytest.raises(ValueError):
+    with pytest.raises(UnknownResourceSlotType):
         ResourceSlot.from_user_input({"x": "1"}, st_user_input)
 
     assert r1["a"] == Decimal(1)
@@ -314,7 +315,7 @@ def test_resource_slot_parsing_typeless_user_input_serialize_again() -> None:
 
 
 def test_resource_slot_parsing_typeless_user_input_serialize_again_2() -> None:
-    with pytest.raises(ValueError, match="Unknown slot type"):
+    with pytest.raises(UnknownResourceSlotType, match="Unknown slot type"):
         ResourceSlot.from_user_input(
             {"a": "1", "shmem": "2g"},
             {
@@ -444,6 +445,27 @@ class _LegacyDecodingCase:
 
 _FOLDER_UUID = uuid.uuid4()
 _QUOTA_SCOPE_STR = f"user:{uuid.uuid4().hex}"
+
+
+class TestMountPermissionExceeds:
+    @pytest.mark.parametrize(
+        ("requested", "other", "expected"),
+        [
+            (MountPermission.READ_WRITE, MountPermission.READ_ONLY, True),
+            (MountPermission.RW_DELETE, MountPermission.READ_WRITE, True),
+            (MountPermission.RW_DELETE, MountPermission.READ_ONLY, True),
+            (MountPermission.READ_ONLY, MountPermission.READ_ONLY, False),
+            (MountPermission.READ_ONLY, MountPermission.READ_WRITE, False),
+            (MountPermission.READ_WRITE, MountPermission.RW_DELETE, False),
+        ],
+    )
+    def test_exceeds(
+        self,
+        requested: MountPermission,
+        other: MountPermission,
+        expected: bool,
+    ) -> None:
+        assert requested.exceeds(other) is expected
 
 
 class TestMountInfoEntryLegacyShape:

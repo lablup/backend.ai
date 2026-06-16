@@ -352,6 +352,29 @@ class TestSessionNode:
         assert restored.lifecycle.status == node.lifecycle.status
         assert restored.network.use_host_network == node.network.use_host_network
 
+    def test_replica_id_defaults_to_none(self) -> None:
+        node = _make_session_node()
+        assert node.replica_id is None
+        assert json.loads(node.model_dump_json())["replica_id"] is None
+
+    def test_replica_id_serializes_and_round_trips_when_set(self) -> None:
+        replica_id = uuid.uuid4()
+        node = SessionNode(
+            id=uuid.uuid4(),
+            domain_name="default",
+            user_id=uuid.uuid4(),
+            project_id=uuid.uuid4(),
+            metadata=_make_metadata_gql_dto(),
+            resource=_make_resource_gql_dto(),
+            lifecycle=_make_lifecycle_gql_dto(),
+            runtime=_make_runtime_gql_dto(),
+            network=_make_network(),
+            replica_id=replica_id,
+        )
+        assert json.loads(node.model_dump_json())["replica_id"] == str(replica_id)
+        restored = SessionNode.model_validate_json(node.model_dump_json())
+        assert restored.replica_id == replica_id
+
 
 class TestRestartSessionPayload:
     """Tests for RestartSessionPayload model."""

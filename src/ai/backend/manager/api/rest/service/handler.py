@@ -56,6 +56,7 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     MountInfoEntry,
+    MountPermission,
     RuntimeVariant,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -714,6 +715,7 @@ class ServiceHandler:
                 model_vfolder_id=validation_result.model_vfolder_id,
                 model_definition_path=validation_result.model_definition_path,
                 model_mount_destination=params.config.model_mount_destination,
+                model_mount_perm=MountPermission.READ_ONLY,
                 vfolder_subpath=params.config.vfolder_subpath,
                 extra_mounts=[
                     MountInfoEntry(

@@ -61,7 +61,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentNetworkSpec,
     DeploymentPolicyData,
     ExecutionSpec,
-    ModelDeploymentData,
+    LegacyDeploymentData,
     ModelRevisionData,
     MountInfo,
     ReplicaSpec,
@@ -124,10 +124,10 @@ class DeploymentAdapter(BaseFilterAdapter):
 
     def convert_to_dto(
         self,
-        data: ModelDeploymentData,
+        data: LegacyDeploymentData,
         runtime_variant_name: RuntimeVariant,
     ) -> DeploymentDTO:
-        """Convert ModelDeploymentData to DTO.
+        """Convert LegacyDeploymentData to DTO.
 
         ``runtime_variant_name`` is resolved by the caller (REST handler)
         from ``data.revision.model_runtime_config.runtime_variant_id``
@@ -464,6 +464,9 @@ def build_revision_creator(
         model_definition_path=revision_input.model_mount_config.definition_path,
         model_mount_destination=revision_input.model_mount_config.mount_destination,
         extra_mounts=extra_mounts,
+        # Legacy v1 deployment requests carry no model mount permission;
+        # ``None`` adopts the requester's own effective permission.
+        model_mount_perm=None,
         vfolder_subpath=revision_input.model_mount_config.subpath,
     )
 

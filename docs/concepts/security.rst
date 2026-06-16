@@ -110,7 +110,7 @@ The management zone contains Backend.AI control plane components:
 * **AppProxy**: Interactive session proxy
 * **Database**: PostgreSQL for persistent state
 * **Etcd**: Configuration and coordination
-* **Redis**: Caching and pub/sub
+* **Valkey**: Caching and pub/sub
 
 **Network Requirements:**
 

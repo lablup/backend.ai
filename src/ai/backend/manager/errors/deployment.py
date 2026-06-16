@@ -54,6 +54,17 @@ class UserNotFoundInDeployment(ObjectNotFound):
         )
 
 
+class NoActiveKeypairForDeployment(ObjectNotFound):
+    object_name = "active keypair for deployment user"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class DeploymentHasNoTargetRevision(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/deployment-has-no-target-revision"
     error_title = "Deployment has no target revision."
@@ -114,35 +125,6 @@ class RevisionNotDeployable(BackendAIError, web.HTTPConflict):
 class InvalidDeploymentStrategy(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-deployment-strategy"
     error_title = "Unknown or invalid deployment strategy."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class InvalidDeploymentStrategySpec(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/invalid-deployment-strategy-spec"
-    error_title = "Mismatched deployment strategy spec type."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class ReplicaCountMismatch(BackendAIError):
-    error_type = "https://api.backend.ai/probs/replica-count-mismatch"
-    error_title = "Active route count does not match target replica count."
-
-    def __init__(self, expected: int, actual: int) -> None:
-        super().__init__(f"Expected {expected} replicas, found {actual}")
-        self.expected = expected
-        self.actual = actual
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(

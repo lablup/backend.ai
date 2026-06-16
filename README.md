@@ -32,7 +32,7 @@ Requirements
 **Required**:
 - Docker 20.10+ (with Compose v2)
 - PostgreSQL 16+ (tested with 16.3)
-- Redis 7.2+ (tested with 7.2.11)
+- Valkey 9.1+ (tested with 9.1.0; Redis-compatible)
 - etcd 3.5+ (tested with 3.5.14)
 - Prometheus 3.x (tested with 3.1.0)
 
@@ -67,7 +67,7 @@ cd backend.ai
 This script will:
 - Check required dependencies (Docker, Python, etc.)
 - Set up Python virtual environment with Pantsbuild
-- Start halfstack infrastructure (PostgreSQL, Redis, etcd, Apollo Router) — only required services by default; observability and object storage are opt-in via Compose profiles (`--profile observability`, `--profile storage`)
+- Start halfstack infrastructure (PostgreSQL, Valkey, etcd, Apollo Router) — only required services by default; observability and object storage are opt-in via Compose profiles (`--profile observability`, `--profile storage`)
 - Initialize database schemas
 - Create default API keypairs and user accounts
 
@@ -222,7 +222,7 @@ as a reference implementation of API clients.
 * `BUILD`: The root build config file
 * `**/BUILD`: Per-directory build config files
 * `BUILD_ROOT`: An indicator to mark the build root directory for Pants
-* `CLAUDE.md`: The steering guide for agent-assisted development
+* `AGENTS.md`: The steering guide for agent-assisted development (`CLAUDE.md` is a symlink to it)
 * `requirements.txt`: The unified requirements file
 * `*.lock`, `tools/*.lock`: The dependency lock files
 * `docker-compose.*.yml`: Per-version recommended halfstack container configs
@@ -371,7 +371,7 @@ The pre-commit hook validates:
 
 Type checking and tests run in CI for comprehensive coverage.
 
-See [CLAUDE.md](CLAUDE.md#hooks-and-code-quality) for detailed hook system documentation.
+See [AGENTS.md](AGENTS.md#hooks-and-code-quality) for detailed hook system documentation.
 
 ### Development Guide
 

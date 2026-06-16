@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -116,6 +116,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -1130,10 +1131,13 @@ async def background_task_manager(
 ) -> AsyncIterator[BackgroundTaskManager]:
     """Real BackgroundTaskManager backed by Valkey."""
     mgr = BackgroundTaskManager(
-        event_producer,
-        valkey_client=valkey_clients.bgtask,
-        server_id=f"test-server-{uuid4()}",
+        BackgroundTaskManagerArgs(
+            event_producer=event_producer,
+            valkey_client=valkey_clients.bgtask,
+            server_id=f"test-server-{uuid4()}",
+        )
     )
+    await mgr.init()
     yield mgr
     await mgr.shutdown()
 
@@ -1271,6 +1275,7 @@ def auth_processors(
         user_resource_policy_repository=user_resource_policy_repository,
         user_repository=user_repository,
         group_repository=group_repository,
+        ssh_key_validator=SSHKeyValidator(),
     )
     return AuthProcessors(
         service=service,

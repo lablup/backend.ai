@@ -18,8 +18,7 @@ from aiodocker.exceptions import DockerError
 from ai.backend.agent import __version__  # pants: no-infer-dep
 from ai.backend.agent.alloc_map import AllocationStrategy
 from ai.backend.agent.docker.kernel import DockerKernel
-from ai.backend.agent.errors import InvalidResourceConfigError
-from ai.backend.agent.exception import InvalidArgumentError
+from ai.backend.agent.errors import InvalidArgumentError, InvalidResourceConfigError
 from ai.backend.agent.plugin.network import (
     AbstractNetworkAgentPlugin,
     ContainerNetworkCapability,

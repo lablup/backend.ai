@@ -43,6 +43,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardOrderField,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import MountPermission
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
@@ -534,6 +535,8 @@ class ModelCardAdapter(BaseAdapter):
                     model_definition_path=None,
                     model_mount_destination="/models",
                     extra_mounts=[],
+                    # model-card deploy always mounts the model read-only.
+                    model_mount_perm=MountPermission.READ_ONLY,
                 ),
                 revision_preset_id=input.revision_preset_id,
             ),

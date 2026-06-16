@@ -1,9 +1,4 @@
-:host > *,
-html {
-}
-
-backend-ai-webui {
-}
+/* Operator stylesheet — add custom WebUI style overrides here. Examples: */
 
 /* .ant-tabs {
   background-color: #2A2C30;

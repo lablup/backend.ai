@@ -19,6 +19,7 @@ from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     ClusterMode,
     MountInfoEntry,
+    MountPermission,
     ResourceSlot,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -31,15 +32,16 @@ from ai.backend.manager.data.deployment.types import (
     PresetAttributionData,
     ResourceConfigData,
 )
-from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     PydanticColumn,
     PydanticListColumn,
+    StrEnumType,
     URLColumn,
 )
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow
@@ -145,6 +147,15 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     model_definition: Mapped[ModelDefinition | None] = mapped_column(
         "model_definition", PydanticColumn(ModelDefinition), nullable=True
     )
+    # Resolved permission for the model vfolder mount, frozen at
+    # revision-write time. Never NULL: legacy rows are backfilled to ``ro``
+    # and every write path supplies a concrete permission.
+    model_mount_perm: Mapped[MountPermission] = mapped_column(
+        "model_mount_perm",
+        StrEnumType(MountPermission),
+        nullable=False,
+        server_default=MountPermission.READ_ONLY.value,
+    )
 
     # Resource configuration
     resource_group: Mapped[str] = mapped_column(
@@ -184,6 +195,16 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
+    # Seconds to keep a route's session alive after its traffic is drained,
+    # so in-flight requests can finish before the kernel is killed.
+    termination_grace_period: Mapped[float] = mapped_column(
+        "termination_grace_period",
+        sa.Float,
+        nullable=False,
+        default=30.0,
+        server_default="30",
+    )
+
     # Mount configuration.
     # Stores only the fields that session creation actually consumes
     # (``vfolder_id``, ``mount_destination``, ``mount_perm``, ``subpath``);
@@ -199,9 +220,9 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     )
 
     # Runtime variant preset values (resolved at session creation time)
-    preset_values: Mapped[list[PresetValueEntry]] = mapped_column(
+    preset_values: Mapped[list[RuntimeVariantPresetValueEntry]] = mapped_column(
         "preset_values",
-        PydanticListColumn(PresetValueEntry),
+        PydanticListColumn(RuntimeVariantPresetValueEntry),
         nullable=False,
         default=[],
         server_default="[]",
@@ -278,6 +299,10 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             model_runtime_config=ModelRuntimeConfigData(
                 runtime_variant_id=RuntimeVariantID(self.runtime_variant_id),
                 environ=self.environ,
+                runtime_variant_preset_values=[
+                    RuntimeVariantPresetValueData(preset_id=pv.preset_id, value=pv.value)
+                    for pv in (self.preset_values or [])
+                ],
             ),
             execution=ExecutionData(
                 startup_command=self.startup_command,
@@ -290,13 +315,13 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 subpath=self.vfolder_subpath,
                 definition_path=self.model_definition_path or "",
                 extra_mounts=list(self.extra_mounts),
+                model_mount_perm=self.model_mount_perm,
             ),
-            preset=PresetAttributionData(
+            revision_preset=PresetAttributionData(
                 preset_id=self.revision_preset_id,
-                values=[
-                    PresetValueData(preset_id=pv.preset_id, value=pv.value)
-                    for pv in (self.preset_values or [])
-                ],
+                # DeploymentRevisionPresetData is not stored on the row
+                # value fields are not used, currently dead code
+                values=[],
             ),
             model_definition=self.model_definition,
         )

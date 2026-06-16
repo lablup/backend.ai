@@ -1,4 +1,4 @@
-"""Handler for synchronizing healthy routes to AppProxy."""
+"""Handler for synchronizing ACTIVE routes to AppProxy."""
 
 import logging
 from collections.abc import Sequence
@@ -23,7 +23,11 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class AppProxySyncRouteHandler(RouteHandler):
-    """Handler for syncing healthy routes to the AppProxy.
+    """Handler for syncing ACTIVE routes to the AppProxy.
+
+    Targets RUNNING + traffic-ACTIVE routes regardless of health: sync
+    reflects the manager's routing intent, while pruning unhealthy
+    backends from the pool is AppProxy's own health-check responsibility.
 
     Single push-side entry point: API handlers and session lifecycle hooks
     no longer push directly. They mark APPPROXY_SYNC needed via

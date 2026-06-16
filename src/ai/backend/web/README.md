@@ -13,7 +13,7 @@ The Webserver provides a web-based user interface, maintains user sessions, and 
 - Provide responsive web interface
 
 ### 2. Session Management
-- Maintain web sessions (Redis-based)
+- Maintain web sessions (Valkey-based)
 - Manage user's access key and secret key stored in sessions
 - Handle session timeouts
 - **Note**: Login processing and authentication are handled by Manager
@@ -42,7 +42,7 @@ Webserver has 1 entry point to receive and process user requests.
 **Port**: 8080 (default)
 
 **Key Features**:
-- Session-based authentication (Redis)
+- Session-based authentication (Valkey)
 - Request signing and proxying to Manager API (JWT/HMAC)
 
 **Processing Flow**:
@@ -51,7 +51,7 @@ Webserver has 1 entry point to receive and process user requests.
 ```
 Browser → POST /auth/login → Webserver → Manager API (authenticate)
                                     ↓
-                              Session created in Redis
+                              Session created in Valkey
                                     ↓
                           Session cookie sent to Browser
 ```
@@ -60,7 +60,7 @@ Browser → POST /auth/login → Webserver → Manager API (authenticate)
 ```
 Browser → API Request + Session Cookie → Webserver
                                             ↓
-                                 Retrieve access/secret key from Redis session
+                                 Retrieve access/secret key from Valkey session
                                             ↓
                                  Sign request (GraphQL: JWT, REST: HMAC)
                                             ↓
@@ -83,7 +83,7 @@ Browser → API Request + Session Cookie → Webserver
 ┌─────────────────────────────────┐
 │      Webserver (Port 8080)      │
 │  - Serve static assets          │
-│  - Session management (Redis)   │
+│  - Session management (Valkey)  │
 │  - Request signing (JWT/HMAC)   │
 │  - Proxy to Manager             │
 └──────┬──────────────────────────┘
@@ -107,7 +107,7 @@ Browser → API Request + Session Cookie → Webserver
 ├─────────────────────────────────────┤
 │  Authentication (auth.py)           │  ← Session management, JWT/HMAC signing
 ├─────────────────────────────────────┤
-│   Session Manager (Redis)           │  ← Session storage
+│   Session Manager (Valkey)          │  ← Session storage
 ├─────────────────────────────────────┤
 │     Proxy (proxy.py)                │  ← Request forwarding
 └─────────────────────────────────────┘
@@ -146,7 +146,7 @@ Web sessions track authenticated users:
 Session Lifecycle:
 1. User logs in through Manager API
 2. Manager returns access key and secret key
-3. Webserver creates session in Redis and stores access/secret keys
+3. Webserver creates session in Valkey and stores access/secret keys
 4. Session cookie is sent to browser
 5. Subsequent requests include session cookie
 6. Webserver retrieves access/secret key from session and signs requests (GraphQL: JWT, REST API: HMAC)
@@ -166,7 +166,7 @@ Session Lifecycle:
    ↓
 5. Manager authenticates and returns access key and secret key
    ↓
-6. Webserver creates session in Redis and stores keys
+6. Webserver creates session in Valkey and stores keys
    ↓
 7. Session cookie is sent to browser
    ↓
@@ -199,9 +199,9 @@ Proxied Request Headers:
 - `X-BackendAI-Version`: API version
 - `X-Forwarded-For`: Proxy chain
 
-### Session Storage (Redis)
+### Session Storage (Valkey)
 
-Session data is stored in Redis:
+Session data is stored in Valkey:
 - **Key**: `websession:{session_id}`
 - **Value**: JSON-encoded session data
 - **TTL**: Session timeout (e.g., 1 hour)
@@ -232,7 +232,7 @@ Example session data:
 Request limiting to prevent brute force attacks:
 - **Limit**: Limited number of requests per access key
 - **Response**: HTTP 429 Too Many Requests
-- **Tracking**: Redis-based counter per access key
+- **Tracking**: Valkey-based counter per access key
 
 ### Input Sanitization
 - HTML escape user input
@@ -250,7 +250,7 @@ See `configs/webserver/halfstack.conf` for configuration file examples.
 - Listen address and port
 - Session timeout and secret
 - Manager API endpoint
-- Redis connection information
+- Valkey connection information
 
 **Security Settings**:
 - Session timeout and secret
@@ -261,7 +261,7 @@ See `configs/webserver/halfstack.conf` for configuration file examples.
 
 ### Required Infrastructure
 
-#### Redis (Session Storage)
+#### Valkey (Session Storage)
 - **Purpose**:
   - Store web session data
   - Validate session cookies
@@ -315,7 +315,7 @@ See `configs/webserver/halfstack.conf` for configuration file examples.
 
 ### Security Configuration
 
-**Session Management**: Session timeout and Redis-based session storage configuration
+**Session Management**: Session timeout and Valkey-based session storage configuration
 **Rate Limiting**: API request limiting
 **CORS Configuration**: Allowed origins, methods, and credentials
 

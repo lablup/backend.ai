@@ -25,6 +25,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.clients.valkey_client.valkey_schedule import (
     ReplicaHealthStatus as ValkeyReplicaHealthStatus,
 )
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkUpdateRoutesResponse,
 )
@@ -213,18 +214,16 @@ class TestCheckRouteHealth:
         When: Check route health
         Then: Route in successes list
         """
+        route = dataclasses.replace(healthy_route, health_check=ModelHealthCheck(enable=True))
         status = ValkeyReplicaHealthStatus(
-            replica_id=healthy_route.route_id,
+            replica_id=route.route_id,
             healthy=True,
             last_check=995,
         )
-        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {
-            healthy_route.route_id: status,
-        }
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {route.route_id: status}
 
-        entity_ids = [healthy_route.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            result = await route_executor.check_route_health([healthy_route])
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
 
         assert len(result.successes) == 1
         assert len(result.errors) == 0
@@ -236,24 +235,109 @@ class TestCheckRouteHealth:
         mock_valkey_schedule: AsyncMock,
         healthy_route: RouteData,
     ) -> None:
-        """RH-002: Unhealthy route is in errors.
+        """RH-002: Route whose failures exhausted max_retries is in errors.
 
-        Given: Route with RouteHealthStatus(healthy=False) in Valkey
+        Given: Enabled health check with max_retries=1 and a failing status
+               whose consecutive_failures reached the budget
         When: Check route health
         Then: Route in errors list
         """
+        route = dataclasses.replace(
+            healthy_route, health_check=ModelHealthCheck(enable=True, max_retries=1)
+        )
         status = ValkeyReplicaHealthStatus(
-            replica_id=healthy_route.route_id,
+            replica_id=route.route_id,
             healthy=False,
             last_check=995,
+            consecutive_failures=1,
         )
-        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {
-            healthy_route.route_id: status,
-        }
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {route.route_id: status}
 
-        entity_ids = [healthy_route.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
+
+        assert len(result.successes) == 0
+        assert len(result.errors) == 1
+        assert len(result.stale) == 0
+
+    async def test_disabled_health_check_is_skipped(
+        self,
+        route_executor: RouteExecutor,
+        mock_valkey_schedule: AsyncMock,
+        healthy_route: RouteData,
+    ) -> None:
+        """A route with health_check present but enable=False is skipped (unmanaged)."""
+        route = dataclasses.replace(healthy_route, health_check=ModelHealthCheck(enable=False))
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {}
+
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
+
+        assert len(result.successes) == 0
+        assert len(result.errors) == 0
+        assert len(result.stale) == 0
+
+    async def test_absent_health_check_is_skipped(
+        self,
+        route_executor: RouteExecutor,
+        mock_valkey_schedule: AsyncMock,
+        healthy_route: RouteData,
+    ) -> None:
+        """A route with no health check is skipped, neither HEALTHY nor DEGRADED."""
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {}
+
+        with RouteRecorderContext.scope("test", entity_ids=[healthy_route.route_id]):
             result = await route_executor.check_route_health([healthy_route])
+
+        assert len(result.successes) == 0
+        assert len(result.errors) == 0
+        assert len(result.stale) == 0
+
+    async def test_failing_route_within_retry_budget_stays_healthy(
+        self,
+        route_executor: RouteExecutor,
+        mock_valkey_schedule: AsyncMock,
+        healthy_route: RouteData,
+    ) -> None:
+        """A failing probe below max_retries keeps the route HEALTHY (within budget)."""
+        route = dataclasses.replace(
+            healthy_route, health_check=ModelHealthCheck(enable=True, max_retries=3)
+        )
+        status = ValkeyReplicaHealthStatus(
+            replica_id=route.route_id,
+            healthy=False,
+            last_check=995,
+            consecutive_failures=2,
+        )
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {route.route_id: status}
+
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
+
+        assert len(result.successes) == 1
+        assert len(result.errors) == 0
+        assert len(result.stale) == 0
+
+    async def test_failing_route_exhausts_retries_in_errors(
+        self,
+        route_executor: RouteExecutor,
+        mock_valkey_schedule: AsyncMock,
+        healthy_route: RouteData,
+    ) -> None:
+        """Once consecutive_failures reaches max_retries the route is UNHEALTHY."""
+        route = dataclasses.replace(
+            healthy_route, health_check=ModelHealthCheck(enable=True, max_retries=3)
+        )
+        status = ValkeyReplicaHealthStatus(
+            replica_id=route.route_id,
+            healthy=False,
+            last_check=995,
+            consecutive_failures=3,
+        )
+        mock_valkey_schedule.get_route_health_statuses_batch.return_value = {route.route_id: status}
+
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
 
         assert len(result.successes) == 0
         assert len(result.errors) == 1
@@ -265,17 +349,18 @@ class TestCheckRouteHealth:
         mock_valkey_schedule: AsyncMock,
         healthy_route: RouteData,
     ) -> None:
-        """RH-003: Route with expired TTL (no key) is in stale list.
+        """RH-003: Enabled-health-check route with expired TTL (no key) is in stale list.
 
-        Given: Route whose RouteHealthStatus TTL has expired (key absent)
+        Given: Route with an active health check whose RouteHealthStatus
+               TTL has expired (key absent)
         When: Check route health
         Then: Route in stale list (DEGRADED)
         """
+        route = dataclasses.replace(healthy_route, health_check=ModelHealthCheck(enable=True))
         mock_valkey_schedule.get_route_health_statuses_batch.return_value = {}
 
-        entity_ids = [healthy_route.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            result = await route_executor.check_route_health([healthy_route])
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
 
         assert len(result.successes) == 0
         assert len(result.errors) == 0
@@ -287,17 +372,17 @@ class TestCheckRouteHealth:
         mock_valkey_schedule: AsyncMock,
         healthy_route: RouteData,
     ) -> None:
-        """RH-004: Missing health data is treated as stale.
+        """RH-004: Missing health data for an active health check is treated as stale.
 
-        Given: Route with no RouteHealthStatus in Valkey
+        Given: Route with an active health check and no RouteHealthStatus in Valkey
         When: Check route health
         Then: Route in stale list
         """
+        route = dataclasses.replace(healthy_route, health_check=ModelHealthCheck(enable=True))
         mock_valkey_schedule.get_route_health_statuses_batch.return_value = {}
 
-        entity_ids = [healthy_route.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            result = await route_executor.check_route_health([healthy_route])
+        with RouteRecorderContext.scope("test", entity_ids=[route.route_id]):
+            result = await route_executor.check_route_health([route])
 
         assert len(result.successes) == 0
         assert len(result.errors) == 0
@@ -553,6 +638,7 @@ class TestCleanupRoutesByConfig:
             revision_id=DeploymentRevisionID(uuid4()),  # neither current nor deploying
             traffic_status=RouteTrafficStatus.ACTIVE,
             health_check=None,
+            termination_grace_period=30.0,
         )
 
         current_revision_mock = MagicMock()
@@ -603,6 +689,7 @@ class TestCleanupRoutesByConfig:
             revision_id=deploying_revision_id,
             traffic_status=RouteTrafficStatus.INACTIVE,
             health_check=None,
+            termination_grace_period=30.0,
         )
 
         deploying_revision_mock = MagicMock()
@@ -651,6 +738,7 @@ class TestCleanupRoutesByConfig:
             revision_id=DeploymentRevisionID(uuid4()),
             traffic_status=RouteTrafficStatus.ACTIVE,
             health_check=None,
+            termination_grace_period=30.0,
         )
 
         deployment = MagicMock()
@@ -906,6 +994,7 @@ def _route_for_endpoint(endpoint_id: DeploymentID) -> RouteData:
         created_at=datetime.now(tzutc()),
         traffic_status=RouteTrafficStatus.ACTIVE,
         health_check=None,
+        termination_grace_period=30.0,
     )
 
 
@@ -1046,3 +1135,62 @@ class TestSyncAppproxy:
         assert len(result.successes) == 2
         assert len(result.errors) == 1
         assert result.errors[0].route_info.deployment_id == endpoint_ids[0]
+
+    async def test_sync_targets_traffic_not_health(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> None:
+        """AP-005: Regression — the routing-table re-read filters by traffic
+        ACTIVE only, never by health.
+
+        Sync mirrors the manager's routing intent; pruning unhealthy
+        backends from the pool is AppProxy's own responsibility. A health
+        filter here would silently drop health-check-disabled
+        (NOT_CHECKED) routes that should keep serving.
+        """
+        endpoint_id = DeploymentID(uuid4())
+        routes = [_route_for_endpoint(endpoint_id)]
+        _wire_proxy_target(mock_deployment_repo, [endpoint_id])
+        client = mock_appproxy_client_pool.load_client.return_value
+        client.bulk_update_routes.return_value = _bulk_response([
+            UpdatedRoutesItem(deployment_id=endpoint_id, success=True)
+        ])
+
+        await route_executor.sync_appproxy(routes)
+
+        querier = mock_deployment_repo.fetch_route_connection_infos.await_args.kwargs[
+            "route_querier"
+        ]
+        compiled = [str(condition()) for condition in querier.conditions]
+        assert not any("health_status" in clause for clause in compiled), (
+            f"sync_appproxy must not filter by health; got {compiled}"
+        )
+        assert any("traffic_status" in clause for clause in compiled)
+
+    async def test_not_checked_route_is_synced(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> None:
+        """AP-006: A RUNNING + ACTIVE route whose health is NOT_CHECKED
+        (health check disabled) is still pushed to AppProxy."""
+        endpoint_id = DeploymentID(uuid4())
+        route = dataclasses.replace(
+            _route_for_endpoint(endpoint_id),
+            health_status=RouteHealthStatus.NOT_CHECKED,
+        )
+        _wire_proxy_target(mock_deployment_repo, [endpoint_id])
+        client = mock_appproxy_client_pool.load_client.return_value
+        client.bulk_update_routes.return_value = _bulk_response([
+            UpdatedRoutesItem(deployment_id=endpoint_id, success=True)
+        ])
+
+        result = await route_executor.sync_appproxy([route])
+
+        assert len(result.successes) == 1
+        client.bulk_update_routes.assert_awaited_once()
+        request = client.bulk_update_routes.await_args.args[0]
+        assert [item.deployment_id for item in request.endpoints] == [endpoint_id]

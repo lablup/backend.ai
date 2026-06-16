@@ -55,6 +55,7 @@ from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRo
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -152,6 +153,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         db_source = GroupDBSource(db=db_with_cleanup)
         mock_role_manager = MagicMock()
         mock_role_manager.create_system_role = AsyncMock(return_value=None)
+        mock_role_manager.create_preset_roles = AsyncMock(return_value=[])
         db_source._role_manager = mock_role_manager
         return db_source
 
@@ -271,6 +273,7 @@ class TestGroupRepository:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -417,6 +420,10 @@ class TestGroupRepository:
         """Create test group together with both an admin role and a member
         role bound at the project scope, matching the runtime state produced
         by GroupDBSource.create() after BA-5746.
+
+        The member role is flagged ``auto_assign=True`` so that joining users
+        are granted it, while the admin role keeps ``auto_assign=False`` so it
+        is never granted on join.
         """
         group_id = uuid.uuid4()
         admin_role_id = uuid.uuid4()
@@ -444,6 +451,7 @@ class TestGroupRepository:
             member_role = RoleRow(
                 id=member_role_id,
                 name=f"project-{str(group_id)[:8]}-member",
+                auto_assign=True,
             )
             session.add(member_role)
             session.add(
@@ -494,6 +502,7 @@ class TestGroupRepository:
         db_source = GroupDBSource(db=db_with_cleanup)
         mock_role_manager = MagicMock()
         mock_role_manager.create_system_role = AsyncMock(return_value=None)
+        mock_role_manager.create_preset_roles = AsyncMock(return_value=[])
         db_source._role_manager = mock_role_manager
         return db_source
 
@@ -673,7 +682,6 @@ class TestGroupRepository:
                 project=group_id,
                 resource_group=test_scaling_group,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             session.add(endpoint)
             await session.commit()

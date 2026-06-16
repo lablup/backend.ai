@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Coroutine, Sequence
+from typing import Any
 
 from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.common.resource.types import AbstractResource
@@ -28,10 +29,20 @@ class Runner:
 
     _resources: Sequence[AbstractResource]
     _closed_event: asyncio.Event
+    _tasks: set[asyncio.Task[None]]
 
     def __init__(self, resources: Sequence[AbstractResource]) -> None:
         self._resources = resources
         self._closed_event = asyncio.Event()
+        self._tasks = set()
+
+    def _track(self, coro: Coroutine[Any, Any, None]) -> None:
+        # The event loop only keeps weak references to tasks, so a fire-and-forget
+        # task may be garbage collected mid-execution. Hold a strong reference until
+        # it completes, then drop it via the done callback.
+        task = asyncio.create_task(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     async def register_observer(self, observer: AbstractObserver) -> None:
         """
@@ -41,7 +52,7 @@ class Runner:
         if self._closed_event.is_set():
             raise RuntimeError("Runner is already closed.")
         log.info("Starting observer: {}", observer.name)
-        asyncio.create_task(self._run_observer(observer))
+        self._track(self._run_observer(observer))
 
     async def _run_observer(self, observer: AbstractObserver) -> None:
         while not self._closed_event.is_set():
@@ -113,7 +124,7 @@ class Runner:
             )
             await self._cleanup()
             raise
-        asyncio.create_task(self._run())
+        self._track(self._run())
         log.info("Runner started.")
 
     async def _run(self) -> None:

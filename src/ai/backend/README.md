@@ -44,7 +44,7 @@ Internal ports are used for internal service requests such as Prometheus metrics
 
 #### Infrastructure Ports
 - **PostgreSQL**: 8101 (host) → 5432 (container)
-- **Redis**: 8111 (host) → 6379 (container)
+- **Valkey**: 8111 (host) → 6379 (container)
 - **etcd**: 8121 (host) → 2379 (container)
 - **Prometheus**: 9090
 - **Grafana**: 3000
@@ -88,7 +88,7 @@ User Browser
                                            - VSCode: 8180
                                            - Other services
 
-* Worker queries routing information from PostgreSQL/Redis/etcd
+* Worker queries routing information from PostgreSQL/Valkey/etcd
 * Worker forwards traffic directly to Kernel on Agent node
 ```
 
@@ -217,7 +217,7 @@ End-user flow accessing container services (Jupyter, VSCode, etc.).
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌──────────────┐  ┌─────────────┐  ┌──────────────────┐    │
-│  │ PostgreSQL   │  │   Redis     │  │      etcd        │    │
+│  │ PostgreSQL   │  │   Valkey    │  │      etcd        │    │
 │  │   (8101)     │  │   (8111)    │  │     (8121)       │    │
 │  │              │  │             │  │                  │    │
 │  │ Manager:     │  │ Manager:    │  │ Global config    │    │
@@ -347,7 +347,7 @@ python scripts/check-multiple-alembic-heads.py
 
 This script:
 - Checks Docker availability
-- Sets up PostgreSQL, Redis, etcd containers
+- Sets up PostgreSQL, Valkey, etcd containers
 - Configures development environment
 
 **Manual Component Startup**:
@@ -364,14 +364,14 @@ This script:
 - Agent: 6011 (RPC), 6003 (metrics)
 - Storage Proxy: 6021 (client), 6022 (manager), 16023 (metrics)
 - PostgreSQL: 8101 → 5432
-- Redis: 8111 → 6379
+- Valkey: 8111 → 6379
 - etcd: 8121 → 2379
 
 ### Contribution Guidelines
 
 For contributing to Backend.AI:
 - [CONTRIBUTING.md](../.github/CONTRIBUTING.md) - Development workflow and code standards
-- [CLAUDE.md](../CLAUDE.md) - Guidelines for AI-assisted development
+- [AGENTS.md](../AGENTS.md) - Guidelines for AI-assisted development
 - [MIGRATION.md](../MIGRATION.md) - Major version migration guide
 
 ## Core Components
@@ -505,29 +505,29 @@ Summary of components and infrastructure each component depends on.
 
 ### Manager
 
-- **Infrastructure**: PostgreSQL (data storage), Redis (caching, events, background task management), etcd (global configuration), Prometheus (metrics queries)
+- **Infrastructure**: PostgreSQL (data storage), Valkey (caching, events, background task management), etcd (global configuration), Prometheus (metrics queries)
 - **Components**: Agent (Kernel management), Storage Proxy (VFolder management), App Proxy (Circuit management)
 
 ### Agent
 
 Agent only receives commands from Manager and does not receive direct requests from users or other components.
 
-- **Infrastructure**: Container Runtime (Docker), Redis (event delivery, heartbeat, background task management), etcd (global configuration)
+- **Infrastructure**: Container Runtime (Docker), Valkey (event delivery, heartbeat, background task management), etcd (global configuration)
 - **Components**: Manager (receive RPC commands), Storage Proxy (VFolder mounting)
 
 ### Storage Proxy
 
-- **Infrastructure**: Backend Storage (XFS, CephFS, NetApp, etc.), Redis (optional caching, background task management), etcd (global configuration)
+- **Infrastructure**: Backend Storage (XFS, CephFS, NetApp, etc.), Valkey (optional caching, background task management), etcd (global configuration)
 - **Components**: Manager (metadata sync)
 
 ### Webserver
 
-- **Infrastructure**: Redis (web session storage), etcd (global configuration)
+- **Infrastructure**: Valkey (web session storage), etcd (global configuration)
 - **Components**: Manager (API proxy), Hive Router (GraphQL proxy)
 
 ### App Proxy
 
-- **Infrastructure**: PostgreSQL (Circuit information), Redis (Health Check state with Manager), etcd (Worker discovery, Traefik routing)
+- **Infrastructure**: PostgreSQL (Circuit information), Valkey (Health Check state with Manager), etcd (Worker discovery, Traefik routing)
 - **Components**: Manager (Circuit registration), Agent (traffic forwarding)
 
 ## Infrastructure
@@ -546,9 +546,9 @@ Backend.AI uses various infrastructure components, with each component having re
   - Manager: Main database (all tables)
   - App Proxy Coordinator: Circuit/Worker information (separate schema)
 
-#### Redis
+#### Valkey
 - **Purpose**: Cache, session storage, distributed locks, message queue
-- **Version**: 7.2 or higher
+- **Version**: 9.1 or higher (Redis-compatible)
 - **Required by**: Manager, Webserver
 - **Optional by**: Storage Proxy (caching)
 - **Halfstack Port**: 8111
@@ -669,7 +669,7 @@ Halfstack includes exporters for infrastructure metrics collection.
 | Infrastructure | Manager | Agent | Storage | Webserver | App Proxy | Note |
 |----------------|---------|-------|---------|-----------|-----------|------|
 | PostgreSQL | **Required** | - | - | - | **Required** (Coordinator) | Main database |
-| Redis | **Required** | **Required** | **Required** | **Required** | **Required** | State storage (App Proxy, Manager, future Agent) & events (all components) |
+| Valkey | **Required** | **Required** | **Required** | **Required** | **Required** | State storage (App Proxy, Manager, future Agent) & events (all components) |
 | etcd | **Required** | **Required** | **Required** | **Required** | **Required** | Global config store (easy configuration sharing across all components) |
 | Prometheus | **Required** | **Required** | Recommended | Recommended | Recommended | Metrics collection and queries (required for Manager and Agent) |
 | Grafana | Recommended | Recommended | Recommended | Recommended | Recommended | Visualization (component-independent) |
@@ -749,13 +749,13 @@ Start each component using configuration files generated by the `install-dev.sh`
 
 #### High Availability
 - **PostgreSQL**: Primary-Replica replication
-- **Redis**: Redis Sentinel (Note: Cluster mode not supported)
+- **Valkey**: Valkey Sentinel (Note: Cluster mode not supported)
 - **etcd**: 3+ node cluster
 - **App Proxy Coordinator**: Active-Standby
 
 #### Backup and Recovery
 - **PostgreSQL**: pg_dump or WAL archiving
-- **Redis**: RDB or AOF snapshots
+- **Valkey**: RDB or AOF snapshots
 - **etcd**: Periodic snapshots
 
 #### Monitoring
@@ -793,14 +793,14 @@ See [Port Number Guide](#port-number-guide) for detailed port information.
 | Component → Infrastructure | Protocol | Port | Purpose |
 |---------------------------|----------|------|-------|
 | Manager, App Proxy → PostgreSQL | asyncpg | 8101 | Persistent data storage/query |
-| Manager, Webserver → Redis | RESP | 8111 | Caching, sessions, distributed locks |
+| Manager, Webserver → Valkey | RESP | 8111 | Caching, sessions, distributed locks |
 | Manager, App Proxy → etcd | gRPC | 8121 | Configuration management, service discovery |
 | All components → Prometheus | HTTP | 9090 | Metrics collection (pull mode) |
 | All components → OTEL Collector | gRPC/HTTP | 4317/4318 | Log and trace transmission (push mode) |
 | OTEL Collector → Loki | HTTP | 3100 | Log storage |
 | OTEL Collector → Tempo | HTTP | 3200 | Trace storage |
 | Prometheus → PostgreSQL Exporter | HTTP | 9187 | DB metrics collection |
-| Prometheus → Redis Exporter | HTTP | 9121 | Redis metrics collection |
+| Prometheus → Redis Exporter | HTTP | 9121 | Valkey metrics collection |
 
 ## Port Allocation Summary
 
@@ -827,7 +827,7 @@ See [Port Number Guide](#port-number-guide) for detailed port information.
 | Infrastructure | Port | Protocol | Purpose |
 |----------------|------|---------|-------|
 | **PostgreSQL** | 8101 | PostgreSQL | Main database |
-| **Redis** | 8111 | RESP | Cache and session store |
+| **Valkey** | 8111 | RESP | Cache and session store |
 | **etcd** | 8121 | gRPC | Configuration and discovery |
 | **Prometheus** | 9090 | HTTP | Metrics collection and queries |
 | **Hive Router** | 4000 | HTTP | GraphQL Federation Gateway |
@@ -840,7 +840,7 @@ See [Port Number Guide](#port-number-guide) for detailed port information.
 | **MinIO** | 9000 | HTTP | S3 API |
 | | 9001 | HTTP | Admin console |
 | **PostgreSQL Exporter** | 9187 | HTTP | PostgreSQL metrics |
-| **Redis Exporter** | 9121 | HTTP | Redis metrics |
+| **Redis Exporter** | 9121 | HTTP | Valkey metrics |
 
 ## Development
 

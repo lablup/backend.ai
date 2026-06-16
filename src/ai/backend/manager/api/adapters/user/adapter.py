@@ -15,10 +15,12 @@ from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair import (
     AdminSearchKeypairsInput,
+    CreateKeypairPayload,
     KeypairFilter,
     KeypairNode,
     KeypairOrderBy,
     KeypairOrderField,
+    SearchKeypairsRequest,
     SearchMyKeypairsRequest,
 )
 from ai.backend.common.dto.manager.v2.keypair.request import (
@@ -53,6 +55,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
 from ai.backend.common.dto.manager.v2.user.response import (
     AdminSearchUsersPayload,
     BulkCreateUsersPayload,
+    BulkCreateUsersWithKeypairPayload,
     BulkCreateUserV2Error,
     BulkPurgeUsersPayload,
     BulkPurgeUserV2Error,
@@ -112,7 +115,10 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.types import (
+    KeypairResourcePolicyKeypairSearchScope,
+    UserKeypairSearchScope,
+)
 from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
@@ -138,6 +144,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminUpdateKeypairAction,
     IssueMyKeypairAction,
     RevokeMyKeypairAction,
+    SearchKeypairsByResourcePolicyAction,
     SearchMyKeypairsAction,
     SwitchMyMainAccessKeyAction,
     UpdateMyKeypairAction,
@@ -425,7 +432,10 @@ class UserAdapter(BaseAdapter):
         result = await self._processors.user.create_user.wait_for_complete(
             CreateUserAction(creator=Creator(spec=spec), group_ids=group_ids)
         )
-        return CreateUserPayload(user=self._user_data_to_node(result.data.user))
+        return CreateUserPayload(
+            user=self._user_data_to_node(result.data.user),
+            keypair=self._keypair_data_to_created_payload(result.data.keypair),
+        )
 
     async def modify_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
         """Update a user by UUID."""
@@ -565,9 +575,13 @@ class UserAdapter(BaseAdapter):
     # ------------------------------------------------------------------ bulk create/update/purge
 
     async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUsersPayload:
-        """Bulk-create users. Each item's transformation is the caller's responsibility."""
+        """Bulk-create users. Each item's transformation is the caller's responsibility.
+
+        Deprecated: the generated keypairs are not returned. Use
+        :meth:`bulk_create_users_with_keypair` instead.
+        """
         result = await self._processors.user.bulk_create_users.wait_for_complete(action)
-        created_users = [self._user_data_to_node(u) for u in result.data.successes]
+        created_users = [self._user_data_to_node(item.user) for item in result.data.successes]
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
@@ -578,6 +592,32 @@ class UserAdapter(BaseAdapter):
             for error in result.data.failures
         ]
         return BulkCreateUsersPayload(created_users=created_users, failed=failed)
+
+    async def bulk_create_users_with_keypair(
+        self, action: BulkCreateUserAction
+    ) -> BulkCreateUsersWithKeypairPayload:
+        """Bulk-create users, returning each user's generated default keypair.
+
+        The secret key of each keypair is only returned here at creation time.
+        """
+        result = await self._processors.user.bulk_create_users.wait_for_complete(action)
+        created = [
+            CreateUserPayload(
+                user=self._user_data_to_node(item.user),
+                keypair=self._keypair_data_to_created_payload(item.keypair),
+            )
+            for item in result.data.successes
+        ]
+        failed = [
+            BulkCreateUserV2Error(
+                index=error.index,
+                username=cast(UserCreatorSpec, error.spec).username,
+                email=cast(UserCreatorSpec, error.spec).email,
+                message=str(error.exception),
+            )
+            for error in result.data.failures
+        ]
+        return BulkCreateUsersWithKeypairPayload(created=created, failed=failed)
 
     async def bulk_modify_users(self, action: BulkModifyUserAction) -> BulkUpdateUsersPayload:
         """Bulk-modify users. Each item's transformation is the caller's responsibility."""
@@ -692,6 +732,44 @@ class UserAdapter(BaseAdapter):
             has_previous_page=action_result.result.has_previous_page,
         )
 
+    async def gql_search_keypairs_by_resource_policy(
+        self,
+        scope: KeypairResourcePolicyKeypairSearchScope,
+        input: SearchKeypairsRequest,
+    ) -> SearchResult[KeypairNode]:
+        """Search keypairs assigned to a keypair resource policy (GQL connection).
+
+        Used by the ``keypairs`` connection on the keypair resource policy node.
+        The connection field gates access with ``check_admin_only()`` because the
+        keypair resource policy entity itself is not RBAC-protected; this method
+        runs the RBAC-scoped action so superadmins receive all keypairs governed
+        by the policy.
+        """
+        conditions = self._convert_keypair_filter(input.filter) if input.filter else []
+        orders = self._convert_keypair_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KEYPAIR_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = (
+            await self._processors.user.search_keypairs_by_resource_policy.wait_for_complete(
+                SearchKeypairsByResourcePolicyAction(scope=scope, querier=querier)
+            )
+        )
+        return SearchResult(
+            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
+            total_count=action_result.result.total_count,
+            has_next_page=action_result.result.has_next_page,
+            has_previous_page=action_result.result.has_previous_page,
+        )
+
     @staticmethod
     def _keypair_data_to_node(data: KeyPairData) -> KeypairNode:
         """Convert KeyPairData to KeypairNode DTO."""
@@ -708,6 +786,14 @@ class UserAdapter(BaseAdapter):
             resource_policy=data.resource_policy_name,
             ssh_public_key=data.ssh_public_key,
             user_id=data.user_id,
+        )
+
+    @staticmethod
+    def _keypair_data_to_created_payload(data: KeyPairData) -> CreateKeypairPayload:
+        """Convert KeyPairData to a CreateKeypairPayload, including the one-time secret key."""
+        return CreateKeypairPayload(
+            keypair=UserAdapter._keypair_data_to_node(data),
+            secret_key=data.secret_key,
         )
 
     # ------------------------------------------------------------------ admin keypair operations
@@ -899,6 +985,15 @@ class UserAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter_req.user_id is not None:
+            condition = self.convert_uuid_filter(
+                filter_req.user_id,
+                equals_factory=KeypairConditions.by_user_id_equals,
+                in_factory=KeypairConditions.by_user_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter_req.created_at is not None:
             condition = filter_req.created_at.build_query_condition(
                 before_factory=KeypairConditions.by_created_at_before,
@@ -1020,8 +1115,95 @@ class UserAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter_req.full_name is not None:
+            condition = self.convert_string_filter(
+                filter_req.full_name,
+                contains_factory=UserConditions.by_full_name_contains,
+                equals_factory=UserConditions.by_full_name_equals,
+                starts_with_factory=UserConditions.by_full_name_starts_with,
+                ends_with_factory=UserConditions.by_full_name_ends_with,
+                in_factory=UserConditions.by_full_name_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.description is not None:
+            condition = self.convert_string_filter(
+                filter_req.description,
+                contains_factory=UserConditions.by_description_contains,
+                equals_factory=UserConditions.by_description_equals,
+                starts_with_factory=UserConditions.by_description_starts_with,
+                ends_with_factory=UserConditions.by_description_ends_with,
+                in_factory=UserConditions.by_description_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.status_info is not None:
+            condition = self.convert_string_filter(
+                filter_req.status_info,
+                contains_factory=UserConditions.by_status_info_contains,
+                equals_factory=UserConditions.by_status_info_equals,
+                starts_with_factory=UserConditions.by_status_info_starts_with,
+                ends_with_factory=UserConditions.by_status_info_ends_with,
+                in_factory=UserConditions.by_status_info_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.resource_policy is not None:
+            condition = self.convert_string_filter(
+                filter_req.resource_policy,
+                contains_factory=UserConditions.by_resource_policy_contains,
+                equals_factory=UserConditions.by_resource_policy_equals,
+                starts_with_factory=UserConditions.by_resource_policy_starts_with,
+                ends_with_factory=UserConditions.by_resource_policy_ends_with,
+                in_factory=UserConditions.by_resource_policy_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter_req.role is not None:
             conditions.extend(self._convert_role_filter(filter_req.role))
+
+        if filter_req.need_password_change is not None:
+            conditions.append(
+                UserConditions.by_need_password_change(filter_req.need_password_change)
+            )
+
+        if filter_req.totp_activated is not None:
+            conditions.append(UserConditions.by_totp_activated(filter_req.totp_activated))
+
+        if filter_req.sudo_session_enabled is not None:
+            conditions.append(
+                UserConditions.by_sudo_session_enabled(filter_req.sudo_session_enabled)
+            )
+
+        if filter_req.container_uid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_uid,
+                UserConditions.by_container_uid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_main_gid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_main_gid,
+                UserConditions.by_container_main_gid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_gids is not None:
+            condition = self.convert_array_filter(
+                filter_req.container_gids,
+                contains_factory=UserConditions.by_container_gids_contains,
+                contains_any_factory=UserConditions.by_container_gids_any,
+                contains_all_factory=UserConditions.by_container_gids_all,
+            )
+            if condition is not None:
+                conditions.append(condition)
 
         if filter_req.created_at is not None:
             condition = filter_req.created_at.build_query_condition(
@@ -1280,6 +1462,32 @@ class UserAdapter(BaseAdapter):
                         UserConditions.by_role_in([UserRole(r.value) for r in role_f.not_in])
                     ])
                 )
+
+        if filter_req.container_uid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_uid,
+                UserConditions.by_container_uid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_main_gid is not None:
+            condition = self.convert_int_filter(
+                filter_req.container_main_gid,
+                UserConditions.by_container_main_gid,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.container_gids is not None:
+            condition = self.convert_array_filter(
+                filter_req.container_gids,
+                contains_factory=UserConditions.by_container_gids_contains,
+                contains_any_factory=UserConditions.by_container_gids_any,
+                contains_all_factory=UserConditions.by_container_gids_all,
+            )
+            if condition is not None:
+                conditions.append(condition)
 
         if filter_req.created_at is not None:
             condition = filter_req.created_at.build_query_condition(

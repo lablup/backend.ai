@@ -7,7 +7,10 @@ import psutil
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import BackendAIError, ErrorCode
-from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
+from ai.backend.common.metrics.multiprocess import (
+    generate_latest_multiprocess,
+    generate_latest_singleprocess,
+)
 from ai.backend.common.metrics.safe import (
     SafeCounter as Counter,
 )
@@ -453,6 +456,7 @@ class LayerType(enum.StrEnum):
     FAIR_SHARE_REPOSITORY = "fair_share_repository"
     RESOURCE_USAGE_HISTORY_REPOSITORY = "resource_usage_history_repository"
     RESOURCE_SLOT_REPOSITORY = "resource_slot_repository"
+    REPLICA_GROUP_REPOSITORY = "replica_group_repository"
 
     # DB Source layers
     AUDIT_LOG_DB_SOURCE = "audit_log_db_source"
@@ -489,6 +493,7 @@ class LayerType(enum.StrEnum):
     VALKEY_STREAM = "valkey_stream"
     VALKEY_BGTASK = "valkey_bgtask"
     VALKEY_VOLUME_STATS = "valkey_volume_stats"
+    VALKEY_TUS = "valkey_tus"
 
     # Client layers
     AGENT_CLIENT = "agent_client"
@@ -762,6 +767,15 @@ class CommonMetricRegistry:
     def to_prometheus(self) -> str:
         self.system.observe()
         return generate_latest_multiprocess().decode("utf-8")
+
+    def to_prometheus_singleprocess(self) -> str:
+        """
+        For single-worker components that do not set up the prometheus
+        multiprocess dir (e.g., the agent, which needs per-series removal
+        that multiprocess mmap storage cannot provide).
+        """
+        self.system.observe()
+        return generate_latest_singleprocess().decode("utf-8")
 
 
 class StageObserver:

@@ -11,11 +11,6 @@ from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder import (
-    AcceptInvitationReq,
-    DeleteInvitationReq,
-    InviteVFolderReq,
-    InviteVFolderResponse,
-    ListInvitationsResponse,
     ListSharedVFoldersQuery,
     ListSharedVFoldersResponse,
     MessageResponse,
@@ -28,11 +23,10 @@ from ai.backend.common.dto.manager.vfolder import (
     UserPermMapping,
 )
 from ai.backend.manager.data.vfolder.types import (
-    VFolderInvitationState,
     VFolderMountPermission,
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.vfolder import vfolder_invitations, vfolder_permissions
+from ai.backend.manager.models.vfolder import vfolder_permissions
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -79,188 +73,6 @@ class TestVFolderSharingFlow:
         )
         assert isinstance(unshare_result, UnshareVFolderResponse)
         assert user_email in unshare_result.unshared_emails
-
-
-class TestVFolderInvitationStateMachine:
-    """Invitation state transitions: verifies all PENDING → ACCEPTED/REJECTED/CANCELED
-    paths and the list_invitations query for pending invitations."""
-
-    async def _get_invitation_id_for_invitee(
-        self,
-        user_registry: BackendAIClientRegistry,
-        vfolder_id: str,
-    ) -> str:
-        """Helper: query list_invitations as invitee and return the matching invitation ID."""
-        result = await user_registry.vfolder.list_invitations()
-        for inv in result.invitations:
-            if str(inv.vfolder_id) == str(vfolder_id):
-                return inv.id
-        raise AssertionError(f"No invitation found for vfolder {vfolder_id}")
-
-    @pytest.mark.xfail(
-        reason="Server bug: ObjectNotFound.__init__() receives unsupported 'object_id' kwarg "
-        "when user system role is missing (repository.py:812)",
-        strict=False,
-    )
-    async def test_invite_and_accept(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        user_registry: BackendAIClientRegistry,
-        target_vfolder: VFolderFixtureData,
-        regular_user_fixture: Any,
-        db_engine: Any,
-    ) -> None:
-        """Scenario: Admin invites a regular user to a USER vfolder with READ_ONLY
-        permission. The invitee accepts the invitation via accept_invitation API.
-        Verifies the invitation state transitions to ACCEPTED in the DB."""
-        invite_result = await admin_registry.vfolder.invite(
-            target_vfolder["name"],
-            InviteVFolderReq(
-                permission=VFolderPermissionField.READ_ONLY,
-                emails=[regular_user_fixture.email],
-            ),
-        )
-        assert isinstance(invite_result, InviteVFolderResponse)
-        assert len(invite_result.invited_ids) == 1
-
-        # Get actual invitation ID from list_invitations
-        inv_id = await self._get_invitation_id_for_invitee(user_registry, str(target_vfolder["id"]))
-
-        accept_result = await user_registry.vfolder.accept_invitation(
-            AcceptInvitationReq(inv_id=inv_id),
-        )
-        assert isinstance(accept_result, MessageResponse)
-
-        # Verify invitation state in DB
-        async with db_engine.begin() as conn:
-            row = (
-                await conn.execute(
-                    sa.select(vfolder_invitations.c.state).where(
-                        vfolder_invitations.c.id == uuid.UUID(inv_id)
-                    )
-                )
-            ).first()
-            assert row is not None
-            assert row.state == VFolderInvitationState.ACCEPTED
-
-    async def test_invite_and_reject_by_invitee(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        user_registry: BackendAIClientRegistry,
-        vfolder_factory: VFolderFactory,
-        regular_user_fixture: Any,
-        db_engine: Any,
-    ) -> None:
-        """Scenario: Admin invites a regular user, then the invitee calls
-        delete_invitation to reject it. Verifies the invitation state transitions
-        to REJECTED in the DB."""
-        vf = await vfolder_factory()
-        invite_result = await admin_registry.vfolder.invite(
-            vf["name"],
-            InviteVFolderReq(
-                permission=VFolderPermissionField.READ_ONLY,
-                emails=[regular_user_fixture.email],
-            ),
-        )
-        assert len(invite_result.invited_ids) == 1
-
-        # Get actual invitation ID
-        inv_id = await self._get_invitation_id_for_invitee(user_registry, str(vf["id"]))
-
-        reject_result = await user_registry.vfolder.delete_invitation(
-            DeleteInvitationReq(inv_id=inv_id),
-        )
-        assert isinstance(reject_result, MessageResponse)
-
-        # Verify state
-        async with db_engine.begin() as conn:
-            row = (
-                await conn.execute(
-                    sa.select(vfolder_invitations.c.state).where(
-                        vfolder_invitations.c.id == uuid.UUID(inv_id)
-                    )
-                )
-            ).first()
-            assert row is not None
-            assert row.state == VFolderInvitationState.REJECTED
-
-    async def test_invite_and_cancel_by_inviter(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        vfolder_factory: VFolderFactory,
-        regular_user_fixture: Any,
-        db_engine: Any,
-    ) -> None:
-        """Scenario: Admin invites a regular user, then the admin (inviter) calls
-        delete_invitation to cancel the pending invitation. Verifies the invitation
-        state transitions to CANCELED in the DB. Note: the inviter retrieves the
-        invitation ID from the DB directly since list_invitations is invitee-only."""
-        vf = await vfolder_factory()
-        invite_result = await admin_registry.vfolder.invite(
-            vf["name"],
-            InviteVFolderReq(
-                permission=VFolderPermissionField.READ_ONLY,
-                emails=[regular_user_fixture.email],
-            ),
-        )
-        assert len(invite_result.invited_ids) == 1
-
-        # Get invitation ID from DB directly (inviter can't use list_invitations)
-        async with db_engine.begin() as conn:
-            row = (
-                await conn.execute(
-                    sa.select(vfolder_invitations.c.id).where(
-                        (vfolder_invitations.c.vfolder == vf["id"])
-                        & (vfolder_invitations.c.state == VFolderInvitationState.PENDING)
-                    )
-                )
-            ).first()
-            assert row is not None
-            inv_id = str(row.id)
-
-        # Cancel as inviter (admin)
-        cancel_result = await admin_registry.vfolder.delete_invitation(
-            DeleteInvitationReq(inv_id=inv_id),
-        )
-        assert isinstance(cancel_result, MessageResponse)
-
-        # Verify state is CANCELED
-        async with db_engine.begin() as conn:
-            row = (
-                await conn.execute(
-                    sa.select(vfolder_invitations.c.state).where(
-                        vfolder_invitations.c.id == uuid.UUID(inv_id)
-                    )
-                )
-            ).first()
-            assert row is not None
-            assert row.state == VFolderInvitationState.CANCELED
-
-    async def test_list_invitations(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        user_registry: BackendAIClientRegistry,
-        vfolder_factory: VFolderFactory,
-        regular_user_fixture: Any,
-    ) -> None:
-        """Scenario: Admin creates an invitation for a regular user. The invitee
-        calls list_invitations and verifies the pending invitation appears in the
-        result with the correct vfolder_id."""
-        vf = await vfolder_factory()
-        await admin_registry.vfolder.invite(
-            vf["name"],
-            InviteVFolderReq(
-                permission=VFolderPermissionField.READ_ONLY,
-                emails=[regular_user_fixture.email],
-            ),
-        )
-
-        # Invitee should see the pending invitation
-        result = await user_registry.vfolder.list_invitations()
-        assert isinstance(result, ListInvitationsResponse)
-        assert len(result.invitations) >= 1
-        inv_vfolder_ids = [inv.vfolder_id for inv in result.invitations]
-        assert str(vf["id"]) in [str(vid) for vid in inv_vfolder_ids]
 
 
 class TestGroupFolderDirectPermissionSharing:

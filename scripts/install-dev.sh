@@ -1020,6 +1020,16 @@ setup_environment() {
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel03/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
+
+    # macOS only (BA-6289): Docker Desktop's bridge IPs aren't routable from the
+    # host, so uncomment announce-hostnames to reach master/replicas by hostname
+    # (node01-03) via /etc/hosts. Linux routes bridge IPs directly, so it stays
+    # commented.
+    if [ "$DISTRO" = "Darwin" ]; then
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel01_cfg_path"
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel02_cfg_path"
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel03_cfg_path"
+    fi
   else
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
     SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"
@@ -1151,6 +1161,18 @@ configure_backendai() {
   sed_inplace "s/jwt_secret = \"some_jwt_secret\"/jwt_secret = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-worker.toml
   sed_inplace "s/secret = \"some_permit_hash_secret\"/secret = \"${APPPROXY_PERMIT_HASH_SECRET}\"/" ./app-proxy-worker.toml
 
+  # In HA mode the app-proxy components must reach Redis through Sentinel (nothing
+  # listens on the standalone REDIS_PORT). Comment out the standalone `addr` and
+  # enable the Sentinel lines carried (commented) in the halfstack templates.
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    for f in ./app-proxy-coordinator.toml ./app-proxy-worker.toml; do
+      sed_inplace "s/^addr = { host = \"127.0.0.1\", port = ${REDIS_PORT} }/# addr = { host = \"127.0.0.1\", port = ${REDIS_PORT} }/" "$f"
+      sed_inplace "s/# sentinel = \[/sentinel = [/" "$f"
+      sed_inplace "s/# service_name = \"mymaster\"/service_name = \"mymaster\"/" "$f"
+      sed_inplace "s/# password = \"develove\"/password = \"develove\"/" "$f"
+    done
+  fi
+
   # configure agent
   cp configs/agent/halfstack.toml ./agent.toml
   mkdir -p "$VAR_BASE_PATH"
@@ -1214,12 +1236,12 @@ configure_backendai() {
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 
   if [ $CONFIGURE_HA -eq 1 ]; then
-    sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
-    sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
-    sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./webserver.conf
-    sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
+    sed_inplace "s/addr = \"localhost:8111\"/# addr = \"localhost:8111\"/" ./webserver.conf
+    sed_inplace "s/# password = \"mysecret\"/password = \"develove\"/" ./webserver.conf
+    sed_inplace "s/# service_name = \"mymaster\"/service_name = \"mymaster\"/" ./webserver.conf
+    sed_inplace "s/# sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/" ./webserver.conf
   else
-    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
+    sed_inplace "s/addr = \"localhost:8111\"/addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
   fi
 
   # install and configure webui

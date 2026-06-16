@@ -53,6 +53,7 @@ from ai.backend.manager.sokovan.data import (
     PromotionSpec,
     SessionWithKernels,
 )
+from ai.backend.manager.sokovan.recorder.pool import RecordPool
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
@@ -856,11 +857,8 @@ class ScheduleCoordinator:
                             )
                         )
 
-            # Get recorded steps for history
-            all_records = pool.build_all_records()
-
             # Phase 2: Apply status transitions (includes hook execution)
-            await self._handle_promotion_status_transitions(spec, result, all_records)
+            await self._handle_promotion_status_transitions(spec, result, pool)
 
             # Emit metrics per scaling group
             self._operation_metrics.observe_success(
@@ -881,6 +879,7 @@ class ScheduleCoordinator:
                     )
 
             # Log recorded steps for this scaling group
+            all_records = pool.get_all_records()
             if all_records:
                 log.debug(
                     "Recorded {} sessions with execution records for {} in scaling group {}",
@@ -893,7 +892,7 @@ class ScheduleCoordinator:
         self,
         spec: PromotionSpec,
         result: SessionExecutionResult,
-        records: Mapping[SessionId, ExecutionRecord],
+        pool: RecordPool[SessionId],
     ) -> None:
         """Apply status transitions for promotion spec results.
 
@@ -912,7 +911,7 @@ class ScheduleCoordinator:
         Args:
             spec: The promotion spec that defines the transition
             result: Execution result containing successes
-            records: Mapping of session IDs to their execution records for sub_steps
+            pool: Recorder pool for the scope; records are built after hooks run
         """
         if not result.successes:
             return
@@ -931,6 +930,10 @@ class ScheduleCoordinator:
                 to_status,
             )
             sessions_to_transition = hook_result.successful_sessions
+
+        # Build records only after hooks have run so hook-recorded sub-steps
+        # (e.g. terminate_cleanup) are captured in the persisted history.
+        records = pool.build_all_records()
 
         # Apply status transition for sessions that passed hooks
         if sessions_to_transition:
@@ -1141,46 +1144,64 @@ class ScheduleCoordinator:
                     result.successes, transitions.success.session
                 )
 
-        # FAILURE transitions - Coordinator classifies failures into give_up/expired/need_retry
+        # FAILURE transitions - Coordinator classifies failures into give_up/expired/need_retry.
+        # A classification without a declared transition keeps the current status but
+        # still records history so the phase attempt counter keeps incrementing.
         if result.failures:
             classified = self._classify_failures(
                 result.failures, sessions, current_time, handler_name
             )
 
-            # Apply transitions for each classification
-            if classified.give_up and transitions.give_up:
-                await self._apply_transition(
-                    handler_name,
-                    classified.give_up,
-                    transitions.give_up,
-                    SchedulingResult.GIVE_UP,
-                    records,
-                    current_time,
-                )
+            if classified.give_up:
+                if transitions.give_up:
+                    await self._apply_transition(
+                        handler_name,
+                        classified.give_up,
+                        transitions.give_up,
+                        SchedulingResult.GIVE_UP,
+                        records,
+                        current_time,
+                    )
+                else:
+                    await self._record_history_without_transition(
+                        handler_name, classified.give_up, records, SchedulingResult.GIVE_UP
+                    )
 
-            if classified.expired and transitions.expired:
-                await self._apply_transition(
-                    handler_name,
-                    classified.expired,
-                    transitions.expired,
-                    SchedulingResult.EXPIRED,
-                    records,
-                    current_time,
-                )
+            if classified.expired:
+                if transitions.expired:
+                    await self._apply_transition(
+                        handler_name,
+                        classified.expired,
+                        transitions.expired,
+                        SchedulingResult.EXPIRED,
+                        records,
+                        current_time,
+                    )
+                else:
+                    await self._record_history_without_transition(
+                        handler_name, classified.expired, records, SchedulingResult.EXPIRED
+                    )
 
-            if classified.need_retry and transitions.need_retry:
-                await self._apply_transition(
-                    handler_name,
-                    classified.need_retry,
-                    transitions.need_retry,
-                    SchedulingResult.NEED_RETRY,
-                    records,
-                    current_time,
-                )
+            if classified.need_retry:
+                if transitions.need_retry:
+                    await self._apply_transition(
+                        handler_name,
+                        classified.need_retry,
+                        transitions.need_retry,
+                        SchedulingResult.NEED_RETRY,
+                        records,
+                        current_time,
+                    )
+                else:
+                    await self._record_history_without_transition(
+                        handler_name, classified.need_retry, records, SchedulingResult.NEED_RETRY
+                    )
 
         # SKIPPED - Record history without status change
         if result.skipped:
-            await self._record_skipped_history(handler_name, result.skipped, records)
+            await self._record_history_without_transition(
+                handler_name, result.skipped, records, SchedulingResult.SKIPPED
+            )
 
         return classified
 
@@ -1365,21 +1386,25 @@ class ScheduleCoordinator:
             len(session_ids),
         )
 
-    async def _record_skipped_history(
+    async def _record_history_without_transition(
         self,
         handler_name: str,
         session_infos: list[SessionTransitionInfo],
         records: Mapping[SessionId, ExecutionRecord],
+        scheduling_result: SchedulingResult,
     ) -> None:
-        """Record history for skipped sessions without status change.
+        """Record history for sessions that stay in their current status.
 
-        Skipped sessions are those that were not processed due to being blocked
-        by other sessions (e.g., scheduling attempt blocked by higher priority sessions).
+        Used for skipped sessions and for classified failures whose handler
+        declares no target transition (e.g., need_retry staying PENDING).
+        Recording keeps the merged ``attempts`` counter incrementing so
+        retry-based classification (give_up) can eventually fire.
 
         Args:
             handler_name: Name of the handler for history recording
-            session_infos: List of skipped session information
+            session_infos: List of session information to record
             records: Mapping of session IDs to their execution records for sub_steps
+            scheduling_result: Result type to record in history
         """
         if not session_infos:
             return
@@ -1388,8 +1413,8 @@ class ScheduleCoordinator:
             SessionSchedulingHistoryCreatorSpec(
                 session_id=info.session_id,
                 phase=handler_name,
-                result=SchedulingResult.SKIPPED,
-                message=info.reason or f"{handler_name} skipped",
+                result=scheduling_result,
+                message=info.reason or f"{handler_name} {scheduling_result.value.lower()}",
                 from_status=info.from_status,
                 to_status=info.from_status,  # No status change
                 error_code=info.error_code,
@@ -1399,9 +1424,10 @@ class ScheduleCoordinator:
         ]
         await self._repository.create_scheduling_history(BulkCreator(specs=history_specs))
         log.debug(
-            "{}: Recorded {} skipped sessions in history",
+            "{}: Recorded {} sessions in history as {} without status change",
             handler_name,
             len(session_infos),
+            scheduling_result.value,
         )
 
     def _collect_target_statuses(
@@ -1674,6 +1700,12 @@ class ScheduleCoordinator:
             ),
             SchedulerTaskSpec(
                 ScheduleType.TERMINATE,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            SchedulerTaskSpec(
+                ScheduleType.DEPRIORITIZE,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,

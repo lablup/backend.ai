@@ -209,6 +209,7 @@ class TestResolveHealthCheck:
                             start_command=["run"],
                             port=8000,
                             health_check=ModelHealthCheck(
+                                enable=True,
                                 path="/custom",
                                 interval=5.0,
                                 max_retries=3,

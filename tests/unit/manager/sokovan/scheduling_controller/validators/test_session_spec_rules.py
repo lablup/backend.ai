@@ -31,7 +31,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry
-from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
+from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, SlotTypePolicy
 from ai.backend.manager.data.session.options import (
     KernelExecutionSpec,
     ResourceOpts,
@@ -170,14 +170,24 @@ def _ctx(
     keypair_policy: KeyPairResourcePolicyData | None = None,
     image_infos: dict[ImageID, ImageInfo] | None = None,
     known_slot_types: dict[SlotName, SlotTypes] | None = None,
+    enabled_slot_names: frozenset[SlotName] | None = None,
     required_slot_names: frozenset[SlotName] | None = None,
     dotfile_data: DotfileBundle | None = None,
 ) -> SessionSpecValidationContext:
+    known_slot_types_val = known_slot_types or {}
+    enabled_val = (
+        enabled_slot_names
+        if enabled_slot_names is not None
+        else frozenset(known_slot_types_val.keys())
+    )
     return SessionSpecValidationContext(
         keypair_resource_policy=keypair_policy,
         image_infos=image_infos or {},
-        known_slot_types=known_slot_types or {},
-        required_slot_names=required_slot_names or frozenset(),
+        known_slot_types=known_slot_types_val,
+        slot_type_policy=SlotTypePolicy(
+            enabled=enabled_val,
+            required=required_slot_names or frozenset(),
+        ),
         dotfile_data=dotfile_data or DotfileBundle(),
     )
 
@@ -251,7 +261,10 @@ class TestResourceLimitRule:
     def test_requested_below_image_min(self) -> None:
         img = ImageID(uuid.uuid4())
         spec = _spec((_kernel(img, cpu="1"),))
-        ctx = _ctx(image_infos={img: _image_info(img, cpu_min="8")})
+        ctx = _ctx(
+            image_infos={img: _image_info(img, cpu_min="8")},
+            known_slot_types=dict(_RG_BASE),
+        )
         with pytest.raises(InvalidAPIParameters):
             ResourceLimitRule().validate(spec, ctx)
 
@@ -268,6 +281,29 @@ class TestResourceLimitRule:
         ctx = _ctx(image_infos={img: _image_info(img)})
         with pytest.raises(InvalidAPIParameters):
             ResourceLimitRule().validate(spec, ctx)
+
+    def test_skips_image_min_for_slot_not_in_enabled(self) -> None:
+        img = ImageID(uuid.uuid4())
+        image_info = ImageInfo(
+            id=uuid.UUID(str(img)),
+            canonical="repo/img:tag",
+            architecture="x86_64",
+            registry="repo",
+            labels={},
+            resource_spec={
+                "cpu": {"min": "1", "max": None},
+                "mem": {"min": "256m", "max": None},
+                "cuda.device": {"min": "1", "max": None},
+            },
+        )
+        spec = _spec((_kernel(img, cpu="2"),))
+        # cuda.device is absent from `enabled` (disabled by admin or unregistered),
+        # so its image-declared min must not be enforced.
+        ctx = _ctx(
+            image_infos={img: image_info},
+            known_slot_types=dict(_RG_BASE),
+        )
+        ResourceLimitRule().validate(spec, ctx)
 
 
 class TestServicePortRule:
@@ -465,6 +501,12 @@ class TestImageSlotTypeRule:
         ctx = _ctx(
             image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem", "cuda.device"))},
             known_slot_types={**_RG_BASE, SlotName("cuda.shares"): SlotTypes.COUNT},
+            enabled_slot_names=frozenset({
+                SlotName("cpu"),
+                SlotName("mem"),
+                SlotName("cuda.shares"),
+                SlotName("cuda.device"),
+            }),
         )
         with pytest.raises(InvalidAPIParameters):
             ImageSlotTypeRule().validate(spec, ctx)
@@ -504,6 +546,34 @@ class TestImageSlotTypeRule:
             known_slot_types=dict(_RG_BASE),
         )
         ImageSlotTypeRule().validate(spec, ctx)
+
+    def test_skips_image_slot_not_in_enabled(self) -> None:
+        # cuda.device is declared by the image but absent from `enabled`,
+        # so the image-side check ignores it instead of rejecting the session.
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(
+            image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem", "cuda.device"))},
+            known_slot_types=dict(_RG_BASE),
+        )
+        ImageSlotTypeRule().validate(spec, ctx)
+
+    def test_rejects_image_slot_when_enabled_but_not_served(self) -> None:
+        # cuda.device is globally enabled but the RG has no agent serving it,
+        # so the image's declaration cannot be satisfied here.
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        ctx = _ctx(
+            image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem", "cuda.device"))},
+            known_slot_types=dict(_RG_BASE),
+            enabled_slot_names=frozenset({
+                SlotName("cpu"),
+                SlotName("mem"),
+                SlotName("cuda.device"),
+            }),
+        )
+        with pytest.raises(InvalidAPIParameters):
+            ImageSlotTypeRule().validate(spec, ctx)
 
 
 class TestRequestedSlotTypeRule:

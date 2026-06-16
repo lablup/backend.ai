@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
+from ai.backend.common.types import SessionId
 from ai.backend.manager.sokovan.data import AllocationBatch
 
 
@@ -20,17 +20,14 @@ class SchedulingAllocator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def allocate(self, batch: AllocationBatch) -> list[ScheduledSessionData]:
+    async def allocate(self, batch: AllocationBatch) -> list[SessionId]:
         """
-        Allocate resources based on the provided allocation batch.
-        This method should handle the actual resource allocation logic,
-        ensuring that all allocations are performed atomically and consistently.
-        It also updates session status for both successful allocations and failures.
+        Reserve and assign the batch's sessions to agents atomically.
 
         Args:
-            batch: AllocationBatch containing successful allocations and failures to process
+            batch: AllocationBatch containing the successful allocations to process
 
         Returns:
-            List of ScheduledSessionData for allocated sessions
+            The ids of the sessions that were actually allocated.
         """
         raise NotImplementedError("Subclasses must implement this method.")

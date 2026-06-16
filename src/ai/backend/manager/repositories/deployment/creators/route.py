@@ -9,6 +9,7 @@ from typing import Any, override
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
@@ -35,6 +36,8 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
     project_id: uuid.UUID
     revision_id: DeploymentRevisionID
     health_check: ModelHealthCheck | None
+    termination_grace_period: float
+    replica_group_id: ReplicaGroupID
     traffic_ratio: float = 1.0
     traffic_status: RouteTrafficStatus = RouteTrafficStatus.INACTIVE
 
@@ -52,6 +55,8 @@ class RouteCreatorSpec(CreatorSpec[RoutingRow]):
             revision=self.revision_id,
             traffic_status=self.traffic_status,
             health_check=self.health_check,
+            termination_grace_period=self.termination_grace_period,
+            replica_group_id=self.replica_group_id,
         )
 
 

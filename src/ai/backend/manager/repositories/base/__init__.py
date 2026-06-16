@@ -76,10 +76,12 @@ from .updater import (
     BatchUpdaterResult,
     BatchUpdaterSpec,
     BulkUpdaterError,
+    BulkUpdaterResult,
     Updater,
     UpdaterResult,
     UpdaterSpec,
     execute_batch_updater,
+    execute_bulk_updater_partial,
     execute_updater,
 )
 from .upserter import (
@@ -164,6 +166,8 @@ __all__ = [
     "execute_batch_updater",
     # BulkUpdater
     "BulkUpdaterError",
+    "BulkUpdaterResult",
+    "execute_bulk_updater_partial",
     # Upserter
     "UpserterSpec",
     "Upserter",

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, SlotName
 
 
 @dataclass
@@ -45,3 +45,18 @@ class KeyPairResourcePolicyData:
 class ScalingGroupProxyTarget:
     addr: str
     api_token: str
+
+
+@dataclass(frozen=True)
+class SlotTypePolicy:
+    """Global slot-type admin policy from `resource_slot_types`.
+
+    - enabled: slot names with enabled=true. Image-side validators
+      (`ImageSlotTypeRule`, `ResourceLimitRule`) only enforce slots in this
+      set, so image-declared slots outside it are skipped instead of rejected.
+    - required: slot names with required=true. Sessions must request nonzero
+      amounts for these slots.
+    """
+
+    enabled: frozenset[SlotName] = field(default_factory=frozenset)
+    required: frozenset[SlotName] = field(default_factory=frozenset)

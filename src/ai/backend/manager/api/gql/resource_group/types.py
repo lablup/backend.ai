@@ -607,6 +607,7 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
         description="Payload for resource group creation.",
     ),
     model=CreateResourceGroupPayloadDTO,
+    name="CreateResourceGroupPayload",
 )
 class CreateResourceGroupPayloadGQL(PydanticOutputMixin[CreateResourceGroupPayloadDTO]):
     resource_group: ResourceGroupGQL = gql_field(description="The created resource group.")
@@ -618,6 +619,7 @@ class CreateResourceGroupPayloadGQL(PydanticOutputMixin[CreateResourceGroupPaylo
         description="Payload for resource group deletion.",
     ),
     model=DeleteResourceGroupPayloadDTO,
+    name="DeleteResourceGroupPayload",
 )
 class DeleteResourceGroupPayloadGQL(PydanticOutputMixin[DeleteResourceGroupPayloadDTO]):
     id: str = gql_field(description="ID of the deleted resource group.")

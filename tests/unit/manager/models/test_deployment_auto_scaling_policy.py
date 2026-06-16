@@ -37,6 +37,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -96,6 +97,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 ImageRow,
                 SessionRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 EndpointRow,
                 DeploymentPolicyRow,
@@ -301,7 +303,6 @@ class TestDeploymentAutoScalingPolicyRow:
                 resource_group=test_scaling_group.name,
                 url=f"https://test-{uuid.uuid4().hex[:8]}.example.com",
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.flush()

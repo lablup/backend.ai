@@ -9,6 +9,7 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -16,7 +17,11 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult
-from ai.backend.manager.data.session.types import SessionData, SessionListResult
+from ai.backend.manager.data.session.types import (
+    SessionData,
+    SessionListResult,
+    SessionRoutingInfo,
+)
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
@@ -52,6 +57,24 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def get_session_owner(self, session_id: str | SessionId) -> UserData:
         return await self._db_source.get_session_owner(session_id)
+
+    @session_repository_resilience.apply()
+    async def resolve_session_id(
+        self,
+        session_name_or_id: str,
+        user_id: uuid.UUID,
+    ) -> SessionId:
+        """Infer a session id from ``(session_name_or_id, user_id)`` for legacy callers.
+
+        The goal is to derive a usable session id when only a name is known, not to return
+        a validated one — ownership and state checks are the caller's job. A UUID-shaped
+        input is already an id and is returned as-is; otherwise the live session owned by
+        the user with that name is looked up. DO NOT USE FOR NEW DEVELOPMENT.
+
+        Raises ``SessionNotFound`` when a name resolves to no live session and
+        ``TooManySessionsMatched`` when more than one shares the name.
+        """
+        return await self._db_source.resolve_session_id(session_name_or_id, user_id)
 
     @session_repository_resilience.apply()
     async def get_session_validated(
@@ -249,13 +272,13 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def get_session_with_routing_minimal(
         self,
-        session_name_or_id: str | SessionId,
-        owner_access_key: AccessKey,
-    ) -> SessionRow:
-        """Get session with minimal routing information"""
-        return await self._db_source.get_session_with_routing_minimal(
-            session_name_or_id, owner_access_key
-        )
+        session_id: SessionID,
+    ) -> SessionRoutingInfo:
+        """Resolve a live session by ``session_id`` into its routing info.
+
+        Pure lookup; session access authorization is the caller's responsibility.
+        """
+        return await self._db_source.get_session_with_routing_minimal(session_id)
 
     @session_repository_resilience.apply()
     async def search(

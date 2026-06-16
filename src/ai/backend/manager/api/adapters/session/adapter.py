@@ -65,6 +65,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     UpdateSessionPayload,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
@@ -819,14 +820,12 @@ class SessionAdapter(BaseAdapter):
 
     async def start_service(
         self,
-        session_id: UUID,
+        session_id: SessionID,
         input: StartSessionServiceInput,
-        access_key: str,
     ) -> StartSessionServicePayload:
         """Start an app service in a session."""
         action = StartServiceAction(
-            session_name=str(session_id),
-            access_key=AccessKey(access_key),
+            session_id=session_id,
             service=input.service,
             login_session_token=input.login_session_token,
             port=input.port,
@@ -961,6 +960,7 @@ class SessionAdapter(BaseAdapter):
                 network_type=data.network_type.value if data.network_type else None,
                 network_id=data.network_id,
             ),
+            replica_id=data.replica_id,
         )
 
     @staticmethod

@@ -17,7 +17,7 @@ This happens when there is no matching database record of target object under co
 This happens when proxy worker does not respond to coordinator's configuration request. Contact administrator to check for activeness of proxy worker.
 ## Proxy Worker
 ### E20001: Route event not delivered to worker
-This states Proxy Worker has not received circuit creation request event from Proxy Coordinator. This can happen either when proxy coordinator or proxy worker has lost contact with its redis backend.
+This states Proxy Worker has not received circuit creation request event from Proxy Coordinator. This can happen either when proxy coordinator or proxy worker has lost contact with its Valkey backend.
 
 ### E20002: Protocol not available as interactive app
 This error can happen when users try to launch interactive app with non-supported protocol (e.g. gRPC / HTTP2). AppProxy prohibits such beahivor, hence facing this error is intended.

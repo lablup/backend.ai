@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -27,6 +28,7 @@ from ai.backend.manager.data.deployment.creator import (
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     ExecutionSpec,
+    LegacyDeploymentData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
@@ -44,6 +46,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import RoutingNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
 )
@@ -132,6 +135,10 @@ from ai.backend.manager.services.deployment.actions.get_deployment_by_id import 
     GetDeploymentByIdAction,
     GetDeploymentByIdActionResult,
 )
+from ai.backend.manager.services.deployment.actions.get_legacy_deployment_by_id import (
+    GetLegacyDeploymentByIdAction,
+    GetLegacyDeploymentByIdActionResult,
+)
 from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
@@ -178,6 +185,10 @@ from ai.backend.manager.services.deployment.actions.search_deployments_in_projec
     SearchDeploymentsInProjectAction,
     SearchDeploymentsInProjectActionResult,
 )
+from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
+    SearchLegacyDeploymentsAction,
+    SearchLegacyDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
     SearchReplicasActionResult,
@@ -220,17 +231,19 @@ def _map_lifecycle_to_status(lifecycle: EndpointLifecycle) -> ModelDeploymentSta
             return ModelDeploymentStatus.STOPPED
 
 
-def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
-    """Convert DeploymentInfo to ModelDeploymentData.
-
-    Note: Some fields are set to defaults as DeploymentInfo doesn't have all the data.
-    """
-    revision: ModelRevisionData | None = info.current_revision
-
+def _deployment_desired_replica_count(info: DeploymentInfo) -> int:
     desired_count = info.replica.desired_replica_count
     if desired_count is None:
         desired_count = info.replica.replica_count
+    return desired_count
 
+
+def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentData:
+    """Convert DeploymentInfo to the modern (v2 / GraphQL) ModelDeploymentData.
+
+    Uses the revision *ids* only — the modern read path does not load the full
+    revision rows. Note: some fields default as DeploymentInfo lacks the data.
+    """
     return ModelDeploymentData(
         id=info.id,
         metadata=ModelDeploymentMetadataInfo(
@@ -244,23 +257,52 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
             updated_at=info.metadata.created_at or datetime.now(UTC),
         ),
         network_access=info.network,
-        revision_history_ids=[info.current_revision.id]
-        if info.current_revision is not None
+        revision_history_ids=[info.current_revision_id]
+        if info.current_revision_id is not None
         else [],
-        revision=revision,
-        current_revision_id=info.current_revision.id if info.current_revision is not None else None,
-        deploying_revision_id=info.deploying_revision.id
-        if info.deploying_revision is not None
-        else None,
+        current_revision_id=info.current_revision_id,
+        deploying_revision_id=info.deploying_revision_id,
         scaling_rule_ids=[],  # Not available in DeploymentInfo
         replica_state=ReplicaStateData(
-            desired_replica_count=desired_count,
+            desired_replica_count=_deployment_desired_replica_count(info),
             replica_ids=[],  # Not available in DeploymentInfo
         ),
         default_deployment_strategy=DeploymentStrategy.ROLLING,
         created_user_id=info.metadata.created_user,
         options=info.options,
         scaling_state=info.state.scaling_state,
+        policy=info.policy,
+        sub_step=info.sub_step,
+    )
+
+
+def _convert_deployment_info_to_legacy_data(info: DeploymentInfo) -> LegacyDeploymentData:
+    """Convert DeploymentInfo to the legacy (REST v1) LegacyDeploymentData.
+
+    Built independently from the same ``DeploymentInfo`` — never derived from
+    ``ModelDeploymentData``. Carries the full current ``revision`` that the
+    legacy ``DeploymentDTO`` embeds, so it requires a full (legacy) read.
+    """
+    return LegacyDeploymentData(
+        id=info.id,
+        metadata=ModelDeploymentMetadataInfo(
+            name=info.metadata.name,
+            status=_map_lifecycle_to_status(info.state.lifecycle),
+            tags=[info.metadata.tag] if info.metadata.tag else [],
+            project_id=info.metadata.project,
+            domain_name=info.metadata.domain,
+            resource_group_name=info.metadata.resource_group,
+            created_at=info.metadata.created_at or datetime.now(UTC),
+            updated_at=info.metadata.created_at or datetime.now(UTC),
+        ),
+        network_access=info.network,
+        revision=info.current_revision,
+        replica_state=ReplicaStateData(
+            desired_replica_count=_deployment_desired_replica_count(info),
+            replica_ids=[],  # Not available in DeploymentInfo
+        ),
+        default_deployment_strategy=DeploymentStrategy.ROLLING,
+        created_user_id=info.metadata.created_user,
         policy=info.policy,
         sub_step=info.sub_step,
     )
@@ -309,6 +351,7 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
     liveness = _ROUTE_STATUS_TO_LIVENESS.get(route.status) or LivenessStatus.NOT_CHECKED
     return ModelReplicaData(
         id=route.route_id,
+        deployment_id=route.deployment_id,
         revision_id=route.revision_id or route.deployment_id,
         session_id=route.session_id,
         readiness_status=readiness,
@@ -354,6 +397,9 @@ def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionC
                 )
                 for m in data.model_mount_config.extra_mounts
             ],
+            # Preserve the existing revision's resolved model mount permission
+            # on refresh so the rebuilt revision keeps it.
+            model_mount_perm=data.model_mount_config.model_mount_perm,
             vfolder_subpath=data.model_mount_config.subpath,
         ),
         execution=ExecutionSpec(
@@ -369,8 +415,8 @@ def _build_creator_from_revision_data(data: ModelRevisionData) -> ModelRevisionC
             inference_runtime_config=data.model_runtime_config.inference_runtime_config,
         ),
         model_definition=None,
-        revision_preset_id=data.preset.preset_id,
-        preset_values=list(data.preset.values),
+        revision_preset_id=data.revision_preset.preset_id,
+        runtime_variant_preset_values=data.model_runtime_config.runtime_variant_preset_values,
     )
 
 
@@ -417,6 +463,7 @@ class DeploymentService:
             await self._deployment_controller.add_deployment_revision(
                 deployment_id=DeploymentID(deployment_info.id),
                 revision=action.creator.model_revision,
+                requester_id=action.creator.metadata.created_user,
                 auto_activate=action.auto_activate,
             )
         updated_deployment_info = await self._deployment_repository.get_endpoint_info(
@@ -445,6 +492,7 @@ class DeploymentService:
         await self._deployment_controller.add_deployment_revision(
             deployment_id=DeploymentID(deployment_info.id),
             revision=revision,
+            requester_id=creator.metadata.created_user,
             auto_activate=True,
         )
         deployment_info = await self._deployment_repository.get_endpoint_info(deployment_info.id)
@@ -526,6 +574,21 @@ class DeploymentService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def search_legacy_deployments(
+        self, action: SearchLegacyDeploymentsAction
+    ) -> SearchLegacyDeploymentsActionResult:
+        """Legacy (REST v1) search — full revision per item. DO NOT USE in new
+        code; v2 uses :meth:`search_deployments`.
+        """
+        result = await self._deployment_repository.search_legacy_endpoints(action.querier)
+        deployments = [_convert_deployment_info_to_legacy_data(info) for info in result.items]
+        return SearchLegacyDeploymentsActionResult(
+            data=deployments,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def search_deployments_in_project(
         self, action: SearchDeploymentsInProjectAction
     ) -> SearchDeploymentsInProjectActionResult:
@@ -556,6 +619,19 @@ class DeploymentService:
         """
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
         return GetDeploymentByIdActionResult(data=_convert_deployment_info_to_data(deployment_info))
+
+    async def get_legacy_deployment_by_id(
+        self, action: GetLegacyDeploymentByIdAction
+    ) -> GetLegacyDeploymentByIdActionResult:
+        """Legacy (REST v1) get-by-id — full revision. DO NOT USE in new code;
+        v2 uses :meth:`get_deployment_by_id`.
+        """
+        deployment_info = await self._deployment_repository.get_legacy_endpoint_info(
+            action.deployment_id
+        )
+        return GetLegacyDeploymentByIdActionResult(
+            data=_convert_deployment_info_to_legacy_data(deployment_info)
+        )
 
     async def get_deployment_policy(
         self, action: GetDeploymentPolicyAction
@@ -612,9 +688,13 @@ class DeploymentService:
         RBAC-checked revision create → history pruning), and optionally
         activates the new revision based on ``action.auto_activate``.
         """
+        requester = current_user()
+        if requester is None:
+            raise UserNotFound("User not found in context")
         revision_data = await self._deployment_controller.add_deployment_revision(
             deployment_id=DeploymentID(action.model_deployment_id),
             revision=action.adder,
+            requester_id=requester.user_id,
             auto_activate=action.auto_activate,
         )
         return AddModelRevisionActionResult(revision=revision_data)
@@ -692,9 +772,11 @@ class DeploymentService:
             try:
                 data = await self._deployment_repository.get_current_revision(deployment_id)
                 creator = _build_creator_from_revision_data(data)
+                endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
                 new_revision = await self._deployment_controller.add_deployment_revision(
                     deployment_id=deployment_id,
                     revision=creator,
+                    requester_id=endpoint_info.metadata.created_user,
                     auto_activate=True,
                 )
                 results.append(

@@ -37,6 +37,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
     VFolderData,
     VFolderMountPermission,
+    VFolderUsageData,
 )
 from ai.backend.manager.errors.common import Forbidden, InternalServerError, ObjectNotFound
 from ai.backend.manager.errors.kernel import BackendAgentError
@@ -119,6 +120,10 @@ from ai.backend.manager.services.vfolder.actions.get_row import (
     GetVFolderLegacyRowAction,
     GetVFolderLegacyRowActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.get_usage import (
+    GetVFolderUsageAction,
+    GetVFolderUsageActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.get_v2 import (
     GetVFolderV2Action,
     GetVFolderV2ActionResult,
@@ -142,8 +147,8 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GetFstabContentsActionResult,
     GetQuotaAction,
     GetQuotaActionResult,
-    GetVFolderUsageAction,
-    GetVFolderUsageActionResult,
+    GetVFolderUsageLegacyAction,
+    GetVFolderUsageLegacyActionResult,
     GetVFolderUsedBytesAction,
     GetVFolderUsedBytesActionResult,
     GetVolumePerfMetricAction,
@@ -974,13 +979,15 @@ class VFolderService:
         storage_reply = await manager_client.get_volume_performance_metric(volume_name)
         return GetVolumePerfMetricActionResult(data=dict(storage_reply))
 
-    async def get_usage(self, action: GetVFolderUsageAction) -> GetVFolderUsageActionResult:
+    async def get_usage_legacy(
+        self, action: GetVFolderUsageLegacyAction
+    ) -> GetVFolderUsageLegacyActionResult:
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             action.folder_host, is_unmanaged(action.unmanaged_path)
         )
         client = self._storage_manager.get_manager_facing_client(proxy_name)
         usage = await client.get_folder_usage(volume_name, action.vfolder_id)
-        return GetVFolderUsageActionResult(data=dict(usage))
+        return GetVFolderUsageLegacyActionResult(data=dict(usage))
 
     async def get_used_bytes(
         self, action: GetVFolderUsedBytesAction
@@ -1724,6 +1731,29 @@ class VFolderService:
         """Get a single vfolder by ID (v2). RBAC is enforced at the processor level."""
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
         return GetVFolderV2ActionResult(vfolder=vfolder_data)
+
+    async def get_folder_usage(self, action: GetVFolderUsageAction) -> GetVFolderUsageActionResult:
+        """Fetch usage statistics on demand through the storage proxy.
+
+        Very slow: every call is a round-trip to the storage proxy, and the
+        measurement cost depends on the storage backend (e.g., a full directory
+        walk on vfs). Returns ``usage=None`` for unmanaged vfolders, which have
+        no storage-proxy backing. RBAC is enforced at the processor level.
+        """
+        vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        if vfolder_data.unmanaged_path:
+            return GetVFolderUsageActionResult(vfolder_uuid=vfolder_data.id, usage=None)
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
+        client = self._storage_manager.get_manager_facing_client(proxy_name)
+        vfid = str(VFolderID(vfolder_data.quota_scope_id, vfolder_data.id))
+        usage = await client.get_folder_usage(volume_name, vfid)
+        return GetVFolderUsageActionResult(
+            vfolder_uuid=vfolder_data.id,
+            usage=VFolderUsageData(
+                num_files=int(usage["file_count"]),
+                used_bytes=int(usage["used_bytes"]),
+            ),
+        )
 
     async def create_in_project(
         self, action: CreateVFolderInProjectAction

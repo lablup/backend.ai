@@ -7,7 +7,6 @@ from uuid import UUID
 
 import aiohttp
 
-from ai.backend.appproxy.coordinator.api.types import AppProxyStatusResponse
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
@@ -29,6 +28,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     BulkUpdateRoutesResponse,
     MintEndpointTokenResponse,
 )
+from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy

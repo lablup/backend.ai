@@ -9,8 +9,11 @@ from typing import Any
 
 from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.data.model_deployment.types import (
+    ActivenessStatus,
     DeploymentStrategy,
+    LivenessStatus,
     ModelDeploymentStatus,
+    ReadinessStatus,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
@@ -23,6 +26,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     DeleteDeploymentPayload,
     DeploymentNode,
     ExtraVFolderMountNode,
+    ReplicaNode,
     RevisionNode,
     RouteNode,
     ScaleDeploymentPayload,
@@ -487,6 +491,42 @@ class TestRouteNode:
         assert restored.health_status == RouteHealthStatus.HEALTHY
         assert restored.traffic_ratio == 0.5
         assert restored.error_data == {"message": "ok"}
+
+
+class TestReplicaNode:
+    """Tests for ReplicaNode model (user-facing view of a routing row)."""
+
+    def _make(self, **overrides: Any) -> ReplicaNode:
+        defaults: dict[str, Any] = dict(
+            id=uuid.uuid4(),
+            deployment_id=uuid.uuid4(),
+            revision_id=uuid.uuid4(),
+            session_id=None,
+            readiness_status=ReadinessStatus.HEALTHY,
+            liveness_status=LivenessStatus.HEALTHY,
+            activeness_status=ActivenessStatus.ACTIVE,
+            status=RouteStatus.RUNNING,
+            traffic_status=RouteTrafficStatus.ACTIVE,
+            health_status=RouteHealthStatus.HEALTHY,
+            created_at=datetime.now(tz=UTC),
+        )
+        defaults.update(overrides)
+        return ReplicaNode(**defaults)
+
+    def test_creation_includes_deployment_id(self) -> None:
+        deployment_id = uuid.uuid4()
+        node = self._make(deployment_id=deployment_id)
+        assert node.deployment_id == deployment_id
+
+    def test_session_id_defaults_to_none(self) -> None:
+        assert self._make().session_id is None
+
+    def test_round_trip_preserves_deployment_id(self) -> None:
+        deployment_id = uuid.uuid4()
+        node = self._make(deployment_id=deployment_id)
+        restored = ReplicaNode.model_validate_json(node.model_dump_json())
+        assert restored.deployment_id == deployment_id
+        assert restored.id == node.id
 
 
 class TestCreateDeploymentPayload:

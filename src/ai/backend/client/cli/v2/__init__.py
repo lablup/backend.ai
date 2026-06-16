@@ -260,11 +260,6 @@ def notification() -> None:
     """Notification commands."""
 
 
-@v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.app_config:app_config")
-def app_config() -> None:
-    """App config commands."""
-
-
 @v2.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.prometheus_query_preset:prometheus_query_preset",

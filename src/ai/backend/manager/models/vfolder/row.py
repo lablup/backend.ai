@@ -931,50 +931,43 @@ async def prepare_vfolder_mounts(
     vfolder configurations, and the given user scope.
     """
     requested_mounts: list[str] = []
-    requested_mount_name_map: dict[str, str] = {}
-    requested_mount_map: dict[uuid.UUID, str] = {}
-    requested_mount_options: dict[str | uuid.UUID, VFolderMountOptions] = {}
-
-    for req in mount_requests:
-        if isinstance(req.ref, uuid.UUID):
-            if req.dst_path is not None:
-                requested_mount_map[req.ref] = req.dst_path
-            requested_mount_options[req.ref] = req.options
-        else:
-            requested_mounts.append(req.ref)
-            if req.dst_path is not None:
-                requested_mount_name_map[req.ref] = req.dst_path
-            requested_mount_options[req.ref] = req.options
-
-    requested_vfolder_names: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_names: dict[str | uuid.UUID | int, str] = {}
     requested_vfolder_ids: set[uuid.UUID] = set()
-    requested_vfolder_subpaths: dict[str | uuid.UUID, str] = {}
-    requested_vfolder_dstpaths: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_subpaths: dict[str | uuid.UUID | int, str] = {}
+    requested_vfolder_dstpaths: dict[str | uuid.UUID | int, str] = {}
+    requested_mount_options: dict[str | uuid.UUID | int, VFolderMountOptions] = {}
     matched_vfolder_mounts: list[VFolderMount] = []
     _already_resolved: set[str] = set()
+    # A vfolder referenced by UUID may be requested several times, each with a
+    # different subpath/destination. Key each such request by its index in
+    # ``mount_requests`` instead of the bare UUID so the entries no longer
+    # collapse to one-per-vfolder; ``uuid_request_indices`` records which
+    # request keys target each vfolder UUID (lablup/backend.ai#11936).
+    uuid_request_indices: dict[uuid.UUID, list[int]] = {}
 
-    # Split the vfolder name and subpaths
-    for req in mount_requests:
-        key = req.ref
-        if isinstance(key, uuid.UUID):
-            requested_vfolder_ids.add(key)
-            continue
-        name, _, subpath = key.partition("/")
-        if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
-            raise InvalidAPIParameters(
-                f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
-            )
-        requested_vfolder_names[key] = name
-        requested_vfolder_subpaths[key] = os.path.normpath(subpath)
-        _already_resolved.add(name)
-    for vfolder_uuid, value in requested_mount_map.items():
-        uuid_opts = requested_mount_options.get(vfolder_uuid)
-        requested_vfolder_subpaths[vfolder_uuid] = _normalize_mount_subpath(
-            uuid_opts.subpath if uuid_opts else None
-        )
-        requested_vfolder_dstpaths[vfolder_uuid] = value
-    for key, value in requested_mount_name_map.items():
-        requested_vfolder_dstpaths[key] = value
+    # Split the requests into the UUID-referenced and name-referenced surfaces,
+    # capturing each request's subpath, destination, and options up front.
+    for index, req in enumerate(mount_requests):
+        if isinstance(req.ref, uuid.UUID):
+            requested_vfolder_ids.add(req.ref)
+            uuid_request_indices.setdefault(req.ref, []).append(index)
+            requested_mount_options[index] = req.options
+            requested_vfolder_subpaths[index] = _normalize_mount_subpath(req.options.subpath)
+            if req.dst_path is not None:
+                requested_vfolder_dstpaths[index] = req.dst_path
+        else:
+            name, _, subpath = req.ref.partition("/")
+            if not PurePosixPath(os.path.normpath(req.ref)).is_relative_to(name):
+                raise InvalidAPIParameters(
+                    f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
+                )
+            requested_mounts.append(req.ref)
+            requested_mount_options[req.ref] = req.options
+            requested_vfolder_names[req.ref] = name
+            requested_vfolder_subpaths[req.ref] = os.path.normpath(subpath)
+            _already_resolved.add(name)
+            if req.dst_path is not None:
+                requested_vfolder_dstpaths[req.ref] = req.dst_path
 
     # Check if there are overlapping mount sources
     for p1 in requested_mounts:
@@ -1007,11 +1000,6 @@ async def prepare_vfolder_mounts(
         extra_vf_conds = sa.or_(
             extra_vf_conds, vfolders.c.name.in_(requested_vfolder_names.values())
         )
-    if requested_mount_map:
-        extra_vf_conds = sa.or_(
-            extra_vf_conds,
-            VFolderRow.id.in_(requested_mount_map.keys()),
-        )
     if requested_vfolder_ids:
         extra_vf_conds = sa.or_(
             extra_vf_conds,
@@ -1029,29 +1017,40 @@ async def prepare_vfolder_mounts(
 
     # Fast-path for empty requested mounts
     if not accessible_vfolders:
-        if requested_vfolder_names:
+        if requested_vfolder_names or requested_vfolder_ids:
             raise VFolderNotFound("There is no accessible vfolders at all.")
         return []
 
     requested_names = set(requested_vfolder_names.values())
+    resolved_vfolder_ids: set[uuid.UUID] = set()
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
         if vfid in requested_vfolder_ids:
-            requested_vfolder_names[vfid] = name
-            vfid_opts = requested_mount_options.get(vfid)
-            requested_vfolder_subpaths[vfid] = _normalize_mount_subpath(
-                vfid_opts.subpath if vfid_opts else None
-            )
+            resolved_vfolder_ids.add(vfid)
+            # Bind every UUID-referenced request for this vfolder to its
+            # resolved name. Each request keeps its own subpath/destination/
+            # options (captured above), so multiple subpaths of one vfolder
+            # all survive into the mount loop (lablup/backend.ai#11936). Source
+            # overlap for these is enforced later by ``is_mount_duplicate``.
+            for index in uuid_request_indices.get(vfid, ()):
+                requested_vfolder_names[index] = name
+            continue
         if name in _already_resolved:
             continue
         if name not in requested_names:
             requested_vfolder_names[vfid] = name
         requested_mounts.append(name)
-        if vfid in requested_mount_map:
-            requested_mount_name_map[name] = requested_mount_map[vfid]
-        if vfid in requested_mount_options:
-            requested_mount_options[name] = requested_mount_options[vfid]
+
+    # A UUID-referenced request that matched no accessible vfolder would
+    # otherwise be silently dropped (its index never enters the mount loop
+    # below). Surface it like the name-referenced path does, so the caller
+    # learns the requested mount was not honored (lablup/backend.ai#11936).
+    if unresolved_vfolder_ids := (requested_vfolder_ids - resolved_vfolder_ids):
+        raise VFolderNotFound(
+            "VFolder(s) not found or accessible: "
+            + ", ".join(sorted(str(vfid) for vfid in unresolved_vfolder_ids))
+        )
 
     # Check if there are overlapping mount sources
     check_overlapping_mounts(requested_mounts)

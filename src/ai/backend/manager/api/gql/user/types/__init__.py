@@ -41,6 +41,7 @@ from .node import (
 )
 from .payloads import (
     BulkCreateUsersV2PayloadGQL,
+    BulkCreateUsersWithKeypairV2PayloadGQL,
     BulkCreateUserV2ErrorGQL,
     BulkPurgeUsersV2PayloadGQL,
     BulkPurgeUserV2ErrorGQL,
@@ -102,6 +103,7 @@ __all__ = [
     "CreateUserPayloadGQL",
     "BulkCreateUserV2ErrorGQL",
     "BulkCreateUsersV2PayloadGQL",
+    "BulkCreateUsersWithKeypairV2PayloadGQL",
     "BulkUpdateUserV2ErrorGQL",
     "BulkUpdateUsersV2PayloadGQL",
     "UpdateUserPayloadGQL",

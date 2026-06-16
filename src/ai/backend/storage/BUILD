@@ -2,6 +2,7 @@ python_sources(
     name="src",
     sources=["**/*.py"],
     dependencies=[
+        "src/ai/backend/cli:src",  # not auto-inferred
         ":resources",
     ],
 )
@@ -11,13 +12,9 @@ visibility_private_component(
         "//src/ai/backend/testutils/**",
     ],
     allowed_dependencies=[
-        "//src/ai/backend/**",
-        "!//src/ai/backend/web/**",
-        "!//src/ai/backend/account_manager/**",
-        "!//src/ai/backend/manager/**",
-        "!//src/ai/backend/agent/**",
-        "!//src/ai/backend/wsproxy/**",
-        "!//src/ai/backend/client/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
     ],
 )
 

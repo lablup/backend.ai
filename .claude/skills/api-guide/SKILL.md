@@ -28,7 +28,7 @@ APIs implement 6 standard operations:
 5. **delete** - Delete entity (soft)
 6. **purge** - Permanently remove entity (hard)
 
-**Batch operations:** `batch_update`, `batch_delete`, `batch_purge`
+**Multi-target:** `batch_*` (atomic, one statement) vs `bulk_*` (per-row, partial failures). See `/repository-guide`.
 
 ## Scope Prefix Rules
 

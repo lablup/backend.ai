@@ -52,12 +52,13 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderAccessControlInfo,
     VFolderMetadataInfo,
     VFolderOwnershipInfo,
+    VFolderQuotaInfo,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import BackendAIError, UnreachableError
-from ai.backend.common.types import BinarySize, VFolderUsageMode
+from ai.backend.common.types import BinarySize, MountPermission, VFolderUsageMode
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment.creator import (
@@ -120,6 +121,9 @@ from ai.backend.manager.services.vfolder.actions.file_v2 import (
     ListFilesV2Action,
     MkdirV2Action,
     MoveFileV2Action,
+)
+from ai.backend.manager.services.vfolder.actions.get_usage import (
+    GetVFolderUsageAction,
 )
 from ai.backend.manager.services.vfolder.actions.get_v2 import GetVFolderV2Action
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
@@ -217,9 +221,7 @@ class VFolderAdapter(BaseAdapter):
                 creator_id=data.creator_id,
                 creator_email=data.creator,
             ),
-            usage=VFolderUsageInfoDTO(
-                num_files=data.num_files,
-                used_bytes=_to_binary_size_info(data.cur_size),
+            quota=VFolderQuotaInfo(
                 max_size=_to_binary_size_info(data.max_size) if data.max_size is not None else None,
                 max_files=data.max_files,
             ),
@@ -417,6 +419,25 @@ class VFolderAdapter(BaseAdapter):
         )
         return self._vfolder_data_to_node(result.vfolder)
 
+    async def get_folder_usage(self, vfolder_id: UUID) -> VFolderUsageInfoDTO | None:
+        """Fetch usage statistics on demand through the storage proxy.
+
+        Very slow: every call is a round-trip to the storage proxy, and the
+        measurement cost depends on the storage backend (e.g., a full directory
+        walk on vfs). Returns ``None`` for unmanaged vfolders, which have no
+        storage-proxy backing.
+        """
+        result = await self._processors.vfolder.get_folder_usage.wait_for_complete(
+            GetVFolderUsageAction(vfolder_uuid=vfolder_id)
+        )
+        usage = result.usage
+        if usage is None:
+            return None
+        return VFolderUsageInfoDTO(
+            num_files=usage.num_files,
+            used_bytes=_to_binary_size_info(usage.used_bytes),
+        )
+
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
         """Soft-delete a vfolder (move to trash). RBAC enforced."""
         action = DeleteVFolderV2Action(vfolder_id=vfolder_id)
@@ -509,6 +530,8 @@ class VFolderAdapter(BaseAdapter):
                     model_definition_path=None,
                     model_mount_destination="/models",
                     extra_mounts=[],
+                    # vfolder deploy always mounts the model read-only.
+                    model_mount_perm=MountPermission.READ_ONLY,
                 ),
                 revision_preset_id=input.revision_preset_id,
             ),

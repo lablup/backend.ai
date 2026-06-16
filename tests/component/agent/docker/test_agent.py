@@ -112,7 +112,7 @@ async def test_auto_pull_digest_when_missing(agent: DockerAgent, mocker: Any) ->
     inspect_mock = AsyncMock(
         side_effect=DockerError(
             status=HTTPStatus.NOT_FOUND,
-            data={"message": "Simulated missing image"},
+            message="Simulated missing image",
         ),
     )
     docker_mock.images.inspect = inspect_mock
@@ -156,7 +156,7 @@ async def test_auto_pull_tag_when_missing(agent: DockerAgent, mocker: Any) -> No
     inspect_mock = AsyncMock(
         side_effect=DockerError(
             status=HTTPStatus.NOT_FOUND,
-            data={"message": "Simulated missing image"},
+            message="Simulated missing image",
         ),
     )
     docker_mock.images.inspect = inspect_mock
@@ -200,7 +200,7 @@ async def test_auto_pull_none_when_missing(agent: DockerAgent, mocker: Any) -> N
     inspect_mock = AsyncMock(
         side_effect=DockerError(
             status=HTTPStatus.NOT_FOUND,
-            data={"message": "Simulated missing image"},
+            message="Simulated missing image",
         ),
     )
     docker_mock.images.inspect = inspect_mock

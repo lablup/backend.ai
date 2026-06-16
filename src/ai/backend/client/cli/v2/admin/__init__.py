@@ -203,3 +203,12 @@ def scheduling_handler() -> None:
 )
 def invitation() -> None:
     """Admin role invitation commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.role_preset:role_preset",
+    name="role-preset",
+)
+def role_preset() -> None:
+    """Admin role preset commands."""

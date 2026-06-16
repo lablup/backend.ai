@@ -18,7 +18,6 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.agent.stats import ContainerMeasurement, NodeMeasurement, StatContext
 from ai.backend.agent.types import Container
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     BinarySize,
     DeviceId,
@@ -27,6 +26,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from . import __version__
 from .tpu import libtpu

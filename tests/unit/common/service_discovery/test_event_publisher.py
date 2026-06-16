@@ -139,7 +139,7 @@ class TestServiceDiscoveryEventPublisher:
         mock_event_producer: AsyncMock,
     ) -> None:
         """start() should immediately publish a registration event."""
-        await publisher.start(heartbeat_interval=60)
+        await publisher.start()
         try:
             # First call should be the initial registration
             assert mock_event_producer.anycast_event.call_count == 1
@@ -154,7 +154,7 @@ class TestServiceDiscoveryEventPublisher:
         mock_event_producer: AsyncMock,
     ) -> None:
         """stop() should publish a deregistered event."""
-        await publisher.start(heartbeat_interval=60)
+        await publisher.start()
         mock_event_producer.anycast_event.reset_mock()
         await publisher.stop()
 
@@ -169,14 +169,16 @@ class TestServiceDiscoveryEventPublisher:
         mock_event_producer: AsyncMock,
     ) -> None:
         """stop() should cancel the heartbeat task."""
-        await publisher.start(heartbeat_interval=60)
-        assert publisher._heartbeat_task is not None
-        assert not publisher._heartbeat_task.done()
+        await publisher.start()
+        assert publisher._local_cron is not None
+        runners = list(publisher._local_cron._task_runners)
+        assert runners
+        assert all(not runner.done() for runner in runners)
 
         await publisher.stop()
         # Give event loop a cycle
         await asyncio.sleep(0)
-        assert publisher._heartbeat_task.done()
+        assert all(runner.done() for runner in runners)
 
     async def test_config_with_no_endpoints(
         self,

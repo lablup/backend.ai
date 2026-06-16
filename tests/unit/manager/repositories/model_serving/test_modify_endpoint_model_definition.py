@@ -19,6 +19,7 @@ from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
@@ -32,6 +33,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -89,6 +91,7 @@ class TestModifyEndpointModelDefinitionRefresh:
                 VFolderRow,
                 SessionRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 RuntimeVariantRow,
                 DeploymentRevisionPresetRow,
@@ -326,10 +329,20 @@ class TestModifyEndpointModelDefinitionRefresh:
             )
             await sess.flush()
 
+            # Current revision lives on the primary replica group.
+            group_id = uuid.uuid4()
+            sess.add(
+                ReplicaGroupRow(
+                    id=ReplicaGroupID(group_id),
+                    deployment_id=DeploymentID(endpoint_id),
+                    current_revision_id=revision_id,
+                )
+            )
+            await sess.flush()
             await sess.execute(
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
-                .values(current_revision=revision_id)
+                .values(primary_replica_group_id=group_id)
             )
             await sess.flush()
         return endpoint_id, revision_id

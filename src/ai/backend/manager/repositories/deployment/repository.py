@@ -81,10 +81,6 @@ from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
-from ai.backend.manager.models.deployment_auto_scaling_policy import (
-    DeploymentAutoScalingPolicyData,
-    DeploymentAutoScalingPolicyRow,
-)
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
@@ -95,11 +91,14 @@ from ai.backend.manager.models.scheduling_history import (
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
+from ai.backend.manager.repositories.base.updater import (
+    BatchUpdater,
+    Updater,
+)
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
@@ -345,12 +344,25 @@ class DeploymentRepository:
         self,
         endpoint_id: DeploymentID,
     ) -> DeploymentInfo:
-        """Get endpoint information.
+        """Get endpoint information (modern, light: revision *ids* only).
 
         Raises:
             EndpointNotFound: If the endpoint does not exist
         """
         return await self._db_source.get_endpoint(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_legacy_endpoint_info(
+        self,
+        endpoint_id: DeploymentID,
+    ) -> DeploymentInfo:
+        """Get endpoint information (legacy, full: includes the current/deploying
+        revision data). DO NOT USE in new code — for the REST v1 surface only.
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
+        """
+        return await self._db_source.get_legacy_endpoint(endpoint_id)
 
     @deployment_repository_resilience.apply()
     async def destroy_endpoint(
@@ -526,6 +538,21 @@ class DeploymentRepository:
         return await self._db_source.resolve_vfolder_permissions(vfolder_ids)
 
     @deployment_repository_resilience.apply()
+    async def resolve_user_vfolder_permissions(
+        self,
+        user_id: uuid.UUID,
+        vfolder_ids: Sequence[VFolderUUID],
+    ) -> dict[VFolderUUID, MountPermission]:
+        """Resolve the requester's effective permission on each vfolder.
+
+        Used at revision-write time to ground the model vfolder mount
+        permission into the requesting user's own permission (and to reject
+        a request exceeding it) — see
+        ``DeploymentDBSource.resolve_user_vfolder_permissions``.
+        """
+        return await self._db_source.resolve_user_vfolder_permissions(user_id, vfolder_ids)
+
+    @deployment_repository_resilience.apply()
     async def fetch_deployment_config(
         self,
         vfolder_id: VFolderUUID,
@@ -627,14 +654,6 @@ class DeploymentRepository:
     ) -> Mapping[DeploymentID, list[RouteInfo]]:
         """Fetch routes for multiple deployments."""
         return await self._db_source.fetch_active_routes_by_deployment_ids(deployment_ids)
-
-    @deployment_repository_resilience.apply()
-    async def scale_routes(
-        self,
-        scale_out_creators: Sequence[RBACEntityCreator[RoutingRow]],
-        scale_in_updater: BatchUpdater[RoutingRow] | None,
-    ) -> None:
-        await self._db_source.scale_routes(scale_out_creators, scale_in_updater)
 
     # Route operations
 
@@ -1292,9 +1311,9 @@ class DeploymentRepository:
     ) -> ModelRevisionData:
         """Get the latest revision (highest ``revision_number``) of a deployment.
 
-        Unlike :meth:`get_current_revision`, this does not consult
-        ``EndpointRow.current_revision``: it returns the most recently
-        created revision for the endpoint regardless of activation state.
+        Unlike :meth:`get_current_revision`, this does not consult the primary
+        group's ``current_revision_id``: it returns the most recently created
+        revision for the endpoint regardless of activation state.
 
         Raises:
             DeploymentRevisionNotFound: If no revisions exist for the endpoint.
@@ -1336,14 +1355,14 @@ class DeploymentRepository:
         return await self._db_source.update_endpoint(updater)
 
     @deployment_repository_resilience.apply()
-    async def set_deploying_revision(
+    async def activate_revision(
         self,
         endpoint_id: DeploymentID,
         revision_id: DeploymentRevisionID,
     ) -> tuple[DeploymentRevisionID | None, bool]:
-        """Set deploying_revision and transition lifecycle to DEPLOYING.
+        """Record the deploy intent and transition lifecycle to DEPLOYING.
 
-        Overrides any previous ``deploying_revision`` unconditionally;
+        Overrides any previous deploy intent unconditionally;
         leftover routes from the preempted rollout are picked up by
         ``RouteEvictionHandler``'s orphan-revision branch.
 
@@ -1351,7 +1370,7 @@ class DeploymentRepository:
             Tuple of (previous_current_revision_id, updated).
             ``updated=False`` means the endpoint row was not found.
         """
-        return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
+        return await self._db_source.activate_revision(endpoint_id, revision_id)
 
     @deployment_repository_resilience.apply()
     async def prune_old_revisions(
@@ -1367,52 +1386,6 @@ class DeploymentRepository:
             Number of revisions deleted.
         """
         return await self._db_source.prune_old_revisions(endpoint_id, revision_history_limit)
-
-    # ========== Deployment Auto-Scaling Policy Operations ==========
-
-    @deployment_repository_resilience.apply()
-    async def create_auto_scaling_policy(
-        self,
-        creator: Creator[DeploymentAutoScalingPolicyRow],
-    ) -> DeploymentAutoScalingPolicyData:
-        """Create a new auto-scaling policy for an endpoint."""
-        return await self._db_source.create_auto_scaling_policy(creator)
-
-    @deployment_repository_resilience.apply()
-    async def get_auto_scaling_policy(
-        self,
-        endpoint_id: DeploymentID,
-    ) -> DeploymentAutoScalingPolicyData:
-        """Get the auto-scaling policy for an endpoint.
-
-        Raises:
-            AutoScalingPolicyNotFound: If no policy exists for the endpoint.
-        """
-        return await self._db_source.get_auto_scaling_policy(endpoint_id)
-
-    @deployment_repository_resilience.apply()
-    async def update_auto_scaling_policy(
-        self,
-        updater: Updater[DeploymentAutoScalingPolicyRow],
-    ) -> DeploymentAutoScalingPolicyData:
-        """Update an auto-scaling policy.
-
-        Raises:
-            AutoScalingPolicyNotFound: If the policy does not exist.
-        """
-        return await self._db_source.update_auto_scaling_policy(updater)
-
-    @deployment_repository_resilience.apply()
-    async def delete_auto_scaling_policy(
-        self,
-        purger: Purger[DeploymentAutoScalingPolicyRow],
-    ) -> PurgerResult[DeploymentAutoScalingPolicyRow] | None:
-        """Delete an auto-scaling policy by primary key.
-
-        Returns:
-            PurgerResult containing the deleted row, or None if no policy existed.
-        """
-        return await self._db_source.delete_auto_scaling_policy(purger)
 
     @deployment_repository_resilience.apply()
     async def upsert_deployment_policy(
@@ -1528,15 +1501,18 @@ class DeploymentRepository:
         self,
         querier: BatchQuerier,
     ) -> DeploymentInfoSearchResult:
-        """Search endpoints with pagination and filtering.
-
-        Args:
-            querier: BatchQuerier containing conditions, orders, and pagination
-
-        Returns:
-            DeploymentInfoSearchResult with items, total_count, and pagination info
-        """
+        """Search endpoints (modern, light: revision *ids* only)."""
         return await self._db_source.search_endpoints(querier)
+
+    @deployment_repository_resilience.apply()
+    async def search_legacy_endpoints(
+        self,
+        querier: BatchQuerier,
+    ) -> DeploymentInfoSearchResult:
+        """Search endpoints (legacy, full: includes the current/deploying
+        revision data). DO NOT USE in new code — for the REST v1 surface only.
+        """
+        return await self._db_source.search_legacy_endpoints(querier)
 
     @deployment_repository_resilience.apply()
     async def search_deployments_in_project(
@@ -1656,6 +1632,15 @@ class DeploymentRepository:
             drain=drain,
             completed_ids=completed_ids,
         )
+
+    @deployment_repository_resilience.apply()
+    async def retire_replica_groups_on_destroy(self, deployment_ids: set[DeploymentID]) -> None:
+        """Drain the deployments' replica groups and clear their deploying-revision pointer atomically.
+
+        Called from the destroy flow so the reconcile stops provisioning replicas for the gone
+        endpoint and no stale group/revision pointer lingers.
+        """
+        await self._db_source.retire_replica_groups_on_destroy(deployment_ids)
 
     @deployment_repository_resilience.apply()
     async def clear_deploying_revision(self, deployment_ids: set[DeploymentID]) -> None:

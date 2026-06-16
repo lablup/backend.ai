@@ -194,6 +194,16 @@ class VFolderData:
 
 
 @dataclass
+class VFolderUsageData:
+    """
+    Usage measurements fetched live from the storage proxy.
+    """
+
+    num_files: int
+    used_bytes: int
+
+
+@dataclass
 class VFolderPermissionData:
     """
     VFolder permission data representing user-specific permissions on a VFolder.
@@ -214,6 +224,7 @@ class VFolderInvitationData:
     id: uuid.UUID
     vfolder: uuid.UUID
     inviter: str  # email
+    inviter_username: str | None
     invitee: str  # email
     permission: VFolderMountPermission
     created_at: datetime

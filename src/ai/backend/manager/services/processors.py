@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.clients.prometheus.client import PrometheusClient
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.idle import IdleCheckerHost
+    from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
     from ai.backend.manager.models.storage import StorageSessionManager
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.notification import NotificationCenter
@@ -44,12 +45,6 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.agent.processors import AgentProcessors
     from ai.backend.manager.services.agent.service import AgentService
-    from ai.backend.manager.services.app_config.processors import (
-        AppConfigProcessors,
-    )
-    from ai.backend.manager.services.app_config.service import (
-        AppConfigService,
-    )
     from ai.backend.manager.services.artifact.processors import (
         ArtifactProcessors,
     )
@@ -232,6 +227,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.resource_usage.service import (
         ResourceUsageService,
     )
+    from ai.backend.manager.services.role_preset.processors import (
+        RolePresetProcessors,
+    )
+    from ai.backend.manager.services.role_preset.service import (
+        RolePresetService,
+    )
     from ai.backend.manager.services.runtime_variant.processors import (
         RuntimeVariantProcessors,
     )
@@ -355,13 +356,13 @@ class ServiceArgs:
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
     prometheus_client: PrometheusClient
+    ssh_key_validator: SSHKeyValidator
     registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass
 class Services:
     agent: AgentService
-    app_config: AppConfigService
     domain: DomainService
     dotfile: DotfileService
     error_log: ErrorLogService
@@ -386,6 +387,7 @@ class Services:
     prometheus_query_preset_category: PrometheusQueryPresetCategoryService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
+    role_preset: RolePresetService
     runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentRevisionPresetService
@@ -426,7 +428,6 @@ class ProcessorArgs:
 @dataclass
 class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
-    app_config: AppConfigProcessors
     domain: DomainProcessors
     dotfile: DotfileProcessors
     error_log: ErrorLogProcessors
@@ -451,6 +452,7 @@ class Processors(AbstractProcessorPackage):
     prometheus_query_preset_category: PrometheusQueryPresetCategoryProcessors
     resource_preset: ResourcePresetProcessors
     resource_slot: ResourceSlotProcessors
+    role_preset: RolePresetProcessors
     runtime_variant: RuntimeVariantProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors
     deployment_revision_preset: DeploymentRevisionPresetProcessors
@@ -484,7 +486,6 @@ class Processors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             *self.agent.supported_actions(),
-            *self.app_config.supported_actions(),
             *self.domain.supported_actions(),
             *self.dotfile.supported_actions(),
             *self.error_log.supported_actions(),
@@ -509,6 +510,7 @@ class Processors(AbstractProcessorPackage):
             *self.prometheus_query_preset_category.supported_actions(),
             *self.resource_preset.supported_actions(),
             *self.resource_slot.supported_actions(),
+            *self.role_preset.supported_actions(),
             *self.runtime_variant.supported_actions(),
             *self.runtime_variant_preset.supported_actions(),
             *self.deployment_revision_preset.supported_actions(),

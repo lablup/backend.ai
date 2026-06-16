@@ -1108,3 +1108,30 @@ class TestReplicaHealthStatusClient:
         status = results[replica_id]
         assert status is not None
         assert status.healthy is False
+
+    async def test_record_consecutive_failures_round_trip(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=False, consecutive_failures=4)
+        ])
+        results = await valkey_schedule_client.get_route_health_statuses_batch([replica_id])
+        status = results[replica_id]
+        assert status is not None
+        assert status.consecutive_failures == 4
+
+    async def test_record_with_custom_ttl(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        """Per-route ttl_sec is applied to the health status key."""
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=True, ttl_sec=7)
+        ])
+        key = valkey_schedule_client._get_route_health_status_key(replica_id)
+        async with valkey_schedule_client._client.client() as conn:
+            ttl = await conn.ttl(key)
+        assert 0 < ttl <= 7

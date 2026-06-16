@@ -8,6 +8,15 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
 )
+from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
+
+
+@dataclass(frozen=True)
+class RuntimeVariantPresetValueData:
+    """A concrete value bound to a runtime variant preset (by 'preset_id')."""
+
+    preset_id: RuntimeVariantPresetID
+    value: str
 
 
 @dataclass(frozen=True)
@@ -59,6 +68,7 @@ class RuntimeVariantPresetData:
     value_type: PresetValueType
     default_value: str | None
     key: str
+    required: bool
     category: str | None
     ui_type: str | None
     display_name: str | None

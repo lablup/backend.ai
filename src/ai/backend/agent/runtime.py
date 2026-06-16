@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import signal
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
-
-import aiotools
 
 from ai.backend.agent.agent import AbstractAgent, AgentClass
 from ai.backend.agent.config.unified import AgentUnifiedConfig
@@ -15,10 +13,11 @@ from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import ComputerContext, ResourceAllocator
+from ai.backend.agent.tasks import CollectNodeStatTask, UpdateSlotsTask
 from ai.backend.agent.types import AgentBackend, get_agent_discovery
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.cron import LocalCron
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.types import AgentId, DeviceName, SlotName
 
 if TYPE_CHECKING:
@@ -35,7 +34,7 @@ class AgentRuntime:
     _metadata_server: MetadataServer | None
 
     _stop_signal: signal.Signals
-    _timer_tasks: Sequence[asyncio.Task[None]]
+    _local_cron: LocalCron
 
     @classmethod
     async def create_runtime(
@@ -87,7 +86,7 @@ class AgentRuntime:
         primary_agent = agents_list[0]
         agents = {agent.id: agent for agent in agents_list}
 
-        return AgentRuntime(
+        runtime = AgentRuntime(
             local_config=local_config,
             etcd_views=etcd_views,
             agents=agents,
@@ -96,6 +95,8 @@ class AgentRuntime:
             resource_allocator=resource_allocator,
             metadata_server=metadata_server,
         )
+        await runtime._local_cron.start()
+        return runtime
 
     @classmethod
     async def _create_metadata_server(
@@ -161,17 +162,13 @@ class AgentRuntime:
         self._metadata_server = metadata_server
 
         self._stop_signal = signal.SIGTERM
-        self._timer_tasks = [
-            aiotools.create_timer(self._update_slots, 30.0),
-            aiotools.create_timer(
-                self._collect_node_stat,
-                UTILIZATION_METRIC_INTERVAL,
-                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
-            ),
-        ]
+        self._local_cron = LocalCron([
+            UpdateSlotsTask(self),
+            CollectNodeStatTask(self, local_config),
+        ])
 
     async def __aexit__(self, *exc_info: Any) -> None:
-        await aiotools.cancel_and_wait(self._timer_tasks)
+        await self._local_cron.stop()
         for agent in self._agents.values():
             await agent.shutdown(self._stop_signal)
         if self._metadata_server is not None:
@@ -206,12 +203,12 @@ class AgentRuntime:
         etcd = self.get_etcd(agent_id)
         await etcd.put("", status, scope=ConfigScopes.NODE)
 
-    async def _update_slots(self, interval: float) -> None:
+    async def update_agent_slots(self) -> None:
         for agent_id, agent in self._agents.items():
             updated_slots = await self._resource_allocator.get_updated_slots(agent_id)
             agent.update_slots(updated_slots)
 
-    async def _collect_node_stat(self, interval: float) -> None:
+    async def collect_node_stats(self) -> None:
         for agent_id, agent in self._agents.items():
             await agent.collect_node_stat(
                 self._resource_allocator.get_resource_scaling_factor(agent_id)

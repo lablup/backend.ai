@@ -139,6 +139,7 @@ class TestSystemComposer:
             "ai.backend.manager.dependencies.system.background_task_manager.BackgroundTaskManager"
         ) as mock_bgtask_class:
             mock_bgtask_manager = MagicMock()
+            mock_bgtask_manager.init = AsyncMock()
             mock_bgtask_manager.shutdown = AsyncMock()
             mock_bgtask_class.return_value = mock_bgtask_manager
 

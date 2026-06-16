@@ -170,12 +170,21 @@ class PreStartAction(BaseConfigModel):
 
 
 class ModelHealthCheck(BaseConfigModel):
+    enable: bool = Field(
+        default=False,
+        description=(
+            "Whether the route should be health-checked. When false the route "
+            "becomes active immediately and the remaining fields are ignored."
+        ),
+        examples=[False],
+    )
     interval: float = Field(
         default=10.0,
         description="Interval in seconds between health checks.",
         examples=[10.0],
     )
     path: str = Field(
+        default="/health",
         description="Path to check for health status.",
         examples=["/health"],
     )
@@ -197,10 +206,42 @@ class ModelHealthCheck(BaseConfigModel):
     )
     initial_delay: float = Field(
         default=60.0,
-        description="Initial delay in seconds before the first health check.",
+        description=(
+            "Grace period in seconds for a warming-up route to pass its first "
+            "health check. Probing starts immediately; the route stays "
+            "WARMING_UP until a probe passes (then it activates) or this period "
+            "elapses without a passing probe (then it is terminated). This does "
+            "not delay the first probe."
+        ),
         examples=[60.0],
         ge=0,
     )
+
+    def is_retry_exhausted(self, consecutive_failures: int) -> bool:
+        """Whether consecutive failed probes have reached ``max_retries``.
+
+        The health observer accumulates ``consecutive_failures`` (reset to 0
+        on a passing probe); the consuming handler calls this to decide when
+        a route should transition to UNHEALTHY.
+        """
+        return consecutive_failures >= self.max_retries
+
+    def is_probe_due(self, last_check: int, now: int) -> bool:
+        """Whether ``interval`` has elapsed since the last probe.
+
+        ``last_check`` / ``now`` are Unix-second timestamps. Used by the
+        observer to throttle per-route probing to the configured interval.
+        """
+        return now - last_check >= self.interval
+
+    def health_status_ttl_sec(self) -> int:
+        """Per-route TTL for the cached health status in Valkey.
+
+        Key expiry signals DEGRADED (no recent check), so the TTL must stay
+        comfortably above the probe ``interval`` — normal probing refreshes
+        it every ``interval`` with margin for scheduling jitter.
+        """
+        return max(120, int(self.interval * 3))
 
 
 class ModelServiceConfig(BaseConfigModel):
@@ -316,6 +357,18 @@ def _pick(base_val: Any, override_val: Any, override_set: bool) -> Any:
     return override_val
 
 
+def _pick_non_null_override(base_val: Any, override_val: Any, override_set: bool) -> Any:
+    """Return a non-null draft override, otherwise keep the base value.
+
+    Draft model definitions are patch layers from several sources. In that
+    patch context ``None`` means the field was not supplied with a concrete
+    value, even when an input adapter materializes optional fields as null.
+    """
+    if not override_set or override_val is None:
+        return base_val
+    return override_val
+
+
 def _merge_metadata(base: ModelMetadata, override: ModelMetadata) -> ModelMetadata:
     """Merge two ModelMetadata instances. All fields are atomic."""
     s = override.model_fields_set
@@ -351,6 +404,7 @@ def _merge_service_config(
         hb, ho = base.health_check, override.health_check
         hs = ho.model_fields_set
         health_check = ModelHealthCheck.model_construct(
+            enable=_pick(hb.enable, ho.enable, "enable" in hs),
             interval=_pick(hb.interval, ho.interval, "interval" in hs),
             path=_pick(hb.path, ho.path, "path" in hs),
             max_retries=_pick(hb.max_retries, ho.max_retries, "max_retries" in hs),
@@ -441,9 +495,20 @@ class ModelDefinition(BaseConfigModel):
 
     def health_check_config(self) -> ModelHealthCheck | None:
         for model in self.models:
+            if model.service and model.service.health_check and model.service.health_check.enable:
+                return model.service.health_check
+        return None
+
+    def health_check_setting(self) -> ModelHealthCheck | None:
+        """The configured health check, preserved even when disabled.
+
+        Unlike :meth:`health_check_config`, this does not gate on ``enable``,
+        so a caller that persists the setting keeps the ``enable`` flag intact
+        and consumers decide based on it rather than on presence alone.
+        """
+        for model in self.models:
             if model.service and model.service.health_check:
-                if model.service.health_check is not None:
-                    return model.service.health_check
+                return model.service.health_check
         return None
 
     def with_args_appended(self, args: list[str]) -> ModelDefinition:
@@ -481,6 +546,7 @@ class ModelDefinition(BaseConfigModel):
 
 
 class ModelHealthCheckDraft(BaseConfigModel):
+    enable: bool | None = None
     interval: float | None = None
     path: str | None = None
     max_retries: int | None = None
@@ -491,8 +557,6 @@ class ModelHealthCheckDraft(BaseConfigModel):
     def to_resolved(self) -> ModelHealthCheck:
         # Drop unset (None) fields so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values.
-        # Missing required fields (e.g. ``path``) surface as the strict
-        # type's ``BackendAISchemaValidationFailed`` via ``model_validate``.
         return ModelHealthCheck.model_validate(self.model_dump(exclude_none=True))
 
 
@@ -511,10 +575,9 @@ class ModelServiceConfigDraft(BaseConfigModel):
     def to_resolved(self) -> ModelServiceConfig:
         # Drop unset (None) scalars so the strict type's ``Field(default=...)``
         # declarations remain the single source of truth for default values;
-        # resolve the nested ``health_check`` draft explicitly so its own
-        # required-field check (``path``) fires through its own
-        # ``model_validate``. Missing required fields (e.g. ``port``)
-        # surface as ``BackendAISchemaValidationFailed``.
+        # resolve the nested ``health_check`` draft explicitly. Missing
+        # required fields (e.g. ``port``) surface as
+        # ``BackendAISchemaValidationFailed``.
         payload = self.model_dump(exclude_none=True, exclude={"health_check"})
         payload["health_check"] = self.health_check.to_resolved() if self.health_check else None
         return ModelServiceConfig.model_validate(payload)
@@ -547,14 +610,21 @@ def _merge_health_check_draft(
 ) -> ModelHealthCheckDraft:
     s = override.model_fields_set
     return ModelHealthCheckDraft.model_construct(
-        interval=_pick(base.interval, override.interval, "interval" in s),
-        path=_pick(base.path, override.path, "path" in s),
-        max_retries=_pick(base.max_retries, override.max_retries, "max_retries" in s),
-        max_wait_time=_pick(base.max_wait_time, override.max_wait_time, "max_wait_time" in s),
-        expected_status_code=_pick(
+        enable=_pick_non_null_override(base.enable, override.enable, "enable" in s),
+        interval=_pick_non_null_override(base.interval, override.interval, "interval" in s),
+        path=_pick_non_null_override(base.path, override.path, "path" in s),
+        max_retries=_pick_non_null_override(
+            base.max_retries, override.max_retries, "max_retries" in s
+        ),
+        max_wait_time=_pick_non_null_override(
+            base.max_wait_time, override.max_wait_time, "max_wait_time" in s
+        ),
+        expected_status_code=_pick_non_null_override(
             base.expected_status_code, override.expected_status_code, "expected_status_code" in s
         ),
-        initial_delay=_pick(base.initial_delay, override.initial_delay, "initial_delay" in s),
+        initial_delay=_pick_non_null_override(
+            base.initial_delay, override.initial_delay, "initial_delay" in s
+        ),
     )
 
 
@@ -567,14 +637,18 @@ def _merge_service_config_draft(
     if "health_check" in s and base.health_check is not None and override.health_check is not None:
         health_check = _merge_health_check_draft(base.health_check, override.health_check)
     else:
-        health_check = _pick(base.health_check, override.health_check, "health_check" in s)
+        health_check = _pick_non_null_override(
+            base.health_check, override.health_check, "health_check" in s
+        )
     return ModelServiceConfigDraft.model_construct(
-        pre_start_actions=_pick(
+        pre_start_actions=_pick_non_null_override(
             base.pre_start_actions, override.pre_start_actions, "pre_start_actions" in s
         ),
-        start_command=_pick(base.start_command, override.start_command, "start_command" in s),
-        shell=_pick(base.shell, override.shell, "shell" in s),
-        port=_pick(base.port, override.port, "port" in s),
+        start_command=_pick_non_null_override(
+            base.start_command, override.start_command, "start_command" in s
+        ),
+        shell=_pick_non_null_override(base.shell, override.shell, "shell" in s),
+        port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
     )
 
@@ -588,14 +662,14 @@ def _merge_config_draft(
     if "service" in s and base.service is not None and override.service is not None:
         service = _merge_service_config_draft(base.service, override.service)
     else:
-        service = _pick(base.service, override.service, "service" in s)
+        service = _pick_non_null_override(base.service, override.service, "service" in s)
     metadata: ModelMetadata | None
     if "metadata" in s and base.metadata is not None and override.metadata is not None:
         metadata = _merge_metadata(base.metadata, override.metadata)
     else:
-        metadata = _pick(base.metadata, override.metadata, "metadata" in s)
+        metadata = _pick_non_null_override(base.metadata, override.metadata, "metadata" in s)
     return ModelConfigDraft.model_construct(
-        name=_pick(base.name, override.name, "name" in s),
+        name=_pick_non_null_override(base.name, override.name, "name" in s),
         model_path=override.model_path if override.model_path is not None else base.model_path,
         service=service,
         metadata=metadata,
@@ -649,6 +723,28 @@ class ModelDefinitionDraft(BaseConfigModel):
         return ModelDefinition.model_validate({
             "models": [m.to_resolved() for m in (self.models or [])],
         })
+
+    @classmethod
+    def from_file_payload(cls, payload: Mapping[str, Any]) -> ModelDefinitionDraft:
+        """Parse a model-definition file into a draft, normalizing the ``health_check`` block."""
+        # Dump by field name so the keys below match regardless of snake/kebab input.
+        data = cls.model_validate(dict(payload)).model_dump(exclude_unset=True, by_alias=False)
+        for model in data.get("models") or []:
+            service = model.get("service")
+            if service is None:
+                continue
+            if "health_check" not in service:
+                continue
+            health_check = service["health_check"]
+            # An empty health_check (null or {}) is an explicit opt-out; disable it so it
+            # overrides any enabled baseline instead of inheriting one.
+            if not health_check:
+                service["health_check"] = {"enable": False}
+                continue
+            # A non-empty block opts in; default enable to True when unset.
+            if health_check.get("enable") is None:
+                health_check["enable"] = True
+        return cls.model_validate(data)
 
 
 def find_config_file(daemon_name: str) -> Path:

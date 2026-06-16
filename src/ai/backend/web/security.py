@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import secrets
 from collections.abc import Callable, Iterable, Mapping
+from contextvars import ContextVar
 from typing import Self
 
 from aiohttp import web
@@ -10,13 +12,23 @@ type RequestPolicy = Callable[[web.Request], None]
 
 type ResponsePolicy = Callable[[web.StreamResponse], web.StreamResponse]
 
+# Per-request CSP nonce shared between the response policies (which set the
+# Content-Security-Policy header) and the handler that renders index.html.
+csp_nonce_var: ContextVar[str] = ContextVar("csp_nonce", default="")
+
+_NONCED_CSP_DIRECTIVES = frozenset({"script-src", "style-src"})
+
 
 @web.middleware
 async def security_policy_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
     security_policy: SecurityPolicy = request.app["security_policy"]
-    security_policy.check_request_policies(request)
-    response = await handler(request)
-    return security_policy.apply_response_policies(response)
+    token = csp_nonce_var.set(secrets.token_urlsafe(16))
+    try:
+        security_policy.check_request_policies(request)
+        response = await handler(request)
+        return security_policy.apply_response_policies(response)
+    finally:
+        csp_nonce_var.reset(token)
 
 
 class SecurityPolicy:
@@ -104,12 +116,19 @@ def add_self_content_security_policy(response: web.StreamResponse) -> web.Stream
 
 
 def csp_policy_builder(csp_config: Mapping[str, list[str] | None]) -> ResponsePolicy:
-    csp = [key + " " + " ".join(value) for key, value in csp_config.items() if value]
-    csp_str = "; ".join(csp)
-    if csp_str:
-        csp_str = csp_str + ";"
-
     def policy(response: web.StreamResponse) -> web.StreamResponse:
+        nonce = csp_nonce_var.get()
+        directives = []
+        for key, value in csp_config.items():
+            if not value:
+                continue
+            sources = list(value)
+            if nonce and key in _NONCED_CSP_DIRECTIVES:
+                sources.append(f"'nonce-{nonce}'")
+            directives.append(key + " " + " ".join(sources))
+        csp_str = "; ".join(directives)
+        if csp_str:
+            csp_str = csp_str + ";"
         response.headers["Content-Security-Policy"] = csp_str
         return response
 

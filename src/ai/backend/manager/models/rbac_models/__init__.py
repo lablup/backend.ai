@@ -3,6 +3,8 @@ from .entity_field import EntityFieldRow
 from .permission.object_permission import ObjectPermissionRow
 from .permission.permission import PermissionRow
 from .role import RoleRow
+from .role_permission_preset import RolePermissionPresetRow
+from .role_preset import RolePresetRow
 from .user_role import UserRoleRow
 
 __all__ = (
@@ -10,6 +12,8 @@ __all__ = (
     "EntityFieldRow",
     "ObjectPermissionRow",
     "PermissionRow",
+    "RolePermissionPresetRow",
+    "RolePresetRow",
     "RoleRow",
     "UserRoleRow",
 )

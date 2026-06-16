@@ -20,7 +20,7 @@ from typing import (
 import aiodocker
 import trafaret as t
 
-from ai.backend.agent.exception import InitializationError
+from ai.backend.agent.errors import InitializationError
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,

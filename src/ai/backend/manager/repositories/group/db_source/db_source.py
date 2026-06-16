@@ -29,6 +29,7 @@ from ai.backend.manager.data.group.types import (
     UnassignUserFailure,
     UnassignUsersResult,
 )
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
@@ -176,6 +177,8 @@ class GroupDBSource:
             await self._role_manager.create_system_role(
                 db_session, ProjectMemberRoleSpec(project_id=data.id)
             )
+            # Provision roles from active presets matching the project scope.
+            await self._role_manager.create_preset_roles(db_session, data.scope_id())
 
             return data
 
@@ -220,11 +223,9 @@ class GroupDBSource:
         """Add users to a project within an existing session.
 
         Creates the RBAC scope binding (association_scopes_entities) via
-        ``RBACScopeBinder`` and a user-role mapping to the project's member
-        role. Admin roles are intentionally NOT granted here; the modifyGroup
-        add path represents "make this user a project member", not "make this
-        user a project admin". Already-assigned users are filtered out to
-        avoid unique-constraint conflicts.
+        ``RBACScopeBinder`` and maps each new user to every active
+        ``auto_assign`` role bound to the project scope. Already-assigned
+        users are filtered out to avoid unique-constraint conflicts.
         """
         project_domain_subq = (
             sa.select(GroupRow.domain_name).where(GroupRow.id == project_id).scalar_subquery()
@@ -262,38 +263,11 @@ class GroupDBSource:
         ]
         await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=pairs))
 
-        # Locate the project's member role. Two naming conventions coexist:
-        # the runtime name `project-{id8}-member` used by GroupDBSource.create
-        # since BA-5746, and the legacy name `role_project_{id8}_member`
-        # created by alembic migration 430b1631804d for pre-existing projects.
-        runtime_member_name = f"project-{str(project_id)[:8]}-member"
-        legacy_member_name = f"role_project_{str(project_id)[:8]}_member"
-        member_role_id = await session.scalar(
-            sa.select(RoleRow.id)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.cast(AssociationScopesEntitiesRow.entity_id, sa.String)
-                == sa.cast(RoleRow.id, sa.String),
-            )
-            .where(
-                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                AssociationScopesEntitiesRow.scope_id == str(project_id),
-                AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
-                RoleRow.name.in_([runtime_member_name, legacy_member_name]),
-            )
+        await self._role_manager.assign_auto_assign_roles(
+            session,
+            [row.uuid for row in new_user_rows],
+            ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(project_id)),
         )
-        if member_role_id is None:
-            log.warning(
-                "project {} has no member role bound at its scope; "
-                "skipping user-role mapping for modifyGroup add",
-                project_id,
-            )
-            return
-
-        user_role_specs = [
-            UserRoleCreatorSpec(user_id=row.uuid, role_id=member_role_id) for row in new_user_rows
-        ]
-        await execute_bulk_creator(session, BulkCreator(specs=user_role_specs))
 
     async def _remove_users_from_project_in_session(
         self,
@@ -813,9 +787,9 @@ class GroupDBSource:
     ) -> UnassignUsersResult:
         """Remove users from a project and return unassigned users and failures.
 
-        Deletes RBAC scope associations (AssociationScopesEntitiesRow) and any
-        project-scoped user-role mappings. Reports which requested user IDs
-        could not be unassigned and why.
+        Deletes the RBAC scope associations (AssociationScopesEntitiesRow) that
+        record project membership. Reports which requested user IDs could not be
+        unassigned and why.
         """
         async with self._db.begin_session_read_committed() as session:
             requested_ids = set(unbinder.user_uuids)
@@ -844,22 +818,6 @@ class GroupDBSource:
 
             # Delete RBAC scope associations via the unbinder API
             await execute_rbac_scope_entity_unbinder(session, unbinder)
-
-            if assigned_rows:
-                # Delete user-role mappings for project-scoped roles
-                project_role_ids_subq = sa.select(
-                    AssociationScopesEntitiesRow.entity_id,
-                ).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
-                    AssociationScopesEntitiesRow.scope_id == str(unbinder.project_id),
-                    AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
-                )
-                await session.execute(
-                    sa.delete(UserRoleRow).where(
-                        UserRoleRow.user_id.in_([row.uuid for row in assigned_rows]),
-                        sa.cast(UserRoleRow.role_id, sa.String).in_(project_role_ids_subq),
-                    )
-                )
 
             # Compute failures
             failures: list[UnassignUserFailure] = []

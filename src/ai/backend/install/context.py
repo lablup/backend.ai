@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import hashlib
 import importlib.resources
 import json
 import os
@@ -11,6 +12,7 @@ import secrets
 import shutil
 import sys
 import tempfile
+import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import asynccontextmanager as actxmgr
@@ -28,6 +30,7 @@ import tomlkit
 from dateutil.tz import tzutc
 from etcd_client import GRPCStatusError
 from rich.text import Text
+from ruamel.yaml import YAML
 from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
@@ -63,6 +66,7 @@ from .types import (
     OSInfo,
     PackageSource,
     Platform,
+    PrerequisiteError,
     ServerAddr,
     ServiceConfig,
 )
@@ -615,6 +619,14 @@ class Context(metaclass=ABCMeta):
                 "exposed_volume_info": "percentage",
             },
         }
+        # When a dedicated SFTP agent is configured, point the storage proxy's
+        # sftp_scaling_groups at that agent's scaling group so that SFTP
+        # upload sessions get routed through it.
+        # Must be under volumes/proxies/<proxy>/ per manager config schema.
+        if service.sftp_agent_enabled:
+            data["volumes"]["proxies"]["local"]["sftp_scaling_groups"] = (
+                service.sftp_agent_scaling_group
+            )
         await self.etcd_put_json("", data)
         data = {}
         # TODO: in dev-mode, enable these.
@@ -734,6 +746,101 @@ class Context(metaclass=ABCMeta):
                 f'endpoint = "{self.install_variable.otel_endpoint}"',
             )
         self.enable_observability_in_toml(toml_path)
+
+    async def configure_sftp_agent(self) -> None:
+        """
+        Configure an optional dedicated SFTP agent alongside the regular
+        compute agent. This is gated by ``install_variable.with_sftp_agent``
+        and piggybacks on Backend.AI's multi-agent-per-node feature.
+
+        Clones the already-generated ``./agent.toml`` (produced by
+        ``configure_agent``) so that etcd, mount-path, plugin, and other
+        environment-specific settings are automatically shared.  Then
+        applies SFTP-specific overrides (distinct ports, pid-file,
+        scaling-group, ipc/var paths) so the two agents can coexist on
+        the same node without resource collisions.
+        """
+        service = self.install_info.service_config
+        if not service.sftp_agent_enabled:
+            return
+
+        # Clone the primary agent config instead of the bundled template
+        # so that every environment-dependent setting (etcd addr, mount-path,
+        # accelerator plugins, etc.) is inherited automatically.
+        primary_toml = Path.cwd() / "agent.toml"
+        toml_path = Path.cwd() / "agent-sftp.toml"
+        shutil.copy2(primary_toml, toml_path)
+        Path(service.sftp_agent_var_base_path).mkdir(parents=True, exist_ok=True)
+
+        self.sed_in_place_multi(
+            toml_path,
+            [
+                # --- port collision avoidance ---
+                (
+                    f"port = {service.agent_rpc_addr.face.port}",
+                    f"port = {service.sftp_agent_rpc_addr.face.port}",
+                ),
+                (
+                    f"agent-sock-port = {service.agent_sock_port}",
+                    f"agent-sock-port = {service.sftp_agent_sock_port}",
+                ),
+                (
+                    f"port = {service.agent_watcher_addr.face.port}",
+                    f"port = {service.sftp_agent_watcher_addr.face.port}",
+                ),
+                # --- identity ---
+                (
+                    re.compile(r'^# id = "i-something-special"', flags=re.MULTILINE),
+                    'id = "i-local-sftp"',
+                ),
+                (re.compile(r'^id = "i-.*"', flags=re.MULTILINE), 'id = "i-local-sftp"'),
+                (
+                    f'scaling-group = "{service.scaling_group}"',
+                    f'scaling-group = "{service.sftp_agent_scaling_group}"',
+                ),
+                # --- path isolation ---
+                ('pid-file = "./agent.pid"', 'pid-file = "./agent-sftp.pid"'),
+                (
+                    f'ipc-base-path = "{service.agent_ipc_base_path}"',
+                    f'ipc-base-path = "{service.sftp_agent_ipc_base_path}"',
+                ),
+                (
+                    f'var-base-path = "{service.agent_var_base_path}"',
+                    f'var-base-path = "{service.sftp_agent_var_base_path}"',
+                ),
+                # --- metric API service-addr (avoid port 6003 collision) ---
+                (
+                    'service-addr = { host = "0.0.0.0", port = 6003 }',
+                    'service-addr = { host = "0.0.0.0", port = 6014 }',
+                ),
+                # --- container port range (non-overlapping) ---
+                ("port-range = [30000, 31000]", "port-range = [31100, 31200]"),
+                # --- disable compute plugins (SFTP only) ---
+                (
+                    re.compile(r"^allow-compute-plugins = \[.*\]", flags=re.MULTILINE),
+                    "allow-compute-plugins = []",
+                ),
+                # --- pyroscope differentiation ---
+                ('app-name = "backendai-half-agent"', 'app-name = "backendai-half-sftp-agent"'),
+            ],
+        )
+        # Insert additional ports into [agent] section to avoid collision
+        # with the primary agent (aiomonitor defaults: 38200/39200,
+        # metadata-server-port default: 40128).
+        self.sed_in_place_multi(
+            toml_path,
+            [
+                (
+                    'id = "i-local-sftp"',
+                    (
+                        'id = "i-local-sftp"\n'
+                        "aiomonitor-termui-port = 38201\n"
+                        "aiomonitor-webui-port = 39201\n"
+                        "metadata-server-port = 40129"
+                    ),
+                ),
+            ],
+        )
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -1191,6 +1298,51 @@ class Context(metaclass=ABCMeta):
                 )
             await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
 
+    async def configure_sftp_agent_fixture(self) -> None:
+        """
+        Register the dedicated SFTP scaling group and associate it with the
+        default domain. This is only populated when the user passed
+        ``--with-sftp-agent`` — it mirrors the ``sgroups_for_domains``
+        association in ``example-users.json`` for the default scaling group.
+        """
+        service = self.install_info.service_config
+        if not service.sftp_agent_enabled:
+            return
+
+        self.log_header(
+            f"Registering '{service.sftp_agent_scaling_group}' scaling group for SFTP agent..."
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fixture_path = Path(tmpdir) / "fixture.json"
+            with fixture_path.open("w") as fw:
+                fw.write(
+                    json.dumps({
+                        "scaling_groups": [
+                            {
+                                "name": service.sftp_agent_scaling_group,
+                                "description": "Scaling group dedicated to SFTP upload sessions",
+                                "is_active": True,
+                                "driver": "static",
+                                "driver_opts": {},
+                                "scheduler": "fifo",
+                                "scheduler_opts": {},
+                                "wsproxy_addr": (
+                                    f"http://{service.appproxy_coordinator_addr.face.host}"
+                                    f":{service.appproxy_coordinator_addr.face.port}"
+                                ),
+                                "wsproxy_api_token": service.appproxy_api_secret,
+                            }
+                        ],
+                        "sgroups_for_domains": [
+                            {
+                                "scaling_group": service.sftp_agent_scaling_group,
+                                "domain": "default",
+                            }
+                        ],
+                    })
+                )
+            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
+
     async def configure_client(self) -> None:
         # TODO: add an option to generate keypairs
         base_path = self.install_info.base_path
@@ -1246,6 +1398,293 @@ class Context(metaclass=ABCMeta):
                 )
                 print(f"""echo 'Your email: {user["email"]}'""", file=fp)
                 print(f"""echo 'Your password: {user["password"]}'""", file=fp)
+
+    def _resolve_harbor_hostname(self, public_facing_address: str) -> str:
+        """
+        Pick a Harbor hostname that Harbor's ``prepare`` script will accept.
+
+        Harbor explicitly rejects loopback addresses (``127.0.0.1`` /
+        ``localhost``) and ``0.0.0.0``. When ``--public-facing-address`` is
+        one of those (the dev-installer default is ``127.0.0.1``), fall back
+        to ``host.docker.internal`` so Harbor still gets a reachable name on
+        Docker Desktop / OrbStack hosts. Users can override the choice with
+        ``--harbor-hostname``.
+        """
+        override = self.install_variable.harbor_hostname
+        if override:
+            return override
+        if public_facing_address in ("127.0.0.1", "0.0.0.0", "localhost"):
+            return "host.docker.internal"
+        return public_facing_address
+
+    async def configure_harbor(self) -> None:
+        """
+        Configure and install a local Harbor container registry.
+
+        Downloads the Harbor offline installer archive, extracts it into
+        ``<base_path>/harbor``, writes ``harbor.yml`` from the bundled template
+        (replacing ``hostname``/``http port``/``admin password``/``data_volume``
+        placeholders), and runs Harbor's own ``install.sh`` which in turn
+        generates the working ``docker-compose.yml`` and config files for the
+        core, portal, registry, jobservice, and database containers.
+
+        The generated ``docker-compose.yml`` can then be managed with
+        ``docker compose -f harbor/docker-compose.yml up -d`` or via the
+        ``./dev harbor start/stop`` helpers.
+        """
+        service = self.install_info.service_config
+        if not service.harbor_enabled:
+            return
+
+        base_path = self.install_info.base_path
+        harbor_dir = base_path / "harbor"
+        harbor_data_dir = base_path / "var" / "harbor"
+        harbor_data_dir.mkdir(parents=True, exist_ok=True)
+
+        if service.harbor_admin_password == "Harbor12345":
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]WARNING: using the well-known default Harbor admin "
+                    "password 'Harbor12345'. Override with --harbor-admin-password "
+                    "for anything beyond a throwaway dev box.[/]"
+                )
+            )
+
+        # If a previous Harbor install has containers running, refusing to
+        # re-prepare under them prevents desync between the on-disk compose
+        # project and the running state (and avoids accidentally tearing
+        # down a Harbor that this run did not start).
+        if (
+            harbor_dir / "docker-compose.yml"
+        ).exists() and await self._harbor_compose_has_running_containers(harbor_dir):
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]Existing Harbor containers detected — leaving the "
+                    "current installation in place. Run [bold]./dev harbor stop[/] "
+                    "and re-run the installer to refresh the configuration.[/]"
+                )
+            )
+            await self._register_local_harbor_registry()
+            return
+
+        download_uri = self.install_variable.harbor_download_uri
+        expected_sha256 = self.install_variable.harbor_download_sha256
+        archive_path = base_path / Path(download_uri).name
+
+        # 1) Download the Harbor offline installer archive if not already present.
+        if not archive_path.exists():
+            self.log_header(f"Downloading Harbor offline installer from {download_uri}")
+            exit_code = await self.run_exec(
+                ["curl", "-fL", "--output", str(archive_path), download_uri],
+                cwd=base_path,
+            )
+            if exit_code != 0:
+                raise RuntimeError(
+                    f"Harbor download failed (curl exit {exit_code}); URL: {download_uri}"
+                )
+        else:
+            self.log.write(
+                Text.from_markup(
+                    f"Using cached Harbor installer archive at [bold]{archive_path}[/]"
+                )
+            )
+
+        # 2) Verify the archive against a pinned SHA-256 when one is configured.
+        #    Upstream Harbor publishes only MD5 sums, so the digest must be
+        #    provided by the operator (--harbor-download-sha256). When unset
+        #    we skip the check and surface a one-line warning rather than
+        #    silently trusting the download.
+        if expected_sha256:
+            self.log_header("Verifying Harbor archive SHA-256...")
+            actual_sha256 = await self._sha256_file(archive_path)
+            if actual_sha256.lower() != expected_sha256.lower():
+                raise RuntimeError(
+                    f"Harbor archive SHA-256 mismatch: expected {expected_sha256}, "
+                    f"got {actual_sha256}. Refusing to extract a potentially "
+                    f"tampered archive at {archive_path}."
+                )
+            self.log.write(Text.from_markup(f"[green]SHA-256 OK[/] [dim]({actual_sha256})[/]"))
+        else:
+            self.log.write(
+                Text.from_markup(
+                    "[yellow]No --harbor-download-sha256 supplied; skipping "
+                    "archive integrity check. Pass an expected digest to enable "
+                    "verification.[/]"
+                )
+            )
+
+        # 3) Replace the installer directory atomically so that scripts/configs
+        #    from a previous (possibly different-version) archive do not linger.
+        #    data_volume lives at <base_path>/var/harbor and is outside
+        #    harbor_dir, so wiping harbor_dir does not touch persistent data.
+        if harbor_dir.exists():
+            shutil.rmtree(harbor_dir)
+        harbor_dir.mkdir(parents=True, exist_ok=True)
+
+        self.log_header("Extracting Harbor installer archive...")
+        with tempfile.TemporaryDirectory(prefix="bai-harbor-") as extract_root:
+            extract_path = Path(extract_root)
+            exit_code = await self.run_exec(
+                ["tar", "-xzf", str(archive_path), "-C", str(extract_path)],
+                cwd=base_path,
+            )
+            if exit_code != 0:
+                raise RuntimeError(
+                    f"Harbor archive extraction failed (tar exit {exit_code}); archive may be corrupt: {archive_path}"
+                )
+            # The tarball extracts into a top-level ``harbor/`` directory.
+            extracted_harbor_dir = extract_path / "harbor"
+            if not extracted_harbor_dir.is_dir():
+                raise RuntimeError(
+                    f"Harbor archive did not contain a top-level 'harbor/' directory: {archive_path}"
+                )
+            for child in extracted_harbor_dir.iterdir():
+                dest = harbor_dir / child.name
+                if child.is_dir():
+                    shutil.copytree(child, dest)
+                else:
+                    shutil.copy2(child, dest)
+
+        # 4) Load Harbor's bundled ``harbor.yml.tmpl`` using ruamel.yaml
+        #    (round-trip mode) so we can modify only the fields we care about
+        #    while preserving comments and structure — mirroring the tomlkit
+        #    pattern used for other service configs.
+        self.log_header("Writing harbor.yml configuration...")
+        harbor_template = harbor_dir / "harbor.yml.tmpl"
+        if not harbor_template.exists():
+            raise RuntimeError(
+                f"Harbor template not found at {harbor_template}; archive may be corrupt."
+            )
+        yaml = YAML()
+        yaml.preserve_quotes = True
+        with harbor_template.open("r", encoding="utf-8") as fp:
+            harbor_config = yaml.load(fp)
+        harbor_config["hostname"] = service.harbor_hostname
+        harbor_config["http"]["port"] = service.harbor_http_port
+        harbor_config["harbor_admin_password"] = service.harbor_admin_password
+        harbor_config["database"]["password"] = service.harbor_admin_password
+        harbor_config["data_volume"] = str(harbor_data_dir)
+        # Drop the https section entirely so that ``prepare`` does not require
+        # certificate files. The template keeps it commented out by default,
+        # but be defensive in case a newer archive enables it.
+        if "https" in harbor_config:
+            del harbor_config["https"]
+        with (harbor_dir / "harbor.yml").open("w", encoding="utf-8") as fp:
+            yaml.dump(harbor_config, fp)
+
+        # 5) Load the bundled service images (``harbor.<version>.tar.gz``)
+        #    so the prepare container — and any later ``./dev harbor start`` —
+        #    can run without an internet round-trip.
+        image_tarballs = sorted(harbor_dir.glob("harbor.*.tar.gz"))
+        if image_tarballs:
+            self.log_header("Loading bundled Harbor images into docker...")
+            for image_tarball in image_tarballs:
+                exit_code = await self.run_exec(
+                    [*self.docker_sudo, "docker", "load", "-i", str(image_tarball)],
+                    cwd=harbor_dir,
+                )
+                if exit_code != 0:
+                    raise RuntimeError(
+                        f"docker load failed for {image_tarball.name} (exit {exit_code})."
+                    )
+
+        # 6) Run Harbor's ``prepare`` script directly to generate
+        #    docker-compose.yml and supporting service configs. We deliberately
+        #    avoid ``install.sh`` because it also runs ``docker compose up`` —
+        #    we manage Harbor's lifecycle via ``./dev harbor start|stop``, and
+        #    bringing containers up here would force a ``docker compose down``
+        #    that could tear down a Harbor someone else started.
+        self.log_header("Running Harbor prepare script...")
+        prepare_script = harbor_dir / "prepare"
+        if not prepare_script.exists():
+            raise RuntimeError(
+                f"Harbor prepare script not found at {prepare_script}; archive may be corrupt."
+            )
+        exit_code = await self.run_exec(
+            ["bash", "prepare"],
+            cwd=harbor_dir,
+        )
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Harbor prepare failed (exit {exit_code}); check the log above for details."
+            )
+
+        # 7) Register the local Harbor as a Backend.AI container registry so
+        #    images can be scanned/pulled from it without an extra manual step.
+        await self._register_local_harbor_registry()
+
+        self.log.write(
+            Text.from_markup(
+                f"[green]Harbor is configured.[/] "
+                f"Start it with [bold]./dev harbor start[/] and access it at "
+                f"[bold]http://{service.harbor_hostname}:{service.harbor_http_port}[/]"
+            )
+        )
+
+    async def _harbor_compose_has_running_containers(self, harbor_dir: Path) -> bool:
+        """Return True if ``docker compose ps -q`` in ``harbor_dir`` lists any
+        container IDs. Used to detect a previously-installed Harbor that is
+        currently up, so the installer can refuse to re-prepare under it."""
+        proc = await asyncio.create_subprocess_exec(
+            *self.docker_sudo,
+            "docker",
+            "compose",
+            "ps",
+            "-q",
+            cwd=str(harbor_dir),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        return proc.returncode == 0 and bool(stdout.strip())
+
+    @staticmethod
+    async def _sha256_file(path: Path) -> str:
+        """Compute the SHA-256 of ``path`` off the event loop."""
+
+        def _digest() -> str:
+            h = hashlib.sha256()
+            with path.open("rb") as fp:
+                for chunk in iter(lambda: fp.read(1024 * 1024), b""):
+                    h.update(chunk)
+            return h.hexdigest()
+
+        return await asyncio.to_thread(_digest)
+
+    async def _register_local_harbor_registry(self) -> None:
+        """
+        Register the freshly configured local Harbor as a Backend.AI
+        ``container_registries`` row (with admin credentials) so it shows up
+        immediately in the manager API/UI without manual registration.
+
+        The fixture uses ``uuid5(NAMESPACE_URL, harbor_url)`` for the row ID
+        so re-running the installer does not create duplicate rows — the
+        manager's fixture loader treats a matching primary key as
+        idempotent.
+        """
+        service = self.install_info.service_config
+        harbor_url = f"http://{service.harbor_hostname}:{service.harbor_http_port}"
+        registry_name = "local-harbor"
+        project = "library"
+        registry_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{harbor_url}/{project}"))
+        fixture = {
+            "container_registries": [
+                {
+                    "id": registry_id,
+                    "registry_name": registry_name,
+                    "url": harbor_url,
+                    "type": "harbor2",
+                    "project": project,
+                    "username": "admin",
+                    "password": service.harbor_admin_password,
+                    "ssl_verify": False,
+                }
+            ]
+        }
+        fixture_path = self.install_info.base_path / "harbor" / "container-registry-fixture.json"
+        fixture_path.write_text(json.dumps(fixture, indent=2))
+        self.log_header("Registering local Harbor as a Backend.AI container registry...")
+        await self.run_manager_cli(["mgr", "fixture", "populate", str(fixture_path)])
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")
@@ -1351,6 +1790,20 @@ class Context(metaclass=ABCMeta):
                             "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64",
                             "x86_64",
                         )
+
+                    if self.install_info.service_config.sftp_agent_enabled:
+                        # Pre-pull the SFTP server image so the first SFTP
+                        # session does not stall on a cold image fetch. The
+                        # tag is single-arch (multi-arch manifest); the
+                        # registered metadata also makes it resolvable for
+                        # storage-proxy when routing SFTP upload sessions.
+                        sftp_image_ref = "cr.backend.ai/stable/sftp-server:24.04-ubuntu24.04"
+                        await self.run_exec([
+                            *self.docker_sudo,
+                            "docker",
+                            "pull",
+                            sftp_image_ref,
+                        ])
                 case ImageSource.DOCKER_HUB:
                     self.log_header(
                         "Scanning and pulling configured Docker Hub container images..."
@@ -1420,8 +1873,10 @@ class DevContext(Context):
                 bind=HostPortPair(public_component_bind_address, 5050),
                 face=HostPortPair(public_facing_address, 5050),
             ),
+            scaling_group="default",
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
+            agent_sock_port=6007,
             agent_ipc_base_path="ipc/agent",
             agent_var_base_path="var/agent",
             storage_proxy_client_facing_addr=ServerAddr(
@@ -1443,6 +1898,15 @@ class DevContext(Context):
             appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
             appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
             appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
+            harbor_enabled=self.install_variable.with_harbor,
+            harbor_hostname=self._resolve_harbor_hostname(public_facing_address),
+            harbor_http_port=self.install_variable.harbor_http_port,
+            harbor_admin_password=self.install_variable.harbor_admin_password,
+            sftp_agent_enabled=self.install_variable.with_sftp_agent,
+            sftp_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6013)),
+            sftp_agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6015)),
+            sftp_agent_var_base_path="var/agent-sftp",
+            sftp_agent_scaling_group="upload",
         )
 
         return InstallInfo(
@@ -1507,6 +1971,10 @@ class DevContext(Context):
         self.log_header("Configuring agent...")
         await self.configure_agent()
 
+        if self.install_variable.with_sftp_agent:
+            self.log_header("Configuring dedicated SFTP agent...")
+            await self.configure_sftp_agent()
+
         self.log_header("Initializing app-proxy database...")
         await self.install_appproxy_db()
 
@@ -1524,8 +1992,15 @@ class DevContext(Context):
         await self.configure_appproxy()
         await self.configure_appproxy_fixture()
 
+        if self.install_variable.with_sftp_agent:
+            await self.configure_sftp_agent_fixture()
+
         self.log_header("Generating client environ configs...")
         await self.configure_client()
+
+        if self.install_variable.with_harbor:
+            self.log_header("Configuring local Harbor registry...")
+            await self.configure_harbor()
 
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
@@ -1569,8 +2044,10 @@ class PackageContext(Context):
                 bind=HostPortPair(public_component_bind_address, 15050),
                 face=HostPortPair(public_facing_address, 15050),
             ),
+            scaling_group="default",
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
+            agent_sock_port=6007,
             agent_ipc_base_path="ipc/agent",
             agent_var_base_path="var/agent",
             storage_proxy_client_facing_addr=ServerAddr(
@@ -1609,6 +2086,11 @@ class PackageContext(Context):
 
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
+        if self.install_variable.with_harbor:
+            raise PrerequisiteError(
+                "--with-harbor is supported only in DEVELOP/SOURCE install modes; "
+                "package mode does not provision a local Harbor registry."
+            )
 
     async def _validate_checksum(self, pkg_path: Path, csum_path: Path) -> None:
         proc = await asyncio.create_subprocess_exec(

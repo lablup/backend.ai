@@ -7,6 +7,7 @@ replacing JSON scalars and organized into logical field groups.
 from .resolver import (
     # Mutations
     admin_bulk_create_users_v2,
+    admin_bulk_create_users_with_keypair_v2,
     admin_bulk_purge_users_v2,
     admin_bulk_update_users_v2,
     admin_create_user_v2,
@@ -36,6 +37,7 @@ __all__ = [
     # Mutations
     "admin_create_user_v2",
     "admin_bulk_create_users_v2",
+    "admin_bulk_create_users_with_keypair_v2",
     "admin_bulk_update_users_v2",
     "admin_update_user_v2",
     "update_user_v2",

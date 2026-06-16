@@ -155,40 +155,37 @@ class RouteExecutor:
             errors=errors,
         )
 
-    async def terminate_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Drain traffic via AppProxy unregister, then destroy sessions.
+    async def drain_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """Drain traffic for TERMINATING+DRAINING routes via AppProxy unregister.
 
-        The drain step pushes a synchronous unregister to AppProxy first
-        so no fresh request lands on a kernel that is about to die.
-        Unregister failures are logged but do not block kernel
-        termination — the AppProxy client's own retry policy already
-        attempted, and continuing to terminate avoids stuck TERMINATING
-        rows. The long-cycle ``AppProxySyncRouteHandler`` keeps state
-        convergent for any leftover drift.
+        The synchronous unregister runs before any kernel teardown so no
+        fresh request lands on a kernel that is about to die. Unregister
+        failures are logged but do not hold the route in DRAINING — the
+        AppProxy client's own retry policy already attempted, and the
+        long-cycle ``AppProxySyncRouteHandler`` keeps state convergent
+        for any leftover drift, so all routes advance to COOLING_DOWN.
 
         Args:
-            routes: Routes to terminate
+            routes: Routes in the DRAINING stage
 
         Returns:
-            Result containing successful and failed routes
+            Result with every route as success (→ COOLING_DOWN)
         """
         if not routes:
             return RouteExecutionResult(successes=[], errors=[])
 
-        # Phase 1: AppProxy unregister (drain traffic before kernel kill)
         with RouteRecorderContext.shared_phase("drain_appproxy_routes"):
             try:
                 unregister_result = await self.unregister_routes_now(routes)
             except Exception:
                 log.exception(
-                    "Synchronous AppProxy unregister failed for {} terminating routes",
+                    "Synchronous AppProxy unregister failed for {} draining routes",
                     len(routes),
                 )
             else:
                 if unregister_result.errors:
                     log.warning(
-                        "AppProxy unregister: {} succeeded, {} failed "
-                        "(proceeding with termination)",
+                        "AppProxy unregister: {} succeeded, {} failed (proceeding to cooling down)",
                         len(unregister_result.successes),
                         len(unregister_result.errors),
                     )
@@ -200,19 +197,53 @@ class RouteExecutor:
                         )
                 else:
                     log.debug(
-                        "Unregistered {} routes from AppProxy before termination",
+                        "Unregistered {} routes from AppProxy",
                         len(unregister_result.successes),
                     )
 
-        # Collect session IDs from routes (no phase - cannot fail)
-        target_session_ids: list[SessionId] = []
+        return RouteExecutionResult(
+            successes=list(routes),
+            errors=[],
+        )
+
+    async def terminate_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """Destroy sessions of COOLING_DOWN routes whose grace period elapsed.
+
+        Traffic was already removed in the DRAINING stage; this stage only
+        waits out each route's ``termination_grace_period`` (counted from
+        the DRAINING → COOLING_DOWN transition) so in-flight requests can
+        finish. Routes still inside their grace period are returned as
+        ``stale`` (no transition) and re-checked on the next cycle.
+
+        Args:
+            routes: Routes in the COOLING_DOWN stage
+
+        Returns:
+            Result with terminated routes as successes and grace-waiting
+            routes as stale
+        """
+        if not routes:
+            return RouteExecutionResult(successes=[], errors=[])
+
+        # Partition by termination grace (no phase - cannot fail)
+        now = await self._deployment_repo.get_db_now()
+        ready_routes: list[RouteData] = []
+        waiting_routes: list[RouteData] = []
         for route in routes:
+            if route.is_termination_grace_elapsed(now):
+                ready_routes.append(route)
+            else:
+                waiting_routes.append(route)
+
+        # Collect session IDs from grace-elapsed routes (no phase - cannot fail)
+        target_session_ids: list[SessionId] = []
+        for route in ready_routes:
             if not route.session_id:
                 log.debug("Route {} has no session, skipping termination", route.route_id)
                 continue
             target_session_ids.append(route.session_id)
 
-        # Phase 2: Terminate sessions
+        # Terminate sessions whose grace period elapsed
         with RouteRecorderContext.shared_phase("terminate_sessions"):
             with RouteRecorderContext.shared_step("mark_sessions_terminating"):
                 await self._scheduling_controller.mark_sessions_for_termination(
@@ -220,8 +251,9 @@ class RouteExecutor:
                 )
 
         return RouteExecutionResult(
-            successes=list(routes),
+            successes=ready_routes,
             errors=[],
+            stale=waiting_routes,
         )
 
     async def check_starting_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
@@ -344,11 +376,12 @@ class RouteExecutor:
     @staticmethod
     def _build_probe_target(route: RouteData) -> ReplicaProbeTarget | None:
         """Build a ReplicaProbeTarget from a route, or None if any required field is absent."""
-        if route.health_check is None or route.replica_host is None or route.replica_port is None:
+        health_check = route.enabled_health_check
+        if health_check is None or route.replica_host is None or route.replica_port is None:
             return None
         return ReplicaProbeTarget(
             replica_id=route.route_id,
-            health_path=route.health_check.path,
+            health_path=health_check.path,
             inference_port=route.replica_port,
             replica_host=route.replica_host,
         )
@@ -362,12 +395,12 @@ class RouteExecutor:
         targets: list[ReplicaProbeTarget] = [
             ReplicaProbeTarget(
                 replica_id=route.route_id,
-                health_path=route.health_check.path,
+                health_path=health_check.path,
                 inference_port=replica_info[route.route_id].replica_port,
                 replica_host=replica_info[route.route_id].replica_host,
             )
             for route in routes
-            if route.health_check is not None
+            if (health_check := route.enabled_health_check) is not None
         ]
 
         if targets:
@@ -412,7 +445,8 @@ class RouteExecutor:
         errors: list[RouteExecutionError] = []
 
         for route in routes:
-            if route.health_check is None:
+            health_check = route.enabled_health_check
+            if health_check is None:
                 successes.append(route)
                 continue
 
@@ -425,14 +459,14 @@ class RouteExecutor:
                 continue
 
             elapsed = (now - route.last_transition_at).total_seconds()
-            if elapsed > route.health_check.initial_delay:
+            if elapsed > health_check.initial_delay:
                 errors.append(
                     RouteExecutionError(
                         route_info=route,
                         reason="Route warming-up timed out waiting for healthy probe",
                         error_detail=(
                             f"Elapsed {elapsed:.0f}s exceeds "
-                            f"initial_delay {route.health_check.initial_delay}s"
+                            f"initial_delay {health_check.initial_delay}s"
                         ),
                     )
                 )
@@ -443,9 +477,12 @@ class RouteExecutor:
         """
         Check health status of RUNNING routes and push newly-healthy ones to AppProxy.
 
-        Reads RouteHealthStatus from Valkey and classifies:
-        - HEALTHY:   status.healthy is True
-        - UNHEALTHY: status.healthy is False
+        Routes with no active health check (absent or disabled) are skipped —
+        their health is left unmanaged. For the rest, reads RouteHealthStatus
+        from Valkey and classifies:
+        - HEALTHY:   latest probe passed, or it failed but consecutive_failures
+                     has not yet reached ``max_retries`` (still within retry budget)
+        - UNHEALTHY: consecutive_failures reached ``max_retries``
         - DEGRADED:  status absent (key missing or TTL expired — no recent check)
 
         Routes whose pre-execute health_status was not HEALTHY but whose
@@ -471,6 +508,12 @@ class RouteExecutor:
 
         # Phase 2: Classify health state (per-route)
         for route in routes:
+            health_check = route.enabled_health_check
+            if health_check is None:
+                # No active health check (absent or disabled) → leave health
+                # unmanaged; do not transition this route.
+                continue
+
             status = statuses.get(route.route_id)
 
             if status is None:
@@ -480,12 +523,18 @@ class RouteExecutor:
 
             if status.healthy:
                 successes.append(route)
+            elif not health_check.is_retry_exhausted(status.consecutive_failures):
+                # Probe failing but still within the retry budget → keep HEALTHY.
+                successes.append(route)
             else:
                 errors.append(
                     RouteExecutionError(
                         route_info=route,
                         reason="Route health check failed",
-                        error_detail="RouteHealthStatus reports unhealthy",
+                        error_detail=(
+                            f"RouteHealthStatus reports unhealthy after "
+                            f"{status.consecutive_failures} consecutive failures"
+                        ),
                         error_code=None,
                     )
                 )
@@ -598,17 +647,25 @@ class RouteExecutor:
         return RouteExecutionResult(successes=[], errors=[])
 
     async def sync_appproxy(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Push the current HEALTHY routing tables for affected endpoints to AppProxy.
+        """Push the current ACTIVE routing tables for affected endpoints to AppProxy.
+
+        Sync mirrors AppProxy to the manager's routing intent (traffic
+        ACTIVE), not to live health. Evicting an UNHEALTHY backend from
+        the pool is AppProxy's own health-check responsibility; on the
+        manager side a confirmed-unhealthy route is removed via the
+        route-eviction → terminate → unregister path per the scaling
+        group's ``cleanup_target_statuses`` policy. Filtering by HEALTHY
+        here would double-manage that and drop health-check-disabled
+        (NOT_CHECKED) routes that should keep serving.
 
         Steps:
         1. Group the input routes by endpoint (the AppProxy contract is
            endpoint-scoped: one ``circuit.route_info`` per deployment).
         2. Resolve each endpoint's proxy target (wsproxy_addr / token)
            via the deployment repository in two batched calls.
-        3. Re-read the authoritative RUNNING + HEALTHY route set per
+        3. Re-read the authoritative RUNNING + ACTIVE route set per
            endpoint with a caller-composed ``BatchQuerier`` so the same
-           plumbing works for sync, debug, and reporting paths — no
-           ``only_healthy`` flag and no Row-side query method.
+           plumbing works for sync, debug, and reporting paths.
         4. Group endpoints by proxy target and issue one
            ``bulk_update_routes`` HTTP call per target instead of one
            event per endpoint, which previously meant one DB connection
@@ -642,7 +699,6 @@ class RouteExecutor:
             conditions=[
                 RouteConditions.by_endpoint_ids(endpoint_ids),
                 RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
-                RouteConditions.by_health_statuses([RouteHealthStatus.HEALTHY]),
                 RouteConditions.by_traffic_status_equals(RouteTrafficStatus.ACTIVE),
             ],
         )

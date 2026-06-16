@@ -10,6 +10,7 @@ import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentInfo,
@@ -45,6 +46,7 @@ if TYPE_CHECKING:
 def sample_deployment_info() -> DeploymentInfo:
     """Sample DeploymentInfo for testing."""
     return DeploymentInfo(
+        primary_replica_group_id=ReplicaGroupID(uuid4()),
         id=DeploymentID(uuid4()),
         metadata=DeploymentMetadata(
             name="test-deployment",
@@ -289,6 +291,7 @@ def coordinator_with_pending_deployments(
         route_controller=mock_route_controller,
         prometheus_client=MagicMock(),
         prometheus_query_preset_repository=MagicMock(),
+        replica_group_repository=MagicMock(),
     )
     yield coordinator
 
@@ -323,6 +326,7 @@ def coordinator_without_deployments(
         route_controller=mock_route_controller,
         prometheus_client=MagicMock(),
         prometheus_query_preset_repository=MagicMock(),
+        replica_group_repository=MagicMock(),
     )
     yield coordinator
 

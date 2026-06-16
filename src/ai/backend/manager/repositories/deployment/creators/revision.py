@@ -14,12 +14,13 @@ from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MountInfoEntry,
+    MountPermission,
     ResourceSlot,
 )
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
 from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
+from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -41,6 +42,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     cluster_size: int
     model_vfolder_id: VFolderUUID
     model_mount_destination: str
+    model_mount_perm: MountPermission
     vfolder_subpath: str | None
     model_definition_path: str | None
     model_definition: ModelDefinition | None
@@ -50,7 +52,10 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     callback_url: str | None
     runtime_variant_id: RuntimeVariantID
     extra_mounts: Sequence[MountInfoEntry]
-    preset_values: Sequence[PresetValueEntry] = field(default_factory=list)
+    termination_grace_period: float = 30.0
+    runtime_variant_preset_values: Sequence[RuntimeVariantPresetValueEntry] = field(
+        default_factory=list
+    )
     revision_preset_id: DeploymentPresetID | None = None
     revision_number: int | None = None
 
@@ -68,6 +73,7 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             image=self.image_id,
             model=self.model_vfolder_id,
             model_mount_destination=self.model_mount_destination,
+            model_mount_perm=self.model_mount_perm,
             vfolder_subpath=self.vfolder_subpath,
             model_definition_path=self.model_definition_path,
             model_definition=self.model_definition,
@@ -81,7 +87,8 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             callback_url=self.callback_url,
             runtime_variant_id=self.runtime_variant_id,
             extra_mounts=list(self.extra_mounts),
-            preset_values=list(self.preset_values),
+            termination_grace_period=self.termination_grace_period,
+            preset_values=list(self.runtime_variant_preset_values),
             revision_preset_id=self.revision_preset_id,
         )
         row.resource_slot_rows = [

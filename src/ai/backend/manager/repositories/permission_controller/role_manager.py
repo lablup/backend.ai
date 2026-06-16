@@ -1,6 +1,7 @@
 import logging
 import uuid
-from collections.abc import Iterable, Mapping
+from collections import defaultdict
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Protocol, cast
 
@@ -8,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
@@ -19,6 +21,7 @@ from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     RBACElementRef,
     RoleSource,
     ScopeType,
@@ -30,8 +33,17 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.creator import (
+    BulkCreator,
+    Creator,
+    execute_bulk_creator,
+    execute_creator,
+)
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
@@ -40,6 +52,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     AssociationScopesEntitiesCreatorSpec,
     ObjectPermissionCreatorSpec,
     RoleCreatorSpec,
+    UserRoleCreatorSpec,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -121,14 +134,213 @@ class RoleManager:
                     scope_id=data.scope_id().scope_id,
                     entity_type=element_type.to_entity_type(),
                     operation=operation,
+                    permission=Permission.from_operation(operation),
                 )
                 permission_rows.append(PermissionRow.from_input(creator))
         db_session.add_all(permission_rows)
         await db_session.flush()
         return [row.to_data() for row in permission_rows]
 
+    async def create_preset_roles(self, db_session: SASession, scope_id: ScopeId) -> list[RoleData]:
+        """Auto-generate roles from active role presets matching the given scope."""
+        preset_rows = (
+            await db_session.scalars(
+                sa.select(RolePresetRow).where(
+                    sa.and_(
+                        RolePresetRow.scope_type == scope_id.scope_type,
+                        RolePresetRow.deleted.is_(False),
+                    )
+                )
+            )
+        ).all()
+        if not preset_rows:
+            return []
+        permission_presets_by_preset = await self._fetch_permission_presets(
+            db_session, [preset.id for preset in preset_rows]
+        )
+        created_roles: list[RoleData] = []
+        for preset in preset_rows:
+            role = await self._create_preset_role(
+                db_session,
+                scope_id,
+                preset,
+                permission_presets_by_preset.get(preset.id, []),
+            )
+            created_roles.append(role)
+        return created_roles
+
+    async def _fetch_permission_presets(
+        self,
+        db_session: SASession,
+        preset_ids: list[RolePresetID],
+    ) -> dict[RolePresetID, list[RolePermissionPresetRow]]:
+        permission_preset_rows = (
+            await db_session.scalars(
+                sa.select(RolePermissionPresetRow).where(
+                    RolePermissionPresetRow.role_preset_id.in_(preset_ids)
+                )
+            )
+        ).all()
+        grouped: dict[RolePresetID, list[RolePermissionPresetRow]] = defaultdict(list)
+        for row in permission_preset_rows:
+            grouped[row.role_preset_id].append(row)
+        return grouped
+
+    async def _create_preset_role(
+        self,
+        db_session: SASession,
+        scope_id: ScopeId,
+        preset: RolePresetRow,
+        permission_presets: list[RolePermissionPresetRow],
+    ) -> RoleData:
+        rbac_creator = RBACEntityCreator(
+            spec=RoleCreatorSpec(
+                name=preset.name,
+                source=RoleSource.SYSTEM,
+                status=RoleStatus.ACTIVE,
+                auto_assign=preset.auto_assign,
+            ),
+            element_type=RBACElementType.ROLE,
+            scope_ref=RBACElementRef(
+                element_type=scope_id.scope_type.to_element(),
+                element_id=scope_id.scope_id,
+            ),
+        )
+        result = await execute_rbac_entity_creator(db_session, rbac_creator)
+        role = result.row.to_data()
+        await self._create_preset_permissions(db_session, scope_id, role.id, permission_presets)
+        return role
+
+    async def _create_preset_permissions(
+        self,
+        db_session: SASession,
+        scope_id: ScopeId,
+        role_id: uuid.UUID,
+        permission_presets: list[RolePermissionPresetRow],
+    ) -> None:
+        if not permission_presets:
+            return
+        permission_rows = [
+            PermissionRow.from_input(
+                PermissionCreator(
+                    role_id=role_id,
+                    scope_type=scope_id.scope_type,
+                    scope_id=scope_id.scope_id,
+                    entity_type=preset_permission.entity_type,
+                    operation=preset_permission.operation,
+                    permission=Permission.from_operation(preset_permission.operation),
+                )
+            )
+            for preset_permission in permission_presets
+        ]
+        db_session.add_all(permission_rows)
+        await db_session.flush()
+
+    async def create_preset_roles_for_user(
+        self, db_session: SASession, user_id: uuid.UUID
+    ) -> list[RoleData]:
+        """Provision user-scope preset roles for a newly created user.
+
+        Creates the roles from active user-scope presets (see `create_preset_roles`)
+        and assigns the auto_assign ones to the user, who is the sole member of its
+        own user scope. Returns all created roles.
+        """
+        scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=str(user_id))
+        created_roles = await self.create_preset_roles(db_session, scope_id)
+        for role in created_roles:
+            if not role.auto_assign:
+                continue
+            await self.map_user_to_role(
+                db_session,
+                Creator(spec=UserRoleCreatorSpec(user_id=user_id, role_id=role.id)),
+            )
+        return created_roles
+
     async def map_user_to_role(self, db_session: SASession, creator: Creator[UserRoleRow]) -> None:
         await execute_creator(db_session, creator)
+
+    async def _query_auto_assign_role_ids_for_scope(
+        self, db_session: SASession, scope_id: ScopeId
+    ) -> list[uuid.UUID]:
+        return list(
+            await db_session.scalars(
+                sa.select(RoleRow.id)
+                .join(
+                    AssociationScopesEntitiesRow,
+                    sa.cast(AssociationScopesEntitiesRow.entity_id, sa.String)
+                    == sa.cast(RoleRow.id, sa.String),
+                )
+                .where(
+                    AssociationScopesEntitiesRow.scope_type == scope_id.scope_type,
+                    AssociationScopesEntitiesRow.scope_id == scope_id.scope_id,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+                    RoleRow.auto_assign.is_(True),
+                    RoleRow.status == RoleStatus.ACTIVE,
+                )
+            )
+        )
+
+    async def _query_existing_user_role_mappings(
+        self,
+        db_session: SASession,
+        role_ids: Collection[uuid.UUID],
+        user_ids: Collection[uuid.UUID],
+    ) -> dict[uuid.UUID, set[uuid.UUID]]:
+        user_role_rows = (
+            await db_session.scalars(
+                sa.select(UserRoleRow).where(
+                    sa.and_(UserRoleRow.role_id.in_(role_ids), UserRoleRow.user_id.in_(user_ids))
+                )
+            )
+        ).all()
+        existing_role_user_maps = defaultdict(set)
+        for user_role in user_role_rows:
+            existing_role_user_maps[user_role.role_id].add(user_role.user_id)
+        return existing_role_user_maps
+
+    async def assign_auto_assign_roles(
+        self,
+        db_session: SASession,
+        user_ids: Collection[uuid.UUID],
+        scope_id: ScopeId,
+    ) -> None:
+        """Map the given users to every active ``auto_assign`` role bound to ``scope_id``.
+
+        Roles bound to the scope are located via the scope-entity association
+        (``association_scopes_entities`` with ``entity_type == ROLE``). Only
+        active roles flagged ``auto_assign`` are granted. Already-mapped
+        (user, role) pairs are filtered out to avoid unique-constraint conflicts.
+        """
+        if not user_ids:
+            return
+
+        user_id_set: set[uuid.UUID] = set(user_ids)
+        role_ids = await self._query_auto_assign_role_ids_for_scope(db_session, scope_id)
+        if not role_ids:
+            return
+
+        existing_role_user_maps = await self._query_existing_user_role_mappings(
+            db_session, role_ids, user_ids
+        )
+        specs: list[UserRoleCreatorSpec] = []
+        for role_id in role_ids:
+            if role_id not in existing_role_user_maps:
+                # No users mapped to this role yet, so all user_ids are new mappings
+                specs.extend(
+                    UserRoleCreatorSpec(user_id=user_id, role_id=role_id) for user_id in user_id_set
+                )
+            else:
+                # Some users already mapped to this role, filter them out
+                existing_user_ids = existing_role_user_maps[role_id]
+                new_user_ids = user_id_set - existing_user_ids
+                specs.extend(
+                    UserRoleCreatorSpec(user_id=user_id, role_id=role_id)
+                    for user_id in new_user_ids
+                )
+
+        if not specs:
+            return
+        await execute_bulk_creator(db_session, BulkCreator(specs=specs))
 
     async def map_entity_to_scope(
         self,

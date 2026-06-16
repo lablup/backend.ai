@@ -60,6 +60,7 @@ from .exception import (
     GenericNotImplementedError,
     InvalidIpAddressValue,
     InvalidResourceSlotQuantity,
+    UnknownResourceSlotType,
 )
 
 # Deprecated re-export: new code should import ``ImageID`` from
@@ -145,6 +146,8 @@ __all__ = (
     "ResultSet",
     "RuntimeVariant",
     "SchedulerStatus",
+    "SSHPrivateKey",
+    "SSHPublicKey",
     "SecretKey",
     "Sentinel",
     "ServiceCatalogStatus",
@@ -467,6 +470,9 @@ MetricKey = NewType("MetricKey", str)
 AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
+SSHPublicKey = NewType("SSHPublicKey", str)
+SSHPrivateKey = NewType("SSHPrivateKey", str)
+
 ClusterRole = NewType("ClusterRole", str)
 
 ImageCanonical = NewType("ImageCanonical", str)
@@ -717,6 +723,17 @@ class MountPermission(enum.StrEnum):
             return self
         order = _MOUNT_PERMISSION_ORDER
         return self if order[other] > order[self] else other
+
+    def exceeds(self, other: MountPermission) -> bool:
+        """Return ``True`` when ``self`` grants more than ``other``.
+
+        Used at revision-write time to reject a caller-requested mount
+        permission that is stronger than the requester's own effective
+        permission on the vfolder (``requested.exceeds(effective)``).
+
+        Ordering: ``READ_ONLY`` < ``READ_WRITE`` < ``RW_DELETE``.
+        """
+        return _MOUNT_PERMISSION_ORDER[self] > _MOUNT_PERMISSION_ORDER[other]
 
 
 _MOUNT_PERMISSION_ORDER: dict[MountPermission, int] = {
@@ -1281,7 +1298,7 @@ class ResourceSlot(UserDict[str, Decimal]):
                 if k not in data:
                     data[k] = fill
         except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
+            raise UnknownResourceSlotType(extra_msg=f"Unknown slot type: {e.args[0]!r}") from e
         return cls(data)
 
     @classmethod
@@ -1313,18 +1330,17 @@ class ResourceSlot(UserDict[str, Decimal]):
             extra_guide = ""
             if e.args[0] == "shmem":
                 extra_guide = " (Put it at the 'resource_opts' field in API, or use '--resource-opts shmem=...' in CLI)"
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}" + extra_guide) from e
+            raise UnknownResourceSlotType(
+                extra_msg=f"Unknown slot type: {e.args[0]!r}" + extra_guide
+            ) from e
         return cls(data)
 
     def to_humanized(self, slot_types: Mapping[str, Any]) -> Mapping[str, str]:
-        try:
-            return {
-                k: type(self)._humanize_value(Decimal(v), slot_types[k])
-                for k, v in self.data.items()
-                if v is not None
-            }
-        except KeyError as e:
-            raise ValueError(f"Unknown slot type: {e.args[0]!r}") from e
+        result: dict[str, str] = {}
+        for k, v in self.data.items():
+            slot_type = slot_types.get(k, self._guess_slot_type(k))
+            result[k] = self._humanize_value(Decimal(v), slot_type)
+        return result
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> ResourceSlot:

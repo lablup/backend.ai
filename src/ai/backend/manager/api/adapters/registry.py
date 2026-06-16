@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
-from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.api.adapters.artifact_registry.adapter import ArtifactRegistryAdapter
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
@@ -39,6 +38,7 @@ from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePoli
 from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.resource_usage.adapter import ResourceUsageAdapter
+from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
     RuntimeVariantPresetAdapter,
@@ -72,7 +72,6 @@ class Adapters:
     def __init__(
         self,
         agent: AgentAdapter,
-        app_config: AppConfigAdapter,
         artifact: ArtifactAdapter,
         artifact_registry: ArtifactRegistryAdapter,
         audit_log: AuditLogAdapter,
@@ -102,6 +101,7 @@ class Adapters:
         deployment_revision_preset: DeploymentRevisionPresetAdapter,
         model_card: ModelCardAdapter,
         resource_usage: ResourceUsageAdapter,
+        role_preset: RolePresetAdapter,
         scheduling_handler: SchedulingHandlerAdapter,
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
@@ -113,7 +113,6 @@ class Adapters:
         vfs_storage: VFSStorageAdapter,
     ) -> None:
         self.agent = agent
-        self.app_config = app_config
         self.artifact = artifact
         self.artifact_registry = artifact_registry
         self.audit_log = audit_log
@@ -143,6 +142,7 @@ class Adapters:
         self.deployment_revision_preset = deployment_revision_preset
         self.model_card = model_card
         self.resource_usage = resource_usage
+        self.role_preset = role_preset
         self.scheduling_handler = scheduling_handler
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
@@ -173,7 +173,6 @@ class Adapters:
         """
         return cls(
             agent=AgentAdapter(processors),
-            app_config=AppConfigAdapter(processors),
             artifact=ArtifactAdapter(processors),
             artifact_registry=ArtifactRegistryAdapter(processors),
             audit_log=AuditLogAdapter(processors),
@@ -205,6 +204,7 @@ class Adapters:
             deployment_revision_preset=DeploymentRevisionPresetAdapter(processors),
             model_card=ModelCardAdapter(processors),
             resource_usage=ResourceUsageAdapter(processors),
+            role_preset=RolePresetAdapter(processors),
             scheduling_handler=SchedulingHandlerAdapter(deployment_coordinator),
             scheduling_history=SchedulingHistoryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),

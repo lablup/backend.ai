@@ -116,7 +116,10 @@ class NoAvailableAgentError(AgentSelectionError):
 
     def _format_header(self) -> str:
         kernel_id_list = ", ".join(str(k) for k in self._kernel_ids)
-        slot_str = " ".join(f"{k}={v}" for k, v in self._requested_slots.items() if v)
+        humanized_slots = self._requested_slots.to_humanized({})
+        slot_str = " ".join(
+            f"{k}={humanized_slots[k]}" for k, v in self._requested_slots.items() if v
+        )
         return f"kernels [{kernel_id_list}] (arch={self._required_architecture}, slots={slot_str})"
 
     def _designated_reasons(self) -> list[str]:

@@ -33,6 +33,13 @@ class RoleSource(enum.StrEnum):
 
 
 class OperationType(enum.StrEnum):
+    """
+    .. deprecated::
+        Superseded by :class:`Permission`, an :class:`enum.IntFlag` bitmask.
+        Retained because permission resolution and the ``permissions.operation``
+        column still consume these string values; do not build new features on it.
+    """
+
     CREATE = "create"
     READ = "read"
     UPDATE = "update"
@@ -72,7 +79,10 @@ class OperationType(enum.StrEnum):
 
 
 class EntityType(enum.StrEnum):
-    """Deprecated for RBAC: use ``RBACElementType`` instead."""
+    """
+    Deprecated for RBAC: use ``RBACElementType`` instead
+    or use ai.backend.common.entity.types.EntityType for non-RBAC-specific contexts.
+    """
 
     # === RBAC scope/resource types (original 12) ===
     USER = "user"
@@ -346,6 +356,7 @@ class ScopeType(enum.StrEnum):
     ROLE_ASSIGNMENT = "role:assignment"
     NOTIFICATION_CHANNEL = "notification_channel"
     KEYPAIR = "keypair"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
 
     def to_element(self) -> RBACElementType:
         from ai.backend.common.exception import RBACTypeConversionError
@@ -537,3 +548,48 @@ def owner_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
 def member_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
     """Operations granted to a *member* role on the given entity type."""
     return _MEMBER_OPS_OVERRIDES.get(entity_type, _DEFAULT_MEMBER_OPS)
+
+
+class Permission(enum.IntFlag):
+    """A bitmask of operations, each a distinct power-of-two bit.
+
+    Bit magnitude carries no semantics; checks are purely bitwise:
+
+    * does the mask include an operation?  ``bool(mask & Permission.X)``
+    * is one mask a subset of another?     ``(a & ~b) == Permission.NONE``
+    * intersect / union two masks          ``a & b`` / ``a | b``
+    """
+
+    NONE = 0
+    READ = 1 << 0
+    UPDATE = 1 << 1
+    CREATE = 1 << 2
+    SOFT_DELETE = 1 << 3
+    HARD_DELETE = 1 << 4
+
+    @classmethod
+    def full(cls) -> Permission:
+        """The full permission cap — every operation allowed."""
+        return cls.READ | cls.UPDATE | cls.CREATE | cls.SOFT_DELETE | cls.HARD_DELETE
+
+    @classmethod
+    def from_operation(cls, operation: OperationType) -> Permission:
+        """Map a single :class:`OperationType` to its corresponding bit.
+
+        Grant operations (``GRANT_*``) have no dedicated bit and map to
+        :attr:`NONE`; grant authority is still carried by the legacy
+        ``permissions.operation`` column during the transition.
+        """
+        match operation:
+            case OperationType.READ:
+                return cls.READ
+            case OperationType.UPDATE:
+                return cls.UPDATE
+            case OperationType.CREATE:
+                return cls.CREATE
+            case OperationType.SOFT_DELETE:
+                return cls.SOFT_DELETE
+            case OperationType.HARD_DELETE:
+                return cls.HARD_DELETE
+            case _:
+                return cls.NONE

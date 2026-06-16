@@ -339,6 +339,7 @@ class HuggingFaceService:
     _transfer_manager: StorageTransferManager
     _artifact_verifier_ctx: ArtifactVerifierContext
     _redis_client: ValkeyArtifactDownloadTrackingClient
+    _background_tasks: set[asyncio.Task[Any]]
 
     def __init__(self, args: HuggingFaceServiceArgs) -> None:
         self._storage_pool = args.storage_pool
@@ -348,6 +349,7 @@ class HuggingFaceService:
         self._transfer_manager = StorageTransferManager(args.storage_pool)
         self._artifact_verifier_ctx = args.artifact_verifier_ctx
         self._redis_client = args.redis_client
+        self._background_tasks = set()
 
     def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
         config = self._registry_configs.get(registry_name)
@@ -392,9 +394,11 @@ class HuggingFaceService:
         # Start background task to download metadata and fire event when complete
         if models:
             scanner = self._make_scanner(registry_name)
-            asyncio.create_task(
+            task = asyncio.create_task(
                 scanner.download_metadata_batch(models, registry_name, self._event_producer)
             )
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
         return models
 
@@ -475,11 +479,13 @@ class HuggingFaceService:
 
         # Start background metadata processing for multiple models
         if retrieved_models:
-            asyncio.create_task(
+            task = asyncio.create_task(
                 scanner.download_metadata_batch(
                     retrieved_models, registry_name, self._event_producer
                 )
             )
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
         log.info("Successfully retrieved {} models", len(retrieved_models))
         return retrieved_models

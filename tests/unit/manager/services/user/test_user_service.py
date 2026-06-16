@@ -270,9 +270,15 @@ class TestBulkCreateUser:
         mock_user_repository: MagicMock,
     ) -> None:
         """5 valid users returns successes=5 + empty failures."""
-        users = [_make_user_data(email=f"u{i}@example.com", username=f"u{i}") for i in range(5)]
+        successes = [
+            UserCreateResultData(
+                user=_make_user_data(email=f"u{i}@example.com", username=f"u{i}"),
+                keypair=_make_keypair_data(),
+            )
+            for i in range(5)
+        ]
         mock_user_repository.bulk_create_users_validated = AsyncMock(
-            return_value=BulkUserCreateResultData(successes=users, failures=[])
+            return_value=BulkUserCreateResultData(successes=successes, failures=[])
         )
 
         items = [self._make_create_spec(f"u{i}@example.com", f"u{i}") for i in range(5)]
@@ -291,7 +297,11 @@ class TestBulkCreateUser:
     ) -> None:
         """3rd email duplicate returns 1-2 success + 3 failure + 4-5 continue."""
         successes = [
-            _make_user_data(email=f"u{i}@example.com", username=f"u{i}") for i in [0, 1, 3, 4]
+            UserCreateResultData(
+                user=_make_user_data(email=f"u{i}@example.com", username=f"u{i}"),
+                keypair=_make_keypair_data(),
+            )
+            for i in [0, 1, 3, 4]
         ]
         failures: list[BulkCreatorError[UserRow]] = [
             BulkCreatorError(

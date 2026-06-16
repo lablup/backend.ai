@@ -13,6 +13,7 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingStat
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -148,6 +149,7 @@ def _create_deployment_info(
     dep_id = deployment_id or uuid4()
 
     return DeploymentInfo(
+        primary_replica_group_id=ReplicaGroupID(uuid4()),
         id=DeploymentID(dep_id),
         metadata=DeploymentMetadata(
             name="test-deployment",
@@ -203,6 +205,7 @@ def _create_route_data(
         revision_id=revision_id or DeploymentRevisionID(uuid4()),
         traffic_status=RouteTrafficStatus.INACTIVE,
         health_check=None,
+        termination_grace_period=30.0,
     )
 
 

@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCards
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -36,6 +37,8 @@ from .nested import (
     VFolderAccessControlInfoGQL,
     VFolderMetadataInfoGQL,
     VFolderOwnershipInfoGQL,
+    VFolderQuotaInfoGQL,
+    VFolderUsageInfoGQL,
 )
 
 
@@ -78,6 +81,37 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         )
     )
     unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
+    quota: VFolderQuotaInfoGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Quota limits (maxSize, maxFiles) configured for the folder.",
+        )
+    )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Usage statistics (numFiles, usedBytes) measured on demand through "
+                "the storage proxy when this field is selected. This is a very slow "
+                "operation: every selection makes a round-trip to the storage proxy, "
+                "and the measurement cost depends on the storage backend (e.g., a "
+                "full directory walk on vfs). Select only when needed. "
+                "Null for unmanaged vfolders."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def usage(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> VFolderUsageInfoGQL | None:
+        result = await info.context.adapters.vfolder.get_folder_usage(UUID(self.id))
+        if result is None:
+            return None
+        return VFolderUsageInfoGQL(
+            num_files=result.num_files,
+            used_bytes=BinarySizeInfoGQL.from_pydantic(result.used_bytes),
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
