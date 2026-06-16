@@ -17,6 +17,9 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStrategyInput as DeploymentStrategyInputDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    PresetValueInput as PresetValueInputDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     CreateDeploymentRevisionPresetInput as CreateInputDTO,
 )
@@ -40,9 +43,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     PresetModelServiceConfigInput as PresetModelServiceConfigInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
-    PresetValueInput as PresetValueInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     UpdateDeploymentRevisionPresetInput as UpdateInputDTO,
@@ -389,7 +389,7 @@ class DeploymentRevisionPresetConnection(Connection[DeploymentRevisionPresetGQL]
     ),
     name="DeploymentRevisionPresetValueEntryInput",
 )
-class PresetValueEntryInputGQL(PydanticInputMixin[PresetValueInputDTO]):
+class DeploymentRevisionPresetValueEntryInputGQL(PydanticInputMixin[PresetValueInputDTO]):
     preset_id: UUID = gql_field(
         description="The runtime variant preset that this value applies to."
     )
@@ -660,7 +660,7 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         ),
         default=None,
     )
-    preset_values: list[PresetValueEntryInputGQL] | None = gql_added_field(
+    preset_values: list[DeploymentRevisionPresetValueEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Runtime variant preset values applied when using this deployment preset.",
@@ -771,7 +771,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
         ),
         default=None,
     )
-    preset_values: list[PresetValueEntryInputGQL] | None = gql_added_field(
+    preset_values: list[DeploymentRevisionPresetValueEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Replace runtime variant preset values. Omit to leave unchanged.",

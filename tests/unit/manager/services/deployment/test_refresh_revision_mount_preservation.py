@@ -85,7 +85,7 @@ class RefreshRevisionBaseFixtures:
                     extra_mounts=extra_mounts or [],
                     subpath=vfolder_subpath,
                 ),
-                preset=PresetAttributionData(preset_id=None, values=[]),
+                revision_preset=PresetAttributionData(preset_id=None, values=[]),
                 model_definition=None,
             )
 

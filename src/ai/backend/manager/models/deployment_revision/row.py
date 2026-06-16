@@ -31,7 +31,7 @@ from ai.backend.manager.data.deployment.types import (
     PresetAttributionData,
     ResourceConfigData,
 )
-from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -39,7 +39,7 @@ from ai.backend.manager.models.base import (
     PydanticListColumn,
     URLColumn,
 )
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow
@@ -209,9 +209,9 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
     )
 
     # Runtime variant preset values (resolved at session creation time)
-    preset_values: Mapped[list[PresetValueEntry]] = mapped_column(
+    preset_values: Mapped[list[RuntimeVariantPresetValueEntry]] = mapped_column(
         "preset_values",
-        PydanticListColumn(PresetValueEntry),
+        PydanticListColumn(RuntimeVariantPresetValueEntry),
         nullable=False,
         default=[],
         server_default="[]",
@@ -288,6 +288,10 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             model_runtime_config=ModelRuntimeConfigData(
                 runtime_variant_id=RuntimeVariantID(self.runtime_variant_id),
                 environ=self.environ,
+                runtime_variant_preset_values=[
+                    RuntimeVariantPresetValueData(preset_id=pv.preset_id, value=pv.value)
+                    for pv in (self.preset_values or [])
+                ],
             ),
             execution=ExecutionData(
                 startup_command=self.startup_command,
@@ -301,12 +305,11 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
                 definition_path=self.model_definition_path or "",
                 extra_mounts=list(self.extra_mounts),
             ),
-            preset=PresetAttributionData(
+            revision_preset=PresetAttributionData(
                 preset_id=self.revision_preset_id,
-                values=[
-                    PresetValueData(preset_id=pv.preset_id, value=pv.value)
-                    for pv in (self.preset_values or [])
-                ],
+                # DeploymentRevisionPresetValueData is not stored on the row
+                # value fields are not used, currently dead code
+                values=[],
             ),
             model_definition=self.model_definition,
         )

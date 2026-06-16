@@ -16,7 +16,9 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetConflict
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.deployment_revision_preset.types import (
+    DeploymentRevisionPresetValueEntry,
+)
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
 from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
@@ -47,7 +49,7 @@ class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRe
     startup_command: str | None
     bootstrap_script: str | None
     environ: dict[str, str]
-    preset_values: list[PresetValueEntry]
+    preset_values: list[DeploymentRevisionPresetValueEntry]
     replica_count: int
     deployment_strategy: DeploymentStrategy
     deployment_strategy_spec: dict[str, Any]

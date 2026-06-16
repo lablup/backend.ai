@@ -65,6 +65,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelServiceConfigInput as ModelServiceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    PresetValueInput as PresetValueInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceConfigInput as ResourceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -808,12 +811,43 @@ class EnvironmentVariablesInputGQL(PydanticInputMixin[EnvironmentVariablesInputD
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "A concrete value for one of a runtime variant's configurable presets, keyed by the "
+            "runtime variant preset ID (from the runtimeVariantPresets query). Distinct from a "
+            "DeploymentRevisionPreset, which is a saved template selected via revision_preset_id."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RuntimeVariantPresetValueInput",
+)
+class RuntimeVariantPresetValueInputGQL(PydanticInputMixin[PresetValueInputDTO]):
+    preset_id: UUID = gql_field(
+        description="The runtime variant preset (from runtimeVariantPresets) this value applies to."
+    )
+    value: str = gql_field(
+        description="The concrete value to set for the referenced runtime variant preset parameter."
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
 class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
     runtime_variant_id: UUID
     environ: EnvironmentVariablesInputGQL | None = gql_field(
         description="Environment variables for the service.", default=None
+    )
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueInputGQL] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Concrete values for the runtime variant's configurable presets, each keyed by the "
+                "runtime variant preset ID. Overrides matching presets from a revision_preset_id "
+                "template (merged by preset_id)."
+            ),
+        ),
+        default=None,
     )
 
 

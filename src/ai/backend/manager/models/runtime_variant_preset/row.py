@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
     PresetValueType,
+    UIOption,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import (
     ChoiceItemData,
@@ -21,7 +22,6 @@ from ai.backend.manager.data.runtime_variant_preset.types import (
     UIOptionData,
 )
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn
-from ai.backend.manager.models.runtime_variant_preset.types import UIOption
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
