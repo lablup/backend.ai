@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import cast
 
 import pytest
@@ -20,6 +21,7 @@ from ai.backend.manager.repositories.base.export import (
     ExportFieldType,
     JoinDef,
     ReportDef,
+    StreamingExportQuery,
 )
 from ai.backend.manager.repositories.export.reports.session import SESSION_REPORT
 
@@ -507,82 +509,131 @@ class TestBuildSessionQueryUserFilter:
     def adapter(self) -> ExportAdapter:
         return ExportAdapter()
 
-    def test_user_email_filter_builds_exists_without_join(
+    @pytest.fixture
+    def build_query(
         self,
         adapter: ExportAdapter,
-    ) -> None:
-        """Filtering by user.email adds a correlated EXISTS subquery, not a users JOIN."""
-        query = adapter.build_session_query(
-            report=SESSION_REPORT,
-            fields=["id", "name"],
-            filter=SessionExportFilter(
+    ) -> Callable[[list[str], SessionExportFilter], StreamingExportQuery]:
+        """Build a session export query, holding the non-varying params constant."""
+
+        def _build(fields: list[str], filter: SessionExportFilter) -> StreamingExportQuery:
+            return adapter.build_session_query(
+                report=SESSION_REPORT,
+                fields=fields,
+                filter=filter,
+                order=None,
+                max_rows=1000,
+                statement_timeout_sec=60,
+            )
+
+        return _build
+
+    @pytest.fixture
+    def query_email_filter(
+        self,
+        build_query: Callable[[list[str], SessionExportFilter], StreamingExportQuery],
+    ) -> StreamingExportQuery:
+        """Filter by user.email; no user column selected."""
+        return build_query(
+            ["id", "name"],
+            SessionExportFilter(
                 user=SessionExportUserNestedFilter(email=StringFilter(equals="user@example.com"))
             ),
-            order=None,
-            max_rows=1000,
-            statement_timeout_sec=60,
         )
 
+    @pytest.fixture
+    def query_email_and_username_filter(
+        self,
+        build_query: Callable[[list[str], SessionExportFilter], StreamingExportQuery],
+    ) -> StreamingExportQuery:
+        """Filter by both user.email and user.username; no user column selected."""
+        return build_query(
+            ["id", "name"],
+            SessionExportFilter(
+                user=SessionExportUserNestedFilter(
+                    email=StringFilter(equals="user@example.com"),
+                    username=StringFilter(contains="admin"),
+                )
+            ),
+        )
+
+    @pytest.fixture
+    def query_no_filter(
+        self,
+        build_query: Callable[[list[str], SessionExportFilter], StreamingExportQuery],
+    ) -> StreamingExportQuery:
+        """No user filter and no user column selected."""
+        return build_query(["id", "name"], SessionExportFilter())
+
+    @pytest.fixture
+    def query_user_column_selected(
+        self,
+        build_query: Callable[[list[str], SessionExportFilter], StreamingExportQuery],
+    ) -> StreamingExportQuery:
+        """Filter by user.email while also selecting the user_email output column."""
+        return build_query(
+            ["name", "status", "user_email"],
+            SessionExportFilter(
+                user=SessionExportUserNestedFilter(email=StringFilter(contains="admin@lablup.com"))
+            ),
+        )
+
+    def test_user_email_filter_builds_exists_without_join(
+        self,
+        query_email_filter: StreamingExportQuery,
+    ) -> None:
+        """Filtering by user.email adds a correlated EXISTS subquery, not a users JOIN."""
         # No JOIN: the FROM clause stays the sessions table only.
-        from_clause = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
+        from_clause = str(
+            query_email_filter.select_from.compile(compile_kwargs={"literal_binds": True})
+        )
         assert "users" not in from_clause
 
         # A single correlated EXISTS condition over the users table.
-        assert len(query.conditions) == 1
-        condition = str(query.conditions[0]().compile(compile_kwargs={"literal_binds": True}))
+        assert len(query_email_filter.conditions) == 1
+        condition = str(
+            query_email_filter.conditions[0]().compile(compile_kwargs={"literal_binds": True})
+        )
         assert "EXISTS (SELECT" in condition
         assert "sessions.user_uuid = users.uuid" in condition
         assert "users.email" in condition
 
     def test_user_email_and_username_filters_share_single_exists(
         self,
-        adapter: ExportAdapter,
+        query_email_and_username_filter: StreamingExportQuery,
     ) -> None:
         """Both nested user filters combine (AND) inside a single EXISTS subquery."""
-        query = adapter.build_session_query(
-            report=SESSION_REPORT,
-            fields=["id", "name"],
-            filter=SessionExportFilter(
-                user=SessionExportUserNestedFilter(
-                    email=StringFilter(equals="user@example.com"),
-                    username=StringFilter(contains="admin"),
-                )
-            ),
-            order=None,
-            max_rows=1000,
-            statement_timeout_sec=60,
+        from_clause = str(
+            query_email_and_username_filter.select_from.compile(
+                compile_kwargs={"literal_binds": True}
+            )
         )
-
-        from_clause = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
         assert "users" not in from_clause
 
-        assert len(query.conditions) == 1
-        condition = str(query.conditions[0]().compile(compile_kwargs={"literal_binds": True}))
+        assert len(query_email_and_username_filter.conditions) == 1
+        condition = str(
+            query_email_and_username_filter.conditions[0]().compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
         assert "EXISTS (SELECT" in condition
         assert "users.email" in condition
         assert "users.username" in condition
 
     def test_no_user_condition_when_user_filter_absent(
         self,
-        adapter: ExportAdapter,
+        query_no_filter: StreamingExportQuery,
     ) -> None:
         """Without a user filter (and no user field selected), no users reference is added."""
-        query = adapter.build_session_query(
-            report=SESSION_REPORT,
-            fields=["id", "name"],
-            filter=SessionExportFilter(),
-            order=None,
-            max_rows=1000,
-            statement_timeout_sec=60,
+        from_clause = str(
+            query_no_filter.select_from.compile(compile_kwargs={"literal_binds": True})
         )
-
-        from_clause = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
         assert "users" not in from_clause
-        assert len(query.conditions) == 0
+        assert len(query_no_filter.conditions) == 0
 
     def test_user_filter_with_user_column_selected_compiles(
         self,
-        adapter: ExportAdapter,
+        query_user_column_selected: StreamingExportQuery,
     ) -> None:
         """Filtering by user.email while also selecting a user column must compile.
 
@@ -590,23 +641,18 @@ class TestBuildSessionQueryUserFilter:
         must keep its own users in FROM (via correlate_except); otherwise users auto-correlates
         out and the subquery is left with no FROM clause ("returned no FROM clauses").
         """
-        query = adapter.build_session_query(
-            report=SESSION_REPORT,
-            fields=["name", "status", "user_email"],
-            filter=SessionExportFilter(
-                user=SessionExportUserNestedFilter(email=StringFilter(contains="admin@lablup.com"))
-            ),
-            order=None,
-            max_rows=1000,
-            statement_timeout_sec=60,
-        )
-
         # users is LEFT JOINed into the outer query because user_email is selected.
-        from_clause = str(query.select_from.compile(compile_kwargs={"literal_binds": True}))
+        from_clause = str(
+            query_user_column_selected.select_from.compile(compile_kwargs={"literal_binds": True})
+        )
         assert from_clause.count("LEFT OUTER JOIN users") == 1
 
         # The full statement (outer join + correlated EXISTS) must compile without raising.
-        stmt = sa.select(sa.literal(1)).select_from(query.select_from).where(query.conditions[0]())
+        stmt = (
+            sa.select(sa.literal(1))
+            .select_from(query_user_column_selected.select_from)
+            .where(query_user_column_selected.conditions[0]())
+        )
         compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
         assert "EXISTS (SELECT" in compiled
         assert "users.email" in compiled
