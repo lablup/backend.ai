@@ -2064,6 +2064,12 @@ class PackageContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
+            appproxy_api_secret=secrets.token_hex(32),
+            appproxy_jwt_secret=secrets.token_hex(32),
+            appproxy_permit_hash_secret=secrets.token_hex(32),
+            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
+            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
+            appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
         )
         return InstallInfo(
             version=self.dist_info.version,
