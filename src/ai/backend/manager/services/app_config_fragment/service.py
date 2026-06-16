@@ -2,6 +2,7 @@ import logging
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.user import UserID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.app_config_fragment.bulk_types import (
     AppConfigFragmentBulkItemError,
@@ -79,7 +80,7 @@ class AppConfigFragmentService:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        user_id = me.user_id
+        user_id = UserID(me.user_id)
         user_id_str = str(user_id)
         created = []
         failed: list[AppConfigFragmentBulkItemError] = []
@@ -113,7 +114,7 @@ class AppConfigFragmentService:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        user_id = me.user_id
+        user_id = UserID(me.user_id)
         user_id_str = str(user_id)
         updated = []
         failed: list[AppConfigFragmentBulkItemError] = []
