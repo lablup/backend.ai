@@ -203,17 +203,7 @@ defaults. Each raw fragment's `config` follows the same rule.
 
 ---
 
-## 4. Caching
-
-The merged-view read path is fronted by a Valkey cache keyed per
-`(user, name)`. Writes invalidate the affected scope so stale merges are
-not served; cache failures fall through to the database transparently
-(never break a request). The cache stores the merged `config`; raw
-per-scope reads are uncached.
-
----
-
-## 5. Client integration (WebUI)
+## 4. Client integration (WebUI)
 
 - **Before login**, the WebUI fetches `public` documents (theme,
   branding) anonymously so the shell can render.
@@ -225,7 +215,7 @@ per-scope reads are uncached.
 
 ---
 
-## 6. User scenarios
+## 5. User scenarios
 
 - **Pre-login public config** — anonymous read of `public` `theme`.
 - **Bootstrap after login** — read merged `AppConfig`s in one round of
@@ -247,11 +237,7 @@ per-scope reads are uncached.
 
 ---
 
-## 7. Future considerations
+## 6. Future considerations
 
 - Automatic seeding of `user` fragments for overridable documents (e.g.
   on first read or at user creation) to avoid per-user admin seeding.
-- Optional read-through caching of the full merged view (fragments +
-  config), not just `config`.
-- Per-`name` schema/validation hooks if document shapes need server-side
-  guarantees (currently fully frontend-owned).
