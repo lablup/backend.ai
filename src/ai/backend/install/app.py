@@ -655,7 +655,14 @@ class ModeMenu(Static):
         pkg_type_menu._dist_info = self._dist_info
         pkg_type_menu._install_variable = self.install_variable
         switcher.current = "pkg-type-menu"
-        self.app.query_one("#pkg-type-list", ListView).focus()
+        lv = self.app.query_one("#pkg-type-list", ListView)
+        lv.focus()
+        if self._non_interactive:
+            # The package-type submenu has no separate non-interactive
+            # auto-select, so a `--non-interactive` run would stall here. Pick
+            # the only option (RELEASE PACKAGE) to actually start the install.
+            li = self.app.query_one("#pkg-type-release", ListItem)
+            lv.post_message(ListView.Selected(lv, li))
 
     @on(ListView.Selected, "#mode-list", item="#mode-maintain")
     def start_maintain_mode(self) -> None:
