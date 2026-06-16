@@ -307,7 +307,7 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
             ),
             revision_preset=PresetAttributionData(
                 preset_id=self.revision_preset_id,
-                # RuntimeVariantPresetValueData is not stored on the row
+                # DeploymentRevisionPresetData is not stored on the row
                 # value fields are not used, currently dead code
                 values=[],
             ),
