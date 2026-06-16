@@ -57,6 +57,14 @@ from ai.backend.manager.services.app_config_policy.actions.scoped_search import 
 
 from .base import BaseAdapter
 
+_APP_CONFIG_POLICY_PAGINATION_SPEC = PaginationSpec(
+    forward_order=AppConfigPolicyOrders.created_at(ascending=False),
+    backward_order=AppConfigPolicyOrders.created_at(ascending=True),
+    forward_condition_factory=AppConfigPolicyConditions.by_cursor_forward,
+    backward_condition_factory=AppConfigPolicyConditions.by_cursor_backward,
+    tiebreaker_order=AppConfigPolicyRow.id.asc(),
+)
+
 
 class AppConfigPolicyAdapter(BaseAdapter):
     """Adapter for AppConfigPolicy domain operations.
@@ -64,14 +72,6 @@ class AppConfigPolicyAdapter(BaseAdapter):
     Writes are bulk-only; single-item create / update / purge entry
     points are intentionally absent.
     """
-
-    _PAGINATION_SPEC = PaginationSpec(
-        forward_order=AppConfigPolicyOrders.created_at(ascending=False),
-        backward_order=AppConfigPolicyOrders.created_at(ascending=True),
-        forward_condition_factory=AppConfigPolicyConditions.by_cursor_forward,
-        backward_condition_factory=AppConfigPolicyConditions.by_cursor_backward,
-        tiebreaker_order=AppConfigPolicyRow.id.asc(),
-    )
 
     # ── Public surface ─────────────────────────────────────────────
 
@@ -173,7 +173,7 @@ class AppConfigPolicyAdapter(BaseAdapter):
         return self._build_querier(
             conditions=conditions,
             orders=orders,
-            pagination_spec=self._PAGINATION_SPEC,
+            pagination_spec=_APP_CONFIG_POLICY_PAGINATION_SPEC,
             first=input.first,
             after=input.after,
             last=input.last,
