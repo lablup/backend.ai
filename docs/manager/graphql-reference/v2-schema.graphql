@@ -156,7 +156,7 @@ type AddRevisionPayload {
   revision: ModelRevision!
 }
 
-"""Added in UNRELEASED. Payload for `adminBulkCreateAppConfigPolicies`."""
+"""Added in 26.4.4. Payload for `adminBulkCreateAppConfigPolicies`."""
 type AdminBulkCreateAppConfigPoliciesPayload {
   """Created policies."""
   created: [AppConfigPolicy!]!
@@ -165,14 +165,14 @@ type AdminBulkCreateAppConfigPoliciesPayload {
   failed: [AppConfigPolicyBulkError!]!
 }
 
-"""Added in UNRELEASED. Admin bulk create input for app-config policies."""
+"""Added in 26.4.4. Admin bulk create input for app-config policies."""
 input AdminBulkCreateAppConfigPolicyInput {
   """Policies to create."""
   items: [AdminBulkCreateAppConfigPolicyItemInput!]!
 }
 
 """
-Added in UNRELEASED. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
+Added in 26.4.4. Per-item input for admin bulk create — `config_name` + initial `scope_sources`.
 """
 input AdminBulkCreateAppConfigPolicyItemInput {
   """Unique, immutable policy name."""
@@ -182,7 +182,7 @@ input AdminBulkCreateAppConfigPolicyItemInput {
   scopeSources: [String!]!
 }
 
-"""Added in UNRELEASED. Payload for `adminBulkPurgeAppConfigPolicies`."""
+"""Added in 26.4.4. Payload for `adminBulkPurgeAppConfigPolicies`."""
 type AdminBulkPurgeAppConfigPoliciesPayload {
   """Ids of policies actually removed (absent ids no-oped)."""
   purgedIds: [UUID!]!
@@ -192,14 +192,14 @@ type AdminBulkPurgeAppConfigPoliciesPayload {
 }
 
 """
-Added in UNRELEASED. Admin bulk purge input for app-config policies (keyed on row id).
+Added in 26.4.4. Admin bulk purge input for app-config policies (keyed on row id).
 """
 input AdminBulkPurgeAppConfigPolicyInput {
   """Policy row ids to purge."""
   ids: [UUID!]!
 }
 
-"""Added in UNRELEASED. Payload for `adminBulkUpdateAppConfigPolicies`."""
+"""Added in 26.4.4. Payload for `adminBulkUpdateAppConfigPolicies`."""
 type AdminBulkUpdateAppConfigPoliciesPayload {
   """Updated policies."""
   updated: [AppConfigPolicy!]!
@@ -208,14 +208,14 @@ type AdminBulkUpdateAppConfigPoliciesPayload {
   failed: [AppConfigPolicyBulkError!]!
 }
 
-"""Added in UNRELEASED. Admin bulk update input for app-config policies."""
+"""Added in 26.4.4. Admin bulk update input for app-config policies."""
 input AdminBulkUpdateAppConfigPolicyInput {
   """Policies to update."""
   items: [AdminBulkUpdateAppConfigPolicyItemInput!]!
 }
 
 """
-Added in UNRELEASED. Per-item input for admin bulk update — target row id + new `scope_sources`.
+Added in 26.4.4. Per-item input for admin bulk update — target row id + new `scope_sources`.
 """
 input AdminBulkUpdateAppConfigPolicyItemInput {
   """Policy row id."""
@@ -673,7 +673,7 @@ type AllowedResourceGroupsPayload {
   items: [String!]!
 }
 
-"""Added in UNRELEASED. Scoped app-config policy."""
+"""Added in 26.4.4. Scoped app-config policy."""
 type AppConfigPolicy implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -691,7 +691,7 @@ type AppConfigPolicy implements Node {
   updatedAt: DateTime
 }
 
-"""Added in UNRELEASED. Per-item failure info for bulk Policy mutations."""
+"""Added in 26.4.4. Per-item failure info for bulk Policy mutations."""
 type AppConfigPolicyBulkError {
   """Original position in the input list."""
   index: Int!
@@ -701,7 +701,7 @@ type AppConfigPolicyBulkError {
 }
 
 """
-Added in UNRELEASED. Connection type for paginated app-config policy results.
+Added in 26.4.4. Connection type for paginated app-config policy results.
 """
 type AppConfigPolicyConnection {
   """Pagination data for this connection"""
@@ -723,13 +723,13 @@ type AppConfigPolicyEdge {
   node: AppConfigPolicy!
 }
 
-"""Added in UNRELEASED. Filter input for querying app-config policies."""
+"""Added in 26.4.4. Filter input for querying app-config policies."""
 input AppConfigPolicyFilter {
   """Filter by config_name."""
   configName: StringFilter = null
 }
 
-"""Added in UNRELEASED. Specifies ordering for app-config policy results."""
+"""Added in 26.4.4. Specifies ordering for app-config policy results."""
 input AppConfigPolicyOrderBy {
   """The field to order by."""
   field: AppConfigPolicyOrderField!
@@ -738,9 +738,7 @@ input AppConfigPolicyOrderBy {
   direction: OrderDirection! = DESC
 }
 
-"""
-Added in UNRELEASED. Fields available for ordering app-config policies.
-"""
+"""Added in 26.4.4. Fields available for ordering app-config policies."""
 enum AppConfigPolicyOrderField {
   CONFIG_NAME
   CREATED_AT
@@ -7550,17 +7548,17 @@ type Mutation {
   updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload
 
   """
-  Added in UNRELEASED. Strict insert keyed on `configName` (admin only, per-item transaction).
+  Added in 26.4.4. Strict insert keyed on `configName` (admin only, per-item transaction).
   """
   adminBulkCreateAppConfigPolicies(input: AdminBulkCreateAppConfigPolicyInput!): AdminBulkCreateAppConfigPoliciesPayload!
 
   """
-  Added in UNRELEASED. Replace `scope_sources`; `config_name` is immutable. Admin only, per-item transaction.
+  Added in 26.4.4. Replace `scope_sources`; `config_name` is immutable. Admin only, per-item transaction.
   """
   adminBulkUpdateAppConfigPolicies(input: AdminBulkUpdateAppConfigPolicyInput!): AdminBulkUpdateAppConfigPoliciesPayload!
 
   """
-  Added in UNRELEASED. Hard-delete policies by row id; rows still referenced by fragments surface in `failed`. Admin only.
+  Added in 26.4.4. Hard-delete policies by row id; rows still referenced by fragments surface in `failed`. Admin only.
   """
   adminBulkPurgeAppConfigPolicies(input: AdminBulkPurgeAppConfigPolicyInput!): AdminBulkPurgeAppConfigPoliciesPayload!
 
@@ -9499,12 +9497,12 @@ type Query {
   adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
   """
-  Added in UNRELEASED. Get a single app-config policy by row id. Available to any authenticated user.
+  Added in 26.4.4. Get a single app-config policy by row id. Available to any authenticated user.
   """
   appConfigPolicy(id: UUID!): AppConfigPolicy
 
   """
-  Added in UNRELEASED. List app-config policies with filtering and pagination. Available to any authenticated user.
+  Added in 26.4.4. List app-config policies with filtering and pagination. Available to any authenticated user.
   """
   appConfigPolicies(filter: AppConfigPolicyFilter = null, orderBy: [AppConfigPolicyOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigPolicyConnection!
 
