@@ -65,6 +65,14 @@ class AppConfigPolicyAdapter(BaseAdapter):
     points are intentionally absent.
     """
 
+    _PAGINATION_SPEC = PaginationSpec(
+        forward_order=AppConfigPolicyOrders.created_at(ascending=False),
+        backward_order=AppConfigPolicyOrders.created_at(ascending=True),
+        forward_condition_factory=AppConfigPolicyConditions.by_cursor_forward,
+        backward_condition_factory=AppConfigPolicyConditions.by_cursor_backward,
+        tiebreaker_order=AppConfigPolicyRow.id.asc(),
+    )
+
     # ── Public surface ─────────────────────────────────────────────
 
     async def get(self, id: AppConfigPolicyID) -> GetAppConfigPolicyPayload:
@@ -155,14 +163,6 @@ class AppConfigPolicyAdapter(BaseAdapter):
         )
 
     # ── Private helpers ────────────────────────────────────────────
-
-    _PAGINATION_SPEC = PaginationSpec(
-        forward_order=AppConfigPolicyOrders.created_at(ascending=False),
-        backward_order=AppConfigPolicyOrders.created_at(ascending=True),
-        forward_condition_factory=AppConfigPolicyConditions.by_cursor_forward,
-        backward_condition_factory=AppConfigPolicyConditions.by_cursor_backward,
-        tiebreaker_order=AppConfigPolicyRow.id.asc(),
-    )
 
     def _build_querier_from_input(
         self,

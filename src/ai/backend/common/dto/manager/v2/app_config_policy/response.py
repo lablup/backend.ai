@@ -32,13 +32,13 @@ class AppConfigPolicyNode(BaseResponseModel):
         description="Ordered scope chain (low → high merge priority).",
     )
     created_at: datetime = Field(description="Creation timestamp")
-    updated_at: datetime | None = Field(default=None, description="Last update timestamp")
+    updated_at: datetime = Field(description="Last update timestamp")
 
 
 class GetAppConfigPolicyPayload(BaseResponseModel):
     """Payload returned after reading a single app-config policy by config_name."""
 
-    item: AppConfigPolicyNode | None = Field(default=None, description="Policy data, or null.")
+    item: AppConfigPolicyNode = Field(description="Policy data.")
 
 
 class SearchAppConfigPoliciesPayload(BaseResponseModel):
