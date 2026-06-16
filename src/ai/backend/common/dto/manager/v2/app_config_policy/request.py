@@ -47,8 +47,7 @@ class AppConfigPolicyOrder(BaseRequestModel):
 
 
 class AdminBulkCreateAppConfigPolicyItemInput(BaseRequestModel):
-    """Per-item input for `adminBulkCreateAppConfigPolicies` —
-    immutable `config_name` + initial `scope_sources`."""
+    """Per-item input for `adminBulkCreateAppConfigPolicies`."""
 
     config_name: str = Field(
         min_length=1,
@@ -70,9 +69,7 @@ class AdminBulkCreateAppConfigPolicyItemInput(BaseRequestModel):
 
 
 class AdminBulkUpdateAppConfigPolicyItemInput(BaseRequestModel):
-    """Per-item input for `adminBulkUpdateAppConfigPolicies` — target
-    row id + new `scope_sources`. `config_name` is immutable so it's
-    not part of the update payload."""
+    """Per-item input for `adminBulkUpdateAppConfigPolicies` (config_name is immutable)."""
 
     id: AppConfigPolicyID = Field(description="Policy row id.")
     scope_sources: list[AppConfigScopeType] = Field(
@@ -93,12 +90,7 @@ class AdminBulkPurgeAppConfigPoliciesInput(BaseRequestModel):
 
 
 class AdminSearchAppConfigPoliciesInput(BaseRequestModel):
-    """Input for searching app-config policies system-wide (admin, no scope).
-
-    Supports two pagination modes (mutually exclusive):
-    - Cursor-based: first/after (forward) or last/before (backward)
-    - Offset-based: limit/offset
-    """
+    """Input for searching app-config policies system-wide (admin, no scope)."""
 
     filter: AppConfigPolicyFilter | None = Field(default=None, description="Filter conditions")
     order: list[AppConfigPolicyOrder] | None = Field(
@@ -113,10 +105,7 @@ class AdminSearchAppConfigPoliciesInput(BaseRequestModel):
 
 
 class AppConfigPolicyScope(BaseRequestModel):
-    """Scope for the scoped app-config-policy query.
-
-    Items are OR'd together; at least one ``config_name`` is required.
-    """
+    """Scope for the scoped app-config-policy query (config_names are OR'd)."""
 
     config_names: list[str] = Field(description="Policy config_names to scope the query to.")
 
@@ -128,13 +117,7 @@ class AppConfigPolicyScope(BaseRequestModel):
 
 
 class ScopedSearchAppConfigPoliciesInput(BaseRequestModel):
-    """Input for searching app-config policies under a scope, with
-    filter / order / pagination.
-
-    Supports two pagination modes (mutually exclusive):
-    - Cursor-based: first/after (forward) or last/before (backward)
-    - Offset-based: limit/offset
-    """
+    """Input for searching app-config policies under a scope."""
 
     scope: AppConfigPolicyScope = Field(description="Scope (OR across all config_names).")
     filter: AppConfigPolicyFilter | None = Field(default=None, description="Filter conditions")
