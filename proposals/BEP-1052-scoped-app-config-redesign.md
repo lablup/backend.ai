@@ -157,9 +157,7 @@ carries an integer priority.
   inserted between two existing ones without renumbering.
 - **No tier defaults.** Priority is not derived from `scope_type`; a
   `user` fragment does not *automatically* outrank a `domain` fragment —
-  it outranks because it is created later (higher next-value rank). (This
-  is a deliberate change from an earlier draft that hard-coded per-scope
-  tiers.)
+  it outranks because it is created later (higher next-value rank).
 
 ---
 
