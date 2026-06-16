@@ -2349,7 +2349,7 @@ class DeploymentAdapter(BaseAdapter):
                 environ=environ_dto,
                 runtime_variant_preset_values=[
                     RuntimeVariantPresetValueInfoDTO(preset_id=pv.preset_id, value=pv.value)
-                    for pv in data.preset.values
+                    for pv in data.revision_preset.values
                 ],
             ),
             model_mount_config=model_mount_config_dto,
