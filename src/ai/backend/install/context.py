@@ -424,8 +424,9 @@ class Context(metaclass=ABCMeta):
 
             self.log_header("Downloading supergraph.graphql from GitHub releases...")
 
-            # Construct URL for the release version
-            version_tag = f"v{__version__}"
+            # Construct URL for the release version. Release tags carry no "v"
+            # prefix (e.g. "26.4.4rc9"), matching _fetch_package's download URL.
+            version_tag = __version__
             url = (
                 f"https://raw.githubusercontent.com/lablup/backend.ai/{version_tag}/"
                 "docs/manager/graphql-reference/supergraph.graphql"
