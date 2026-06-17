@@ -49,8 +49,10 @@ Three scopes cover the use cases (`public` for the pre-login shell):
 - Where the admin has granted it, users persist their own settings on
   the server (language, recently used sessions, visible/ordered table
   columns, experimental-feature toggles).
-- The same scope may publish several independently-managed documents
-  loaded by different parts of the WebUI.
+- A single `config_name` can hold a different value at each scope: an
+  admin manages the `public` / `domain` value, and the user changes only
+  their own `user`-scope fragment. This one mechanism — per-scope
+  fragments combined by the merge — covers every use case above.
 
 ## Design Principles
 
