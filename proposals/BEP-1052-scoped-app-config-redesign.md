@@ -27,7 +27,7 @@ query with **no joins and no permission lookup**.
 records — **pre-configured by admins** — enumerate the
 `(config_name, scope_type)` pairs at which a fragment may be written.
 **Every** fragment write, admin or user, requires a matching record;
-admins additionally own the allow-list and the registry themselves
+admins additionally own the allow-list and the `app_config_keys` registry themselves
 (users cannot). So the cost of permission lives entirely on the
 (infrequent) write path and the (one-time) admin setup, never on read.
 
@@ -75,8 +75,8 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   holds **one record per `(config_name, scope_type)`**; a fragment at
   that scope may be created/updated/purged **only if** the record exists
   — for the admin path and the self-service path alike. What sets admins
-  apart is that they alone manage the allow-list (and the registry)
-  itself. It governs **writes only** — never reads.
+  apart is that they alone manage the allow-list (and the
+  `app_config_keys` registry) itself. It governs **writes only** — never reads.
 - **`rank` lives on the fragment.** A fragment's `rank` is its merge
   priority within a `config_name`; the read merge orders fragments by it.
 - **Single source-of-truth table.** One `app_config_fragments` table
@@ -147,8 +147,8 @@ allow-list rows themselves.
   scope_type)`. The service layer rejects per-row when either is missing.
 - The self-service path is further restricted to the caller's own `user`
   row; the admin path may target any scope (still gated by the
-  allow-list) and is the only path that may write the allow-list and the
-  registry.
+  allow-list) and is the only path that may write the allow-list and
+  `app_config_keys`.
 - `app_config_keys` purge is rejected while any fragment or allow-list
   entry still references the name (`ON DELETE NO ACTION`).
 - `app_config_allow_list` purge **revokes future writes** at that
@@ -164,7 +164,7 @@ Two write paths:
 - **Admin path** — `create` / `update` / `purge` a fragment at any scope
   whose `(config_name, scope_type)` is in the allow-list. The only path
   that may write another user's `user` row, and the only path that may
-  manage the allow-list and the registry themselves.
+  manage the allow-list and `app_config_keys` themselves.
 - **Self-service (`my`) path** — `create` / `update` / `purge` on the
   caller's own `user` row, **only when** an allow-list row exists for
   `(config_name, user)`.
