@@ -2208,7 +2208,7 @@ input CreateDeploymentRevisionPresetInput {
   """
   Added in 26.4.4. Runtime variant preset values applied when using this deployment preset.
   """
-  presetValues: [DeploymentRevisionPresetValueEntryInput!] = null
+  presetValues: [RuntimeVariantPresetValueEntryInput!] = null
 }
 
 """Added in 26.4.2. Create deployment revision preset payload."""
@@ -3730,7 +3730,7 @@ type DeploymentRevisionPreset implements Node {
   """
   List of runtime variant preset values applied when using this deployment preset to auto-configure runtime parameters.
   """
-  presetValues: [DeploymentRevisionPresetValueEntry!]!
+  presetValues: [RuntimeVariantPresetValueEntry!]!
 
   """Timestamp when this deployment preset was created."""
   createdAt: DateTime!
@@ -3806,28 +3806,6 @@ enum DeploymentRevisionPresetOrderField {
   NAME
   RANK
   CREATED_AT
-}
-
-"""
-Added in 26.4.2. A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.
-"""
-type DeploymentRevisionPresetValueEntry {
-  """Runtime variant preset ID."""
-  presetId: UUID!
-
-  """Value for this preset."""
-  value: String!
-}
-
-"""
-Added in 26.4.4. A mapping of a runtime variant preset to a concrete value, used to auto-configure runtime parameters when this deployment preset is applied.
-"""
-input DeploymentRevisionPresetValueEntryInput {
-  """The runtime variant preset that this value applies to."""
-  presetId: UUID!
-
-  """The concrete value to set for the referenced preset parameter."""
-  value: String!
 }
 
 """Added in 24.09.0. Scope for deployment scheduling history query"""
@@ -11808,6 +11786,28 @@ type RuntimeVariantPresetValue {
 }
 
 """
+Added in 26.4.4. A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.
+"""
+type RuntimeVariantPresetValueEntry {
+  """Runtime variant preset ID."""
+  presetId: UUID!
+
+  """Value for this preset."""
+  value: String!
+}
+
+"""
+Added in 26.4.4. A mapping of a runtime variant preset to a concrete value, used to auto-configure runtime parameters when this deployment preset is applied.
+"""
+input RuntimeVariantPresetValueEntryInput {
+  """The runtime variant preset that this value applies to."""
+  presetId: UUID!
+
+  """The concrete value to set for the referenced preset parameter."""
+  value: String!
+}
+
+"""
 Added in 26.4.4. A concrete value for one of a runtime variant's configurable presets, keyed by the runtime variant preset ID (from the runtimeVariantPresets query). Distinct from a DeploymentRevisionPreset, which is a saved template selected via revision_preset_id.
 """
 input RuntimeVariantPresetValueInput {
@@ -13152,7 +13152,7 @@ input UpdateDeploymentRevisionPresetInput {
   """
   Added in 26.4.4. Replace runtime variant preset values. Omit to leave unchanged.
   """
-  presetValues: [DeploymentRevisionPresetValueEntryInput!] = null
+  presetValues: [RuntimeVariantPresetValueEntryInput!] = null
 }
 
 """Added in 26.4.2. Update deployment revision preset payload."""

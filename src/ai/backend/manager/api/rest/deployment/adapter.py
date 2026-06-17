@@ -464,6 +464,9 @@ def build_revision_creator(
         model_definition_path=revision_input.model_mount_config.definition_path,
         model_mount_destination=revision_input.model_mount_config.mount_destination,
         extra_mounts=extra_mounts,
+        # Legacy v1 deployment requests carry no model mount permission;
+        # ``None`` adopts the requester's own effective permission.
+        model_mount_perm=None,
         vfolder_subpath=revision_input.model_mount_config.subpath,
     )
 

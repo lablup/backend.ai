@@ -285,6 +285,15 @@ class ModelMountConfigInput(BaseRequestModel):
 
     vfolder_id: VFolderUUID = Field(description="VFolder ID for the model")
     mount_destination: str = Field(description="Mount destination path inside container")
+    mount_perm: MountPermission | None = Field(
+        default=None,
+        description=(
+            "Optional permission for the model vfolder mount. ``null`` (default) uses "
+            "the requester's own effective permission on the vfolder; a concrete value "
+            "(e.g. ``ro``) forces that permission. A value stronger than the requester's "
+            "own permission is rejected."
+        ),
+    )
     definition_path: str | None = Field(
         default=None,
         min_length=1,

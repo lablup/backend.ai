@@ -115,6 +115,7 @@ def _make_creator(
                 model_definition_path=None,
                 model_mount_destination="/models",
                 extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(runtime_variant_id=RuntimeVariantID(uuid.uuid4())),
             model_definition=None,

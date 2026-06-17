@@ -342,7 +342,7 @@ class IntFlagType[T_IntFlag: enum.IntFlag](TypeDecorator[T_IntFlag]):
     ) -> int | None:
         if value is None:
             return None
-        return int(value.value)
+        return int(value)
 
     def process_result_value(
         self,

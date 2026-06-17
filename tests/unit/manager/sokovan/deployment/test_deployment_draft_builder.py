@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import cast
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 
@@ -10,6 +11,8 @@ from ai.backend.common.config import (
     ModelDefinition,
     ModelServiceConfig,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import MountPermission
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.data.session.draft import KernelExecutionSpecDraft
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -171,3 +174,31 @@ class TestKernelGroups:
         assert main.replica_count == 1
         assert sub.role == "sub"
         assert sub.replica_count == expected_sub_replicas
+
+
+class TestResolveMounts:
+    """The model vfolder mount uses the permission frozen on the revision."""
+
+    @staticmethod
+    def _revision(model_mount_perm: MountPermission) -> ModelRevisionData:
+        revision = MagicMock(spec=ModelRevisionData)
+        mount_config = MagicMock()
+        mount_config.vfolder_id = VFolderUUID(uuid4())
+        mount_config.mount_destination = "/models"
+        mount_config.model_mount_perm = model_mount_perm
+        mount_config.subpath = None
+        mount_config.extra_mounts = []
+        revision.model_mount_config = mount_config
+        return cast(ModelRevisionData, revision)
+
+    def test_uses_stored_model_mount_perm(self) -> None:
+        mounts = DeploymentSessionDraftBuilder._resolve_mounts(
+            self._revision(MountPermission.READ_WRITE)
+        )
+        assert mounts[0].mount_perm == MountPermission.READ_WRITE
+
+    def test_read_only_revision_mounts_read_only(self) -> None:
+        mounts = DeploymentSessionDraftBuilder._resolve_mounts(
+            self._revision(MountPermission.READ_ONLY)
+        )
+        assert mounts[0].mount_perm == MountPermission.READ_ONLY

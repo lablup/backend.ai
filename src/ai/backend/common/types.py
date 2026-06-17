@@ -724,6 +724,17 @@ class MountPermission(enum.StrEnum):
         order = _MOUNT_PERMISSION_ORDER
         return self if order[other] > order[self] else other
 
+    def exceeds(self, other: MountPermission) -> bool:
+        """Return ``True`` when ``self`` grants more than ``other``.
+
+        Used at revision-write time to reject a caller-requested mount
+        permission that is stronger than the requester's own effective
+        permission on the vfolder (``requested.exceeds(effective)``).
+
+        Ordering: ``READ_ONLY`` < ``READ_WRITE`` < ``RW_DELETE``.
+        """
+        return _MOUNT_PERMISSION_ORDER[self] > _MOUNT_PERMISSION_ORDER[other]
+
 
 _MOUNT_PERMISSION_ORDER: dict[MountPermission, int] = {
     MountPermission.READ_ONLY: 0,

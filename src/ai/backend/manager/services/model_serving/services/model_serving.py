@@ -394,6 +394,7 @@ class ModelServingService:
                 model_vfolder_id=model_vfolder_id,
                 model_definition_path=None,
                 model_mount_destination=action.config.model_mount_destination,
+                model_mount_perm=MountPermission.READ_ONLY,
                 extra_mounts=[
                     MountInfoEntry(
                         vfolder_id=VFolderUUID(m.vfid.folder_id),
@@ -839,6 +840,7 @@ class ModelServingService:
                     model_definition_path=definition_path_override,
                     model_mount_destination=latest_draft.mounts.model_mount_destination,
                     extra_mounts=list(latest_draft.mounts.extra_mounts),
+                    model_mount_perm=latest_draft.mounts.model_mount_perm,
                     vfolder_subpath=latest_draft.mounts.vfolder_subpath,
                 )
             )
