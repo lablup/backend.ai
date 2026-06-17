@@ -74,8 +74,8 @@ Three scopes cover the use cases (`public` for the pre-login shell):
 - **Allow-list = the write gate for every fragment.** `app_config_allow_list`
   holds **one record per `(config_name, scope_type)`**; a fragment at
   that scope may be created/updated/purged **only if** the record exists
-  — for the admin path and the self-service path alike. What sets admins
-  apart is that they alone manage the allow-list (and the
+  — through the admin mutations and the regular ones alike. What sets
+  admins apart is that they alone manage the allow-list (and the
   `app_config_keys` registry) itself. It governs **writes only** — never reads.
 - **`rank` lives on the fragment.** A fragment's `rank` is its merge
   priority within a `config_name`; the read merge orders fragments by it.
@@ -141,14 +141,14 @@ allow-list rows themselves.
 
 ### Integrity
 
-- **Every** fragment write (admin or self-service) requires (a) a
-  registered `config_name` (FK to `app_config_keys`) and (b) an
+- **Every** fragment write (admin or regular) requires (a) a registered
+  `config_name` (FK to `app_config_keys`) and (b) an
   `app_config_allow_list` row for the write's `(config_name,
   scope_type)`. The service layer rejects per-row when either is missing.
-- The self-service path is further restricted to the caller's own `user`
-  row; the admin path may target any scope (still gated by the
-  allow-list) and is the only path that may write the allow-list and
-  `app_config_keys`.
+- A regular (non-admin) mutation is further restricted to the caller's
+  own `user` row; admin mutations may target any scope (still gated by
+  the allow-list) and are the only writes that may touch the allow-list
+  and `app_config_keys`.
 - `app_config_keys` purge is rejected while any fragment or allow-list
   entry still references the name (`ON DELETE NO ACTION`).
 - `app_config_allow_list` purge **revokes future writes** at that
@@ -159,15 +159,16 @@ allow-list rows themselves.
 <a id="write-model"></a>
 ### Write model
 
-Two write paths:
+Two kinds of mutation:
 
-- **Admin path** — `create` / `update` / `purge` a fragment at any scope
-  whose `(config_name, scope_type)` is in the allow-list. The only path
-  that may write another user's `user` row, and the only path that may
-  manage the allow-list and `app_config_keys` themselves.
-- **Self-service (`my`) path** — `create` / `update` / `purge` on the
-  caller's own `user` row, **only when** an allow-list row exists for
-  `(config_name, user)`.
+- **Admin mutations** (admin-only) — `create` / `update` / `purge` a
+  fragment at any scope whose `(config_name, scope_type)` is in the
+  allow-list. The only mutations that may write another user's `user`
+  row, and the only ones that may manage the allow-list and
+  `app_config_keys` themselves.
+- **Regular mutations** (any authenticated user) — `create` / `update` /
+  `purge` the caller's own `user` row, **only when** an allow-list row
+  exists for `(config_name, user)`.
 
 `create` errors if the natural key already exists; `update` errors if it
 does not; `purge` removes the row (and thus its contribution to the
@@ -180,8 +181,8 @@ boundary.
 dance:
 
 - **Fixed** (user cannot change): no `(config_name, user)` row exists in
-  the allow-list. The `my` path is rejected, so the merged value is the
-  admin's (`public` / `domain` fragments only).
+  the allow-list, so a regular `user`-scope write is rejected and the
+  merged value is the admin's (`public` / `domain` fragments only).
 - **Overridable**: the admin grants `(config_name, user)`. The admin
   sets the `domain` default; the user freely creates/updates/purges
   their own `user` fragment, which (higher `rank`) wins on merge.
@@ -261,8 +262,8 @@ likewise `null` — clients fall back to their built-in defaults.
 - **After login**, it reads its merged `AppConfig`s (`theme`, `menu`,
   `preferences`, …) — a fast, join-free merge of every public/domain/user
   fragment that exists for the caller — and persists user changes through
-  the `my` path (allowed only where the admin has granted it), which
-  returns the recomputed merged view.
+  a regular mutation on its own `user` fragment (allowed only where the
+  admin has granted it), which returns the recomputed merged view.
 
 ---
 
@@ -276,9 +277,9 @@ likewise `null` — clients fall back to their built-in defaults.
 - **Pre-login public config** — anonymous read of `public` `theme`.
 - **Bootstrap after login** — read merged `AppConfig`s in one round of
   queries; each is a single-table rank merge, no per-scope stitching.
-- **User edits a document** — `my` create/update/purge on the caller's
-  own `user` row (only where the grant exists); the response is the
-  recomputed merge.
+- **User edits a document** — a regular create/update/purge on the
+  caller's own `user` row (only where the grant exists); the response is
+  the recomputed merge.
 - **Admin publishes a fixed domain value** — add the `(config_name,
   domain)` allow-list row, write the `domain` fragment, and add no
   `(config_name, user)` row; users cannot override it.
