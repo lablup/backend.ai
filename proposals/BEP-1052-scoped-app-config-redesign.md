@@ -76,8 +76,7 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   that scope may be created/updated/purged **only if** the record exists
   — for the admin path and the self-service path alike. What sets admins
   apart is that they alone manage the allow-list (and the registry)
-  itself. This replaces `AppConfigPolicy.scope_sources`, but it governs
-  **writes only** — never reads.
+  itself. It governs **writes only** — never reads.
 - **`rank` lives on the fragment.** A fragment's `rank` is its merge
   priority within a `config_name`; the read merge orders fragments by it.
 - **Single source-of-truth table.** One `app_config_fragments` table
@@ -115,9 +114,8 @@ Keyed by the natural composite `(scope_type, scope_id, config_name)`
 
 ### `app_config_allow_list` — the per-`(name, scope)` write gate
 
-One row per `(config_name, scope_type)` (unique) — the normalized
-replacement for `AppConfigPolicy.scope_sources`, but reduced to a single
-purpose: **the write gate**. A fragment at `(config_name, scope_type)`
+One row per `(config_name, scope_type)` (unique) — a normalized,
+single-purpose table: **the write gate**. A fragment at `(config_name, scope_type)`
 may be written only if its row exists here. Admins set these up in
 advance.
 
