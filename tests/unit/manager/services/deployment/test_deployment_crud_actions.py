@@ -195,7 +195,7 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         )
         mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
         mock_deployment_controller.add_deployment_revision = AsyncMock()
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_legacy_endpoint_info = AsyncMock(return_value=endpoint_info)
 
         action = CreateLegacyDeploymentAction(draft=draft)
         result = await processors.create_legacy_deployment.wait_for_complete(action)
@@ -218,7 +218,7 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         )
         mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
         mock_deployment_controller.add_deployment_revision = AsyncMock()
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_legacy_endpoint_info = AsyncMock(return_value=endpoint_info)
 
         action = CreateLegacyDeploymentAction(draft=draft)
         await processors.create_legacy_deployment.wait_for_complete(action)
@@ -227,6 +227,36 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         kwargs = mock_deployment_controller.add_deployment_revision.await_args.kwargs
         assert kwargs["deployment_id"] == endpoint_info.id
         assert kwargs["auto_activate"] is True
+
+    async def test_response_read_uses_legacy_endpoint_getter(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        mock_deployment_controller: MagicMock,
+        endpoint_info: DeploymentInfo,
+        draft: MagicMock,
+    ) -> None:
+        """Regression (#12251): the legacy create response is read through the
+        full ``get_legacy_endpoint_info`` getter (eagerly-loaded revision data),
+        not the modern ids-only ``get_endpoint_info``. Reading through the modern
+        getter drops ``current_revision`` / ``deploying_revision`` and makes the
+        REST v1 handler raise ``RuntimeVariantNotFound`` post-create.
+        """
+        mock_deployment_controller.build_creator_from_legacy_draft = AsyncMock(
+            return_value=(MagicMock(), MagicMock())
+        )
+        mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
+        mock_deployment_controller.add_deployment_revision = AsyncMock()
+        mock_deployment_repository.get_legacy_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+
+        action = CreateLegacyDeploymentAction(draft=draft)
+        await processors.create_legacy_deployment.wait_for_complete(action)
+
+        mock_deployment_repository.get_legacy_endpoint_info.assert_awaited_once_with(
+            endpoint_info.id
+        )
+        mock_deployment_repository.get_endpoint_info.assert_not_awaited()
 
     async def test_non_existent_domain_raises(
         self,

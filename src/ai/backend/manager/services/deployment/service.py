@@ -495,7 +495,14 @@ class DeploymentService:
             requester_id=creator.metadata.created_user,
             auto_activate=True,
         )
-        deployment_info = await self._deployment_repository.get_endpoint_info(deployment_info.id)
+        # Legacy (REST v1) create re-reads through the *legacy* getter so the
+        # response carries the eagerly-loaded current/deploying revision data.
+        # The modern ``get_endpoint_info`` returns revision *ids* only, which
+        # makes the REST v1 handler raise ``RuntimeVariantNotFound`` while
+        # shaping the response even though the deployment was created.
+        deployment_info = await self._deployment_repository.get_legacy_endpoint_info(
+            deployment_info.id
+        )
         return CreateLegacyDeploymentActionResult(data=deployment_info)
 
     async def update_deployment(
