@@ -6,6 +6,7 @@ from .circuit import (
     CircuitCreationError,
     InvalidCircuitConfigError,
     InvalidCircuitStateError,
+    SubdomainAllocationError,
 )
 from .config import (
     CleanupContextNotInitializedError,
@@ -28,6 +29,7 @@ __all__ = [
     "CircuitCreationError",
     "InvalidCircuitConfigError",
     "InvalidCircuitStateError",
+    "SubdomainAllocationError",
     # config
     "CleanupContextNotInitializedError",
     "InvalidEnumTypeError",

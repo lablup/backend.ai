@@ -24,6 +24,7 @@ from ai.backend.appproxy.coordinator.errors import (
     InvalidCircuitConfigError,
     MissingTraefikConfigError,
 )
+from ai.backend.common.identifier.subdomain import Subdomain
 from ai.backend.common.types import RuntimeVariant
 
 from .base import (
@@ -106,7 +107,18 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         uselist=False,
     )
 
-    # TODO: Create primary key - worker, port, subdomain
+    __table_args__ = (
+        # The proxied URL in wildcard mode is ``{subdomain}{worker.wildcard_domain}``,
+        # so a subdomain must be unique per worker. The rule is scoped to the
+        # wildcard frontend mode via a partial index.
+        sa.Index(
+            "uq_circuits_worker_subdomain",
+            "worker",
+            "subdomain",
+            unique=True,
+            postgresql_where=sa.text("frontend_mode = 'WILDCARD_DOMAIN'"),
+        ),
+    )
 
     @classmethod
     async def get(
@@ -245,6 +257,82 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         c.updated_at = datetime.now(UTC)
 
         return c
+
+    @classmethod
+    def create_domain_mode(
+        cls,
+        id: UUID,
+        app: str,
+        protocol: ProxyProtocol,
+        worker: UUID,
+        app_mode: AppMode,
+        route_info: list[RouteInfo],
+        subdomain: Subdomain,
+        *,
+        envs: dict[str, Any] | None = None,
+        args: str | None = None,
+        open_to_public: bool = False,
+        allowed_client_ips: str | None = None,
+        user_uuid: UUID | None = None,
+        endpoint_id: UUID | None = None,
+        runtime_variant: RuntimeVariant | None = None,
+    ) -> "Circuit":
+        """Create a wildcard-domain-mode circuit bound to an allocated subdomain."""
+        return cls.create(
+            id,
+            app,
+            protocol,
+            worker,
+            app_mode,
+            FrontendMode.WILDCARD_DOMAIN,
+            route_info,
+            subdomain=subdomain,
+            envs=envs,
+            args=args,
+            open_to_public=open_to_public,
+            allowed_client_ips=allowed_client_ips,
+            user_uuid=user_uuid,
+            endpoint_id=endpoint_id,
+            runtime_variant=runtime_variant,
+        )
+
+    @classmethod
+    def create_port_mode(
+        cls,
+        id: UUID,
+        app: str,
+        protocol: ProxyProtocol,
+        worker: UUID,
+        app_mode: AppMode,
+        route_info: list[RouteInfo],
+        port: int,
+        *,
+        envs: dict[str, Any] | None = None,
+        args: str | None = None,
+        open_to_public: bool = False,
+        allowed_client_ips: str | None = None,
+        user_uuid: UUID | None = None,
+        endpoint_id: UUID | None = None,
+        runtime_variant: RuntimeVariant | None = None,
+    ) -> "Circuit":
+        """Create a port-mode circuit bound to an allocated port."""
+        return cls.create(
+            id,
+            app,
+            protocol,
+            worker,
+            app_mode,
+            FrontendMode.PORT,
+            route_info,
+            port=port,
+            envs=envs,
+            args=args,
+            open_to_public=open_to_public,
+            allowed_client_ips=allowed_client_ips,
+            user_uuid=user_uuid,
+            endpoint_id=endpoint_id,
+            runtime_variant=runtime_variant,
+        )
 
     async def get_endpoint_url(self, session: AsyncSession | None = None) -> URL:
         from .worker import Worker

@@ -41,6 +41,20 @@ class InvalidCircuitConfigError(BackendAIError):
         )
 
 
+class SubdomainAllocationError(BackendAIError):
+    """Raised when a unique subdomain could not be allocated after retries."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/subdomain-allocation-failed"
+    error_title = "Failed to allocate a unique subdomain."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class InvalidCircuitStateError(BackendAIError):
     """Raised when circuit state is invalid."""
 
