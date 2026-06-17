@@ -190,7 +190,7 @@ class Context(metaclass=ABCMeta):
         except asyncio.CancelledError:
             p.terminate()
             try:
-                exit_code = await p.wait()
+                exit_code = await asyncio.wait_for(p.wait(), timeout=5.0)
             except TimeoutError:
                 p.kill()
                 exit_code = await p.wait()
@@ -424,8 +424,9 @@ class Context(metaclass=ABCMeta):
 
             self.log_header("Downloading supergraph.graphql from GitHub releases...")
 
-            # Construct URL for the release version
-            version_tag = f"v{__version__}"
+            # Construct URL for the release version. Release tags carry no "v"
+            # prefix (e.g. "26.4.4rc9"), matching _fetch_package's download URL.
+            version_tag = __version__
             url = (
                 f"https://raw.githubusercontent.com/lablup/backend.ai/{version_tag}/"
                 "docs/manager/graphql-reference/supergraph.graphql"
@@ -856,7 +857,7 @@ class Context(metaclass=ABCMeta):
         self.log_header("Generating self-signed SSL certificate for storage-proxy (manager API)...")
         public_addr = self.install_variable.public_facing_address
         subj = f"/C=KR/ST=Seoul/L=Seoul/O=BackendAI/OU=StorageProxy/CN={public_addr}"
-        await asyncio.create_subprocess_exec(
+        proc = await asyncio.create_subprocess_exec(
             "openssl",
             "req",
             "-x509",
@@ -871,7 +872,15 @@ class Context(metaclass=ABCMeta):
             "-nodes",
             "-subj",
             subj,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"Failed to generate the storage-proxy self-signed certificate "
+                f"(openssl exit {proc.returncode}):\n{stderr.decode(errors='replace')}"
+            )
         self.log.write(Text.from_markup(f"Created SSL cert/key under {ssl_dir}"))
 
         with toml_path.open("r") as fp:
@@ -1787,7 +1796,7 @@ class Context(metaclass=ABCMeta):
                     else:
                         await self.alias_image(
                             "python",
-                            "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64",
+                            "cr.backend.ai/stable/python:3.13-ubuntu24.04-amd64",
                             "x86_64",
                         )
 
@@ -2063,6 +2072,12 @@ class PackageContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
+            appproxy_api_secret=secrets.token_hex(32),
+            appproxy_jwt_secret=secrets.token_hex(32),
+            appproxy_permit_hash_secret=secrets.token_hex(32),
+            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
+            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
+            appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -2271,6 +2286,12 @@ class PackageContext(Context):
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
         await self.configure_manager()
+
+        # Manager schema must exist before fixtures and the app-proxy DB step
+        # update scaling_groups (mirrors the DevContext.configure() order).
+        self.log_header("Initializing manager database schema...")
+        await self.run_manager_cli(["mgr", "schema", "oneshot"])
+
         self.log_header("Configuring agent...")
         await self.configure_agent()
         self.log_header("Configuring storage-proxy...")
