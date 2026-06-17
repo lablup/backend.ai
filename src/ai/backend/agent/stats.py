@@ -29,7 +29,6 @@ from ai.backend.common import msgpack
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.metrics.metric import (
     CollectionLayer,
-    CollectionMarker,
     CollectionStage,
     StageObserver,
 )
@@ -519,18 +518,10 @@ class StatContext:
             asyncio.create_task(gather_node_measures_with_slots(computer.instance))
             for computer in self.agent.computers.values()
         ]
-        self._stage_observer.observe_stage(
-            stage=CollectionMarker.BEFORE_GATHER_MEASURES,
-            upper_layer=CollectionLayer.NODE,
-        )
-        with self._stage_observer.stage_timer(
+        with self._stage_observer.measure_stage(
             stage=CollectionStage.GATHER_MEASURES, upper_layer=CollectionLayer.NODE
         ):
             results = await asyncio.gather(*_tasks, return_exceptions=True)
-        self._stage_observer.observe_stage(
-            stage=CollectionMarker.BEFORE_OBSERVE,
-            upper_layer=CollectionLayer.NODE,
-        )
         for res in results:
             if isinstance(res, BaseException):
                 log.error("collect_node_stat(): gather_node_measures() error", exc_info=res)
@@ -630,19 +621,14 @@ class StatContext:
                 self.agent.id,
                 redis_agent_updates["node"],
             )
-        with self._stage_observer.stage_timer(
+        with self._stage_observer.measure_stage(
             stage=CollectionStage.SERIALIZE, upper_layer=CollectionLayer.NODE
         ):
             serialized_agent_updates = msgpack.packb(redis_agent_updates)
 
-        self._stage_observer.observe_stage(
-            stage=CollectionMarker.BEFORE_REPORT_TO_REDIS,
-            upper_layer=CollectionLayer.NODE,
-        )
-
         # Use ValkeyStatClient set method with expiration
         agent_id = self.agent.id
-        with self._stage_observer.stage_timer(
+        with self._stage_observer.measure_stage(
             stage=CollectionStage.REDIS_WRITE, upper_layer=CollectionLayer.NODE
         ):
             await self.agent.valkey_stat_client.set(
@@ -772,19 +758,11 @@ class StatContext:
                     ),
                 )
             )
-        self._stage_observer.observe_stage(
-            stage=CollectionMarker.BEFORE_GATHER_MEASURES,
-            upper_layer=CollectionLayer.CONTAINER,
-        )
-        with self._stage_observer.stage_timer(
+        with self._stage_observer.measure_stage(
             stage=CollectionStage.GATHER_MEASURES, upper_layer=CollectionLayer.CONTAINER
         ):
             results = await asyncio.gather(*_tasks, return_exceptions=True)
         updated_kernel_ids: set[KernelId] = set()
-        self._stage_observer.observe_stage(
-            stage=CollectionMarker.BEFORE_OBSERVE,
-            upper_layer=CollectionLayer.CONTAINER,
-        )
         for result in results:
             if isinstance(result, BaseException):
                 log.error(
@@ -864,13 +842,8 @@ class StatContext:
 
             serializable_by_kernel[str(kernel_id)] = serializable_metrics
 
-        self._stage_observer.observe_stage(
-            stage=CollectionMarker.BEFORE_REPORT_TO_REDIS,
-            upper_layer=CollectionLayer.CONTAINER,
-        )
-
         # Use ValkeyStatClient set_multiple_keys for batch operations
-        with self._stage_observer.stage_timer(
+        with self._stage_observer.measure_stage(
             stage=CollectionStage.SERIALIZE, upper_layer=CollectionLayer.CONTAINER
         ):
             key_value_map = {
@@ -878,7 +851,7 @@ class StatContext:
                 for kernel_id, metrics in serializable_by_kernel.items()
             }
         if key_value_map:
-            with self._stage_observer.stage_timer(
+            with self._stage_observer.measure_stage(
                 stage=CollectionStage.REDIS_WRITE, upper_layer=CollectionLayer.CONTAINER
             ):
                 await self.agent.valkey_stat_client.set_multiple_keys(key_value_map)
@@ -936,7 +909,7 @@ class StatContext:
                 kernel_id_map[ContainerId(cid)] = kid
 
         pid_map: dict[PID, ContainerId] = {}
-        with self._stage_observer.stage_timer(
+        with self._stage_observer.measure_stage(
             stage=CollectionStage.DOCKER_TOP, upper_layer=CollectionLayer.PROCESS
         ):
             async with aiodocker.Docker() as docker:
@@ -956,18 +929,10 @@ class StatContext:
                     ),
                 )
             )
-        self._stage_observer.observe_stage(
-            stage=CollectionMarker.BEFORE_GATHER_MEASURES,
-            upper_layer=CollectionLayer.PROCESS,
-        )
-        with self._stage_observer.stage_timer(
+        with self._stage_observer.measure_stage(
             stage=CollectionStage.GATHER_MEASURES, upper_layer=CollectionLayer.PROCESS
         ):
             results = await asyncio.gather(*_tasks, return_exceptions=True)
-        self._stage_observer.observe_stage(
-            stage=CollectionMarker.BEFORE_OBSERVE,
-            upper_layer=CollectionLayer.PROCESS,
-        )
         updated_cids: set[ContainerId] = set()
         for result in results:
             if isinstance(result, BaseException):
@@ -1011,11 +976,6 @@ class StatContext:
                         )
                     else:
                         self.process_metrics[cid][pid][metric_key].update(measure)
-
-        self._stage_observer.observe_stage(
-            stage=CollectionMarker.BEFORE_REPORT_TO_REDIS,
-            upper_layer=CollectionLayer.PROCESS,
-        )
 
         # Prune metrics for PIDs that are no longer alive.
         active_pids_by_cid: defaultdict[ContainerId, set[PID]] = defaultdict(set)
@@ -1068,14 +1028,14 @@ class StatContext:
             serializable_by_cid[str(cid)] = serializable_table
 
         # Use ValkeyStatClient set_multiple_keys for batch operations.
-        with self._stage_observer.stage_timer(
+        with self._stage_observer.measure_stage(
             stage=CollectionStage.SERIALIZE, upper_layer=CollectionLayer.PROCESS
         ):
             key_value_map = {
                 cid: msgpack.packb(table) for cid, table in serializable_by_cid.items()
             }
         if key_value_map:
-            with self._stage_observer.stage_timer(
+            with self._stage_observer.measure_stage(
                 stage=CollectionStage.REDIS_WRITE, upper_layer=CollectionLayer.PROCESS
             ):
                 await self.agent.valkey_stat_client.set_multiple_keys(

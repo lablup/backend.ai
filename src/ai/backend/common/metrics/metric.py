@@ -23,6 +23,7 @@ from ai.backend.common.metrics.safe import (
 from ai.backend.common.metrics.safe import (
     SafeHistogram as Histogram,
 )
+from ai.backend.common.metrics.types import SUCCESS_LABEL_FALSE, SUCCESS_LABEL_TRUE
 
 
 class APIMetricObserver:
@@ -781,16 +782,8 @@ class CommonMetricRegistry:
         return generate_latest_singleprocess().decode("utf-8")
 
 
-class CollectionMarker(enum.StrEnum):
-    """Checkpoint markers within a stat collection cycle (counted via observe_stage)."""
-
-    BEFORE_GATHER_MEASURES = "before_gather_measures"
-    BEFORE_OBSERVE = "before_observe"
-    BEFORE_REPORT_TO_REDIS = "before_report_to_redis"
-
-
 class CollectionStage(enum.StrEnum):
-    """Named timed segments of a stat collection cycle (measured via stage_timer)."""
+    """Named timed segments of a stat collection cycle (measured via measure_stage)."""
 
     DOCKER_TOP = "docker_top"
     GATHER_MEASURES = "gather_measures"
@@ -816,7 +809,7 @@ class StageObserver:
         self._stage_count = Counter(
             name="backendai_stage_count",
             documentation="Count stage occurrences",
-            labelnames=["stage", "upper_layer"],
+            labelnames=["stage", "upper_layer", "success"],
         )
         self._stage_duration_sec = Histogram(
             name="backendai_stage_duration_sec",
@@ -831,26 +824,36 @@ class StageObserver:
             cls._instance = cls()
         return cls._instance
 
-    def observe_stage(self, *, stage: CollectionMarker, upper_layer: CollectionLayer) -> None:
-        self._stage_count.labels(stage=stage.value, upper_layer=upper_layer.value).inc()
-
     @contextmanager
-    def stage_timer(
+    def measure_stage(
         self, *, stage: CollectionStage, upper_layer: CollectionLayer
     ) -> Iterator[None]:
         """
-        Measure the wall-clock duration of the wrapped block and record it into
-        the stage-duration histogram. Usable around ``await`` expressions:
+        Measure the wrapped block: record its wall-clock duration into the
+        stage-duration histogram and count its occurrence (with a ``success``
+        label) into the stage counter. Usable around ``await`` expressions:
 
-            with observer.stage_timer(
+            with observer.measure_stage(
                 stage=CollectionStage.DOCKER_TOP, upper_layer=CollectionLayer.PROCESS
             ):
                 await do_docker_call()
+
+        A block that raises (including ``CancelledError``) is counted as
+        ``success="False"`` and the exception is re-raised.
         """
-        start = time.perf_counter()
+        start_time = time.perf_counter()
+        success = SUCCESS_LABEL_TRUE
         try:
             yield
+        except BaseException:
+            success = SUCCESS_LABEL_FALSE
+            raise
         finally:
             self._stage_duration_sec.labels(
                 stage=stage.value, upper_layer=upper_layer.value
-            ).observe(time.perf_counter() - start)
+            ).observe(time.perf_counter() - start_time)
+            self._stage_count.labels(
+                stage=stage.value,
+                upper_layer=upper_layer.value,
+                success=success,
+            ).inc()
