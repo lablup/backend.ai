@@ -152,13 +152,13 @@ class EnvironEntryGQL(PydanticOutputMixin[EnvironEntryInfoDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.2",
+        added_version=NEXT_RELEASE_VERSION,
         description="A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.",
     ),
     model=PresetValueInfoDTO,
-    name="DeploymentRevisionPresetValueEntry",
+    name="RuntimeVariantPresetValueEntry",
 )
-class PresetValueEntryGQL(PydanticOutputMixin[PresetValueInfoDTO]):
+class RuntimeVariantPresetValueEntryGQL(PydanticOutputMixin[PresetValueInfoDTO]):
     preset_id: UUID = gql_field(
         description="The runtime variant preset that this value applies to."
     )
@@ -290,7 +290,7 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
         description="Parsed model definition specifying health checks, ports, and service configuration for the inference endpoint.",
         default=None,
     )
-    preset_values: list[PresetValueEntryGQL] = gql_field(
+    preset_values: list[RuntimeVariantPresetValueEntryGQL] = gql_field(
         description="List of runtime variant preset values applied when using this deployment preset to auto-configure runtime parameters."
     )
     created_at: datetime = gql_field(
@@ -387,9 +387,9 @@ class DeploymentRevisionPresetConnection(Connection[DeploymentRevisionPresetGQL]
         added_version=NEXT_RELEASE_VERSION,
         description="A mapping of a runtime variant preset to a concrete value, used to auto-configure runtime parameters when this deployment preset is applied.",
     ),
-    name="DeploymentRevisionPresetValueEntryInput",
+    name="RuntimeVariantPresetValueEntryInput",
 )
-class DeploymentRevisionPresetValueEntryInputGQL(PydanticInputMixin[PresetValueInputDTO]):
+class RuntimeVariantPresetValueEntryInputGQL(PydanticInputMixin[PresetValueInputDTO]):
     preset_id: UUID = gql_field(
         description="The runtime variant preset that this value applies to."
     )
@@ -660,7 +660,7 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
         ),
         default=None,
     )
-    preset_values: list[DeploymentRevisionPresetValueEntryInputGQL] | None = gql_added_field(
+    preset_values: list[RuntimeVariantPresetValueEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Runtime variant preset values applied when using this deployment preset.",
@@ -771,7 +771,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
         ),
         default=None,
     )
-    preset_values: list[DeploymentRevisionPresetValueEntryInputGQL] | None = gql_added_field(
+    preset_values: list[RuntimeVariantPresetValueEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Replace runtime variant preset values. Omit to leave unchanged.",
