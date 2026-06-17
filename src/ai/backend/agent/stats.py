@@ -348,20 +348,6 @@ class Metric:
         }
 
 
-async def _packb_many_in_executor(
-    loop: asyncio.AbstractEventLoop,
-    mapping: dict[str, Any],
-) -> dict[str, bytes]:
-    """
-    msgpack-pack each value of ``mapping`` off the event loop in a single hop.
-    """
-
-    def _pack(m: dict[str, Any]) -> dict[str, bytes]:
-        return {key: msgpack.packb(value) for key, value in m.items()}
-
-    return await loop.run_in_executor(None, _pack, mapping)
-
-
 class StatContext:
     agent: AbstractAgent[Any, Any]
     mode: StatModes
@@ -884,11 +870,13 @@ class StatContext:
         )
 
         # Use ValkeyStatClient set_multiple_keys for batch operations
-        loop = asyncio.get_running_loop()
         with self._stage_observer.stage_timer(
             stage=CollectionStage.SERIALIZE, upper_layer=CollectionLayer.CONTAINER
         ):
-            key_value_map = await _packb_many_in_executor(loop, serializable_by_kernel)
+            key_value_map = {
+                kernel_id: msgpack.packb(metrics)
+                for kernel_id, metrics in serializable_by_kernel.items()
+            }
         if key_value_map:
             with self._stage_observer.stage_timer(
                 stage=CollectionStage.REDIS_WRITE, upper_layer=CollectionLayer.CONTAINER
@@ -1080,11 +1068,12 @@ class StatContext:
             serializable_by_cid[str(cid)] = serializable_table
 
         # Use ValkeyStatClient set_multiple_keys for batch operations.
-        loop = asyncio.get_running_loop()
         with self._stage_observer.stage_timer(
             stage=CollectionStage.SERIALIZE, upper_layer=CollectionLayer.PROCESS
         ):
-            key_value_map = await _packb_many_in_executor(loop, serializable_by_cid)
+            key_value_map = {
+                cid: msgpack.packb(table) for cid, table in serializable_by_cid.items()
+            }
         if key_value_map:
             with self._stage_observer.stage_timer(
                 stage=CollectionStage.REDIS_WRITE, upper_layer=CollectionLayer.PROCESS
