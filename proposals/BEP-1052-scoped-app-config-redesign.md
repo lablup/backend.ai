@@ -24,9 +24,11 @@ query with **no joins and no permission lookup**.
 
 **Write authorization is set up ahead of time.** Every document name is
 **explicitly registered** in `app_config_keys`, and `app_config_allow_list`
-records — **pre-configured by admins** — grant the self-service (user)
-path permission to `create` / `update` / `purge` its own fragment. Admin
-writes are ungated. So the cost of permission lives entirely on the
+records — **pre-configured by admins** — enumerate the
+`(config_name, scope_type)` pairs at which a fragment may be written.
+**Every** fragment write, admin or user, requires a matching record;
+admins additionally own the allow-list and the registry themselves
+(users cannot). So the cost of permission lives entirely on the
 (infrequent) write path and the (one-time) admin setup, never on read.
 
 Whether a value is admin-fixed or user-overridable is therefore a matter
@@ -69,12 +71,13 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   `app_config_fragments` alone, ordering the existing fragments by
   `rank`. No allow-list or policy is consulted at read time — the hot
   path stays a single indexed scan.
-- **Allow-list = pre-configured write delegation.** `app_config_allow_list`
-  holds **one record per `(config_name, scope_type)`**; its presence
-  grants the self-service path `create` / `update` / `purge` on its own
-  fragment at that scope. The admin path is ungated. This replaces
-  `AppConfigPolicy.scope_sources`, but it governs **writes only** —
-  never reads.
+- **Allow-list = the write gate for every fragment.** `app_config_allow_list`
+  holds **one record per `(config_name, scope_type)`**; a fragment at
+  that scope may be created/updated/purged **only if** the record exists
+  — for the admin path and the self-service path alike. What sets admins
+  apart is that they alone manage the allow-list (and the registry)
+  itself. This replaces `AppConfigPolicy.scope_sources`, but it governs
+  **writes only** — never reads.
 - **`rank` lives on the fragment.** A fragment's `rank` is its merge
   priority within a `config_name`; the read merge orders fragments by it.
 - **Single source-of-truth table.** One `app_config_fragments` table
@@ -110,23 +113,25 @@ Keyed by the natural composite `(scope_type, scope_id, config_name)`
   higher wins). Assigned on create (see §2).
 - `created_at` / `updated_at`.
 
-### `app_config_allow_list` — pre-configured write grants
+### `app_config_allow_list` — the per-`(name, scope)` write gate
 
 One row per `(config_name, scope_type)` (unique) — the normalized
 replacement for `AppConfigPolicy.scope_sources`, but reduced to a single
-purpose: **write authorization for the self-service path**. Admins set
-these up in advance.
+purpose: **the write gate**. A fragment at `(config_name, scope_type)`
+may be written only if its row exists here. Admins set these up in
+advance.
 
 - `config_name` — FK → `app_config_keys.config_name`.
-- `scope_type` — the scope whose owner is granted self-service writes
-  (`public | domain | user`). In practice the only non-admin owner is
-  `user`, so user-overridable documents carry a `(config_name, user)`
-  row.
+- `scope_type` — a scope at which fragments may be written
+  (`public | domain | user`). A user-overridable document carries a
+  `(config_name, user)` row; an admin-only value carries
+  `(config_name, domain)` and/or `(config_name, public)`.
 - `created_at` / `updated_at`.
 
-A grant's **presence** is the entire signal — there is no `rank` here,
-because the allow-list never participates in the merge. The admin path
-writes any scope of any registered name regardless of the allow-list.
+A row's **presence** is the entire signal — there is no `rank` here,
+because the allow-list never participates in the merge. It gates **both**
+write paths; admins, unlike users, may also create/update/purge the
+allow-list rows themselves.
 
 ### Scope-ID convention
 
@@ -138,30 +143,32 @@ writes any scope of any registered name regardless of the allow-list.
 
 ### Integrity
 
-- An **admin** fragment write requires only a registered `config_name`
-  (FK to `app_config_keys`).
-- A **self-service** fragment write additionally requires an
-  `app_config_allow_list` grant for the write's `(config_name,
-  scope_type)`. The service layer rejects per-row when the grant is
-  missing.
+- **Every** fragment write (admin or self-service) requires (a) a
+  registered `config_name` (FK to `app_config_keys`) and (b) an
+  `app_config_allow_list` row for the write's `(config_name,
+  scope_type)`. The service layer rejects per-row when either is missing.
+- The self-service path is further restricted to the caller's own `user`
+  row; the admin path may target any scope (still gated by the
+  allow-list) and is the only path that may write the allow-list and the
+  registry.
 - `app_config_keys` purge is rejected while any fragment or allow-list
   entry still references the name (`ON DELETE NO ACTION`).
-- `app_config_allow_list` purge **revokes future self-service writes**
-  for that scope. Because reads never consult the allow-list, **existing
-  fragments are untouched and keep merging** — to actually drop a value,
-  an admin purges the fragments themselves.
+- `app_config_allow_list` purge **revokes future writes** at that
+  `(config_name, scope_type)`. Because reads never consult the
+  allow-list, **existing fragments are untouched and keep merging** — to
+  actually drop a value, an admin purges the fragments themselves.
 
 <a id="write-model"></a>
 ### Write model
 
 Two write paths:
 
-- **Admin path** — `create` / `update` / `purge` on any scope of any
-  registered name. Ungated by the allow-list. The only way an
-  admin-owned (`public`, `domain`) row, or another user's `user` row,
-  comes into existence.
+- **Admin path** — `create` / `update` / `purge` a fragment at any scope
+  whose `(config_name, scope_type)` is in the allow-list. The only path
+  that may write another user's `user` row, and the only path that may
+  manage the allow-list and the registry themselves.
 - **Self-service (`my`) path** — `create` / `update` / `purge` on the
-  caller's own `user` row, **only when** an allow-list grant exists for
+  caller's own `user` row, **only when** an allow-list row exists for
   `(config_name, user)`.
 
 `create` errors if the natural key already exists; `update` errors if it
@@ -174,9 +181,9 @@ boundary.
 **Overridability is a write-grant decision** — there is no admin-seeding
 dance:
 
-- **Fixed** (user cannot change): no `(config_name, user)` grant exists.
-  The `my` path is rejected, so the merged value is the admin's
-  (`public` / `domain` fragments only).
+- **Fixed** (user cannot change): no `(config_name, user)` row exists in
+  the allow-list. The `my` path is rejected, so the merged value is the
+  admin's (`public` / `domain` fragments only).
 - **Overridable**: the admin grants `(config_name, user)`. The admin
   sets the `domain` default; the user freely creates/updates/purges
   their own `user` fragment, which (higher `rank`) wins on merge.
@@ -263,18 +270,20 @@ likewise `null` — clients fall back to their built-in defaults.
 
 ## 5. User scenarios
 
-- **Register a document name and grant writes** — admin creates the
-  `app_config_keys` row for `theme`, then (if users may customize it)
-  the `app_config_allow_list` grant `(theme, user)`.
+- **Register a document name and open its scopes** — admin creates the
+  `app_config_keys` row for `theme`, then the `app_config_allow_list`
+  rows for every scope it will use — e.g. `(theme, domain)` for the admin
+  default, plus `(theme, user)` if users may customize it. A fragment can
+  be written only after its scope's row exists.
 - **Pre-login public config** — anonymous read of `public` `theme`.
 - **Bootstrap after login** — read merged `AppConfig`s in one round of
   queries; each is a single-table rank merge, no per-scope stitching.
 - **User edits a document** — `my` create/update/purge on the caller's
   own `user` row (only where the grant exists); the response is the
   recomputed merge.
-- **Admin publishes a fixed domain value** — create a `domain` (or
-  `public`) fragment and grant no `user` write; users cannot override
-  it.
+- **Admin publishes a fixed domain value** — add the `(config_name,
+  domain)` allow-list row, write the `domain` fragment, and add no
+  `(config_name, user)` row; users cannot override it.
 - **Admin makes a value user-overridable** — add the `(config_name,
   user)` grant; users then create/update/purge their own copy. No data
   migration.
