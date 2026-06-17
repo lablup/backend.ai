@@ -177,8 +177,7 @@ with `{}`, which reads back as `null` (null projection, §3). `update`
 replaces the stored JSON wholesale — no partial/deep update at the write
 boundary.
 
-**Overridability is a write-grant decision** — there is no admin-seeding
-dance:
+**Overridability is a write-grant decision:**
 
 - **Fixed** (user cannot change): no `(config_name, user)` row exists in
   the allow-list, so a regular `user`-scope write is rejected and the
