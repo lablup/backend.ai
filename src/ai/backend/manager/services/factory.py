@@ -6,6 +6,12 @@ from ai.backend.manager.repositories.resource_allocation.repository import (
 )
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.app_config_definition.processors import (
+    AppConfigDefinitionProcessors,
+)
+from ai.backend.manager.services.app_config_definition.service import (
+    AppConfigDefinitionService,
+)
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
@@ -326,6 +332,9 @@ def create_services(args: ServiceArgs) -> Services:
             group_repository=repositories.group.repository,
             ssh_key_validator=args.ssh_key_validator,
         ),
+        app_config_definition=AppConfigDefinitionService(
+            repository=repositories.app_config_definition.repository,
+        ),
         login_client_type=LoginClientTypeService(
             repository=repositories.auth.login_client_type,
         ),
@@ -487,6 +496,9 @@ def create_processors(
             services.model_serving_auto_scaling, action_monitors, validators
         ),
         auth=AuthProcessors(services.auth, action_monitors, validators),
+        app_config_definition=AppConfigDefinitionProcessors(
+            services.app_config_definition, action_monitors
+        ),
         login_client_type=LoginClientTypeProcessors(services.login_client_type, action_monitors),
         login_client_type_admin=LoginClientTypeAdminProcessors(
             services.login_client_type_admin, action_monitors
