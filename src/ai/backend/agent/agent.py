@@ -1349,6 +1349,9 @@ class AbstractAgent[
 
     @_observe_stat_task(stat_scope=StatScope.NODE)
     async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]) -> None:
+        if not self.local_config.agent.utilization_metric.node.enable:
+            log.debug("skipping node stat collection as it's disabled in config")
+            return
         if self.local_config.debug.log_stats:
             log.debug("collecting node statistics")
         async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
@@ -1356,6 +1359,9 @@ class AbstractAgent[
 
     @_observe_stat_task(stat_scope=StatScope.CONTAINER)
     async def collect_container_stat(self) -> None:
+        if not self.local_config.agent.utilization_metric.container.enable:
+            log.debug("skipping container stat collection as it's disabled in config")
+            return
         if self.local_config.debug.log_stats:
             log.debug("collecting container statistics")
         container_ids: set[ContainerId] = set()
@@ -1368,7 +1374,7 @@ class AbstractAgent[
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self) -> None:
-        if not self.local_config.agent.utilization_metric.enable_process_metric:
+        if not self.local_config.agent.utilization_metric.process.enable:
             log.debug("skipping process stat collection as it's disabled in config")
             return
         if self.local_config.debug.log_stats:

@@ -387,8 +387,8 @@ class StatContext:
         self._utilization_metric_observer = UtilizationMetricObserver.instance()
         self._stage_observer = StageObserver.instance()
 
-    def _metric_ttl(self) -> int:
-        return int(self._local_config.agent.utilization_metric.interval * _METRIC_TTL_FACTOR)
+    def _metric_ttl(self, interval: float) -> int:
+        return int(interval * _METRIC_TTL_FACTOR)
 
     def update_timestamp(self, timestamp_key: str) -> tuple[float, float]:
         """
@@ -646,7 +646,9 @@ class StatContext:
         # Use ValkeyStatClient set method with expiration
         agent_id = self.agent.id
         await self.agent.valkey_stat_client.set(
-            agent_id, serialized_agent_updates, expire_sec=self._metric_ttl()
+            agent_id,
+            serialized_agent_updates,
+            expire_sec=self._metric_ttl(self._local_config.agent.utilization_metric.node.interval),
         )
 
     def _extract_slot_measurement_scale_factor(
@@ -762,7 +764,9 @@ class StatContext:
                 asyncio.create_task(
                     asyncio.wait_for(
                         computer.instance.gather_container_measures(self, container_ids),
-                        timeout=self._metric_ttl(),
+                        timeout=self._metric_ttl(
+                            self._local_config.agent.utilization_metric.container.interval
+                        ),
                     ),
                 )
             )
@@ -1049,5 +1053,8 @@ class StatContext:
         key_value_map = await _packb_many_in_executor(loop, serializable_by_cid)
         if key_value_map:
             await self.agent.valkey_stat_client.set_multiple_keys(
-                key_value_map, expire_sec=self._metric_ttl()
+                key_value_map,
+                expire_sec=self._metric_ttl(
+                    self._local_config.agent.utilization_metric.process.interval
+                ),
             )
