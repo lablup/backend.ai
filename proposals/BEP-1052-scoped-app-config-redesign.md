@@ -14,7 +14,7 @@ Implemented-Version:
 App configuration is redesigned as **scoped entities** — one row per
 `(scope_type, scope_id, config_name)` — so storage and merge live at the
 scope level. A single scope (one domain, one user) can hold **multiple
-named configuration documents** (`theme`, `menu`, `preferences`, …),
+named configs** (`theme`, `menu`, `preferences`, …),
 each managed independently.
 
 **Reads are the hot path.** A user's effective configuration for a
@@ -23,7 +23,7 @@ them**, taken
 straight from `app_config_fragments` in `rank` order — a single-table
 query with **no joins and no permission lookup**.
 
-**Write authorization is set up ahead of time.** Every document name is
+**Write authorization is set up ahead of time.** Every config name is
 **explicitly registered** in `app_config_definitions`, and `app_config_allow_list`
 records — **pre-configured by admins** — enumerate the
 `(config_name, scope_type)` pairs at which a fragment may be written.
@@ -60,12 +60,12 @@ Three scopes cover the use cases (`public` for the pre-login shell):
 ## Design Principles
 
 - **Schema-less JSON.** The backend is pure storage; the structure and
-  meaning of each document are owned by the frontend.
+  meaning of each config are owned by the frontend.
 - **Scope = entity.** Access control is expressed at the scope level,
   not per field. Three scopes: `public` (anonymous read / admin write),
   `domain` (same-domain read / admin write), `user` (owner+admin read /
   owner-modify + admin write).
-- **Explicitly registered names.** Every document name lives in
+- **Explicitly registered names.** Every config name lives in
   `app_config_definitions`; fragments and allow-list entries reference it by
   foreign key. No fragment may exist for an unregistered `config_name`.
 - **Reads are join-free and unconditional.** The merge reads
@@ -89,14 +89,14 @@ Three scopes cover the use cases (`public` for the pre-login shell):
 
 Three tables, with `app_config_definitions` as the hub both others reference.
 
-### `app_config_definitions` — the registered config documents
+### `app_config_definitions` — the registered configs
 
-One row per document name. A name must be registered here before any
+One row per config name. A name must be registered here before any
 fragment or allow-list entry can reference it. **Explicitly managed by
 admins** (`create` / `purge`) — registration is a deliberate step, not a
 side effect of writing a fragment.
 
-- `config_name` — the document name (unique). The foreign-key target for
+- `config_name` — the config name (unique). The foreign-key target for
   both other tables. Immutable (rename = purge + recreate).
 - `created_at` / `updated_at`.
 
@@ -122,7 +122,7 @@ advance.
 
 - `config_name` — FK → `app_config_definitions.config_name`.
 - `scope_type` — a scope at which fragments may be written
-  (`public | domain | user`). A user-overridable document carries a
+  (`public | domain | user`). A user-overridable config carries a
   `(config_name, user)` row; an admin-only value carries
   `(config_name, domain)` and/or `(config_name, public)`.
 - `created_at` / `updated_at`.
@@ -136,7 +136,7 @@ allow-list rows themselves.
 
 | `scope_type` | `scope_id`              | Meaning of `config`              |
 |--------------|-------------------------|----------------------------------|
-| `public`     | literal `"public"`      | pre-login value of the document  |
+| `public`     | literal `"public"`      | pre-login value of the config  |
 | `domain`     | `domain_id`             | the domain's value / default     |
 | `user`       | `user_id` (UUID string) | the user's own value             |
 
@@ -173,7 +173,7 @@ Two kinds of mutation:
 
 `create` errors if the natural key already exists; `update` errors if it
 does not; `purge` removes the row (and thus its contribution to the
-merge). A caller "clears" a document without deleting it by `update`-ing
+merge). A caller "clears" a config without deleting it by `update`-ing
 with `{}`, which reads back as `null` (null projection, §3). `update`
 replaces the stored JSON wholesale — no partial/deep update at the write
 boundary.
@@ -257,7 +257,7 @@ likewise `null` — clients fall back to their built-in defaults.
 
 ## 4. Client integration (WebUI)
 
-- **Before login**, the WebUI fetches `public` documents (theme,
+- **Before login**, the WebUI fetches `public` configs (theme,
   branding) anonymously so the shell can render.
 - **After login**, it reads its merged `AppConfig`s (`theme`, `menu`,
   `preferences`, …) — a fast, join-free merge of every public/domain/user
@@ -269,7 +269,7 @@ likewise `null` — clients fall back to their built-in defaults.
 
 ## 5. User scenarios
 
-- **Register a document name and open its scopes** — admin creates the
+- **Register a config name and open its scopes** — admin creates the
   `app_config_definitions` row for `theme`, then the `app_config_allow_list`
   rows for every scope it will use — e.g. `(theme, domain)` for the admin
   default, plus `(theme, user)` if users may customize it. A fragment can
@@ -277,7 +277,7 @@ likewise `null` — clients fall back to their built-in defaults.
 - **Pre-login public config** — anonymous read of `public` `theme`.
 - **Bootstrap after login** — read merged `AppConfig`s in one round of
   queries; each is a single-table rank merge, no per-scope stitching.
-- **User edits a document** — a regular create/update/purge on the
+- **User edits a config** — a regular create/update/purge on the
   caller's own `user` row (only where the grant exists); the response is
   the recomputed merge.
 - **Admin publishes a fixed domain value** — add the `(config_name,
@@ -290,7 +290,7 @@ likewise `null` — clients fall back to their built-in defaults.
   grant **and** purge existing `user` fragments (the grant gates writes,
   not reads).
 - **Admin reorders contributions** — adjust fragment `rank`s.
-- **Admin retires a document name** — purge the fragments, then the
+- **Admin retires a config name** — purge the fragments, then the
   allow-list entries, then the `app_config_definitions` row (purge is rejected
   while references remain).
 - **Admin audit** — cross-scope fragment search and cross-user merged
