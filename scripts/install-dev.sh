@@ -778,7 +778,11 @@ install_editable_webui() {
   fi
   pushd ./packages/backend.ai-ui && pnpm install && popd
   pnpm i
-  make compile
+  # The production Web UI build can exceed Node's ~2GB default old-space heap and
+  # crash with "JavaScript heap out of memory" (exit code 134) on low-RAM machines
+  # (e.g. WSL2). Scope a larger heap to the build only, so users don't have to
+  # export NODE_OPTIONS globally before running this script.
+  NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}" make compile
   cd ../../../..
 }
 
