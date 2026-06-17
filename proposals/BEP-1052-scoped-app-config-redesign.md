@@ -12,42 +12,43 @@ Implemented-Version:
 ## Overview
 
 App configuration is redesigned as **scoped entities** — one row per
-`(scope_type, scope_id, config_name)` — so access control and merge
-semantics live at the scope level, not the field level. A single scope
-(one domain, one user) can hold **multiple named configuration
-documents** (`theme`, `menu`, `preferences`, …), each managed
-independently.
+`(scope_type, scope_id, config_name)` — so storage and merge live at the
+scope level. A single scope (one domain, one user) can hold **multiple
+named configuration documents** (`theme`, `menu`, `preferences`, …),
+each managed independently.
 
-Every document name is **explicitly registered** in `app_config_keys`,
-and a config row cannot exist for an unregistered name. For each
-registered name, `app_config_allow_list` enumerates — **one record per
-(name, scope)** — which scopes may hold a fragment and in what **merge
-order**.
-A user's effective configuration for a name is the **deep merge of the
-fragments that apply to them**, combined in the allow-list's order.
+**Reads are the hot path.** A user's effective configuration for a name
+is the **deep merge of every fragment that applies to them**, taken
+straight from `app_config_fragments` in `rank` order — a single-table
+query with **no joins and no permission lookup**.
 
-A user can read and modify their own `user`-scope config, but **only
-where the name's allow-list admits the `user` scope**. Whether a value
-is admin-fixed or user-overridable is therefore an explicit allow-list
-decision — see [Write model](#write-model).
+**Write authorization is set up ahead of time.** Every document name is
+**explicitly registered** in `app_config_keys`, and `app_config_allow_list`
+records — **pre-configured by admins** — grant the self-service (user)
+path permission to `create` / `update` / `purge` its own fragment. Admin
+writes are ungated. So the cost of permission lives entirely on the
+(infrequent) write path and the (one-time) admin setup, never on read.
+
+Whether a value is admin-fixed or user-overridable is therefore a matter
+of whether an allow-list grant exists — see [Write model](#write-model).
 
 ## User Stories
 
 Three scopes cover the use cases (`public` for the pre-login shell):
 
-| Use case                                         | Scope(s)          | Who writes                                  |
-|--------------------------------------------------|-------------------|---------------------------------------------|
-| Pre-login values (theme, branding)               | `public`          | Admin                                       |
-| Domain-wide value the user **cannot** change     | `domain`          | Admin                                       |
-| Per-domain **default** the user **can** override | `domain` + `user` | Admin sets the default; user writes their own copy |
-| User value with **no** default                   | `user`            | User (admin may also write)                 |
+| Use case                                         | Scope(s)          | Who writes                                       |
+|--------------------------------------------------|-------------------|--------------------------------------------------|
+| Pre-login values (theme, branding)               | `public`          | Admin                                            |
+| Domain-wide value the user **cannot** change     | `domain`          | Admin                                            |
+| Per-domain **default** the user **can** override | `domain` + `user` | Admin sets the default; user writes their own copy (where granted) |
+| User value with **no** default                   | `user`            | User (where granted); admin may also write       |
 
 - Admins set values that apply across a domain; a domain-fixed value
-  cannot be changed by users.
+  cannot be changed by users (no `user` write grant exists).
 - Some domain settings must be readable **before login** (theme).
-- Where the allow-list admits `user`, users persist their own settings
-  on the server (language, recently used sessions, visible/ordered
-  table columns, experimental-feature toggles).
+- Where the admin has granted it, users persist their own settings on
+  the server (language, recently used sessions, visible/ordered table
+  columns, experimental-feature toggles).
 - The same scope may publish several independently-managed documents
   loaded by different parts of the WebUI.
 
@@ -62,15 +63,18 @@ Three scopes cover the use cases (`public` for the pre-login shell):
 - **Explicitly registered names.** Every document name lives in
   `app_config_keys`; fragments and allow-list entries reference it by
   foreign key. No fragment may exist for an unregistered name.
-- **Allow-list = the merge chain and the write gate.** For each name,
-  `app_config_allow_list` holds **one record per participating scope**,
-  each carrying a `rank`. Those records — ordered by `rank` — are
-  exactly the scopes that may be written and exactly the scopes merged
-  into the effective view. This replaces the old
-  `AppConfigPolicy.scope_sources` array with one row per entry.
-- **Named documents within a scope.** Each fragment is identified by
-  `(scope_type, scope_id, config_name)`. Clients address documents
-  explicitly by name — no hierarchical fall-through lookup.
+- **Reads are join-free and unconditional.** The merge reads
+  `app_config_fragments` alone, ordering the existing fragments by
+  `rank`. No allow-list or policy is consulted at read time — the hot
+  path stays a single indexed scan.
+- **Allow-list = pre-configured write delegation.** `app_config_allow_list`
+  holds **one record per `(config_name, scope_type)`**; its presence
+  grants the self-service path `create` / `update` / `purge` on its own
+  fragment at that scope. The admin path is ungated. This replaces
+  `AppConfigPolicy.scope_sources`, but it governs **writes only** —
+  never reads.
+- **`rank` lives on the fragment.** A fragment's `rank` is its merge
+  priority within a `config_name`; the read merge orders fragments by it.
 - **Single source-of-truth table.** One `app_config_fragments` table
   holds every scope; only the exposure layer is split.
 
@@ -91,35 +95,36 @@ side effect of writing a fragment.
   both other tables. Immutable (rename = purge + recreate).
 - `created_at` / `updated_at`.
 
-### `app_config_fragments` — the per-scope values
+### `app_config_fragments` — the per-scope values (read hot path)
 
 Keyed by the natural composite `(scope_type, scope_id, config_name)`
-(unique). Columns of note:
+(unique). The read merge scans this table alone. Columns of note:
 
 - `scope_type` — `public | domain | user`.
 - `scope_id` — the scope's identifier (see convention below).
 - `config_name` — FK → `app_config_keys.config_name`.
 - `config` — schema-less JSON payload.
+- `rank` — integer merge priority within the `config_name` (low → high;
+  higher wins). Assigned on create (see §2).
 - `created_at` / `updated_at`.
 
-### `app_config_allow_list` — the per-name scope chain
+### `app_config_allow_list` — pre-configured write grants
 
 One row per `(config_name, scope_type)` (unique) — the normalized
-replacement for `AppConfigPolicy.scope_sources`. Each row is one entry
-in the name's chain.
+replacement for `AppConfigPolicy.scope_sources`, but reduced to a single
+purpose: **write authorization for the self-service path**. Admins set
+these up in advance.
 
 - `config_name` — FK → `app_config_keys.config_name`.
-- `scope_type` — a scope that participates in this name
-  (`public | domain | user`).
-- `rank` — integer merge priority within the name (low → high; higher
-  wins). Assigned on create (see §2).
+- `scope_type` — the scope whose owner is granted self-service writes
+  (`public | domain | user`). In practice the only non-admin owner is
+  `user`, so user-overridable documents carry a `(config_name, user)`
+  row.
 - `created_at` / `updated_at`.
 
-The set of `scope_type`s present for a `config_name` is **both** the
-**write allow-list** (only these scopes may hold a fragment) **and** the
-**merge chain** (these scopes, in `rank` order, are deep-merged). Adding
-a scope to the chain is a single `create`; removing one is a single
-`purge` — never a read-modify-write of an array.
+A grant's **presence** is the entire signal — there is no `rank` here,
+because the allow-list never participates in the merge. The admin path
+writes any scope of any registered name regardless of the allow-list.
 
 ### Scope-ID convention
 
@@ -131,68 +136,73 @@ a scope to the chain is a single `create`; removing one is a single
 
 ### Integrity
 
-- A fragment write requires (a) a registered `config_name` (FK to
-  `app_config_keys`) and (b) an allow-list entry for the write's
-  `(config_name, scope_type)`. The service layer rejects per-row when
-  either is missing, with a friendly error; the FK is defense-in-depth.
+- An **admin** fragment write requires only a registered `config_name`
+  (FK to `app_config_keys`).
+- A **self-service** fragment write additionally requires an
+  `app_config_allow_list` grant for the write's `(config_name,
+  scope_type)`. The service layer rejects per-row when the grant is
+  missing.
 - `app_config_keys` purge is rejected while any fragment or allow-list
   entry still references the name (`ON DELETE NO ACTION`).
-- `app_config_allow_list` purge removes a scope from the chain. Existing
-  fragments at that scope are left in the DB but stop being read or
-  written; an admin removes them with a fragment purge if desired.
+- `app_config_allow_list` purge **revokes future self-service writes**
+  for that scope. Because reads never consult the allow-list, **existing
+  fragments are untouched and keep merging** — to actually drop a value,
+  an admin purges the fragments themselves.
 
 <a id="write-model"></a>
 ### Write model
 
 Two write paths:
 
-- **Admin path** — `create` / `update` / `purge`, on any scope admitted
-  by the allow-list. The only way an admin-owned (`public`, `domain`)
-  row, or another user's `user` row, comes into existence.
-- **Self-service (`my`) path** — `create` / `update` on the caller's own
-  `user` row, **only when** the name's allow-list admits `user`. No
-  `purge`.
+- **Admin path** — `create` / `update` / `purge` on any scope of any
+  registered name. Ungated by the allow-list. The only way an
+  admin-owned (`public`, `domain`) row, or another user's `user` row,
+  comes into existence.
+- **Self-service (`my`) path** — `create` / `update` / `purge` on the
+  caller's own `user` row, **only when** an allow-list grant exists for
+  `(config_name, user)`.
 
 `create` errors if the natural key already exists; `update` errors if it
-does not; `purge` (admin-only) is the single deletion verb. A caller
-"clears" a document by `update`-ing it with `{}`, which reads back as
-`null` (null projection, §3). `update` replaces the stored JSON
-wholesale — no partial/deep update at the write boundary.
+does not; `purge` removes the row (and thus its contribution to the
+merge). A caller "clears" a document without deleting it by `update`-ing
+with `{}`, which reads back as `null` (null projection, §3). `update`
+replaces the stored JSON wholesale — no partial/deep update at the write
+boundary.
 
-**Overridability is an allow-list decision** — there is no admin-seeding
+**Overridability is a write-grant decision** — there is no admin-seeding
 dance:
 
-- **Fixed** (user cannot change): the name's allow-list omits `user`
-  (e.g. `[domain]` or `[public]`). The `my` path is rejected, so the
-  merged value is the admin's.
-- **Overridable**: the allow-list includes `user` at a higher `rank`
-  than `domain` (e.g. `[domain, user]`). The admin sets the `domain`
-  default; the user creates/updates their own `user` fragment, which
-  wins on merge.
-- **User-only**: the allow-list is `[user]`; no domain default exists.
+- **Fixed** (user cannot change): no `(config_name, user)` grant exists.
+  The `my` path is rejected, so the merged value is the admin's
+  (`public` / `domain` fragments only).
+- **Overridable**: the admin grants `(config_name, user)`. The admin
+  sets the `domain` default; the user freely creates/updates/purges
+  their own `user` fragment, which (higher `rank`) wins on merge.
+- **User-only**: the grant exists and no admin fragment is published.
 
 To promote a fixed value to user-customizable, the admin adds a single
-`user` allow-list entry — no data migration, no schema change. Reverting
-— purging that `user` entry — blocks new user writes and drops `user`
-fragments from the merge, while leaving the rows in the DB (see §1
-*Integrity*).
+`(config_name, user)` grant — no data migration. To lock it back down,
+the admin removes the grant **and** purges any existing `user` fragments
+(removing the grant alone only blocks new writes; reads still merge what
+is already stored).
 
 ---
 
 ## 2. `rank` — merge priority
 
-`rank` is the integer priority an **allow-list entry** carries within a
-`config_name`; the merge applies the corresponding fragments in `rank`
-order (low → high, higher wins).
+`rank` is the integer priority a **fragment** carries within a
+`config_name`; the read merge applies fragments in `rank` order (low →
+high, higher wins).
 
-- **Assignment.** A new allow-list entry is placed after the existing
-  ones for the same name, so a later-added scope outranks earlier ones
-  by default. Admins re-order by setting `rank` explicitly. (Adding
-  `domain` before `user` naturally gives the `user` entry the higher
-  rank, so the user value wins.)
-- **No tier defaults.** Priority is the allow-list `rank`, not derived
-  from `scope_type` — a `user` entry outranks a `domain` entry only
-  because its `rank` is higher, not because `user` is "above" `domain`.
+- **Assignment.** A new fragment is placed after the existing ones for
+  the same name, so a later-created fragment outranks earlier ones by
+  default. Admins re-order by setting `rank` explicitly. (Publishing the
+  `domain` default before a user writes their own copy naturally gives
+  the `user` fragment the higher rank, so the user value wins.)
+- **No tier defaults.** Priority is the fragment's `rank`, not derived
+  from `scope_type` — a `user` fragment outranks a `domain` fragment
+  only because its `rank` is higher, not because `user` is "above"
+  `domain`.
 
 ---
 
@@ -201,7 +211,7 @@ order (low → high, higher wins).
 Two read shapes exist:
 
 - **`AppConfigFragment`** — one raw row, regardless of scope. Carries
-  `scopeType`, `scopeId`, `configName`, and `config`. Callers
+  `scopeType`, `scopeId`, `configName`, `rank`, and `config`. Callers
   disambiguate scope by reading `scopeType` (no per-scope wrapper
   types).
 - **`AppConfig`** — the merged per-user view for a `config_name`: the
@@ -209,21 +219,18 @@ Two read shapes exist:
 
 ### How a merge is resolved
 
-For a user resolving `config_name`, the chain is the name's
-`app_config_allow_list` entries ordered by `rank`. Each entry resolves
-to one applicable `scope_id`:
+For a user resolving `config_name`, the **applicable** fragments are
+those whose scope applies to them:
 
-- `public` → `"public"`,
-- `domain` → the user's domain,
-- `user` → the user's id.
+- every `public` fragment (`scope_id = "public"`),
+- the user's `domain` fragment (`scope_id = the user's domain`),
+- the user's `user` fragment (`scope_id = the user's id`).
 
-The fragments that exist at those `(scope_type, scope_id, config_name)`
-keys are ordered by `rank` (low → high) and deep-merged: nested objects
-recurse, scalars and lists are wholesale-replaced, and the higher `rank`
-wins on conflict. A single SQL statement joins `app_config_fragments`
-with `app_config_allow_list ON config_name AND scope_type`, filtered to
-each entry's resolved `scope_id`, and orders by `rank` — a plain
-equi-join, with no array membership/position tricks.
+A single `app_config_fragments` query selects exactly those rows (the
+user's domain is known from the session — **no join, no allow-list
+lookup**), orders them by `rank` (low → high), and deep-merges: nested
+objects recurse, scalars and lists are wholesale-replaced, and the
+higher `rank` wins on conflict.
 
 **Null projection.** A stored `config` of `{}` reads back as `null`, and
 a merged `config` that is empty after combining every fragment is
@@ -245,31 +252,34 @@ likewise `null` — clients fall back to their built-in defaults.
 - **Before login**, the WebUI fetches `public` documents (theme,
   branding) anonymously so the shell can render.
 - **After login**, it reads its merged `AppConfig`s (`theme`, `menu`,
-  `preferences`, …) — already combining the public/domain/user fragments
-  admitted by each name's allow-list — and persists user changes through
-  the `my` **update** (allowed only where the allow-list admits `user`),
-  which returns the recomputed merged view.
+  `preferences`, …) — a fast, join-free merge of every public/domain/user
+  fragment that exists for the caller — and persists user changes through
+  the `my` path (allowed only where the admin has granted it), which
+  returns the recomputed merged view.
 
 ---
 
 ## 5. User scenarios
 
-- **Register a document name** — admin creates the `app_config_keys` row
-  for `theme` and its `app_config_allow_list` entries (the chain) before
-  any fragment exists.
+- **Register a document name and grant writes** — admin creates the
+  `app_config_keys` row for `theme`, then (if users may customize it)
+  the `app_config_allow_list` grant `(theme, user)`.
 - **Pre-login public config** — anonymous read of `public` `theme`.
 - **Bootstrap after login** — read merged `AppConfig`s in one round of
-  queries; no per-scope stitching on the client.
-- **User edits a document** — `my` create/update on the caller's own
-  `user` row (only where the allow-list admits `user`); the response is
-  the recomputed merge.
-- **Admin publishes a fixed domain value** — register the name with
-  allow-list `[domain]` (or `[public]`); with no `user` entry, users
-  cannot override it.
-- **Admin makes a value user-overridable** — add a `user` allow-list
-  entry at a higher `rank`; users then create/update their own copy. No
-  data migration.
-- **Admin reorders contributions** — adjust allow-list `rank`s.
+  queries; each is a single-table rank merge, no per-scope stitching.
+- **User edits a document** — `my` create/update/purge on the caller's
+  own `user` row (only where the grant exists); the response is the
+  recomputed merge.
+- **Admin publishes a fixed domain value** — create a `domain` (or
+  `public`) fragment and grant no `user` write; users cannot override
+  it.
+- **Admin makes a value user-overridable** — add the `(config_name,
+  user)` grant; users then create/update/purge their own copy. No data
+  migration.
+- **Admin locks a value back down** — remove the `(config_name, user)`
+  grant **and** purge existing `user` fragments (the grant gates writes,
+  not reads).
+- **Admin reorders contributions** — adjust fragment `rank`s.
 - **Admin retires a document name** — purge the fragments, then the
   allow-list entries, then the `app_config_keys` row (purge is rejected
   while references remain).
