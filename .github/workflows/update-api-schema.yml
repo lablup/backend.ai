@@ -95,6 +95,13 @@ jobs:
       contents: read
       pull-requests: write
       checks: write
+    env:
+      # The pinned graphql-inspector action declares `runs.using: node20`.
+      # GitHub now force-runs node20 actions on Node 24, where this old bundle
+      # crashes at module load (the job dies at `action/index.js:1` with no
+      # output). Opt back to Node 20 until upstream ships a node24 release
+      # (graphql-hive/graphql-inspector#2948); then bump the pin and drop this.
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
     steps:
       - uses: actions/checkout@v6
       - uses: kamilkisiela/graphql-inspector@release-1717403590269
