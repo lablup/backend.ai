@@ -24,11 +24,11 @@ straight from `app_config_fragments` in `rank` order — a single-table
 query with **no joins and no permission lookup**.
 
 **Write authorization is set up ahead of time.** Every document name is
-**explicitly registered** in `app_config_keys`, and `app_config_allow_list`
+**explicitly registered** in `app_config_definitions`, and `app_config_allow_list`
 records — **pre-configured by admins** — enumerate the
 `(config_name, scope_type)` pairs at which a fragment may be written.
 **Every** fragment write, admin or user, requires a matching record;
-admins additionally own the allow-list and the `app_config_keys` registry themselves
+admins additionally own the allow-list and the `app_config_definitions` registry themselves
 (users cannot). So the cost of permission lives entirely on the
 (infrequent) write path and the (one-time) admin setup, never on read.
 
@@ -66,7 +66,7 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   `domain` (same-domain read / admin write), `user` (owner+admin read /
   owner-modify + admin write).
 - **Explicitly registered names.** Every document name lives in
-  `app_config_keys`; fragments and allow-list entries reference it by
+  `app_config_definitions`; fragments and allow-list entries reference it by
   foreign key. No fragment may exist for an unregistered `config_name`.
 - **Reads are join-free and unconditional.** The merge reads
   `app_config_fragments` alone, ordering the existing fragments by
@@ -77,7 +77,7 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   that scope may be created/updated/purged **only if** the record exists
   — through the admin mutations and the regular ones alike. What sets
   admins apart is that they alone manage the allow-list (and the
-  `app_config_keys` registry) itself. It governs **writes only** — never reads.
+  `app_config_definitions` registry) itself. It governs **writes only** — never reads.
 - **`rank` lives on the fragment.** A fragment's `rank` is its merge
   priority within a `config_name`; the read merge orders fragments by it.
 - **Single source-of-truth table.** One `app_config_fragments` table
@@ -87,9 +87,9 @@ Three scopes cover the use cases (`public` for the pre-login shell):
 
 ## 1. Data model
 
-Three tables, with `app_config_keys` as the hub both others reference.
+Three tables, with `app_config_definitions` as the hub both others reference.
 
-### `app_config_keys` — the document-name registry
+### `app_config_definitions` — the document-name registry
 
 One row per document name. A name must be registered here before any
 fragment or allow-list entry can reference it. **Explicitly managed by
@@ -107,7 +107,7 @@ Keyed by the natural composite `(scope_type, scope_id, config_name)`
 
 - `scope_type` — `public | domain | user`.
 - `scope_id` — the scope's identifier (see convention below).
-- `config_name` — FK → `app_config_keys.config_name`.
+- `config_name` — FK → `app_config_definitions.config_name`.
 - `config` — schema-less JSON payload.
 - `rank` — integer merge priority within the `config_name` (low → high;
   higher wins). Assigned on create (see §2).
@@ -120,7 +120,7 @@ single-purpose table: **the write gate**. A fragment at `(config_name, scope_typ
 may be written only if its row exists here. Admins set these up in
 advance.
 
-- `config_name` — FK → `app_config_keys.config_name`.
+- `config_name` — FK → `app_config_definitions.config_name`.
 - `scope_type` — a scope at which fragments may be written
   (`public | domain | user`). A user-overridable document carries a
   `(config_name, user)` row; an admin-only value carries
@@ -143,14 +143,14 @@ allow-list rows themselves.
 ### Integrity
 
 - **Every** fragment write (admin or regular) requires (a) a registered
-  `config_name` (FK to `app_config_keys`) and (b) an
+  `config_name` (FK to `app_config_definitions`) and (b) an
   `app_config_allow_list` row for the write's `(config_name,
   scope_type)`. The service layer rejects per-row when either is missing.
 - A regular (non-admin) mutation is further restricted to the caller's
   own `user` row; admin mutations may target any scope (still gated by
   the allow-list) and are the only writes that may touch the allow-list
-  and `app_config_keys`.
-- `app_config_keys` purge is rejected while any fragment or allow-list
+  and `app_config_definitions`.
+- `app_config_definitions` purge is rejected while any fragment or allow-list
   entry still references the `config_name` (`ON DELETE NO ACTION`).
 - `app_config_allow_list` purge **revokes future writes** at that
   `(config_name, scope_type)`. Because reads never consult the
@@ -166,7 +166,7 @@ Two kinds of mutation:
   fragment at any scope whose `(config_name, scope_type)` is in the
   allow-list. The only mutations that may write another user's `user`
   row, and the only ones that may manage the allow-list and
-  `app_config_keys` themselves.
+  `app_config_definitions` themselves.
 - **Regular mutations** (any authenticated user) — `create` / `update` /
   `purge` the caller's own `user` row, **only when** an allow-list row
   exists for `(config_name, user)`.
@@ -270,7 +270,7 @@ likewise `null` — clients fall back to their built-in defaults.
 ## 5. User scenarios
 
 - **Register a document name and open its scopes** — admin creates the
-  `app_config_keys` row for `theme`, then the `app_config_allow_list`
+  `app_config_definitions` row for `theme`, then the `app_config_allow_list`
   rows for every scope it will use — e.g. `(theme, domain)` for the admin
   default, plus `(theme, user)` if users may customize it. A fragment can
   be written only after its scope's row exists.
@@ -291,7 +291,7 @@ likewise `null` — clients fall back to their built-in defaults.
   not reads).
 - **Admin reorders contributions** — adjust fragment `rank`s.
 - **Admin retires a document name** — purge the fragments, then the
-  allow-list entries, then the `app_config_keys` row (purge is rejected
+  allow-list entries, then the `app_config_definitions` row (purge is rejected
   while references remain).
 - **Admin audit** — cross-scope fragment search and cross-user merged
   search for support.
