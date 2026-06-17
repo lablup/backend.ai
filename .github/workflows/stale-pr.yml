@@ -1,0 +1,42 @@
+name: 'Close Stale PRs'
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+
+env:
+  # Days of inactivity before a PR is marked stale and notified.
+  DAYS_BEFORE_STALE: 14
+  # Days of further inactivity after being marked stale before the PR is closed.
+  DAYS_BEFORE_CLOSE: 14
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute projected close date
+        run: echo "CLOSE_DATE=$(date -u -d "+${DAYS_BEFORE_CLOSE} days" +%Y-%m-%d)" >> "$GITHUB_ENV"
+
+      - uses: actions/stale@v9
+        with:
+          days-before-stale: ${{ env.DAYS_BEFORE_STALE }}
+          days-before-close: ${{ env.DAYS_BEFORE_CLOSE }}
+          stale-pr-label: 'stale'
+          stale-pr-message: >
+            This PR has had no activity for ${{ env.DAYS_BEFORE_STALE }} days
+            and has been marked as stale. It will be closed on
+            ${{ env.CLOSE_DATE }} (in ${{ env.DAYS_BEFORE_CLOSE }} days) if no
+            further activity occurs. Push a commit or leave a comment to keep it
+            open.
+          close-pr-message: >
+            This PR has been automatically closed because it had no activity
+            for ${{ env.DAYS_BEFORE_CLOSE }} days after being marked as stale.
+            Feel free to reopen it if you intend to continue the work.
+          # Only act on pull requests, not issues.
+          days-before-issue-stale: -1
+          days-before-issue-close: -1
