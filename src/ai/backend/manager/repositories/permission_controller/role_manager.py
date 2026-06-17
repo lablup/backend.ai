@@ -90,6 +90,14 @@ class UserSystemRoleSpec:
 
 
 class RoleManager:
+    """Deprecated. Use :class:`ai.backend.manager.repositories.ops.rbac.provider.RBACWriteOps`
+    instead.
+
+    RBAC role and scope-association management is migrating to the ops-provider
+    layer (``RBACWriteOps``), which performs these writes through the shared
+    ``DBOpsProvider`` transaction.
+    """
+
     def __init__(self) -> None:
         pass
 
