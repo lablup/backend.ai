@@ -28,7 +28,7 @@ query with **no joins and no permission lookup**.
 records — **pre-configured by admins** — enumerate the
 `(config_name, scope_type)` pairs at which a fragment may be written.
 **Every** fragment write, admin or user, requires a matching record;
-admins additionally own the allow-list and the `app_config_definitions` registry themselves
+admins additionally own the allow-list and `app_config_definitions` themselves
 (users cannot). So the cost of permission lives entirely on the
 (infrequent) write path and the (one-time) admin setup, never on read.
 
@@ -77,7 +77,7 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   that scope may be created/updated/purged **only if** the record exists
   — through the admin mutations and the regular ones alike. What sets
   admins apart is that they alone manage the allow-list (and the
-  `app_config_definitions` registry) itself. It governs **writes only** — never reads.
+  `app_config_definitions`) itself. It governs **writes only** — never reads.
 - **`rank` lives on the fragment.** A fragment's `rank` is its merge
   priority within a `config_name`; the read merge orders fragments by it.
 - **Single source-of-truth table.** One `app_config_fragments` table
@@ -89,7 +89,7 @@ Three scopes cover the use cases (`public` for the pre-login shell):
 
 Three tables, with `app_config_definitions` as the hub both others reference.
 
-### `app_config_definitions` — the document-name registry
+### `app_config_definitions` — the registered config documents
 
 One row per document name. A name must be registered here before any
 fragment or allow-list entry can reference it. **Explicitly managed by
