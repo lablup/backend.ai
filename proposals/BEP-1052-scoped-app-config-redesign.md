@@ -17,8 +17,9 @@ scope level. A single scope (one domain, one user) can hold **multiple
 named configuration documents** (`theme`, `menu`, `preferences`, …),
 each managed independently.
 
-**Reads are the hot path.** A user's effective configuration for a name
-is the **deep merge of every fragment that applies to them**, taken
+**Reads are the hot path.** A user's effective configuration for a
+`config_name` is the **deep merge of every fragment that applies to
+them**, taken
 straight from `app_config_fragments` in `rank` order — a single-table
 query with **no joins and no permission lookup**.
 
@@ -66,7 +67,7 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   owner-modify + admin write).
 - **Explicitly registered names.** Every document name lives in
   `app_config_keys`; fragments and allow-list entries reference it by
-  foreign key. No fragment may exist for an unregistered name.
+  foreign key. No fragment may exist for an unregistered `config_name`.
 - **Reads are join-free and unconditional.** The merge reads
   `app_config_fragments` alone, ordering the existing fragments by
   `rank`. No allow-list or policy is consulted at read time — the hot
@@ -112,7 +113,7 @@ Keyed by the natural composite `(scope_type, scope_id, config_name)`
   higher wins). Assigned on create (see §2).
 - `created_at` / `updated_at`.
 
-### `app_config_allow_list` — the per-`(name, scope)` write gate
+### `app_config_allow_list` — the per-`(config_name, scope_type)` write gate
 
 One row per `(config_name, scope_type)` (unique) — a normalized,
 single-purpose table: **the write gate**. A fragment at `(config_name, scope_type)`
@@ -150,7 +151,7 @@ allow-list rows themselves.
   the allow-list) and are the only writes that may touch the allow-list
   and `app_config_keys`.
 - `app_config_keys` purge is rejected while any fragment or allow-list
-  entry still references the name (`ON DELETE NO ACTION`).
+  entry still references the `config_name` (`ON DELETE NO ACTION`).
 - `app_config_allow_list` purge **revokes future writes** at that
   `(config_name, scope_type)`. Because reads never consult the
   allow-list, **existing fragments are untouched and keep merging** — to
@@ -202,7 +203,7 @@ is already stored).
 high, higher wins).
 
 - **Assignment.** A new fragment is placed after the existing ones for
-  the same name, so a later-created fragment outranks earlier ones by
+  the same `config_name`, so a later-created fragment outranks earlier ones by
   default. Admins re-order by setting `rank` explicitly. (Publishing the
   `domain` default before a user writes their own copy naturally gives
   the `user` fragment the higher rank, so the user value wins.)
