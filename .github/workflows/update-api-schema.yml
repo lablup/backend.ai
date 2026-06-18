@@ -99,7 +99,7 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
     steps:
       - uses: actions/checkout@v6
-      - uses: graphql-hive/graphql-inspector@release-1762508344828
+      - uses: graphql-hive/graphql-inspector@release-1733751254476
         with:
           schema: '${{ github.base_ref }}:docs/manager/graphql-reference/schema.graphql'
           rules: |
