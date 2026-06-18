@@ -6,8 +6,6 @@ on:
       - 'src/ai/backend/manager/models/**'
       - 'src/ai/backend/manager/api/**'
       - 'VERSION'
-      - '.github/workflows/update-api-schema.yml'
-      - 'gql-inspector-checker.js'
 
 jobs:
   api-updated:
