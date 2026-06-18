@@ -21,24 +21,21 @@ from ai.backend.common.dto.manager.v2.app_config_definition.types import (
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.models.app_config_definition.conditions import (
     AppConfigDefinitionConditions,
 )
 from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
-from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
 )
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
 )
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.services.app_config_definition.actions.create import (
     CreateAppConfigDefinitionAction,
 )
@@ -52,7 +49,15 @@ from ai.backend.manager.services.app_config_definition.actions.search import (
     SearchAppConfigDefinitionsAction,
 )
 
-DEFAULT_PAGINATION_LIMIT = 50
+
+def _pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=AppConfigDefinitionOrders.id(ascending=False),
+        backward_order=AppConfigDefinitionOrders.id(ascending=True),
+        forward_condition_factory=AppConfigDefinitionConditions.by_cursor_forward,
+        backward_condition_factory=AppConfigDefinitionConditions.by_cursor_backward,
+        tiebreaker_order=AppConfigDefinitionOrders.id(ascending=True),
+    )
 
 
 class AppConfigDefinitionAdapter(BaseAdapter):
@@ -70,9 +75,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
     async def admin_create(
         self, input: CreateAppConfigDefinitionInput
     ) -> CreateAppConfigDefinitionPayload:
-        creator = Creator[AppConfigDefinitionRow](
-            spec=AppConfigDefinitionCreatorSpec(config_name=input.config_name),
-        )
+        creator = Creator(spec=AppConfigDefinitionCreatorSpec(config_name=input.config_name))
         action_result = await self._processors.app_config_definition.create.wait_for_complete(
             CreateAppConfigDefinitionAction(creator=creator)
         )
@@ -133,16 +136,21 @@ class AppConfigDefinitionAdapter(BaseAdapter):
     async def admin_search(
         self, input: SearchAppConfigDefinitionsInput
     ) -> SearchAppConfigDefinitionsPayload:
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
         action_result = await self._processors.app_config_definition.search.wait_for_complete(
-            SearchAppConfigDefinitionsAction(
-                querier=BatchQuerier(pagination=pagination, conditions=conditions, orders=orders)
-            )
+            SearchAppConfigDefinitionsAction(querier=querier)
         )
         return SearchAppConfigDefinitionsPayload(
             items=[self._data_to_node(item) for item in action_result.data],
@@ -152,11 +160,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         )
 
     async def admin_purge(self, definition_id: UUID) -> PurgeAppConfigDefinitionPayload:
-        purger = Purger[AppConfigDefinitionRow](
-            row_class=AppConfigDefinitionRow,
-            pk_value=AppConfigDefinitionID(definition_id),
-        )
         action_result = await self._processors.app_config_definition.purge.wait_for_complete(
-            PurgeAppConfigDefinitionAction(purger=purger)
+            PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(definition_id))
         )
         return PurgeAppConfigDefinitionPayload(id=action_result.definition.id)

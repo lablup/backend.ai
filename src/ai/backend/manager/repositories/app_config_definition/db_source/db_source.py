@@ -48,12 +48,12 @@ class AppConfigDefinitionDBSource:
                 )
             return result.row.to_data()
 
-    async def purge(self, purger: Purger[AppConfigDefinitionRow]) -> AppConfigDefinitionData:
+    async def purge(self, definition_id: AppConfigDefinitionID) -> AppConfigDefinitionData:
         async with self._ops.write_ops() as w:
-            result = await w.purge(purger)
+            result = await w.purge(Purger(row_class=AppConfigDefinitionRow, pk_value=definition_id))
             if result is None:
                 raise AppConfigDefinitionNotFound(
-                    f"App config definition {purger.pk_value} not found"
+                    f"App config definition {definition_id} not found"
                 )
             return result.row.to_data()
 

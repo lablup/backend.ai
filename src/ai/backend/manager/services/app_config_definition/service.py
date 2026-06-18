@@ -53,5 +53,5 @@ class AppConfigDefinitionService:
     async def purge(
         self, action: PurgeAppConfigDefinitionAction
     ) -> PurgeAppConfigDefinitionActionResult:
-        data = await self._repository.purge(action.purger)
+        data = await self._repository.purge(action.definition_id)
         return PurgeAppConfigDefinitionActionResult(definition=data)

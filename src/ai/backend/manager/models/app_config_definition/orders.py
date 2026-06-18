@@ -10,6 +10,12 @@ __all__ = ("AppConfigDefinitionOrders",)
 
 class AppConfigDefinitionOrders:
     @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AppConfigDefinitionRow.id.asc()
+        return AppConfigDefinitionRow.id.desc()
+
+    @staticmethod
     def config_name(ascending: bool = True) -> QueryOrder:
         if ascending:
             return AppConfigDefinitionRow.config_name.asc()

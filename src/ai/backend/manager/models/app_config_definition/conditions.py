@@ -69,6 +69,22 @@ class AppConfigDefinitionConditions:
 
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigDefinitionRow.config_name))
 
+    # --- cursor (id-based) pagination ---
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigDefinitionRow.id < sa.text(f"'{cursor_id}'::uuid")
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigDefinitionRow.id > sa.text(f"'{cursor_id}'::uuid")
+
+        return inner
+
     # --- created_at datetime filters ---
 
     @staticmethod

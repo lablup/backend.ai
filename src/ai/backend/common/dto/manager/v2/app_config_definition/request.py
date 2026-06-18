@@ -55,6 +55,10 @@ class SearchAppConfigDefinitionsInput(BaseRequestModel):
     order: list[AppConfigDefinitionOrder] | None = Field(
         default=None, description="Order specifiers, applied in sequence."
     )
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size.")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor.")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size.")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor.")
     limit: int | None = Field(
         default=None, ge=1, description="Offset-based: maximum number of results."
     )

@@ -26,8 +26,8 @@ from ai.backend.manager.repositories.app_config_definition.repository import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
+    CursorForwardPagination,
     OffsetPagination,
-    Purger,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -87,16 +87,14 @@ class TestPurge:
         repository: AppConfigDefinitionRepository,
         existing_definition: AppConfigDefinitionData,
     ) -> None:
-        purged = await repository.purge(
-            Purger(row_class=AppConfigDefinitionRow, pk_value=existing_definition.id)
-        )
+        purged = await repository.purge(existing_definition.id)
         assert purged.id == existing_definition.id
         with pytest.raises(AppConfigDefinitionNotFound):
             await repository.get_by_id(existing_definition.id)
 
     async def test_purge_missing_raises(self, repository: AppConfigDefinitionRepository) -> None:
         with pytest.raises(AppConfigDefinitionNotFound):
-            await repository.purge(Purger(row_class=AppConfigDefinitionRow, pk_value=_missing_id()))
+            await repository.purge(_missing_id())
 
 
 class TestSearch:
@@ -193,3 +191,21 @@ class TestSearch:
             definition.id for definition in sorted(seeded_definitions, key=lambda d: d.created_at)
         ]
         assert [item.id for item in result.items] == expected
+
+    async def test_search_cursor_forward(
+        self,
+        repository: AppConfigDefinitionRepository,
+        seeded_definitions: list[AppConfigDefinitionData],
+    ) -> None:
+        by_id_desc = sorted(seeded_definitions, key=lambda d: d.id, reverse=True)
+        cursor = by_id_desc[0].id
+        result = await repository.search(
+            BatchQuerier(
+                pagination=CursorForwardPagination(
+                    first=10,
+                    cursor_order=AppConfigDefinitionOrders.id(ascending=False),
+                    cursor_condition=AppConfigDefinitionConditions.by_cursor_forward(str(cursor)),
+                )
+            )
+        )
+        assert [item.id for item in result.items] == [d.id for d in by_id_desc[1:]]

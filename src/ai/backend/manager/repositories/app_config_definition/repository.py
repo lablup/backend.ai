@@ -9,7 +9,7 @@ from ai.backend.manager.models.app_config_definition.row import AppConfigDefinit
 from ai.backend.manager.repositories.app_config_definition.db_source import (
     AppConfigDefinitionDBSource,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger
+from ai.backend.manager.repositories.base import BatchQuerier, Creator
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigDefinitionRepository",)
@@ -35,5 +35,5 @@ class AppConfigDefinitionRepository:
     async def search(self, querier: BatchQuerier) -> AppConfigDefinitionListResult:
         return await self._db_source.search(querier)
 
-    async def purge(self, purger: Purger[AppConfigDefinitionRow]) -> AppConfigDefinitionData:
-        return await self._db_source.purge(purger)
+    async def purge(self, definition_id: AppConfigDefinitionID) -> AppConfigDefinitionData:
+        return await self._db_source.purge(definition_id)
