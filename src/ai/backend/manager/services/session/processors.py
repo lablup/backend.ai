@@ -106,13 +106,13 @@ from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
 )
-from ai.backend.manager.services.session.actions.restart_session import (
-    RestartSessionAction,
-    RestartSessionActionResult,
-)
 from ai.backend.manager.services.session.actions.resolve_session_name import (
     ResolveSessionNameAction,
     ResolveSessionNameActionResult,
+)
+from ai.backend.manager.services.session.actions.restart_session import (
+    RestartSessionAction,
+    RestartSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
