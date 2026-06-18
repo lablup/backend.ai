@@ -97,7 +97,7 @@ jobs:
       checks: write
     steps:
       - uses: actions/checkout@v6
-      - uses: graphql-hive/graphql-inspector@release-1781692943029
+      - uses: graphql-hive/graphql-inspector@release-1762782918138
         with:
           schema: '${{ github.base_ref }}:docs/manager/graphql-reference/schema.graphql'
           rules: |
