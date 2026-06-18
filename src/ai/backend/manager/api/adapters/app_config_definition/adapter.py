@@ -63,15 +63,6 @@ def _pagination_spec() -> PaginationSpec:
 class AppConfigDefinitionAdapter(BaseAdapter):
     """Adapter for app config definition domain operations (admin-only)."""
 
-    @staticmethod
-    def _data_to_node(data: AppConfigDefinitionData) -> AppConfigDefinitionNode:
-        return AppConfigDefinitionNode(
-            id=data.id,
-            config_name=data.config_name,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-        )
-
     async def admin_create(
         self, input: CreateAppConfigDefinitionInput
     ) -> CreateAppConfigDefinitionPayload:
@@ -88,6 +79,47 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             GetAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(definition_id))
         )
         return self._data_to_node(action_result.definition)
+
+    async def admin_search(
+        self, input: SearchAppConfigDefinitionsInput
+    ) -> SearchAppConfigDefinitionsPayload:
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.app_config_definition.search.wait_for_complete(
+            SearchAppConfigDefinitionsAction(querier=querier)
+        )
+        return SearchAppConfigDefinitionsPayload(
+            items=[self._data_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def admin_purge(self, definition_id: UUID) -> PurgeAppConfigDefinitionPayload:
+        action_result = await self._processors.app_config_definition.purge.wait_for_complete(
+            PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(definition_id))
+        )
+        return PurgeAppConfigDefinitionPayload(id=action_result.definition.id)
+
+    @staticmethod
+    def _data_to_node(data: AppConfigDefinitionData) -> AppConfigDefinitionNode:
+        return AppConfigDefinitionNode(
+            id=data.id,
+            config_name=data.config_name,
+            created_at=data.created_at,
+            updated_at=data.updated_at,
+        )
 
     def _convert_filter(self, filter_: AppConfigDefinitionFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -132,35 +164,3 @@ class AppConfigDefinitionAdapter(BaseAdapter):
                 case AppConfigDefinitionOrderField.UPDATED_AT:
                     result.append(AppConfigDefinitionOrders.updated_at(ascending))
         return result
-
-    async def admin_search(
-        self, input: SearchAppConfigDefinitionsInput
-    ) -> SearchAppConfigDefinitionsPayload:
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=conditions,
-            orders=orders,
-            pagination_spec=_pagination_spec(),
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-        action_result = await self._processors.app_config_definition.search.wait_for_complete(
-            SearchAppConfigDefinitionsAction(querier=querier)
-        )
-        return SearchAppConfigDefinitionsPayload(
-            items=[self._data_to_node(item) for item in action_result.data],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    async def admin_purge(self, definition_id: UUID) -> PurgeAppConfigDefinitionPayload:
-        action_result = await self._processors.app_config_definition.purge.wait_for_complete(
-            PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(definition_id))
-        )
-        return PurgeAppConfigDefinitionPayload(id=action_result.definition.id)
