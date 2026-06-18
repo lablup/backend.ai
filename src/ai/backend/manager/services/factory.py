@@ -6,6 +6,12 @@ from ai.backend.manager.repositories.resource_allocation.repository import (
 )
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.app_config_allow_list.processors import (
+    AppConfigAllowListProcessors,
+)
+from ai.backend.manager.services.app_config_allow_list.service import (
+    AppConfigAllowListService,
+)
 from ai.backend.manager.services.app_config_definition.processors import (
     AppConfigDefinitionProcessors,
 )
@@ -167,6 +173,9 @@ def create_services(args: ServiceArgs) -> Services:
             args.hook_plugin_ctx,
             args.event_producer,
             args.agent_cache,
+        ),
+        app_config_allow_list=AppConfigAllowListService(
+            repository=repositories.app_config_allow_list.repository,
         ),
         domain=DomainService(repositories.domain.repository),
         dotfile=DotfileService(
@@ -433,6 +442,9 @@ def create_processors(
     services = create_services(args.service_args)
     return Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
+        app_config_allow_list=AppConfigAllowListProcessors(
+            services.app_config_allow_list, action_monitors
+        ),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
         error_log=ErrorLogProcessors(services.error_log, action_monitors, validators),
