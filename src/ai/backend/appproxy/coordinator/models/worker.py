@@ -1,7 +1,6 @@
 import logging
 import uuid
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
@@ -12,7 +11,6 @@ if TYPE_CHECKING:
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from yarl import URL
@@ -31,10 +29,7 @@ from ai.backend.appproxy.common.types import (
     SessionConfig,
     Slot,
 )
-from ai.backend.appproxy.coordinator.errors import (
-    MissingFrontendConfigError,
-    SubdomainAllocationError,
-)
+from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import Subdomain
 from ai.backend.logging import BraceStyleAdapter
@@ -145,12 +140,15 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         worker_id: UUID,
         load_filters: bool = False,
         load_circuits: bool = False,
+        for_update: bool = False,
     ) -> "Worker":
         query = sa.select(Worker).filter(Worker.id == worker_id)
         if load_filters:
             query = query.options(selectinload(Worker.filters))
         if load_circuits:
             query = query.options(selectinload(Worker.circuits))
+        if for_update:
+            query = query.with_for_update()
         worker = await session.scalar(query)
         if not worker:
             raise ObjectNotFound(object_name="worker")
@@ -411,58 +409,8 @@ async def pick_worker(
         session,
         worker.id,
         load_circuits=True,
+        for_update=True,
     )
-
-
-# Bounded retries for the rare race where two concurrent requests pick the same
-# normalized subdomain: the DB unique index rejects the duplicate and we retry
-# with a fresh suffix.
-_MAX_SUBDOMAIN_ATTEMPTS = 10
-
-
-def _is_subdomain_unique_violation(error: IntegrityError) -> bool:
-    """True if ``error`` is the circuits subdomain unique-index violation (23505)."""
-    return getattr(error.orig, "pgcode", None) == "23505" and "uq_circuits_worker_subdomain" in str(
-        error.orig
-    )
-
-
-@dataclass(frozen=True)
-class WildcardCircuitInput:
-    """Inputs for creating a single wildcard-domain-mode circuit."""
-
-    session: AsyncSession
-    worker: Worker
-    app: str
-    protocol: ProxyProtocol
-    mode: AppMode
-    routes: list[RouteInfo]
-    session_info: SessionConfig
-    endpoint_info: EndpointConfig | None
-    preferred_subdomain: str | None
-    envs: dict[str, Any]
-    args: str | None
-    open_to_public: bool
-    allowed_client_ips: str | None
-
-
-@dataclass(frozen=True)
-class PortCircuitInput:
-    """Inputs for creating a single port-mode circuit."""
-
-    session: AsyncSession
-    worker: Worker
-    app: str
-    protocol: ProxyProtocol
-    mode: AppMode
-    routes: list[RouteInfo]
-    session_info: SessionConfig
-    endpoint_info: EndpointConfig | None
-    preferred_port: int | None
-    envs: dict[str, Any]
-    args: str | None
-    open_to_public: bool
-    allowed_client_ips: str | None
 
 
 async def add_circuit(
@@ -485,11 +433,13 @@ async def add_circuit(
     if envs is None:
         envs = {}
     if worker_id:
-        worker = await Worker.get(session, worker_id, load_circuits=True)
+        worker = await Worker.get(session, worker_id, load_circuits=True, for_update=True)
         if worker.available_slots - worker.occupied_slots <= 0 and worker.available_slots >= 0:
             raise WorkerNotAvailable
     else:
         worker = await pick_worker(session, session_info, endpoint_info, protocol, mode)
+
+    circuit_params: dict[str, Any] = {}
 
     if worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
         generator = SubdomainGenerator()
@@ -499,109 +449,40 @@ async def add_circuit(
         taken: set[Subdomain] = {Subdomain(c.subdomain) for c in worker.circuits if c.subdomain}
         circuit_params["subdomain"] = generator.generate_subdomain(preferred, taken)
     else:
-        circuit = await _allocate_port_circuit(
-            PortCircuitInput(
-                session=session,
-                worker=worker,
-                app=app,
-                protocol=protocol,
-                mode=mode,
-                routes=routes,
-                session_info=session_info,
-                endpoint_info=endpoint_info,
-                preferred_port=preferred_port,
-                envs=envs,
-                args=args,
-                open_to_public=open_to_public,
-                allowed_client_ips=allowed_client_ips,
-            )
-        )
+        acquired_ports = {c.port for c in worker.circuits}
+        port_range = worker.port_range
+        if not port_range:
+            raise MissingFrontendConfigError("Port range is required for PORT frontend mode")
+        port_pool = set(range(port_range[0], port_range[1] + 1)) - acquired_ports
+        if _requested_port := preferred_port:
+            if _requested_port not in port_pool:
+                raise PortNotAvailable
+            port = _requested_port
+        else:
+            if len(port_pool) == 0:
+                raise PortNotAvailable
+            port = port_pool.pop()
+        circuit_params["port"] = port
 
-    worker.occupied_slots += 1
-    return (circuit, worker)
-
-
-async def _allocate_port_circuit(spec: PortCircuitInput) -> Circuit:
-    """Allocate a free port on the worker and create a port-mode circuit."""
-    worker = spec.worker
-    acquired_ports = {c.port for c in worker.circuits}
-    port_range = worker.port_range
-    if not port_range:
-        raise MissingFrontendConfigError("Port range is required for PORT frontend mode")
-    port_pool = set(range(port_range[0], port_range[1] + 1)) - acquired_ports
-    if _requested_port := spec.preferred_port:
-        if _requested_port not in port_pool:
-            raise PortNotAvailable
-        port = _requested_port
-    else:
-        if len(port_pool) == 0:
-            raise PortNotAvailable
-        port = port_pool.pop()
-    circuit = Circuit.create_port_mode(
+    circuit = Circuit.create(
         uuid.uuid4(),
-        spec.app,
-        spec.protocol,
+        app,
+        protocol,
         worker.id,
-        spec.mode,
-        spec.routes,
-        port,
-        envs=spec.envs,
-        args=spec.args,
-        open_to_public=spec.open_to_public,
-        allowed_client_ips=spec.allowed_client_ips,
-        user_uuid=spec.session_info.user_uuid,
-        endpoint_id=spec.endpoint_info.id if spec.endpoint_info else None,
-        runtime_variant=spec.endpoint_info.runtime_variant if spec.endpoint_info else None,
+        mode,
+        worker.frontend_mode,
+        routes,
+        envs=envs,
+        args=args,
+        open_to_public=open_to_public,
+        allowed_client_ips=allowed_client_ips,
+        user_uuid=session_info.user_uuid,
+        endpoint_id=endpoint_info.id if endpoint_info else None,
+        runtime_variant=endpoint_info.runtime_variant if endpoint_info else None,
+        **circuit_params,
     )
     circuit.worker_row = worker
-    spec.session.add(circuit)
-    return circuit
 
-
-async def _allocate_wildcard_circuit(spec: WildcardCircuitInput) -> Circuit:
-    """Create a wildcard-domain circuit, normalizing the requested subdomain and
-    retrying with a fresh suffix when the per-worker unique index rejects it.
-
-    The flush runs inside a savepoint so a unique-violation rolls back only the
-    failed insert, leaving the enclosing transaction usable for the retry.
-    """
-    session = spec.session
-    generator = SubdomainGenerator()
-    subdomain = Subdomain(spec.preferred_subdomain) if spec.preferred_subdomain else None
-    taken: set[Subdomain] = {Subdomain(c.subdomain) for c in spec.worker.circuits if c.subdomain}
-    last_error: IntegrityError | None = None
-    for _ in range(_MAX_SUBDOMAIN_ATTEMPTS):
-        subdomain = generator.generate_subdomain(subdomain, taken)
-        taken.add(subdomain)
-        circuit = Circuit.create_domain_mode(
-            uuid.uuid4(),
-            spec.app,
-            spec.protocol,
-            spec.worker.id,
-            spec.mode,
-            spec.routes,
-            subdomain,
-            envs=spec.envs,
-            args=spec.args,
-            open_to_public=spec.open_to_public,
-            allowed_client_ips=spec.allowed_client_ips,
-            user_uuid=spec.session_info.user_uuid,
-            endpoint_id=spec.endpoint_info.id if spec.endpoint_info else None,
-            runtime_variant=spec.endpoint_info.runtime_variant if spec.endpoint_info else None,
-        )
-        circuit.worker_row = spec.worker
-        session.add(circuit)
-        try:
-            async with session.begin_nested():
-                await session.flush()
-        except IntegrityError as e:
-            if not _is_subdomain_unique_violation(e):
-                raise
-            session.expunge(circuit)
-            last_error = e
-            continue
-        return circuit
-    raise SubdomainAllocationError(
-        f"Could not allocate a unique subdomain on worker {spec.worker.id} "
-        f"after {_MAX_SUBDOMAIN_ATTEMPTS} attempts."
-    ) from last_error
+    worker.occupied_slots += 1
+    session.add(circuit)
+    return (circuit, worker)
