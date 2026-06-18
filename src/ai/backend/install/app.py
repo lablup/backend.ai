@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import textwrap
 from pathlib import Path
 from typing import Any, cast
@@ -618,7 +619,7 @@ class ModeMenu(Static):
             # Trigger the selected mode immediately.
             lv = self.app.query_one("#mode-list", ListView)
             li = self.app.query_one(f"#mode-{self._mode.lower()}", ListItem)
-            lv.post_message(ListView.Selected(lv, li))
+            lv.post_message(ListView.Selected(lv, li, list(lv.children).index(li)))
 
     async def update_platform_info(self) -> None:
         os_info = await detect_os()
@@ -677,9 +678,9 @@ class InstallerApp(App[None]):
         Binding("q", "shutdown", "Interrupt ongoing tasks / Quit the installer"),
         Binding(
             "ctrl+c",
-            "shutdown",
-            "Interrupt ongoing tasks / Quit the installer",
-            show=False,
+            "copy_or_quit",
+            "Copy selection (drag to select)",
+            show=True,
             priority=True,
         ),
     ]
@@ -739,6 +740,43 @@ class InstallerApp(App[None]):
         header = self.query_one("Header", Header)
         header.tall = True
         self.title = "Backend.AI Installer"
+
+    async def action_copy_or_quit(self) -> None:
+        # Ctrl+C copies the current text selection when there is one (so logs are
+        # easy to grab for error reports); otherwise it falls back to quitting.
+        selected = self.screen.get_selected_text()
+        if not selected:
+            await self.action_shutdown()
+            return
+        # OSC52 reaches the clipboard over SSH / on terminals that permit it,
+        # but is unsupported by some (e.g. macOS Terminal). Also write to the
+        # local OS clipboard tool so a local install copies reliably.
+        self.copy_to_clipboard(selected)
+        await self._copy_to_os_clipboard(selected)
+        self.notify(f"Copied {len(selected.splitlines())} line(s) to the clipboard.")
+
+    async def _copy_to_os_clipboard(self, text: str) -> bool:
+        """Best-effort copy to the local OS clipboard via a CLI tool."""
+        for argv in (
+            ["pbcopy"],
+            ["wl-copy"],
+            ["xclip", "-selection", "clipboard"],
+            ["xsel", "--clipboard", "--input"],
+        ):
+            if shutil.which(argv[0]) is None:
+                continue
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    *argv,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                await proc.communicate(text.encode())
+                return proc.returncode == 0
+            except Exception:
+                return False
+        return False
 
     async def action_shutdown(self, message: str | None = None, exit_code: int = 0) -> None:
         had_cancelled_tasks = False
