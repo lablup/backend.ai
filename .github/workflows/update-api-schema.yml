@@ -95,6 +95,8 @@ jobs:
       contents: read
       pull-requests: write
       checks: write
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
     steps:
       - uses: actions/checkout@v6
       - uses: graphql-hive/graphql-inspector@release-1762782918138
