@@ -16,7 +16,7 @@ Create Date: 2026-06-15
 
 """
 
-# Part of: {NEXT_RELEASE_VERSION}
+# Part of: 26.4.4
 
 import json
 

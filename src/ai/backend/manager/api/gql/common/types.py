@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ServicePortsInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.streaming.types import ServiceProtocol
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_enum,
@@ -159,7 +158,7 @@ class ResourceOptsInput(PydanticInputMixin[ResourceOptsDTOInput]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A single environment variable entry with key and value.",
     ),
     name="EnvironEntryInput",

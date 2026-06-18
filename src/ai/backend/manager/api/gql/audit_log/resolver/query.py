@@ -7,7 +7,6 @@ from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
     ScopedSearchAuditLogsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.audit_log.types import (
     AuditLogFilterGQL,
     AuditLogOrderByGQL,
@@ -71,7 +70,7 @@ async def admin_audit_logs_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Query audit logs within a scope (non-admin accessible, subject to RBAC). "
             "All scope items are OR'd; raises an error if every field is empty."

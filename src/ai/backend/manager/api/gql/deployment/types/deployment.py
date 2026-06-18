@@ -91,7 +91,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
 )
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -182,7 +181,7 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
 
 ScalingStateGQL: type[ScalingState] = gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Replica scaling axis for a deployment, orthogonal to the"
             " lifecycle status. ``SCALING`` while the replica reconciler"
@@ -235,14 +234,14 @@ class ModelDeploymentMetadata:
     updated_at: datetime
     resource_group_name: str = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Name of the resource group (scaling group) this deployment runs in.",
         )
     )
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="The resource group this deployment runs in, resolved via DataLoader.",
         )
     )  # type: ignore[misc]
@@ -344,8 +343,8 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     options: DeploymentOptionsInfoGQL
     scaling_state: ScalingStateGQL = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            deprecated_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
+            deprecated_version="26.4.4",
             deprecation_hint="per-replica-group scaling status",
             description=(
                 "Endpoint-level replica scaling axis. Scaling is now reconciled per replica"
@@ -856,7 +855,7 @@ class AdminRefreshDeploymentRevisionsPayload:
 # Replace deployment options types
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Input for the replaceDeploymentOptions mutation. Full-replace"
             " semantics — the supplied payload is the complete new value."
@@ -871,7 +870,7 @@ class ReplaceDeploymentOptionsInputGQL(PydanticInputMixin[ReplaceDeploymentOptio
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Payload returned after replacing a deployment's options. Only"
             " the refreshed options surface is returned; the server path uses"
