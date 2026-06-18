@@ -183,6 +183,10 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
+    ResolveSessionNameActionResult,
+)
 from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
@@ -272,6 +276,32 @@ class SessionService:
         self._database_ptask_group = aiotools.PersistentTaskGroup()
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
+
+    async def resolve_session(self, action: ResolveSessionAction) -> ResolveSessionActionResult:
+        """Resolve a live session to its ``session_id`` by ``(session_name, user_id)``.
+        DO NOT USE THIS FOR NEW DEVELOPMENT. This is only for backward compatibility with existing resolvers.
+
+        Callers go through this resolver before invoking any other session operation, so
+        that downstream lookups can rely solely on ``session_id``. The ``user_id`` scope
+        covers sessions created with any of the user's keypair access keys.
+        """
+        session_id = await self._session_repository.resolve_session_id(
+            action.session_name,
+            action.user_id,
+        )
+        return ResolveSessionActionResult(session_id=session_id)
+
+    async def resolve_session_name(
+        self, action: ResolveSessionNameAction
+    ) -> ResolveSessionNameActionResult:
+        """Resolve a session id to its canonical session name.
+
+        Callers normalize a UUID-shaped path reference back to a name so that
+        downstream name-keyed operations receive a real name. DO NOT USE THIS FOR
+        NEW DEVELOPMENT — it only bridges the legacy name-or-id path parameter.
+        """
+        session_name = await self._session_repository.get_session_name(action.session_id)
+        return ResolveSessionNameActionResult(session_name=session_name)
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name

@@ -45,6 +45,9 @@ from ai.backend.manager.errors.kernel import InvalidStreamMode
 from ai.backend.manager.errors.resource import AppNotFound, NoCurrentTaskContext
 from ai.backend.manager.errors.service import AppServiceStartFailed
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
+)
 from ai.backend.manager.services.stream.actions.execute_in_stream import ExecuteInStreamAction
 from ai.backend.manager.services.stream.actions.gc_stale_connections import (
     GCStaleConnectionsAction,
@@ -66,6 +69,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
         StreamCleanupEventHandler,
     )
+    from ai.backend.manager.services.session.processors import SessionProcessors
     from ai.backend.manager.services.stream.processors import StreamProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -93,13 +97,32 @@ class StreamHandler:
         *,
         private_ctx: PrivateContext,
         stream_processors: StreamProcessors,
+        session_processors: SessionProcessors,
         config_provider: ManagerConfigProvider,
         error_monitor: ErrorPluginContext,
     ) -> None:
         self._ctx = private_ctx
         self._stream = stream_processors
+        self._session = session_processors
         self.config_provider = config_provider
         self.error_monitor = error_monitor
+
+    async def _resolve_session_name(self, session_name_or_id: str) -> str:
+        """Normalize a streaming path reference (name or UUID) to its canonical name.
+
+        Streaming path parameters historically accepted either a session name or its
+        UUID (row_id). The downstream streaming lookups are keyed by name, so a
+        UUID-shaped reference is resolved to its real name here; a plain name is
+        passed through unchanged so the name lookup stays out of the repository.
+        """
+        try:
+            session_id = SessionId(uuid.UUID(session_name_or_id))
+        except (ValueError, TypeError):
+            return session_name_or_id
+        result = await self._session.resolve_session_name.wait_for_complete(
+            ResolveSessionNameAction(session_id=session_id)
+        )
+        return result.session_name
 
     # ------------------------------------------------------------------
     # stream_pty (GET /stream/session/{session_name}/pty)
@@ -113,8 +136,9 @@ class StreamHandler:
     ) -> web.StreamResponse:
         request = ctx.request
         app_ctx = self._ctx
-        session_name = path.parsed.session_name
-        access_key = AccessKey(user_ctx.access_key)
+        user_id = _require_current_user_id()
+        session_name_or_id = path.parsed.session_name
+        session_name = await self._resolve_session_name(session_name_or_id)
         api_version = request["api_version"]
         result = await self._stream.get_streaming_session.wait_for_complete(
             GetStreamingSessionAction(session_name=session_name, access_key=access_key),
@@ -309,8 +333,9 @@ class StreamHandler:
         app_ctx = self._ctx
 
         config = self.config_provider.config
-        session_name = path.parsed.session_name
-        access_key = AccessKey(user_ctx.access_key)
+        user_id = _require_current_user_id()
+        session_name_or_id = path.parsed.session_name
+        session_name = await self._resolve_session_name(session_name_or_id)
         api_version = request["api_version"]
         log.info("STREAM_EXECUTE(ak:{0}, s:{1})", access_key, session_name)
         session_result = await self._stream.get_streaming_session.wait_for_complete(
@@ -423,8 +448,9 @@ class StreamHandler:
         request = ctx.request
         app_ctx = self._ctx
         rpc_ptask_group = app_ctx.rpc_ptask_group
-        session_name: str = path.parsed.session_name
-        access_key = AccessKey(user_ctx.access_key)
+        user_id = _require_current_user_id()
+        session_name_or_id = path.parsed.session_name
+        session_name: str = await self._resolve_session_name(session_name_or_id)
         params = query.parsed
         service: str = params.app
         myself = asyncio.current_task()
@@ -590,8 +616,9 @@ class StreamHandler:
         ctx: RequestCtx,
         user_ctx: UserContext,
     ) -> web.StreamResponse:
-        session_name = path.parsed.session_name
-        access_key = AccessKey(user_ctx.access_key)
+        user_id = _require_current_user_id()
+        session_name_or_id = path.parsed.session_name
+        session_name = await self._resolve_session_name(session_name_or_id)
         result = await self._stream.get_streaming_session.wait_for_complete(
             GetStreamingSessionAction(session_name=session_name, access_key=access_key),
         )

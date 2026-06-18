@@ -110,6 +110,10 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
+    ResolveSessionNameActionResult,
+)
 from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
@@ -178,7 +182,8 @@ class SessionProcessors(AbstractProcessorPackage):
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
     rename_session: ActionProcessor[RenameSessionAction, RenameSessionActionResult]
-    restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
+    resolve_session: ActionProcessor[ResolveSessionAction, ResolveSessionActionResult]
+    resolve_session_name: ActionProcessor[ResolveSessionNameAction, ResolveSessionNameActionResult]
     search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
     search_sessions: ActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
     search_sessions_in_project: ActionProcessor[
@@ -225,7 +230,8 @@ class SessionProcessors(AbstractProcessorPackage):
         self.interrupt = ActionProcessor(service.interrupt, action_monitors)
         self.list_files = ActionProcessor(service.list_files, action_monitors)
         self.rename_session = ActionProcessor(service.rename_session, action_monitors)
-        self.restart_session = ActionProcessor(service.restart_session, action_monitors)
+        self.resolve_session = ActionProcessor(service.resolve_session, action_monitors)
+        self.resolve_session_name = ActionProcessor(service.resolve_session_name, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
         self.start_service = ActionProcessor(service.start_service, action_monitors)
         self.terminate_sessions = ActionProcessor(service.terminate_sessions, action_monitors)
@@ -322,7 +328,8 @@ class SessionProcessors(AbstractProcessorPackage):
             ListFilesAction.spec(),
             MatchSessionsAction.spec(),
             RenameSessionAction.spec(),
-            RestartSessionAction.spec(),
+            ResolveSessionAction.spec(),
+            ResolveSessionNameAction.spec(),
             SearchKernelsAction.spec(),
             SearchSessionsAction.spec(),
             SearchSessionsInProjectAction.spec(),

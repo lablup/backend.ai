@@ -286,6 +286,7 @@ def build_api_routes(
     stream_handler = StreamHandler(
         private_ctx=stream_ctx,
         stream_processors=stream_processors,
+        session_processors=processors.session,
         config_provider=config_provider,
         error_monitor=error_monitor,
     )
