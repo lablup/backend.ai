@@ -41,11 +41,13 @@ class SubdomainGenerator:
             # candidate is empty when the preferred == "." or ""
             candidate = self._fallback_subdomain()
 
+        candidate = self._trim(candidate)
+
         if candidate in taken:
             final = self._find_unique_subdomain(candidate, taken)
         else:
             final = candidate
-        return self._trim(final)
+        return final
 
     def _find_unique_subdomain(self, base: Subdomain, taken: Container[Subdomain]) -> Subdomain:
         """Find a unique subdomain by appending a suffix to ``base``."""
