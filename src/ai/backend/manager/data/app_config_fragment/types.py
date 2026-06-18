@@ -28,3 +28,13 @@ class AppConfigFragmentData:
     config: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class AppConfigFragmentSearchResult:
+    """Search result with total count for app config fragments."""
+
+    items: list[AppConfigFragmentData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
