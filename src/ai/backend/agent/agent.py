@@ -8,6 +8,7 @@ import pickle
 import re
 import signal
 import sys
+import time
 import traceback
 import weakref
 import zlib
@@ -776,6 +777,7 @@ def _observe_stat_task(
     ) -> Callable[Concatenate[AbstractAgent[Any, Any], P], Coroutine[Any, Any, None]]:
         async def wrapper(self: AbstractAgent[Any, Any], *args: P.args, **kwargs: P.kwargs) -> None:
             stat_task_observer.observe_stat_task_triggered(agent_id=self.id, stat_scope=stat_scope)
+            start = time.perf_counter()
             try:
                 await func(self, *args, **kwargs)
             except asyncio.CancelledError:
@@ -801,6 +803,12 @@ def _observe_stat_task(
             else:
                 stat_task_observer.observe_stat_task_success(
                     agent_id=self.id, stat_scope=stat_scope
+                )
+            finally:
+                stat_task_observer.observe_stat_task_duration(
+                    agent_id=self.id,
+                    stat_scope=stat_scope,
+                    elapsed=time.perf_counter() - start,
                 )
 
         return wrapper  # type: ignore[return-value]
@@ -1349,6 +1357,9 @@ class AbstractAgent[
 
     @_observe_stat_task(stat_scope=StatScope.NODE)
     async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]) -> None:
+        if not self.local_config.agent.utilization_metric.node.enable:
+            log.debug("skipping node stat collection as it's disabled in config")
+            return
         if self.local_config.debug.log_stats:
             log.debug("collecting node statistics")
         async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
@@ -1356,6 +1367,9 @@ class AbstractAgent[
 
     @_observe_stat_task(stat_scope=StatScope.CONTAINER)
     async def collect_container_stat(self) -> None:
+        if not self.local_config.agent.utilization_metric.container.enable:
+            log.debug("skipping container stat collection as it's disabled in config")
+            return
         if self.local_config.debug.log_stats:
             log.debug("collecting container statistics")
         container_ids: set[ContainerId] = set()
@@ -1368,6 +1382,9 @@ class AbstractAgent[
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self) -> None:
+        if not self.local_config.agent.utilization_metric.process.enable:
+            log.debug("skipping process stat collection as it's disabled in config")
+            return
         if self.local_config.debug.log_stats:
             log.debug("collecting process statistics in container")
         container_ids: set[ContainerId] = set()

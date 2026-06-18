@@ -27,7 +27,7 @@ class CollectContainerStatTask(PeriodicTask):
 
     @property
     def interval(self) -> float:
-        return self._local_config.agent.utilization_metric.interval
+        return self._local_config.agent.utilization_metric.container.interval
 
     @property
     def initial_delay(self) -> float:

@@ -1,6 +1,9 @@
 import asyncio
 import enum
 import os
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Self
 
 import psutil
@@ -20,6 +23,7 @@ from ai.backend.common.metrics.safe import (
 from ai.backend.common.metrics.safe import (
     SafeHistogram as Histogram,
 )
+from ai.backend.common.metrics.types import SUCCESS_LABEL_FALSE, SUCCESS_LABEL_TRUE
 
 
 class APIMetricObserver:
@@ -778,16 +782,40 @@ class CommonMetricRegistry:
         return generate_latest_singleprocess().decode("utf-8")
 
 
+class CollectionStage(enum.StrEnum):
+    """Named timed segments of a stat collection cycle (measured via measure_stage)."""
+
+    DOCKER_TOP = "docker_top"
+    GATHER_MEASURES = "gather_measures"
+    SERIALIZE = "serialize"
+    REDIS_WRITE = "redis_write"
+
+
+class CollectionLayer(enum.StrEnum):
+    """The collection task a stage belongs to (the ``upper_layer`` label)."""
+
+    NODE = "collect_node_stat"
+    CONTAINER = "collect_container_stat"
+    PROCESS = "collect_per_container_process_stat"
+
+
 class StageObserver:
     _instance: Self | None = None
 
     _stage_count: Counter
+    _stage_duration_sec: Histogram
 
     def __init__(self) -> None:
         self._stage_count = Counter(
             name="backendai_stage_count",
             documentation="Count stage occurrences",
+            labelnames=["stage", "upper_layer", "success"],
+        )
+        self._stage_duration_sec = Histogram(
+            name="backendai_stage_duration_sec",
+            documentation="Elapsed wall-clock time spent in each stage in seconds",
             labelnames=["stage", "upper_layer"],
+            buckets=[0.001, 0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
         )
 
     @classmethod
@@ -796,5 +824,36 @@ class StageObserver:
             cls._instance = cls()
         return cls._instance
 
-    def observe_stage(self, *, stage: str, upper_layer: str) -> None:
-        self._stage_count.labels(stage=stage, upper_layer=upper_layer).inc()
+    @contextmanager
+    def measure_stage(
+        self, *, stage: CollectionStage, upper_layer: CollectionLayer
+    ) -> Iterator[None]:
+        """
+        Measure the wrapped block: record its wall-clock duration into the
+        stage-duration histogram and count its occurrence (with a ``success``
+        label) into the stage counter. Usable around ``await`` expressions:
+
+            with observer.measure_stage(
+                stage=CollectionStage.DOCKER_TOP, upper_layer=CollectionLayer.PROCESS
+            ):
+                await do_docker_call()
+
+        A block that raises (including ``CancelledError``) is counted as
+        ``success="False"`` and the exception is re-raised.
+        """
+        start_time = time.perf_counter()
+        success = SUCCESS_LABEL_TRUE
+        try:
+            yield
+        except BaseException:
+            success = SUCCESS_LABEL_FALSE
+            raise
+        finally:
+            self._stage_duration_sec.labels(
+                stage=stage.value, upper_layer=upper_layer.value
+            ).observe(time.perf_counter() - start_time)
+            self._stage_count.labels(
+                stage=stage.value,
+                upper_layer=upper_layer.value,
+                success=success,
+            ).inc()
