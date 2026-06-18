@@ -25,22 +25,6 @@ class TestStreamWebSocketGetApps:
         app_names = {app.name for app in apps}
         assert app_names == {"jupyter", "ttyd"}
 
-    async def test_get_stream_apps_by_uuid(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """Regression (BA-6341): a session UUID (row_id) is accepted in the
-        streaming path and resolves to the same session as its name.
-
-        Before the fix the streaming endpoints looked the session up by name
-        only, so a UUID raised ``Session (name=<UUID>) does not exist``.
-        """
-        result = await admin_registry.streaming.get_stream_apps(str(session_seed.session_id))
-        assert isinstance(result, GetStreamAppsResponse)
-        app_names = {app.name for app in result.root}
-        assert app_names == {"jupyter", "ttyd"}
-
     async def test_get_stream_apps_nonexistent_session(
         self,
         admin_registry: BackendAIClientRegistry,

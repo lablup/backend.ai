@@ -96,9 +96,9 @@ from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
 )
-from ai.backend.manager.services.session.actions.resolve_session_name import (
-    ResolveSessionNameAction,
-    ResolveSessionNameActionResult,
+from ai.backend.manager.services.session.actions.restart_session import (
+    RestartSessionAction,
+    RestartSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
@@ -1013,41 +1013,60 @@ class TestRenameSession:
             await session_service.rename_session(action)
 
 
-class TestResolveSessionName:
-    """Test cases for SessionService.resolve_session_name"""
+# ==================== RestartSession Tests ====================
+
+
+class TestRestartSession:
+    """Test cases for SessionService.restart_session"""
 
     async def test_success(
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
-        sample_session_id: SessionId,
+        mock_agent_registry: MagicMock,
+        sample_session_data: SessionData,
+        sample_access_key: AccessKey,
     ) -> None:
-        """A session id resolves to its canonical session name."""
-        mock_session_repository.get_session_name = AsyncMock(return_value="test-session")
+        """Test successfully restarting session"""
+        mock_session = MagicMock()
+        mock_session.to_dataclass.return_value = sample_session_data
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_agent_registry.restart_session = AsyncMock()
 
-        result = await session_service.resolve_session_name(
-            ResolveSessionNameAction(session_id=sample_session_id)
+        action = RestartSessionAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
         )
+        result = await session_service.restart_session(action)
 
-        assert isinstance(result, ResolveSessionNameActionResult)
-        assert result.session_name == "test-session"
-        mock_session_repository.get_session_name.assert_called_once_with(sample_session_id)
+        assert isinstance(result, RestartSessionActionResult)
+        assert result.session_data == sample_session_data
+        assert result.result is None
+        mock_session_repository.get_session_validated.assert_called_once()
+        mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+        mock_agent_registry.restart_session.assert_called_once_with(mock_session)
 
     async def test_session_not_found(
         self,
         session_service: SessionService,
         mock_session_repository: MagicMock,
-        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
     ) -> None:
-        """An unknown session id surfaces SessionNotFound from the repository."""
-        mock_session_repository.get_session_name = AsyncMock(
+        """Test restarting session when session not found"""
+        mock_session_repository.get_session_validated = AsyncMock(
             side_effect=SessionNotFound("Session not found")
         )
 
+        action = RestartSessionAction(
+            session_name="nonexistent",
+            owner_access_key=sample_access_key,
+        )
+
         with pytest.raises(SessionNotFound):
-            await session_service.resolve_session_name(
-                ResolveSessionNameAction(session_id=sample_session_id)
-            )
+            await session_service.restart_session(action)
+
+
+# ==================== ShutdownService Tests ====================
 
 
 class TestShutdownService:
