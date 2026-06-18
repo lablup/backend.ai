@@ -6,6 +6,8 @@ on:
       - 'src/ai/backend/manager/models/**'
       - 'src/ai/backend/manager/api/**'
       - 'VERSION'
+      - '.github/workflows/update-api-schema.yml'
+      - 'gql-inspector-checker.js'
 
 jobs:
   api-updated:
@@ -101,4 +103,4 @@ jobs:
         with:
           schema: '${{ github.base_ref }}:docs/manager/graphql-reference/schema.graphql'
           rules: |
-            gql-inspector-checker.js
+            ${{ github.workspace }}/gql-inspector-checker.js
