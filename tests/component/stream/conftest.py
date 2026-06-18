@@ -95,7 +95,6 @@ async def session_processors(database_engine: ExtendedAsyncSAEngine) -> Any:
             error_monitor=AsyncMock(),
             idle_checker_host=AsyncMock(),
             session_repository=repo,
-            scheduler_repository=AsyncMock(),
             scheduling_controller=AsyncMock(),
             appproxy_client_pool=AsyncMock(),
             user_repository=AsyncMock(),

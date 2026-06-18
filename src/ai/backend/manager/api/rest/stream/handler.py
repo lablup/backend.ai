@@ -136,7 +136,7 @@ class StreamHandler:
     ) -> web.StreamResponse:
         request = ctx.request
         app_ctx = self._ctx
-        user_id = _require_current_user_id()
+        access_key = AccessKey(user_ctx.access_key)
         session_name_or_id = path.parsed.session_name
         session_name = await self._resolve_session_name(session_name_or_id)
         api_version = request["api_version"]
@@ -333,7 +333,7 @@ class StreamHandler:
         app_ctx = self._ctx
 
         config = self.config_provider.config
-        user_id = _require_current_user_id()
+        access_key = AccessKey(user_ctx.access_key)
         session_name_or_id = path.parsed.session_name
         session_name = await self._resolve_session_name(session_name_or_id)
         api_version = request["api_version"]
@@ -448,7 +448,7 @@ class StreamHandler:
         request = ctx.request
         app_ctx = self._ctx
         rpc_ptask_group = app_ctx.rpc_ptask_group
-        user_id = _require_current_user_id()
+        access_key = AccessKey(user_ctx.access_key)
         session_name_or_id = path.parsed.session_name
         session_name: str = await self._resolve_session_name(session_name_or_id)
         params = query.parsed
@@ -616,7 +616,7 @@ class StreamHandler:
         ctx: RequestCtx,
         user_ctx: UserContext,
     ) -> web.StreamResponse:
-        user_id = _require_current_user_id()
+        access_key = AccessKey(user_ctx.access_key)
         session_name_or_id = path.parsed.session_name
         session_name = await self._resolve_session_name(session_name_or_id)
         result = await self._stream.get_streaming_session.wait_for_complete(

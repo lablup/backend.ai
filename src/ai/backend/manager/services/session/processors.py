@@ -182,7 +182,7 @@ class SessionProcessors(AbstractProcessorPackage):
     list_files: ActionProcessor[ListFilesAction, ListFilesActionResult]
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
     rename_session: ActionProcessor[RenameSessionAction, RenameSessionActionResult]
-    resolve_session: ActionProcessor[ResolveSessionAction, ResolveSessionActionResult]
+    restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
     resolve_session_name: ActionProcessor[ResolveSessionNameAction, ResolveSessionNameActionResult]
     search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
     search_sessions: ActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
@@ -230,7 +230,7 @@ class SessionProcessors(AbstractProcessorPackage):
         self.interrupt = ActionProcessor(service.interrupt, action_monitors)
         self.list_files = ActionProcessor(service.list_files, action_monitors)
         self.rename_session = ActionProcessor(service.rename_session, action_monitors)
-        self.resolve_session = ActionProcessor(service.resolve_session, action_monitors)
+        self.restart_session = ActionProcessor(service.restart_session, action_monitors)
         self.resolve_session_name = ActionProcessor(service.resolve_session_name, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
         self.start_service = ActionProcessor(service.start_service, action_monitors)
@@ -328,7 +328,7 @@ class SessionProcessors(AbstractProcessorPackage):
             ListFilesAction.spec(),
             MatchSessionsAction.spec(),
             RenameSessionAction.spec(),
-            ResolveSessionAction.spec(),
+            RestartSessionAction.spec(),
             ResolveSessionNameAction.spec(),
             SearchKernelsAction.spec(),
             SearchSessionsAction.spec(),
