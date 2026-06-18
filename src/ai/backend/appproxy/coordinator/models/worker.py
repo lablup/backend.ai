@@ -140,12 +140,15 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         worker_id: UUID,
         load_filters: bool = False,
         load_circuits: bool = False,
+        for_update: bool = False,
     ) -> "Worker":
         query = sa.select(Worker).filter(Worker.id == worker_id)
         if load_filters:
             query = query.options(selectinload(Worker.filters))
         if load_circuits:
             query = query.options(selectinload(Worker.circuits))
+        if for_update:
+            query = query.with_for_update()
         worker = await session.scalar(query)
         if not worker:
             raise ObjectNotFound(object_name="worker")
@@ -406,6 +409,7 @@ async def pick_worker(
         session,
         worker.id,
         load_circuits=True,
+        for_update=True,
     )
 
 
@@ -429,7 +433,7 @@ async def add_circuit(
     if envs is None:
         envs = {}
     if worker_id:
-        worker = await Worker.get(session, worker_id, load_circuits=True)
+        worker = await Worker.get(session, worker_id, load_circuits=True, for_update=True)
         if worker.available_slots - worker.occupied_slots <= 0 and worker.available_slots >= 0:
             raise WorkerNotAvailable
     else:
