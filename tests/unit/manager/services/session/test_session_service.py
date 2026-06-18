@@ -99,6 +99,10 @@ from ai.backend.manager.services.session.actions.rename_session import (
     RenameSessionAction,
     RenameSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
+    ResolveSessionNameActionResult,
+)
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 from ai.backend.manager.services.session.actions.shutdown_service import (
@@ -1019,6 +1023,43 @@ class TestRenameSession:
 
         with pytest.raises(InvalidAPIParameters):
             await session_service.rename_session(action)
+
+
+class TestResolveSessionName:
+    """Test cases for SessionService.resolve_session_name"""
+
+    async def test_success(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_id: SessionId,
+    ) -> None:
+        """A session id resolves to its canonical session name."""
+        mock_session_repository.get_session_name = AsyncMock(return_value="test-session")
+
+        result = await session_service.resolve_session_name(
+            ResolveSessionNameAction(session_id=sample_session_id)
+        )
+
+        assert isinstance(result, ResolveSessionNameActionResult)
+        assert result.session_name == "test-session"
+        mock_session_repository.get_session_name.assert_called_once_with(sample_session_id)
+
+    async def test_session_not_found(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        sample_session_id: SessionId,
+    ) -> None:
+        """An unknown session id surfaces SessionNotFound from the repository."""
+        mock_session_repository.get_session_name = AsyncMock(
+            side_effect=SessionNotFound("Session not found")
+        )
+
+        with pytest.raises(SessionNotFound):
+            await session_service.resolve_session_name(
+                ResolveSessionNameAction(session_id=sample_session_id)
+            )
 
 
 class TestShutdownService:
