@@ -1,0 +1,67 @@
+"""Database source for app config allow-list repository operations.
+
+Each public method binds its work to a single session through the injected
+``DBOpsProvider`` and builds the spec/wrapper it needs internally.
+"""
+
+from __future__ import annotations
+
+import sqlalchemy as sa
+
+from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
+from ai.backend.manager.data.app_config_allow_list.types import (
+    AppConfigAllowListData,
+    AppConfigAllowListSearchResult,
+)
+from ai.backend.manager.errors.app_config import AppConfigAllowListNotFound
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger, Querier
+from ai.backend.manager.repositories.ops import DBOpsProvider
+
+__all__ = ("AppConfigAllowListDBSource",)
+
+
+class AppConfigAllowListDBSource:
+    """Database source for app config allow-list operations."""
+
+    _ops: DBOpsProvider
+
+    def __init__(self, ops_provider: DBOpsProvider) -> None:
+        self._ops = ops_provider
+
+    async def create(
+        self,
+        creator: Creator[AppConfigAllowListRow],
+    ) -> AppConfigAllowListData:
+        async with self._ops.write_ops() as w:
+            created = await w.create(creator)
+            return created.row.to_data()
+
+    async def get_by_id(self, allow_list_id: AppConfigAllowListID) -> AppConfigAllowListData:
+        async with self._ops.read_ops() as r:
+            result = await r.query(Querier(row_class=AppConfigAllowListRow, pk_value=allow_list_id))
+            if result is None:
+                raise AppConfigAllowListNotFound(
+                    f"App config allow-list entry {allow_list_id} not found"
+                )
+            return result.row.to_data()
+
+    async def purge(self, allow_list_id: AppConfigAllowListID) -> AppConfigAllowListData:
+        async with self._ops.write_ops() as w:
+            result = await w.purge(Purger(row_class=AppConfigAllowListRow, pk_value=allow_list_id))
+            if result is None:
+                raise AppConfigAllowListNotFound(
+                    f"App config allow-list entry {allow_list_id} not found"
+                )
+            return result.row.to_data()
+
+    async def search(self, querier: BatchQuerier) -> AppConfigAllowListSearchResult:
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(sa.select(AppConfigAllowListRow), querier)
+            items = [row.AppConfigAllowListRow.to_data() for row in result.rows]
+            return AppConfigAllowListSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
