@@ -605,6 +605,78 @@ type AllowedResourceGroupsPayload {
 }
 
 """
+Added in 26.4.4. A registered app config definition (one managed config name).
+"""
+type AppConfigDefinition implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Registered config name (e.g. 'theme', 'menu')."""
+  configName: String!
+
+  """Creation timestamp (UTC)."""
+  createdAt: DateTime!
+
+  """Last update timestamp (UTC)."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.4.4. Paginated connection for app config definition records.
+"""
+type AppConfigDefinitionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AppConfigDefinitionEdge!]!
+
+  """
+  Total number of app config definition records matching the query criteria.
+  """
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AppConfigDefinitionEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AppConfigDefinition!
+}
+
+"""Added in 26.4.4. Filter input for querying app config definitions."""
+input AppConfigDefinitionFilter {
+  """Filter by config name."""
+  configName: StringFilter = null
+
+  """Filter by creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by last update datetime."""
+  updatedAt: DateTimeFilter = null
+}
+
+"""Added in 26.4.4. Specifies ordering for app config definition results."""
+input AppConfigDefinitionOrderBy {
+  """The field to order by."""
+  field: AppConfigDefinitionOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.4.4. Fields available for ordering app config definition results.
+"""
+enum AppConfigDefinitionOrderField {
+  CONFIG_NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""
 Added in 24.09.0. Input for approving an artifact revision.
 
 Admin-only operation to approve artifact revisions for general use.
@@ -2047,6 +2119,18 @@ input CreateAccessTokenInput {
 type CreateAccessTokenPayload {
   """Created access token"""
   accessToken: AccessToken!
+}
+
+"""Added in 26.4.4. Input for registering a new app config definition."""
+input CreateAppConfigDefinitionInput {
+  """Unique config name to register."""
+  configName: String!
+}
+
+"""Added in 26.4.4. Payload for app config definition creation."""
+type CreateAppConfigDefinitionPayload {
+  """Created app config definition."""
+  appConfigDefinition: AppConfigDefinition!
 }
 
 """Added in 25.19.0. Input for creating an auto-scaling rule."""
@@ -7545,6 +7629,16 @@ type Mutation {
   """Added in 26.4.2. Delete a login client type (super admin only)."""
   adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload
 
+  """
+  Added in 26.4.4. Register a new app config definition (super admin only).
+  """
+  adminCreateAppConfigDefinition(input: CreateAppConfigDefinitionInput!): CreateAppConfigDefinitionPayload
+
+  """
+  Added in 26.4.4. Purge an app config definition by id (super admin only).
+  """
+  adminPurgeAppConfigDefinition(id: UUID!): PurgeAppConfigDefinitionPayload
+
   """Added in 26.4.2. Create a new runtime variant (superadmin only)."""
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload
 
@@ -9009,6 +9103,12 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
+"""Added in 26.4.4. Payload for app config definition purge."""
+type PurgeAppConfigDefinitionPayload {
+  """UUID of the purged app config definition."""
+  id: UUID!
+}
+
 """Added in 26.4.2. Payload for domain permanent deletion mutation."""
 type PurgeDomainPayload {
   """Whether the purge was successful."""
@@ -9681,6 +9781,16 @@ type Query {
   Added in 26.4.2. Search login client types with filtering, ordering, and pagination.
   """
   loginClientTypes(filter: LoginClientTypeFilter = null, orderBy: [LoginClientTypeOrderBy!] = null, limit: Int = null, offset: Int = null): LoginClientTypeConnection
+
+  """
+  Added in 26.4.4. Get a single app config definition by id (super admin only).
+  """
+  appConfigDefinition(id: UUID!): AppConfigDefinition
+
+  """
+  Added in 26.4.4. Search app config definitions with filtering, ordering, and pagination (super admin only).
+  """
+  appConfigDefinitions(filter: AppConfigDefinitionFilter = null, orderBy: [AppConfigDefinitionOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigDefinitionConnection
 
   """Added in 26.4.2. Search runtime variants."""
   runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection
