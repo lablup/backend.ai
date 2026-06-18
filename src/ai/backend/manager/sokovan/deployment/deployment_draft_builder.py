@@ -23,7 +23,6 @@ from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     MountInfoEntry,
-    MountPermission,
     ResourceSlotEntry,
     SessionTypes,
 )
@@ -184,7 +183,9 @@ class DeploymentSessionDraftBuilder:
                 mount_destination=(
                     target_revision.model_mount_config.mount_destination or "/models"
                 ),
-                mount_perm=MountPermission.READ_ONLY,
+                # Use the permission frozen on the revision at write time
+                # (always concrete; legacy rows are backfilled to READ_ONLY).
+                mount_perm=target_revision.model_mount_config.model_mount_perm,
                 subpath=target_revision.model_mount_config.subpath,
             ),
             *target_revision.model_mount_config.extra_mounts,

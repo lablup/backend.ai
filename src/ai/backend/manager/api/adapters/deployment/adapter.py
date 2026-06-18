@@ -122,6 +122,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RollingUpdateConfigInfo,
     RollingUpdateStrategySpecInfo,
     RouteOrderField,
+    RuntimeVariantPresetValueInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AllocatedResourceSlotFilter,
@@ -524,6 +525,7 @@ class DeploymentAdapter(BaseAdapter):
                     )
                     for m in (initial_revision.extra_mounts or [])
                 ],
+                model_mount_perm=initial_revision.model_mount_config.mount_perm,
                 vfolder_subpath=initial_revision.model_mount_config.subpath,
             )
             model_revision_creator = ModelRevisionCreator(
@@ -1146,6 +1148,7 @@ class DeploymentAdapter(BaseAdapter):
             model_definition_path=input.model_mount_config.definition_path,
             model_mount_destination=input.model_mount_config.mount_destination,
             extra_mounts=extra_mounts,
+            model_mount_perm=input.model_mount_config.mount_perm,
             vfolder_subpath=input.model_mount_config.subpath,
         )
 
@@ -2346,6 +2349,10 @@ class DeploymentAdapter(BaseAdapter):
                     else None
                 ),
                 environ=environ_dto,
+                runtime_variant_preset_values=[
+                    RuntimeVariantPresetValueInfoDTO(preset_id=pv.preset_id, value=pv.value)
+                    for pv in data.model_runtime_config.runtime_variant_preset_values
+                ],
             ),
             model_mount_config=model_mount_config_dto,
             model_definition=(

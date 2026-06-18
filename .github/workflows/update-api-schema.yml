@@ -46,13 +46,16 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v10
+      uses: pantsbuild/actions/init-pants@v11
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        gha-cache-key: v0
+        gha-cache-key: v1
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
+        # ``pants export`` fails when a stale PEX from the pex->uv lockfile
+        # migration is restored from the lmdb_store cache; disable it here
+        # (the build-* export jobs already do).
+        cache-lmdb-store: 'false'
     - name: Pants export
       run: pants export --resolve=python-default
     - name: Install Rover CLI for generating supergraph
@@ -92,6 +95,13 @@ jobs:
       contents: read
       pull-requests: write
       checks: write
+    env:
+      # The pinned graphql-inspector action declares `runs.using: node20`.
+      # GitHub now force-runs node20 actions on Node 24, where this old bundle
+      # crashes at module load (the job dies at `action/index.js:1` with no
+      # output). Opt back to Node 20 until upstream ships a node24 release
+      # (graphql-hive/graphql-inspector#2948); then bump the pin and drop this.
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
     steps:
       - uses: actions/checkout@v6
       - uses: kamilkisiela/graphql-inspector@release-1717403590269

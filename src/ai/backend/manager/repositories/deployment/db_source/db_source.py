@@ -144,7 +144,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder import VFolderRow, query_accessible_vfolders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
@@ -2474,6 +2474,51 @@ class DeploymentDBSource:
                     f"VFolder permission unavailable for: {', '.join(unresolved)}"
                 )
             return {VFolderUUID(vid): MountPermission(perm.value) for vid, perm in rows.items()}
+
+    async def resolve_user_vfolder_permissions(
+        self, user_id: uuid.UUID, vfolder_ids: Sequence[VFolderUUID]
+    ) -> dict[VFolderUUID, MountPermission]:
+        """Return the requester's effective permission on each vfolder.
+
+        Resolves against the requesting ``user_id`` (ownership + shared
+        ``vfolder_permissions`` grants + group membership) via
+        ``query_accessible_vfolders``, mirroring what session creation
+        (``prepare_vfolder_mounts``) sees. Used at revision-write time to
+        ground the model vfolder mount permission into the requester's own.
+
+        Raises ``VFolderNotFound`` for any requested id the user cannot
+        access at all — fail-fast at create time instead of failing later
+        at session spawn.
+        """
+        if not vfolder_ids:
+            return {}
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            user_row = (
+                await db_sess.execute(
+                    sa.select(UserRow.role, UserRow.domain_name).where(UserRow.uuid == user_id)
+                )
+            ).first()
+            if user_row is None:
+                raise VFolderNotFound(f"Requesting user {user_id} not found")
+            conn = await db_sess.connection()
+            accessible = await query_accessible_vfolders(
+                conn,
+                user_id,
+                user_role=user_row.role,
+                domain_name=user_row.domain_name,
+                allowed_vfolder_types=["user", "group"],
+                extra_vf_conds=VFolderRow.id.in_(list(vfolder_ids)),
+            )
+            perms = {
+                VFolderUUID(entry["id"]): MountPermission(entry["permission"].value)
+                for entry in accessible
+            }
+            unresolved = [str(vid) for vid in vfolder_ids if vid not in perms]
+            if unresolved:
+                raise VFolderNotFound(
+                    f"VFolder not accessible by user {user_id}: {', '.join(unresolved)}"
+                )
+            return perms
 
     async def get_default_architecture_from_scaling_group(
         self, scaling_group_name: str
