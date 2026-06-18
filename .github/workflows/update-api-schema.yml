@@ -104,7 +104,7 @@ jobs:
       # the last known-good release (action @4.x, release-1717403590269) and opt
       # back into Node 20 (this release predates the Node 24 runtime fix). Drop
       # both once upstream addresses
-      # https://github.com/graphql-hive/graphql-inspector/issues/<TBD>.
+      # https://github.com/graphql-hive/graphql-inspector/issues/2962.
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
     steps:
       - uses: actions/checkout@v6
