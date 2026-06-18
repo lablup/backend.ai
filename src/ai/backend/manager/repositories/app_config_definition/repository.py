@@ -12,11 +12,11 @@ from ai.backend.manager.repositories.app_config_definition.db_source import (
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
-__all__ = ("AppConfigDefinitionAdminRepository",)
+__all__ = ("AppConfigDefinitionRepository",)
 
 
-class AppConfigDefinitionAdminRepository:
-    """Admin access to app config definitions."""
+class AppConfigDefinitionRepository:
+    """Access to app config definitions."""
 
     _db_source: AppConfigDefinitionDBSource
 
