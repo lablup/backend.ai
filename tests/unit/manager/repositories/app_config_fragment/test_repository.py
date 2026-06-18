@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
 
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigScopeType,
 )
@@ -32,8 +35,10 @@ from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
-_DOMAIN_ID = "default"
-_USER_ID = str(uuid.uuid4())
+_DOMAIN_UUID = uuid.uuid4()
+_DOMAIN_ID = str(_DOMAIN_UUID)
+_USER_UUID = uuid.uuid4()
+_USER_ID = str(_USER_UUID)
 _OTHER_USER_ID = str(uuid.uuid4())
 
 
@@ -54,7 +59,7 @@ def _spec(
     config_name: str = "theme",
     scope_type: AppConfigScopeType = AppConfigScopeType.PUBLIC,
     scope_id: str = "public",
-    config: dict | None = None,
+    config: dict[str, Any] | None = None,
 ) -> AppConfigFragmentCreatorSpec:
     return AppConfigFragmentCreatorSpec(
         config_name=config_name,
@@ -219,6 +224,8 @@ class TestApplicableFragments:
         )
 
         applicable = await repository.applicable_fragments(
-            config_name="theme", domain_id=_DOMAIN_ID, user_id=_USER_ID
+            config_name="theme",
+            domain_id=DomainID(_DOMAIN_UUID),
+            user_id=UserID(_USER_UUID),
         )
         assert [f.id for f in applicable] == [public.id, domain.id, user.id]

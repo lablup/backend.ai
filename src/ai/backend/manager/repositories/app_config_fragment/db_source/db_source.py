@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
@@ -96,8 +98,8 @@ class AppConfigFragmentDBSource:
     async def applicable_fragments(
         self,
         config_name: str,
-        domain_id: str,
-        user_id: str,
+        domain_id: DomainID,
+        user_id: UserID,
     ) -> list[AppConfigFragmentData]:
         """Return the fragments that apply to a ``(user, config_name)`` resolution.
 
@@ -113,11 +115,11 @@ class AppConfigFragmentDBSource:
                 ),
                 sa.and_(
                     AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
-                    AppConfigFragmentRow.scope_id == domain_id,
+                    AppConfigFragmentRow.scope_id == str(domain_id),
                 ),
                 sa.and_(
                     AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
-                    AppConfigFragmentRow.scope_id == user_id,
+                    AppConfigFragmentRow.scope_id == str(user_id),
                 ),
             ),
         )
