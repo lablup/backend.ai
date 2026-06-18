@@ -74,6 +74,15 @@ class TestFallback:
         result = generator.generate_subdomain(Subdomain("..."), set())
         assert result.startswith("app-")
 
+    def test_single_dot_preferred_uses_generated_fallback(
+        self, generator: SubdomainGenerator
+    ) -> None:
+        # "." normalizes to an empty label, so it must fall back rather than
+        # yield an empty subdomain.
+        result = generator.generate_subdomain(Subdomain("."), set())
+        assert result.startswith("app-")
+        assert set(result) <= LDH_CHARS
+
 
 class TestUniqueness:
     def test_returns_normalized_when_not_taken(self, generator: SubdomainGenerator) -> None:

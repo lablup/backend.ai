@@ -36,16 +36,30 @@ class SubdomainGenerator:
             candidate = self._fallback_subdomain()
         else:
             candidate = self._normalize(preferred)
+
         if not candidate:
+            # candidate is empty when the preferred == "." or ""
             candidate = self._fallback_subdomain()
-        if candidate not in taken:
-            return candidate
-        trimmed = candidate[: _DNS_LABEL_MAX_LENGTH - _UNIQUE_SUFFIX_LENGTH].strip("-")
-        prefix = trimmed or _FALLBACK_PREFIX
+
+        if candidate in taken:
+            final = self._find_unique_subdomain(candidate, taken)
+        else:
+            final = candidate
+        return self._trim(final)
+
+    def _find_unique_subdomain(self, base: Subdomain, taken: Container[Subdomain]) -> Subdomain:
+        """Find a unique subdomain by appending a suffix to ``base``."""
+        # e.g. base "glm-52" -> prefix_candidate "glm-52" -> candidate "glm-52-1a2b3c4d"
+        prefix_candidate = base[: _DNS_LABEL_MAX_LENGTH - _UNIQUE_SUFFIX_LENGTH].strip("-")
+        prefix = prefix_candidate or _FALLBACK_PREFIX
         while True:
-            candidate = Subdomain(f"{prefix}{self._unique_suffix()}")
+            candidate = self._trim(Subdomain(f"{prefix}{self._unique_suffix()}"))
             if candidate not in taken:
                 return candidate
+
+    def _trim(self, candidate: Subdomain) -> Subdomain:
+        """Trim a candidate subdomain to fit within the DNS label limit."""
+        return Subdomain(candidate[:_DNS_LABEL_MAX_LENGTH].strip("-"))
 
     def _normalize(self, raw: Subdomain) -> Subdomain:
         """Convert ``raw`` into a single DNS label usable as a wildcard subdomain.
@@ -72,7 +86,7 @@ class SubdomainGenerator:
         else:
             # Punycode keeps every character within one ASCII label.
             final = "xn--" + text.encode("punycode").decode("ascii")
-        return Subdomain(final[:_DNS_LABEL_MAX_LENGTH].strip("-"))
+        return self._trim(Subdomain(final))
 
     def _fallback_subdomain(self) -> Subdomain:
         """Generate a fallback subdomain when the preferred value is unusable."""
