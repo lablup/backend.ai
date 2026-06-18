@@ -679,7 +679,7 @@ class InstallerApp(App[None]):
         Binding(
             "ctrl+c",
             "copy_or_quit",
-            "Copy selection (drag to select)",
+            "Copy install log (or drag-selected text)",
             show=True,
             priority=True,
         ),
@@ -742,18 +742,28 @@ class InstallerApp(App[None]):
         self.title = "Backend.AI Installer"
 
     async def action_copy_or_quit(self) -> None:
-        # Ctrl+C copies the current text selection when there is one (so logs are
-        # easy to grab for error reports); otherwise it falls back to quitting.
-        selected = self.screen.get_selected_text()
-        if not selected:
+        # Ctrl+C copies the current text selection when there is one; with no
+        # selection it copies the whole install log (works after the install
+        # switches to the report tab, or any time drag-selection is awkward).
+        # With nothing to copy at all it quits.
+        text = self.screen.get_selected_text() or self._install_log_text()
+        if not text:
             await self.action_shutdown()
             return
         # OSC52 reaches the clipboard over SSH / on terminals that permit it,
         # but is unsupported by some (e.g. macOS Terminal). Also write to the
         # local OS clipboard tool so a local install copies reliably.
-        self.copy_to_clipboard(selected)
-        await self._copy_to_os_clipboard(selected)
-        self.notify(f"Copied {len(selected.splitlines())} line(s) to the clipboard.")
+        self.copy_to_clipboard(text)
+        await self._copy_to_os_clipboard(text)
+        self.notify(f"Copied {len(text.splitlines())} line(s) to the clipboard.")
+
+    def _install_log_text(self) -> str:
+        """Full plain text of the active install log (the one with content)."""
+        logs = [log for log in self.query(SetupLog) if log.lines]
+        if not logs:
+            return ""
+        log = max(logs, key=lambda w: len(w.lines))
+        return "\n".join(str(line) for line in log.lines)
 
     async def _copy_to_os_clipboard(self, text: str) -> bool:
         """Best-effort copy to the local OS clipboard via a CLI tool."""
