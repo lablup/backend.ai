@@ -36,13 +36,23 @@ async def repository(
         yield AppConfigDefinitionAdminRepository(DBOpsProvider(database_connection))
 
 
-async def _create(
+@pytest.fixture
+async def existing_definition(
     repository: AppConfigDefinitionAdminRepository,
-    config_name: str,
 ) -> AppConfigDefinitionData:
-    return await repository.create(
-        Creator(spec=AppConfigDefinitionCreatorSpec(config_name=config_name))
-    )
+    return await repository.create(Creator(spec=AppConfigDefinitionCreatorSpec(config_name="menu")))
+
+
+@pytest.fixture
+async def seeded_definitions(
+    repository: AppConfigDefinitionAdminRepository,
+) -> list[AppConfigDefinitionData]:
+    return [
+        await repository.create(
+            Creator(spec=AppConfigDefinitionCreatorSpec(config_name=config_name))
+        )
+        for config_name in ("theme", "menu", "preferences")
+    ]
 
 
 def _missing_id() -> AppConfigDefinitionID:
@@ -53,7 +63,9 @@ class TestCreateAndGet:
     async def test_create_then_get_by_id(
         self, repository: AppConfigDefinitionAdminRepository
     ) -> None:
-        created = await _create(repository, "theme")
+        created = await repository.create(
+            Creator(spec=AppConfigDefinitionCreatorSpec(config_name="theme"))
+        )
         fetched = await repository.get_by_id(created.id)
         assert fetched.id == created.id
         assert fetched.config_name == "theme"
@@ -66,14 +78,17 @@ class TestCreateAndGet:
 
 
 class TestPurge:
-    async def test_purge_removes_row(self, repository: AppConfigDefinitionAdminRepository) -> None:
-        created = await _create(repository, "menu")
+    async def test_purge_removes_row(
+        self,
+        repository: AppConfigDefinitionAdminRepository,
+        existing_definition: AppConfigDefinitionData,
+    ) -> None:
         purged = await repository.purge(
-            Purger(row_class=AppConfigDefinitionRow, pk_value=created.id)
+            Purger(row_class=AppConfigDefinitionRow, pk_value=existing_definition.id)
         )
-        assert purged.id == created.id
+        assert purged.id == existing_definition.id
         with pytest.raises(AppConfigDefinitionNotFound):
-            await repository.get_by_id(created.id)
+            await repository.get_by_id(existing_definition.id)
 
     async def test_purge_missing_raises(
         self, repository: AppConfigDefinitionAdminRepository
@@ -84,10 +99,10 @@ class TestPurge:
 
 class TestSearch:
     async def test_search_returns_all_with_total_count(
-        self, repository: AppConfigDefinitionAdminRepository
+        self,
+        repository: AppConfigDefinitionAdminRepository,
+        seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        for config_name in ("theme", "menu", "preferences"):
-            await _create(repository, config_name)
         result = await repository.search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         )
@@ -99,10 +114,10 @@ class TestSearch:
         }
 
     async def test_search_respects_pagination(
-        self, repository: AppConfigDefinitionAdminRepository
+        self,
+        repository: AppConfigDefinitionAdminRepository,
+        seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        for config_name in ("a", "b", "c"):
-            await _create(repository, config_name)
         result = await repository.search(
             BatchQuerier(pagination=OffsetPagination(limit=2, offset=0))
         )
