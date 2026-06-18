@@ -403,6 +403,7 @@ SessionId = NewType("SessionId", UUID)
 KernelId = NewType("KernelId", UUID)
 ImageAlias = NewType("ImageAlias", str)
 ArchName = NewType("ArchName", str)
+Subdomain = NewType("Subdomain", str)
 
 ResourceGroupID = NewType("ResourceGroupID", str)
 AgentId = NewType("AgentId", str)
