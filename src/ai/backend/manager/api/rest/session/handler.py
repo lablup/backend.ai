@@ -85,6 +85,7 @@ from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AgentId,
     KernelId,
+    SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.utils import undefined
@@ -165,6 +166,9 @@ from ai.backend.manager.services.session.actions.rename_session import (
 )
 from ai.backend.manager.services.session.actions.resolve_session import (
     ResolveSessionAction,
+)
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
 )
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
@@ -420,6 +424,23 @@ class SessionHandler:
         self._agent = agent
         self._vfolder = vfolder
         self._config_provider = config_provider
+
+    async def _resolve_session_name(self, session_name_or_id: str) -> str:
+        """Normalize a session path reference (name or UUID) to its canonical name.
+
+        Session REST path parameters historically accepted either a session name or
+        its UUID (row_id). Downstream operations are keyed by name, so a UUID-shaped
+        reference is resolved to its real name here; a non-UUID reference is passed
+        through unchanged so the name lookup stays out of the repositories.
+        """
+        try:
+            session_id = SessionId(UUID(session_name_or_id))
+        except (ValueError, TypeError):
+            return session_name_or_id
+        result = await self._session.resolve_session_name.wait_for_complete(
+            ResolveSessionNameAction(session_id=session_id)
+        )
+        return result.session_name
 
     def _require_user_id(self) -> UUID:
         """Return the authenticated user's id from the request context.
@@ -855,7 +876,8 @@ class SessionHandler:
 
     async def get_info(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -918,7 +940,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = query.parsed
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         user_role = cast(UserRole, request["user"]["role"])
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
@@ -966,7 +989,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = body.parsed
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1004,7 +1028,8 @@ class SessionHandler:
 
     async def interrupt(self, ctx: RequestCtx) -> web.Response:
         request = ctx.request
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1043,7 +1068,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = body.parsed
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1084,7 +1110,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = body.parsed
-        session_name: str = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name: str = await self._resolve_session_name(session_name_or_id)
         myself = asyncio.current_task()
         if myself is None:
             raise NoCurrentTaskContext("No current task context")
@@ -1118,7 +1145,8 @@ class SessionHandler:
     ) -> web.Response:
         request = ctx.request
         params = body.parsed
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1154,7 +1182,8 @@ class SessionHandler:
     async def upload_files(self, ctx: RequestCtx) -> web.Response:
         request = ctx.request
         reader = await request.multipart()
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1194,7 +1223,8 @@ class SessionHandler:
     ) -> web.Response:
         request = ctx.request
         params = body.parsed
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1232,7 +1262,8 @@ class SessionHandler:
     ) -> web.Response:
         request = ctx.request
         params = query.parsed
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1270,7 +1301,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = query.parsed
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1308,7 +1340,8 @@ class SessionHandler:
     ) -> web.Response:
         request = ctx.request
         params = body.parsed
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         new_name = params.session_name
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
@@ -1346,7 +1379,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = query.parsed
-        session_name: str = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name: str = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1385,7 +1419,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = query.parsed
-        session_name: str = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name: str = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1429,7 +1464,8 @@ class SessionHandler:
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        session_name: str = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name: str = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1469,7 +1505,8 @@ class SessionHandler:
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        session_name: str = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name: str = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1509,7 +1546,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = query.parsed
-        session_name: str = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name: str = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1542,7 +1580,8 @@ class SessionHandler:
 
     async def get_direct_access_info(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
-        session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1574,7 +1613,8 @@ class SessionHandler:
     ) -> APIResponse:
         request = ctx.request
         params = query.parsed
-        session_name: str = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        session_name: str = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],
@@ -1652,7 +1692,8 @@ class SessionHandler:
 
     async def get_dependency_graph(self, ctx: RequestCtx) -> APIResponse:
         request = ctx.request
-        root_session_name = request.match_info["session_name"]
+        session_name_or_id = request.match_info["session_name"]
+        root_session_name = await self._resolve_session_name(session_name_or_id)
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
                 requester_access_key=request["keypair"]["access_key"],

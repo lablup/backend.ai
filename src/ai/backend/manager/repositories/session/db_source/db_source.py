@@ -113,6 +113,20 @@ class SessionDBSource:
             )
         return rows[0].id
 
+    async def get_session_name(self, session_id: SessionId) -> str:
+        """Return the canonical session name for a session id.
+
+        A session id maps to exactly one row, so this lookup is unambiguous. Used to
+        normalize a UUID-shaped path reference back to its real name; ownership and
+        state checks remain the caller's job.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(SessionRow.name).where(SessionRow.id == session_id)
+            name = await db_sess.scalar(query)
+            if name is None:
+                raise SessionNotFound(f"Session with id {session_id} not found")
+            return name
+
     async def get_session_owner(self, session_id: str | SessionId) -> UserData:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = (

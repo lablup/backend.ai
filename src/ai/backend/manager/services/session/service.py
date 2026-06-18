@@ -201,6 +201,10 @@ from ai.backend.manager.services.session.actions.resolve_session import (
     ResolveSessionAction,
     ResolveSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
+    ResolveSessionNameActionResult,
+)
 from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
@@ -303,6 +307,18 @@ class SessionService:
             action.user_id,
         )
         return ResolveSessionActionResult(session_id=session_id)
+
+    async def resolve_session_name(
+        self, action: ResolveSessionNameAction
+    ) -> ResolveSessionNameActionResult:
+        """Resolve a session id to its canonical session name.
+
+        Callers normalize a UUID-shaped path reference back to a name so that
+        downstream name-keyed operations receive a real name. DO NOT USE THIS FOR
+        NEW DEVELOPMENT — it only bridges the legacy name-or-id path parameter.
+        """
+        session_name = await self._session_repository.get_session_name(action.session_id)
+        return ResolveSessionNameActionResult(session_name=session_name)
 
     async def commit_session(self, action: CommitSessionAction) -> CommitSessionActionResult:
         session_name = action.session_name
