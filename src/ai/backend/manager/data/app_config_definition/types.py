@@ -14,3 +14,13 @@ class AppConfigDefinitionData:
     config_name: str
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class AppConfigDefinitionListResult:
+    """Search result with total count for app config definitions."""
+
+    items: list[AppConfigDefinitionData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
