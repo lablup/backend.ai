@@ -55,3 +55,4 @@ The v2 DTOs (`common/dto/manager/v2/`) are the schema shared by REST v2 handlers
 - Belongs: HTTP request/response conversion, auth decorators (`@auth_required_for_method`).
 - Does NOT belong: business logic / domain rules, direct DB access or `manager/models/` ORM imports,
   Repository/Service class imports.
+

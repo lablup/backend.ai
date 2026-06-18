@@ -95,18 +95,9 @@ jobs:
       contents: read
       pull-requests: write
       checks: write
-    env:
-      # graphql-hive/graphql-inspector @5.0.21 (release-1781692943029) regressed
-      # the `rules` file resolution — it can no longer load a checker file from
-      # the checked-out workspace, failing with "Cannot find module ...". Pin to
-      # the last known-good release (action @4.x, release-1717403590269) and opt
-      # back into Node 20 (this release predates the Node 24 runtime fix). Drop
-      # both once upstream addresses
-      # https://github.com/graphql-hive/graphql-inspector/issues/2962.
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
     steps:
       - uses: actions/checkout@v6
-      - uses: graphql-hive/graphql-inspector@release-1717403590269
+      - uses: graphql-hive/graphql-inspector@v4.0.0
         with:
           schema: '${{ github.base_ref }}:docs/manager/graphql-reference/schema.graphql'
           rules: |
