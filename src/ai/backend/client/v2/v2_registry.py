@@ -16,6 +16,7 @@ from .config import ClientConfig
 
 if TYPE_CHECKING:
     from .domains_v2.agent import V2AgentClient
+    from .domains_v2.app_config_allow_list import V2AppConfigAllowListClient
     from .domains_v2.app_config_definition import V2AppConfigDefinitionClient
     from .domains_v2.artifact import V2ArtifactClient
     from .domains_v2.artifact_registry import V2ArtifactRegistryClient
@@ -89,6 +90,12 @@ class V2ClientRegistry:
         from .domains_v2.agent import V2AgentClient
 
         return V2AgentClient(self._client)
+
+    @cached_property
+    def app_config_allow_list(self) -> V2AppConfigAllowListClient:
+        from .domains_v2.app_config_allow_list import V2AppConfigAllowListClient
+
+        return V2AppConfigAllowListClient(self._client)
 
     @cached_property
     def app_config_definition(self) -> V2AppConfigDefinitionClient:
