@@ -5,8 +5,15 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.app_config_definition.types import (
+    AppConfigDefinitionOrderField,
+)
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
+    "AppConfigDefinitionFilter",
+    "AppConfigDefinitionOrder",
     "CreateAppConfigDefinitionInput",
     "SearchAppConfigDefinitionsInput",
 )
@@ -22,9 +29,26 @@ class CreateAppConfigDefinitionInput(BaseRequestModel):
     )
 
 
+class AppConfigDefinitionFilter(BaseRequestModel):
+    """Filter for app config definition search."""
+
+    config_name: StringFilter | None = Field(default=None, description="Filter by config name.")
+
+
+class AppConfigDefinitionOrder(BaseRequestModel):
+    """Order specifier for app config definition search."""
+
+    field: AppConfigDefinitionOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
+
+
 class SearchAppConfigDefinitionsInput(BaseRequestModel):
     """Input for paginated app config definition search."""
 
+    filter: AppConfigDefinitionFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[AppConfigDefinitionOrder] | None = Field(
+        default=None, description="Order specifiers, applied in sequence."
+    )
     limit: int | None = Field(
         default=None, ge=1, description="Offset-based: maximum number of results."
     )

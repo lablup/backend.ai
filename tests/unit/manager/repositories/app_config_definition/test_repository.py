@@ -7,9 +7,14 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
+from ai.backend.manager.models.app_config_definition.conditions import (
+    AppConfigDefinitionConditions,
+)
+from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_definition.creators import (
@@ -119,3 +124,42 @@ class TestSearch:
         assert result.total_count == len(seeded_definitions)
         assert len(result.items) == 2
         assert result.has_next_page is True
+
+    async def test_search_filters_by_config_name(
+        self,
+        repository: AppConfigDefinitionRepository,
+        seeded_definitions: list[AppConfigDefinitionData],
+    ) -> None:
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[
+                    AppConfigDefinitionConditions.by_config_name_equals(
+                        StringMatchSpec("menu", case_insensitive=False, negated=False)
+                    )
+                ],
+            )
+        )
+        expected = [
+            definition.config_name
+            for definition in seeded_definitions
+            if definition.config_name == "menu"
+        ]
+        assert result.total_count == len(expected)
+        assert [item.config_name for item in result.items] == expected
+
+    async def test_search_orders_by_config_name_desc(
+        self,
+        repository: AppConfigDefinitionRepository,
+        seeded_definitions: list[AppConfigDefinitionData],
+    ) -> None:
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                orders=[AppConfigDefinitionOrders.config_name(ascending=False)],
+            )
+        )
+        expected = sorted(
+            (definition.config_name for definition in seeded_definitions), reverse=True
+        )
+        assert [item.config_name for item in result.items] == expected
