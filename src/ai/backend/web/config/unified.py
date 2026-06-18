@@ -768,12 +768,20 @@ class CSPConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "CSP script-src directive. Specifies valid sources for JavaScript. "
-                "\"'unsafe-inline'\" allows inline scripts (less secure but often required). "
-                "When set, the webserver appends a per-request \"'nonce-<random>'\" so inline "
-                "scripts in index.html are allowed; keep \"'self'\" and avoid \"'strict-dynamic'\" "
-                "so the bundled module script keeps loading."
+                "Add \"'nonce'\" to opt in to a per-request nonce: the webserver replaces it "
+                "with \"'nonce-<random>'\" and renders the same value into index.html so inline "
+                "scripts there are allowed. Keep \"'self'\" and avoid \"'strict-dynamic'\" so the "
+                "bundled module script keeps loading. \"'unsafe-inline'\" allows inline scripts "
+                "instead (less secure); do NOT combine it with \"'nonce'\" since a browser ignores "
+                "\"'unsafe-inline'\" when a nonce is present, so the webserver drops the nonce in "
+                "that case. Other unsafe-* keywords (\"'unsafe-eval'\" etc.) are orthogonal and may "
+                "coexist with \"'nonce'\". Example: [\"'self'\", \"'nonce'\"]."
             ),
             added_version="25.12.0",
+            example=ConfigExample(
+                local="""["'self'", "'nonce'"]""",
+                prod="""["'self'", "'nonce'"]""",
+            ),
         ),
     ]
     style_src: Annotated[
@@ -786,11 +794,20 @@ class CSPConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "CSP style-src directive. Specifies valid sources for stylesheets. "
-                "\"'unsafe-inline'\" is often needed for frameworks that inject styles dynamically. "
-                "When set, the webserver appends a per-request \"'nonce-<random>'\" so nonce-aware "
-                "style injectors (e.g. antd via globalThis.baiNonce) are allowed."
+                "Add \"'nonce'\" to opt in to a per-request nonce: the webserver replaces it "
+                "with \"'nonce-<random>'\" and renders the same value into index.html so nonce-aware "
+                "style injectors (e.g. antd via globalThis.baiNonce) are allowed. "
+                "\"'unsafe-inline'\" is often needed for frameworks that inject styles dynamically; "
+                "do NOT combine it with \"'nonce'\" since a browser ignores \"'unsafe-inline'\" when a "
+                "nonce is present, so the webserver drops the nonce in that case. Other unsafe-* "
+                "keywords are orthogonal and may coexist with \"'nonce'\". "
+                "Example: [\"'self'\", \"'nonce'\"]."
             ),
             added_version="25.12.0",
+            example=ConfigExample(
+                local="""["'self'", "'nonce'"]""",
+                prod="""["'self'", "'nonce'"]""",
+            ),
         ),
     ]
     frame_src: Annotated[
@@ -923,9 +940,12 @@ class SecurityConfig(BaseConfigSchema):
             description=(
                 "Content Security Policy configuration. When set, adds CSP headers to responses "
                 "to protect against XSS and other injection attacks. Leave unset (None) to skip "
-                "CSP headers entirely. When script-src and/or style-src are set, the webserver "
-                "appends a per-request \"'nonce-<random>'\" to those directives and renders the "
-                "same value into index.html (the {{nonce}} placeholders / globalThis.baiNonce)."
+                "CSP headers entirely. Any directive that lists the \"'nonce'\" keyword opts in to a "
+                "per-request nonce: the webserver replaces the keyword with \"'nonce-<random>'\" and "
+                "renders the same value into index.html (the {{nonce}} placeholders / "
+                "globalThis.baiNonce). A directive that also lists \"'unsafe-inline'\" keeps that "
+                "source and drops the nonce (a browser ignores \"'unsafe-inline'\" when a nonce is "
+                "present); other unsafe-* keywords may coexist with the nonce."
             ),
             added_version="25.12.0",
             composite=CompositeType.FIELD,
