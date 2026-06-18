@@ -7,7 +7,8 @@ from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.services.app_config_definition.actions.base import (
     AppConfigDefinitionScopeAction,
     AppConfigDefinitionScopeActionResult,
@@ -15,13 +16,13 @@ from ai.backend.manager.services.app_config_definition.actions.base import (
 
 
 @dataclass
-class SearchAppConfigDefinitionsAction(AppConfigDefinitionScopeAction):
-    querier: BatchQuerier
+class CreateAppConfigDefinitionAction(AppConfigDefinitionScopeAction):
+    creator: Creator[AppConfigDefinitionRow]
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+        return ActionOperationType.CREATE
 
     @override
     def scope_type(self) -> ScopeType:
@@ -37,11 +38,8 @@ class SearchAppConfigDefinitionsAction(AppConfigDefinitionScopeAction):
 
 
 @dataclass
-class SearchAppConfigDefinitionsActionResult(AppConfigDefinitionScopeActionResult):
-    data: list[AppConfigDefinitionData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+class CreateAppConfigDefinitionActionResult(AppConfigDefinitionScopeActionResult):
+    definition: AppConfigDefinitionData
 
     @override
     def scope_type(self) -> ScopeType:
