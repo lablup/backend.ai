@@ -24,7 +24,6 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -99,7 +98,7 @@ class VFolderAccessControlInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Quota limits configured for a virtual folder.",
     ),
     model=VFolderQuotaInfoDTO,
@@ -116,7 +115,7 @@ class VFolderQuotaInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Usage statistics for a virtual folder, measured live through the storage proxy."
         ),

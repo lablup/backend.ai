@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     QueryDefinitionOrder as QueryDefinitionOrderDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -38,28 +37,28 @@ class QueryDefinitionFilter(PydanticInputMixin[QueryDefinitionFilterDTO]):
     category_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
             description="Filter by category ID.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
         ),
         default=None,
     )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(
             description="Combine multiple filters with AND logic. All conditions must match.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
         ),
         default=None,
     )
     OR: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(
             description="Combine multiple filters with OR logic. At least one condition must match.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
         ),
         default=None,
     )
     NOT: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(
             description="Negate the specified filters. Records matching these conditions will be excluded.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
         ),
         default=None,
     )

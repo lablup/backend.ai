@@ -105,7 +105,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RuntimeVariantPresetValueInfoDTO,
 )
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -236,7 +235,7 @@ class ResourceConfig:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A runtime variant preset value materialised on a revision.",
     ),
     model=RuntimeVariantPresetValueInfoDTO,
@@ -281,14 +280,14 @@ class ModelRuntimeConfig:
     )
     runtime_variant_preset_values: list[RuntimeVariantPresetValueGQL] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Preset values materialised on this revision.",
         ),
     )
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="The runtime variant referenced by this runtime config.",
         )
     )  # type: ignore[misc]
@@ -322,7 +321,7 @@ class ModelMountConfig:
     )
     subpath: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Subpath within the model vfolder. ``null`` means the vfolder root.",
         ),
         default=None,
@@ -351,7 +350,7 @@ class ExtraVFolderMountInfoGQL:
     )
     mount_perm: MountPermission = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "The concrete permission snapshot fixed at revision-write time; "
                 "later vfolder permission changes do not retroactively affect it."
@@ -360,7 +359,7 @@ class ExtraVFolderMountInfoGQL:
     )
     subpath: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Subpath within the vfolder. ``null`` means the vfolder root.",
         ),
         default=None,
@@ -398,7 +397,7 @@ class PreStartActionGQL:
 class ModelHealthCheckGQL:
     enable: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Whether the route is health-checked. When false the route activates "
                 "immediately and the remaining fields are ignored."
@@ -517,7 +516,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     id: NodeID[str]
     revision_number: int = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Per-deployment sequential revision number assigned at "
                 "insert time (UNIQUE per deployment). Use this to surface "
@@ -547,7 +546,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     )
     revision_preset_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "ID of the deployment-level preset that produced this "
                 "revision. ``None`` when the revision was created without a "
@@ -560,7 +559,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     )
     deployment_id: ID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "ID of the parent deployment that owns this revision. "
                 "Exposed alongside the resolved ``deployment`` node so "
@@ -601,7 +600,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "The deployment-level preset that produced this revision, "
                 "resolved via DataLoader. ``None`` when the revision was "
@@ -626,7 +625,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="The parent deployment owning this revision, resolved via DataLoader.",
         )
     )  # type: ignore[misc]
@@ -852,7 +851,7 @@ class EnvironmentVariablesInputGQL(PydanticInputMixin[EnvironmentVariablesInputD
             "runtime variant preset ID (from the runtimeVariantPresets query). Distinct from a "
             "DeploymentRevisionPreset, which is a saved template selected via revision_preset_id."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="RuntimeVariantPresetValueInput",
 )
@@ -875,7 +874,7 @@ class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
     )
     runtime_variant_preset_values: list[RuntimeVariantPresetValueInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Concrete values for the runtime variant's configurable presets, each keyed by the "
                 "runtime variant preset ID. Overrides matching presets from a revision_preset_id "
@@ -895,7 +894,7 @@ class ModelMountConfigInput(PydanticInputMixin[ModelMountConfigInputDTO]):
     definition_path: str | None = None
     subpath: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Subpath within the model vfolder. ``null`` (default) mounts the vfolder root."
             ),
@@ -912,7 +911,7 @@ class ExtraVFolderMountInput(PydanticInputMixin[ExtraVFolderMountInputDTO]):
     mount_destination: str | None
     subpath: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=("Subpath within the vfolder. ``null`` (default) mounts the vfolder root."),
         ),
         default=None,
@@ -1140,7 +1139,7 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionInputDTO]):
     )
     options: AddRevisionOptionsGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Additional options for the add revision operation.",
         ),
         default=None,

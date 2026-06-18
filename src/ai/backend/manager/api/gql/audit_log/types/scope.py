@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from ai.backend.common.dto.manager.v2.audit_log.request import AuditLogScope
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -19,7 +18,7 @@ from ai.backend.manager.api.gql.rbac.types.scope import EntityTypeScopeGQL, UUID
             "Scope for the scoped audit log query. "
             "All items are OR'd; raises an error if every field is empty."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="AuditLogScope",
 )

@@ -34,7 +34,6 @@ from ai.backend.common.dto.manager.v2.session_options import (
     SessionHandlerOptionsInfo,
     SessionHandlerOptionsInput,
 )
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInputGQL,
     ResourceSlotEntryGQL,
@@ -55,7 +54,7 @@ from ai.backend.manager.api.gql.decorators import (
 
 FailurePolicyGQL = gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=("Policy for how a kernel group's startup failures affect the owning session."),
     ),
     FailurePolicyEnum,
@@ -65,7 +64,7 @@ FailurePolicyGQL = gql_enum(
 
 AgentSelectionPolicyGQL = gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Scheduling constraint applied to designated agents for a session.",
     ),
     AgentSelectionPolicyEnum,
@@ -81,7 +80,7 @@ AgentSelectionPolicyGQL = gql_enum(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Per-handler scheduler policy fields for session handler options.",
     ),
     name="DefaultSessionHandlerOptionsInput",
@@ -93,7 +92,7 @@ class DefaultSessionHandlerOptionsInputGQL(PydanticInputMixin[HandlerOptionsInpu
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Per-handler scheduler policy snapshot for session handler options.",
     ),
     model=HandlerOptionsInfo,
@@ -106,7 +105,7 @@ class DefaultSessionHandlerOptionsInfoGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A single (handler_name, options) entry for session handler options.",
     ),
     name="DefaultSessionHandlerOptionsEntryInput",
@@ -119,7 +118,7 @@ class DefaultSessionHandlerOptionsEntryInputGQL(PydanticInputMixin[HandlerOption
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A single (handler_name, options) entry response for session handler options.",
     ),
     model=HandlerOptionsEntryInfo,
@@ -133,7 +132,7 @@ class DefaultSessionHandlerOptionsEntryInfoGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Session handler-options input (timeout + retry, handler-keyed).",
     ),
     name="DefaultSessionHandlerOptionsPolicyInput",
@@ -145,7 +144,7 @@ class DefaultSessionHandlerOptionsPolicyInputGQL(PydanticInputMixin[SessionHandl
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Session handler-options policy response.",
     ),
     model=SessionHandlerOptionsInfo,
@@ -163,7 +162,7 @@ class DefaultSessionHandlerOptionsPolicyInfoGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Qualitative resource hints for session-level defaults (shared memory, ...).",
     ),
     name="DefaultSessionResourceOptsInput",
@@ -174,7 +173,7 @@ class DefaultSessionResourceOptsInputGQL(PydanticInputMixin[ResourceOptsInput]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Qualitative resource hints response.",
     ),
     model=ResourceOptsInfo,
@@ -191,7 +190,7 @@ class DefaultSessionResourceOptsInfoGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Baseline kernel execution spec input used as the resource-group default.",
     ),
     name="DefaultSessionKernelExecutionSpecInput",
@@ -213,7 +212,7 @@ class DefaultSessionKernelExecutionSpecInputGQL(PydanticInputMixin[KernelExecuti
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Baseline kernel execution spec response.",
     ),
     model=KernelExecutionSpecInfo,
@@ -241,7 +240,7 @@ class DefaultSessionKernelExecutionSpecInfoGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A role + replica bundle carrying one kernel spec.",
     ),
     name="DefaultSessionKernelGroupInput",
@@ -256,7 +255,7 @@ class DefaultSessionKernelGroupInputGQL(PydanticInputMixin[KernelGroupInput]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A role + replica bundle response.",
     ),
     model=KernelGroupInfo,
@@ -278,7 +277,7 @@ class DefaultSessionKernelGroupInfoGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Resource-group default session options input payload.",
     ),
     name="DefaultSessionOptionsInput",
@@ -297,7 +296,7 @@ class DefaultSessionOptionsInputGQL(PydanticInputMixin[DefaultSessionOptionsInpu
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Resource-group default session options response.",
     ),
     model=DefaultSessionOptionsInfo,

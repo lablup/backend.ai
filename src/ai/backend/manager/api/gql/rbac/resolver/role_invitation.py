@@ -10,7 +10,6 @@ from strawberry import Info
 from ai.backend.common.dto.manager.v2.role_invitation.request import (
     SearchRoleInvitationsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -37,7 +36,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="List the current user's role invitations.",
     )
 )  # type: ignore[misc]
@@ -85,7 +84,7 @@ async def my_role_invitations(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="List role invitations sent by the current user.",
     )
 )  # type: ignore[misc]
@@ -133,7 +132,7 @@ async def my_sent_role_invitations(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="List invitations for a specific role.",
     )
 )  # type: ignore[misc]
@@ -183,7 +182,7 @@ async def role_scoped_role_invitations(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="List all role invitations across the system (superadmin only).",
     )
 )  # type: ignore[misc]
@@ -235,7 +234,7 @@ async def admin_role_invitations(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Create role invitations by email.",
     )
 )
@@ -249,7 +248,7 @@ async def create_role_invitation(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Accept a pending role invitation.",
     )
 )
@@ -264,7 +263,7 @@ async def accept_role_invitation(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Reject a pending role invitation.",
     )
 )
@@ -279,7 +278,7 @@ async def reject_role_invitation(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Cancel a pending role invitation (admin only).",
     )
 )

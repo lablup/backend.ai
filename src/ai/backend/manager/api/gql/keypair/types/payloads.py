@@ -38,7 +38,6 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 from ai.backend.common.dto.manager.v2.keypair.response import (
     UpdateMyKeypairPayload as UpdateMyKeypairPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -50,7 +49,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A keypair returned at creation time, including its one-time secret key.",
     ),
     model=CreateKeypairPayloadDTO,

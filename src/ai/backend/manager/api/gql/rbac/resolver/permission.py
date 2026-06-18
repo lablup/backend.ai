@@ -10,7 +10,6 @@ from ai.backend.common.data.permission.scope_entity_combinations import (
 )
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY, build_operation_description
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -200,7 +199,7 @@ async def admin_delete_permission(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Bulk-insert scoped permission rows across one or more roles (admin only).",
     )
 )
@@ -215,7 +214,7 @@ async def admin_bulk_add_role_permissions(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Bulk-delete permission rows by primary key (admin only).",
     )
 )
@@ -230,7 +229,7 @@ async def admin_bulk_remove_role_permissions(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Replace one role's entire scoped-permission set (admin only).",
     )
 )

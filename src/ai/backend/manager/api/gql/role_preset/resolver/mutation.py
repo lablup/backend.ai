@@ -7,7 +7,6 @@ from uuid import UUID
 from strawberry import Info
 
 from ai.backend.common.identifier.role_preset import RolePresetID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -34,7 +33,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Create a new role preset (admin only).",
     )
 )
@@ -49,7 +48,7 @@ async def admin_create_role_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Update an existing role preset's metadata (admin only).",
     )
 )
@@ -64,7 +63,7 @@ async def admin_update_role_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Bulk-soft-delete role presets (admin only).",
     )
 )
@@ -79,7 +78,7 @@ async def admin_delete_role_presets(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Bulk-restore soft-deleted role presets (admin only).",
     )
 )
@@ -94,7 +93,7 @@ async def admin_restore_role_presets(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Bulk-hard-delete role presets (admin only).",
     )
 )
@@ -109,7 +108,7 @@ async def admin_purge_role_presets(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Bulk-add permission entries to an existing role preset (admin only).",
     )
 )
@@ -127,7 +126,7 @@ async def admin_bulk_add_role_preset_permissions(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Bulk-remove permission entries from a role preset (admin only).",
     )
 )

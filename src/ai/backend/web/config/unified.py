@@ -24,7 +24,6 @@ from ai.backend.common.configs import (
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.meta import (
-    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -1560,7 +1559,7 @@ class APIConfig(BaseConfigSchema):
                 "does not forward requests to a half-broken Manager. Use "
                 "'/health/livez' if you only want a liveness signal."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="/health/readyz", prod="/health/readyz"),
         ),
     ]
@@ -1577,7 +1576,7 @@ class APIConfig(BaseConfigSchema):
                 "Seconds between background liveness probes per Manager endpoint. "
                 "Smaller values detect upstream failures faster at the cost of probe traffic."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="10.0", prod="10.0"),
         ),
     ]
@@ -1596,7 +1595,7 @@ class APIConfig(BaseConfigSchema):
                 "Consecutive probe (or caller-reported) failures required before an "
                 "endpoint flips from healthy to unhealthy."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="3", prod="3"),
         ),
     ]
@@ -1616,7 +1615,7 @@ class APIConfig(BaseConfigSchema):
                 "is marked unhealthy. Reserved for future eviction policies; the "
                 "endpoint itself flips back to healthy on the next successful probe."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="60.0", prod="60.0"),
         ),
     ]
@@ -1636,7 +1635,7 @@ class APIConfig(BaseConfigSchema):
                 "health-check-interval: the probe must finish within this window or "
                 "it counts as a failure."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="2.0", prod="2.0"),
         ),
     ]
@@ -1654,7 +1653,7 @@ class APIConfig(BaseConfigSchema):
                 "picks uniformly; 'least_connections' favors the endpoint with the "
                 "fewest in-flight acquisitions."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="round_robin", prod="least_connections"),
         ),
     ]
@@ -2055,7 +2054,7 @@ class ApolloRouterConfig(BaseConfigSchema):
                 "a gateway that is still starting up. Apollo Router (Rust) deployments "
                 "typically expose '/health/readiness' instead; switch via this option."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="/readiness", prod="/readiness"),
         ),
     ]
@@ -2069,7 +2068,7 @@ class ApolloRouterConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description="Seconds between background liveness probes per Apollo Router endpoint.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="10.0", prod="10.0"),
         ),
     ]
@@ -2088,7 +2087,7 @@ class ApolloRouterConfig(BaseConfigSchema):
                 "Consecutive probe (or caller-reported) failures required before an "
                 "Apollo Router endpoint flips from healthy to unhealthy."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="3", prod="3"),
         ),
     ]
@@ -2107,7 +2106,7 @@ class ApolloRouterConfig(BaseConfigSchema):
                 "Seconds the unhealthy_since timestamp is retained after an Apollo "
                 "Router endpoint is marked unhealthy."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="60.0", prod="60.0"),
         ),
     ]
@@ -2123,7 +2122,7 @@ class ApolloRouterConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description="Per-endpoint HTTP probe timeout in seconds for Apollo Router.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="2.0", prod="2.0"),
         ),
     ]
@@ -2139,7 +2138,7 @@ class ApolloRouterConfig(BaseConfigSchema):
                 "Selection policy ApolloRouterClientPool uses to pick an Apollo Router "
                 "endpoint per request."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             example=ConfigExample(local="round_robin", prod="least_connections"),
         ),
     ]

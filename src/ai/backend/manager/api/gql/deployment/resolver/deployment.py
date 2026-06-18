@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplaceDeploymentOptionsInput,
 )
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -238,7 +237,7 @@ async def delete_model_deployment(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Fully replace the ``options`` surface of a deployment. "
             "Replace semantics — the supplied payload is the complete new value."

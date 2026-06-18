@@ -35,7 +35,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ReplicaOrderField,
 )
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
@@ -116,7 +115,7 @@ TrafficStatus: type[RouteTrafficStatus] = gql_enum(
 
 ReplicaHealthStatusGQL: type[RouteHealthStatus] = gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="This enum represents the health check status of a replica.",
     ),
     RouteHealthStatus,
@@ -195,7 +194,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     revision_id: ID
     deployment_id: ID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="ID of the model deployment this replica belongs to.",
         )
     )
@@ -210,19 +209,19 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     )
     status: ReplicaStatus = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Provisioning status of the replica (mirrors the underlying route status).",
         )
     )
     traffic_status: TrafficStatus = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Traffic status of the replica.",
         )
     )
     health_status: ReplicaHealthStatusGQL = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Health check status of the replica.",
         )
     )
@@ -273,7 +272,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="The model deployment this replica belongs to.",
         )
     )  # type: ignore[misc]

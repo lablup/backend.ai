@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
 from ai.backend.common.dto.manager.v2.keypair.request import (
     KeypairOrderBy as KeypairOrderByDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -47,7 +46,7 @@ class KeypairFilterGQL(PydanticInputMixin[KeypairFilterDTO]):
     resource_policy: StringFilter | None = None
     user_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter keypairs by the UUID of their owner.",
         ),
         default=None,
