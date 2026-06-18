@@ -52,8 +52,11 @@ class ReplicaSpecUpdaterSpec(UpdaterSpec[EndpointRow]):
     @override
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
-        # Use the actual database column names
+        # Use the actual database column names. The scaling goal is
+        # COALESCE(desired_replicas, replicas), so a manual scale must update
+        # desired_replicas too; otherwise a stale desired_replicas overrides it.
         self.replica_count.update_dict(to_update, "replicas")
+        self.replica_count.update_dict(to_update, "desired_replicas")
         return to_update
 
 
