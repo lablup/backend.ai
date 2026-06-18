@@ -99,6 +99,22 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             )
             if condition:
                 conditions.append(condition)
+        if filter_.created_at:
+            condition = filter_.created_at.build_query_condition(
+                before_factory=AppConfigDefinitionConditions.by_created_at_before,
+                after_factory=AppConfigDefinitionConditions.by_created_at_after,
+                equals_factory=AppConfigDefinitionConditions.by_created_at_equals,
+            )
+            if condition:
+                conditions.append(condition)
+        if filter_.updated_at:
+            condition = filter_.updated_at.build_query_condition(
+                before_factory=AppConfigDefinitionConditions.by_updated_at_before,
+                after_factory=AppConfigDefinitionConditions.by_updated_at_after,
+                equals_factory=AppConfigDefinitionConditions.by_updated_at_equals,
+            )
+            if condition:
+                conditions.append(condition)
         return conditions
 
     def _convert_orders(self, orders: list[AppConfigDefinitionOrder]) -> list[QueryOrder]:
@@ -110,6 +126,8 @@ class AppConfigDefinitionAdapter(BaseAdapter):
                     result.append(AppConfigDefinitionOrders.config_name(ascending))
                 case AppConfigDefinitionOrderField.CREATED_AT:
                     result.append(AppConfigDefinitionOrders.created_at(ascending))
+                case AppConfigDefinitionOrderField.UPDATED_AT:
+                    result.append(AppConfigDefinitionOrders.updated_at(ascending))
         return result
 
     async def admin_search(

@@ -163,3 +163,33 @@ class TestSearch:
             (definition.config_name for definition in seeded_definitions), reverse=True
         )
         assert [item.config_name for item in result.items] == expected
+
+    async def test_search_filters_by_created_at(
+        self,
+        repository: AppConfigDefinitionRepository,
+        seeded_definitions: list[AppConfigDefinitionData],
+    ) -> None:
+        target = seeded_definitions[1]
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[AppConfigDefinitionConditions.by_created_at_equals(target.created_at)],
+            )
+        )
+        assert [item.id for item in result.items] == [target.id]
+
+    async def test_search_orders_by_created_at(
+        self,
+        repository: AppConfigDefinitionRepository,
+        seeded_definitions: list[AppConfigDefinitionData],
+    ) -> None:
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                orders=[AppConfigDefinitionOrders.created_at(ascending=True)],
+            )
+        )
+        expected = [
+            definition.id for definition in sorted(seeded_definitions, key=lambda d: d.created_at)
+        ]
+        assert [item.id for item in result.items] == expected

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -66,3 +68,49 @@ class AppConfigDefinitionConditions:
         return inner
 
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigDefinitionRow.config_name))
+
+    # --- created_at datetime filters ---
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigDefinitionRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigDefinitionRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigDefinitionRow.created_at == dt
+
+        return inner
+
+    # --- updated_at datetime filters ---
+
+    @staticmethod
+    def by_updated_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigDefinitionRow.updated_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigDefinitionRow.updated_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_updated_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigDefinitionRow.updated_at == dt
+
+        return inner

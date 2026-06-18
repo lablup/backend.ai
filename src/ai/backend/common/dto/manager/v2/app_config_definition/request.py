@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.app_config_definition.types import (
     AppConfigDefinitionOrderField,
 )
@@ -33,6 +33,12 @@ class AppConfigDefinitionFilter(BaseRequestModel):
     """Filter for app config definition search."""
 
     config_name: StringFilter | None = Field(default=None, description="Filter by config name.")
+    created_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by creation datetime."
+    )
+    updated_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by last update datetime."
+    )
 
 
 class AppConfigDefinitionOrder(BaseRequestModel):

@@ -20,3 +20,9 @@ class AppConfigDefinitionOrders:
         if ascending:
             return AppConfigDefinitionRow.created_at.asc()
         return AppConfigDefinitionRow.created_at.desc()
+
+    @staticmethod
+    def updated_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AppConfigDefinitionRow.updated_at.asc()
+        return AppConfigDefinitionRow.updated_at.desc()
