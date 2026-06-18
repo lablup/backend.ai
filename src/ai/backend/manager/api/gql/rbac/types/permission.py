@@ -231,6 +231,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.SESSION_TEMPLATE
                 | RBACElementType.APP_CONFIG
                 | RBACElementType.APP_CONFIG_DEFINITION
+                | RBACElementType.APP_CONFIG_ALLOW_LIST
                 | RBACElementType.RESOURCE_PRESET
                 | RBACElementType.USER_RESOURCE_POLICY
                 | RBACElementType.KEYPAIR_RESOURCE_POLICY
