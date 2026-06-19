@@ -29,10 +29,12 @@ from ai.backend.manager.models.app_config_definition.conditions import (
     AppConfigDefinitionConditions,
 )
 from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
+from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
 )
 from ai.backend.manager.repositories.base import (
+    Purger,
     QueryCondition,
     QueryOrder,
 )
@@ -109,8 +111,11 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         )
 
     async def admin_purge(self, definition_id: UUID) -> PurgeAppConfigDefinitionPayload:
+        purger = Purger(
+            row_class=AppConfigDefinitionRow, pk_value=AppConfigDefinitionID(definition_id)
+        )
         action_result = await self._processors.app_config_definition.purge.wait_for_complete(
-            PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(definition_id))
+            PurgeAppConfigDefinitionAction(purger=purger)
         )
         return PurgeAppConfigDefinitionPayload(id=action_result.definition.id)
 

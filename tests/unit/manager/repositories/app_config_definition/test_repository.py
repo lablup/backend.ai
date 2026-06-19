@@ -28,6 +28,7 @@ from ai.backend.manager.repositories.base import (
     Creator,
     CursorForwardPagination,
     OffsetPagination,
+    Purger,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -87,14 +88,16 @@ class TestPurge:
         repository: AppConfigDefinitionRepository,
         existing_definition: AppConfigDefinitionData,
     ) -> None:
-        purged = await repository.purge(existing_definition.id)
+        purged = await repository.purge(
+            Purger(row_class=AppConfigDefinitionRow, pk_value=existing_definition.id)
+        )
         assert purged.id == existing_definition.id
         with pytest.raises(AppConfigDefinitionNotFound):
             await repository.get_by_id(existing_definition.id)
 
     async def test_purge_missing_raises(self, repository: AppConfigDefinitionRepository) -> None:
         with pytest.raises(AppConfigDefinitionNotFound):
-            await repository.purge(_missing_id())
+            await repository.purge(Purger(row_class=AppConfigDefinitionRow, pk_value=_missing_id()))
 
 
 class TestSearch:
