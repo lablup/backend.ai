@@ -100,7 +100,7 @@ class TestSchemaRegistration:
     def test_types_and_root_fields_present_in_schema(self) -> None:
         sdl = schema.as_str()
         assert "type AppConfigAllowList " in sdl
-        assert "appConfigAllowList(" in sdl
-        assert "appConfigAllowLists(" in sdl
+        assert "adminAppConfigAllowList(" in sdl
+        assert "adminAppConfigAllowLists(" in sdl
         assert "adminCreateAppConfigAllowList(" in sdl
         assert "adminPurgeAppConfigAllowList(" in sdl
