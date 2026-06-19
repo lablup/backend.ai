@@ -131,8 +131,8 @@ class ArrayFilter[T](BaseRequestModel):
 class DateTimeFilter(BaseRequestModel):
     """Filter for datetime fields supporting range and equality operations."""
 
-    before: datetime | None = Field(default=None, description="Before this datetime (inclusive)")
-    after: datetime | None = Field(default=None, description="After this datetime (inclusive)")
+    before: datetime | None = Field(default=None, description="Before this datetime (exclusive)")
+    after: datetime | None = Field(default=None, description="After this datetime (exclusive)")
     equals: datetime | None = Field(default=None, description="Exact datetime match")
     not_equals: datetime | None = Field(default=None, description="Not equal to this datetime")
 
@@ -145,8 +145,8 @@ class DateTimeFilter(BaseRequestModel):
         """Build a query condition from this filter using the provided factory callables.
 
         Args:
-            before_factory: Factory function that takes datetime and returns a condition for <= comparison
-            after_factory: Factory function that takes datetime and returns a condition for >= comparison
+            before_factory: Factory function that takes datetime and returns a condition for < comparison
+            after_factory: Factory function that takes datetime and returns a condition for > comparison
             equals_factory: Factory function for = comparison
 
         Returns:

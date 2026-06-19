@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
@@ -50,10 +51,11 @@ from ai.backend.manager.services.app_config_definition.actions.search import (
 )
 
 
-def _pagination_spec() -> PaginationSpec:
+@lru_cache(maxsize=1)
+def _get_app_config_definition_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=AppConfigDefinitionOrders.id(ascending=False),
-        backward_order=AppConfigDefinitionOrders.id(ascending=True),
+        forward_order=AppConfigDefinitionOrders.created_at(ascending=False),
+        backward_order=AppConfigDefinitionOrders.created_at(ascending=True),
         forward_condition_factory=AppConfigDefinitionConditions.by_cursor_forward,
         backward_condition_factory=AppConfigDefinitionConditions.by_cursor_backward,
         tiebreaker_order=AppConfigDefinitionOrders.id(ascending=True),
@@ -88,7 +90,7 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         querier = self._build_querier(
             conditions=conditions,
             orders=orders,
-            pagination_spec=_pagination_spec(),
+            pagination_spec=_get_app_config_definition_pagination_spec(),
             first=input.first,
             after=input.after,
             last=input.last,

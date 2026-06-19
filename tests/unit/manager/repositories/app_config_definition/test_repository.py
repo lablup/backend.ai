@@ -197,15 +197,15 @@ class TestSearch:
         repository: AppConfigDefinitionRepository,
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        by_id_desc = sorted(seeded_definitions, key=lambda d: d.id, reverse=True)
-        cursor = by_id_desc[0].id
+        by_created_desc = sorted(seeded_definitions, key=lambda d: d.created_at, reverse=True)
+        cursor = by_created_desc[0].id
         result = await repository.search(
             BatchQuerier(
                 pagination=CursorForwardPagination(
                     first=10,
-                    cursor_order=AppConfigDefinitionOrders.id(ascending=False),
+                    cursor_order=AppConfigDefinitionOrders.created_at(ascending=False),
                     cursor_condition=AppConfigDefinitionConditions.by_cursor_forward(str(cursor)),
                 )
             )
         )
-        assert [item.id for item in result.items] == [d.id for d in by_id_desc[1:]]
+        assert [item.id for item in result.items] == [d.id for d in by_created_desc[1:]]
