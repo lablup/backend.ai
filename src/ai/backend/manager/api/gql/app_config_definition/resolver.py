@@ -28,6 +28,7 @@ from .types import (
     AppConfigDefinitionOrderByGQL,
     CreateAppConfigDefinitionInputGQL,
     CreateAppConfigDefinitionPayloadGQL,
+    PurgeAppConfigDefinitionInputGQL,
     PurgeAppConfigDefinitionPayloadGQL,
 )
 
@@ -124,8 +125,8 @@ async def admin_create_app_config_definition(
 )
 async def admin_purge_app_config_definition(
     info: Info[StrawberryGQLContext],
-    id: UUID,
+    input: PurgeAppConfigDefinitionInputGQL,
 ) -> PurgeAppConfigDefinitionPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.app_config_definition.admin_purge(id)
+    payload = await info.context.adapters.app_config_definition.admin_purge(input.to_pydantic())
     return PurgeAppConfigDefinitionPayloadGQL.from_pydantic(payload)

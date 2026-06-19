@@ -20,6 +20,9 @@ from ai.backend.common.dto.manager.v2.app_config_definition.request import (
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     CreateAppConfigDefinitionInput as CreateAppConfigDefinitionInputDTO,
 )
+from ai.backend.common.dto.manager.v2.app_config_definition.request import (
+    PurgeAppConfigDefinitionInput as PurgeAppConfigDefinitionInputDTO,
+)
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     AppConfigDefinitionNode,
 )
@@ -53,6 +56,7 @@ __all__ = (
     "AppConfigDefinitionOrderFieldGQL",
     "CreateAppConfigDefinitionInputGQL",
     "CreateAppConfigDefinitionPayloadGQL",
+    "PurgeAppConfigDefinitionInputGQL",
     "PurgeAppConfigDefinitionPayloadGQL",
 )
 
@@ -65,7 +69,7 @@ __all__ = (
 @gql_node_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A registered app config name.",
+        description="A registered app config.",
     ),
     name="AppConfigDefinition",
 )
@@ -171,6 +175,17 @@ class AppConfigDefinitionOrderByGQL(PydanticInputMixin[AppConfigDefinitionOrderD
 )
 class CreateAppConfigDefinitionInputGQL(PydanticInputMixin[CreateAppConfigDefinitionInputDTO]):
     config_name: str = gql_field(description="Unique config name to register.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for purging an app config definition.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="PurgeAppConfigDefinitionInput",
+)
+class PurgeAppConfigDefinitionInputGQL(PydanticInputMixin[PurgeAppConfigDefinitionInputDTO]):
+    id: UUID = gql_field(description="App config definition id to purge.")
 
 
 @gql_pydantic_type(

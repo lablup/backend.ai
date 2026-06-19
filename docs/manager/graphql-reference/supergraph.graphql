@@ -885,7 +885,7 @@ type AllowedResourceGroupsPayload
   items: [String!]!
 }
 
-"""Added in 26.7.0. A registered app config name."""
+"""Added in 26.7.0. A registered app config."""
 type AppConfigDefinition implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -11764,7 +11764,7 @@ type Mutation
   """
   Added in 26.7.0. Purge an app config definition by id (super admin only).
   """
-  adminPurgeAppConfigDefinition(id: UUID!): PurgeAppConfigDefinitionPayload @join__field(graph: STRAWBERRY)
+  adminPurgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Create a new runtime variant (superadmin only)."""
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload @join__field(graph: STRAWBERRY)
@@ -13537,6 +13537,14 @@ input ProjectWeightInputItem
   Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
+}
+
+"""Added in 26.7.0. Input for purging an app config definition."""
+input PurgeAppConfigDefinitionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """App config definition id to purge."""
+  id: UUID!
 }
 
 """Added in 26.7.0. Payload for app config definition purge."""

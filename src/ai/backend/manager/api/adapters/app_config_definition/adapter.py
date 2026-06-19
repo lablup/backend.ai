@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     AppConfigDefinitionFilter,
     AppConfigDefinitionOrder,
     CreateAppConfigDefinitionInput,
+    PurgeAppConfigDefinitionInput,
     SearchAppConfigDefinitionsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
@@ -132,10 +133,10 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def admin_purge(self, definition_id: UUID) -> PurgeAppConfigDefinitionPayload:
-        purger = Purger(
-            row_class=AppConfigDefinitionRow, pk_value=AppConfigDefinitionID(definition_id)
-        )
+    async def admin_purge(
+        self, input: PurgeAppConfigDefinitionInput
+    ) -> PurgeAppConfigDefinitionPayload:
+        purger = Purger(row_class=AppConfigDefinitionRow, pk_value=AppConfigDefinitionID(input.id))
         action_result = await self._processors.app_config_definition.purge.wait_for_complete(
             PurgeAppConfigDefinitionAction(purger=purger)
         )

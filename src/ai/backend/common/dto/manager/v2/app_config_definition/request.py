@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
@@ -15,6 +17,7 @@ __all__ = (
     "AppConfigDefinitionFilter",
     "AppConfigDefinitionOrder",
     "CreateAppConfigDefinitionInput",
+    "PurgeAppConfigDefinitionInput",
     "SearchAppConfigDefinitionsInput",
 )
 
@@ -27,6 +30,12 @@ class CreateAppConfigDefinitionInput(BaseRequestModel):
         max_length=128,
         description="Unique config name to register (e.g. 'theme', 'menu').",
     )
+
+
+class PurgeAppConfigDefinitionInput(BaseRequestModel):
+    """Input for purging an app config definition."""
+
+    id: UUID = Field(description="App config definition id to purge.")
 
 
 class AppConfigDefinitionFilter(BaseRequestModel):
