@@ -86,6 +86,10 @@ class LoginClientTypeIdPathParam(BaseRequestModel):
     login_client_type_id: UUID = Field(description="Login client type UUID")
 
 
+class AppConfigDefinitionIdPathParam(BaseRequestModel):
+    app_config_definition_id: UUID = Field(description="App config definition UUID")
+
+
 class ReplicaIdPathParam(BaseRequestModel):
     replica_id: UUID = Field(description="Replica UUID")
 

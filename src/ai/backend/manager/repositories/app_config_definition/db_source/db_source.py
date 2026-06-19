@@ -52,9 +52,7 @@ class AppConfigDefinitionDBSource:
         async with self._ops.write_ops() as w:
             result = await w.purge(purger)
             if result is None:
-                raise AppConfigDefinitionNotFound(
-                    f"App config definition {purger.pk_value} not found"
-                )
+                raise AppConfigDefinitionNotFound("App config definition not found")
             return result.row.to_data()
 
     async def search(self, querier: BatchQuerier) -> AppConfigDefinitionListResult:

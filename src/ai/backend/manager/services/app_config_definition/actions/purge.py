@@ -8,7 +8,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base import Purger
 from ai.backend.manager.services.app_config_definition.actions.base import (
     AppConfigDefinitionSingleEntityAction,
     AppConfigDefinitionSingleEntityActionResult,
