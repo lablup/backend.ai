@@ -1,10 +1,10 @@
 """GraphQL app config allow-list module."""
 
 from .resolver import (
+    admin_app_config_allow_list,
+    admin_app_config_allow_lists,
     admin_create_app_config_allow_list,
     admin_purge_app_config_allow_list,
-    app_config_allow_list,
-    app_config_allow_lists,
 )
 from .types import (
     AppConfigAllowListConnection,
@@ -32,8 +32,8 @@ __all__ = (
     "CreateAppConfigAllowListPayloadGQL",
     "PurgeAppConfigAllowListPayloadGQL",
     # Query resolvers
-    "app_config_allow_list",
-    "app_config_allow_lists",
+    "admin_app_config_allow_list",
+    "admin_app_config_allow_lists",
     # Mutation resolvers
     "admin_create_app_config_allow_list",
     "admin_purge_app_config_allow_list",

@@ -16,10 +16,10 @@ from .agent import (
     agents_v2,
 )
 from .app_config_allow_list import (
+    admin_app_config_allow_list,
+    admin_app_config_allow_lists,
     admin_create_app_config_allow_list,
     admin_purge_app_config_allow_list,
-    app_config_allow_list,
-    app_config_allow_lists,
 )
 from .app_config_definition import (
     admin_app_config_definition,
@@ -472,8 +472,8 @@ from .vfs_storage import (
 class Query:
     agent_stats = agent_stats
     agents_v2 = agents_v2
-    app_config_allow_list = app_config_allow_list
-    app_config_allow_lists = app_config_allow_lists
+    admin_app_config_allow_list = admin_app_config_allow_list
+    admin_app_config_allow_lists = admin_app_config_allow_lists
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
