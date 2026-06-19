@@ -37,6 +37,7 @@ jobs:
             This PR has been automatically closed because it had no activity
             for ${{ env.DAYS_BEFORE_CLOSE }} days after being marked as stale.
             Feel free to reopen it if you intend to continue the work.
+          operations-per-run: 200
           # Only act on pull requests, not issues.
           days-before-issue-stale: -1
           days-before-issue-close: -1
