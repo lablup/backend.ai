@@ -16,10 +16,10 @@ from .agent import (
     agents_v2,
 )
 from .app_config_definition import (
+    admin_app_config_definition,
+    admin_app_config_definitions,
     admin_create_app_config_definition,
     admin_purge_app_config_definition,
-    app_config_definition,
-    app_config_definitions,
 )
 from .artifact import (
     approve_artifact_revision,
@@ -640,8 +640,8 @@ class Query:
     login_client_type = login_client_type
     login_client_types = login_client_types
     # App Config Definition APIs
-    app_config_definition = app_config_definition
-    app_config_definitions = app_config_definitions
+    admin_app_config_definition = admin_app_config_definition
+    admin_app_config_definitions = admin_app_config_definitions
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant

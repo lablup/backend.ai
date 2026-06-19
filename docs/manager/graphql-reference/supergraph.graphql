@@ -14723,12 +14723,12 @@ type Query
   """
   Added in 26.7.0. Get a single app config definition by id (super admin only).
   """
-  appConfigDefinition(id: UUID!): AppConfigDefinition @join__field(graph: STRAWBERRY)
+  adminAppConfigDefinition(id: UUID!): AppConfigDefinition @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.7.0. Search app config definitions with filtering, ordering, and pagination (super admin only).
   """
-  appConfigDefinitions(filter: AppConfigDefinitionFilter = null, orderBy: [AppConfigDefinitionOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigDefinitionConnection @join__field(graph: STRAWBERRY)
+  adminAppConfigDefinitions(filter: AppConfigDefinitionFilter = null, orderBy: [AppConfigDefinitionOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigDefinitionConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Search runtime variants."""
   runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection @join__field(graph: STRAWBERRY)

@@ -39,7 +39,7 @@ from .types import (
         description="Get a single app config definition by id (super admin only).",
     )
 )  # type: ignore[misc]
-async def app_config_definition(
+async def admin_app_config_definition(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> AppConfigDefinitionGQL | None:
@@ -57,7 +57,7 @@ async def app_config_definition(
         ),
     )
 )  # type: ignore[misc]
-async def app_config_definitions(
+async def admin_app_config_definitions(
     info: Info[StrawberryGQLContext],
     filter: AppConfigDefinitionFilterGQL | None = None,
     order_by: list[AppConfigDefinitionOrderByGQL] | None = None,
