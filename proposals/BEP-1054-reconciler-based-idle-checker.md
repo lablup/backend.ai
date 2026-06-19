@@ -69,7 +69,7 @@ Two tables. The checker carries no scope of its own; the association table carri
 | Column | Type | Description |
 |---|---|---|
 | `id` | UUID, PK | Identity of the reusable checker |
-| `name` | string, unique | Human-readable name |
+| `name` | string | Human-readable name |
 | `description` | string, nullable | Optional description |
 | `checker_type` | string | `session_lifetime` / `network_timeout` / `utilization` |
 | `spec` | JSONB | Checker-type-specific configuration payload |
@@ -223,7 +223,7 @@ The Source does not branch centrally on checker type to read Valkey or Prometheu
 | `network_timeout` | an interactive session has had no access and no active connections beyond a timeout | last-access / active-connection signals |
 | `utilization` | a session's resource utilization stays below thresholds across a window, after a grace period | windowed utilization metrics |
 
-The exact judgment rules for each checker are an implementation concern and are intentionally not specified here.
+The exact judgment rules for each checker are an implementation concern and are intentionally not specified here. A single scope can bind multiple checkers of the same `checker_type`
 
 ### Utilization via Prometheus
 
@@ -264,7 +264,6 @@ flowchart TB
 
 ## Open Questions
 
-- May a single scope bind multiple checkers of the same `checker_type`?
 - Is scope specificity (`resource_group` > `project` > `domain`) plus a stable tiebreak enough to order a session's effective checkers, or is an explicit per-binding `priority` needed?
 - Should the legacy keypair `idle_timeout` / `max_session_lifetime` values be backfilled into checker specs, or only honored as a fallback during rollout?
 - Should utilization `and` / `or` threshold semantics match the legacy behavior or be redefined?
