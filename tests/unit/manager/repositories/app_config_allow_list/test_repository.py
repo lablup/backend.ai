@@ -40,6 +40,8 @@ from ai.backend.manager.repositories.app_config_definition.repository import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
+    CursorBackwardPagination,
+    CursorForwardPagination,
     OffsetPagination,
     Purger,
 )
@@ -237,3 +239,81 @@ class TestSearch:
         )
         config_names = [item.config_name for item in result.items]
         assert config_names == sorted(config_names, reverse=True)
+
+    async def test_search_filters_by_created_at(
+        self,
+        repository: AppConfigAllowListRepository,
+        seeded_entries: list[AppConfigAllowListData],
+    ) -> None:
+        target = seeded_entries[1]
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[AppConfigAllowListConditions.by_created_at_equals(target.created_at)],
+            )
+        )
+        assert [item.id for item in result.items] == [target.id]
+
+    async def test_search_filters_by_updated_at(
+        self,
+        repository: AppConfigAllowListRepository,
+        seeded_entries: list[AppConfigAllowListData],
+    ) -> None:
+        target = seeded_entries[1]
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[AppConfigAllowListConditions.by_updated_at_equals(target.updated_at)],
+            )
+        )
+        assert [item.id for item in result.items] == [target.id]
+
+    async def test_search_orders_by_created_at(
+        self,
+        repository: AppConfigAllowListRepository,
+        seeded_entries: list[AppConfigAllowListData],
+    ) -> None:
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                orders=[AppConfigAllowListOrders.created_at(ascending=True)],
+            )
+        )
+        expected = [entry.id for entry in sorted(seeded_entries, key=lambda e: e.created_at)]
+        assert [item.id for item in result.items] == expected
+
+    async def test_search_cursor_forward(
+        self,
+        repository: AppConfigAllowListRepository,
+        seeded_entries: list[AppConfigAllowListData],
+    ) -> None:
+        by_created_desc = sorted(seeded_entries, key=lambda e: e.created_at, reverse=True)
+        cursor = by_created_desc[0].id
+        result = await repository.search(
+            BatchQuerier(
+                pagination=CursorForwardPagination(
+                    first=10,
+                    cursor_order=AppConfigAllowListOrders.created_at(ascending=False),
+                    cursor_condition=AppConfigAllowListConditions.by_cursor_forward(str(cursor)),
+                )
+            )
+        )
+        assert [item.id for item in result.items] == [entry.id for entry in by_created_desc[1:]]
+
+    async def test_search_cursor_backward(
+        self,
+        repository: AppConfigAllowListRepository,
+        seeded_entries: list[AppConfigAllowListData],
+    ) -> None:
+        by_created_asc = sorted(seeded_entries, key=lambda e: e.created_at)
+        cursor = by_created_asc[0].id
+        result = await repository.search(
+            BatchQuerier(
+                pagination=CursorBackwardPagination(
+                    last=10,
+                    cursor_order=AppConfigAllowListOrders.created_at(ascending=True),
+                    cursor_condition=AppConfigAllowListConditions.by_cursor_backward(str(cursor)),
+                )
+            )
+        )
+        assert {item.id for item in result.items} == {entry.id for entry in by_created_asc[1:]}

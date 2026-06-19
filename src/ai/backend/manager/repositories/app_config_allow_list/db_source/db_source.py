@@ -1,7 +1,8 @@
 """Database source for app config allow-list repository operations.
 
 Each public method binds its work to a single session through the injected
-``DBOpsProvider`` and builds the spec/wrapper it needs internally.
+``DBOpsProvider``. The caller passes in the spec
+(``Creator``/``Purger``/``BatchQuerier``) that scopes the operation.
 """
 
 from __future__ import annotations
