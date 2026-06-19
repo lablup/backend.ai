@@ -36,10 +36,12 @@ from ai.backend.manager.models.app_config_allow_list.conditions import (
     AppConfigAllowListConditions,
 )
 from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllowListOrders
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
     AppConfigAllowListCreatorSpec,
 )
 from ai.backend.manager.repositories.base import (
+    Purger,
     QueryCondition,
     QueryOrder,
 )
@@ -121,8 +123,11 @@ class AppConfigAllowListAdapter(BaseAdapter):
         )
 
     async def admin_purge(self, allow_list_id: UUID) -> PurgeAppConfigAllowListPayload:
+        purger = Purger(
+            row_class=AppConfigAllowListRow, pk_value=AppConfigAllowListID(allow_list_id)
+        )
         action_result = await self._processors.app_config_allow_list.purge.wait_for_complete(
-            PurgeAppConfigAllowListAction(allow_list_id=AppConfigAllowListID(allow_list_id))
+            PurgeAppConfigAllowListAction(purger=purger)
         )
         return PurgeAppConfigAllowListPayload(id=action_result.allow_list.id)
 
