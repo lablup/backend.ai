@@ -53,5 +53,5 @@ class AppConfigAllowListService:
     async def purge(
         self, action: PurgeAppConfigAllowListAction
     ) -> PurgeAppConfigAllowListActionResult:
-        data = await self._repository.purge(action.allow_list_id)
+        data = await self._repository.purge(action.purger)
         return PurgeAppConfigAllowListActionResult(allow_list=data)

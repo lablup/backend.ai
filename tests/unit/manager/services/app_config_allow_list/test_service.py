@@ -15,13 +15,19 @@ from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigScopeType,
 )
 from ai.backend.manager.errors.app_config import AppConfigAllowListNotFound
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
     AppConfigAllowListCreatorSpec,
 )
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    OffsetPagination,
+    Purger,
+)
 from ai.backend.manager.services.app_config_allow_list.actions.create import (
     CreateAppConfigAllowListAction,
 )
@@ -131,10 +137,9 @@ class TestAppConfigAllowListService:
         allow_list_data: AppConfigAllowListData,
     ) -> None:
         mock_repository.purge = AsyncMock(return_value=allow_list_data)
+        purger = Purger(row_class=AppConfigAllowListRow, pk_value=allow_list_data.id)
 
-        result = await service.purge(
-            PurgeAppConfigAllowListAction(allow_list_id=allow_list_data.id)
-        )
+        result = await service.purge(PurgeAppConfigAllowListAction(purger=purger))
 
         assert result.allow_list == allow_list_data
-        mock_repository.purge.assert_called_once_with(allow_list_data.id)
+        mock_repository.purge.assert_called_once_with(purger)
