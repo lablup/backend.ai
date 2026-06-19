@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -70,7 +71,14 @@ class AppConfigDefinitionConditions:
 
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigDefinitionRow.config_name))
 
-    # --- cursor (id-based) pagination ---
+    @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigDefinitionRow.id.in_(ids)
+
+        return inner
+
+    # --- cursor (created_at-based) pagination ---
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:

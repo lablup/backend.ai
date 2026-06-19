@@ -885,6 +885,89 @@ type AllowedResourceGroupsPayload
   items: [String!]!
 }
 
+"""Added in 26.7.0. A registered app config."""
+type AppConfigDefinition implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Registered config name."""
+  configName: String!
+
+  """Creation timestamp (UTC)."""
+  createdAt: DateTime!
+
+  """Last update timestamp (UTC)."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.7.0. Paginated connection for app config definition records.
+"""
+type AppConfigDefinitionConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AppConfigDefinitionEdge!]!
+
+  """
+  Total number of app config definition records matching the query criteria.
+  """
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AppConfigDefinitionEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AppConfigDefinition!
+}
+
+"""Added in 26.7.0. Filter input for querying app config definitions."""
+input AppConfigDefinitionFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by config name."""
+  configName: StringFilter = null
+
+  """Filter by creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by last update datetime."""
+  updatedAt: DateTimeFilter = null
+}
+
+"""Added in 26.7.0. Specifies ordering for app config definition results."""
+input AppConfigDefinitionOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: AppConfigDefinitionOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.7.0. Fields available for ordering app config definition results.
+"""
+enum AppConfigDefinitionOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CONFIG_NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
 """
 Added in 24.09.0. Input for approving an artifact revision.
 
@@ -3192,6 +3275,22 @@ type CreateAccessTokenPayload
 {
   """Created access token"""
   accessToken: AccessToken!
+}
+
+"""Added in 26.7.0. Input for registering a new app config definition."""
+input CreateAppConfigDefinitionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Unique config name to register."""
+  configName: String!
+}
+
+"""Added in 26.7.0. Payload for app config definition creation."""
+type CreateAppConfigDefinitionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Created app config definition."""
+  appConfigDefinition: AppConfigDefinition!
 }
 
 """Added in 25.19.0. Input for creating an auto-scaling rule."""
@@ -11657,6 +11756,16 @@ type Mutation
   """Added in 26.4.2. Delete a login client type (super admin only)."""
   adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.7.0. Register a new app config definition (super admin only).
+  """
+  adminCreateAppConfigDefinition(input: CreateAppConfigDefinitionInput!): CreateAppConfigDefinitionPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.7.0. Purge an app config definition by id (super admin only).
+  """
+  adminPurgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload @join__field(graph: STRAWBERRY)
+
   """Added in 26.4.2. Create a new runtime variant (superadmin only)."""
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload @join__field(graph: STRAWBERRY)
 
@@ -13430,6 +13539,22 @@ input ProjectWeightInputItem
   weight: Decimal = null
 }
 
+"""Added in 26.7.0. Input for purging an app config definition."""
+input PurgeAppConfigDefinitionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """App config definition id to purge."""
+  id: UUID!
+}
+
+"""Added in 26.7.0. Payload for app config definition purge."""
+type PurgeAppConfigDefinitionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the purged app config definition."""
+  id: UUID!
+}
+
 """
 Completely delete domain from DB.
 
@@ -14594,6 +14719,16 @@ type Query
   Added in 26.4.2. Search login client types with filtering, ordering, and pagination.
   """
   loginClientTypes(filter: LoginClientTypeFilter = null, orderBy: [LoginClientTypeOrderBy!] = null, limit: Int = null, offset: Int = null): LoginClientTypeConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.7.0. Get a single app config definition by id (super admin only).
+  """
+  adminAppConfigDefinition(id: UUID!): AppConfigDefinition @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.7.0. Search app config definitions with filtering, ordering, and pagination (super admin only).
+  """
+  adminAppConfigDefinitions(filter: AppConfigDefinitionFilter = null, orderBy: [AppConfigDefinitionOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigDefinitionConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Search runtime variants."""
   runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection @join__field(graph: STRAWBERRY)

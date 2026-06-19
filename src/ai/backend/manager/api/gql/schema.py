@@ -15,6 +15,12 @@ from .agent import (
     agent_stats,
     agents_v2,
 )
+from .app_config_definition import (
+    admin_app_config_definition,
+    admin_app_config_definitions,
+    admin_create_app_config_definition,
+    admin_purge_app_config_definition,
+)
 from .artifact import (
     approve_artifact_revision,
     artifact,
@@ -633,6 +639,9 @@ class Query:
     admin_resource_preset_v2 = admin_resource_preset_v2
     login_client_type = login_client_type
     login_client_types = login_client_types
+    # App Config Definition APIs
+    admin_app_config_definition = admin_app_config_definition
+    admin_app_config_definitions = admin_app_config_definitions
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant
@@ -857,6 +866,9 @@ class Mutation:
     admin_create_login_client_type = admin_create_login_client_type
     admin_update_login_client_type = admin_update_login_client_type
     admin_delete_login_client_type = admin_delete_login_client_type
+    # App Config Definition mutations
+    admin_create_app_config_definition = admin_create_app_config_definition
+    admin_purge_app_config_definition = admin_purge_app_config_definition
     # Runtime Variant mutations
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant

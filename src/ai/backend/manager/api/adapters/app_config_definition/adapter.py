@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     AppConfigDefinitionFilter,
     AppConfigDefinitionOrder,
     CreateAppConfigDefinitionInput,
+    PurgeAppConfigDefinitionInput,
     SearchAppConfigDefinitionsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
@@ -84,6 +86,27 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         )
         return self._data_to_node(action_result.definition)
 
+    async def batch_load_by_ids(
+        self, ids: Sequence[AppConfigDefinitionID]
+    ) -> list[AppConfigDefinitionNode | None]:
+        """Batch load app config definitions by id for DataLoader use.
+
+        Returns nodes in the same order as the input ids, with None for missing ones.
+        """
+        if not ids:
+            return []
+        querier = self._build_querier(
+            conditions=[AppConfigDefinitionConditions.by_ids(list(ids))],
+            orders=[],
+            pagination_spec=_get_app_config_definition_pagination_spec(),
+            limit=len(ids),
+        )
+        action_result = await self._processors.app_config_definition.search.wait_for_complete(
+            SearchAppConfigDefinitionsAction(querier=querier)
+        )
+        node_map = {node.id: node for node in map(self._data_to_node, action_result.data)}
+        return [node_map.get(definition_id) for definition_id in ids]
+
     async def admin_search(
         self, input: SearchAppConfigDefinitionsInput
     ) -> SearchAppConfigDefinitionsPayload:
@@ -110,10 +133,10 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def admin_purge(self, definition_id: UUID) -> PurgeAppConfigDefinitionPayload:
-        purger = Purger(
-            row_class=AppConfigDefinitionRow, pk_value=AppConfigDefinitionID(definition_id)
-        )
+    async def admin_purge(
+        self, input: PurgeAppConfigDefinitionInput
+    ) -> PurgeAppConfigDefinitionPayload:
+        purger = Purger(row_class=AppConfigDefinitionRow, pk_value=AppConfigDefinitionID(input.id))
         action_result = await self._processors.app_config_definition.purge.wait_for_complete(
             PurgeAppConfigDefinitionAction(purger=purger)
         )

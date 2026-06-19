@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     CreateAppConfigDefinitionInput,
+    PurgeAppConfigDefinitionInput,
     SearchAppConfigDefinitionsInput,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -57,5 +58,7 @@ class V2AppConfigDefinitionHandler:
         path: PathParam[AppConfigDefinitionIdPathParam],
     ) -> APIResponse:
         """Purge an app config definition by id (superadmin only)."""
-        result = await self._adapter.admin_purge(path.parsed.app_config_definition_id)
+        result = await self._adapter.admin_purge(
+            PurgeAppConfigDefinitionInput(id=path.parsed.app_config_definition_id)
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
