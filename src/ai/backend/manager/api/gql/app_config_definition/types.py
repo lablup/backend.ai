@@ -32,6 +32,7 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
 from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     PurgeAppConfigDefinitionPayload as PurgeAppConfigDefinitionPayloadDTO,
 )
+from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -90,7 +91,7 @@ class AppConfigDefinitionGQL(PydanticNodeMixin[AppConfigDefinitionNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.app_config_definition_loader.load_many([
-            UUID(nid) for nid in node_ids
+            AppConfigDefinitionID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

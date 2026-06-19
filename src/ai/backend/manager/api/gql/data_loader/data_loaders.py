@@ -126,15 +126,17 @@ class DataLoaders:
     @cached_property
     def app_config_definition_loader(
         self,
-    ) -> DataLoader[uuid.UUID, AppConfigDefinitionGQL | None]:
+    ) -> DataLoader[AppConfigDefinitionID, AppConfigDefinitionGQL | None]:
         adapter = self._adapters.app_config_definition
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[AppConfigDefinitionGQL | None]:
+        async def load_fn(
+            ids: list[AppConfigDefinitionID],
+        ) -> list[AppConfigDefinitionGQL | None]:
             from ai.backend.manager.api.gql.app_config_definition.types import (  # pants: no-infer-dep
                 AppConfigDefinitionGQL as ACD,
             )
 
-            dtos = await adapter.batch_load_by_ids([AppConfigDefinitionID(i) for i in ids])
+            dtos = await adapter.batch_load_by_ids(ids)
             return [ACD.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
