@@ -37,7 +37,12 @@ from ai.backend.manager.repositories.app_config_definition.creators import (
 from ai.backend.manager.repositories.app_config_definition.repository import (
     AppConfigDefinitionRepository,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    OffsetPagination,
+    Purger,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
@@ -147,14 +152,16 @@ class TestPurge:
         repository: AppConfigAllowListRepository,
         existing_entry: AppConfigAllowListData,
     ) -> None:
-        purged = await repository.purge(existing_entry.id)
+        purged = await repository.purge(
+            Purger(row_class=AppConfigAllowListRow, pk_value=existing_entry.id)
+        )
         assert purged.id == existing_entry.id
         with pytest.raises(AppConfigAllowListNotFound):
             await repository.get_by_id(existing_entry.id)
 
     async def test_purge_missing_raises(self, repository: AppConfigAllowListRepository) -> None:
         with pytest.raises(AppConfigAllowListNotFound):
-            await repository.purge(_missing_id())
+            await repository.purge(Purger(row_class=AppConfigAllowListRow, pk_value=_missing_id()))
 
 
 class TestSearch:

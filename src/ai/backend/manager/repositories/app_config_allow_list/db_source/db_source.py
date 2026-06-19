@@ -46,13 +46,11 @@ class AppConfigAllowListDBSource:
                 )
             return result.row.to_data()
 
-    async def purge(self, allow_list_id: AppConfigAllowListID) -> AppConfigAllowListData:
+    async def purge(self, purger: Purger[AppConfigAllowListRow]) -> AppConfigAllowListData:
         async with self._ops.write_ops() as w:
-            result = await w.purge(Purger(row_class=AppConfigAllowListRow, pk_value=allow_list_id))
+            result = await w.purge(purger)
             if result is None:
-                raise AppConfigAllowListNotFound(
-                    f"App config allow-list entry {allow_list_id} not found"
-                )
+                raise AppConfigAllowListNotFound("App config allow-list entry not found")
             return result.row.to_data()
 
     async def search(self, querier: BatchQuerier) -> AppConfigAllowListSearchResult:

@@ -9,7 +9,7 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.repositories.app_config_allow_list.db_source import (
     AppConfigAllowListDBSource,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigAllowListRepository",)
@@ -35,5 +35,5 @@ class AppConfigAllowListRepository:
     async def search(self, querier: BatchQuerier) -> AppConfigAllowListSearchResult:
         return await self._db_source.search(querier)
 
-    async def purge(self, allow_list_id: AppConfigAllowListID) -> AppConfigAllowListData:
-        return await self._db_source.purge(allow_list_id)
+    async def purge(self, purger: Purger[AppConfigAllowListRow]) -> AppConfigAllowListData:
+        return await self._db_source.purge(purger)
