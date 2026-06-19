@@ -1,10 +1,11 @@
 """create app_config_allow_list table
 
-Introduce ``app_config_allow_list`` — the per-``(config_name, scope_type)``
-write gate (BEP-1052). A config fragment at a given ``(config_name,
-scope_type)`` may be written only if a row exists here; admins pre-configure
-these. ``config_name`` is a foreign key into ``app_config_definitions`` so an
-entry may only reference a registered config name.
+Introduce ``app_config_allow_list`` (BEP-1052). Each row grants permission to
+write config fragments for one ``(config_name, scope_type)``: a config fragment
+at that ``(config_name, scope_type)`` may be created, updated, or purged only if
+a row exists here, and admins pre-configure these rows. ``config_name`` is a
+foreign key into ``app_config_definitions`` so an entry may only reference a
+registered config name.
 
 Revision ID: 2d6443ac0d4a
 Revises: 9fc9e6bfe695

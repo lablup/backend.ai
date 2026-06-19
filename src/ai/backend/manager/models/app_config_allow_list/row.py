@@ -16,7 +16,13 @@ __all__ = ("AppConfigAllowListRow",)
 
 
 class AppConfigAllowListRow(Base):  # type: ignore[misc]
-    """One per-``(config_name, scope_type)`` write gate (admin-managed)."""
+    """Permission to write config fragments for one config name at one scope type.
+
+    A config fragment may be created, updated, or purged only when a matching row
+    exists here; without one, the write is rejected. Reads never consult this table.
+    There is at most one row per ``(config_name, scope_type)``, and only admins
+    create or remove these rows.
+    """
 
     __tablename__ = "app_config_allow_list"
     __table_args__ = (
