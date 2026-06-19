@@ -143,6 +143,22 @@ services:
       - "./grafana-provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro"
       - "./grafana-provisioning/datasources:/etc/grafana/provisioning/datasources:ro"
 
+  backendai-half-grafana-mcp:
+    image: mcp/grafana
+    profiles: ["observability"]
+    restart: unless-stopped
+    networks:
+      - half
+    depends_on:
+      - backendai-half-grafana
+    command: ["-t", "streamable-http", "-address", "0.0.0.0:3001"]
+    environment:
+      - GRAFANA_URL=http://backendai-half-grafana:3000
+      - GRAFANA_USERNAME=backend
+      - GRAFANA_PASSWORD=develove
+    ports:
+      - "3001:3001"
+
   backendai-half-pyroscope:
     image: grafana/pyroscope:1.9.2
     profiles: ["observability"]
