@@ -51,7 +51,7 @@ class TestAdminCreate:
     async def test_happy_path(self) -> None:
         definition_id = str(uuid4())
         mock_resp = AsyncMock()
-        mock_resp.status = 200
+        mock_resp.status = 201
         mock_resp.json = AsyncMock(
             return_value={"app_config_definition": _node_payload(definition_id, "theme")}
         )
@@ -63,6 +63,7 @@ class TestAdminCreate:
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
         assert str(call_args[0][1]).endswith("/v2/app-config-definitions/")
+        assert call_args.kwargs["json"]["config_name"] == "theme"
         assert isinstance(result, CreateAppConfigDefinitionPayload)
         assert result.app_config_definition.config_name == "theme"
 
