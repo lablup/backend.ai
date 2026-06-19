@@ -5,6 +5,7 @@ import textwrap
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from functools import cached_property
 from typing import (
     Annotated,
     Any,
@@ -16,6 +17,7 @@ import aiohttp_cors
 from aiohttp import web
 from pydantic import AliasChoices, AnyUrl, BaseModel, ConfigDict, Field
 
+from ai.backend.appproxy.common.client_ip import IPValidator
 from ai.backend.common.types import BackendAISchema, ModelServiceStatus, RuntimeVariant
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
@@ -239,6 +241,11 @@ class SerializableCircuit(BackendAISchema):
     def traefik_router_name(self) -> str:
         """ID of the traefik router which represents this circuit."""
         return f"bai_router_{self.id}@etcd"
+
+    @cached_property
+    def ip_validator(self) -> IPValidator:
+        """Client-IP allowlist parsed once from ``allowed_client_ips``."""
+        return IPValidator(self.allowed_client_ips)
 
 
 class SerializableToken(BackendAISchema):

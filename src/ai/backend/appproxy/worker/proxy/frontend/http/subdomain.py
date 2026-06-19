@@ -88,6 +88,7 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
         async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
             slot = self.parse_slot(request)
             circuit = self.circuits[slot]
+            self.ensure_allowed_ip(request, circuit)
             self.ensure_credential(request, circuit)
             backend = self.backends[slot]
             request["circuit"] = circuit

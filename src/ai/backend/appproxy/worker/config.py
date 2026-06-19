@@ -10,7 +10,7 @@ from pprint import pformat
 from typing import Annotated, Self
 
 import click
-from pydantic import AnyUrl, Field, FilePath, ValidationError, model_validator
+from pydantic import AnyUrl, Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
 
 from ai.backend.appproxy.common.config import (
     BaseSchema,
@@ -783,6 +783,23 @@ class ProxyWorkerConfig(BaseSchema):
             ),
             added_version="25.9.0",
             example=ConfigExample(local="", prod="worker.example.com:10201"),
+        ),
+    ]
+
+    trusted_proxies: Annotated[
+        list[IPvAnyNetwork],
+        Field(default_factory=list),
+        BackendAIConfigMeta(
+            description=(
+                "CIDR blocks (or bare IP addresses) of load balancers / reverse proxies that sit "
+                "in front of this worker and may be trusted to set the 'X-Forwarded-For' header. "
+                "Client-IP allowlist checks honor 'X-Forwarded-For' only when the immediate peer "
+                "matches one of these networks; otherwise the direct connection address is used, so "
+                "a directly-exposed worker cannot be spoofed by a forged header. Leave empty when "
+                "clients connect directly to the worker."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="[]", prod='["10.0.0.0/8"]'),
         ),
     ]
 

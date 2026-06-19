@@ -93,6 +93,7 @@ class PortFrontend(BaseHTTPFrontend[int]):
         circuit = self.circuits.get(port, None)
         if circuit is None:
             raise GenericBadRequest(f"Unregistered slot {port}")
+        self.ensure_allowed_ip(request, circuit)
         self.ensure_credential(request, circuit)
         backend = self.backends[port]
         request["circuit"] = circuit
