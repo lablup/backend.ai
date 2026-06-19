@@ -15,6 +15,7 @@ from .types import (
     AppConfigDefinitionOrderFieldGQL,
     CreateAppConfigDefinitionInputGQL,
     CreateAppConfigDefinitionPayloadGQL,
+    PurgeAppConfigDefinitionInputGQL,
     PurgeAppConfigDefinitionPayloadGQL,
 )
 
@@ -28,6 +29,7 @@ __all__ = (
     "AppConfigDefinitionOrderFieldGQL",
     "CreateAppConfigDefinitionInputGQL",
     "CreateAppConfigDefinitionPayloadGQL",
+    "PurgeAppConfigDefinitionInputGQL",
     "PurgeAppConfigDefinitionPayloadGQL",
     # Query resolvers
     "admin_app_config_definition",
