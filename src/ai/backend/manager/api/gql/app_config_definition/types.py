@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Self, cast
+from uuid import UUID
 
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
@@ -39,6 +42,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
     "AppConfigDefinitionConnection",
@@ -61,7 +65,7 @@ __all__ = (
 @gql_node_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A registered app config definition (one managed config name).",
+        description="A registered app config name.",
     ),
     name="AppConfigDefinition",
 )
@@ -69,9 +73,22 @@ class AppConfigDefinitionGQL(PydanticNodeMixin[AppConfigDefinitionNode]):
     id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the app config definition."
     )
-    config_name: str = gql_field(description="Registered config name (e.g. 'theme', 'menu').")
+    config_name: str = gql_field(description="Registered config name.")
     created_at: datetime = gql_field(description="Creation timestamp (UTC).")
     updated_at: datetime = gql_field(description="Last update timestamp (UTC).")
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.app_config_definition_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
 
 
 AppConfigDefinitionEdge = Edge[AppConfigDefinitionGQL]

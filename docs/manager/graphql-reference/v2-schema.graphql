@@ -604,14 +604,12 @@ type AllowedResourceGroupsPayload {
   items: [String!]!
 }
 
-"""
-Added in 26.4.4. A registered app config definition (one managed config name).
-"""
+"""Added in 26.7.0. A registered app config name."""
 type AppConfigDefinition implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Registered config name (e.g. 'theme', 'menu')."""
+  """Registered config name."""
   configName: String!
 
   """Creation timestamp (UTC)."""
@@ -622,7 +620,7 @@ type AppConfigDefinition implements Node {
 }
 
 """
-Added in 26.4.4. Paginated connection for app config definition records.
+Added in 26.7.0. Paginated connection for app config definition records.
 """
 type AppConfigDefinitionConnection {
   """Pagination data for this connection"""
@@ -646,7 +644,7 @@ type AppConfigDefinitionEdge {
   node: AppConfigDefinition!
 }
 
-"""Added in 26.4.4. Filter input for querying app config definitions."""
+"""Added in 26.7.0. Filter input for querying app config definitions."""
 input AppConfigDefinitionFilter {
   """Filter by config name."""
   configName: StringFilter = null
@@ -658,7 +656,7 @@ input AppConfigDefinitionFilter {
   updatedAt: DateTimeFilter = null
 }
 
-"""Added in 26.4.4. Specifies ordering for app config definition results."""
+"""Added in 26.7.0. Specifies ordering for app config definition results."""
 input AppConfigDefinitionOrderBy {
   """The field to order by."""
   field: AppConfigDefinitionOrderField!
@@ -668,7 +666,7 @@ input AppConfigDefinitionOrderBy {
 }
 
 """
-Added in 26.4.4. Fields available for ordering app config definition results.
+Added in 26.7.0. Fields available for ordering app config definition results.
 """
 enum AppConfigDefinitionOrderField {
   CONFIG_NAME
@@ -2121,13 +2119,13 @@ type CreateAccessTokenPayload {
   accessToken: AccessToken!
 }
 
-"""Added in 26.4.4. Input for registering a new app config definition."""
+"""Added in 26.7.0. Input for registering a new app config definition."""
 input CreateAppConfigDefinitionInput {
   """Unique config name to register."""
   configName: String!
 }
 
-"""Added in 26.4.4. Payload for app config definition creation."""
+"""Added in 26.7.0. Payload for app config definition creation."""
 type CreateAppConfigDefinitionPayload {
   """Created app config definition."""
   appConfigDefinition: AppConfigDefinition!
@@ -7630,12 +7628,12 @@ type Mutation {
   adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload
 
   """
-  Added in 26.4.4. Register a new app config definition (super admin only).
+  Added in 26.7.0. Register a new app config definition (super admin only).
   """
   adminCreateAppConfigDefinition(input: CreateAppConfigDefinitionInput!): CreateAppConfigDefinitionPayload
 
   """
-  Added in 26.4.4. Purge an app config definition by id (super admin only).
+  Added in 26.7.0. Purge an app config definition by id (super admin only).
   """
   adminPurgeAppConfigDefinition(id: UUID!): PurgeAppConfigDefinitionPayload
 
@@ -9103,7 +9101,7 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
-"""Added in 26.4.4. Payload for app config definition purge."""
+"""Added in 26.7.0. Payload for app config definition purge."""
 type PurgeAppConfigDefinitionPayload {
   """UUID of the purged app config definition."""
   id: UUID!
@@ -9783,12 +9781,12 @@ type Query {
   loginClientTypes(filter: LoginClientTypeFilter = null, orderBy: [LoginClientTypeOrderBy!] = null, limit: Int = null, offset: Int = null): LoginClientTypeConnection
 
   """
-  Added in 26.4.4. Get a single app config definition by id (super admin only).
+  Added in 26.7.0. Get a single app config definition by id (super admin only).
   """
   appConfigDefinition(id: UUID!): AppConfigDefinition
 
   """
-  Added in 26.4.4. Search app config definitions with filtering, ordering, and pagination (super admin only).
+  Added in 26.7.0. Search app config definitions with filtering, ordering, and pagination (super admin only).
   """
   appConfigDefinitions(filter: AppConfigDefinitionFilter = null, orderBy: [AppConfigDefinitionOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigDefinitionConnection
 
