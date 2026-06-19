@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
 
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
@@ -94,6 +95,25 @@ class AppConfigAllowListAdapter(BaseAdapter):
             GetAppConfigAllowListAction(allow_list_id=allow_list_id)
         )
         return self._data_to_node(action_result.allow_list)
+
+    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[AppConfigAllowListNode | None]:
+        """Batch load app config allow-list entries by id for DataLoader use.
+
+        Returns nodes in the same order as the input ids, with None for missing ones.
+        """
+        if not ids:
+            return []
+        querier = self._build_querier(
+            conditions=[AppConfigAllowListConditions.by_ids(list(ids))],
+            orders=[],
+            pagination_spec=_get_app_config_allow_list_pagination_spec(),
+            limit=len(ids),
+        )
+        action_result = await self._processors.app_config_allow_list.search.wait_for_complete(
+            SearchAppConfigAllowListAction(querier=querier)
+        )
+        node_map = {node.id: node for node in map(self._data_to_node, action_result.data)}
+        return [node_map.get(allow_list_id) for allow_list_id in ids]
 
     async def admin_search(
         self, input: SearchAppConfigAllowListInput

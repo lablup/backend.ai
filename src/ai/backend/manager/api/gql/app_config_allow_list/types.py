@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Self, cast
+from uuid import UUID
 
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
@@ -45,6 +48,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
     "AppConfigAllowListConnection",
@@ -68,7 +72,7 @@ __all__ = (
 @gql_node_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="An app config allow-list entry (a per-(config_name, scope_type) write gate).",
+        description="Permission to write config fragments for one config name at one scope type.",
     ),
     name="AppConfigAllowList",
 )
@@ -76,12 +80,25 @@ class AppConfigAllowListGQL(PydanticNodeMixin[AppConfigAllowListNode]):
     id: NodeID[str] = gql_field(
         description="Relay-style global node identifier for the app config allow-list entry."
     )
-    config_name: str = gql_field(description="Gated config name (FK to app config definitions).")
+    config_name: str = gql_field(description="The config name this entry permits writes for.")
     scope_type: AppConfigScopeType = gql_field(
         description="Scope type the entry permits writes at (public | domain | user)."
     )
     created_at: datetime = gql_field(description="Creation timestamp (UTC).")
     updated_at: datetime = gql_field(description="Last update timestamp (UTC).")
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.app_config_allow_list_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
 
 
 AppConfigAllowListEdge = Edge[AppConfigAllowListGQL]
