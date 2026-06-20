@@ -21,7 +21,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 type IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 
-class IPValidator:
+class ClientIPValidator:
     """Per-circuit client-IP allowlist.
 
     Constructed from a circuit's ``allowed_client_ips`` string; the string is
@@ -86,7 +86,7 @@ class ClientIPResolver:
     Holds the worker-level ``trusted_proxies`` (load balancers / reverse proxies
     in front of the worker) as a field, so it is built once per worker and reused
     across requests. ``trusted_proxies`` is NOT a per-circuit value, which is why
-    resolution lives here rather than on :class:`IPValidator`.
+    resolution lives here rather than on :class:`ClientIPValidator`.
     """
 
     def __init__(self, trusted_proxies: Sequence[IPNetwork]) -> None:

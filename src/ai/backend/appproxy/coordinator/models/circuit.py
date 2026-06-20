@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from yarl import URL
 
-from ai.backend.appproxy.common.client_ip import IPValidator
+from ai.backend.appproxy.common.client_ip import ClientIPValidator
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.errors import ObjectNotFound, UnsupportedProtocol
 from ai.backend.appproxy.common.types import (
@@ -296,9 +296,9 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         return f"{worker.authority}:{self.port or self.subdomain}"
 
     @cached_property
-    def ip_validator(self) -> IPValidator:
+    def ip_validator(self) -> ClientIPValidator:
         """Client-IP allowlist parsed once from ``allowed_client_ips``."""
-        return IPValidator(self.allowed_client_ips)
+        return ClientIPValidator(self.allowed_client_ips)
 
     @property
     def traefik_rule(self) -> str:

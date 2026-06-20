@@ -10,7 +10,7 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
-from ai.backend.appproxy.common.client_ip import ClientIPResolver, IPNetwork, IPValidator
+from ai.backend.appproxy.common.client_ip import ClientIPResolver, ClientIPValidator, IPNetwork
 from ai.backend.appproxy.common.errors import ClientIPNotAllowed
 
 
@@ -55,30 +55,30 @@ class TestIPValidator:
         ],
     )
     def test_is_allowed(self, allowed: str | None, client_ip: str, expected: bool) -> None:
-        assert IPValidator(allowed).is_allowed(client_ip) is expected
+        assert ClientIPValidator(allowed).is_allowed(client_ip) is expected
 
     def test_invalid_entries_are_skipped_not_raised(self) -> None:
         # A malformed entry is dropped; valid entries still enforce.
-        validator = IPValidator("garbage, 10.0.0.0/8")
+        validator = ClientIPValidator("garbage, 10.0.0.0/8")
         assert validator.is_allowed("10.0.0.1") is True
         assert validator.is_allowed("11.0.0.1") is False
 
     def test_all_invalid_means_no_restriction(self) -> None:
-        validator = IPValidator("garbage, also-bad")
+        validator = ClientIPValidator("garbage, also-bad")
         assert validator.is_restricted is False
         assert validator.is_allowed("203.0.113.5") is True
 
     def test_is_restricted(self) -> None:
-        assert IPValidator(None).is_restricted is False
-        assert IPValidator("10.0.0.0/8").is_restricted is True
+        assert ClientIPValidator(None).is_restricted is False
+        assert ClientIPValidator("10.0.0.0/8").is_restricted is True
 
     def test_ranges_normalizes_entries(self) -> None:
         # Bare IPs become host routes; whitespace stripped; order preserved.
-        validator = IPValidator(" 10.0.0.0/8 , 203.0.113.5 ")
+        validator = ClientIPValidator(" 10.0.0.0/8 , 203.0.113.5 ")
         assert validator.ranges == ["10.0.0.0/8", "203.0.113.5/32"]
 
     def test_ranges_empty_when_unrestricted(self) -> None:
-        assert IPValidator(None).ranges == []
+        assert ClientIPValidator(None).ranges == []
 
 
 class TestClientIPResolver:
