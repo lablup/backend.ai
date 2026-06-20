@@ -456,10 +456,10 @@ class TestSessionLifetimeChecker:
 
     @pytest.fixture
     def session_kernel_row(self, session_id: SessionId, base_time: datetime) -> Any:
-        """Kernel row with session created at base_time"""
+        """Kernel row with session started (RUNNING) at base_time"""
         return mock_row(
             session_id=session_id,
-            created_at=base_time,
+            starts_at=base_time,
         )
 
     @pytest.fixture
