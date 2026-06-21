@@ -273,6 +273,13 @@ async def nerdctl_exec(
     nerdctl_bin: str = DEFAULT_NERDCTL_BIN,
     namespace: str = DEFAULT_NERDCTL_NAMESPACE,
 ) -> tuple[int, bytes, bytes]:
+    # NOTE: plain exec (input_bytes=None) is reliable, but streaming bulk data via
+    # ``input_bytes`` (``exec -i`` stdin) is NOT a safe transport on the Kata
+    # runtime — live validation on kata-lab-150 (2026-06-21) saw it truncate
+    # payloads above a few KiB and, with a ``tar`` reader, hang and poison the
+    # container's exec channel. Use the rw virtio-fs scratch share for file
+    # transfer (see KataKernel). ``input_bytes`` is kept only for short control
+    # input; do not push large blobs through it.
     args = [*_nerdctl_base(nerdctl_bin=nerdctl_bin, namespace=namespace), "exec"]
     if input_bytes is not None:
         args.append("-i")  # keep stdin open so we can stream data into the guest

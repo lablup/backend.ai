@@ -20,7 +20,8 @@ image scan/pull) is inherited unchanged. The only behavioral delta:
 |---|---|---|
 | create + start container | `aiodocker` `containers.create()` + `container.start()` | translate `container_config` → `nerdctl run -d --runtime io.containerd.kata.v2` |
 | destroy / clean | `aiodocker` stop/delete | `nerdctl stop` / `nerdctl rm -f -v` |
-| logs / list / download | `aiodocker` / `docker exec` | `nerdctl logs` / `nerdctl exec` |
+| logs / list-files | `aiodocker` / `docker exec` | `nerdctl logs` / `nerdctl exec` (plain exec) |
+| file upload / download | host-side scratch write / `get_archive` | host-side read/write of the rw **virtio-fs scratch** share (§4b) |
 | named krunner volume | Docker named volume | resolved to its host path and **bind-mounted** (Kata can't share a Docker named volume into the guest) |
 | death detection | dockerd event stream | lightweight `nerdctl ps` poller (dockerd events don't see containerd's namespace) |
 
@@ -124,20 +125,24 @@ This `kata/` backend uses the **nerdctl/containerd** path instead because (a) it
 is what Handover A's host proves (`nerdctl --runtime io.containerd.kata.v2`), (b)
 it keeps Kata kernels in a separate containerd namespace from Docker, and (c) it
 is the cleaner stepping stone toward the production containerd-gRPC backend
-(BEP-1051 / report §6d.3). It also routes file upload/download through the kernel
-**exec channel** (tar over `nerdctl exec`), which should fix the upload/download
-gap seen on the Docker-runtime path.
+(BEP-1051 / report §6d.3). File upload/download go through the **rw virtio-fs
+scratch share** (host-side read/write of the kernel `work` dir), which live
+testing on `kata-lab-150` proved transfers 1 MiB byte-exact in both directions —
+the BA-6541 "upload fails" symptom was the Docker `cp`/`get_archive` API, not the
+shared mount. (An earlier draft used the exec channel; that was reverted after
+the host test showed `tar` over `nerdctl exec -i` hangs and poisons the exec
+channel — see report §4b.)
 
 ## Known MVP degradations
 
 - **stats** are not collected (lxcfs proc/sys mounts are meaningless inside a
   real VM; guest cgroup stats need a different path) — stubbed via inheritance.
 - **container log streaming** is one-shot (`nerdctl logs`), not a live follow.
-- **file upload/download**: routed through the kernel exec channel (tar over
-  `nerdctl exec`) rather than host-side scratch writes / `docker get_archive`,
-  to address the upload/download failure observed on the Docker-runtime path
-  (BA-6541). Uploaded files land owned by the exec user (root) — ownership is
-  not matched to the kernel user yet.
+- **file upload/download**: host-side read/write of the rw virtio-fs scratch
+  share (`accept_file` is inherited from `DockerKernel`; downloads read the host
+  scratch dir, replacing Docker's `get_archive`). Proven byte-exact on-host.
+  Assumes the scratch `work` dir is bind-mounted into the guest (it is). Do **not**
+  use `nerdctl exec -i` to stream bulk data — it truncates/hangs on Kata (§4b).
 - **commit / image-from-container** raises `NotImplementedError`.
 - **death detection** is a 5s poller, not an event stream.
 - **GPU / accelerators** are out of scope (Docker `DeviceRequests` are not

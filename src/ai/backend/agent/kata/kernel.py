@@ -11,11 +11,25 @@ Almost everything in :class:`DockerKernel` is reused verbatim:
   these all go through the ZMQ runner, not the container engine.
 
 Operations that address the container by ID are overridden to call ``nerdctl``
-(``get_logs``, ``list_files``). File transfer (``accept_file`` upload and
-``download_*``) is routed through the kernel **exec channel** (tar over
-``nerdctl exec``) rather than host-side scratch writes / ``docker get_archive``,
-because the host↔guest virtio-fs propagation for those was observed to fail on
-Kata (BA-6541), while the exec channel works. ``commit`` is stubbed for the MVP
+(``get_logs``, ``list_files``). File transfer is routed through the **host-side
+scratch dir** (the kernel's ``work`` directory), which is bind-mounted into the
+Kata guest as a *read-write virtio-fs share*:
+
+* ``accept_file`` (upload) is **inherited unchanged** from :class:`DockerKernel`
+  — it writes host-side into ``scratch-root/<kernel_id>/work`` and the bytes
+  appear inside the guest over virtio-fs.
+* ``download_file`` / ``download_single`` are overridden to **read host-side**
+  from that same scratch dir (the Docker path uses the aiodocker
+  ``get_archive`` API, which has no containerd equivalent).
+
+This replaces the earlier exec-channel design (tar over ``nerdctl exec``). Live
+validation on ``kata-lab-150`` (2026-06-21) showed the exec channel is the wrong
+mechanism: ``tar`` over ``nerdctl exec -i`` *hangs even for small files and
+poisons the container's whole exec channel*; ``cat`` over ``exec -i`` truncates
+payloads above a few KiB. By contrast the rw virtio-fs share round-trips 1 MiB
+binary payloads byte-exact in **both** directions (host↔guest md5 match). The
+BA-6541 "upload fails" symptom was specific to the Docker ``cp``/``get_archive``
+API path, not the shared mount. ``commit`` is stubbed for the MVP
 (image-from-container needs a nerdctl/buildkit path).
 """
 
@@ -25,14 +39,17 @@ import io
 import logging
 import os
 import tarfile
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any, override
 
 from ai.backend.agent.docker.kernel import DockerKernel
-from ai.backend.agent.errors.kata import NerdctlError
 from ai.backend.agent.kata import nerdctl
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
+
+#: Mirror of DockerKernel's 1 MiB download cap.
+_MAX_DOWNLOAD_BYTES = 1048576
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -78,85 +95,52 @@ class KataKernel(DockerKernel):
             "abspath": str(container_path),
         }
 
-    async def _download_archive(self, container_abspath: PurePosixPath) -> bytes:
-        # Stream a tar archive of the target out of the guest via `nerdctl exec tar`.
-        container_id = self.data["container_id"]
-        parent = str(container_abspath.parent)
-        name = container_abspath.name
-        rc, raw_out, raw_err = await nerdctl.nerdctl_exec(
-            container_id,
-            ["tar", "cf", "-", "-C", parent, name],
-            timeout_sec=120.0,
+    def _resolve_host_work_path(self, container_path: os.PathLike[str] | str) -> Path:
+        """
+        Map a container-relative path under ``/home/work`` to its host-side
+        location in the scratch dir (the rw virtio-fs share), with the same
+        path-escape guard DockerKernel applies. ``accept_file`` (inherited) and
+        the download overrides both go through this single host-side view.
+        """
+        host_work_dir: Path = (
+            self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
         )
-        if rc != 0:
-            raise NerdctlError(
-                f"could not download {container_abspath} from kata container "
-                f"(rc={rc}): {raw_err.decode(errors='replace').strip()}"
-            )
-        if len(raw_out) > 1048576:
-            raise ValueError("Too large archive file exceeding 1 MiB")
-        return raw_out
+        host_abspath = (host_work_dir / container_path).resolve(strict=False)
+        if not host_abspath.is_relative_to(host_work_dir):
+            raise PermissionError("You cannot access files outside /home/work")
+        return host_abspath
 
-    @override
-    async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
-        # DockerKernel.accept_file writes host-side into the scratch `work` dir and
-        # relies on it being visible inside the container. On Kata that host->guest
-        # propagation across the virtio-fs boundary is unreliable (observed:
-        # in-session file creation works but host-driven upload fails, BA-6541).
-        # Stream the file into the guest through the proven exec channel instead.
-        container_home_path = PurePosixPath("/home/work")
-        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
-        if not container_abspath.is_relative_to(container_home_path):
-            raise PermissionError("Not allowed to upload files outside /home/work")
-        arcname = str(container_abspath.relative_to(container_home_path))
-
-        buf = io.BytesIO()
-        with tarfile.open(fileobj=buf, mode="w") as tf:
-            info = tarfile.TarInfo(name=arcname)
-            info.size = len(filedata)
-            info.mode = 0o644
-            tf.addfile(info, io.BytesIO(filedata))
-        tar_bytes = buf.getvalue()
-
-        rc, _raw_out, raw_err = await nerdctl.nerdctl_exec(
-            self.data["container_id"],
-            ["tar", "xf", "-", "-C", str(container_home_path)],
-            input_bytes=tar_bytes,
-            timeout_sec=120.0,
-        )
-        if rc != 0:
-            raise NerdctlError(
-                f"could not upload {container_abspath} into kata container "
-                f"(rc={rc}): {raw_err.decode(errors='replace').strip()}"
-            )
+    # accept_file (upload) is inherited from DockerKernel: a host-side write into
+    # scratch-root/<kernel_id>/work, which the guest sees over rw virtio-fs.
 
     @override
     async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
-        container_home_path = PurePosixPath("/home/work")
-        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
-        if not container_abspath.is_relative_to(container_home_path):
-            raise PermissionError("You cannot download files outside /home/work")
-        return await self._download_archive(container_abspath)
+        # Docker returns a tar archive (via get_archive); preserve that contract
+        # but build the archive from the host-side scratch file instead.
+        loop = current_loop()
+        host_abspath = self._resolve_host_work_path(container_path)
+
+        def _read_as_tar() -> bytes:
+            if host_abspath.stat().st_size > _MAX_DOWNLOAD_BYTES:
+                raise ValueError("Too large archive file exceeding 1 MiB")
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w") as tf:
+                tf.add(str(host_abspath), arcname=host_abspath.name)
+            return buf.getvalue()
+
+        return await loop.run_in_executor(None, _read_as_tar)
 
     @override
     async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
-        container_home_path = PurePosixPath("/home/work")
-        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
-        if not container_abspath.is_relative_to(container_home_path):
-            raise PermissionError("You cannot download files outside /home/work")
-        tar_bytes = await self._download_archive(container_abspath)
-        with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as tf:
-            members = tf.getmembers()
-            files = [m for m in members if m.isfile()]
-            if len(files) != 1:
-                raise ValueError(
-                    f"Expected a single-file archive but found {len(files)} files "
-                    f"from {container_abspath}"
-                )
-            extracted = tf.extractfile(files[0])
-            if extracted is None:
-                raise ValueError(f"Could not read {files[0].name!r} from {container_abspath}")
-            return extracted.read()
+        loop = current_loop()
+        host_abspath = self._resolve_host_work_path(container_path)
+
+        def _read_bytes() -> bytes:
+            if host_abspath.stat().st_size > _MAX_DOWNLOAD_BYTES:
+                raise ValueError("Too large archive file exceeding 1 MiB")
+            return host_abspath.read_bytes()
+
+        return await loop.run_in_executor(None, _read_bytes)
 
     @override
     async def commit(
