@@ -46,15 +46,29 @@ Run `scripts/release.sh` which performs these steps:
 scripts/release.sh {target_version} [webui_version]
 ```
 
+To override the next development version (year rollover or planned sprint skip):
+
+```bash
+NEXT_DEV_VERSION={next_version} scripts/release.sh {target_version} [webui_version]
+```
+
 **What the script does:**
 1. Creates branch `release/{target_version}`
 2. Downloads WebUI release (if `webui_version` provided)
-3. Runs quality checks: `pants tailor --check`, `pants check ::`
-4. Updates `VERSION` file
+3. Updates `VERSION` file
+4. Freezes `NEXT_RELEASE_VERSION` placeholders to the actual version (stable releases only; skipped for `rc`/`a`/`b`/`dev`/`post`)
 5. Runs towncrier to generate changelog entries
 6. Generates sample config files
 7. Generates API docs (OpenAPI, GraphQL schema)
-8. Commits everything as `release: {target_version}`
+8. Runs quality checks: `pants tailor --check`, `pants check ::`
+9. Commits everything as `release: {target_version}`
+10. For sprint releases only (`{year}.{sprint}.0`): advances `NEXT_RELEASE_VERSION` in `meta.py` to the next sprint and commits it separately as `chore: bump NEXT_RELEASE_VERSION to {next_version}`
+
+**NEXT_RELEASE_VERSION auto-advance (step 10):**
+- Runs only for sprint releases — patch must be `0` (e.g. `26.7.0`). Patch releases (`26.7.1`) and pre-releases (`rc`/`a`/`b`/`dev`/`post`) are skipped automatically.
+- Default: increments the sprint number, resets patch to `0` (`26.7.0` → `26.8.0`).
+- Override the default by setting `NEXT_DEV_VERSION` (e.g. `27.1.0` for a year rollover, or to skip sprints).
+- Produces a second commit, kept separate from the `release:` commit (freeze = this release; bump = next dev cycle).
 
 **Error handling:**
 - If quality checks fail, report errors and stop

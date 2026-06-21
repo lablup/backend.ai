@@ -63,3 +63,13 @@ pants check ::
 
 git add -A
 git commit -m "release: $TARGET_VERSION"
+
+# Advance NEXT_RELEASE_VERSION to the next sprint development cycle.
+# Only for sprint releases (patch == 0); the regex also excludes patch
+# releases and PEP 440 pre-releases (rc/a/b/dev/post). Override the computed
+# sprint+1 default with NEXT_DEV_VERSION (e.g. for year rollover: 27.1.0).
+if [[ "$TARGET_VERSION" =~ ^[0-9]+\.[0-9]+\.0$ ]]; then
+    next_dev=$(python3 scripts/bump_next_release_version.py ${NEXT_DEV_VERSION:+"$NEXT_DEV_VERSION"})
+    git add src/ai/backend/common/meta/meta.py
+    git commit -m "chore: bump NEXT_RELEASE_VERSION to $next_dev"
+fi
