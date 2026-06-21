@@ -59,6 +59,9 @@ def test_basic_run_shape() -> None:
     assert args[0] == "nerdctl"
     assert "run" in args
     assert "-d" in args
+    # Regression: nerdctl rejects `-i -d` together, so OpenStdin must NOT become
+    # `-i` even though the config sets OpenStdin=True (verified on kata-lab-150).
+    assert "-i" not in args
     assert _adjacent(args, "--runtime") == ["io.containerd.kata.v2"]
     assert _adjacent(args, "--name") == ["kernel.python.k-123"]
     # image must appear, and after all flags

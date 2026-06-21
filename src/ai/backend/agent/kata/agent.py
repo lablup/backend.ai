@@ -30,10 +30,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator, Mapping, MutableMapping
+import uuid
+from collections.abc import AsyncGenerator, Mapping, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, cast, override
 
+from ai.backend.agent.agent import ACTIVE_STATUS_SET
 from ai.backend.agent.config.unified import ContainerSandboxType
 from ai.backend.agent.docker.agent import (
     DockerAgent,
@@ -50,6 +52,7 @@ from ai.backend.agent.kata.kernel import KataKernel
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import (
+    Container,
     KernelOwnershipData,
     LifecycleEvent,
 )
@@ -63,6 +66,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterSSHPortMapping,
     ContainerId,
+    ContainerStatus,
     KernelCreationConfig,
     KernelId,
     ServicePort,
@@ -99,6 +103,31 @@ class KataKernelCreationContext(DockerKernelCreationContext):
         )
         kernel.__class__ = KataKernel
         return cast(KataKernel, kernel)
+
+    async def _externalize_inline_seccomp(self, container_config: MutableMapping[str, Any]) -> None:
+        """Docker's API (and ``_apply_seccomp_profile``) injects the seccomp
+        profile as *inline JSON* in ``HostConfig.SecurityOpt`` (``seccomp=<json>``).
+        nerdctl's ``--security-opt seccomp=`` instead expects a *file path*, so it
+        tries to ``open()`` the JSON blob and fails with "file name too long".
+        Write any inline profile to the kernel's config dir and rewrite the opt to
+        point at that file (cleaned up with the scratch)."""
+        host_config = container_config.get("HostConfig", {}) or {}
+        sec_opts = host_config.get("SecurityOpt")
+        if not sec_opts:
+            return
+        loop = current_loop()
+        new_opts: list[str] = []
+        for opt in sec_opts:
+            prefix = "seccomp="
+            if isinstance(opt, str) and opt.startswith(prefix):
+                value = opt[len(prefix) :]
+                if value.lstrip().startswith("{"):
+                    profile_path = self.config_dir / "seccomp.json"
+                    await loop.run_in_executor(None, profile_path.write_text, value)
+                    new_opts.append(f"{prefix}{profile_path}")
+                    continue
+            new_opts.append(opt)
+        host_config["SecurityOpt"] = new_opts
 
     async def _resolve_named_volumes(self, container_config: Mapping[str, Any]) -> dict[str, str]:
         """Pre-resolve every Docker named volume referenced by the mounts to its
@@ -297,6 +326,8 @@ class KataKernelCreationContext(DockerKernelCreationContext):
                     self.computers[dev_name].alloc_map.free(device_alloc)
 
         # --- THE delta: translate config -> nerdctl run (Kata runtime) ---
+        # nerdctl needs the seccomp profile as a file path, not Docker's inline JSON.
+        await self._externalize_inline_seccomp(container_config)
         volume_map = await self._resolve_named_volumes(container_config)
         nerdctl_args = nerdctl.translate_container_config_to_nerdctl_args(
             container_config,
@@ -426,12 +457,54 @@ class KataAgent(DockerAgent):
         )
 
     @override
+    async def enumerate_containers(
+        self,
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
+        # CRITICAL: DockerAgent.enumerate_containers lists containers from the
+        # Docker ("moby") namespace, which NEVER contains Kata kernels (they live
+        # in containerd's `default` namespace). The registry-reconciliation loop
+        # (`_clean_kernel_registry_loop`) uses this to find "dangling" kernels; if
+        # it sees zero alive Kata containers it evicts every live kernel from the
+        # registry, after which destroy can't find the container_id and the VM
+        # leaks. So we enumerate via nerdctl/containerd instead.
+        infos = await nerdctl.nerdctl_inspect_kernel_containers(LabelName.KERNEL_ID)
+        result: list[tuple[KernelId, Container]] = []
+        for info in infos:
+            labels = (info.get("Config") or {}).get("Labels") or {}
+            if labels.get(LabelName.OWNER_AGENT) != str(self.id):
+                continue
+            raw_status = ((info.get("State") or {}).get("Status") or "").lower()
+            try:
+                status = ContainerStatus(raw_status)
+            except ValueError:
+                continue
+            if status not in status_filter:
+                continue
+            raw_kernel_id = labels.get(LabelName.KERNEL_ID)
+            if not raw_kernel_id:
+                continue
+            container = Container(
+                id=ContainerId(info.get("Id") or ""),
+                status=status,
+                image=(info.get("Config") or {}).get("Image") or info.get("Image") or "",
+                labels=labels,
+                ports=[],  # MVP: restart-recovery of ports is not reconstructed
+                backend_obj=info,
+            )
+            result.append((KernelId(uuid.UUID(raw_kernel_id)), container))
+        return result
+
+    @override
     async def destroy_kernel(
         self,
         kernel_id: KernelId,
         container_id: ContainerId | None,
     ) -> None:
-        if container_id is None:
+        # Guard falsy ids too: a create that fails before `nerdctl run` returns a
+        # cid leaves container_id="" — calling nerdctl stop/logs with it triggers
+        # a filter parse error.
+        if not container_id:
             return
         try:
             await nerdctl.nerdctl_stop(str(container_id))
@@ -447,7 +520,7 @@ class KataAgent(DockerAgent):
         restarting: bool,
     ) -> None:
         loop = current_loop()
-        if container_id is not None:
+        if container_id:  # falsy when a create failed before producing a cid
             try:
                 logs = await nerdctl.nerdctl_logs(str(container_id))
                 await self.collect_logs(
@@ -472,7 +545,7 @@ class KataAgent(DockerAgent):
                     except OSError:
                         pass
 
-        if not self.local_config.debug.skip_container_deletion and container_id is not None:
+        if not self.local_config.debug.skip_container_deletion and container_id:
             try:
                 await nerdctl.nerdctl_rm(str(container_id))
             except Exception:

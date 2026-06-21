@@ -19,6 +19,7 @@ without a Kata host.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import shlex
@@ -86,8 +87,10 @@ def translate_container_config_to_nerdctl_args(
 
     if container_config.get("Tty"):
         args.append("-t")
-    if container_config.get("OpenStdin"):
-        args.append("-i")
+    # NOTE: Docker accepts OpenStdin (`-i`) together with detached (`-d`), but
+    # nerdctl rejects `-i -d` ("cannot be specified together"). The kernel runs
+    # detached and communicates over ZMQ repl ports (not container stdin), so we
+    # intentionally do NOT translate OpenStdin to `-i` (verified on kata-lab-150).
     if stop_signal := container_config.get("StopSignal"):
         args += ["--stop-signal", str(stop_signal)]
     if working_dir := container_config.get("WorkingDir"):
@@ -333,6 +336,38 @@ async def nerdctl_list_running_kernel_ids(
             f"nerdctl ps failed (rc={rc}): {stderr.decode(errors='replace').strip()}"
         )
     return {line.strip() for line in stdout.decode().splitlines() if line.strip()}
+
+
+async def nerdctl_inspect_kernel_containers(
+    label_key: str,
+    *,
+    nerdctl_bin: str = DEFAULT_NERDCTL_BIN,
+    namespace: str = DEFAULT_NERDCTL_NAMESPACE,
+) -> list[dict[str, Any]]:
+    """Return the docker-compatible ``inspect`` records for every container (any
+    state) carrying ``label_key`` in our namespace.
+
+    Used by :meth:`KataAgent.enumerate_containers` to reconcile the kernel
+    registry against containerd's namespace — DockerAgent's version queries the
+    ``moby`` namespace, which never contains Kata kernels.
+    """
+    base = _nerdctl_base(nerdctl_bin=nerdctl_bin, namespace=namespace)
+    ids_args = [*base, "ps", "-a", "--filter", f"label={label_key}", "--format", "{{.ID}}"]
+    rc, stdout, stderr = await _run(ids_args, timeout_sec=30.0)
+    if rc != 0:
+        raise NerdctlError(
+            f"nerdctl ps failed (rc={rc}): {stderr.decode(errors='replace').strip()}"
+        )
+    ids = [line.strip() for line in stdout.decode().splitlines() if line.strip()]
+    if not ids:
+        return []
+    rc, stdout, stderr = await _run([*base, "inspect", *ids], timeout_sec=60.0)
+    if rc != 0:
+        raise NerdctlError(
+            f"nerdctl inspect failed (rc={rc}): {stderr.decode(errors='replace').strip()}"
+        )
+    parsed = json.loads(stdout.decode() or "[]")
+    return list(parsed)
 
 
 async def resolve_docker_volume_path(volume_name: str, *, docker_bin: str = "docker") -> str:
