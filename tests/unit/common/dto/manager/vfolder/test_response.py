@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.vfolder.response import (
     InviteVFolderResponse,
     ListAllHostsResponse,
     ListAllowedTypesResponse,
+    ListHostsResponse,
     ListInvitationsResponse,
     ListSharedVFoldersResponse,
     MessageResponse,
@@ -298,6 +299,23 @@ class TestAdminResponses:
         resp = ListAllHostsResponse(default="host-1", allowed=["host-1", "host-2"])
         assert resp.default == "host-1"
         assert len(resp.allowed) == 2
+
+    def test_list_hosts_response_carries_per_host_permissions(self) -> None:
+        resp = ListHostsResponse(
+            default="host-1",
+            allowed=["host-1", "host-2"],
+            allowed_permissions={
+                "host-1": ["create-vfolder", "mount-in-session"],
+                "host-2": ["download-file"],
+            },
+        )
+        assert resp.allowed_permissions["host-1"] == ["create-vfolder", "mount-in-session"]
+        assert "create-vfolder" not in resp.allowed_permissions["host-2"]
+
+    def test_list_hosts_response_permissions_default_empty(self) -> None:
+        # Backward compatibility: clients/responses predating the field still parse.
+        resp = ListHostsResponse(default="host-1", allowed=["host-1"])
+        assert resp.allowed_permissions == {}
 
     def test_allowed_types_response(self) -> None:
         resp = ListAllowedTypesResponse(["user", "group"])

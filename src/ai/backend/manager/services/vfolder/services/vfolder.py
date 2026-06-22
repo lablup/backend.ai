@@ -1061,6 +1061,7 @@ class VFolderService:
             default=default_host,
             allowed=sorted(allowed_hosts),
             volume_info=volume_info,
+            allowed_permissions=allowed_hosts.to_json(),
         )
 
     async def get_my_storage_host_permissions(
