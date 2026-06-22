@@ -20,6 +20,7 @@ from ai.backend.common.types import (
     MountInfoEntry,
     MountPermission,
     ResourceSlot,
+    ResourceSlotEntry,
     SlotName,
     SlotTypes,
     _stringify_number,
@@ -556,3 +557,46 @@ class TestMountInfoEntryLegacyShape:
                 "mount_destination": "/home/work/data",
                 "mount_perm": "rw",
             })
+
+
+class TestResourceSlotEntryToResourceSlot:
+    """``ResourceSlotEntry.to_resource_slot`` quantity parsing (BA-6576)."""
+
+    def test_plain_decimal_quantities(self) -> None:
+        entries = [
+            ResourceSlotEntry(resource_type="cpu", quantity="2"),
+            ResourceSlotEntry(resource_type="mem", quantity="4294967296"),
+        ]
+        assert ResourceSlotEntry.to_resource_slot(entries) == ResourceSlot({
+            "cpu": Decimal("2"),
+            "mem": Decimal("4294967296"),
+        })
+
+    def test_human_readable_memory_size_is_accepted(self) -> None:
+        """A human-readable size such as ``"4g"`` for a memory slot is parsed
+        with BinarySize tolerance, matching the legacy enqueue path, instead of
+        raising and surfacing as a 500."""
+        entries = [
+            ResourceSlotEntry(resource_type="cpu", quantity="2"),
+            ResourceSlotEntry(resource_type="mem", quantity="4g"),
+        ]
+        assert ResourceSlotEntry.to_resource_slot(entries) == ResourceSlot({
+            "cpu": Decimal("2"),
+            "mem": Decimal(BinarySize.from_str("4g")),
+        })
+
+    def test_non_decimal_quantity_raises_4xx(self) -> None:
+        """A non-parseable quantity is rejected with a 4xx
+        ``InvalidResourceSlotQuantity`` (BackendAIError) rather than letting
+        ``decimal.InvalidOperation`` propagate as an unhandled 500."""
+        entries = [ResourceSlotEntry(resource_type="mem", quantity="not-a-number")]
+        with pytest.raises(InvalidResourceSlotQuantity):
+            ResourceSlotEntry.to_resource_slot(entries)
+
+    def test_negative_quantity_raises_4xx(self) -> None:
+        entries = [ResourceSlotEntry(resource_type="cpu", quantity="-1")]
+        with pytest.raises(InvalidResourceSlotQuantity):
+            ResourceSlotEntry.to_resource_slot(entries)
+
+    def test_empty_entries(self) -> None:
+        assert ResourceSlotEntry.to_resource_slot([]) == ResourceSlot()

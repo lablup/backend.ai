@@ -1398,8 +1398,20 @@ class ResourceSlotEntry(BackendAISchema):
         Transitional helper: repository layer still writes ``ResourceSlot``
         to the DB column, so the final boundary converts back. New
         in-memory pipelines should stay on the entry-list form.
+
+        Quantities are parsed with the same tolerance as user input
+        (:meth:`ResourceSlot.from_user_input`), so human-readable sizes such
+        as ``"4g"`` for memory slots are accepted just like the legacy
+        enqueue path. A non-parseable quantity is rejected with a 4xx
+        :class:`InvalidResourceSlotQuantity` instead of letting
+        ``decimal.InvalidOperation`` propagate as an unhandled 500.
         """
-        return ResourceSlot({e.resource_type: Decimal(e.quantity) for e in entries})
+        try:
+            return ResourceSlot.from_user_input(
+                {e.resource_type: e.quantity for e in entries}, None
+            )
+        except ValueError as e:
+            raise InvalidResourceSlotQuantity(extra_msg=str(e)) from e
 
 
 class ResourceSlotState(enum.StrEnum):
