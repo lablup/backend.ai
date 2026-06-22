@@ -10,6 +10,7 @@ from strawberry.relay import PageInfo
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     SearchAppConfigDefinitionsInput,
 )
+from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -44,7 +45,7 @@ async def admin_app_config_definition(
     id: UUID,
 ) -> AppConfigDefinitionGQL | None:
     check_admin_only()
-    node = await info.context.adapters.app_config_definition.admin_get(id)
+    node = await info.context.adapters.app_config_definition.admin_get(AppConfigDefinitionID(id))
     return AppConfigDefinitionGQL.from_pydantic(node)
 
 

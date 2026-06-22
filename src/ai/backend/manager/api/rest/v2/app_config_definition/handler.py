@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     PurgeAppConfigDefinitionInput,
     SearchAppConfigDefinitionsInput,
 )
+from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import AppConfigDefinitionIdPathParam
 
@@ -50,7 +51,9 @@ class V2AppConfigDefinitionHandler:
         path: PathParam[AppConfigDefinitionIdPathParam],
     ) -> APIResponse:
         """Get an app config definition by id (superadmin only)."""
-        result = await self._adapter.admin_get(path.parsed.app_config_definition_id)
+        result = await self._adapter.admin_get(
+            AppConfigDefinitionID(path.parsed.app_config_definition_id)
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(
