@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
+    Protocol,
     Self,
     cast,
 )
@@ -30,6 +31,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionResult,
+    VFolderID,
     VFolderMount,
 )
 from ai.backend.manager.api.gql.base import resolve_global_id
@@ -189,6 +191,22 @@ class SessionPermissionValueField(graphene.Scalar):  # type: ignore[misc]
     @staticmethod
     def parse_value(value: str) -> ComputeSessionPermission:
         return ComputeSessionPermission(value)
+
+
+class _HasVFID(Protocol):
+    vfid: VFolderID
+
+
+def _dedup_folder_ids(mounts: Iterable[_HasVFID]) -> list[uuid.UUID]:
+    """Project mounts to their folder ids, deduplicated by folder.
+
+    A vfolder mounted at multiple subpaths yields one mount entry per subpath
+    but is still a single folder, so the ``vfolder_nodes`` connection (and the
+    deprecated ``vfolder_mounts`` id list it is resolved from) must surface each
+    folder once. Accepts both ``VFolderMount`` and ``VFolderMountData`` (the two
+    constructors feed different types). First-occurrence order is preserved.
+    """
+    return list(dict.fromkeys(vf.vfid.folder_id for vf in mounts))
 
 
 @graphene_federation.key("id")
@@ -377,7 +395,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             agent_ids=row.agent_ids,
             scaling_group=row.scaling_group_name,
             # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
-            vfolder_mounts=[vf.vfid.folder_id for vf in row.vfolders_sorted_by_id],
+            vfolder_mounts=_dedup_folder_ids(row.vfolders_sorted_by_id),
             occupied_slots=row.occupying_slots.to_json(),
             requested_slots=row.requested_slots.to_json(),
             image_references=row.images,
@@ -398,10 +416,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     ) -> Self:
         status_history = session_data.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
-        if not session_data.vfolder_mounts:
-            vfolder_mounts = []
-        else:
-            vfolder_mounts = [vf.vfid.folder_id for vf in session_data.vfolder_mounts]
+        vfolder_mounts = _dedup_folder_ids(session_data.vfolder_mounts or [])
 
         if session_data.owner is None:
             raise SessionWithInvalidStateError()
