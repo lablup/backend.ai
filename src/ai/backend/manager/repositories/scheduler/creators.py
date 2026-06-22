@@ -70,7 +70,7 @@ class KernelRowFromSpec(CreatorSpec[KernelRow]):
         environ_payload = [f"{k}={v}" for k, v in (execution.environ or {}).items()]
         resource_opts_payload = execution.resource_opts.model_dump(exclude_none=True)
         resolved_mounts = list(self.kernel_spec.vfolder_mounts)
-        requested_slots = ResourceSlotEntry.to_resource_slot(execution.resources)
+        requested_slots = ResourceSlotEntry.inputs_to_resource_slot(execution.resources)
 
         return KernelRow(
             session_id=self.spec.identity.session_id,
@@ -160,7 +160,9 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
                         session_images.insert(0, image_info.canonical)
                     else:
                         session_images.append(image_info.canonical)
-            requested_slots += ResourceSlotEntry.to_resource_slot(kernel.execution_spec.resources)
+            requested_slots += ResourceSlotEntry.inputs_to_resource_slot(
+                kernel.execution_spec.resources
+            )
 
         main_mounts = list(main_kernel.vfolder_mounts) if main_kernel else []
         session_starts_at = main_kernel.execution_spec.starts_at if main_kernel else None
