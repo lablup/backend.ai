@@ -48,6 +48,11 @@ class PortFrontend(BaseHTTPFrontend[int]):
             # Keep in mind that implementation of ensure_slot_middleware should manually handle exception and respond with
             # appropriate HTTP response, which usually is automatically covered by exception_middleware
             # That can be achieved by wraping whole execution block with AbstractHTTPFrontend.exception_safe_handler_wrapper()
+            # Resolve the real client IP from X-Forwarded-For first (only when
+            # trusted proxies are configured) so request.remote is the real client
+            # before any other middleware or the proxy handler reads it.
+            if self._xff_strict is not None:
+                app.middlewares.append(self._xff_strict.middleware)
             app.middlewares.extend([
                 self.ensure_slot_middleware,
                 self.metric_collector_middleware,

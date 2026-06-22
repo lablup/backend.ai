@@ -1,33 +1,16 @@
-"""Unit tests for ai.backend.appproxy.common.client_ip."""
+"""Unit tests for ai.backend.appproxy.common.client_ip.
+
+X-Forwarded-For resolution is no longer done here — the worker installs
+``aiohttp_remotes.XForwardedStrict`` as a middleware, so ``request.remote`` is
+already the real client IP. Only the per-circuit allowlist matcher lives in this
+module and is unit-tested below.
+"""
 
 from __future__ import annotations
 
-import ipaddress
-from collections.abc import Sequence
-from unittest.mock import Mock
-
 import pytest
-from aiohttp import web
-from aiohttp.test_utils import make_mocked_request
 
-from ai.backend.appproxy.common.client_ip import ClientIPResolver, ClientIPValidator, IPNetwork
-from ai.backend.appproxy.common.errors import ClientIPNotAllowed
-
-
-def _nets(*cidrs: str) -> list[IPNetwork]:
-    return [ipaddress.ip_network(c) for c in cidrs]
-
-
-def _make_request(remote: str | None, forwarded_for: str | None) -> web.Request:
-    """Build a mocked aiohttp request with the given peer address and
-    ``X-Forwarded-For`` header. ``request.remote`` derives from the transport
-    peername, so a mock transport supplies it."""
-    headers = {"X-Forwarded-For": forwarded_for} if forwarded_for is not None else {}
-    transport = Mock()
-    transport.get_extra_info.side_effect = lambda key, default=None: (
-        (remote, 0) if key == "peername" and remote is not None else default
-    )
-    return make_mocked_request("GET", "/", headers=headers, transport=transport)
+from ai.backend.appproxy.common.client_ip import ClientIPValidator
 
 
 class TestIPValidator:
@@ -79,81 +62,3 @@ class TestIPValidator:
 
     def test_ranges_empty_when_unrestricted(self) -> None:
         assert ClientIPValidator(None).ranges == []
-
-
-class TestClientIPResolver:
-    @pytest.mark.parametrize(
-        ("peer", "forwarded_for", "trusted", "expected"),
-        [
-            # No X-Forwarded-For header -> always the direct peer, regardless of trust.
-            ("203.0.113.5", None, ("10.0.0.0/8",), "203.0.113.5"),
-            # Empty header string is treated the same as no header.
-            ("203.0.113.5", "", ("10.0.0.0/8",), "203.0.113.5"),
-            # Peer is not a trusted proxy -> ignore the (forgeable) header, use peer.
-            ("203.0.113.5", "1.2.3.4", ("10.0.0.0/8",), "203.0.113.5"),
-            # No trusted proxies configured -> nothing is trusted -> use peer.
-            ("10.0.0.9", "1.2.3.4", (), "10.0.0.9"),
-            # Peer trusted, single forwarded entry -> that entry is the client.
-            ("10.0.0.9", "203.0.113.5", ("10.0.0.0/8",), "203.0.113.5"),
-            # Peer trusted, chain of trusted proxies on the right are skipped,
-            # first untrusted (from the right) wins.
-            (
-                "10.0.0.9",
-                "203.0.113.5, 10.1.1.1, 10.2.2.2",
-                ("10.0.0.0/8",),
-                "203.0.113.5",
-            ),
-            # An untrusted hop to the left of a trusted one is not selected;
-            # only the nearest untrusted (rightmost) is.
-            (
-                "10.0.0.9",
-                "9.9.9.9, 203.0.113.5, 10.1.1.1",
-                ("10.0.0.0/8",),
-                "203.0.113.5",
-            ),
-            # Every hop is a trusted proxy -> fall back to the leftmost (claimed origin).
-            ("10.0.0.9", "10.1.1.1, 10.2.2.2", ("10.0.0.0/8",), "10.1.1.1"),
-            # Whitespace around entries is stripped.
-            ("10.0.0.9", "  203.0.113.5 , 10.1.1.1 ", ("10.0.0.0/8",), "203.0.113.5"),
-            # Header with no usable entries (only separators) -> fall back to peer.
-            ("10.0.0.9", " , ", ("10.0.0.0/8",), "10.0.0.9"),
-            # Multiple trusted networks are all honored.
-            (
-                "192.168.1.1",
-                "203.0.113.5, 172.16.0.1",
-                ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"),
-                "203.0.113.5",
-            ),
-            # IPv6 peer + forwarded client.
-            ("fd00::1", "2001:db8::5", ("fd00::/8",), "2001:db8::5"),
-        ],
-        ids=[
-            "no-header",
-            "empty-header",
-            "peer-untrusted-ignores-header",
-            "no-trusted-proxies",
-            "single-forwarded-entry",
-            "skip-trailing-trusted-proxies",
-            "nearest-untrusted-wins",
-            "all-hops-trusted-uses-leftmost",
-            "strips-whitespace",
-            "empty-chain-falls-back-to-peer",
-            "multiple-trusted-networks",
-            "ipv6",
-        ],
-    )
-    def test_resolve(
-        self,
-        peer: str,
-        forwarded_for: str | None,
-        trusted: tuple[str, ...],
-        expected: str,
-    ) -> None:
-        trusted_networks: Sequence[IPNetwork] = _nets(*trusted)
-        request = _make_request(peer, forwarded_for)
-        assert ClientIPResolver(trusted_networks).resolve(request) == expected
-
-    def test_missing_peer_raises(self) -> None:
-        request = _make_request(None, None)
-        with pytest.raises(ClientIPNotAllowed):
-            ClientIPResolver(_nets("10.0.0.0/8")).resolve(request)

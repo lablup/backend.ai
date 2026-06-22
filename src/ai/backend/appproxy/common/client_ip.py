@@ -1,19 +1,22 @@
-"""Client IP allowlist matching and X-Forwarded-For resolution shared by the
-coordinator (request validation, Traefik config generation) and the worker
-(Python-mode enforcement).
+"""Client-IP allowlist matching for the per-circuit ``allowed_client_ips``
+restriction, shared by the coordinator (Traefik config generation) and the
+worker (Python-mode enforcement).
 
 The allowlist is persisted on a circuit as a comma-separated string of CIDR
 blocks or bare IP addresses (``Circuit.allowed_client_ips``). A null/blank value
 means the circuit is reachable from anywhere.
+
+Resolving the real client IP from ``X-Forwarded-For`` is handled separately: the
+worker installs ``aiohttp_remotes.XForwardedStrict`` as a middleware (see
+:class:`ai.backend.appproxy.worker.proxy.frontend.http.base.BaseHTTPFrontend`),
+so ``request.remote`` already holds the real client IP — trusted only when the
+connection arrives through the configured ``trusted_proxies`` — by the time this
+validator runs.
 """
 
 import ipaddress
 import logging
-from collections.abc import Sequence
 
-from aiohttp import web
-
-from ai.backend.appproxy.common.errors import ClientIPNotAllowed
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -77,53 +80,3 @@ class ClientIPValidator:
         except ValueError:
             return False
         return any(addr in net for net in self._networks)
-
-
-class ClientIPResolver:
-    """Resolves the effective client IP from ``X-Forwarded-For``, trusting the
-    header only when the immediate peer is a configured trusted proxy.
-
-    Holds the worker-level ``trusted_proxies`` (load balancers / reverse proxies
-    in front of the worker) as a field, so it is built once per worker and reused
-    across requests. ``trusted_proxies`` is NOT a per-circuit value, which is why
-    resolution lives here rather than on :class:`ClientIPValidator`.
-    """
-
-    def __init__(self, trusted_proxies: Sequence[IPNetwork]) -> None:
-        self._trusted_proxies = trusted_proxies
-
-    def _is_trusted(self, ip: str) -> bool:
-        if not self._trusted_proxies:
-            return False
-        try:
-            addr = ipaddress.ip_address(ip)
-        except ValueError:
-            return False
-        return any(addr in net for net in self._trusted_proxies)
-
-    def resolve(self, request: web.Request) -> str:
-        """Resolve the effective client IP from an aiohttp request.
-
-        The direct connection source is ``request.remote``; the forwarded chain
-        is the raw ``X-Forwarded-For`` header, ordered original-client → ... →
-        nearest proxy. Raises :class:`ClientIPNotAllowed` when the peer address
-        cannot be determined.
-
-        If the peer is not a trusted proxy, the header is ignored entirely and
-        the peer address is returned, so a directly-exposed worker cannot be
-        spoofed by a forged header. Otherwise the chain is walked from right
-        (nearest) to left, skipping trusted-proxy hops, and the first untrusted
-        address is returned as the real client. If every hop is a trusted proxy,
-        the leftmost entry (the claimed original client) is used.
-        """
-        peer_ip = request.remote
-        if not peer_ip:
-            raise ClientIPNotAllowed("E20010: Unable to determine client address")
-        forwarded_for = request.headers.get("X-Forwarded-For")
-        if not forwarded_for or not self._is_trusted(peer_ip):
-            return peer_ip
-        chain = [part.strip() for part in forwarded_for.split(",") if part.strip()]
-        for candidate in reversed(chain):
-            if not self._is_trusted(candidate):
-                return candidate
-        return chain[0] if chain else peer_ip
