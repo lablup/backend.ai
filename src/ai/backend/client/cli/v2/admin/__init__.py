@@ -16,6 +16,15 @@ def admin() -> None:
     """Admin-only management commands (superadmin required)."""
 
 
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.app_config_definition:app_config_definition",
+    name="app-config-definition",
+)
+def app_config_definition() -> None:
+    """Admin app config definition commands."""
+
+
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.domain:domain")
 def domain() -> None:
     """Admin domain commands."""
