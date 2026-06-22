@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
-    AppConfigScopeType as DTOAppConfigScopeType,
+    AppConfigScopeType as AppConfigScopeTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
@@ -136,7 +136,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
         return AppConfigAllowListNode(
             id=data.id,
             config_name=data.config_name,
-            scope_type=DTOAppConfigScopeType(data.scope_type.value),
+            scope_type=AppConfigScopeTypeDTO(data.scope_type.value),
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
