@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.5 (2026-06-22)
+
+### Fixes
+* Enforce per-circuit client IP allowlists (`allowed_client_ips`) at the app proxy layer for both Python and Traefik proxy modes, so externally published apps with IP restrictions are no longer reachable from disallowed addresses. ([#12321](https://github.com/lablup/backend.ai/issues/12321))
+* Fix session stuck in TERMINATING state when a kernel ends in CANCELLED or ERROR status ([#12322](https://github.com/lablup/backend.ai/issues/12322))
+* Terminate not-yet-serving and unhealthy model-service replicas first on scale-in, instead of ordering removal solely by creation time. ([#12323](https://github.com/lablup/backend.ai/issues/12323))
+* Fixed a compute session's mounted-folder list (`vfolder_nodes`) showing the same folder multiple times when it is mounted at more than one subpath. ([#12349](https://github.com/lablup/backend.ai/issues/12349))
+
+### Miscellaneous
+* Pin `graphql-hive/graphql-inspector` GitHub Action to `v4.0.0`, which includes the `createRequire(import.meta.url)` fix for the `rules:` file resolution regression introduced in `release-1781692943029` (action@5.0.21). See graphql-hive/graphql-inspector#2962. ([#12291](https://github.com/lablup/backend.ai/issues/12291))
+
+
 ## 26.4.4 (2026-06-18)
 
 ### Breaking Changes
