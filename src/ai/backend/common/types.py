@@ -1392,7 +1392,7 @@ class ResourceSlotEntry(BackendAISchema):
         ]
 
     @classmethod
-    def to_resource_slot(cls, entries: Sequence[ResourceSlotEntry]) -> ResourceSlot:
+    def inputs_to_resource_slot(cls, entries: Sequence[ResourceSlotEntry]) -> ResourceSlot:
         """Collapse an entry list back into the legacy ``ResourceSlot``.
 
         Transitional helper: repository layer still writes ``ResourceSlot``

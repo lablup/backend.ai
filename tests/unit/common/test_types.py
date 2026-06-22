@@ -590,7 +590,7 @@ class TestResourceSlotEntryToResourceSlot:
         slot are parsed with BinarySize tolerance, matching the legacy enqueue
         path, instead of raising and surfacing as a 500."""
         entries = [ResourceSlotEntry(resource_type=case.resource_type, quantity=case.quantity)]
-        assert ResourceSlotEntry.to_resource_slot(entries) == ResourceSlot({
+        assert ResourceSlotEntry.inputs_to_resource_slot(entries) == ResourceSlot({
             case.resource_type: case.expected
         })
 
@@ -609,17 +609,17 @@ class TestResourceSlotEntryToResourceSlot:
         ``decimal.InvalidOperation`` propagate as an unhandled 500."""
         entries = [ResourceSlotEntry(resource_type=resource_type, quantity=quantity)]
         with pytest.raises(InvalidResourceSlotQuantity):
-            ResourceSlotEntry.to_resource_slot(entries)
+            ResourceSlotEntry.inputs_to_resource_slot(entries)
 
     def test_multiple_entries_are_merged(self) -> None:
         entries = [
             ResourceSlotEntry(resource_type="cpu", quantity="2"),
             ResourceSlotEntry(resource_type="mem", quantity="4g"),
         ]
-        assert ResourceSlotEntry.to_resource_slot(entries) == ResourceSlot({
+        assert ResourceSlotEntry.inputs_to_resource_slot(entries) == ResourceSlot({
             "cpu": Decimal("2"),
             "mem": Decimal(BinarySize.from_str("4g")),
         })
 
     def test_empty_entries(self) -> None:
-        assert ResourceSlotEntry.to_resource_slot([]) == ResourceSlot()
+        assert ResourceSlotEntry.inputs_to_resource_slot([]) == ResourceSlot()
