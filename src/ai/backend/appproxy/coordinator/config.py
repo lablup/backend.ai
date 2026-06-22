@@ -183,7 +183,7 @@ class ClientIPStrategyConfig(BaseSchema):
                 "as the client IP. Mutually exclusive with 'excluded_ips'. Use this when a fixed "
                 "number of proxies always front Traefik."
             ),
-            added_version="26.4.4",
+            added_version="26.4.5",
             example=ConfigExample(local="", prod="1"),
         ),
     ]
@@ -197,7 +197,7 @@ class ClientIPStrategyConfig(BaseSchema):
                 "remaining address as the client IP. Mutually exclusive with 'depth'. Prefer this "
                 "for environments where the proxy chain length varies."
             ),
-            added_version="26.4.4",
+            added_version="26.4.5",
             example=ConfigExample(local="[]", prod='["10.0.0.0/8"]'),
         ),
     ]
@@ -234,7 +234,7 @@ class TraefikConfig(BaseSchema):
                 "when enforcing per-circuit client-IP allowlists via Traefik's ipAllowList "
                 "middleware. Leave unset when Traefik is directly exposed to clients."
             ),
-            added_version="26.4.4",
+            added_version="26.4.5",
             composite=CompositeType.FIELD,
         ),
     ]

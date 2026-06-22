@@ -798,7 +798,7 @@ class ProxyWorkerConfig(BaseSchema):
                 "a directly-exposed worker cannot be spoofed by a forged header. Leave empty when "
                 "clients connect directly to the worker."
             ),
-            added_version="26.4.4",
+            added_version="26.4.5",
             example=ConfigExample(local="[]", prod='["10.0.0.0/8"]'),
         ),
     ]

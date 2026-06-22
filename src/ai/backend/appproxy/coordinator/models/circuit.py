@@ -296,7 +296,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         return f"{worker.authority}:{self.port or self.subdomain}"
 
     @cached_property
-    def ip_validator(self) -> ClientIPValidator:
+    def _ip_validator(self) -> ClientIPValidator:
         """Client-IP allowlist parsed once from ``allowed_client_ips``."""
         return ClientIPValidator(self.allowed_client_ips)
 
@@ -308,7 +308,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 # encoded into the router's ClientIP match rule: connections from
                 # other sources match no router and are dropped. Falls back to
                 # accepting any source when unrestricted.
-                ranges = self.ip_validator.ranges
+                ranges = self._ip_validator.ranges
                 if ranges:
                     return "ClientIP(" + ", ".join(f"`{cidr}`" for cidr in ranges) + ")"
                 return "ClientIP(`0.0.0.0/0`)"
@@ -346,7 +346,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 # The ipAllowList middleware must precede the auth plugins so that
                 # disallowed clients are rejected before any credential handling.
                 middlewares = ["CORSHeaders"]
-                ranges = self.ip_validator.ranges
+                ranges = self._ip_validator.ranges
                 if ranges:
                     middlewares.append(f"bai_ipallowlist_{self.id}")
                 middlewares += [
@@ -485,7 +485,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                         }
                     },
                 }
-                ranges = self.ip_validator.ranges
+                ranges = self._ip_validator.ranges
                 if ranges:
                     # ipAllowList matches against the IP Traefik selects per its
                     # ipStrategy. Without a strategy Traefik uses the direct
