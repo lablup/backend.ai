@@ -22,6 +22,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
+from ai.backend.common.data.vfolder.types import VFolderMountData
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
@@ -191,6 +192,48 @@ class SessionPermissionValueField(graphene.Scalar):  # type: ignore[misc]
         return ComputeSessionPermission(value)
 
 
+class VFolderMountInfo(graphene.ObjectType):  # type: ignore[misc]
+    """
+    Added in 26.4.4.
+
+    Per-mount details for a vfolder attached to a compute session.
+
+    Unlike the ``mounts`` (vfolder names) and ``vfolder_mounts`` (vfolder UUIDs)
+    fields, this surfaces the individual mount configuration such as the mounted
+    subpath, the in-container mount destination (alias), and the granted
+    permission for each mount.
+    """
+
+    vfolder_id = graphene.String()
+    name = graphene.String()
+    subpath = graphene.String()  # null when mounting the vfolder root
+    mount_destination = graphene.String()  # alias / container mount path
+    permission = graphene.String()
+    usage_mode = graphene.String()
+
+
+def _vfolder_mount_info_from_mount(
+    mount: VFolderMount | VFolderMountData,
+) -> VFolderMountInfo:
+    """Map a single ``VFolderMount``/``VFolderMountData`` to a ``VFolderMountInfo``."""
+    subpath = str(mount.vfsubpath)
+    return VFolderMountInfo(
+        vfolder_id=str(mount.vfid.folder_id),
+        name=mount.name,
+        subpath=None if subpath == "." else subpath,
+        mount_destination=str(mount.kernel_path),
+        permission=mount.mount_perm.value,
+        usage_mode=mount.usage_mode.value,
+    )
+
+
+def _vfolder_mount_infos(
+    mounts: Iterable[VFolderMount | VFolderMountData],
+) -> list[VFolderMountInfo]:
+    """Map a list of mounts to a list of ``VFolderMountInfo`` objects."""
+    return [_vfolder_mount_info_from_mount(mount) for mount in mounts]
+
+
 @graphene_federation.key("id")
 class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
@@ -247,6 +290,10 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     scaling_group = graphene.String()
     service_ports = graphene.JSONString()
     vfolder_mounts = graphene.List(lambda: graphene.String)
+    vfolder_mount_infos = graphene.List(
+        lambda: VFolderMountInfo,
+        description="Added in 26.4.4.",
+    )
     occupied_slots = graphene.JSONString()
     requested_slots = graphene.JSONString()
     image_references = graphene.List(
@@ -378,6 +425,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             scaling_group=row.scaling_group_name,
             # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
             vfolder_mounts=[vf.vfid.folder_id for vf in row.vfolders_sorted_by_id],
+            vfolder_mount_infos=_vfolder_mount_infos(row.vfolders_sorted_by_id),
             occupied_slots=row.occupying_slots.to_json(),
             requested_slots=row.requested_slots.to_json(),
             image_references=row.images,
@@ -441,6 +489,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             agent_ids=session_data.agent_ids,
             scaling_group=session_data.scaling_group_name,
             vfolder_mounts=vfolder_mounts,
+            vfolder_mount_infos=_vfolder_mount_infos(session_data.vfolder_mounts or []),
             occupied_slots=session_data.occupying_slots,
             requested_slots=session_data.requested_slots,
             image_references=session_data.images,
@@ -1021,6 +1070,10 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
     service_ports = graphene.JSONString()
     mounts = graphene.List(lambda: graphene.String)
     vfolder_mounts = graphene.List(lambda: graphene.String)
+    vfolder_mount_infos = graphene.List(
+        lambda: VFolderMountInfo,
+        description="Added in 26.4.4.",
+    )
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()  # legacy
     requested_slots = graphene.JSONString(description="Added in 24.03.0.")
@@ -1103,6 +1156,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             "mounts": [*{mount.name for mount in vfolder_mounts}],
             # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
             "vfolder_mounts": [*{vf.vfid.folder_id for vf in vfolder_mounts}],
+            "vfolder_mount_infos": _vfolder_mount_infos(vfolder_mounts),
             "occupying_slots": row.occupying_slots.to_json(),
             "occupied_slots": row.occupying_slots.to_json(),
             "requested_slots": row.requested_slots.to_json(),

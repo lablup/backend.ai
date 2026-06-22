@@ -1300,6 +1300,9 @@ type ComputeSession implements Item {
   service_ports: JSONString
   mounts: [String]
   vfolder_mounts: [String]
+
+  """Added in 26.4.4."""
+  vfolder_mount_infos: [VFolderMountInfo]
   occupying_slots: JSONString
   occupied_slots: JSONString
 
@@ -1309,6 +1312,25 @@ type ComputeSession implements Item {
   containers: [ComputeContainer]
   dependencies: [ComputeSession]
   inference_metrics: JSONString
+}
+
+"""
+Added in 26.4.4.
+
+Per-mount details for a vfolder attached to a compute session.
+
+Unlike the ``mounts`` (vfolder names) and ``vfolder_mounts`` (vfolder UUIDs)
+fields, this surfaces the individual mount configuration such as the mounted
+subpath, the in-container mount destination (alias), and the granted
+permission for each mount.
+"""
+type VFolderMountInfo {
+  vfolder_id: String
+  name: String
+  subpath: String
+  mount_destination: String
+  permission: String
+  usage_mode: String
 }
 
 type UserInfo {
@@ -1606,6 +1628,9 @@ type ComputeSessionNode implements Node @key(fields: "id") {
   scaling_group: String
   service_ports: JSONString
   vfolder_mounts: [String]
+
+  """Added in 26.4.4."""
+  vfolder_mount_infos: [VFolderMountInfo]
   occupied_slots: JSONString
   requested_slots: JSONString
 

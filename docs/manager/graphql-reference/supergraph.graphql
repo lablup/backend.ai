@@ -2879,6 +2879,9 @@ type ComputeSession implements Item
   service_ports: JSONString
   mounts: [String]
   vfolder_mounts: [String]
+
+  """Added in 26.4.4."""
+  vfolder_mount_infos: [VFolderMountInfo]
   occupying_slots: JSONString
   occupied_slots: JSONString
 
@@ -2978,6 +2981,9 @@ type ComputeSessionNode implements Node
   scaling_group: String @join__field(graph: GRAPHENE)
   service_ports: JSONString @join__field(graph: GRAPHENE)
   vfolder_mounts: [String] @join__field(graph: GRAPHENE)
+
+  """Added in 26.4.4."""
+  vfolder_mount_infos: [VFolderMountInfo] @join__field(graph: GRAPHENE)
   occupied_slots: JSONString @join__field(graph: GRAPHENE)
   requested_slots: JSONString @join__field(graph: GRAPHENE)
 
@@ -21193,6 +21199,27 @@ type VFolderMetadataInfo
   createdAt: DateTime!
   lastUsed: DateTime
   cloneable: Boolean!
+}
+
+"""
+Added in 26.4.4.
+
+Per-mount details for a vfolder attached to a compute session.
+
+Unlike the ``mounts`` (vfolder names) and ``vfolder_mounts`` (vfolder UUIDs)
+fields, this surfaces the individual mount configuration such as the mounted
+subpath, the in-container mount destination (alias), and the granted
+permission for each mount.
+"""
+type VFolderMountInfo
+  @join__type(graph: GRAPHENE)
+{
+  vfolder_id: String
+  name: String
+  subpath: String
+  mount_destination: String
+  permission: String
+  usage_mode: String
 }
 
 """Added in 26.4.2. Mount permission level for a virtual folder."""
