@@ -975,14 +975,6 @@ class ScaleOutDecision:
     target_revision_id: DeploymentRevisionID | None = None
 
 
-_HEALTH_TERMINATION_PRIORITY: dict[RouteHealthStatus, int] = {
-    RouteHealthStatus.UNHEALTHY: 1,
-    RouteHealthStatus.DEGRADED: 2,
-    RouteHealthStatus.NOT_CHECKED: 3,
-    RouteHealthStatus.HEALTHY: 4,
-}
-
-
 @dataclass
 class RouteInfo:
     """Route information for deployment."""
@@ -999,17 +991,6 @@ class RouteInfo:
     health_check: ModelHealthCheck | None
     replica_group_id: ReplicaGroupID | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def termination_priority(self) -> int:
-        """Priority for scale-in termination (lower = terminated first).
-
-        Non-RUNNING routes are terminated first (0).
-        Among RUNNING routes: UNHEALTHY(1) > DEGRADED(2) > NOT_CHECKED(3) > HEALTHY(4).
-        """
-        if self.status != RouteStatus.RUNNING:
-            return 0
-        return _HEALTH_TERMINATION_PRIORITY.get(self.health_status, 0)
 
 
 @dataclass
