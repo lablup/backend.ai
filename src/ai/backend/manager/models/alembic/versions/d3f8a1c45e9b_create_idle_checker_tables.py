@@ -8,7 +8,7 @@ polymorphic ``(scope_type, scope_id)`` string pair validated on the write
 path rather than by a DB foreign key.
 
 Revision ID: d3f8a1c45e9b
-Revises: 2d6443ac0d4a
+Revises: a8e06485829f
 Create Date: 2026-06-22
 
 """
@@ -21,7 +21,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "d3f8a1c45e9b"
-down_revision = "2d6443ac0d4a"
+down_revision = "a8e06485829f"
 # Part of: 26.5.0
 branch_labels = None
 depends_on = None
