@@ -107,7 +107,7 @@ class _Shape(ABCColumnPayload):
 class _Circle(_Shape):
     radius: float
 
-    def write(self) -> dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         return {"kind": "circle", "radius": self.radius}
 
 
@@ -115,7 +115,7 @@ class _Circle(_Shape):
 class _Square(_Shape):
     side: float
 
-    def write(self) -> dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         return {"kind": "square", "side": self.side}
 
 

@@ -640,14 +640,14 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]])
 
 class ABCColumnPayload(abc.ABC):
     """
-    Storage contract for :class:`ABCColumn`: ``write`` serializes to a JSONB
+    Storage contract for :class:`ABCColumn`: ``serialize`` produces a JSONB
     dict, ``load`` rehydrates one (and may dispatch by discriminator to a
     concrete subtype). Informal abstracts rather than ``@abc.abstractmethod`` so
     the base can be passed to ``ABCColumn(...)`` without tripping mypy's
     ``type-abstract`` check; subclasses must override both.
     """
 
-    def write(self) -> dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @classmethod
@@ -656,7 +656,7 @@ class ABCColumnPayload(abc.ABC):
 
 
 class ABCColumn(TypeDecorator[ABCColumnPayload]):
-    """Polymorphic JSONB column: stores ``value.write()``, reads via
+    """Polymorphic JSONB column: stores ``value.serialize()``, reads via
     ``schema.load(...)``. Domain-agnostic; modeled on :class:`PydanticColumn`."""
 
     impl = JSONB
@@ -676,7 +676,7 @@ class ABCColumn(TypeDecorator[ABCColumnPayload]):
         # JSONB accepts Python objects directly, not JSON strings
         if value is None:
             return None
-        return value.write()
+        return value.serialize()
 
     def process_result_value(
         self,
