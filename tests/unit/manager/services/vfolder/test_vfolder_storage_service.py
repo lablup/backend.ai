@@ -228,6 +228,9 @@ class TestListHostsAction:
         assert (
             VFolderHostPermission.CREATE.value not in result.allowed_permissions["proxy2:volume2"]
         )
+        # Permissions are sorted for a deterministic response (sets are unordered).
+        for perms in result.allowed_permissions.values():
+            assert perms == sorted(perms)
 
     async def test_volume_info_includes_backend_capabilities_usage(
         self,

@@ -1061,7 +1061,12 @@ class VFolderService:
             default=default_host,
             allowed=sorted(allowed_hosts),
             volume_info=volume_info,
-            allowed_permissions=allowed_hosts.to_json(),
+            # Sort hosts and permissions for a deterministic REST response;
+            # `to_json()` emits set-ordered (nondeterministic) permission lists.
+            allowed_permissions={
+                host: sorted(perm.value for perm in perms)
+                for host, perms in sorted(allowed_hosts.items())
+            },
         )
 
     async def get_my_storage_host_permissions(
