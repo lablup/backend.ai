@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
 )
+from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import AppConfigAllowListIdPathParam
 
@@ -49,7 +50,9 @@ class V2AppConfigAllowListHandler:
         path: PathParam[AppConfigAllowListIdPathParam],
     ) -> APIResponse:
         """Get an app config allow-list entry by id (superadmin only)."""
-        result = await self._adapter.admin_get(path.parsed.app_config_allow_list_id)
+        result = await self._adapter.admin_get(
+            AppConfigAllowListID(path.parsed.app_config_allow_list_id)
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(
@@ -57,5 +60,7 @@ class V2AppConfigAllowListHandler:
         path: PathParam[AppConfigAllowListIdPathParam],
     ) -> APIResponse:
         """Purge an app config allow-list entry by id (superadmin only)."""
-        result = await self._adapter.admin_purge(path.parsed.app_config_allow_list_id)
+        result = await self._adapter.admin_purge(
+            AppConfigAllowListID(path.parsed.app_config_allow_list_id)
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

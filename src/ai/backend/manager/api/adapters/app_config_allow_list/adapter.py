@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     AppConfigAllowListFilter,
@@ -90,9 +89,9 @@ class AppConfigAllowListAdapter(BaseAdapter):
             app_config_allow_list=self._data_to_node(action_result.allow_list),
         )
 
-    async def admin_get(self, allow_list_id: UUID) -> AppConfigAllowListNode:
+    async def admin_get(self, allow_list_id: AppConfigAllowListID) -> AppConfigAllowListNode:
         action_result = await self._processors.app_config_allow_list.get.wait_for_complete(
-            GetAppConfigAllowListAction(allow_list_id=AppConfigAllowListID(allow_list_id))
+            GetAppConfigAllowListAction(allow_list_id=allow_list_id)
         )
         return self._data_to_node(action_result.allow_list)
 
@@ -122,10 +121,10 @@ class AppConfigAllowListAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    async def admin_purge(self, allow_list_id: UUID) -> PurgeAppConfigAllowListPayload:
-        purger = Purger(
-            row_class=AppConfigAllowListRow, pk_value=AppConfigAllowListID(allow_list_id)
-        )
+    async def admin_purge(
+        self, allow_list_id: AppConfigAllowListID
+    ) -> PurgeAppConfigAllowListPayload:
+        purger = Purger(row_class=AppConfigAllowListRow, pk_value=allow_list_id)
         action_result = await self._processors.app_config_allow_list.purge.wait_for_complete(
             PurgeAppConfigAllowListAction(purger=purger)
         )
