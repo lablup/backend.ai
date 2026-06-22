@@ -303,7 +303,7 @@ class ListHostsResponse(BaseResponseModel):
             "by host name (e.g. `create-vfolder`, `mount-in-session`). Lets "
             "clients distinguish hosts the user may create folders on from "
             "read-only hosts, since `allowed` carries only host names. "
-            "Added in 26.4.4."
+            "Added in 26.4.5."
         ),
     )
 
