@@ -8,6 +8,7 @@ from .config import (
 )
 from .http import (
     AuthorizationFailed,
+    ClientIPNotAllowed,
     GenericBadRequest,
     GenericForbidden,
     GraphQLError,
@@ -50,6 +51,7 @@ __all__ = [
     "RejectedByHook",
     "InvalidCredentials",
     "GenericForbidden",
+    "ClientIPNotAllowed",
     "InsufficientPrivilege",
     "MethodNotAllowed",
     "InternalServerError",

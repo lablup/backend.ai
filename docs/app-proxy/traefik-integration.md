@@ -136,6 +136,48 @@ experimental:
       moduleName: backend.ai/appproxy-traefik-plugin-go
 ```
 
+## Client IP allowlist behind a proxy
+
+When a circuit sets `allowed_client_ips`, the coordinator emits a Traefik `ipAllowList`
+middleware (HTTP) or a `ClientIP` router rule (TCP) so that only the listed CIDR
+blocks / addresses can reach the published app. The middleware matches against the IP
+Traefik selects per its `ipStrategy`.
+
+If Traefik is **directly exposed** to clients, leave `[proxy_coordinator.traefik].client_ip_strategy`
+unset — the default strategy uses the direct connection address, which cannot be spoofed.
+
+If Traefik sits **behind a load balancer / reverse proxy** (e.g. HAProxy), the direct
+connection address is the proxy's, so you must read the real client IP from
+`X-Forwarded-For`. This requires **two** coordinated settings:
+
+1. `[proxy_coordinator.traefik].client_ip_strategy` — set `excluded_ips` to the trusted
+   proxy networks (Traefik scans `X-Forwarded-For` right-to-left, skipping these), or
+   `depth` to a fixed number of proxy hops.
+2. `entryPoints.<name>.forwardedHeaders.trustedIPs` in the Traefik **static config** — set
+   to the same proxy networks. **This is a prerequisite, not optional**: Traefik discards
+   the incoming `X-Forwarded-For` from an untrusted peer and resets it to the direct remote
+   address. Without `trustedIPs`, the real client IP never reaches the `ipStrategy`, so the
+   allowlist match fails (legitimate clients are rejected or enforcement misbehaves).
+
+```yaml
+# Static config example: HAProxy on the 172.0.0.0/8 bridge network fronts Traefik
+entryPoints:
+  domainproxy:
+    address: 0.0.0.0:8443
+    forwardedHeaders:
+      trustedIPs: ["172.0.0.0/8"]
+```
+
+```toml
+# Matching coordinator config (proxy-coordinator.toml)
+[proxy_coordinator.traefik.client_ip_strategy]
+excluded_ips = ["172.0.0.0/8"]
+```
+
+The worker's Python proxy mode has an equivalent setting,
+`[proxy_worker].trusted_proxies`, which governs the same `X-Forwarded-For` trust decision
+when a circuit is served directly by the worker rather than Traefik.
+
 ## Migrating AppProxy configuration
 
 ### Path relocations
