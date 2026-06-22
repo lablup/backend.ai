@@ -19,6 +19,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
     ReplicaGroupHandlerCategory,
     ReplicaGroupLifecycle,
+    RouteHealthStatus,
     RouteStatus,
     RouteSubStatus,
     RouteTrafficStatus,
@@ -87,6 +88,31 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+def _serving_predicate() -> sa.ColumnElement[bool]:
+    """RUNNING & traffic ACTIVE — routes actually receiving traffic."""
+    return sa.and_(
+        RoutingRow.status == RouteStatus.RUNNING,
+        RoutingRow.traffic_status == RouteTrafficStatus.ACTIVE,
+    )
+
+
+def _live_predicate() -> sa.ColumnElement[bool]:
+    """PROVISIONING (warming) or serving — routes counted toward the replica count."""
+    return sa.or_(RoutingRow.status == RouteStatus.PROVISIONING, _serving_predicate())
+
+
+def _scale_in_termination_priority() -> sa.ColumnElement[int]:
+    """Scale-in drain order (lower drains first): not-yet-serving (PROVISIONING) first,
+    then RUNNING by health UNHEALTHY < DEGRADED < NOT_CHECKED < HEALTHY."""
+    return sa.case(
+        (RoutingRow.status != RouteStatus.RUNNING, 0),
+        (RoutingRow.health_status == RouteHealthStatus.UNHEALTHY, 1),
+        (RoutingRow.health_status == RouteHealthStatus.DEGRADED, 2),
+        (RoutingRow.health_status == RouteHealthStatus.NOT_CHECKED, 3),
+        else_=4,
+    )
 
 
 class ReplicaGroupDBSource:
@@ -309,11 +335,8 @@ class ReplicaGroupDBSource:
     ) -> Mapping[ReplicaGroupID, Mapping[DeploymentRevisionID, RevisionReplicaCount]]:
         if not group_ids:
             return {}
-        serving = sa.and_(
-            RoutingRow.status == RouteStatus.RUNNING,
-            RoutingRow.traffic_status == RouteTrafficStatus.ACTIVE,
-        )
-        live = sa.or_(RoutingRow.status == RouteStatus.PROVISIONING, serving)
+        serving = _serving_predicate()
+        live = _live_predicate()
         query = (
             sa.select(
                 RoutingRow.replica_group_id,
@@ -520,15 +543,16 @@ class ReplicaGroupDBSource:
         for drain in drain_instructions:
             if drain.count <= 0:
                 continue
+            # Candidates are the live set (same as the deficit count): not-yet-serving
+            # PROVISIONING routes drain before serving RUNNING routes, RUNNING by health.
             query = (
                 sa.select(RoutingRow.id)
                 .where(
                     RoutingRow.replica_group_id == drain.replica_group_id,
                     RoutingRow.revision == drain.revision_id,
-                    RoutingRow.status == RouteStatus.RUNNING,
-                    RoutingRow.traffic_status == RouteTrafficStatus.ACTIVE,
+                    _live_predicate(),
                 )
-                .order_by(RoutingRow.created_at.desc())
+                .order_by(_scale_in_termination_priority().asc(), RoutingRow.created_at.asc())
                 .limit(drain.count)
             )
             result = await db_sess.execute(query)
