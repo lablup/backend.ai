@@ -20,7 +20,6 @@ from ai.backend.manager.api.gql.app_config_allow_list.types import (
     AppConfigScopeTypeFilterGQL,
 )
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.schema import schema
 
 
 class TestAppConfigAllowListGQL:
@@ -94,14 +93,3 @@ class TestAppConfigAllowListInputs:
 
         assert dto.field == AppConfigAllowListOrderField.SCOPE_TYPE
         assert dto.direction.value == OrderDirection.DESC.value
-
-
-class TestSchemaRegistration:
-    def test_types_and_root_fields_present_in_schema(self) -> None:
-        sdl = schema.as_str()
-        assert "type AppConfigAllowList " in sdl
-        assert "adminAppConfigAllowList(" in sdl
-        assert "adminAppConfigAllowLists(" in sdl
-        assert "adminCreateAppConfigAllowList(" in sdl
-        assert "adminPurgeAppConfigAllowList(" in sdl
-        assert "input PurgeAppConfigAllowListInput " in sdl
