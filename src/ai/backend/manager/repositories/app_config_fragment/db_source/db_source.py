@@ -6,7 +6,12 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
@@ -32,6 +37,25 @@ __all__ = ("AppConfigFragmentDBSource",)
 # Gap between successive ranks, leaving room to re-order fragments without renumbering.
 RANK_GAP = 100
 
+app_config_fragment_db_source_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(
+                domain=DomainType.DB_SOURCE,
+                layer=LayerType.APP_CONFIG_FRAGMENT_DB_SOURCE,
+            )
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=5,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
+
 
 class AppConfigFragmentDBSource:
     """Database source for app config fragment operations."""
@@ -41,6 +65,7 @@ class AppConfigFragmentDBSource:
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._ops = ops_provider
 
+    @app_config_fragment_db_source_resilience.apply()
     async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
         policy = NextValuePolicy(
             column=AppConfigFragmentRow.rank,
@@ -54,6 +79,7 @@ class AppConfigFragmentDBSource:
             created = await w.create_with_next_value(policy, spec)
             return created.row.to_data()
 
+    @app_config_fragment_db_source_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
         async with self._ops.read_ops() as r:
             result = await r.query(Querier(row_class=AppConfigFragmentRow, pk_value=fragment_id))
@@ -61,6 +87,7 @@ class AppConfigFragmentDBSource:
                 raise AppConfigFragmentNotFound(f"App config fragment {fragment_id} not found")
             return result.row.to_data()
 
+    @app_config_fragment_db_source_resilience.apply()
     async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
         async with self._ops.write_ops() as w:
             result = await w.update(updater)
@@ -68,6 +95,7 @@ class AppConfigFragmentDBSource:
                 raise AppConfigFragmentNotFound(f"App config fragment {updater.pk_value} not found")
             return result.row.to_data()
 
+    @app_config_fragment_db_source_resilience.apply()
     async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
         async with self._ops.write_ops() as w:
             result = await w.purge(purger)
@@ -75,6 +103,7 @@ class AppConfigFragmentDBSource:
                 raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
             return result.row.to_data()
 
+    @app_config_fragment_db_source_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
         """Superadmin/internal path: query across all fragments with no scope filter."""
         async with self._ops.read_ops() as r:
@@ -86,6 +115,7 @@ class AppConfigFragmentDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    @app_config_fragment_db_source_resilience.apply()
     async def scoped_search(
         self,
         querier: BatchQuerier,

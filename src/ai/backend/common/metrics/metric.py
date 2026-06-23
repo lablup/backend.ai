@@ -466,6 +466,9 @@ class LayerType(enum.StrEnum):
     REPLICA_GROUP_REPOSITORY = "replica_group_repository"
 
     # DB Source layers
+    APP_CONFIG_ALLOW_LIST_DB_SOURCE = "app_config_allow_list_db_source"
+    APP_CONFIG_DEFINITION_DB_SOURCE = "app_config_definition_db_source"
+    APP_CONFIG_FRAGMENT_DB_SOURCE = "app_config_fragment_db_source"
     AUDIT_LOG_DB_SOURCE = "audit_log_db_source"
     AUTH_DB_SOURCE = "auth_db_source"
     AGENT_DB_SOURCE = "agent_db_source"
