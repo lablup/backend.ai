@@ -7,7 +7,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.manager.models.base import GUID, ABCColumn, Base
+from ai.backend.manager.data.idle_checker.types import CheckerType
+from ai.backend.manager.models.base import GUID, ABCColumn, Base, StrEnumType
 from ai.backend.manager.models.idle_checker.spec import IdleCheckerSpecABC
 
 
@@ -19,7 +20,9 @@ class IdleCheckerRow(Base):  # type: ignore[misc]
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=128), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
-    checker_type: Mapped[str] = mapped_column("checker_type", sa.String(length=64), nullable=False)
+    checker_type: Mapped[CheckerType] = mapped_column(
+        "checker_type", StrEnumType(CheckerType), nullable=False
+    )
     spec: Mapped[IdleCheckerSpecABC] = mapped_column(
         "spec", ABCColumn(IdleCheckerSpecABC), nullable=False
     )
