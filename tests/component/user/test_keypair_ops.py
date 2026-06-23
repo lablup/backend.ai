@@ -136,6 +136,7 @@ def server_module_registries(
                 gql_schema=MagicMock(),
                 gql_deps=mock_gql_deps,
                 strawberry_schema=strawberry_schema,
+                public_strawberry_schema=MagicMock(),
             ),
             route_deps,
             sub_registries=[user_registry],
