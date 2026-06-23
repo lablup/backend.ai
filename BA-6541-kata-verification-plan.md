@@ -163,7 +163,7 @@ Classify each item: ✅ Fully / ⚠️ Partial (note required config) / ❌ Unsu
 | 12 | vfolder / NFS-backed mount | ✅ | Session created with an NFS-backed vfolder mounted; the mount is visible in the kernel and read + write both succeed inside the Kata guest | NFS host_path bind → virtio-fs passthrough into the VM works with no extra config (pending: capture guest `mount` type = virtiofs and host `df -T` = nfs4 to finalize evidence) |
 | 13 | Port binding | ✅ | jupyter service port reached end-to-end through proxy chain (coordinator:10200 → worker:10201 → app:10240) | Service port traverses Kata VM network with no extra config |
 | 14 | App Proxy | ✅ | `start-service` → `/v2/proxy/auth` → worker `/setup` (cookie) → Jupyter Notebook 7.3.3 returned `200 OK` + full HTML | wsproxy/appproxy end-to-end works; `rootUri=file:///home/work` confirms VM scratch mount |
-| 15 | Overlay networking | | | |
+| 15 | Overlay networking | ✅ | `cluster_mode=multi-node, cluster_size=2` session placed kernels on two agents (ag1/ag2); Docker swarm overlay `bai-multinode-<id>` created with both nodes as VXLAN peers; kernels got overlay IPs `10.0.1.4` (main1) / `10.0.1.2` (sub1); cross-node TCP connect sub1 → `10.0.1.4:12345` succeeded (`OK: overlay reachable`) | Kata VMs participate in the swarm overlay; inter-node connectivity confirmed end-to-end. **Caveat:** swarm `advertise-addr` was the public IP, so VXLAN (UDP 4789) traverses the public interface in plaintext — for production re-init swarm on the private VPC IP. MTU left at 1500. |
 | 16 | JAIL sandbox | | | |
 | 17 | seccomp profile | | | |
 
