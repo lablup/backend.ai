@@ -421,6 +421,8 @@ class DomainType(enum.StrEnum):
 class LayerType(enum.StrEnum):
     # Repository layers with _REPOSITORY suffix
     AGENT_REPOSITORY = "agent_repository"
+    APP_CONFIG_ALLOW_LIST_REPOSITORY = "app_config_allow_list_repository"
+    APP_CONFIG_DEFINITION_REPOSITORY = "app_config_definition_repository"
     APP_CONFIG_FRAGMENT_REPOSITORY = "app_config_fragment_repository"
     AUTH_REPOSITORY = "auth_repository"
     ARTIFACT_REPOSITORY = "artifact_repository"
