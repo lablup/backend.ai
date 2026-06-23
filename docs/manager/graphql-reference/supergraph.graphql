@@ -15256,6 +15256,7 @@ enum RBACElementType
   APP_CONFIG @join__enumValue(graph: STRAWBERRY)
   APP_CONFIG_DEFINITION @join__enumValue(graph: STRAWBERRY)
   APP_CONFIG_ALLOW_LIST @join__enumValue(graph: STRAWBERRY)
+  APP_CONFIG_FRAGMENT @join__enumValue(graph: STRAWBERRY)
   MODEL_CARD @join__enumValue(graph: STRAWBERRY)
   RESOURCE_PRESET @join__enumValue(graph: STRAWBERRY)
   USER_RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
