@@ -6,15 +6,8 @@ import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.data.permission.types import (
-    GLOBAL_SCOPE_ID,
-    EntityType,
-    RelationType,
-    ScopeType,
-)
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
@@ -23,9 +16,6 @@ from ai.backend.manager.models.app_config_definition.conditions import (
 )
 from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
@@ -48,10 +38,7 @@ from ai.backend.testutils.db import with_tables
 async def repository(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[AppConfigDefinitionRepository, None]:
-    # AssociationScopesEntitiesRow: create registers the definition as an RBAC object.
-    async with with_tables(
-        database_connection, [AppConfigDefinitionRow, AssociationScopesEntitiesRow]
-    ):
+    async with with_tables(database_connection, [AppConfigDefinitionRow]):
         yield AppConfigDefinitionRepository(DBOpsProvider(database_connection))
 
 
@@ -87,26 +74,6 @@ class TestCreateAndGet:
         fetched = await repository.get_by_id(created.id)
         assert fetched.id == created.id
         assert fetched.config_name == "theme"
-
-    async def test_create_registers_global_rbac_association(
-        self,
-        repository: AppConfigDefinitionRepository,
-        database_connection: ExtendedAsyncSAEngine,
-    ) -> None:
-        created = await repository.create(
-            Creator(spec=AppConfigDefinitionCreatorSpec(config_name="theme"))
-        )
-        async with database_connection.begin_readonly_session() as db_sess:
-            association = await db_sess.scalar(
-                sa.select(AssociationScopesEntitiesRow).where(
-                    AssociationScopesEntitiesRow.entity_type == EntityType.APP_CONFIG_DEFINITION,
-                    AssociationScopesEntitiesRow.entity_id == str(created.id),
-                )
-            )
-        assert association is not None
-        assert association.scope_type is ScopeType.GLOBAL
-        assert association.scope_id == GLOBAL_SCOPE_ID
-        assert association.relation_type is RelationType.AUTO
 
     async def test_get_by_id_missing_raises(
         self, repository: AppConfigDefinitionRepository

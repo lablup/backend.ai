@@ -24,9 +24,6 @@ from ai.backend.manager.models.app_config_definition.conditions import (
     AppConfigDefinitionConditions,
 )
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.repositories.app_config_definition.creators import (
-    AppConfigDefinitionGlobalScopeAssociationSpec,
-)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
@@ -70,12 +67,6 @@ class AppConfigDefinitionDBSource:
     ) -> AppConfigDefinitionData:
         async with self._ops.write_ops() as w:
             created = await w.create(creator)
-            # Register the definition as an RBAC object at GLOBAL scope so object-level
-            # READ on (APP_CONFIG_DEFINITION, id) is resolvable (BA-6593).
-            await w.create_dependent(
-                AppConfigDefinitionGlobalScopeAssociationSpec(),
-                created.row.id,
-            )
             return created.row.to_data()
 
     @app_config_definition_db_source_resilience.apply()
