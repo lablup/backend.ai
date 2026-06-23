@@ -159,6 +159,10 @@ class Context(metaclass=ABCMeta):
     async def run_exec(self, cmdargs: Sequence[str], **kwargs: Any) -> int:
         p = await asyncio.create_subprocess_exec(
             *cmdargs,
+            # Detach from the controlling terminal: a child that inherits the
+            # TUI's stdin would steal terminal input (mouse drag events), which
+            # breaks log text-selection partway through an install.
+            stdin=kwargs.pop("stdin", asyncio.subprocess.DEVNULL),
             stdout=kwargs.pop("stdout", asyncio.subprocess.PIPE),
             stderr=kwargs.pop("stderr", asyncio.subprocess.PIPE),
             **kwargs,

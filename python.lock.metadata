@@ -103,7 +103,7 @@
     "temporenc~=0.1.0",
     "tenacity>=9.0",
     "testcontainers[minio,postgres,redis]~=4.13.3",
-    "textual~=0.79.1",
+    "textual~=6.2",
     "tomli-w~=1.2.0",
     "tomli~=2.0.1",
     "tomlkit~=0.13.2",
