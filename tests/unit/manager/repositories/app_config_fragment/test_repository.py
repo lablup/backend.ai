@@ -39,24 +39,53 @@ from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
-_DOMAIN_UUID = uuid.uuid4()
-_DOMAIN_ID = str(_DOMAIN_UUID)
-_USER_UUID = uuid.uuid4()
-_USER_ID = str(_USER_UUID)
+_DOMAIN_ID = str(uuid.uuid4())
+_USER_ID = str(uuid.uuid4())
 _OTHER_USER_ID = str(uuid.uuid4())
 
 
 @pytest.fixture
-async def repository(
+async def database(
     database_connection: ExtendedAsyncSAEngine,
-) -> AsyncGenerator[AppConfigFragmentRepository, None]:
+) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    # FK order: app_config_definitions (parent) before app_config_fragments (child).
     async with with_tables(database_connection, [AppConfigDefinitionRow, AppConfigFragmentRow]):
-        # Seed the FK parent definitions referenced by the fragments under test.
-        async with database_connection.begin_session() as db_sess:
-            db_sess.add_all([
-                AppConfigDefinitionRow(config_name=name) for name in ("theme", "menu")
-            ])
-        yield AppConfigFragmentRepository(DBOpsProvider(database_connection))
+        yield database_connection
+
+
+@pytest.fixture
+def repository(database: ExtendedAsyncSAEngine) -> AppConfigFragmentRepository:
+    return AppConfigFragmentRepository(DBOpsProvider(database))
+
+
+async def _seed_definition(database: ExtendedAsyncSAEngine, config_name: str) -> None:
+    """Insert the FK parent definition row directly."""
+    async with database.begin_session() as db_sess:
+        db_sess.add(AppConfigDefinitionRow(config_name=config_name))
+        await db_sess.flush()
+
+
+async def _seed_fragment(
+    database: ExtendedAsyncSAEngine,
+    *,
+    config_name: str,
+    scope_type: AppConfigScopeType,
+    scope_id: str,
+    rank: int,
+    config: dict[str, Any] | None = None,
+) -> AppConfigFragmentData:
+    """Insert a fragment row directly (bypassing the repository under test)."""
+    async with database.begin_session() as db_sess:
+        row = AppConfigFragmentRow(
+            config_name=config_name,
+            scope_type=scope_type,
+            scope_id=scope_id,
+            rank=rank,
+            config=config if config is not None else {"k": "v"},
+        )
+        db_sess.add(row)
+        await db_sess.flush()
+        return row.to_data()
 
 
 def _spec(
@@ -77,41 +106,104 @@ def _missing_id() -> AppConfigFragmentID:
     return AppConfigFragmentID(uuid.uuid4())
 
 
+# --- FK parent definitions (seeded directly) ---
+
+
 @pytest.fixture
-async def existing_fragment(
-    repository: AppConfigFragmentRepository,
+async def registered_theme(database: ExtendedAsyncSAEngine) -> None:
+    await _seed_definition(database, "theme")
+
+
+@pytest.fixture
+async def registered_menu(database: ExtendedAsyncSAEngine) -> None:
+    await _seed_definition(database, "menu")
+
+
+# --- Fragment inputs (each seeded directly; rank assigned explicitly) ---
+
+
+@pytest.fixture
+async def theme_public(
+    database: ExtendedAsyncSAEngine, registered_theme: None
 ) -> AppConfigFragmentData:
-    """A single pre-created fragment for tests that need an existing row as precondition."""
-    return await repository.create(
-        _spec(scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_ID, config={"k": "v"})
+    return await _seed_fragment(
+        database,
+        config_name="theme",
+        scope_type=AppConfigScopeType.PUBLIC,
+        scope_id="public",
+        rank=100,
     )
 
 
 @pytest.fixture
-async def seeded_fragments(
-    repository: AppConfigFragmentRepository,
-) -> list[AppConfigFragmentData]:
-    """A fixed set of fragments (returned in creation order) for search/applicable tests.
+async def theme_domain(
+    database: ExtendedAsyncSAEngine, registered_theme: None
+) -> AppConfigFragmentData:
+    return await _seed_fragment(
+        database,
+        config_name="theme",
+        scope_type=AppConfigScopeType.DOMAIN,
+        scope_id=_DOMAIN_ID,
+        rank=200,
+    )
 
-    Covers every scope_type, two domains, two users, and two config_names so that search
-    filters, rank ordering, and applicability can all derive their expectations from it.
-    """
-    specs = [
-        _spec(config_name="theme", scope_type=AppConfigScopeType.PUBLIC, scope_id="public"),
-        _spec(config_name="theme", scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_ID),
-        _spec(config_name="theme", scope_type=AppConfigScopeType.DOMAIN, scope_id="other"),
-        _spec(config_name="theme", scope_type=AppConfigScopeType.USER, scope_id=_USER_ID),
-        _spec(config_name="theme", scope_type=AppConfigScopeType.USER, scope_id=_OTHER_USER_ID),
-        _spec(config_name="menu", scope_type=AppConfigScopeType.PUBLIC, scope_id="public"),
-    ]
-    fragments: list[AppConfigFragmentData] = []
-    for spec in specs:
-        fragments.append(await repository.create(spec))
-    return fragments
+
+@pytest.fixture
+async def theme_domain_other(
+    database: ExtendedAsyncSAEngine, registered_theme: None
+) -> AppConfigFragmentData:
+    return await _seed_fragment(
+        database,
+        config_name="theme",
+        scope_type=AppConfigScopeType.DOMAIN,
+        scope_id="other",
+        rank=300,
+    )
+
+
+@pytest.fixture
+async def theme_user(
+    database: ExtendedAsyncSAEngine, registered_theme: None
+) -> AppConfigFragmentData:
+    return await _seed_fragment(
+        database,
+        config_name="theme",
+        scope_type=AppConfigScopeType.USER,
+        scope_id=_USER_ID,
+        rank=400,
+    )
+
+
+@pytest.fixture
+async def theme_user_other(
+    database: ExtendedAsyncSAEngine, registered_theme: None
+) -> AppConfigFragmentData:
+    return await _seed_fragment(
+        database,
+        config_name="theme",
+        scope_type=AppConfigScopeType.USER,
+        scope_id=_OTHER_USER_ID,
+        rank=500,
+    )
+
+
+@pytest.fixture
+async def menu_public(
+    database: ExtendedAsyncSAEngine, registered_menu: None
+) -> AppConfigFragmentData:
+    return await _seed_fragment(
+        database,
+        config_name="menu",
+        scope_type=AppConfigScopeType.PUBLIC,
+        scope_id="public",
+        rank=100,
+    )
 
 
 class TestCreateAndGet:
-    async def test_create_then_get_by_id(self, repository: AppConfigFragmentRepository) -> None:
+    async def test_create_then_get_by_id(
+        self, repository: AppConfigFragmentRepository, registered_theme: None
+    ) -> None:
         created = await repository.create(_spec(config={"theme": "dark"}))
         fetched = await repository.get_by_id(created.id)
         assert fetched.id == created.id
@@ -126,21 +218,21 @@ class TestCreateAndGet:
     async def test_unique_constraint_violation(
         self,
         repository: AppConfigFragmentRepository,
-        existing_fragment: AppConfigFragmentData,
+        theme_domain: AppConfigFragmentData,
     ) -> None:
         with pytest.raises(UniqueConstraintViolationError):
             await repository.create(
                 _spec(
-                    config_name=existing_fragment.config_name,
-                    scope_type=existing_fragment.scope_type,
-                    scope_id=existing_fragment.scope_id,
+                    config_name=theme_domain.config_name,
+                    scope_type=theme_domain.scope_type,
+                    scope_id=theme_domain.scope_id,
                 )
             )
 
 
 class TestRankAssignment:
     async def test_rank_increases_per_config_name(
-        self, repository: AppConfigFragmentRepository
+        self, repository: AppConfigFragmentRepository, registered_theme: None
     ) -> None:
         first = await repository.create(
             _spec(scope_type=AppConfigScopeType.PUBLIC, scope_id="public")
@@ -158,16 +250,16 @@ class TestUpdate:
     async def test_update_replaces_config(
         self,
         repository: AppConfigFragmentRepository,
-        existing_fragment: AppConfigFragmentData,
+        theme_domain: AppConfigFragmentData,
     ) -> None:
         updated = await repository.update(
             Updater(
                 spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
-                pk_value=existing_fragment.id,
+                pk_value=theme_domain.id,
             )
         )
         assert updated.config == {"b": 2}
-        assert (await repository.get_by_id(existing_fragment.id)).config == {"b": 2}
+        assert (await repository.get_by_id(theme_domain.id)).config == {"b": 2}
 
     async def test_update_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
         with pytest.raises(AppConfigFragmentNotFound):
@@ -183,14 +275,14 @@ class TestPurge:
     async def test_purge_removes_row(
         self,
         repository: AppConfigFragmentRepository,
-        existing_fragment: AppConfigFragmentData,
+        theme_domain: AppConfigFragmentData,
     ) -> None:
         purged = await repository.purge(
-            Purger(row_class=AppConfigFragmentRow, pk_value=existing_fragment.id)
+            Purger(row_class=AppConfigFragmentRow, pk_value=theme_domain.id)
         )
-        assert purged.id == existing_fragment.id
+        assert purged.id == theme_domain.id
         with pytest.raises(AppConfigFragmentNotFound):
-            await repository.get_by_id(existing_fragment.id)
+            await repository.get_by_id(theme_domain.id)
 
     async def test_purge_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
         with pytest.raises(AppConfigFragmentNotFound):
@@ -201,19 +293,27 @@ class TestSearch:
     async def test_search_returns_all_and_paginates(
         self,
         repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        theme_public: AppConfigFragmentData,
+        theme_domain: AppConfigFragmentData,
+        theme_domain_other: AppConfigFragmentData,
+        theme_user: AppConfigFragmentData,
+        theme_user_other: AppConfigFragmentData,
+        menu_public: AppConfigFragmentData,
     ) -> None:
         result = await repository.admin_search(
             BatchQuerier(pagination=OffsetPagination(limit=2, offset=0))
         )
-        assert result.total_count == len(seeded_fragments)
+        assert result.total_count == 6
         assert len(result.items) == 2
         assert result.has_next_page is True
 
     async def test_filter_by_scope_type(
         self,
         repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        theme_public: AppConfigFragmentData,
+        theme_domain: AppConfigFragmentData,
+        theme_domain_other: AppConfigFragmentData,
+        theme_user: AppConfigFragmentData,
     ) -> None:
         result = await repository.admin_search(
             BatchQuerier(
@@ -223,13 +323,13 @@ class TestSearch:
                 ],
             )
         )
-        expected = {f.id for f in seeded_fragments if f.scope_type is AppConfigScopeType.DOMAIN}
-        assert {item.id for item in result.items} == expected
+        assert {item.id for item in result.items} == {theme_domain.id, theme_domain_other.id}
 
     async def test_filter_by_scope_id(
         self,
         repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        theme_user: AppConfigFragmentData,
+        theme_user_other: AppConfigFragmentData,
     ) -> None:
         result = await repository.admin_search(
             BatchQuerier(
@@ -237,16 +337,17 @@ class TestSearch:
                 conditions=[AppConfigFragmentConditions.by_scope_id_equals(_USER_ID)],
             )
         )
-        expected = {f.id for f in seeded_fragments if f.scope_id == _USER_ID}
-        assert {item.id for item in result.items} == expected
+        assert {item.id for item in result.items} == {theme_user.id}
 
     async def test_order_by_rank_desc(
         self,
         repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        theme_public: AppConfigFragmentData,
+        theme_domain: AppConfigFragmentData,
+        theme_domain_other: AppConfigFragmentData,
+        theme_user: AppConfigFragmentData,
+        theme_user_other: AppConfigFragmentData,
     ) -> None:
-        # Rank is monotonic per config_name, so scope to one config_name for a total order.
-        theme_fragments = [f for f in seeded_fragments if f.config_name == "theme"]
         result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
@@ -258,28 +359,37 @@ class TestSearch:
                 orders=[AppConfigFragmentOrders.rank(ascending=False)],
             )
         )
-        expected = [f.id for f in sorted(theme_fragments, key=lambda f: f.rank, reverse=True)]
-        assert [item.id for item in result.items] == expected
+        assert [item.id for item in result.items] == [
+            theme_user_other.id,
+            theme_user.id,
+            theme_domain_other.id,
+            theme_domain.id,
+            theme_public.id,
+        ]
 
 
 class TestScopedSearch:
     async def test_scoped_search_returns_only_that_config_name(
         self,
         repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        theme_public: AppConfigFragmentData,
+        theme_domain: AppConfigFragmentData,
+        theme_user: AppConfigFragmentData,
+        menu_public: AppConfigFragmentData,
     ) -> None:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
             [ConfigNameSearchScope(config_name="theme")],
         )
-        expected = {f.id for f in seeded_fragments if f.config_name == "theme"}
-        assert {item.id for item in result.items} == expected
-        assert result.total_count == len(expected)
+        assert {item.id for item in result.items} == {
+            theme_public.id,
+            theme_domain.id,
+            theme_user.id,
+        }
+        assert result.total_count == 3
 
     async def test_scoped_search_unregistered_config_name_raises(
-        self,
-        repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        self, repository: AppConfigFragmentRepository
     ) -> None:
         with pytest.raises(AppConfigDefinitionNotFound):
             await repository.scoped_search(
