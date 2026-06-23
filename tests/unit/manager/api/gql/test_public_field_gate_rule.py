@@ -12,19 +12,19 @@ from graphql import (
 )
 
 from ai.backend.common.meta import BackendAIGQLMeta
-from ai.backend.manager.api.gql.decorators import gql_root_field
+from ai.backend.manager.api.gql.decorators import gql_public_root_field, gql_root_field
 from ai.backend.manager.api.gql.directives import Public
 from ai.backend.manager.api.graphql_rules import PublicFieldGateRule
 
-# --- Part A: gql_root_field(public=True) attaches the @public marker ---
+# --- Part A: gql_public_root_field attaches the @public marker; gql_root_field does not ---
 
 
-def test_gql_root_field_public_attaches_directive() -> None:
-    field = gql_root_field(BackendAIGQLMeta(description="d", added_version="26.4.4"), public=True)
+def test_gql_public_root_field_attaches_directive() -> None:
+    field = gql_public_root_field(BackendAIGQLMeta(description="d", added_version="26.4.4"))
     assert any(isinstance(d, Public) for d in field.directives)
 
 
-def test_gql_root_field_default_is_unmarked() -> None:
+def test_gql_root_field_is_not_public() -> None:
     field = gql_root_field(BackendAIGQLMeta(description="d", added_version="26.4.4"))
     assert not any(isinstance(d, Public) for d in field.directives)
 
@@ -33,12 +33,10 @@ def test_gql_root_field_default_is_unmarked() -> None:
 #
 # The schema is built with graphql-core directly (Strawberry's type/field constructors are banned
 # in this repo). The ``strawberry-definition`` extension holds a real ``StrawberryField`` produced
-# by ``gql_root_field(..., public=True)``, so the rule reads ``@public`` exactly as it does on the
-# production schema.
+# by ``gql_public_root_field``, so the rule reads ``@public`` exactly as it does on the production
+# schema.
 
-_public_marker = gql_root_field(
-    BackendAIGQLMeta(description="d", added_version="26.4.4"), public=True
-)
+_public_marker = gql_public_root_field(BackendAIGQLMeta(description="d", added_version="26.4.4"))
 _info_type = GraphQLObjectType("Info", {"version": GraphQLField(GraphQLString)})
 _schema = GraphQLSchema(
     query=GraphQLObjectType(

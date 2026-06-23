@@ -55,6 +55,7 @@ __all__ = (
     "gql_pydantic_input",
     "gql_pydantic_interface",
     "gql_pydantic_type",
+    "gql_public_root_field",
     "gql_root_field",
     "gql_subscription",
     "gql_federation_type",
@@ -263,23 +264,38 @@ def gql_root_field(
     name: str | None = None,
     deprecation_reason: str | None = None,
     directives: Sequence[object] = (),
-    public: bool = False,
 ) -> Any:
     """Root query/subscription field on the Query type (always has its own version).
 
     Use for top-level fields on the Query type that are independently versioned.
     ``directives`` forwards schema directives (e.g. federation ``@override``) onto the field.
-    Set ``public=True`` to expose the field on the unauthenticated public endpoint (attaches the
-    ``@public`` marker; see ``api.gql.directives.Public``); only do so for resolvers that are safe
-    to run without an authenticated user.
     """
-    if public:
-        directives = (*directives, Public())
     return strawberry.field(
         description=_build_description(meta),
         name=name,
         deprecation_reason=deprecation_reason,
         directives=directives,
+    )
+
+
+def gql_public_root_field(
+    meta: BackendAIGQLMeta,
+    *,
+    name: str | None = None,
+    deprecation_reason: str | None = None,
+    directives: Sequence[object] = (),
+) -> Any:
+    """Root Query field exposed on the unauthenticated public endpoint.
+
+    Same as ``gql_root_field`` but attaches the ``@public`` marker (see ``api.gql.directives.Public``)
+    so anonymous callers may select the field on ``POST /admin/gql/strawberry/public``. Only use for
+    resolvers that are safe to run without an authenticated user.
+    """
+    return gql_root_field(
+        meta,
+        name=name,
+        deprecation_reason=deprecation_reason,
+        directives=(*directives, Public()),
     )
 
 
