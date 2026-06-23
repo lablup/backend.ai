@@ -212,3 +212,19 @@ class TestSearch:
             )
         )
         assert [item.id for item in result.items] == [d.id for d in by_created_desc[1:]]
+
+
+class TestByConfigName:
+    async def test_resolves_existing(
+        self,
+        repository: AppConfigDefinitionRepository,
+        seeded_definitions: list[AppConfigDefinitionData],
+    ) -> None:
+        expected = next(d for d in seeded_definitions if d.config_name == "theme")
+        resolved = await repository.by_config_name("theme")
+        assert resolved.id == expected.id
+        assert resolved.config_name == "theme"
+
+    async def test_unregistered_raises(self, repository: AppConfigDefinitionRepository) -> None:
+        with pytest.raises(AppConfigDefinitionNotFound):
+            await repository.by_config_name("unregistered")

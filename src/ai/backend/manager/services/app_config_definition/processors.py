@@ -18,6 +18,10 @@ from ai.backend.manager.services.app_config_definition.actions.purge import (
     PurgeAppConfigDefinitionAction,
     PurgeAppConfigDefinitionActionResult,
 )
+from ai.backend.manager.services.app_config_definition.actions.resolve_by_config_name import (
+    ResolveAppConfigDefinitionByConfigNameAction,
+    ResolveAppConfigDefinitionByConfigNameActionResult,
+)
 from ai.backend.manager.services.app_config_definition.actions.search import (
     SearchAppConfigDefinitionsAction,
     SearchAppConfigDefinitionsActionResult,
@@ -34,6 +38,10 @@ class AppConfigDefinitionProcessors(AbstractProcessorPackage):
     get: SingleEntityActionProcessor[
         GetAppConfigDefinitionAction, GetAppConfigDefinitionActionResult
     ]
+    resolve_by_config_name: ScopeActionProcessor[
+        ResolveAppConfigDefinitionByConfigNameAction,
+        ResolveAppConfigDefinitionByConfigNameActionResult,
+    ]
     search: ScopeActionProcessor[
         SearchAppConfigDefinitionsAction, SearchAppConfigDefinitionsActionResult
     ]
@@ -48,6 +56,9 @@ class AppConfigDefinitionProcessors(AbstractProcessorPackage):
     ) -> None:
         self.create = ScopeActionProcessor(service.create, action_monitors)
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
+        self.resolve_by_config_name = ScopeActionProcessor(
+            service.resolve_by_config_name, action_monitors
+        )
         self.search = ScopeActionProcessor(service.search, action_monitors)
         self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
 
@@ -56,6 +67,7 @@ class AppConfigDefinitionProcessors(AbstractProcessorPackage):
         return [
             CreateAppConfigDefinitionAction.spec(),
             GetAppConfigDefinitionAction.spec(),
+            ResolveAppConfigDefinitionByConfigNameAction.spec(),
             SearchAppConfigDefinitionsAction.spec(),
             PurgeAppConfigDefinitionAction.spec(),
         ]

@@ -36,6 +36,9 @@ from ai.backend.manager.services.app_config_definition.actions.get import (
 from ai.backend.manager.services.app_config_definition.actions.purge import (
     PurgeAppConfigDefinitionAction,
 )
+from ai.backend.manager.services.app_config_definition.actions.resolve_by_config_name import (
+    ResolveAppConfigDefinitionByConfigNameAction,
+)
 from ai.backend.manager.services.app_config_definition.actions.search import (
     SearchAppConfigDefinitionsAction,
 )
@@ -101,6 +104,35 @@ class TestAppConfigDefinitionService:
 
         with pytest.raises(AppConfigDefinitionNotFound):
             await service.get(GetAppConfigDefinitionAction(definition_id=missing_id))
+
+    async def test_resolve_by_config_name(
+        self,
+        service: AppConfigDefinitionService,
+        mock_repository: MagicMock,
+        definition_data: AppConfigDefinitionData,
+    ) -> None:
+        mock_repository.by_config_name = AsyncMock(return_value=definition_data)
+
+        result = await service.resolve_by_config_name(
+            ResolveAppConfigDefinitionByConfigNameAction(config_name="theme")
+        )
+
+        assert result.definition == definition_data
+        mock_repository.by_config_name.assert_called_once_with("theme")
+
+    async def test_resolve_by_config_name_not_found(
+        self,
+        service: AppConfigDefinitionService,
+        mock_repository: MagicMock,
+    ) -> None:
+        mock_repository.by_config_name = AsyncMock(
+            side_effect=AppConfigDefinitionNotFound("'missing' not found")
+        )
+
+        with pytest.raises(AppConfigDefinitionNotFound):
+            await service.resolve_by_config_name(
+                ResolveAppConfigDefinitionByConfigNameAction(config_name="missing")
+            )
 
     async def test_search(
         self,

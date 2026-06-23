@@ -15,6 +15,10 @@ from ai.backend.manager.services.app_config_definition.actions.purge import (
     PurgeAppConfigDefinitionAction,
     PurgeAppConfigDefinitionActionResult,
 )
+from ai.backend.manager.services.app_config_definition.actions.resolve_by_config_name import (
+    ResolveAppConfigDefinitionByConfigNameAction,
+    ResolveAppConfigDefinitionByConfigNameActionResult,
+)
 from ai.backend.manager.services.app_config_definition.actions.search import (
     SearchAppConfigDefinitionsAction,
     SearchAppConfigDefinitionsActionResult,
@@ -38,6 +42,12 @@ class AppConfigDefinitionService:
     async def get(self, action: GetAppConfigDefinitionAction) -> GetAppConfigDefinitionActionResult:
         data = await self._repository.get_by_id(action.definition_id)
         return GetAppConfigDefinitionActionResult(definition=data)
+
+    async def resolve_by_config_name(
+        self, action: ResolveAppConfigDefinitionByConfigNameAction
+    ) -> ResolveAppConfigDefinitionByConfigNameActionResult:
+        data = await self._repository.by_config_name(action.config_name)
+        return ResolveAppConfigDefinitionByConfigNameActionResult(definition=data)
 
     async def search(
         self, action: SearchAppConfigDefinitionsAction

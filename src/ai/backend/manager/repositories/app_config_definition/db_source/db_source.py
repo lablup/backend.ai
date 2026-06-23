@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -19,8 +20,17 @@ from ai.backend.manager.data.app_config_definition.types import (
     AppConfigDefinitionListResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
+from ai.backend.manager.models.app_config_definition.conditions import (
+    AppConfigDefinitionConditions,
+)
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger, Querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    OffsetPagination,
+    Purger,
+    Querier,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigDefinitionDBSource",)
@@ -70,6 +80,27 @@ class AppConfigDefinitionDBSource:
                     f"App config definition {definition_id} not found"
                 )
             return result.row.to_data()
+
+    @app_config_definition_db_source_resilience.apply()
+    async def by_config_name(self, config_name: str) -> AppConfigDefinitionData:
+        """Resolve one definition by its unique ``config_name`` (raises if unregistered)."""
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(
+                sa.select(AppConfigDefinitionRow),
+                BatchQuerier(
+                    pagination=OffsetPagination(offset=0, limit=1),
+                    conditions=[
+                        AppConfigDefinitionConditions.by_config_name_equals(
+                            StringMatchSpec(config_name, case_insensitive=False, negated=False)
+                        )
+                    ],
+                ),
+            )
+            if not result.rows:
+                raise AppConfigDefinitionNotFound(
+                    f"App config definition {config_name!r} not found"
+                )
+            return result.rows[0].AppConfigDefinitionRow.to_data()
 
     @app_config_definition_db_source_resilience.apply()
     async def purge(self, purger: Purger[AppConfigDefinitionRow]) -> AppConfigDefinitionData:
