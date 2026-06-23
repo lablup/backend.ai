@@ -5,16 +5,14 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
-from ai.backend.manager.repositories.app_config_fragment.updaters import (
-    AppConfigFragmentUpdaterSpec,
-)
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base import BatchQuerier, Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigFragmentRepository",)
@@ -34,12 +32,8 @@ class AppConfigFragmentRepository:
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
         return await self._db_source.get_by_id(fragment_id)
 
-    async def update(
-        self,
-        fragment_id: AppConfigFragmentID,
-        spec: AppConfigFragmentUpdaterSpec,
-    ) -> AppConfigFragmentData:
-        return await self._db_source.update(fragment_id, spec)
+    async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        return await self._db_source.update(updater)
 
     async def purge(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
         return await self._db_source.purge(fragment_id)

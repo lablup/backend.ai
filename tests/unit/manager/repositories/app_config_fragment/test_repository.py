@@ -30,7 +30,7 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -157,8 +157,10 @@ class TestUpdate:
         existing_fragment: AppConfigFragmentData,
     ) -> None:
         updated = await repository.update(
-            existing_fragment.id,
-            AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
+            Updater(
+                spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
+                pk_value=existing_fragment.id,
+            )
         )
         assert updated.config == {"b": 2}
         assert (await repository.get_by_id(existing_fragment.id)).config == {"b": 2}
@@ -166,8 +168,10 @@ class TestUpdate:
     async def test_update_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.update(
-                _missing_id(),
-                AppConfigFragmentUpdaterSpec(config=OptionalState.update({})),
+                Updater(
+                    spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({})),
+                    pk_value=_missing_id(),
+                )
             )
 
 

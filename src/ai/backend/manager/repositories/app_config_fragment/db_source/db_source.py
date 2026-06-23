@@ -16,9 +16,6 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreateDependency,
     AppConfigFragmentCreatorSpec,
 )
-from ai.backend.manager.repositories.app_config_fragment.updaters import (
-    AppConfigFragmentUpdaterSpec,
-)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Purger,
@@ -64,15 +61,11 @@ class AppConfigFragmentDBSource:
                 raise AppConfigFragmentNotFound(f"App config fragment {fragment_id} not found")
             return result.row.to_data()
 
-    async def update(
-        self,
-        fragment_id: AppConfigFragmentID,
-        spec: AppConfigFragmentUpdaterSpec,
-    ) -> AppConfigFragmentData:
+    async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
         async with self._ops.write_ops() as w:
-            result = await w.update(Updater(spec=spec, pk_value=fragment_id))
+            result = await w.update(updater)
             if result is None:
-                raise AppConfigFragmentNotFound(f"App config fragment {fragment_id} not found")
+                raise AppConfigFragmentNotFound(f"App config fragment {updater.pk_value} not found")
             return result.row.to_data()
 
     async def purge(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
