@@ -16,7 +16,6 @@ from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.repositories.app_config_fragment.creators import (
-    AppConfigFragmentCreateDependency,
     AppConfigFragmentCreatorSpec,
 )
 from ai.backend.manager.repositories.base import (
@@ -54,9 +53,7 @@ class AppConfigFragmentDBSource:
             gap=RANK_GAP,
         )
         async with self._ops.write_ops() as w:
-            created = await w.create_with_next_value(
-                policy, spec, lambda rank: AppConfigFragmentCreateDependency(rank=rank)
-            )
+            created = await w.create_with_next_value(policy, spec)
             return created.row.to_data()
 
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:

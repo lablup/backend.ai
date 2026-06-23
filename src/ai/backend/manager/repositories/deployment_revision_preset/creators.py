@@ -31,25 +31,11 @@ def _parse_quantity(value: str) -> Decimal:
         return Decimal(BinarySize.from_str(value))
 
 
-@dataclass(frozen=True)
-class DeploymentRevisionPresetCreateDependency:
-    """Execution-time values resolved while creating a preset.
-
-    Currently holds only the ``rank`` assigned by the ops layer (next-value). Kept as a
-    dedicated type rather than a bare ``int`` so additional execution-resolved fields can
-    be added later without changing ``build_row``'s signature.
-    """
-
-    rank: int
-
-
 @dataclass
-class DeploymentRevisionPresetCreatorSpec(
-    DependentCreatorSpec[DeploymentRevisionPresetCreateDependency, DeploymentRevisionPresetRow]
-):
+class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRevisionPresetRow]):
     """Preset creator whose rank is assigned by the ops layer (next-value) at execution.
 
-    ``build_row`` receives the resolved dependency.
+    ``build_row`` receives the computed next rank as its dependency.
     """
 
     runtime_variant_id: RuntimeVariantID
@@ -83,14 +69,12 @@ class DeploymentRevisionPresetCreatorSpec(
         )
 
     @override
-    def build_row(
-        self, dependency: DeploymentRevisionPresetCreateDependency
-    ) -> DeploymentRevisionPresetRow:
+    def build_row(self, next_rank: int) -> DeploymentRevisionPresetRow:
         return DeploymentRevisionPresetRow(
             runtime_variant=self.runtime_variant_id,
             name=self.name,
             description=self.description,
-            rank=dependency.rank,
+            rank=next_rank,
             image_id=self.image_id,
             model_definition=self.model_definition,
             resource_opts=self.resource_opts,
