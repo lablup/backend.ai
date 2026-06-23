@@ -5,6 +5,7 @@ from ai.backend.manager.errors.common import ObjectNotFound
 __all__ = (
     "AppConfigAllowListNotFound",
     "AppConfigDefinitionNotFound",
+    "AppConfigFragmentNotFound",
 )
 
 
@@ -16,3 +17,8 @@ class AppConfigDefinitionNotFound(ObjectNotFound):
 class AppConfigAllowListNotFound(ObjectNotFound):
     error_type = "https://api.backend.ai/probs/app-config-allow-list-not-found"
     object_name = "app config allow-list entry"
+
+
+class AppConfigFragmentNotFound(ObjectNotFound):
+    error_type = "https://api.backend.ai/probs/app-config-fragment-not-found"
+    object_name = "app config fragment"
