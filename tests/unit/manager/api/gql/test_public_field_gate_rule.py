@@ -12,29 +12,15 @@ from graphql import (
 )
 
 from ai.backend.common.meta import BackendAIGQLMeta
-from ai.backend.manager.api.gql.decorators import gql_public_root_field, gql_root_field
-from ai.backend.manager.api.gql.directives import Public
+from ai.backend.manager.api.gql.decorators import gql_public_root_field
 from ai.backend.manager.api.graphql_rules import PublicFieldGateRule
 
-# --- Part A: gql_public_root_field attaches the @public marker; gql_root_field does not ---
-
-
-def test_gql_public_root_field_attaches_directive() -> None:
-    field = gql_public_root_field(BackendAIGQLMeta(description="d", added_version="26.4.4"))
-    assert any(isinstance(d, Public) for d in field.directives)
-
-
-def test_gql_root_field_is_not_public() -> None:
-    field = gql_root_field(BackendAIGQLMeta(description="d", added_version="26.4.4"))
-    assert not any(isinstance(d, Public) for d in field.directives)
-
-
-# --- Part B: PublicFieldGateRule enforces the marker at validation time ---
+# PublicFieldGateRule enforces the @public marker at validation time.
 #
 # The schema is built with graphql-core directly (Strawberry's type/field constructors are banned
 # in this repo). The ``strawberry-definition`` extension holds a real ``StrawberryField`` produced
-# by ``gql_public_root_field``, so the rule reads ``@public`` exactly as it does on the production
-# schema.
+# by ``gql_public_root_field`` (which attaches @public), so the rule reads it exactly as on the
+# production schema; ``test_public_marked_root_field_passes`` therefore also covers the marker.
 
 _public_marker = gql_public_root_field(BackendAIGQLMeta(description="d", added_version="26.4.4"))
 _info_type = GraphQLObjectType("Info", {"version": GraphQLField(GraphQLString)})
