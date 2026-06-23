@@ -18,15 +18,17 @@ from ai.backend.manager.api.gql.decorators import gql_root_field
 from ai.backend.manager.api.gql.directives import Public
 from ai.backend.manager.api.graphql_rules import PublicFieldGateRule
 
-# --- Part A: the gql_root_field decorator attaches the @public marker ---
+# --- Part A: a root field declared with directives=[Public()] carries the @public marker ---
 
 
-def test_gql_root_field_public_attaches_directive() -> None:
-    field = gql_root_field(BackendAIGQLMeta(description="d", added_version="26.4.4"), public=True)
+def test_gql_root_field_carries_public_directive() -> None:
+    field = gql_root_field(
+        BackendAIGQLMeta(description="d", added_version="26.4.4"), directives=[Public()]
+    )
     assert any(isinstance(d, Public) for d in field.directives)
 
 
-def test_gql_root_field_default_has_no_public_directive() -> None:
+def test_gql_root_field_without_public_directive_is_unmarked() -> None:
     field = gql_root_field(BackendAIGQLMeta(description="d", added_version="26.4.4"))
     assert not any(isinstance(d, Public) for d in field.directives)
 
