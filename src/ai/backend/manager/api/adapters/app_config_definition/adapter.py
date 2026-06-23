@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from functools import lru_cache
-from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     AppConfigDefinitionFilter,
@@ -80,9 +79,9 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             app_config_definition=self._data_to_node(action_result.definition),
         )
 
-    async def admin_get(self, definition_id: UUID) -> AppConfigDefinitionNode:
+    async def admin_get(self, definition_id: AppConfigDefinitionID) -> AppConfigDefinitionNode:
         action_result = await self._processors.app_config_definition.get.wait_for_complete(
-            GetAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(definition_id))
+            GetAppConfigDefinitionAction(definition_id=definition_id)
         )
         return self._data_to_node(action_result.definition)
 

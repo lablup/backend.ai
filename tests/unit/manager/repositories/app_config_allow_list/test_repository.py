@@ -226,6 +226,24 @@ class TestSearch:
         }
         assert {item.id for item in result.items} == expected
 
+    async def test_search_filters_by_scope_type_not_equals(
+        self,
+        repository: AppConfigAllowListRepository,
+        seeded_entries: list[AppConfigAllowListData],
+    ) -> None:
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[
+                    AppConfigAllowListConditions.by_scope_type_not_equals(AppConfigScopeType.USER)
+                ],
+            )
+        )
+        expected = {
+            entry.id for entry in seeded_entries if entry.scope_type is not AppConfigScopeType.USER
+        }
+        assert {item.id for item in result.items} == expected
+
     async def test_search_orders_by_config_name_desc(
         self,
         repository: AppConfigAllowListRepository,

@@ -45,6 +45,12 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.agent.processors import AgentProcessors
     from ai.backend.manager.services.agent.service import AgentService
+    from ai.backend.manager.services.app_config_allow_list.processors import (
+        AppConfigAllowListProcessors,
+    )
+    from ai.backend.manager.services.app_config_allow_list.service import (
+        AppConfigAllowListService,
+    )
     from ai.backend.manager.services.app_config_definition.processors import (
         AppConfigDefinitionProcessors,
     )
@@ -369,6 +375,7 @@ class ServiceArgs:
 @dataclass
 class Services:
     agent: AgentService
+    app_config_allow_list: AppConfigAllowListService
     app_config_definition: AppConfigDefinitionService
     domain: DomainService
     dotfile: DotfileService
@@ -435,6 +442,7 @@ class ProcessorArgs:
 @dataclass
 class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
+    app_config_allow_list: AppConfigAllowListProcessors
     app_config_definition: AppConfigDefinitionProcessors
     domain: DomainProcessors
     dotfile: DotfileProcessors
@@ -494,6 +502,7 @@ class Processors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             *self.agent.supported_actions(),
+            *self.app_config_allow_list.supported_actions(),
             *self.app_config_definition.supported_actions(),
             *self.domain.supported_actions(),
             *self.dotfile.supported_actions(),

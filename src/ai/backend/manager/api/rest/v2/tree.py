@@ -28,6 +28,8 @@ def build_v2_routes(
     # Lazy imports to avoid circular dependencies at module level
     from .agent.handler import V2AgentHandler
     from .agent.registry import register_v2_agent_routes
+    from .app_config_allow_list.handler import V2AppConfigAllowListHandler
+    from .app_config_allow_list.registry import register_v2_app_config_allow_list_routes
     from .app_config_definition.handler import V2AppConfigDefinitionHandler
     from .app_config_definition.registry import register_v2_app_config_definition_routes
     from .artifact.handler import V2ArtifactHandler
@@ -119,6 +121,9 @@ def build_v2_routes(
 
     # Build all handlers (each takes its individual adapter)
     agent_handler = V2AgentHandler(adapter=adapters.agent)
+    app_config_allow_list_handler = V2AppConfigAllowListHandler(
+        adapter=adapters.app_config_allow_list
+    )
     app_config_definition_handler = V2AppConfigDefinitionHandler(
         adapter=adapters.app_config_definition
     )
@@ -179,6 +184,9 @@ def build_v2_routes(
 
     # Add all domain sub-registries
     v2_reg.add_subregistry(register_v2_agent_routes(agent_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_app_config_allow_list_routes(app_config_allow_list_handler, route_deps)
+    )
     v2_reg.add_subregistry(
         register_v2_app_config_definition_routes(app_config_definition_handler, route_deps)
     )

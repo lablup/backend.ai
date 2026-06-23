@@ -88,6 +88,20 @@ class AppConfigAllowListConditions:
 
         return inner
 
+    @staticmethod
+    def by_scope_type_not_equals(scope_type: AppConfigScopeType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigAllowListRow.scope_type != scope_type
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_not_in(scope_types: Sequence[AppConfigScopeType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigAllowListRow.scope_type.not_in(list(scope_types))
+
+        return inner
+
     # --- cursor (created_at-based) pagination ---
 
     @staticmethod
