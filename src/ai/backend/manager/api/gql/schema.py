@@ -1,3 +1,5 @@
+import re
+
 import strawberry
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.federation import Schema
@@ -92,6 +94,7 @@ from .deployment import (
     update_model_deployment,
     update_route_traffic_status,
 )
+from .domain import Domain as _DomainStub
 from .domain_v2 import (
     admin_create_domain_v2,
     admin_delete_domain_v2,
@@ -148,6 +151,7 @@ from .image import (
     image_scoped_aliases,
     image_v2,
 )
+from .image_federation import Image as _ImageStub
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .keypair import (
     admin_create_keypair_v2,
@@ -163,6 +167,18 @@ from .keypair import (
     revoke_my_keypair,
     switch_my_main_access_key,
     update_my_keypair,
+)
+from .legacy_node_stubs import (
+    AgentNodeStub as _AgentNodeStub,
+)
+from .legacy_node_stubs import (
+    ContainerRegistryNodeStub as _ContainerRegistryNodeStub,
+)
+from .legacy_node_stubs import (
+    ModelCardStub as _ModelCardStub,
+)
+from .legacy_node_stubs import (
+    NetworkNodeStub as _NetworkNodeStub,
 )
 from .login_client_type import (
     admin_create_login_client_type,
@@ -191,6 +207,7 @@ from .model_card import (
     project_model_cards_v2,
     scan_project_model_cards_v2,
 )
+from .node_field import node
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -228,6 +245,7 @@ from .object_storage import (
     object_storages,
     update_object_storage,
 )
+from .project import Project as _ProjectStub
 from .project_v2 import (
     admin_create_project_v2,
     admin_delete_project_v2,
@@ -322,6 +340,7 @@ from .resource_group import (
     resource_groups,
     update_resource_group_fair_share_spec,
 )
+from .resource_group.federation import ResourceGroup as _ResourceGroupStub
 from .resource_policy_v2 import (
     admin_create_keypair_resource_policy_v2,
     admin_create_project_resource_policy_v2,
@@ -406,6 +425,7 @@ from .session.resolver import (
     session_v2,
     terminate_sessions_v2,
 )
+from .session_federation import Session as _SessionStub
 from .storage_host import my_storage_host_permissions
 from .storage_namespace import (
     register_storage_namespace,
@@ -432,6 +452,8 @@ from .user import (
     update_my_allowed_client_ip,
     update_user_v2,
 )
+from .user_federation import User as _UserStub
+from .vfolder import VFolder as _VFolderStub
 from .vfolder_v2 import (
     admin_vfolders_v2,
     bulk_delete_vfolders_v2,
@@ -464,6 +486,8 @@ from .vfs_storage import (
 
 @strawberry.type
 class Query:
+    # Relay Global Object Identification entry point (resolves any Node by global ID)
+    node = node
     agent_stats = agent_stats
     agents_v2 = agents_v2
     artifact = artifact
@@ -932,8 +956,16 @@ class CustomizedSchema(Schema):
                 if isinstance(getattr(field, "default_value", None), BackendSentinel):
                     field.default_value = GraphQLUndefined
         sdl = super().as_str()
-        sdl = sdl.replace("type PageInfo", "type PageInfo @shareable").replace(
-            'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
+        sdl = sdl.replace("type PageInfo", "type PageInfo @shareable")
+        # PageInfo is force-marked @shareable above, so the directive must be imported from the
+        # federation spec @link. Strawberry only auto-imports the directives it actually emits, and
+        # that set varies (e.g. @external drops out once no field uses it), so inject @shareable
+        # into whatever import list is present rather than matching a fixed literal.
+        sdl = re.sub(
+            r'(@link\(url: "[^"]*/federation/[^"]*", import: \[)(?![^\]]*"@shareable")([^\]]*)\]',
+            r'\1\2, "@shareable"]',
+            sdl,
+            count=1,
         )
         # Convert escaped newlines to actual newlines for better description formatting
         return sdl.replace("\\n", "\n")
@@ -945,6 +977,22 @@ schema = CustomizedSchema(
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),
     federation_version="2.7",
+    # Federation stubs bridging legacy graphene Node types into the Strawberry-owned
+    # node(id:) resolver. Listed explicitly so they are part of the schema (and the Node
+    # interface's possible types) even when no V2 field references them.
+    types=[
+        _SessionStub,
+        _DomainStub,
+        _ProjectStub,
+        _ImageStub,
+        _VFolderStub,
+        _UserStub,
+        _ResourceGroupStub,
+        _AgentNodeStub,
+        _NetworkNodeStub,
+        _ModelCardStub,
+        _ContainerRegistryNodeStub,
+    ],
     extensions=[
         GQLLoggingExtension,
         GQLMetricExtension,

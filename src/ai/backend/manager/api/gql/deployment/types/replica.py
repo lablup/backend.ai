@@ -37,7 +37,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
-    to_global_id,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -53,7 +52,6 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
@@ -234,10 +232,9 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     async def session(self, info: Info[StrawberryGQLContext]) -> Session | None:
         if self.session_id is None:
             return None
-        session_global_id = to_global_id(
-            ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
-        )
-        return Session(id=ID(session_global_id))
+        # The federated ComputeSessionNode stub is a relay.Node; pass the inner id so
+        # Strawberry re-encodes the same global ID the graphene subgraph expects.
+        return Session(id=ID(str(UUID(str(self.session_id)))))
 
     @gql_added_field(
         BackendAIGQLMeta(

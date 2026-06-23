@@ -98,7 +98,6 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
     encode_cursor,
-    to_global_id,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -154,8 +153,6 @@ from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql_legacy.domain import DomainNode
-from ai.backend.manager.api.gql_legacy.group import GroupNode
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchScope,
     AutoScalingRuleSearchScope,
@@ -261,10 +258,9 @@ class ModelDeploymentMetadata:
         deprecation_reason="Use project_v2 instead.",
     )  # type: ignore[misc]
     async def project(self, info: Info[StrawberryGQLContext]) -> Project | None:
-        project_global_id = to_global_id(
-            GroupNode, UUID(str(self.project_id)), is_target_graphene_object=True
-        )
-        return Project(id=ID(project_global_id))
+        # Federated GroupNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return Project(id=ID(str(UUID(str(self.project_id)))))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -288,10 +284,9 @@ class ModelDeploymentMetadata:
         deprecation_reason="Use domain_v2 instead.",
     )  # type: ignore[misc]
     async def domain(self, info: Info[StrawberryGQLContext]) -> Domain | None:
-        domain_global_id = to_global_id(
-            DomainNode, self.domain_name, is_target_graphene_object=True
-        )
-        return Domain(id=ID(domain_global_id))
+        # Federated DomainNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return Domain(id=ID(str(self.domain_name)))
 
     @gql_added_field(
         BackendAIGQLMeta(

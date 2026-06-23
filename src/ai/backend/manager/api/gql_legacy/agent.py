@@ -11,6 +11,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -123,6 +124,7 @@ async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> d
     return {}
 
 
+@graphene_federation.key("id")
 class AgentNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
@@ -157,6 +159,11 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         AgentPermissionField,
         description=f"Added in 24.12.0. One of {[val.value for val in AgentPermission]}.",
     )
+
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> AgentNode | None:
+        return await AgentNode.get_node(info, self.id)
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
