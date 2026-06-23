@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from graphql import GraphQLError, GraphQLField, ValidationRule
+from strawberry.types.field import StrawberryField
 
 from ai.backend.manager.api.gql.directives import Public
 
@@ -35,12 +36,18 @@ class PublicFieldGateRule(ValidationRule):
 
     @staticmethod
     def _is_public_field(field_def: GraphQLField | None) -> bool:
-        """Return True if the resolved GraphQL field carries the ``@public`` schema directive."""
+        """Return True if the resolved GraphQL field carries the ``@public`` schema directive.
+
+        Strawberry stores its own field definition under the ``strawberry-definition`` key of the
+        graphql-core field's ``extensions``; that object is a ``StrawberryField`` whose
+        ``directives`` list holds the applied schema directives.
+        """
         if field_def is None:
             return False
-        strawberry_definition = (field_def.extensions or {}).get("strawberry-definition")
-        directives = getattr(strawberry_definition, "directives", None) or ()
-        return any(isinstance(directive, Public) for directive in directives)
+        definition = (field_def.extensions or {}).get("strawberry-definition")
+        if not isinstance(definition, StrawberryField):
+            return False
+        return any(isinstance(directive, Public) for directive in definition.directives)
 
     def enter_field(self, node: Any, *_args: Any) -> None:
         parent_type = self.context.get_parent_type()

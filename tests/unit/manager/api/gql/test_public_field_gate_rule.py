@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 from graphql import (
     GraphQLField,
     GraphQLObjectType,
@@ -35,10 +33,14 @@ def test_gql_root_field_without_public_directive_is_unmarked() -> None:
 
 # --- Part B: PublicFieldGateRule enforces the marker at validation time ---
 #
-# The schema is built with graphql-core directly (Strawberry constructors are banned in this
-# repo). A stand-in object under the ``strawberry-definition`` extension key mirrors the shape
-# Strawberry produces, so the rule reads ``@public`` exactly as it does on the real schema.
+# The schema is built with graphql-core directly (Strawberry's type/field constructors are banned
+# in this repo). The ``strawberry-definition`` extension holds a real ``StrawberryField`` produced
+# by ``gql_root_field(..., directives=[Public()])``, so the rule reads ``@public`` exactly as it
+# does on the production schema.
 
+_public_marker = gql_root_field(
+    BackendAIGQLMeta(description="d", added_version="26.4.4"), directives=[Public()]
+)
 _info_type = GraphQLObjectType("Info", {"version": GraphQLField(GraphQLString)})
 _schema = GraphQLSchema(
     query=GraphQLObjectType(
@@ -46,7 +48,7 @@ _schema = GraphQLSchema(
         {
             "serverConfig": GraphQLField(
                 _info_type,
-                extensions={"strawberry-definition": SimpleNamespace(directives=[Public()])},
+                extensions={"strawberry-definition": _public_marker},
             ),
             "secretData": GraphQLField(GraphQLString),
         },
