@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
 
 import sqlalchemy as sa
 
@@ -20,7 +19,6 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BatchQuerierResult,
     Purger,
     Querier,
     SearchScope,
@@ -81,7 +79,12 @@ class AppConfigFragmentDBSource:
         """Superadmin/internal path: query across all fragments with no scope filter."""
         async with self._ops.read_ops() as r:
             result = await r.batch_query_in_global(sa.select(AppConfigFragmentRow), querier)
-            return self._to_search_result(result)
+            return AppConfigFragmentSearchResult(
+                items=[row.AppConfigFragmentRow.to_data() for row in result.rows],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     async def scoped_search(
         self,
@@ -93,16 +96,9 @@ class AppConfigFragmentDBSource:
             result = await r.batch_query_with_scopes(
                 sa.select(AppConfigFragmentRow), querier, scopes
             )
-            return self._to_search_result(result)
-
-    @staticmethod
-    def _to_search_result(
-        result: BatchQuerierResult[sa.Row[Any]],
-    ) -> AppConfigFragmentSearchResult:
-        items = [row.AppConfigFragmentRow.to_data() for row in result.rows]
-        return AppConfigFragmentSearchResult(
-            items=items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+            return AppConfigFragmentSearchResult(
+                items=[row.AppConfigFragmentRow.to_data() for row in result.rows],
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
