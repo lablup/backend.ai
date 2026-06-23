@@ -1021,11 +1021,13 @@ class PublicQueries:
     """Query root served at the unauthenticated public endpoint (POST /admin/gql/strawberry/public).
 
     Contains ONLY fields that are safe to expose without authentication; private fields are
-    physically absent, so they cannot be queried (no runtime gate needed). A public query resolver
-    should be registered both here and on ``Query`` so authenticated clients can reach it too.
+    physically absent, so they cannot be queried (no runtime gate needed). Real public fields
+    should be registered both here and on ``Query`` so authenticated clients can reach them via the
+    main endpoint too.
 
-    ``public_ping`` is a placeholder so this type is non-empty (GraphQL requires >=1 field); it will
-    be replaced by real public fields (e.g. ``publicAppConfigs``).
+    ``public_ping`` is a temporary placeholder so this type is non-empty (GraphQL requires >=1
+    field). It is intentionally registered only here (not on ``Query``) and will be replaced by
+    real public fields (e.g. ``publicAppConfigs``).
     """
 
     public_ping: str = strawberry.field(
