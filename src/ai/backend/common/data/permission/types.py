@@ -359,6 +359,10 @@ class ScopeType(enum.StrEnum):
     NOTIFICATION_CHANNEL = "notification_channel"
     KEYPAIR = "keypair"
     KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
+    # An app config definition acts as a scope so per-definition READ can gate the
+    # AppConfigFragment scoped search (BA-6593). Other app_config element types become
+    # scopes only when an operation actually needs it.
+    APP_CONFIG_DEFINITION = "app_config_definition"
 
     def to_element(self) -> RBACElementType:
         from ai.backend.common.exception import RBACTypeConversionError
