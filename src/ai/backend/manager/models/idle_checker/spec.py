@@ -7,16 +7,16 @@ from ai.backend.manager.models.base import ABCColumnPayload
 
 
 # Placeholder contract types — fleshed out by the checker-logic stories.
-# Per-tick context (DB/Valkey/Prometheus handles) prepare() reads runtime state through.
-class IdleCheckContext: ...
+class IdleCheckContext:
+    """Per-tick context (DB/Valkey/Prometheus handles) prepare() reads runtime state through."""
 
 
-# One session under idle evaluation, carrying the facts a checker judges against.
-class IdleCheckTarget: ...
+class IdleCheckTarget:
+    """One session under idle evaluation, carrying the facts a checker judges against."""
 
 
-# Runtime state prepare() batch-reads for its targets, consumed by the judgment step.
-class PreparedCheckerState: ...
+class PreparedCheckerState:
+    """Runtime state prepare() batch-reads for its targets, consumed by the judgment step."""
 
 
 class IdleCheckerSpecABC(ABCColumnPayload):
