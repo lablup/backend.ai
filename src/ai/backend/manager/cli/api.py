@@ -10,6 +10,7 @@ import aiofiles
 import click
 
 from ai.backend.common.json import pretty_json_str
+from ai.backend.manager.api.gql.schema import public_schema
 from ai.backend.manager.api.gql.schema import schema as strawberry_schema
 from ai.backend.manager.api.gql_legacy.schema import graphene_schema
 from ai.backend.manager.openapi import generate
@@ -41,6 +42,21 @@ async def generate_strawberry_gql_schema(output_path: Path | None) -> None:
     else:
         async with aiofiles.open(output_path, "w") as fw:
             await fw.write(strawberry_schema.as_str())
+
+
+async def generate_public_strawberry_gql_schema(output_path: Path | None) -> None:
+    """Dump the unauthenticated public schema (``PublicQueries``).
+
+    This is a separate schema from the main one (a different Query root), served directly at
+    ``POST /admin/gql/strawberry/public`` and not part of the federated supergraph, so it is
+    dumped to its own file.
+    """
+    if output_path is None:
+        log.info("======== Public Strawberry GraphQL API Schema ========")
+        print(public_schema.as_str())
+    else:
+        async with aiofiles.open(output_path, "w") as fw:
+            await fw.write(public_schema.as_str())
 
 
 def generate_supergraph_schema(
@@ -132,11 +148,19 @@ def generate_supergraph(_cli_ctx: CLIContext, config: Path, output_dir: Path) ->
     default=False,  # TODO: Set default to True after v2 migration is complete
     help="Generate strawberry based v2 GraphQL schema (default: False)",
 )
-def dump_gql_schema(_cli_ctx: CLIContext, output: Path, v2: bool) -> None:
+@click.option(
+    "--public",
+    is_flag=True,
+    default=False,
+    help="Dump the unauthenticated public schema (PublicQueries) instead of the main schema",
+)
+def dump_gql_schema(_cli_ctx: CLIContext, output: Path, v2: bool, public: bool) -> None:
     """
     Generates GraphQL schema of Backend.AI API.
     """
-    if v2:
+    if public:
+        asyncio.run(generate_public_strawberry_gql_schema(output))
+    elif v2:
         asyncio.run(generate_strawberry_gql_schema(output))
     else:
         asyncio.run(generate_graphene_gql_schema(output))
