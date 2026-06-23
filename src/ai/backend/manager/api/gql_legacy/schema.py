@@ -515,6 +515,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     Type name changed from 'Queries' to 'Query' in 25.14.0
     """
 
+    # Relay node(id:) runtime resolution is migrated to the Strawberry (v2) subgraph via
+    # federation ``@override`` (see ``api/gql/node_field.py``). This field stays declared so the
+    # v1 graphene schema contract is unchanged; at runtime the supergraph resolves ``node`` in the
+    # Strawberry subgraph.
     node = AsyncNode.Field()
 
     # super-admin only

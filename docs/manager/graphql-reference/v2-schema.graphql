@@ -1,6 +1,6 @@
 directive @oneOf on INPUT_OBJECT
 
-schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
+schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@key", "@override", "@shareable"]) {
   query: Query
   mutation: Mutation
   subscription: Subscription
@@ -293,6 +293,11 @@ type AgentNetworkInfo {
   Network address and port where the agent can be reached (format: "host:port"). Used by the manager to communicate with the agent.
   """
   addr: String!
+}
+
+extend type AgentNode implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
 }
 
 """Added in 26.1.0. Options for ordering agents"""
@@ -2091,8 +2096,14 @@ type ComputePlugins {
   entries: [ComputePluginEntry!]!
 }
 
-extend type ComputeSessionNode @key(fields: "id") {
-  id: ID! @external
+extend type ComputeSessionNode implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
+}
+
+extend type ContainerRegistryNode implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
 }
 
 """
@@ -4238,8 +4249,9 @@ type DomainLifecycleInfo {
   modifiedAt: DateTime!
 }
 
-extend type DomainNode @key(fields: "id") {
-  id: ID! @external
+extend type DomainNode implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
 }
 
 """Added in 26.4.2. Payload for domain mutation responses."""
@@ -4944,8 +4956,9 @@ type GetPresignedUploadURLPayload {
   fields: String!
 }
 
-extend type GroupNode @key(fields: "id") {
-  id: ID! @external
+extend type GroupNode implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
 }
 
 """
@@ -5041,8 +5054,9 @@ input ImageInput {
   id: ID!
 }
 
-extend type ImageNode @key(fields: "id") {
-  id: ID! @external
+extend type ImageNode implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
 }
 
 """
@@ -6245,6 +6259,11 @@ Added in 26.4.2. Payload returned after creating directories in a virtual folder
 type MkdirV2Payload {
   """List of created directory paths"""
   results: [String!]!
+}
+
+extend type ModelCard implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
 }
 
 """
@@ -7894,6 +7913,11 @@ type MyStorageHostPermissionsPayload {
   items: [StorageHostPermission!]!
 }
 
+extend type NetworkNode implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
+}
+
 """An object with a Globally Unique ID"""
 interface Node {
   """The Globally Unique ID of this object"""
@@ -9324,6 +9348,11 @@ type PurgeVFolderV2Payload {
 type Query {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
+
+  """
+  Added in 26.7.0. Relay Global Object Identification: resolve any Node by its global ID.
+  """
+  node(id: ID!): Node @override(from: "graphene")
 
   """Added in 25.15.0. Get aggregate agent resource statistics"""
   agentStats: AgentStats
@@ -12114,8 +12143,9 @@ type SSHKeypairNode {
   sshPublicKey: String
 }
 
-extend type ScalingGroupNode @key(fields: "id") {
-  id: ID! @external
+extend type ScalingGroupNode implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
 }
 
 """
@@ -14321,6 +14351,11 @@ input UserFairShareUserNestedFilter {
   isActive: Boolean = null
 }
 
+extend type UserNode implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
+}
+
 """
 Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
 """
@@ -15171,8 +15206,9 @@ type ValidateNotificationRulePayload {
   message: String!
 }
 
-extend type VirtualFolderNode @key(fields: "id") {
-  id: ID! @external
+extend type VirtualFolderNode implements Node @key(fields: "id") {
+  """The Globally Unique ID of this object"""
+  id: ID!
 }
 
 """Added in 24.09.0. Input for webhook configuration"""
@@ -15182,7 +15218,7 @@ input WebhookSpecInput {
 
 scalar _Any
 
-union _Entity = ComputeSessionNode | DomainNode | DomainV2 | GroupNode | ImageNode | ProjectV2 | ScalingGroupNode | UserV2 | VirtualFolderNode
+union _Entity = AgentNode | ComputeSessionNode | ContainerRegistryNode | DomainNode | DomainV2 | GroupNode | ImageNode | ModelCard | NetworkNode | ProjectV2 | ScalingGroupNode | UserNode | UserV2 | VirtualFolderNode
 
 type _Service {
   sdl: String!

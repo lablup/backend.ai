@@ -112,7 +112,6 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
     UUIDFilter,
-    to_global_id,
 )
 from ai.backend.manager.api.gql.common.types import (
     ClusterModeGQL,
@@ -136,9 +135,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.federation import ResourceGroup
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import VFolder
-from ai.backend.manager.api.gql_legacy.image import ImageNode
-from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
-from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
 
 from .resource_slot import (
     RESOURCE_SLOTS_FETCH_LIMIT,
@@ -227,10 +223,9 @@ class ResourceConfig:
     @gql_field(description="The resource group of this entity.")  # type: ignore[misc]
     def resource_group(self) -> ResourceGroup | None:
         """Resolves the federated ResourceGroup."""
-        global_id = to_global_id(
-            ScalingGroupNode, self.resource_group_name, is_target_graphene_object=True
-        )
-        return ResourceGroup(id=ID(global_id))
+        # Federated ScalingGroupNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return ResourceGroup(id=ID(str(self.resource_group_name)))
 
 
 @gql_pydantic_type(
@@ -329,10 +324,9 @@ class ModelMountConfig:
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
-        vfolder_global_id = to_global_id(
-            VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
-        )
-        return VFolder(id=ID(vfolder_global_id))
+        # Federated VirtualFolderNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return VFolder(id=ID(str(UUID(str(self.vfolder_id)))))
 
 
 @gql_pydantic_type(
@@ -367,10 +361,9 @@ class ExtraVFolderMountInfoGQL:
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
-        vfolder_global_id = to_global_id(
-            VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
-        )
-        return VFolder(id=ID(vfolder_global_id))
+        # Federated VirtualFolderNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return VFolder(id=ID(str(UUID(str(self.vfolder_id)))))
 
 
 @gql_pydantic_type(
@@ -574,10 +567,9 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         deprecation_reason="Use image_v2 instead.",
     )  # type: ignore[misc]
     async def image(self, info: Info[StrawberryGQLContext]) -> Image | None:
-        image_global_id = to_global_id(
-            ImageNode, UUID(str(self.image_id)), is_target_graphene_object=True
-        )
-        return Image(id=ID(image_global_id))
+        # Federated ImageNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return Image(id=ID(str(UUID(str(self.image_id)))))
 
     @gql_added_field(
         BackendAIGQLMeta(
