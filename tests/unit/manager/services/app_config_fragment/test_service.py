@@ -19,6 +19,7 @@ from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
     AppConfigFragmentWriteNotAllowed,
 )
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
 )
@@ -31,7 +32,12 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    OffsetPagination,
+    Purger,
+    Updater,
+)
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
 )
@@ -197,14 +203,15 @@ class TestAppConfigFragmentService:
         mock_repository.get_by_id = AsyncMock(return_value=existing)
         mock_allow_list_repository.search = AsyncMock(return_value=_allow_list_result(1))
         mock_repository.update = AsyncMock(return_value=updated)
-        spec = AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2}))
-
-        result = await service.update(
-            UpdateAppConfigFragmentAction(fragment_id=existing.id, updater_spec=spec)
+        updater = Updater(
+            spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
+            pk_value=existing.id,
         )
 
+        result = await service.update(UpdateAppConfigFragmentAction(updater=updater))
+
         assert result.fragment == updated
-        mock_repository.update.assert_called_once_with(existing.id, spec)
+        mock_repository.update.assert_called_once_with(updater)
 
     async def test_update_rejected_when_not_allow_listed(
         self,
@@ -220,10 +227,10 @@ class TestAppConfigFragmentService:
         with pytest.raises(AppConfigFragmentWriteNotAllowed):
             await service.update(
                 UpdateAppConfigFragmentAction(
-                    fragment_id=existing.id,
-                    updater_spec=AppConfigFragmentUpdaterSpec(
-                        config=OptionalState.update({"b": 2})
-                    ),
+                    updater=Updater(
+                        spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
+                        pk_value=existing.id,
+                    )
                 )
             )
         mock_repository.update.assert_not_called()
@@ -235,8 +242,9 @@ class TestAppConfigFragmentService:
     ) -> None:
         fragment = _fragment()
         mock_repository.purge = AsyncMock(return_value=fragment)
+        purger = Purger(row_class=AppConfigFragmentRow, pk_value=fragment.id)
 
-        result = await service.purge(PurgeAppConfigFragmentAction(fragment_id=fragment.id))
+        result = await service.purge(PurgeAppConfigFragmentAction(purger=purger))
 
         assert result.fragment == fragment
-        mock_repository.purge.assert_called_once_with(fragment.id)
+        mock_repository.purge.assert_called_once_with(purger)

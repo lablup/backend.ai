@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing import cast
+
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigScopeType as AllowListScopeType,
 )
@@ -106,13 +109,15 @@ class AppConfigFragmentService:
     async def update(
         self, action: UpdateAppConfigFragmentAction
     ) -> UpdateAppConfigFragmentActionResult:
-        existing = await self._repository.get_by_id(action.fragment_id)
+        existing = await self._repository.get_by_id(
+            cast(AppConfigFragmentID, action.updater.pk_value)
+        )
         await self._assert_write_allowed(existing.config_name, existing.scope_type)
-        data = await self._repository.update(action.fragment_id, action.updater_spec)
+        data = await self._repository.update(action.updater)
         return UpdateAppConfigFragmentActionResult(fragment=data)
 
     async def purge(
         self, action: PurgeAppConfigFragmentAction
     ) -> PurgeAppConfigFragmentActionResult:
-        data = await self._repository.purge(action.fragment_id)
+        data = await self._repository.purge(action.purger)
         return PurgeAppConfigFragmentActionResult(fragment=data)
