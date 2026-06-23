@@ -26,8 +26,8 @@ class IdleCheckerRow(Base):  # type: ignore[misc]
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
-    modified_at: Mapped[datetime] = mapped_column(
-        "modified_at",
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
         sa.DateTime(timezone=True),
         nullable=False,
         server_default=sa.func.now(),
@@ -67,8 +67,8 @@ class IdleCheckerBindingRow(Base):  # type: ignore[misc]
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
-    modified_at: Mapped[datetime] = mapped_column(
-        "modified_at",
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
         sa.DateTime(timezone=True),
         nullable=False,
         server_default=sa.func.now(),
