@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.6 (2026-06-23)
+
+### Fixes
+* Measure the session lifetime limit (`max_session_lifetime`) from when the session starts running (`starts_at`) instead of when it was created, so scheduling wait time is no longer counted against the user's allowed lifetime. ([#12325](https://github.com/lablup/backend.ai/issues/12325))
+* Fix a deployment auto-scaling deadlock where scale-down (and other replica-count changes) were never applied while replicas stayed pending due to resource limits. ([#12370](https://github.com/lablup/backend.ai/issues/12370))
+* Backfill a default service block (with port) for the `custom` runtime variant baseline when it was seeded without one, so model-service deployments no longer fail with `port: Field required`. ([#12374](https://github.com/lablup/backend.ai/issues/12374))
+
+
 ## 26.4.5 (2026-06-22)
 
 ### Fixes
