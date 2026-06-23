@@ -463,6 +463,17 @@ class TestSessionLifetimeChecker:
         )
 
     @pytest.fixture
+    def session_kernel_row_without_starts_at(
+        self, session_id: SessionId, base_time: datetime
+    ) -> Any:
+        """Kernel row missing starts_at; created_at is the fallback baseline"""
+        return mock_row(
+            session_id=session_id,
+            starts_at=None,
+            created_at=base_time,
+        )
+
+    @pytest.fixture
     def session_lifetime_policy(self, test_config: _SessionLifetimeTestConfig) -> Any:
         """Policy with max_session_lifetime from test_config"""
         return mock_row(max_session_lifetime=test_config.max_lifetime_seconds)
@@ -539,6 +550,47 @@ class TestSessionLifetimeChecker:
         )
 
         # Then
+        assert should_alive is test_config.expected_alive
+        assert remaining == test_config.expected_remaining
+
+    @pytest.mark.parametrize(
+        "test_config",
+        [
+            # Remaining = max_lifetime - elapsed = 30 - 10 = 20s
+            _SessionLifetimeTestConfig(
+                elapsed_seconds=10,
+                max_lifetime_seconds=30,
+                expected_remaining=20.0,
+                expected_alive=True,
+            ),
+        ],
+        ids=["fallback_to_created_at"],
+    )
+    async def test_session_lifetime_falls_back_to_created_at(
+        self,
+        test_config: _SessionLifetimeTestConfig,
+        session_id: SessionId,
+        valkey_live: AsyncMock,
+        db_connection: AsyncMock,
+        session_lifetime_checker: SessionLifetimeChecker,
+        session_kernel_row_without_starts_at: Any,
+        session_lifetime_policy: Any,
+    ) -> None:
+        """When starts_at is None, created_at is used as the lifetime baseline"""
+        # When - check_idleness runs against a row without starts_at
+        should_alive = await session_lifetime_checker.check_idleness(
+            session_kernel_row_without_starts_at,
+            db_connection,
+            session_lifetime_policy,
+        )
+
+        # Mock: get_checker_result will read the stored result
+        valkey_live.get_live_data.return_value = msgpack.packb(test_config.expected_remaining)
+        remaining = await session_lifetime_checker.get_checker_result(
+            session_lifetime_checker._redis_live, session_id
+        )
+
+        # Then - baseline falls back to created_at, yielding the same remaining time
         assert should_alive is test_config.expected_alive
         assert remaining == test_config.expected_remaining
 

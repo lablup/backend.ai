@@ -844,7 +844,9 @@ class SessionLifetimeChecker(BaseIdleChecker):
         if (max_session_lifetime := policy.max_session_lifetime) > 0:
             idle_timeout = timedelta(seconds=max_session_lifetime)
             now: datetime = await get_db_now(dbconn)
-            kernel_starts_at: datetime = kernel.starts_at
+            # starts_at is set at the RUNNING transition; fall back to created_at
+            # for abnormal/legacy rows where it was never populated.
+            kernel_starts_at: datetime = kernel.starts_at or kernel.created_at
             remaining = calculate_remaining_time(
                 now, kernel_starts_at, idle_timeout, grace_period_end
             )
