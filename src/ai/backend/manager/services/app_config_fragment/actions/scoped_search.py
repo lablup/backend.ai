@@ -15,7 +15,10 @@ from ai.backend.manager.services.app_config_fragment.actions.base import (
 
 
 @dataclass
-class SearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
+class ScopedSearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
+    """Scoped path: search the fragments of a single ``config_name``."""
+
+    config_name: str
     querier: BatchQuerier
 
     @override
@@ -37,7 +40,7 @@ class SearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
 
 
 @dataclass
-class SearchAppConfigFragmentActionResult(AppConfigFragmentScopeActionResult):
+class ScopedSearchAppConfigFragmentActionResult(AppConfigFragmentScopeActionResult):
     data: list[AppConfigFragmentData]
     total_count: int
     has_next_page: bool

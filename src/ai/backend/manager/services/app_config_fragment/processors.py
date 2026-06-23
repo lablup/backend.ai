@@ -6,6 +6,10 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
+    AdminSearchAppConfigFragmentAction,
+    AdminSearchAppConfigFragmentActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
     CreateAppConfigFragmentActionResult,
@@ -18,9 +22,9 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
     PurgeAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.search import (
-    SearchAppConfigFragmentAction,
-    SearchAppConfigFragmentActionResult,
+from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
+    ScopedSearchAppConfigFragmentAction,
+    ScopedSearchAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
@@ -34,7 +38,12 @@ from ai.backend.manager.services.app_config_fragment.service import (
 class AppConfigFragmentProcessors(AbstractProcessorPackage):
     create: ScopeActionProcessor[CreateAppConfigFragmentAction, CreateAppConfigFragmentActionResult]
     get: SingleEntityActionProcessor[GetAppConfigFragmentAction, GetAppConfigFragmentActionResult]
-    search: ScopeActionProcessor[SearchAppConfigFragmentAction, SearchAppConfigFragmentActionResult]
+    admin_search: ScopeActionProcessor[
+        AdminSearchAppConfigFragmentAction, AdminSearchAppConfigFragmentActionResult
+    ]
+    scoped_search: ScopeActionProcessor[
+        ScopedSearchAppConfigFragmentAction, ScopedSearchAppConfigFragmentActionResult
+    ]
     update: SingleEntityActionProcessor[
         UpdateAppConfigFragmentAction, UpdateAppConfigFragmentActionResult
     ]
@@ -49,7 +58,8 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     ) -> None:
         self.create = ScopeActionProcessor(service.create, action_monitors)
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
-        self.search = ScopeActionProcessor(service.search, action_monitors)
+        self.admin_search = ScopeActionProcessor(service.admin_search, action_monitors)
+        self.scoped_search = ScopeActionProcessor(service.scoped_search, action_monitors)
         self.update = SingleEntityActionProcessor(service.update, action_monitors)
         self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
 
@@ -58,7 +68,8 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         return [
             CreateAppConfigFragmentAction.spec(),
             GetAppConfigFragmentAction.spec(),
-            SearchAppConfigFragmentAction.spec(),
+            AdminSearchAppConfigFragmentAction.spec(),
+            ScopedSearchAppConfigFragmentAction.spec(),
             UpdateAppConfigFragmentAction.spec(),
             PurgeAppConfigFragmentAction.spec(),
         ]

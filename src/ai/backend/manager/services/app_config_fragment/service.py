@@ -18,7 +18,12 @@ from ai.backend.manager.repositories.app_config_allow_list.repository import (
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
+from ai.backend.manager.repositories.app_config_fragment.types import ConfigNameSearchScope
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
+    AdminSearchAppConfigFragmentAction,
+    AdminSearchAppConfigFragmentActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
     CreateAppConfigFragmentActionResult,
@@ -31,9 +36,9 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
     PurgeAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.search import (
-    SearchAppConfigFragmentAction,
-    SearchAppConfigFragmentActionResult,
+from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
+    ScopedSearchAppConfigFragmentAction,
+    ScopedSearchAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
@@ -95,11 +100,24 @@ class AppConfigFragmentService:
         data = await self._repository.get_by_id(action.fragment_id)
         return GetAppConfigFragmentActionResult(fragment=data)
 
-    async def search(
-        self, action: SearchAppConfigFragmentAction
-    ) -> SearchAppConfigFragmentActionResult:
-        result = await self._repository.search(action.querier)
-        return SearchAppConfigFragmentActionResult(
+    async def admin_search(
+        self, action: AdminSearchAppConfigFragmentAction
+    ) -> AdminSearchAppConfigFragmentActionResult:
+        result = await self._repository.admin_search(action.querier)
+        return AdminSearchAppConfigFragmentActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def scoped_search(
+        self, action: ScopedSearchAppConfigFragmentAction
+    ) -> ScopedSearchAppConfigFragmentActionResult:
+        result = await self._repository.scoped_search(
+            action.querier, [ConfigNameSearchScope(config_name=action.config_name)]
+        )
+        return ScopedSearchAppConfigFragmentActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

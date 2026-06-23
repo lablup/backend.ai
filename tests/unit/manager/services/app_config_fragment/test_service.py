@@ -38,6 +38,9 @@ from ai.backend.manager.repositories.base import (
     Purger,
     Updater,
 )
+from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
+    AdminSearchAppConfigFragmentAction,
+)
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
 )
@@ -47,8 +50,8 @@ from ai.backend.manager.services.app_config_fragment.actions.get import (
 from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.search import (
-    SearchAppConfigFragmentAction,
+from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
+    ScopedSearchAppConfigFragmentAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
@@ -170,11 +173,11 @@ class TestAppConfigFragmentService:
         with pytest.raises(AppConfigFragmentNotFound):
             await service.get(GetAppConfigFragmentAction(fragment_id=missing_id))
 
-    async def test_search(
+    async def test_admin_search(
         self, service: AppConfigFragmentService, mock_repository: MagicMock
     ) -> None:
         fragment = _fragment()
-        mock_repository.search = AsyncMock(
+        mock_repository.admin_search = AsyncMock(
             return_value=AppConfigFragmentSearchResult(
                 items=[fragment],
                 total_count=1,
@@ -184,11 +187,35 @@ class TestAppConfigFragmentService:
         )
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
 
-        result = await service.search(SearchAppConfigFragmentAction(querier=querier))
+        result = await service.admin_search(AdminSearchAppConfigFragmentAction(querier=querier))
 
         assert result.data == [fragment]
         assert result.total_count == 1
-        mock_repository.search.assert_called_once_with(querier)
+        mock_repository.admin_search.assert_called_once_with(querier)
+
+    async def test_scoped_search_builds_config_name_scope(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    ) -> None:
+        fragment = _fragment(config_name="theme")
+        mock_repository.scoped_search = AsyncMock(
+            return_value=AppConfigFragmentSearchResult(
+                items=[fragment],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+        querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
+
+        result = await service.scoped_search(
+            ScopedSearchAppConfigFragmentAction(config_name="theme", querier=querier)
+        )
+
+        assert result.data == [fragment]
+        mock_repository.scoped_search.assert_called_once()
+        called_querier, called_scopes = mock_repository.scoped_search.call_args.args
+        assert called_querier is querier
+        assert [s.config_name for s in called_scopes] == ["theme"]
 
     # --- admin update ---
 
