@@ -28,7 +28,9 @@ from ai.backend.manager.sokovan.reconciler.base import (
 
 def build_idle_check_stage() -> ReconcilerStageRegistration:
     reconcile_type = "idle_check"
-    # No status transitions: idle output is a termination list, not per-entity results.
+    # Termination runs through the scheduler lifecycle (mark_sessions_for_termination in
+    # the applier) — which also terminates kernels, is idempotent for already-terminating/
+    # terminal sessions, and broadcasts — not this per-entity status-transition map.
     transitions: Mapping[SchedulingResult, SessionStatus] = {}
     metadata = ReconcilerStageMetadata(
         category=IdleCheckCategory.IDLE,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import override
 from uuid import UUID
@@ -78,7 +78,7 @@ class IdleCheckDecision(ReconcilerDecision):
 
 @dataclass
 class IdleCheckResult(BaseReconcilerResult):
-    idle_session_ids: tuple[SessionId, ...] = ()
+    idle_session_ids: list[SessionId] = field(default_factory=list)
 
     @override
     def processed_count(self) -> int:
