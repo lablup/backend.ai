@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Sequence
 from typing import Any, override
 
@@ -33,6 +34,7 @@ class IdleCheckerSpecABC(ABCColumnPayload):
     def load(cls, raw: dict[str, Any]) -> IdleCheckerSpecABC:
         raise NotImplementedError
 
+    @abstractmethod
     def prepare(
         self, context: IdleCheckContext, targets: Sequence[IdleCheckTarget]
     ) -> PreparedCheckerState:
