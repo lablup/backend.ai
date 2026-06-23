@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ai.backend.manager.errors.common import GenericBadRequest, ObjectNotFound
+from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
 
 __all__ = (
     "AppConfigAllowListNotFound",
@@ -25,7 +25,7 @@ class AppConfigFragmentNotFound(ObjectNotFound):
     object_name = "app config fragment"
 
 
-class AppConfigFragmentWriteNotAllowed(GenericBadRequest):
+class AppConfigFragmentWriteNotAllowed(GenericForbidden):
     """A fragment write was rejected by the write-gate.
 
     Raised when the target ``config_name`` is not registered, or no app_config_allow_list
