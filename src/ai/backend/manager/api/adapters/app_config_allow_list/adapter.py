@@ -96,7 +96,9 @@ class AppConfigAllowListAdapter(BaseAdapter):
         )
         return self._data_to_node(action_result.allow_list)
 
-    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[AppConfigAllowListNode | None]:
+    async def batch_load_by_ids(
+        self, ids: Sequence[AppConfigAllowListID]
+    ) -> list[AppConfigAllowListNode | None]:
         """Batch load app config allow-list entries by id for DataLoader use.
 
         Returns nodes in the same order as the input ids, with None for missing ones.

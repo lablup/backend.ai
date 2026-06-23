@@ -35,6 +35,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
+from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -96,7 +97,7 @@ class AppConfigAllowListGQL(PydanticNodeMixin[AppConfigAllowListNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.app_config_allow_list_loader.load_many([
-            UUID(nid) for nid in node_ids
+            AppConfigAllowListID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 

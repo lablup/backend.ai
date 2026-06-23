@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
+from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
@@ -129,10 +130,12 @@ class DataLoaders:
     @cached_property
     def app_config_allow_list_loader(
         self,
-    ) -> DataLoader[uuid.UUID, AppConfigAllowListGQL | None]:
+    ) -> DataLoader[AppConfigAllowListID, AppConfigAllowListGQL | None]:
         adapter = self._adapters.app_config_allow_list
 
-        async def load_fn(ids: list[uuid.UUID]) -> list[AppConfigAllowListGQL | None]:
+        async def load_fn(
+            ids: list[AppConfigAllowListID],
+        ) -> list[AppConfigAllowListGQL | None]:
             from ai.backend.manager.api.gql.app_config_allow_list.types import (  # pants: no-infer-dep
                 AppConfigAllowListGQL as ACL,
             )
