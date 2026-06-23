@@ -14,7 +14,10 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigScopeType,
 )
-from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
+from ai.backend.manager.errors.app_config import (
+    AppConfigDefinitionNotFound,
+    AppConfigFragmentNotFound,
+)
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
@@ -27,6 +30,7 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
+from ai.backend.manager.repositories.app_config_fragment.types import ConfigNameSearchScope
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
 )
@@ -199,7 +203,7 @@ class TestSearch:
         repository: AppConfigFragmentRepository,
         seeded_fragments: list[AppConfigFragmentData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(pagination=OffsetPagination(limit=2, offset=0))
         )
         assert result.total_count == len(seeded_fragments)
@@ -211,7 +215,7 @@ class TestSearch:
         repository: AppConfigFragmentRepository,
         seeded_fragments: list[AppConfigFragmentData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[
@@ -227,7 +231,7 @@ class TestSearch:
         repository: AppConfigFragmentRepository,
         seeded_fragments: list[AppConfigFragmentData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[AppConfigFragmentConditions.by_scope_id_equals(_USER_ID)],
@@ -243,7 +247,7 @@ class TestSearch:
     ) -> None:
         # Rank is monotonic per config_name, so scope to one config_name for a total order.
         theme_fragments = [f for f in seeded_fragments if f.config_name == "theme"]
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[
@@ -256,3 +260,29 @@ class TestSearch:
         )
         expected = [f.id for f in sorted(theme_fragments, key=lambda f: f.rank, reverse=True)]
         assert [item.id for item in result.items] == expected
+
+
+class TestScopedSearch:
+    async def test_scoped_search_returns_only_that_config_name(
+        self,
+        repository: AppConfigFragmentRepository,
+        seeded_fragments: list[AppConfigFragmentData],
+    ) -> None:
+        result = await repository.scoped_search(
+            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+            [ConfigNameSearchScope(config_name="theme")],
+        )
+        expected = {f.id for f in seeded_fragments if f.config_name == "theme"}
+        assert {item.id for item in result.items} == expected
+        assert result.total_count == len(expected)
+
+    async def test_scoped_search_unregistered_config_name_raises(
+        self,
+        repository: AppConfigFragmentRepository,
+        seeded_fragments: list[AppConfigFragmentData],
+    ) -> None:
+        with pytest.raises(AppConfigDefinitionNotFound):
+            await repository.scoped_search(
+                BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+                [ConfigNameSearchScope(config_name="unregistered")],
+            )

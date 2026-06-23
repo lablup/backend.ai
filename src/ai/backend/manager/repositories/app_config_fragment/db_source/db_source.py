@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Any
+
 import sqlalchemy as sa
 
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -18,8 +21,10 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    BatchQuerierResult,
     Purger,
     Querier,
+    SearchScope,
     Updater,
 )
 from ai.backend.manager.repositories.base.creator import NextValuePolicy
@@ -75,13 +80,32 @@ class AppConfigFragmentDBSource:
                 raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
             return result.row.to_data()
 
-    async def search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
+    async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
+        """Superadmin/internal path: query across all fragments with no scope filter."""
         async with self._ops.read_ops() as r:
             result = await r.batch_query_in_global(sa.select(AppConfigFragmentRow), querier)
-            items = [row.AppConfigFragmentRow.to_data() for row in result.rows]
-            return AppConfigFragmentSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
+            return self._to_search_result(result)
+
+    async def scoped_search(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> AppConfigFragmentSearchResult:
+        """Scoped path: query fragments restricted to ``scopes`` (combined with OR)."""
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_with_scopes(
+                sa.select(AppConfigFragmentRow), querier, scopes
             )
+            return self._to_search_result(result)
+
+    @staticmethod
+    def _to_search_result(
+        result: BatchQuerierResult[sa.Row[Any]],
+    ) -> AppConfigFragmentSearchResult:
+        items = [row.AppConfigFragmentRow.to_data() for row in result.rows]
+        return AppConfigFragmentSearchResult(
+            items=items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
