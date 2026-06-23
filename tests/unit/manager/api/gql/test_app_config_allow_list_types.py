@@ -104,3 +104,4 @@ class TestSchemaRegistration:
         assert "adminAppConfigAllowLists(" in sdl
         assert "adminCreateAppConfigAllowList(" in sdl
         assert "adminPurgeAppConfigAllowList(" in sdl
+        assert "input PurgeAppConfigAllowListInput " in sdl

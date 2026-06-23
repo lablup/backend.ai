@@ -20,6 +20,9 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput as CreateAppConfigAllowListInputDTO,
 )
+from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
+    PurgeAppConfigAllowListInput as PurgeAppConfigAllowListInputDTO,
+)
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     AppConfigAllowListNode,
 )
@@ -61,6 +64,7 @@ __all__ = (
     "AppConfigScopeTypeFilterGQL",
     "CreateAppConfigAllowListInputGQL",
     "CreateAppConfigAllowListPayloadGQL",
+    "PurgeAppConfigAllowListInputGQL",
     "PurgeAppConfigAllowListPayloadGQL",
 )
 
@@ -225,6 +229,17 @@ class CreateAppConfigAllowListPayloadGQL(PydanticOutputMixin[CreateAppConfigAllo
     app_config_allow_list: AppConfigAllowListGQL = gql_field(
         description="The created app config allow-list entry."
     )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for purging an app config allow-list entry.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="PurgeAppConfigAllowListInput",
+)
+class PurgeAppConfigAllowListInputGQL(PydanticInputMixin[PurgeAppConfigAllowListInputDTO]):
+    id: UUID = gql_field(description="App config allow-list entry id to purge.")
 
 
 @gql_pydantic_type(

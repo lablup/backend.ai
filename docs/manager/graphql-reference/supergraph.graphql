@@ -11273,7 +11273,7 @@ type Mutation
   """
   Added in 26.7.0. Purge an app config allow-list entry by id (super admin only).
   """
-  adminPurgeAppConfigAllowList(id: UUID!): PurgeAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
+  adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
@@ -13687,6 +13687,14 @@ input ProjectWeightInputItem
   Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
+}
+
+"""Added in 26.7.0. Input for purging an app config allow-list entry."""
+input PurgeAppConfigAllowListInput
+  @join__type(graph: STRAWBERRY)
+{
+  """App config allow-list entry id to purge."""
+  id: UUID!
 }
 
 """Added in 26.7.0. Payload for app config allow-list entry purge."""

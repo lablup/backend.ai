@@ -9,6 +9,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     AppConfigAllowListFilter,
     AppConfigAllowListOrder,
     CreateAppConfigAllowListInput,
+    PurgeAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
@@ -144,9 +145,9 @@ class AppConfigAllowListAdapter(BaseAdapter):
         )
 
     async def admin_purge(
-        self, allow_list_id: AppConfigAllowListID
+        self, input: PurgeAppConfigAllowListInput
     ) -> PurgeAppConfigAllowListPayload:
-        purger = Purger(row_class=AppConfigAllowListRow, pk_value=allow_list_id)
+        purger = Purger(row_class=AppConfigAllowListRow, pk_value=AppConfigAllowListID(input.id))
         action_result = await self._processors.app_config_allow_list.purge.wait_for_complete(
             PurgeAppConfigAllowListAction(purger=purger)
         )

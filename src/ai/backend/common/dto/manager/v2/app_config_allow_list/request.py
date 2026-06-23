@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
@@ -17,6 +19,7 @@ __all__ = (
     "AppConfigAllowListFilter",
     "AppConfigAllowListOrder",
     "CreateAppConfigAllowListInput",
+    "PurgeAppConfigAllowListInput",
     "SearchAppConfigAllowListInput",
 )
 
@@ -32,6 +35,12 @@ class CreateAppConfigAllowListInput(BaseRequestModel):
     scope_type: AppConfigScopeType = Field(
         description="Scope at which fragments may be written (public | domain | user)."
     )
+
+
+class PurgeAppConfigAllowListInput(BaseRequestModel):
+    """Input for purging an app config allow-list entry."""
+
+    id: UUID = Field(description="App config allow-list entry id to purge.")
 
 
 class AppConfigAllowListFilter(BaseRequestModel):

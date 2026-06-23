@@ -28,6 +28,7 @@ from .types import (
     AppConfigAllowListOrderByGQL,
     CreateAppConfigAllowListInputGQL,
     CreateAppConfigAllowListPayloadGQL,
+    PurgeAppConfigAllowListInputGQL,
     PurgeAppConfigAllowListPayloadGQL,
 )
 
@@ -124,8 +125,8 @@ async def admin_create_app_config_allow_list(
 )
 async def admin_purge_app_config_allow_list(
     info: Info[StrawberryGQLContext],
-    id: UUID,
+    input: PurgeAppConfigAllowListInputGQL,
 ) -> PurgeAppConfigAllowListPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.app_config_allow_list.admin_purge(id)
+    payload = await info.context.adapters.app_config_allow_list.admin_purge(input.to_pydantic())
     return PurgeAppConfigAllowListPayloadGQL.from_pydantic(payload)
