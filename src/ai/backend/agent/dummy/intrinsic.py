@@ -137,6 +137,10 @@ class CPUPlugin(AbstractComputePlugin):
         docker: aiodocker.docker.Docker,
         device_alloc: DeviceAllocation,
     ) -> Mapping[str, Any]:
+        # The Docker backend pins ``CpusetMems`` to the allocation's NUMA node
+        # when the allocation is node-local. The dummy backend intentionally
+        # skips that because it never actually runs containers; the output is
+        # only inspected by tests that exercise the plumbing, not NUMA policy.
         cores = [*map(int, device_alloc[SlotName("cpu")].keys())]
         sorted_core_ids = [*map(str, sorted(cores))]
         return {
@@ -145,7 +149,6 @@ class CPUPlugin(AbstractComputePlugin):
                 "CpuQuota": int(100_000 * len(cores)),
                 "Cpus": ",".join(sorted_core_ids),
                 "CpusetCpus": ",".join(sorted_core_ids),
-                # 'CpusetMems': f'{resource_spec.numa_node}',
             },
         }
 

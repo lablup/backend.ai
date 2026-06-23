@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -17,6 +18,30 @@ from ai.backend.agent.docker.intrinsic import (
     read_proc_net_dev,
 )
 from ai.backend.agent.stats import StatModes
+from ai.backend.common.types import DeviceId, SlotName
+
+
+@contextmanager
+def _patched_libnuma(
+    core_to_node: dict[int, int],
+    num_nodes: int,
+) -> Generator[None, None, None]:
+    """Patch ``libnuma.num_nodes`` and ``libnuma.node_of_cpu`` used by
+    ``CPUPlugin._resolve_node_local_mem``. ``node_of_cpu`` returns ``-1`` for
+    cores missing from the map, matching real libnuma's behavior when NUMA
+    info is unavailable.
+    """
+    with (
+        patch(
+            "ai.backend.agent.docker.intrinsic.libnuma.num_nodes",
+            return_value=num_nodes,
+        ),
+        patch(
+            "ai.backend.agent.docker.intrinsic.libnuma.node_of_cpu",
+            side_effect=lambda core: core_to_node.get(core, -1),
+        ),
+    ):
+        yield
 
 
 class BaseDockerIntrinsicTest:
@@ -610,3 +635,111 @@ class TestReadProcNetDev:
         """Raises OSError when /proc/[pid]/net/dev does not exist."""
         with pytest.raises(OSError):
             read_proc_net_dev(999999999)
+
+
+@dataclass(frozen=True)
+class _NumaScenario:
+    num_nodes: int
+    core_to_node: dict[int, int]
+    cores: list[int]
+    expected_cpuset_mems: str | None
+
+
+_NUMA_SCENARIOS: dict[str, _NumaScenario] = {
+    # All allocated cores on node 0 → pin memory to "0".
+    "node_local_allocation": _NumaScenario(
+        num_nodes=2,
+        core_to_node={0: 0, 1: 0, 2: 1, 3: 1},
+        cores=[0, 1],
+        expected_cpuset_mems="0",
+    ),
+    # Cores span nodes 0 and 1 → let the kernel default policy apply.
+    "multi_node_allocation": _NumaScenario(
+        num_nodes=2,
+        core_to_node={0: 0, 1: 0, 2: 1, 3: 1},
+        cores=[0, 2],
+        expected_cpuset_mems=None,
+    ),
+    # libnuma can't resolve core 1 → side_effect returns -1 for unmapped cores.
+    "unknown_core": _NumaScenario(
+        num_nodes=2,
+        core_to_node={0: 0},
+        cores=[0, 1],
+        expected_cpuset_mems=None,
+    ),
+    # libnuma reports -1 for a known core (NUMA info unavailable).
+    "negative_node_id": _NumaScenario(
+        num_nodes=2,
+        core_to_node={0: 0, 1: -1},
+        cores=[0, 1],
+        expected_cpuset_mems=None,
+    ),
+    # Non-NUMA host (macOS, Docker Desktop, WSL, Linux w/o libnuma.so):
+    # num_nodes==1 must short-circuit before inspecting per-core nodes so
+    # containers are not unconditionally pinned to CpusetMems="0".
+    "non_numa_host": _NumaScenario(
+        num_nodes=1,
+        core_to_node={0: 0, 1: 0},
+        cores=[0, 1],
+        expected_cpuset_mems=None,
+    ),
+    # Empty allocation → no cores to pin; must not produce CpusetMems="" or
+    # a spurious node id. Locks in the defensive behavior so a future
+    # refactor of _resolve_node_local_mem cannot regress it.
+    "empty_allocation": _NumaScenario(
+        num_nodes=2,
+        core_to_node={0: 0, 1: 0},
+        cores=[],
+        expected_cpuset_mems=None,
+    ),
+}
+
+
+@pytest.fixture(params=list(_NUMA_SCENARIOS), ids=list(_NUMA_SCENARIOS))
+def numa_scenario(request: pytest.FixtureRequest) -> _NumaScenario:
+    return _NUMA_SCENARIOS[request.param]
+
+
+class TestCPUPluginResolveNodeLocalMem:
+    """Unit tests for ``CPUPlugin._resolve_node_local_mem`` NUMA-locality logic."""
+
+    def test_returns_expected_cpuset_mems(self, numa_scenario: _NumaScenario) -> None:
+        with _patched_libnuma(numa_scenario.core_to_node, numa_scenario.num_nodes):
+            result = CPUPlugin._resolve_node_local_mem(numa_scenario.cores)
+
+        assert result == numa_scenario.expected_cpuset_mems
+
+
+class TestCPUPluginGenerateDockerArgsNumaLocality:
+    """Integration tests for ``CPUPlugin.generate_docker_args`` covering the
+    end-to-end wiring of ``_resolve_node_local_mem`` into ``HostConfig``.
+    """
+
+    @pytest.fixture
+    def cpu_plugin(self) -> CPUPlugin:
+        return CPUPlugin.__new__(CPUPlugin)
+
+    @staticmethod
+    def _device_alloc(core_ids: list[int]) -> dict[SlotName, dict[DeviceId, Decimal]]:
+        return {
+            SlotName("cpu"): {DeviceId(str(cid)): Decimal("1") for cid in core_ids},
+        }
+
+    async def test_host_config_matches_scenario(
+        self,
+        cpu_plugin: CPUPlugin,
+        numa_scenario: _NumaScenario,
+    ) -> None:
+        with _patched_libnuma(numa_scenario.core_to_node, numa_scenario.num_nodes):
+            result = await cpu_plugin.generate_docker_args(
+                AsyncMock(),
+                self._device_alloc(numa_scenario.cores),
+            )
+
+        host_config = result["HostConfig"]
+        assert host_config["Cpus"] == len(numa_scenario.cores)
+        assert host_config["CpusetCpus"] == ",".join(str(c) for c in sorted(numa_scenario.cores))
+        if numa_scenario.expected_cpuset_mems is None:
+            assert "CpusetMems" not in host_config
+        else:
+            assert host_config["CpusetMems"] == numa_scenario.expected_cpuset_mems

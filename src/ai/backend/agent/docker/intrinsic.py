@@ -436,6 +436,33 @@ class CPUPlugin(AbstractComputePlugin):
         # TODO: move the sysconf hook in libbaihook.so here
         return []
 
+    @staticmethod
+    def _resolve_node_local_mem(cores: list[int]) -> str | None:
+        """Return the NUMA node id (as a string suitable for ``CpusetMems``) when
+        every core in ``cores`` is on the same node, otherwise ``None``.
+
+        Returns ``None`` when:
+        - NUMA is unsupported (non-Linux hosts, Linux without libnuma.so,
+          Docker Desktop, WSL, etc.) or the host exposes a single node —
+          otherwise ``libnuma.node_of_cpu`` would fall back to ``0`` and every
+          container would be pinned to ``CpusetMems="0"``.
+        - ``libnuma.node_of_cpu`` cannot resolve a core (returns a negative id).
+        - The allocation spans multiple NUMA nodes — in which case we
+          intentionally leave ``CpusetMems`` unset so Docker / the kernel
+          default NUMA memory placement policy can apply.
+        """
+        if libnuma.num_nodes() <= 1:
+            return None
+        allocated_nodes: set[int] = set()
+        for core in cores:
+            node = libnuma.node_of_cpu(core)
+            if node < 0:
+                return None
+            allocated_nodes.add(node)
+        if len(allocated_nodes) != 1:
+            return None
+        return str(next(iter(allocated_nodes)))
+
     async def generate_docker_args(
         self,
         docker: Docker,
@@ -443,12 +470,15 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Mapping[str, Any]:
         cores = [*map(int, device_alloc[SlotName("cpu")].keys())]
         sorted_core_ids = [*map(str, sorted(cores))]
+        host_config: dict[str, Any] = {
+            "Cpus": len(cores),
+            "CpusetCpus": ",".join(sorted_core_ids),
+        }
+        cpuset_mems = self._resolve_node_local_mem(cores)
+        if cpuset_mems is not None:
+            host_config["CpusetMems"] = cpuset_mems
         return {
-            "HostConfig": {
-                "Cpus": len(cores),
-                "CpusetCpus": ",".join(sorted_core_ids),
-                # 'CpusetMems': f'{resource_spec.numa_node}',
-            },
+            "HostConfig": host_config,
         }
 
     async def restore_from_container(
