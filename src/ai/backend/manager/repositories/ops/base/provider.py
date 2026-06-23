@@ -8,7 +8,7 @@ managers and never touch the engine, raw sessions, or raw SQLAlchemy statements.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -164,18 +164,22 @@ class WriteOps(ReadOps):
         """
         return await execute_bulk_dependent_creator(self._sess, specs, dependency)
 
-    async def create_with_next_value[TRow: Base](
+    async def create_with_next_value[TDependency, TRow: Base](
         self,
         policy: NextValuePolicy,
-        spec: DependentCreatorSpec[int, TRow],
+        spec: DependentCreatorSpec[TDependency, TRow],
+        build_dependency: Callable[[int], TDependency],
     ) -> CreatorResult[TRow]:
         """Insert a row assigning the next monotonic column value (e.g. rank), race-free.
 
         Locks the parent row (FOR UPDATE), computes ``MAX(column) + gap`` within the
         scope, and inserts via the spec — all within this write transaction so the lock
         and insert commit together. Must be used inside ``write_ops()``.
+
+        ``build_dependency`` wraps the computed value into the spec's domain-specific
+        dependency type.
         """
-        return await execute_next_value_creator(self._sess, policy, spec)
+        return await execute_next_value_creator(self._sess, policy, spec, build_dependency)
 
     async def update[TRow: Base](self, updater: Updater[TRow]) -> UpdaterResult[TRow] | None:
         """Update a single row by primary key."""

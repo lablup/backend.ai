@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
@@ -48,11 +46,3 @@ class AppConfigFragmentRepository:
 
     async def search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
         return await self._db_source.search(querier)
-
-    async def applicable_fragments(
-        self,
-        config_name: str,
-        domain_id: DomainID,
-        user_id: UserID,
-    ) -> list[AppConfigFragmentData]:
-        return await self._db_source.applicable_fragments(config_name, domain_id, user_id)

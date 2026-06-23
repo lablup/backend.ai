@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -407,10 +407,11 @@ class NextValuePolicy:
     gap: int
 
 
-async def execute_next_value_creator[TRow: Base](
+async def execute_next_value_creator[TDependency, TRow: Base](
     db_sess: SASession,
     policy: NextValuePolicy,
-    spec: DependentCreatorSpec[int, TRow],
+    spec: DependentCreatorSpec[TDependency, TRow],
+    build_dependency: Callable[[int], TDependency],
 ) -> CreatorResult[TRow]:
     """Insert a row with the next monotonic column value, race-free.
 
@@ -422,7 +423,9 @@ async def execute_next_value_creator[TRow: Base](
     Args:
         db_sess: Database session (must be writable)
         policy: How to compute the next value (column, scope, parent lock, gap)
-        spec: Dependent creator spec whose build_row receives the computed next value
+        spec: Dependent creator spec whose build_row receives the resolved dependency
+        build_dependency: Wraps the computed next value into the spec's domain-specific
+            dependency type (e.g. ``lambda rank: AppConfigFragmentCreateDependency(rank=rank)``)
 
     Returns:
         CreatorResult containing the created row
@@ -434,7 +437,7 @@ async def execute_next_value_creator[TRow: Base](
     max_value = max_result.scalar_one_or_none()
     next_value = (max_value + policy.gap) if max_value is not None else policy.gap
 
-    row = spec.build_row(next_value)
+    row = spec.build_row(build_dependency(next_value))
     db_sess.add(row)
     try:
         await db_sess.flush()

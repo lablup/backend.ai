@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
+    DeploymentRevisionPresetCreateDependency,
     DeploymentRevisionPresetCreatorSpec,
     PresetResourceSlotDependentCreatorSpec,
     PresetSlotDependency,
@@ -60,7 +61,9 @@ class DeploymentRevisionPresetDBSource:
             gap=RANK_GAP,
         )
         async with self._ops.write_ops() as w:
-            created = await w.create_with_next_value(policy, spec)
+            created = await w.create_with_next_value(
+                policy, spec, lambda rank: DeploymentRevisionPresetCreateDependency(rank=rank)
+            )
             preset = created.row
             await w.bulk_create_dependent(slot_specs, PresetSlotDependency(preset_id=preset.id))
             return preset.to_data()

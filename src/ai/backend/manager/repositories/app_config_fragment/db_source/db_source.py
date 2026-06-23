@@ -5,18 +5,15 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
-    AppConfigScopeType,
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.repositories.app_config_fragment.creators import (
+    AppConfigFragmentCreateDependency,
     AppConfigFragmentCreatorSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
@@ -24,7 +21,6 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    NoPagination,
     Purger,
     Querier,
     Updater,
@@ -56,7 +52,9 @@ class AppConfigFragmentDBSource:
             gap=RANK_GAP,
         )
         async with self._ops.write_ops() as w:
-            created = await w.create_with_next_value(policy, spec)
+            created = await w.create_with_next_value(
+                policy, spec, lambda rank: AppConfigFragmentCreateDependency(rank=rank)
+            )
             return created.row.to_data()
 
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
@@ -94,41 +92,3 @@ class AppConfigFragmentDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    async def applicable_fragments(
-        self,
-        config_name: str,
-        domain_id: DomainID,
-        user_id: UserID,
-    ) -> list[AppConfigFragmentData]:
-        """Return the fragments that apply to a ``(user, config_name)`` resolution.
-
-        Every ``public`` fragment plus the user's ``domain`` and ``user`` fragments,
-        ordered by ``rank`` ascending (low -> high) for the downstream merge.
-        """
-        stmt = sa.select(AppConfigFragmentRow).where(
-            AppConfigFragmentRow.config_name == config_name,
-            sa.or_(
-                sa.and_(
-                    AppConfigFragmentRow.scope_type == AppConfigScopeType.PUBLIC,
-                    AppConfigFragmentRow.scope_id == "public",
-                ),
-                sa.and_(
-                    AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
-                    AppConfigFragmentRow.scope_id == str(domain_id),
-                ),
-                sa.and_(
-                    AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
-                    AppConfigFragmentRow.scope_id == str(user_id),
-                ),
-            ),
-        )
-        async with self._ops.read_ops() as r:
-            result = await r.batch_query_in_global(
-                stmt,
-                BatchQuerier(
-                    pagination=NoPagination(),
-                    orders=[AppConfigFragmentOrders.rank(ascending=True)],
-                ),
-            )
-            return [row.AppConfigFragmentRow.to_data() for row in result.rows]
