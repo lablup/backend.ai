@@ -6,17 +6,15 @@ from graphql import ValidationRule
 from strawberry.extensions.base_extension import SchemaExtension
 from strawberry.extensions.query_depth_limiter import create_validator as create_depth_validator
 
-from ai.backend.manager.api.gql.types import PublicGQLContext, StrawberryGQLContext
-from ai.backend.manager.api.graphql_rules import CustomIntrospectionRule, PublicFieldGateRule
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.graphql_rules import CustomIntrospectionRule
 
 
 class GQLValidationExtension(SchemaExtension):
-    """Assembles per-request GraphQL validation rules.
+    """Conditionally applies introspection blocking and query depth limiting.
 
-    Reads configuration from ``StrawberryGQLContext.config_provider`` to decide which validation
-    rules to add at request time (introspection blocking, query depth limiting). For the
-    unauthenticated public endpoint — identified by a ``PublicGQLContext`` — it also applies
-    ``PublicFieldGateRule`` so anonymous callers reach only ``@public``-marked root fields.
+    Reads configuration from ``StrawberryGQLContext.config_provider`` to decide
+    which validation rules to add at request time.
     """
 
     def on_validate(self) -> Iterator[None]:
@@ -29,8 +27,6 @@ class GQLValidationExtension(SchemaExtension):
         max_depth = config.api.max_gql_query_depth
         if max_depth is not None:
             additional_rules.append(create_depth_validator(max_depth, None, None))
-        if isinstance(ctx, PublicGQLContext):
-            additional_rules.append(PublicFieldGateRule)
 
         if additional_rules:
             self.execution_context.validation_rules = (

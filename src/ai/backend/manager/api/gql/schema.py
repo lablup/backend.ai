@@ -1010,3 +1010,39 @@ schema = CustomizedSchema(
         GQLExceptionHandlerExtension,
     ],
 )
+
+
+async def _public_ping() -> str:
+    return "pong"
+
+
+@strawberry.type
+class PublicQueries:
+    """Query root served at the unauthenticated public endpoint (POST /admin/gql/strawberry/public).
+
+    Contains ONLY fields that are safe to expose without authentication; private fields are
+    physically absent, so they cannot be queried (no runtime gate needed). A public query resolver
+    should be registered both here and on ``Query`` so authenticated clients can reach it too.
+
+    ``public_ping`` is a placeholder so this type is non-empty (GraphQL requires >=1 field); it will
+    be replaced by real public fields (e.g. ``publicAppConfigs``).
+    """
+
+    public_ping: str = strawberry.field(
+        resolver=_public_ping,
+        description="Placeholder public field; returns 'pong'.",
+    )
+
+
+# Plain (non-federation) schema: the public endpoint is hit directly, not through the Apollo
+# Router supergraph, so it needs no federation machinery.
+public_schema = strawberry.Schema(
+    query=PublicQueries,
+    config=StrawberryConfig(auto_camel_case=True),
+    extensions=[
+        GQLLoggingExtension,
+        GQLMetricExtension,
+        GQLValidationExtension,
+        GQLExceptionHandlerExtension,
+    ],
+)

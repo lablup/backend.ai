@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.admin.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
-from ai.backend.manager.api.gql.types import PublicGQLContext, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.base import DataLoaderManager
 from ai.backend.manager.api.gql_legacy.schema import (
     GQLExceptionMiddleware,
@@ -37,7 +37,7 @@ from ai.backend.manager.errors.api import GraphQLError as BackendGQLError
 from ai.backend.manager.errors.common import ServerFrozen
 
 if TYPE_CHECKING:
-    from strawberry.federation import Schema as StrawberrySchema
+    from strawberry import Schema as StrawberrySchema
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -77,10 +77,12 @@ class AdminHandler:
         gql_schema: graphene.Schema,
         gql_deps: GQLContextDeps,
         strawberry_schema: StrawberrySchema,
+        public_strawberry_schema: StrawberrySchema,
     ) -> None:
         self._gql_schema = gql_schema
         self._gql_deps = gql_deps
         self._strawberry_schema = strawberry_schema
+        self._public_strawberry_schema = public_strawberry_schema
 
     async def _handle_gql_common(
         self, request_ctx: RequestCtx, params: GraphQLRequest
@@ -200,13 +202,10 @@ class AdminHandler:
     # ------------------------------------------------------------------
 
     async def _execute_strawberry(
-        self,
-        params: GraphQLRequest,
-        *,
-        context_cls: type[StrawberryGQLContext] = StrawberryGQLContext,
+        self, params: GraphQLRequest, *, schema: StrawberrySchema
     ) -> APIResponse:
         gql_deps = self._gql_deps
-        gql_ctx = context_cls(
+        gql_ctx = StrawberryGQLContext(
             config_provider=gql_deps.config_provider,
             event_hub=gql_deps.processors.events.event_hub,
             event_fetcher=gql_deps.processors.events.event_fetcher,
@@ -215,7 +214,7 @@ class AdminHandler:
             metric_observer=gql_deps.metric_observer,
             adapters=gql_deps.adapters,
         )
-        result = await self._strawberry_schema.execute(
+        result = await schema.execute(
             params.query,
             variable_values=params.variables,
             operation_name=params.operation_name,
@@ -237,7 +236,7 @@ class AdminHandler:
         ctx: UserContext,
         request_ctx: RequestCtx,
     ) -> APIResponse:
-        return await self._execute_strawberry(body.parsed)
+        return await self._execute_strawberry(body.parsed, schema=self._strawberry_schema)
 
     # ------------------------------------------------------------------
     # handle_gql_strawberry_public (POST /admin/gql/strawberry/public)
@@ -249,10 +248,9 @@ class AdminHandler:
     ) -> APIResponse:
         """Anonymous (unauthenticated) GraphQL endpoint.
 
-        Registered without ``auth_required`` so unauthenticated callers reach it. Executing with a
-        ``PublicGQLContext`` makes ``GQLValidationExtension`` apply ``PublicFieldGateRule`` during
-        the normal validation pass, so only root ``Query`` fields marked with the ``@public``
-        directive are accepted; every other query field, mutation, and subscription is rejected.
-        Existing authenticated routes are unaffected.
+        Registered without ``auth_required`` so unauthenticated callers reach it. It serves a
+        separate ``PublicQueries`` schema that contains only public fields, so private fields are
+        physically absent and cannot be queried (no runtime gate needed). Authenticated routes are
+        unaffected.
         """
-        return await self._execute_strawberry(body.parsed, context_cls=PublicGQLContext)
+        return await self._execute_strawberry(body.parsed, schema=self._public_strawberry_schema)

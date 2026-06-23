@@ -47,9 +47,9 @@ def register_admin_routes(
         handler.handle_gql_strawberry,
         middlewares=[auth_required],
     )
-    # Anonymous public endpoint: no auth_required, so unauthenticated callers reach the
-    # handler. Access is restricted to root Query fields marked with the @public directive
-    # by the PublicFieldGateRule applied in the handler.
+    # Anonymous public endpoint: no auth_required, so unauthenticated callers reach the handler.
+    # It serves a separate PublicQueries schema that contains only public fields, so private
+    # fields are physically absent and cannot be queried.
     reg.add(
         "POST",
         "/gql/strawberry/public",

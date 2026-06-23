@@ -48,15 +48,6 @@ class StrawberryGQLContext:
     adapters: Adapters
 
 
-class PublicGQLContext(StrawberryGQLContext):
-    """Execution context for the unauthenticated public endpoint.
-
-    Carries the same dependencies as ``StrawberryGQLContext`` but signals, by type, that the
-    request is anonymous so ``GQLValidationExtension`` applies ``PublicFieldGateRule``. Only
-    ``@public``-marked root Query fields are reachable; the request has no authenticated user.
-    """
-
-
 # Scope input types for BEP-1041 Resource Group scoped APIs
 
 
