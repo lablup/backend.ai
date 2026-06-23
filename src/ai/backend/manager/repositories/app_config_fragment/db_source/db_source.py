@@ -68,11 +68,11 @@ class AppConfigFragmentDBSource:
                 raise AppConfigFragmentNotFound(f"App config fragment {updater.pk_value} not found")
             return result.row.to_data()
 
-    async def purge(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
+    async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
         async with self._ops.write_ops() as w:
-            result = await w.purge(Purger(row_class=AppConfigFragmentRow, pk_value=fragment_id))
+            result = await w.purge(purger)
             if result is None:
-                raise AppConfigFragmentNotFound(f"App config fragment {fragment_id} not found")
+                raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
             return result.row.to_data()
 
     async def search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:

@@ -30,7 +30,7 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Purger, Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -181,14 +181,16 @@ class TestPurge:
         repository: AppConfigFragmentRepository,
         existing_fragment: AppConfigFragmentData,
     ) -> None:
-        purged = await repository.purge(existing_fragment.id)
+        purged = await repository.purge(
+            Purger(row_class=AppConfigFragmentRow, pk_value=existing_fragment.id)
+        )
         assert purged.id == existing_fragment.id
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(existing_fragment.id)
 
     async def test_purge_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
         with pytest.raises(AppConfigFragmentNotFound):
-            await repository.purge(_missing_id())
+            await repository.purge(Purger(row_class=AppConfigFragmentRow, pk_value=_missing_id()))
 
 
 class TestSearch:

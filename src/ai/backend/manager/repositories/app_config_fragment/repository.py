@@ -12,7 +12,7 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Updater
+from ai.backend.manager.repositories.base import BatchQuerier, Purger, Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigFragmentRepository",)
@@ -35,8 +35,8 @@ class AppConfigFragmentRepository:
     async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
         return await self._db_source.update(updater)
 
-    async def purge(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
-        return await self._db_source.purge(fragment_id)
+    async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        return await self._db_source.purge(purger)
 
     async def search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
         return await self._db_source.search(querier)
