@@ -45,7 +45,7 @@ def auto_scaling_rule() -> None:
 @click.option(
     "--metric-source",
     required=True,
-    type=click.Choice(["KERNEL", "INFERENCE_FRAMEWORK"], case_sensitive=False),
+    type=click.Choice(["KERNEL", "INFERENCE_FRAMEWORK", "PROMETHEUS"], case_sensitive=False),
     help="Source of the metric.",
 )
 @click.option("--metric-name", required=True, type=str, help="Name of the metric to monitor.")
@@ -57,6 +57,12 @@ def auto_scaling_rule() -> None:
 @click.option("--max-threshold", default=None, type=str, help="Maximum threshold for scaling.")
 @click.option("--min-replicas", default=None, type=int, help="Minimum number of replicas.")
 @click.option("--max-replicas", default=None, type=int, help="Maximum number of replicas.")
+@click.option(
+    "--prometheus-query-preset-id",
+    default=None,
+    type=click.UUID,
+    help="Prometheus query preset UUID (required when metric source is PROMETHEUS).",
+)
 def create(
     deployment_id: uuid.UUID,
     metric_source: str,
@@ -67,6 +73,7 @@ def create(
     max_threshold: str | None,
     min_replicas: int | None,
     max_replicas: int | None,
+    prometheus_query_preset_id: uuid.UUID | None,
 ) -> None:
     """Create an auto-scaling rule for a deployment."""
     from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
@@ -84,6 +91,7 @@ def create(
         max_threshold=Decimal(max_threshold) if max_threshold is not None else None,
         min_replicas=min_replicas,
         max_replicas=max_replicas,
+        prometheus_query_preset_id=prometheus_query_preset_id,
     )
 
     async def _run() -> None:
@@ -184,7 +192,7 @@ def get(rule_id: uuid.UUID) -> None:
 @click.option(
     "--metric-source",
     default=None,
-    type=click.Choice(["KERNEL", "INFERENCE_FRAMEWORK"], case_sensitive=False),
+    type=click.Choice(["KERNEL", "INFERENCE_FRAMEWORK", "PROMETHEUS"], case_sensitive=False),
     help="Updated metric source.",
 )
 @click.option("--metric-name", default=None, type=str, help="Updated metric name.")
@@ -194,6 +202,12 @@ def get(rule_id: uuid.UUID) -> None:
 @click.option("--max-threshold", default=None, type=str, help="Updated maximum threshold.")
 @click.option("--min-replicas", default=None, type=int, help="Updated minimum replicas.")
 @click.option("--max-replicas", default=None, type=int, help="Updated maximum replicas.")
+@click.option(
+    "--prometheus-query-preset-id",
+    default=None,
+    type=click.UUID,
+    help="Updated Prometheus query preset UUID (omit = no change).",
+)
 def update(
     rule_id: uuid.UUID,
     metric_source: str | None,
@@ -204,8 +218,10 @@ def update(
     max_threshold: str | None,
     min_replicas: int | None,
     max_replicas: int | None,
+    prometheus_query_preset_id: uuid.UUID | None,
 ) -> None:
     """Update an auto-scaling rule."""
+    from ai.backend.common.api_handlers import SENTINEL
     from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
         UpdateAutoScalingRuleInput,
     )
@@ -223,6 +239,9 @@ def update(
         max_threshold=Decimal(max_threshold) if max_threshold is not None else None,
         min_replicas=min_replicas if min_replicas is not None else None,
         max_replicas=max_replicas if max_replicas is not None else None,
+        prometheus_query_preset_id=(
+            prometheus_query_preset_id if prometheus_query_preset_id is not None else SENTINEL
+        ),
     )
 
     async def _run() -> None:
