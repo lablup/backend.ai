@@ -251,7 +251,16 @@ class AgentRegistry:
                     perm = None
             raw_subpath = opts.get("subpath")
             subpath_value = str(raw_subpath) if raw_subpath is not None else None
-            dst_path = mount_id_map.get(vfolder_uuid) or mount_id_map.get(raw_id)
+            # Destination may come from either the explicit ``mount_id_map``
+            # (preferred — atomic to the destination concept) or, as a
+            # fallback, the per-vfolder ``mount_options[uuid].mount_destination``
+            # so callers can express both option and destination in a single
+            # dict — matching the inference service creation surface.
+            dst_path = (
+                mount_id_map.get(vfolder_uuid)
+                or mount_id_map.get(raw_id)
+                or opts.get("mount_destination")
+            )
             entries.append(
                 MountInfoEntry(
                     vfolder_id=VFolderUUID(vfolder_uuid),

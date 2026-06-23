@@ -393,3 +393,52 @@ class TestWaitForSessionRunning:
                 await mock_registry_obj._wait_for_session_running(
                     session_id, mock_propagator, max_wait=0
                 )
+
+
+class TestMountEntriesFromCreationConfig:
+    """Session creation honors ``mount_destination`` from both ``mount_id_map``
+    (preferred) and ``mount_options[uuid].mount_destination`` (fallback), so the
+    same ``MountOption`` shape that inference service creation accepts also
+    works for sessions.
+    """
+
+    def test_mount_id_map_supplies_destination(self) -> None:
+        vfid = uuid.uuid4()
+        creation_config = {
+            "mount_ids": [vfid],
+            "mount_id_map": {vfid: "/data/dst"},
+            "mount_options": {vfid: {"permission": "ro"}},
+        }
+
+        entries = AgentRegistry._mount_entries_from_creation_config(creation_config)
+
+        assert len(entries) == 1
+        assert entries[0].mount_destination == "/data/dst"
+
+    def test_mount_options_mount_destination_fallback(self) -> None:
+        vfid = uuid.uuid4()
+        creation_config = {
+            "mount_ids": [vfid],
+            "mount_id_map": {},
+            "mount_options": {
+                vfid: {"mount_destination": "/data/from-options", "permission": "ro"},
+            },
+        }
+
+        entries = AgentRegistry._mount_entries_from_creation_config(creation_config)
+
+        assert len(entries) == 1
+        assert entries[0].mount_destination == "/data/from-options"
+
+    def test_mount_id_map_takes_precedence_over_mount_options(self) -> None:
+        vfid = uuid.uuid4()
+        creation_config = {
+            "mount_ids": [vfid],
+            "mount_id_map": {vfid: "/data/winner"},
+            "mount_options": {vfid: {"mount_destination": "/data/loser"}},
+        }
+
+        entries = AgentRegistry._mount_entries_from_creation_config(creation_config)
+
+        assert len(entries) == 1
+        assert entries[0].mount_destination == "/data/winner"
