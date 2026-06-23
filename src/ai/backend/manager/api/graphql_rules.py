@@ -20,15 +20,6 @@ class CustomIntrospectionRule(ValidationRule):
             )
 
 
-def _is_public_field(field_def: GraphQLField | None) -> bool:
-    """Return True if the resolved GraphQL field carries the ``@public`` schema directive."""
-    if field_def is None:
-        return False
-    strawberry_definition = (field_def.extensions or {}).get("strawberry-definition")
-    directives = getattr(strawberry_definition, "directives", None) or ()
-    return any(isinstance(directive, Public) for directive in directives)
-
-
 class PublicFieldGateRule(ValidationRule):
     """Restricts anonymous (unauthenticated) public queries to ``@public``-marked root fields.
 
@@ -42,6 +33,15 @@ class PublicFieldGateRule(ValidationRule):
     so fragments and inline fragments cannot be used to bypass the gate.
     """
 
+    @staticmethod
+    def _is_public_field(field_def: GraphQLField | None) -> bool:
+        """Return True if the resolved GraphQL field carries the ``@public`` schema directive."""
+        if field_def is None:
+            return False
+        strawberry_definition = (field_def.extensions or {}).get("strawberry-definition")
+        directives = getattr(strawberry_definition, "directives", None) or ()
+        return any(isinstance(directive, Public) for directive in directives)
+
     def enter_field(self, node: Any, *_args: Any) -> None:
         parent_type = self.context.get_parent_type()
         if parent_type is None:
@@ -49,7 +49,7 @@ class PublicFieldGateRule(ValidationRule):
         schema = self.context.schema
         field_name = node.name.value
         if parent_type is schema.query_type:
-            if field_name == "__typename" or _is_public_field(self.context.get_field_def()):
+            if field_name == "__typename" or self._is_public_field(self.context.get_field_def()):
                 return
             self.report_error(
                 GraphQLError(
