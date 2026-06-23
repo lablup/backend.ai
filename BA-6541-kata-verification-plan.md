@@ -165,7 +165,7 @@ Classify each item: ✅ Fully / ⚠️ Partial (note required config) / ❌ Unsu
 | 14 | App Proxy | ✅ | `start-service` → `/v2/proxy/auth` → worker `/setup` (cookie) → Jupyter Notebook 7.3.3 returned `200 OK` + full HTML | wsproxy/appproxy end-to-end works; `rootUri=file:///home/work` confirms VM scratch mount |
 | 15 | Overlay networking | ✅ | `cluster_mode=multi-node, cluster_size=2` session placed kernels on two agents (ag1/ag2); Docker swarm overlay `bai-multinode-<id>` created with both nodes as VXLAN peers; kernels got overlay IPs `10.0.1.4` (main1) / `10.0.1.2` (sub1); cross-node TCP connect sub1 → `10.0.1.4:12345` succeeded (`OK: overlay reachable`) | Kata VMs participate in the swarm overlay; inter-node connectivity confirmed end-to-end. **Caveat:** swarm `advertise-addr` was the public IP, so VXLAN (UDP 4789) traverses the public interface in plaintext — for production re-init swarm on the private VPC IP. MTU left at 1500. |
 | 16 | JAIL sandbox | | | |
-| 17 | seccomp profile | | | |
+| 17 | seccomp profile | ✅ | (1) `docker inspect … .HostConfig.SecurityOpt` shows the full default-deny profile attached (`defaultAction=SCMP_ACT_ERRNO`, `defaultErrnoRet=1`, 441-syscall allowlist + cap-gated rules); kernel runs normally → applied without breaking the Kata VM. (2) **Enforcement confirmed inside the guest:** an allowlist-excluded syscall (`keyctl`, x86_64 #250) returned `errno 1 (EPERM)` — exactly the profile's `defaultErrnoRet`, so the filter is actually enforced in the Kata guest, not just passed to the runtime | Backend.AI's appended "additionally allowed syscalls" rule is present but empty (no accelerator extras on GPU-less host) |
 
 Summarize the filled table into the BA-6541 findings (fully / partially /
 unsupported under Kata).
