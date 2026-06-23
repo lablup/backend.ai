@@ -416,12 +416,12 @@ class VfolderRepository:
         domain_name: str,
         allowed_vfolder_types: list[str],
         extra_conditions: sa.sql.elements.ColumnElement[bool] | None = None,
-        group_scope_id: UUID | None = None,
+        project_id: UUID | None = None,
     ) -> VFolderListResult:
         """
         List all VFolders accessible to a user.
 
-        When ``group_scope_id`` is given, group-owned vfolders are restricted to
+        When ``project_id`` is given, project-owned vfolders are restricted to
         that project; user-owned and invited vfolders are unaffected.
         Returns VFolderListResult with access information.
         """
@@ -435,7 +435,7 @@ class VfolderRepository:
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=extra_conditions,
                 extra_vf_group_conds=(
-                    (VFolderRow.group == group_scope_id) if group_scope_id is not None else None
+                    (VFolderRow.group == project_id) if project_id is not None else None
                 ),
             )
 
