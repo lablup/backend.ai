@@ -1,6 +1,10 @@
 ---
 name: release
 description: Guide the Backend.AI release process - run release.sh, generate changelog via towncrier, consolidate RC entries for final releases with subsection grouping.
+tags:
+  - release
+  - changelog
+  - towncrier
 ---
 
 # Release Workflow

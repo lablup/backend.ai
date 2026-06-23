@@ -4,6 +4,12 @@ description: Observe Backend.AI logs, metrics, and traces during local developme
 invoke_method: automatic
 auto_execute: false
 enabled: true
+tags:
+  - observability
+  - grafana
+  - logs
+  - metrics
+  - traces
 ---
 
 # Observability — Logs & Metrics During Development

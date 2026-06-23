@@ -1,6 +1,11 @@
 ---
 name: submit
 description: Complete submission workflow - quality checks, commit, PR creation, changelog generation, and final push. Use after finishing implementation work.
+tags:
+  - submit
+  - pr
+  - quality
+  - changelog
 ---
 
 # Submit Workflow
@@ -192,8 +197,7 @@ No JIRA issue key found.
 
 Options:
 1. Provide JIRA key: /submit BA-1234
-2. Create new issue: /jira-issue
-3. Continue without JIRA key (not recommended)
+2. Continue without JIRA key (not recommended)
 ```
 
 ## Examples
@@ -216,18 +220,9 @@ User: /submit BA-5678 --type=fix --message="Fix session cleanup race condition w
 Agent: [Uses provided parameters, runs full workflow]
 ```
 
-### After jira-issue skill
-```
-User: /jira-issue → creates BA-9999
-User: [implements feature]
-User: /submit BA-9999
-Agent: [Full submission with BA-9999 reference]
-```
-
 ## Related Skills
 
-- `/jira-issue` - Create JIRA issue before starting work
-- `/tdd-guide` - TDD workflow (run before /submit)
+- `/test-guide` - Scenario-first testing (run before /submit)
 
 ## Implementation Notes
 
