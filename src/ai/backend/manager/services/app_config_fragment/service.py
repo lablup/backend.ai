@@ -51,10 +51,14 @@ __all__ = ("AppConfigFragmentService",)
 class AppConfigFragmentService:
     """Admin write paths for app config fragments.
 
-    Every write passes the allow-list write-gate: a fragment may only be written when an
-    ``app_config_allow_list`` row exists for its ``(config_name, scope_type)``. Because an
-    allow-list row itself requires a registered ``config_name`` (FK to
-    ``app_config_definitions``), this single check also enforces registration.
+    ``create`` and ``update`` pass the allow-list write-gate: a fragment value may only be
+    written when an ``app_config_allow_list`` row exists for its ``(config_name,
+    scope_type)``. Because an allow-list row itself requires a registered ``config_name``
+    (FK to ``app_config_definitions``), this single check also enforces registration.
+
+    ``purge`` is deliberately NOT gated: removal is admin cleanup and must stay possible
+    even after a ``(config_name, scope_type)`` is de-allow-listed, so orphaned rows can
+    always be deleted.
     """
 
     _repository: AppConfigFragmentRepository
