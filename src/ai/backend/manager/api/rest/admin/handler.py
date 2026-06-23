@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Final, cast
 
 import graphene
 from graphene.validation import depth_limit_validator
-from graphql import GraphQLError, ValidationRule, parse, validate
+from graphql import ValidationRule, parse, validate
 from graphql.execution import ExecutionResult
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.admin.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.types import PublicGQLContext, StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.base import DataLoaderManager
 from ai.backend.manager.api.gql_legacy.schema import (
     GQLExceptionMiddleware,
@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql_legacy.schema import (
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
 )
-from ai.backend.manager.api.graphql_rules import CustomIntrospectionRule, PublicFieldGateRule
+from ai.backend.manager.api.graphql_rules import CustomIntrospectionRule
 from ai.backend.manager.api.rest.types import GQLContextDeps
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import GraphQLError as BackendGQLError
@@ -199,9 +199,14 @@ class AdminHandler:
     # handle_gql_strawberry (POST /admin/gql/strawberry)
     # ------------------------------------------------------------------
 
-    async def _execute_strawberry(self, params: GraphQLRequest) -> APIResponse:
+    async def _execute_strawberry(
+        self,
+        params: GraphQLRequest,
+        *,
+        context_cls: type[StrawberryGQLContext] = StrawberryGQLContext,
+    ) -> APIResponse:
         gql_deps = self._gql_deps
-        gql_ctx = StrawberryGQLContext(
+        gql_ctx = context_cls(
             config_provider=gql_deps.config_provider,
             event_hub=gql_deps.processors.events.event_hub,
             event_fetcher=gql_deps.processors.events.event_fetcher,
@@ -244,29 +249,10 @@ class AdminHandler:
     ) -> APIResponse:
         """Anonymous (unauthenticated) GraphQL endpoint.
 
-        Registered without ``auth_required`` so unauthenticated callers reach it. Before
-        execution the query is gated by ``PublicFieldGateRule``: only root ``Query`` fields
-        marked with the ``@public`` directive are accepted, and every other query field,
-        mutation, and subscription is rejected. The gate lives on this route alone — the
-        shared schema, context, and extensions are untouched.
+        Registered without ``auth_required`` so unauthenticated callers reach it. Executing with a
+        ``PublicGQLContext`` makes ``GQLValidationExtension`` apply ``PublicFieldGateRule`` during
+        the normal validation pass, so only root ``Query`` fields marked with the ``@public``
+        directive are accepted; every other query field, mutation, and subscription is rejected.
+        Existing authenticated routes are unaffected.
         """
-        params = body.parsed
-        try:
-            document = parse(params.query)
-        except GraphQLError as e:
-            return self._build_gql_error_response([e])
-        gate_errors = validate(
-            self._strawberry_schema._schema,
-            document,
-            [PublicFieldGateRule],
-        )
-        if gate_errors:
-            return self._build_gql_error_response(gate_errors)
-        return await self._execute_strawberry(params)
-
-    @staticmethod
-    def _build_gql_error_response(errors: list[GraphQLError]) -> APIResponse:
-        for e in errors:
-            log.error("ADMIN.GQL.V2.PUBLIC rejected: {}", e.message)
-        resp = GraphQLResponse(data=None, errors=[dict(e.formatted) for e in errors])
-        return APIResponse.build(HTTPStatus.OK, resp)
+        return await self._execute_strawberry(body.parsed, context_cls=PublicGQLContext)
