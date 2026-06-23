@@ -340,6 +340,7 @@ class StatTaskObserver:
     _task_trigger_count: Counter
     _task_success_count: Counter
     _task_failure_count: Counter
+    _task_duration_sec: Histogram
 
     def __init__(self) -> None:
         self._task_trigger_count = Counter(
@@ -356,6 +357,12 @@ class StatTaskObserver:
             name="backendai_stat_task_failure_count",
             documentation="Number of stat() task failed",
             labelnames=["agent_id", "stat_scope", "exception"],
+        )
+        self._task_duration_sec = Histogram(
+            name="backendai_stat_task_duration_sec",
+            documentation="Total elapsed time of a stat() collection cycle in seconds",
+            labelnames=["agent_id", "stat_scope"],
+            buckets=[0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300, 600],
         )
 
     @classmethod
@@ -391,3 +398,12 @@ class StatTaskObserver:
         self._task_failure_count.labels(
             agent_id=agent_id, stat_scope=stat_scope, exception=exception_name
         ).inc()
+
+    def observe_stat_task_duration(
+        self,
+        *,
+        agent_id: AgentId,
+        stat_scope: StatScope,
+        elapsed: float,
+    ) -> None:
+        self._task_duration_sec.labels(agent_id=agent_id, stat_scope=stat_scope).observe(elapsed)

@@ -4,7 +4,7 @@ description: Guide for implementing Backend.AI client SDK and CLI (Session, Base
 version: 1.0.0
 dependencies:
   - api-guide
-  - tdd-guide
+  - test-guide
 tags:
   - client-sdk
   - cli
@@ -233,7 +233,7 @@ When implementing new CLI/SDK feature:
    - Map options/arguments to SDK calls
    - Handle errors with proper exit codes
 
-6. ✅ **Write tests** (`/tdd-guide`)
+6. ✅ **Write tests** (`/test-guide`)
    - SDK: Mock HTTP responses (pytest-aiohttp)
    - CLI: Use CliRunner, mock SDK functions (not HTTP)
    - Verify request/response serialization
@@ -255,7 +255,7 @@ When implementing new CLI/SDK feature:
 - Test output formatting and exit codes
 
 **See:**
-- `/tdd-guide` skill for testing workflow
+- `/test-guide` skill for testing workflow
 - `tests/unit/client/` - Test examples
 
 ## Reference Files
@@ -308,5 +308,5 @@ When implementing new CLI/SDK feature:
 
 **Related skills:**
 - `/api-guide` - REST API implementation (prerequisite)
-- `/tdd-guide` - Testing workflow
+- `/test-guide` - Testing workflow
 - `/local-dev` - Service management and CLI testing

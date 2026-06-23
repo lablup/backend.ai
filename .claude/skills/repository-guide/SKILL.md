@@ -4,6 +4,11 @@ description: Guide for implementing Backend.AI repository patterns (create, get,
 invoke_method: automatic
 auto_execute: false
 enabled: true
+tags:
+  - repository
+  - data-access
+  - querier
+  - search-scope
 ---
 
 # Repository Development Guide
@@ -223,7 +228,7 @@ Define SearchScope dataclass with `to_conditions()` method.
 - Test scope filtering
 - Test error cases
 
-**See:** `/tdd-guide` skill for testing workflow
+**See:** `/test-guide` skill for testing workflow
 
 ## Transaction Management
 
@@ -284,7 +289,7 @@ Define SearchScope dataclass with `to_conditions()` method.
 
 - **Service Layer**: `/service-guide` - Service methods using repositories
 - **API Layer**: `/api-guide` - API handlers calling services
-- **Testing**: `/tdd-guide` - TDD workflow with repositories
+- **Testing**: `/test-guide` - Scenario-first testing with repositories
 - **Base README**: `repositories/README.md` - Architecture overview
 
 ## Troubleshooting
@@ -331,5 +336,5 @@ Define SearchScope dataclass with `to_conditions()` method.
 1. Study example repositories
 2. Define types and scope
 3. Implement standard operations
-4. Write tests with `/tdd-guide`
+4. Write tests with `/test-guide`
 5. Integrate with service layer (`/service-guide`)

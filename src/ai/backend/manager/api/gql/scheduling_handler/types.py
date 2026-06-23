@@ -5,7 +5,6 @@ from __future__ import annotations
 from enum import StrEnum
 
 from ai.backend.common.dto.manager.v2.scheduling_handler.types import SchedulingHandlerNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_enum,
@@ -21,7 +20,7 @@ __all__ = (
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Category of a deployment scheduling handler (lifecycle/scaling/health).",
     ),
     name="SchedulingHandlerCategory",
@@ -36,7 +35,7 @@ class SchedulingHandlerCategoryGQL(StrEnum):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Metadata for a single registered deployment scheduling handler. "
             "Surfaces the stable ``name`` used in ``DeploymentOptions.handler_options.by_handler``."

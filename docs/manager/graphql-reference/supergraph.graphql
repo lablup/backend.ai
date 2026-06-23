@@ -442,40 +442,42 @@ type AgentNetworkInfo
 """Added in 24.12.0."""
 type AgentNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
-  @join__type(graph: GRAPHENE)
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: GRAPHENE, key: "id")
+  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
-  row_id: String
-  status: String
-  status_changed: DateTime
-  region: String
-  scaling_group: String
-  schedulable: Boolean
-  available_slots: JSONString
-  occupied_slots: JSONString
+  row_id: String @join__field(graph: GRAPHENE)
+  status: String @join__field(graph: GRAPHENE)
+  status_changed: DateTime @join__field(graph: GRAPHENE)
+  region: String @join__field(graph: GRAPHENE)
+  scaling_group: String @join__field(graph: GRAPHENE)
+  schedulable: Boolean @join__field(graph: GRAPHENE)
+  available_slots: JSONString @join__field(graph: GRAPHENE)
+  occupied_slots: JSONString @join__field(graph: GRAPHENE)
 
   """Agent's address with port. (bind/advertised host:port)"""
-  addr: String
-  architecture: String
-  first_contact: DateTime
-  lost_at: DateTime
-  live_stat: JSONString
-  version: String
-  compute_plugins: JSONString
-  hardware_metadata: JSONString
-  auto_terminate_abusing_kernel: Boolean
-  local_config: JSONString
-  container_count: Int
+  addr: String @join__field(graph: GRAPHENE)
+  architecture: String @join__field(graph: GRAPHENE)
+  first_contact: DateTime @join__field(graph: GRAPHENE)
+  lost_at: DateTime @join__field(graph: GRAPHENE)
+  live_stat: JSONString @join__field(graph: GRAPHENE)
+  version: String @join__field(graph: GRAPHENE)
+  compute_plugins: JSONString @join__field(graph: GRAPHENE)
+  hardware_metadata: JSONString @join__field(graph: GRAPHENE)
+  auto_terminate_abusing_kernel: Boolean @join__field(graph: GRAPHENE)
+  local_config: JSONString @join__field(graph: GRAPHENE)
+  container_count: Int @join__field(graph: GRAPHENE)
 
   """Added in 25.4.0."""
-  gpu_alloc_map: UUIDFloatMap
-  kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
+  gpu_alloc_map: UUIDFloatMap @join__field(graph: GRAPHENE)
+  kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection @join__field(graph: GRAPHENE)
 
   """
   Added in 24.12.0. One of ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service'].
   """
-  permissions: [AgentPermissionField]
+  permissions: [AgentPermissionField] @join__field(graph: GRAPHENE)
 }
 
 """Added in 26.1.0. Options for ordering agents"""
@@ -883,6 +885,208 @@ type AllowedResourceGroupsPayload
 {
   """Allowed resource group names."""
   items: [String!]!
+}
+
+"""
+Added in 26.7.0. Permission to write config fragments for one config name at one scope type.
+"""
+type AppConfigAllowList implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The config name this entry permits writes for."""
+  configName: String!
+
+  """Scope type the entry permits writes at (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+
+  """Creation timestamp (UTC)."""
+  createdAt: DateTime!
+
+  """Last update timestamp (UTC)."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.7.0. Paginated connection for app config allow-list records.
+"""
+type AppConfigAllowListConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AppConfigAllowListEdge!]!
+
+  """
+  Total number of app config allow-list records matching the query criteria.
+  """
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AppConfigAllowListEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AppConfigAllowList!
+}
+
+"""
+Added in 26.7.0. Filter input for querying app config allow-list entries.
+"""
+input AppConfigAllowListFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by config name."""
+  configName: StringFilter = null
+
+  """Filter by scope type."""
+  scopeType: AppConfigScopeTypeFilter = null
+
+  """Filter by creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by last update datetime."""
+  updatedAt: DateTimeFilter = null
+}
+
+"""Added in 26.7.0. Specifies ordering for app config allow-list results."""
+input AppConfigAllowListOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: AppConfigAllowListOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.7.0. Fields available for ordering app config allow-list results.
+"""
+enum AppConfigAllowListOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CONFIG_NAME @join__enumValue(graph: STRAWBERRY)
+  SCOPE_TYPE @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.7.0. A registered app config."""
+type AppConfigDefinition implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Registered config name."""
+  configName: String!
+
+  """Creation timestamp (UTC)."""
+  createdAt: DateTime!
+
+  """Last update timestamp (UTC)."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.7.0. Paginated connection for app config definition records.
+"""
+type AppConfigDefinitionConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AppConfigDefinitionEdge!]!
+
+  """
+  Total number of app config definition records matching the query criteria.
+  """
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AppConfigDefinitionEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AppConfigDefinition!
+}
+
+"""Added in 26.7.0. Filter input for querying app config definitions."""
+input AppConfigDefinitionFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by config name."""
+  configName: StringFilter = null
+
+  """Filter by creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by last update datetime."""
+  updatedAt: DateTimeFilter = null
+}
+
+"""Added in 26.7.0. Specifies ordering for app config definition results."""
+input AppConfigDefinitionOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: AppConfigDefinitionOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.7.0. Fields available for ordering app config definition results.
+"""
+enum AppConfigDefinitionOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CONFIG_NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+enum AppConfigScopeType
+  @join__type(graph: STRAWBERRY)
+{
+  PUBLIC @join__enumValue(graph: STRAWBERRY)
+  DOMAIN @join__enumValue(graph: STRAWBERRY)
+  USER @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.7.0. Filter input for the scope_type enum field."""
+input AppConfigScopeTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact scope type match."""
+  equals: AppConfigScopeType = null
+
+  """Match any of the provided scope types."""
+  in: [AppConfigScopeType!] = null
+
+  """Exclude exact scope type match."""
+  notEquals: AppConfigScopeType = null
+
+  """Exclude any of the provided scope types."""
+  notIn: [AppConfigScopeType!] = null
 }
 
 """
@@ -2845,6 +3049,7 @@ type ComputeSessionList implements PaginatedList
 """Added in 24.09.0."""
 type ComputeSessionNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
+  @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
   @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
@@ -2973,44 +3178,46 @@ type ContainerRegistryEdge
 """Added in 24.09.0."""
 type ContainerRegistryNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
-  @join__type(graph: GRAPHENE)
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: GRAPHENE, key: "id")
+  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
 
   """Added in 24.09.0. The UUID type id of DB container_registries row."""
-  row_id: UUID
-  name: String
+  row_id: UUID @join__field(graph: GRAPHENE)
+  name: String @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  url: String!
+  url: String! @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  type: ContainerRegistryTypeField!
+  type: ContainerRegistryTypeField! @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  registry_name: String!
+  registry_name: String! @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  is_global: Boolean
+  is_global: Boolean @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  project: String
+  project: String @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  username: String
+  username: String @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  password: String
+  password: String @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  ssl_verify: Boolean
+  ssl_verify: Boolean @join__field(graph: GRAPHENE)
 
   """Added in 24.09.3."""
-  extra: JSONString
+  extra: JSONString @join__field(graph: GRAPHENE)
 
   """Added in 25.3.0."""
-  allowed_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
+  allowed_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection @join__field(graph: GRAPHENE)
 }
 
 """
@@ -3192,6 +3399,43 @@ type CreateAccessTokenPayload
 {
   """Created access token"""
   accessToken: AccessToken!
+}
+
+"""
+Added in 26.7.0. Input for registering a new app config allow-list entry.
+"""
+input CreateAppConfigAllowListInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Registered config name to gate."""
+  configName: String!
+
+  """Scope at which fragments may be written (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+}
+
+"""Added in 26.7.0. Payload for app config allow-list entry creation."""
+type CreateAppConfigAllowListPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Created app config allow-list entry."""
+  appConfigAllowList: AppConfigAllowList!
+}
+
+"""Added in 26.7.0. Input for registering a new app config definition."""
+input CreateAppConfigDefinitionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Unique config name to register."""
+  configName: String!
+}
+
+"""Added in 26.7.0. Payload for app config definition creation."""
+type CreateAppConfigDefinitionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Created app config definition."""
+  appConfigDefinition: AppConfigDefinition!
 }
 
 """Added in 25.19.0. Input for creating an auto-scaling rule."""
@@ -6063,6 +6307,7 @@ type DomainLifecycleInfo
 """Added in 24.12.0."""
 type DomainNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
+  @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
   @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
@@ -7194,6 +7439,7 @@ input GroupInput
 
 type GroupNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
+  @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
   @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
@@ -7409,6 +7655,7 @@ input ImageInput
 
 type ImageNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
+  @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
   @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
@@ -9171,46 +9418,48 @@ type MkdirV2Payload
 
 type ModelCard implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
-  @join__type(graph: GRAPHENE)
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: GRAPHENE, key: "id")
+  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
-  name: String
+  name: String @join__field(graph: GRAPHENE)
 
   """Added in 24.03.8. ID of VFolder."""
-  row_id: UUID
-  vfolder: VirtualFolder
+  row_id: UUID @join__field(graph: GRAPHENE)
+  vfolder: VirtualFolder @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  vfolder_node: VirtualFolderNode
-  author: String
+  vfolder_node: VirtualFolderNode @join__field(graph: GRAPHENE)
+  author: String @join__field(graph: GRAPHENE)
 
   """Human readable name of the model."""
-  title: String
-  version: String
+  title: String @join__field(graph: GRAPHENE)
+  version: String @join__field(graph: GRAPHENE)
 
   """The time the model was created."""
-  created_at: DateTime
+  created_at: DateTime @join__field(graph: GRAPHENE)
 
   """The last time the model was modified."""
-  modified_at: DateTime
-  description: String
-  task: String
-  category: String
-  architecture: String
-  framework: [String]
-  label: [String]
-  license: String
-  min_resource: JSONString
-  readme: String
+  modified_at: DateTime @join__field(graph: GRAPHENE)
+  description: String @join__field(graph: GRAPHENE)
+  task: String @join__field(graph: GRAPHENE)
+  category: String @join__field(graph: GRAPHENE)
+  architecture: String @join__field(graph: GRAPHENE)
+  framework: [String] @join__field(graph: GRAPHENE)
+  label: [String] @join__field(graph: GRAPHENE)
+  license: String @join__field(graph: GRAPHENE)
+  min_resource: JSONString @join__field(graph: GRAPHENE)
+  readme: String @join__field(graph: GRAPHENE)
 
   """
   Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ...
   """
-  readme_filetype: String
+  readme_filetype: String @join__field(graph: GRAPHENE)
 
   """Added in 24.03.8."""
-  error_msg: String
+  error_msg: String @join__field(graph: GRAPHENE)
 }
 
 """
@@ -11027,6 +11276,16 @@ type Mutation
   delete_network(network: String!): DeleteNetwork @join__field(graph: GRAPHENE)
 
   """
+  Added in 26.7.0. Register a new app config allow-list entry (super admin only).
+  """
+  adminCreateAppConfigAllowList(input: CreateAppConfigAllowListInput!): CreateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.7.0. Purge an app config allow-list entry by id (super admin only).
+  """
+  adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
   """
   scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload @join__field(graph: STRAWBERRY)
@@ -11657,6 +11916,16 @@ type Mutation
   """Added in 26.4.2. Delete a login client type (super admin only)."""
   adminDeleteLoginClientType(id: UUID!): DeleteLoginClientTypePayload @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.7.0. Register a new app config definition (super admin only).
+  """
+  adminCreateAppConfigDefinition(input: CreateAppConfigDefinitionInput!): CreateAppConfigDefinitionPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.7.0. Purge an app config definition by id (super admin only).
+  """
+  adminPurgeAppConfigDefinition(input: PurgeAppConfigDefinitionInput!): PurgeAppConfigDefinitionPayload @join__field(graph: STRAWBERRY)
+
   """Added in 26.4.2. Create a new runtime variant (superadmin only)."""
   adminCreateRuntimeVariant(input: CreateRuntimeVariantInput!): CreateRuntimeVariantPayload @join__field(graph: STRAWBERRY)
 
@@ -11817,19 +12086,21 @@ type NetworkEdge
 """Added in 24.12.0."""
 type NetworkNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
-  @join__type(graph: GRAPHENE)
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: GRAPHENE, key: "id")
+  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
-  row_id: UUID
-  name: String
-  ref_name: String
-  driver: String
-  project: UUID
-  domain_name: String
-  options: JSONString
-  created_at: DateTime
-  updated_at: DateTime
+  row_id: UUID @join__field(graph: GRAPHENE)
+  name: String @join__field(graph: GRAPHENE)
+  ref_name: String @join__field(graph: GRAPHENE)
+  driver: String @join__field(graph: GRAPHENE)
+  project: UUID @join__field(graph: GRAPHENE)
+  domain_name: String @join__field(graph: GRAPHENE)
+  options: JSONString @join__field(graph: GRAPHENE)
+  created_at: DateTime @join__field(graph: GRAPHENE)
+  updated_at: DateTime @join__field(graph: GRAPHENE)
 }
 
 """
@@ -13430,6 +13701,38 @@ input ProjectWeightInputItem
   weight: Decimal = null
 }
 
+"""Added in 26.7.0. Input for purging an app config allow-list entry."""
+input PurgeAppConfigAllowListInput
+  @join__type(graph: STRAWBERRY)
+{
+  """App config allow-list entry id to purge."""
+  id: UUID!
+}
+
+"""Added in 26.7.0. Payload for app config allow-list entry purge."""
+type PurgeAppConfigAllowListPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the purged app config allow-list entry."""
+  id: UUID!
+}
+
+"""Added in 26.7.0. Input for purging an app config definition."""
+input PurgeAppConfigDefinitionInput
+  @join__type(graph: STRAWBERRY)
+{
+  """App config definition id to purge."""
+  id: UUID!
+}
+
+"""Added in 26.7.0. Payload for app config definition purge."""
+type PurgeAppConfigDefinitionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the purged app config definition."""
+  id: UUID!
+}
+
 """
 Completely delete domain from DB.
 
@@ -13623,10 +13926,13 @@ type Query
   @join__type(graph: GRAPHENE)
   @join__type(graph: STRAWBERRY)
 {
+  """
+  Added in 26.7.0. Relay Global Object Identification: resolve any Node by its global ID.
+  """
   node(
     """The ID of the object"""
     id: ID!
-  ): Node @join__field(graph: GRAPHENE)
+  ): Node @join__field(graph: STRAWBERRY, override: "graphene")
 
   """Added in 25.6.0."""
   audit_log_schema: AuditLogSchema @join__field(graph: GRAPHENE)
@@ -13998,6 +14304,16 @@ type Query
 
   """Added in 26.1.0. List agents with filtering and pagination"""
   agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.7.0. Get a single app config allow-list entry by id (super admin only).
+  """
+  adminAppConfigAllowList(id: UUID!): AppConfigAllowList @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.7.0. Search app config allow-list entries with filtering, ordering, and pagination (super admin only).
+  """
+  adminAppConfigAllowLists(filter: AppConfigAllowListFilter = null, orderBy: [AppConfigAllowListOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigAllowListConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
@@ -14595,6 +14911,16 @@ type Query
   """
   loginClientTypes(filter: LoginClientTypeFilter = null, orderBy: [LoginClientTypeOrderBy!] = null, limit: Int = null, offset: Int = null): LoginClientTypeConnection @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.7.0. Get a single app config definition by id (super admin only).
+  """
+  adminAppConfigDefinition(id: UUID!): AppConfigDefinition @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.7.0. Search app config definitions with filtering, ordering, and pagination (super admin only).
+  """
+  adminAppConfigDefinitions(filter: AppConfigDefinitionFilter = null, orderBy: [AppConfigDefinitionOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigDefinitionConnection @join__field(graph: STRAWBERRY)
+
   """Added in 26.4.2. Search runtime variants."""
   runtimeVariants(filter: RuntimeVariantFilter = null, orderBy: [RuntimeVariantOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantConnection @join__field(graph: STRAWBERRY)
 
@@ -14928,6 +15254,8 @@ enum RBACElementType
   ARTIFACT_REGISTRY @join__enumValue(graph: STRAWBERRY)
   SESSION_TEMPLATE @join__enumValue(graph: STRAWBERRY)
   APP_CONFIG @join__enumValue(graph: STRAWBERRY)
+  APP_CONFIG_DEFINITION @join__enumValue(graph: STRAWBERRY)
+  APP_CONFIG_ALLOW_LIST @join__enumValue(graph: STRAWBERRY)
   MODEL_CARD @join__enumValue(graph: STRAWBERRY)
   RESOURCE_PRESET @join__enumValue(graph: STRAWBERRY)
   USER_RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
@@ -17265,6 +17593,7 @@ type ScalingGroupEdge
 """Added in 24.12.0."""
 type ScalingGroupNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
+  @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
   @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
@@ -20119,57 +20448,59 @@ type UserList implements PaginatedList
 
 type UserNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
+  @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
+  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
 
   """Unique username of the user."""
-  username: String
+  username: String @join__field(graph: GRAPHENE)
 
   """Unique email of the user."""
-  email: String
-  need_password_change: Boolean
-  full_name: String
-  description: String
-  is_active: Boolean @deprecated(reason: "Deprecated since 24.03.0. Recommend to use `status` field.")
+  email: String @join__field(graph: GRAPHENE)
+  need_password_change: Boolean @join__field(graph: GRAPHENE)
+  full_name: String @join__field(graph: GRAPHENE)
+  description: String @join__field(graph: GRAPHENE)
+  is_active: Boolean @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 24.03.0. Recommend to use `status` field.")
 
   """
   The status is one of `active`, `inactive`, `deleted` or `before-verification`.
   """
-  status: String
+  status: String @join__field(graph: GRAPHENE)
 
   """Additional information of user status."""
-  status_info: String
-  created_at: DateTime
-  modified_at: DateTime
-  domain_name: String
+  status_info: String @join__field(graph: GRAPHENE)
+  created_at: DateTime @join__field(graph: GRAPHENE)
+  modified_at: DateTime @join__field(graph: GRAPHENE)
+  domain_name: String @join__field(graph: GRAPHENE)
 
   """The role is one of `user`, `admin`, `superadmin` or `monitor`."""
-  role: String
-  resource_policy: String
-  allowed_client_ip: [String]
-  totp_activated: Boolean
-  totp_activated_at: DateTime
-  sudo_session_enabled: Boolean
+  role: String @join__field(graph: GRAPHENE)
+  resource_policy: String @join__field(graph: GRAPHENE)
+  allowed_client_ip: [String] @join__field(graph: GRAPHENE)
+  totp_activated: Boolean @join__field(graph: GRAPHENE)
+  totp_activated_at: DateTime @join__field(graph: GRAPHENE)
+  sudo_session_enabled: Boolean @join__field(graph: GRAPHENE)
 
   """
   Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
   """
-  container_uid: Int
+  container_uid: Int @join__field(graph: GRAPHENE)
 
   """
   Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
   """
-  container_main_gid: Int
+  container_main_gid: Int @join__field(graph: GRAPHENE)
 
   """
   Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
   """
-  container_gids: [Int]
+  container_gids: [Int] @join__field(graph: GRAPHENE)
 
   """Added in 25.5.0."""
-  project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
+  project_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection @join__field(graph: GRAPHENE)
 }
 
 """
@@ -21318,6 +21649,7 @@ type VirtualFolderList implements PaginatedList
 """Added in 24.03.4"""
 type VirtualFolderNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
+  @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
   @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {

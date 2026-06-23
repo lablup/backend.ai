@@ -107,6 +107,10 @@ from ai.backend.manager.services.session.actions.resolve_session import (
     ResolveSessionAction,
     ResolveSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.resolve_session_name import (
+    ResolveSessionNameAction,
+    ResolveSessionNameActionResult,
+)
 from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
@@ -172,6 +176,7 @@ class SessionProcessors(AbstractProcessorPackage):
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
     rename_session: ActionProcessor[RenameSessionAction, RenameSessionActionResult]
     resolve_session: ActionProcessor[ResolveSessionAction, ResolveSessionActionResult]
+    resolve_session_name: ActionProcessor[ResolveSessionNameAction, ResolveSessionNameActionResult]
     search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
     search_sessions: ActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
     search_sessions_in_project: ActionProcessor[
@@ -213,6 +218,7 @@ class SessionProcessors(AbstractProcessorPackage):
         self.list_files = ActionProcessor(service.list_files, action_monitors)
         self.rename_session = ActionProcessor(service.rename_session, action_monitors)
         self.resolve_session = ActionProcessor(service.resolve_session, action_monitors)
+        self.resolve_session_name = ActionProcessor(service.resolve_session_name, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
         self.upload_files = ActionProcessor(service.upload_files, action_monitors)
 
@@ -310,6 +316,7 @@ class SessionProcessors(AbstractProcessorPackage):
             MatchSessionsAction.spec(),
             RenameSessionAction.spec(),
             ResolveSessionAction.spec(),
+            ResolveSessionNameAction.spec(),
             SearchKernelsAction.spec(),
             SearchSessionsAction.spec(),
             SearchSessionsInProjectAction.spec(),

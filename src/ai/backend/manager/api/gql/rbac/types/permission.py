@@ -77,7 +77,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeFilter as OperationTypeFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -115,7 +114,7 @@ OperationTypeGQL: type[OperationTypeDTO] = gql_enum(
         description=(
             "Filter for permission operation columns. Supports equals / in / not_equals / not_in."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="OperationTypeFilter",
 )
@@ -231,6 +230,8 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.ARTIFACT_REGISTRY
                 | RBACElementType.SESSION_TEMPLATE
                 | RBACElementType.APP_CONFIG
+                | RBACElementType.APP_CONFIG_DEFINITION
+                | RBACElementType.APP_CONFIG_ALLOW_LIST
                 | RBACElementType.RESOURCE_PRESET
                 | RBACElementType.USER_RESOURCE_POLICY
                 | RBACElementType.KEYPAIR_RESOURCE_POLICY
@@ -342,7 +343,7 @@ class DeletePermissionInput(PydanticInputMixin[DeletePermissionInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for bulk-inserting scoped permissions across one or more roles",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="BulkAddRolePermissionsInput",
 )
@@ -353,7 +354,7 @@ class BulkAddRolePermissionsInputGQL(PydanticInputMixin[BulkAddRolePermissionsIn
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for bulk-deleting permission rows by primary key",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="BulkRemoveRolePermissionsInput",
 )
@@ -364,7 +365,7 @@ class BulkRemoveRolePermissionsInputGQL(PydanticInputMixin[BulkRemoveRolePermiss
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for replacing one role's entire scoped-permission set",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="ReplaceRolePermissionsInput",
 )
@@ -391,7 +392,7 @@ class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
 @gql_pydantic_type(
     BackendAIGQLMeta(
         description="Failure detail for a single permission entry in bulk add",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     model=BulkAddRolePermissionFailureInfoDTO,
     name="BulkAddRolePermissionFailureInfo",
@@ -410,7 +411,7 @@ class BulkAddRolePermissionFailureInfoGQL(
 @gql_pydantic_type(
     BackendAIGQLMeta(
         description="Failure detail for a single permission ID in bulk remove",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     model=BulkRemoveRolePermissionFailureInfoDTO,
     name="BulkRemoveRolePermissionFailureInfo",
@@ -425,7 +426,7 @@ class BulkRemoveRolePermissionFailureInfoGQL(
 @gql_pydantic_type(
     BackendAIGQLMeta(
         description="Failure detail for a single permission entry in replace",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     model=ReplaceRolePermissionFailureInfoDTO,
     name="ReplaceRolePermissionFailureInfo",
@@ -444,7 +445,7 @@ class ReplaceRolePermissionFailureInfoGQL(
 @gql_pydantic_type(
     BackendAIGQLMeta(
         description="Payload for bulk role-permission insertion",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     model=BulkAddRolePermissionsPayloadDTO,
     name="BulkAddRolePermissionsPayload",
@@ -461,7 +462,7 @@ class BulkAddRolePermissionsPayloadGQL(
 @gql_pydantic_type(
     BackendAIGQLMeta(
         description="Payload for bulk role-permission deletion",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     model=BulkRemoveRolePermissionsPayloadDTO,
     name="BulkRemoveRolePermissionsPayload",
@@ -478,7 +479,7 @@ class BulkRemoveRolePermissionsPayloadGQL(
 @gql_pydantic_type(
     BackendAIGQLMeta(
         description="Payload for replacing a role's entire scoped-permission set",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     model=ReplaceRolePermissionsPayloadDTO,
     name="ReplaceRolePermissionsPayload",

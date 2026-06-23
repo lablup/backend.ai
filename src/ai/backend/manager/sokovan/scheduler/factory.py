@@ -309,11 +309,11 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
             success_status=SessionStatus.RUNNING,
             reason="triggered-by-scheduler",
         ),
-        # Promote to TERMINATED when all kernels are TERMINATED
+        # Promote to TERMINATED when all kernels are in terminal states
         ScheduleType.CHECK_TERMINATING_PROGRESS: PromotionSpec(
             name="promote-to-terminated",
             target_statuses=[SessionStatus.TERMINATING],
-            target_kernel_statuses=[KernelStatus.TERMINATED],
+            target_kernel_statuses=list(KernelStatus.terminal_statuses()),
             kernel_match_type=KernelMatchType.ALL,
             success_status=SessionStatus.TERMINATED,
             reason="triggered-by-scheduler",

@@ -261,15 +261,18 @@ def gql_root_field(
     *,
     name: str | None = None,
     deprecation_reason: str | None = None,
+    directives: Sequence[object] = (),
 ) -> Any:
     """Root query/subscription field on the Query type (always has its own version).
 
     Use for top-level fields on the Query type that are independently versioned.
+    ``directives`` forwards schema directives (e.g. federation ``@override``) onto the field.
     """
     return strawberry.field(
         description=_build_description(meta),
         name=name,
         deprecation_reason=deprecation_reason,
+        directives=directives,
     )
 
 

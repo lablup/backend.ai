@@ -6,6 +6,18 @@ from ai.backend.manager.repositories.resource_allocation.repository import (
 )
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.app_config_allow_list.processors import (
+    AppConfigAllowListProcessors,
+)
+from ai.backend.manager.services.app_config_allow_list.service import (
+    AppConfigAllowListService,
+)
+from ai.backend.manager.services.app_config_definition.processors import (
+    AppConfigDefinitionProcessors,
+)
+from ai.backend.manager.services.app_config_definition.service import (
+    AppConfigDefinitionService,
+)
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
@@ -161,6 +173,9 @@ def create_services(args: ServiceArgs) -> Services:
             args.hook_plugin_ctx,
             args.event_producer,
             args.agent_cache,
+        ),
+        app_config_allow_list=AppConfigAllowListService(
+            repository=repositories.app_config_allow_list.repository,
         ),
         domain=DomainService(repositories.domain.repository),
         dotfile=DotfileService(
@@ -326,6 +341,9 @@ def create_services(args: ServiceArgs) -> Services:
             group_repository=repositories.group.repository,
             ssh_key_validator=args.ssh_key_validator,
         ),
+        app_config_definition=AppConfigDefinitionService(
+            repository=repositories.app_config_definition.repository,
+        ),
         login_client_type=LoginClientTypeService(
             repository=repositories.auth.login_client_type,
         ),
@@ -424,6 +442,9 @@ def create_processors(
     services = create_services(args.service_args)
     return Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
+        app_config_allow_list=AppConfigAllowListProcessors(
+            services.app_config_allow_list, action_monitors
+        ),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
         error_log=ErrorLogProcessors(services.error_log, action_monitors, validators),
@@ -487,6 +508,9 @@ def create_processors(
             services.model_serving_auto_scaling, action_monitors, validators
         ),
         auth=AuthProcessors(services.auth, action_monitors, validators),
+        app_config_definition=AppConfigDefinitionProcessors(
+            services.app_config_definition, action_monitors
+        ),
         login_client_type=LoginClientTypeProcessors(services.login_client_type, action_monitors),
         login_client_type_admin=LoginClientTypeAdminProcessors(
             services.login_client_type_admin, action_monitors

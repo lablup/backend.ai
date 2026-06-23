@@ -51,7 +51,6 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -324,7 +323,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     project_id: ID
     replica_id: ID | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="UUID of the model deployment replica served by this session.",
         )
     )
@@ -445,7 +444,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "The model deployment replica served by this session: a single replica "
                 "instance of a model deployment that runs in this compute session and serves "
@@ -568,7 +567,7 @@ class SessionMountItemInputGQL(PydanticInputMixin[MountItemInputDTO]):
     permission: str | None = gql_field(default=None, description="Mount permission ('rw' or 'ro').")
     subpath: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Subpath within the vfolder to mount. Null mounts the vfolder root.",
         ),
         default=None,

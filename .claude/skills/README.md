@@ -16,14 +16,21 @@ This directory contains Claude Code skills for Backend.AI development tasks.
 | `/service-guide` | Service layer (Actions, Processors, ActionProcessor) | New service implementation, Action/Processor patterns |
 | `/api-guide` | REST/GraphQL API (scope, filter, admin_ prefix, BaseFilterAdapter) | API endpoint implementation |
 | `/cli-sdk-guide` | Client SDK/CLI (Session, @api_function, Click, FieldSpec) | SDK function implementation, CLI command creation |
-| `/tdd-guide` | TDD workflow (Red → Green → Refactor) | Test-first approach for new features/bug fixes |
+| `/test-guide` | Propose scenarios → refine with user → verify each (fixtures, with_tables, optional TDD) | Writing tests for a new feature/bug fix |
+
+## Exploration & Navigation
+
+| Skill | Purpose | Use When |
+|-------|---------|----------|
+| `/code-trace` | Map a feature across REST/GraphQL/Service/Repository/DB; read the large supergraph.graphql safely | Finding where a feature lives, tracing a request through layers |
+
+For finding/defining exceptions, see `src/ai/backend/manager/errors/AGENTS.md`.
 
 ## Database Management
 
 | Skill | Purpose |
 |-------|---------|
-| `/db-status` | Check schema version and migration status |
-| `/db-migrate` | Apply migrations (upgrade/downgrade) |
+| `/db-migrate` | Inspect & apply migrations (status, upgrade/downgrade) |
 
 ## Local Development & CLI
 
@@ -31,12 +38,8 @@ This directory contains Claude Code skills for Backend.AI development tasks.
 |-------|---------|----------|
 | `/local-dev` | Service management (`./dev`) — start, stop, restart, crash debugging | Restarting services after code changes, debugging startup crashes |
 | `/bai-cli` | V2 CLI usage (`./bai`) — config, login, command patterns, entity reference | Testing API changes on live server, discovering CLI commands |
-
-## Component Execution
-
-| Skill | Purpose |
-|-------|---------|
-| `/cli-executor` | Execute component CLI (mgr, ag, storage, web, app-proxy) |
+| `/observability` | Logs/metrics/traces via Grafana MCP (Loki, Prometheus, Tempo, Pyroscope) | Verifying behavior after a restart |
+| `/halfstack` | Docker Compose halfstack — config, service health, DB/Valkey/etcd, supergraph | Halfstack/infra troubleshooting |
 
 ## Submission
 
@@ -60,16 +63,16 @@ bep-guide → ┬→ repository-guide ─┐
 ```
 
 **Testing Flow:**
-tdd-guide → repository/service/api layer tests
+test-guide → repository/service/api layer tests
 
 **Submission Flow:**
-jira-issue → [implement] → submit (quality checks → commit → PR → changelog → push)
+[implement] → submit (quality checks → commit → PR → changelog → push)
 
 **Release Flow:**
 release (pre-flight → release.sh → changelog editing → RC consolidation → summary)
 
 **Infrastructure Flow:**
-halfstack → db-status → db-migrate → cli-executor → local-dev → bai-cli
+halfstack → db-migrate → local-dev → bai-cli
 
 ## Related Documents
 

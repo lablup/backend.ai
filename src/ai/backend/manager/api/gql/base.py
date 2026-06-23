@@ -28,7 +28,6 @@ from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
 from ai.backend.common.dto.manager.query import NullableDateTimeFilter as NullableDateTimeFilterDTO
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor as decode_cursor
 from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor as encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -270,7 +269,7 @@ class IntFilter(PydanticInputMixin[IntFilterDTO]):
             "single value), 'contains_any' (column contains any of these values), and "
             "'contains_all' (column contains all of these values)."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="IntArrayFilter",
 )

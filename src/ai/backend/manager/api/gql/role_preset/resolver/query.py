@@ -13,7 +13,6 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     SearchRolePresetsInput,
 )
 from ai.backend.common.identifier.role_preset import RolePresetID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -31,7 +30,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Get a single role preset by ID (admin only).",
     )
 )  # type: ignore[misc]
@@ -46,7 +45,7 @@ async def admin_role_preset(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="List role presets with filtering and pagination (admin only).",
     )
 )  # type: ignore[misc]

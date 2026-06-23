@@ -80,7 +80,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -347,7 +346,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
     )
     default_deployment_options: DeploymentOptionsInfoGQL = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Default deployment options (timeouts, etc.) snapshot-copied"
                 " onto each new deployment created in this resource group."
@@ -356,7 +355,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
     )
     default_session_options: DefaultSessionOptionsInfoGQL = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Default session options used as the fallback layer for the"
                 " scheduling controller's options resolver at session enqueue time."
@@ -733,7 +732,7 @@ class AllowedProjectsPayloadGQL(PydanticOutputMixin[AllowedProjectsPayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Input for the replaceResourceGroupDefaultDeploymentOptions mutation."
             " Full-replace semantics — the supplied payload is the complete new value."
@@ -752,7 +751,7 @@ class ReplaceResourceGroupDefaultDeploymentOptionsInputGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Payload returned after replacing a resource group's"
             " default_deployment_options surface."
@@ -774,7 +773,7 @@ class ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Input for the replaceResourceGroupDefaultSessionOptions mutation."
             " Full-replace semantics — the supplied payload is the complete new value."
@@ -793,7 +792,7 @@ class ReplaceResourceGroupDefaultSessionOptionsInputGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Payload returned after replacing a resource group's default_session_options surface."
         ),
