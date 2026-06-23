@@ -33,11 +33,11 @@ class GroupAutoscaleHandler(
             with recorder.phase("group_autoscale"):
                 with recorder.step("evaluate"):
                     goal = view.deployment_desired_replica_count
-                    # Same convergence criteria as the scaling reconcile; a group with no
-                    # current revision has nothing the scaling reconcile could fill.
-                    converged = view.current_revision_id is None or (
-                        view.current_live_replica_count == goal
-                        and view.current_serving_replica_count == goal
+                    # Count-only, mirroring the steady-state scaling reconcile. Serving health
+                    # is judged separately and must not re-arm scaling; otherwise a group that
+                    # cannot fully serve (resource starvation) would oscillate STABLE<->SCALING.
+                    converged = (
+                        view.current_revision_id is None or view.current_live_replica_count == goal
                     )
                     # FAILURE re-arms scaling so the scaling reconcile fills/drains routes.
                     if view.desired_current_replica_count != goal:
