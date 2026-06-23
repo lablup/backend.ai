@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from ai.backend.manager.errors.common import GenericBadRequest, GenericForbidden, ObjectNotFound
+from ai.backend.manager.errors.common import GenericBadRequest, ObjectNotFound
 
 __all__ = (
     "AppConfigAllowListNotFound",
     "AppConfigDefinitionNotFound",
     "AppConfigFragmentNotFound",
     "AppConfigFragmentWriteNotAllowed",
-    "AppConfigFragmentForbidden",
 )
 
 
@@ -35,14 +34,3 @@ class AppConfigFragmentWriteNotAllowed(GenericBadRequest):
 
     error_type = "https://api.backend.ai/probs/app-config-fragment-write-not-allowed"
     error_title = "App config fragment write is not allowed for this config/scope."
-
-
-class AppConfigFragmentForbidden(GenericForbidden):
-    """A self-service write targeted a fragment the caller does not own.
-
-    Raised when a ``my`` write path targets a fragment that is not the caller's own
-    user-scope row.
-    """
-
-    error_type = "https://api.backend.ai/probs/app-config-fragment-forbidden"
-    error_title = "You are not allowed to modify this app config fragment."

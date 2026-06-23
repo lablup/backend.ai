@@ -26,10 +26,6 @@ from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
     UpdateAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.update_my import (
-    UpdateMyAppConfigFragmentAction,
-    UpdateMyAppConfigFragmentActionResult,
-)
 from ai.backend.manager.services.app_config_fragment.service import (
     AppConfigFragmentService,
 )
@@ -41,9 +37,6 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     search: ScopeActionProcessor[SearchAppConfigFragmentAction, SearchAppConfigFragmentActionResult]
     update: SingleEntityActionProcessor[
         UpdateAppConfigFragmentAction, UpdateAppConfigFragmentActionResult
-    ]
-    update_my: SingleEntityActionProcessor[
-        UpdateMyAppConfigFragmentAction, UpdateMyAppConfigFragmentActionResult
     ]
     purge: SingleEntityActionProcessor[
         PurgeAppConfigFragmentAction, PurgeAppConfigFragmentActionResult
@@ -58,7 +51,6 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
         self.search = ScopeActionProcessor(service.search, action_monitors)
         self.update = SingleEntityActionProcessor(service.update, action_monitors)
-        self.update_my = SingleEntityActionProcessor(service.update_my, action_monitors)
         self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
 
     @override
@@ -68,6 +60,5 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
             GetAppConfigFragmentAction.spec(),
             SearchAppConfigFragmentAction.spec(),
             UpdateAppConfigFragmentAction.spec(),
-            UpdateMyAppConfigFragmentAction.spec(),
             PurgeAppConfigFragmentAction.spec(),
         ]

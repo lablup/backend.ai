@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListSearchResult
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
@@ -17,7 +16,6 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigScopeType,
 )
 from ai.backend.manager.errors.app_config import (
-    AppConfigFragmentForbidden,
     AppConfigFragmentNotFound,
     AppConfigFragmentWriteNotAllowed,
 )
@@ -48,9 +46,6 @@ from ai.backend.manager.services.app_config_fragment.actions.search import (
 )
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
-)
-from ai.backend.manager.services.app_config_fragment.actions.update_my import (
-    UpdateMyAppConfigFragmentAction,
 )
 from ai.backend.manager.services.app_config_fragment.service import AppConfigFragmentService
 from ai.backend.manager.types import OptionalState
@@ -229,89 +224,6 @@ class TestAppConfigFragmentService:
                     updater_spec=AppConfigFragmentUpdaterSpec(
                         config=OptionalState.update({"b": 2})
                     ),
-                )
-            )
-        mock_repository.update.assert_not_called()
-
-    # --- self-service update ---
-
-    async def test_update_my_replaces_config(
-        self,
-        service: AppConfigFragmentService,
-        mock_repository: MagicMock,
-        mock_allow_list_repository: MagicMock,
-    ) -> None:
-        existing = _fragment(scope_type=AppConfigScopeType.USER, scope_id=_USER_ID)
-        updated = _fragment()
-        mock_repository.get_by_id = AsyncMock(return_value=existing)
-        mock_allow_list_repository.search = AsyncMock(return_value=_allow_list_result(1))
-        mock_repository.update = AsyncMock(return_value=updated)
-
-        result = await service.update_my(
-            UpdateMyAppConfigFragmentAction(
-                fragment_id=existing.id, user_id=UserID(_USER_UUID), config={"b": 2}
-            )
-        )
-
-        assert result.fragment == updated
-        mock_repository.update.assert_called_once()
-        called_id, called_spec = mock_repository.update.call_args.args
-        assert called_id == existing.id
-        assert called_spec.build_values() == {"config": {"b": 2}}
-
-    async def test_update_my_clearing_is_empty_config(
-        self,
-        service: AppConfigFragmentService,
-        mock_repository: MagicMock,
-        mock_allow_list_repository: MagicMock,
-    ) -> None:
-        existing = _fragment(scope_type=AppConfigScopeType.USER, scope_id=_USER_ID)
-        mock_repository.get_by_id = AsyncMock(return_value=existing)
-        mock_allow_list_repository.search = AsyncMock(return_value=_allow_list_result(1))
-        mock_repository.update = AsyncMock(return_value=_fragment())
-
-        await service.update_my(
-            UpdateMyAppConfigFragmentAction(
-                fragment_id=existing.id, user_id=UserID(_USER_UUID), config={}
-            )
-        )
-
-        _, called_spec = mock_repository.update.call_args.args
-        assert called_spec.build_values() == {"config": {}}
-
-    async def test_update_my_forbidden_when_not_owner(
-        self,
-        service: AppConfigFragmentService,
-        mock_repository: MagicMock,
-        mock_allow_list_repository: MagicMock,
-    ) -> None:
-        existing = _fragment(scope_type=AppConfigScopeType.USER, scope_id=str(uuid.uuid4()))
-        mock_repository.get_by_id = AsyncMock(return_value=existing)
-        mock_allow_list_repository.search = AsyncMock(return_value=_allow_list_result(1))
-        mock_repository.update = AsyncMock()
-
-        with pytest.raises(AppConfigFragmentForbidden):
-            await service.update_my(
-                UpdateMyAppConfigFragmentAction(
-                    fragment_id=existing.id, user_id=UserID(_USER_UUID), config={"b": 2}
-                )
-            )
-        mock_repository.update.assert_not_called()
-
-    async def test_update_my_forbidden_when_not_user_scope(
-        self,
-        service: AppConfigFragmentService,
-        mock_repository: MagicMock,
-        mock_allow_list_repository: MagicMock,
-    ) -> None:
-        existing = _fragment(scope_type=AppConfigScopeType.PUBLIC, scope_id="public")
-        mock_repository.get_by_id = AsyncMock(return_value=existing)
-        mock_repository.update = AsyncMock()
-
-        with pytest.raises(AppConfigFragmentForbidden):
-            await service.update_my(
-                UpdateMyAppConfigFragmentAction(
-                    fragment_id=existing.id, user_id=UserID(_USER_UUID), config={"b": 2}
                 )
             )
         mock_repository.update.assert_not_called()

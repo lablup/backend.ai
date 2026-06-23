@@ -5,10 +5,7 @@ from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigScopeType as AllowListScopeType,
 )
 from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
-from ai.backend.manager.errors.app_config import (
-    AppConfigFragmentForbidden,
-    AppConfigFragmentWriteNotAllowed,
-)
+from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowed
 from ai.backend.manager.models.app_config_allow_list.conditions import (
     AppConfigAllowListConditions,
 )
@@ -17,9 +14,6 @@ from ai.backend.manager.repositories.app_config_allow_list.repository import (
 )
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
-)
-from ai.backend.manager.repositories.app_config_fragment.updaters import (
-    AppConfigFragmentUpdaterSpec,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.app_config_fragment.actions.create import (
@@ -42,11 +36,6 @@ from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
     UpdateAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.update_my import (
-    UpdateMyAppConfigFragmentAction,
-    UpdateMyAppConfigFragmentActionResult,
-)
-from ai.backend.manager.types import OptionalState
 
 __all__ = ("AppConfigFragmentService",)
 
@@ -121,23 +110,6 @@ class AppConfigFragmentService:
         await self._assert_write_allowed(existing.config_name, existing.scope_type)
         data = await self._repository.update(action.fragment_id, action.updater_spec)
         return UpdateAppConfigFragmentActionResult(fragment=data)
-
-    async def update_my(
-        self, action: UpdateMyAppConfigFragmentAction
-    ) -> UpdateMyAppConfigFragmentActionResult:
-        existing = await self._repository.get_by_id(action.fragment_id)
-        if existing.scope_type is not AppConfigScopeType.USER or existing.scope_id != str(
-            action.user_id
-        ):
-            raise AppConfigFragmentForbidden(
-                f"Fragment {action.fragment_id} is not your own user-scope fragment."
-            )
-        await self._assert_write_allowed(existing.config_name, existing.scope_type)
-        data = await self._repository.update(
-            action.fragment_id,
-            AppConfigFragmentUpdaterSpec(config=OptionalState.update(action.config)),
-        )
-        return UpdateMyAppConfigFragmentActionResult(fragment=data)
 
     async def purge(
         self, action: PurgeAppConfigFragmentAction
