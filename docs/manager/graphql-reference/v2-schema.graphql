@@ -604,6 +604,87 @@ type AllowedResourceGroupsPayload {
   items: [String!]!
 }
 
+"""
+Added in 26.7.0. Permission to write config fragments for one config name at one scope type.
+"""
+type AppConfigAllowList implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The config name this entry permits writes for."""
+  configName: String!
+
+  """Scope type the entry permits writes at (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+
+  """Creation timestamp (UTC)."""
+  createdAt: DateTime!
+
+  """Last update timestamp (UTC)."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.7.0. Paginated connection for app config allow-list records.
+"""
+type AppConfigAllowListConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AppConfigAllowListEdge!]!
+
+  """
+  Total number of app config allow-list records matching the query criteria.
+  """
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AppConfigAllowListEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AppConfigAllowList!
+}
+
+"""
+Added in 26.7.0. Filter input for querying app config allow-list entries.
+"""
+input AppConfigAllowListFilter {
+  """Filter by config name."""
+  configName: StringFilter = null
+
+  """Filter by scope type."""
+  scopeType: AppConfigScopeTypeFilter = null
+
+  """Filter by creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by last update datetime."""
+  updatedAt: DateTimeFilter = null
+}
+
+"""Added in 26.7.0. Specifies ordering for app config allow-list results."""
+input AppConfigAllowListOrderBy {
+  """The field to order by."""
+  field: AppConfigAllowListOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.7.0. Fields available for ordering app config allow-list results.
+"""
+enum AppConfigAllowListOrderField {
+  CONFIG_NAME
+  SCOPE_TYPE
+  CREATED_AT
+  UPDATED_AT
+}
+
 """Added in 26.7.0. A registered app config."""
 type AppConfigDefinition implements Node {
   """The Globally Unique ID of this object"""
@@ -672,6 +753,27 @@ enum AppConfigDefinitionOrderField {
   CONFIG_NAME
   CREATED_AT
   UPDATED_AT
+}
+
+enum AppConfigScopeType {
+  PUBLIC
+  DOMAIN
+  USER
+}
+
+"""Added in 26.7.0. Filter input for the scope_type enum field."""
+input AppConfigScopeTypeFilter {
+  """Exact scope type match."""
+  equals: AppConfigScopeType = null
+
+  """Match any of the provided scope types."""
+  in: [AppConfigScopeType!] = null
+
+  """Exclude exact scope type match."""
+  notEquals: AppConfigScopeType = null
+
+  """Exclude any of the provided scope types."""
+  notIn: [AppConfigScopeType!] = null
 }
 
 """
@@ -2117,6 +2219,23 @@ input CreateAccessTokenInput {
 type CreateAccessTokenPayload {
   """Created access token"""
   accessToken: AccessToken!
+}
+
+"""
+Added in 26.7.0. Input for registering a new app config allow-list entry.
+"""
+input CreateAppConfigAllowListInput {
+  """Registered config name to gate."""
+  configName: String!
+
+  """Scope at which fragments may be written (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+}
+
+"""Added in 26.7.0. Payload for app config allow-list entry creation."""
+type CreateAppConfigAllowListPayload {
+  """Created app config allow-list entry."""
+  appConfigAllowList: AppConfigAllowList!
 }
 
 """Added in 26.7.0. Input for registering a new app config definition."""
@@ -6997,6 +7116,16 @@ type MoveFileV2Payload {
 
 type Mutation {
   """
+  Added in 26.7.0. Register a new app config allow-list entry (super admin only).
+  """
+  adminCreateAppConfigAllowList(input: CreateAppConfigAllowListInput!): CreateAppConfigAllowListPayload
+
+  """
+  Added in 26.7.0. Purge an app config allow-list entry by id (super admin only).
+  """
+  adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload
+
+  """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
   """
   scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload
@@ -9101,6 +9230,18 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
+"""Added in 26.7.0. Input for purging an app config allow-list entry."""
+input PurgeAppConfigAllowListInput {
+  """App config allow-list entry id to purge."""
+  id: UUID!
+}
+
+"""Added in 26.7.0. Payload for app config allow-list entry purge."""
+type PurgeAppConfigAllowListPayload {
+  """UUID of the purged app config allow-list entry."""
+  id: UUID!
+}
+
 """Added in 26.7.0. Input for purging an app config definition."""
 input PurgeAppConfigDefinitionInput {
   """App config definition id to purge."""
@@ -9189,6 +9330,16 @@ type Query {
 
   """Added in 26.1.0. List agents with filtering and pagination"""
   agentsV2(filter: AgentFilter = null, orderBy: [AgentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AgentV2Connection
+
+  """
+  Added in 26.7.0. Get a single app config allow-list entry by id (super admin only).
+  """
+  adminAppConfigAllowList(id: UUID!): AppConfigAllowList
+
+  """
+  Added in 26.7.0. Search app config allow-list entries with filtering, ordering, and pagination (super admin only).
+  """
+  adminAppConfigAllowLists(filter: AppConfigAllowListFilter = null, orderBy: [AppConfigAllowListOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigAllowListConnection
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.

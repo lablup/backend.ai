@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -71,6 +71,13 @@ class AppConfigAllowListConditions:
         return inner
 
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigAllowListRow.config_name))
+
+    @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigAllowListRow.id.in_(ids)
+
+        return inner
 
     # --- scope_type filters ---
 

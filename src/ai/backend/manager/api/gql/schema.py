@@ -15,6 +15,12 @@ from .agent import (
     agent_stats,
     agents_v2,
 )
+from .app_config_allow_list import (
+    admin_app_config_allow_list,
+    admin_app_config_allow_lists,
+    admin_create_app_config_allow_list,
+    admin_purge_app_config_allow_list,
+)
 from .app_config_definition import (
     admin_app_config_definition,
     admin_app_config_definitions,
@@ -466,6 +472,8 @@ from .vfs_storage import (
 class Query:
     agent_stats = agent_stats
     agents_v2 = agents_v2
+    admin_app_config_allow_list = admin_app_config_allow_list
+    admin_app_config_allow_lists = admin_app_config_allow_lists
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
@@ -673,6 +681,8 @@ class Query:
 
 @strawberry.type
 class Mutation:
+    admin_create_app_config_allow_list = admin_create_app_config_allow_list
+    admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts

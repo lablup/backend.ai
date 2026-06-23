@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput,
+    PurgeAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
 )
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
@@ -61,6 +62,6 @@ class V2AppConfigAllowListHandler:
     ) -> APIResponse:
         """Purge an app config allow-list entry by id (superadmin only)."""
         result = await self._adapter.admin_purge(
-            AppConfigAllowListID(path.parsed.app_config_allow_list_id)
+            PurgeAppConfigAllowListInput(id=path.parsed.app_config_allow_list_id)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

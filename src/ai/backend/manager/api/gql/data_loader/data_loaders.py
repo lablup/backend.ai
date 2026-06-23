@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
+from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
@@ -15,6 +16,9 @@ if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.rbac.response import EntityNode  # pants: no-infer-dep
     from ai.backend.manager.api.adapters.registry import Adapters  # pants: no-infer-dep
     from ai.backend.manager.api.gql.agent.types import AgentV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.app_config_allow_list.types import (  # pants: no-infer-dep
+        AppConfigAllowListGQL,
+    )
     from ai.backend.manager.api.gql.app_config_definition.types import (  # pants: no-infer-dep
         AppConfigDefinitionGQL,
     )
@@ -122,6 +126,24 @@ class DataLoaders:
 
     def __init__(self, adapters: Adapters) -> None:
         self._adapters = adapters
+
+    @cached_property
+    def app_config_allow_list_loader(
+        self,
+    ) -> DataLoader[AppConfigAllowListID, AppConfigAllowListGQL | None]:
+        adapter = self._adapters.app_config_allow_list
+
+        async def load_fn(
+            ids: list[AppConfigAllowListID],
+        ) -> list[AppConfigAllowListGQL | None]:
+            from ai.backend.manager.api.gql.app_config_allow_list.types import (  # pants: no-infer-dep
+                AppConfigAllowListGQL as ACL,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [ACL.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
 
     @cached_property
     def app_config_definition_loader(
