@@ -45,6 +45,15 @@ def agent() -> None:
     """Admin agent commands."""
 
 
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.app_config_allow_list:app_config_allow_list",
+    name="app-config-allow-list",
+)
+def app_config_allow_list() -> None:
+    """Admin app config allow-list commands."""
+
+
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.deployment:deployment")
 def deployment() -> None:
     """Admin deployment commands."""
