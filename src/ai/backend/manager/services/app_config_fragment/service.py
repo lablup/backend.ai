@@ -2,18 +2,24 @@ from __future__ import annotations
 
 from typing import cast
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigScopeType as AllowListScopeType,
 )
 from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
 from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowed
+from ai.backend.manager.models.app_config_allow_list.conditions import (
+    AppConfigAllowListConditions,
+)
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
 )
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
+from ai.backend.manager.repositories.base import ExistsQuerier
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
@@ -64,7 +70,17 @@ class AppConfigFragmentService:
 
     async def _ensure_write_allowed(self, config_name: str, scope_type: AppConfigScopeType) -> None:
         allowed = await self._allow_list_repository.exists(
-            config_name, AllowListScopeType(scope_type.value)
+            ExistsQuerier(
+                row_class=AppConfigAllowListRow,
+                conditions=[
+                    AppConfigAllowListConditions.by_config_name_equals(
+                        StringMatchSpec(config_name, case_insensitive=False, negated=False)
+                    ),
+                    AppConfigAllowListConditions.by_scope_type_equals(
+                        AllowListScopeType(scope_type.value)
+                    ),
+                ],
+            )
         )
         if not allowed:
             raise AppConfigFragmentWriteNotAllowed(
