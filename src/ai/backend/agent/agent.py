@@ -632,6 +632,10 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         mount_static_binary("all-smi.1", "/usr/local/share/man/man1/all-smi.1", skip_missing=True)
         mount_static_binary(f"bssh.{arch}.bin", "/usr/local/bin/bssh")
         mount_static_binary("bssh.1", "/usr/local/share/man/man1/bssh.1", skip_missing=True)
+        mount_static_binary(f"bssh-server.{arch}.bin", "/opt/kernel/bssh-server", skip_missing=True)
+        mount_static_binary(
+            "bssh-server.1", "/usr/local/share/man/man1/bssh-server.1", skip_missing=True
+        )
 
         jail_path: Path | None
         if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:
