@@ -37,6 +37,7 @@ from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
 
 from ai.backend.common.meta import BackendAIGQLMeta
+from ai.backend.manager.api.gql.directives import Public
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
     PydanticNodeMixin,
@@ -262,12 +263,18 @@ def gql_root_field(
     name: str | None = None,
     deprecation_reason: str | None = None,
     directives: Sequence[object] = (),
+    public: bool = False,
 ) -> Any:
     """Root query/subscription field on the Query type (always has its own version).
 
     Use for top-level fields on the Query type that are independently versioned.
     ``directives`` forwards schema directives (e.g. federation ``@override``) onto the field.
+    Set ``public=True`` to mark the field accessible without authentication via the public
+    GraphQL endpoint; only do so for resolvers that are safe to run without an authenticated
+    user. See ``api.gql.directives.Public``.
     """
+    if public:
+        directives = (*directives, Public())
     return strawberry.field(
         description=_build_description(meta),
         name=name,

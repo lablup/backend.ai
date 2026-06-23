@@ -1,0 +1,1 @@
+Add an unauthenticated public GraphQL endpoint (`POST /admin/gql/strawberry/public`). Anonymous callers may only access root `Query` fields marked with the new `@public` schema directive; all other queries and every mutation/subscription are rejected. Existing authenticated GraphQL endpoints are unchanged.
