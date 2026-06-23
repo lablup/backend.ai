@@ -116,6 +116,7 @@ error (e.g. `runtime not found`, mount failure).**
 | 9 | GPU passthrough | accelerator plugin injects `Devices`/env | Create with GPU resource slot | GPU visible in kernel (likely needs VFIO setup ⇒ ⚠️/❌) |
 | 10 | RDMA / hugepage | `/dev/infiniband` device, `IPC_LOCK`, `memlock` ulimit (`agent.py:717,1201`) | Create on RDMA-capable host | Device present & usable |
 | 11 | shmem (`/dev/shm`) | `ShmSize` (`agent.py:1244`) | Create with `shmem` resource_opt; check `/dev/shm` | tmpfs sized correctly inside VM |
+| 12 | vfolder / NFS-backed mount | vfolder host bind: `Path(host_path) → kernel_path` (`agent.py:559-565`) — same bind mechanism as scratch #2 | Mount an NFS-backed vfolder; inside kernel `ls`, read/write a file, `mount` to confirm the path | Vfolder visible & R/W inside VM; an NFS-backed host path passes through the bind → virtio-fs hop with byte-exact data (note any locking/attr-cache caveats) |
 
 > If the test host has no GPU/RDMA, mark #9–#10 **Not tested** with the reason,
 > rather than guessing.
@@ -126,9 +127,9 @@ error (e.g. `runtime not found`, mount failure).**
 
 | # | Item | BA mechanism | How to test | Pass criteria |
 |---|------|-------------|-------------|---------------|
-| 12 | Port binding / service port | `PortBindings` host↔container (`agent.py:1196`) | Inspect published ports; reach a service port | Port mapping works through VM network |
-| 13 | App Proxy access | wsproxy/appproxy → kernel service port | Open an app (e.g. Jupyter) via proxy | App reachable end-to-end (depends on #12) |
-| 14 | Overlay networking | multi-node cluster network | Multi-node session (if available) | Inter-node connectivity (single-node ⇒ defer) |
+| 13 | Port binding / service port | `PortBindings` host↔container (`agent.py:1196`) | Inspect published ports; reach a service port | Port mapping works through VM network |
+| 14 | App Proxy access | wsproxy/appproxy → kernel service port | Open an app (e.g. Jupyter) via proxy | App reachable end-to-end (depends on #13) |
+| 15 | Overlay networking | multi-node cluster network | Multi-node session (if available) | Inter-node connectivity (single-node ⇒ defer) |
 
 ---
 
@@ -136,8 +137,8 @@ error (e.g. `runtime not found`, mount failure).**
 
 | # | Item | BA mechanism | How to test | Pass criteria |
 |---|------|-------------|-------------|---------------|
-| 15 | JAIL sandbox mode | `seccomp=unconfined`, `apparmor=unconfined`, `SYS_PTRACE` (`agent.py:1227-1236`) | Set `container.sandbox_type = JAIL`, create kernel | Kernel starts & sandbox functions under Kata |
-| 16 | seccomp profile | `_apply_seccomp_profile` (`agent.py:1053,1222`) | Default sandbox create | Profile applied without breaking the VM |
+| 16 | JAIL sandbox mode | `seccomp=unconfined`, `apparmor=unconfined`, `SYS_PTRACE` (`agent.py:1227-1236`) | Set `container.sandbox_type = JAIL`, create kernel | Kernel starts & sandbox functions under Kata |
+| 17 | seccomp profile | `_apply_seccomp_profile` (`agent.py:1053,1222`) | Default sandbox create | Profile applied without breaking the VM |
 
 ---
 
@@ -159,11 +160,12 @@ Classify each item: ✅ Fully / ⚠️ Partial (note required config) / ❌ Unsu
 | 9 | GPU passthrough | ➖ | No GPU on the Vultr bare-metal host | Not tested — requires GPU + VFIO setup under Kata |
 | 10 | RDMA / hugepage | ➖ | No `/dev/infiniband` on the host | Not tested — requires RDMA-capable host |
 | 11 | shmem | | | |
-| 12 | Port binding | ✅ | jupyter service port reached end-to-end through proxy chain (coordinator:10200 → worker:10201 → app:10240) | Service port traverses Kata VM network with no extra config |
-| 13 | App Proxy | ✅ | `start-service` → `/v2/proxy/auth` → worker `/setup` (cookie) → Jupyter Notebook 7.3.3 returned `200 OK` + full HTML | wsproxy/appproxy end-to-end works; `rootUri=file:///home/work` confirms VM scratch mount |
-| 14 | Overlay networking | | | |
-| 15 | JAIL sandbox | | | |
-| 16 | seccomp profile | | | |
+| 12 | vfolder / NFS-backed mount | ✅ | Session created with an NFS-backed vfolder mounted; the mount is visible in the kernel and read + write both succeed inside the Kata guest | NFS host_path bind → virtio-fs passthrough into the VM works with no extra config (pending: capture guest `mount` type = virtiofs and host `df -T` = nfs4 to finalize evidence) |
+| 13 | Port binding | ✅ | jupyter service port reached end-to-end through proxy chain (coordinator:10200 → worker:10201 → app:10240) | Service port traverses Kata VM network with no extra config |
+| 14 | App Proxy | ✅ | `start-service` → `/v2/proxy/auth` → worker `/setup` (cookie) → Jupyter Notebook 7.3.3 returned `200 OK` + full HTML | wsproxy/appproxy end-to-end works; `rootUri=file:///home/work` confirms VM scratch mount |
+| 15 | Overlay networking | | | |
+| 16 | JAIL sandbox | | | |
+| 17 | seccomp profile | | | |
 
 Summarize the filled table into the BA-6541 findings (fully / partially /
 unsupported under Kata).
