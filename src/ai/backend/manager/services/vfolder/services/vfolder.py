@@ -582,13 +582,13 @@ class VFolderService:
         user_role, user_domain_name = user_info
 
         # When scoped to a project (i.e. the request carried a `group_id`),
-        # restrict group-owned vfolders to that project. Without this, the
+        # restrict project-owned vfolders to that project. Without this, the
         # listing returns the full accessible union (every MODEL_STORE project,
         # and every domain project for admins) regardless of the scope, which
         # made the REST `group_id` query parameter a no-op.
-        group_scope_id: UUID | None = None
+        project_id: UUID | None = None
         if action.scope_type() == ScopeType.PROJECT:
-            group_scope_id = UUID(action.scope_id())
+            project_id = UUID(action.scope_id())
 
         # Use repository to get accessible vfolders
         vfolder_list_result = await self._vfolder_repository.list_accessible_vfolders(
@@ -596,7 +596,7 @@ class VFolderService:
             user_role=user_role,
             domain_name=user_domain_name,
             allowed_vfolder_types=list(allowed_vfolder_types),
-            group_scope_id=group_scope_id,
+            project_id=project_id,
         )
 
         vfolders = [
