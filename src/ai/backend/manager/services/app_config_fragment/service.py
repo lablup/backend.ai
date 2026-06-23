@@ -2,23 +2,18 @@ from __future__ import annotations
 
 from typing import cast
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigScopeType as AllowListScopeType,
 )
 from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
 from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowed
-from ai.backend.manager.models.app_config_allow_list.conditions import (
-    AppConfigAllowListConditions,
-)
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
 )
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
@@ -48,7 +43,7 @@ __all__ = ("AppConfigFragmentService",)
 
 
 class AppConfigFragmentService:
-    """Admin and self-service write paths for app config fragments.
+    """Admin write paths for app config fragments.
 
     Every write passes the allow-list write-gate: a fragment may only be written when an
     ``app_config_allow_list`` row exists for its ``(config_name, scope_type)``. Because an
@@ -67,21 +62,11 @@ class AppConfigFragmentService:
         self._repository = repository
         self._allow_list_repository = allow_list_repository
 
-    async def _assert_write_allowed(self, config_name: str, scope_type: AppConfigScopeType) -> None:
-        result = await self._allow_list_repository.search(
-            BatchQuerier(
-                pagination=OffsetPagination(limit=1, offset=0),
-                conditions=[
-                    AppConfigAllowListConditions.by_config_name_equals(
-                        StringMatchSpec(config_name, case_insensitive=False, negated=False)
-                    ),
-                    AppConfigAllowListConditions.by_scope_type_equals(
-                        AllowListScopeType(scope_type.value)
-                    ),
-                ],
-            )
+    async def _ensure_write_allowed(self, config_name: str, scope_type: AppConfigScopeType) -> None:
+        allowed = await self._allow_list_repository.exists(
+            config_name, AllowListScopeType(scope_type.value)
         )
-        if result.total_count == 0:
+        if not allowed:
             raise AppConfigFragmentWriteNotAllowed(
                 f"Writing app config {config_name!r} at scope {scope_type.value!r} is not allowed."
             )
@@ -89,7 +74,7 @@ class AppConfigFragmentService:
     async def create(
         self, action: CreateAppConfigFragmentAction
     ) -> CreateAppConfigFragmentActionResult:
-        await self._assert_write_allowed(
+        await self._ensure_write_allowed(
             action.creator_spec.config_name, action.creator_spec.scope_type
         )
         data = await self._repository.create(action.creator_spec)
@@ -130,7 +115,7 @@ class AppConfigFragmentService:
         existing = await self._repository.get_by_id(
             cast(AppConfigFragmentID, action.updater.pk_value)
         )
-        await self._assert_write_allowed(existing.config_name, existing.scope_type)
+        await self._ensure_write_allowed(existing.config_name, existing.scope_type)
         data = await self._repository.update(action.updater)
         return UpdateAppConfigFragmentActionResult(fragment=data)
 

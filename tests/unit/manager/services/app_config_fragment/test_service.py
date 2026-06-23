@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListSearchResult
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
@@ -83,15 +82,6 @@ def _fragment(
     )
 
 
-def _allow_list_result(total_count: int) -> AppConfigAllowListSearchResult:
-    return AppConfigAllowListSearchResult(
-        items=[],
-        total_count=total_count,
-        has_next_page=False,
-        has_previous_page=False,
-    )
-
-
 class TestAppConfigFragmentService:
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
@@ -119,7 +109,7 @@ class TestAppConfigFragmentService:
         mock_allow_list_repository: MagicMock,
     ) -> None:
         fragment = _fragment()
-        mock_allow_list_repository.search = AsyncMock(return_value=_allow_list_result(1))
+        mock_allow_list_repository.exists = AsyncMock(return_value=True)
         mock_repository.create = AsyncMock(return_value=fragment)
         spec = AppConfigFragmentCreatorSpec(
             config_name="theme",
@@ -139,7 +129,7 @@ class TestAppConfigFragmentService:
         mock_repository: MagicMock,
         mock_allow_list_repository: MagicMock,
     ) -> None:
-        mock_allow_list_repository.search = AsyncMock(return_value=_allow_list_result(0))
+        mock_allow_list_repository.exists = AsyncMock(return_value=False)
         mock_repository.create = AsyncMock()
         spec = AppConfigFragmentCreatorSpec(
             config_name="theme",
@@ -232,7 +222,7 @@ class TestAppConfigFragmentService:
         existing = _fragment()
         updated = _fragment()
         mock_repository.get_by_id = AsyncMock(return_value=existing)
-        mock_allow_list_repository.search = AsyncMock(return_value=_allow_list_result(1))
+        mock_allow_list_repository.exists = AsyncMock(return_value=True)
         mock_repository.update = AsyncMock(return_value=updated)
         updater = Updater(
             spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
@@ -252,7 +242,7 @@ class TestAppConfigFragmentService:
     ) -> None:
         existing = _fragment()
         mock_repository.get_by_id = AsyncMock(return_value=existing)
-        mock_allow_list_repository.search = AsyncMock(return_value=_allow_list_result(0))
+        mock_allow_list_repository.exists = AsyncMock(return_value=False)
         mock_repository.update = AsyncMock()
 
         with pytest.raises(AppConfigFragmentWriteNotAllowed):
