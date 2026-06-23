@@ -3,6 +3,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy import exc as sa_exc
@@ -415,9 +416,13 @@ class VfolderRepository:
         domain_name: str,
         allowed_vfolder_types: list[str],
         extra_conditions: sa.sql.elements.ColumnElement[bool] | None = None,
+        group_scope_id: UUID | None = None,
     ) -> VFolderListResult:
         """
         List all VFolders accessible to a user.
+
+        When ``group_scope_id`` is given, group-owned vfolders are restricted to
+        that project; user-owned and invited vfolders are unaffected.
         Returns VFolderListResult with access information.
         """
         async with self._db.begin_readonly_session() as session:
@@ -429,6 +434,9 @@ class VfolderRepository:
                 domain_name=domain_name,
                 allowed_vfolder_types=allowed_vfolder_types,
                 extra_vf_conds=extra_conditions,
+                extra_vf_group_conds=(
+                    (VFolderRow.group == group_scope_id) if group_scope_id is not None else None
+                ),
             )
 
             vfolder_access_infos = []
