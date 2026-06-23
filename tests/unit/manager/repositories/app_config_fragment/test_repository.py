@@ -66,7 +66,7 @@ async def theme_registered(database: ExtendedAsyncSAEngine) -> None:
 
 
 @pytest.fixture
-async def existing_fragment(database: ExtendedAsyncSAEngine) -> AppConfigFragmentData:
+async def domain_scoped_fragment(database: ExtendedAsyncSAEngine) -> AppConfigFragmentData:
     """Situation: a single pre-existing ``theme``/domain fragment."""
     async with database.begin_session() as db_sess:
         db_sess.add(AppConfigDefinitionRow(config_name="theme"))
@@ -84,7 +84,7 @@ async def existing_fragment(database: ExtendedAsyncSAEngine) -> AppConfigFragmen
 
 
 @pytest.fixture
-async def seeded_fragments(database: ExtendedAsyncSAEngine) -> list[AppConfigFragmentData]:
+async def fragments_across_scopes(database: ExtendedAsyncSAEngine) -> list[AppConfigFragmentData]:
     """Situation: fragments across every scope_type, two domains, two users, two config_names.
 
     Returned in creation order so search filters and rank ordering can derive their
@@ -170,14 +170,14 @@ class TestCreateAndGet:
     async def test_unique_constraint_violation(
         self,
         repository: AppConfigFragmentRepository,
-        existing_fragment: AppConfigFragmentData,
+        domain_scoped_fragment: AppConfigFragmentData,
     ) -> None:
         with pytest.raises(UniqueConstraintViolationError):
             await repository.create(
                 AppConfigFragmentCreatorSpec(
-                    config_name=existing_fragment.config_name,
-                    scope_type=existing_fragment.scope_type,
-                    scope_id=existing_fragment.scope_id,
+                    config_name=domain_scoped_fragment.config_name,
+                    scope_type=domain_scoped_fragment.scope_type,
+                    scope_id=domain_scoped_fragment.scope_id,
                     config={"k": "v"},
                 )
             )
@@ -218,16 +218,16 @@ class TestUpdate:
     async def test_update_replaces_config(
         self,
         repository: AppConfigFragmentRepository,
-        existing_fragment: AppConfigFragmentData,
+        domain_scoped_fragment: AppConfigFragmentData,
     ) -> None:
         updated = await repository.update(
             Updater(
                 spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
-                pk_value=existing_fragment.id,
+                pk_value=domain_scoped_fragment.id,
             )
         )
         assert updated.config == {"b": 2}
-        assert (await repository.get_by_id(existing_fragment.id)).config == {"b": 2}
+        assert (await repository.get_by_id(domain_scoped_fragment.id)).config == {"b": 2}
 
     async def test_update_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
         with pytest.raises(AppConfigFragmentNotFound):
@@ -243,14 +243,14 @@ class TestPurge:
     async def test_purge_removes_row(
         self,
         repository: AppConfigFragmentRepository,
-        existing_fragment: AppConfigFragmentData,
+        domain_scoped_fragment: AppConfigFragmentData,
     ) -> None:
         purged = await repository.purge(
-            Purger(row_class=AppConfigFragmentRow, pk_value=existing_fragment.id)
+            Purger(row_class=AppConfigFragmentRow, pk_value=domain_scoped_fragment.id)
         )
-        assert purged.id == existing_fragment.id
+        assert purged.id == domain_scoped_fragment.id
         with pytest.raises(AppConfigFragmentNotFound):
-            await repository.get_by_id(existing_fragment.id)
+            await repository.get_by_id(domain_scoped_fragment.id)
 
     async def test_purge_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
         with pytest.raises(AppConfigFragmentNotFound):
@@ -263,19 +263,19 @@ class TestSearch:
     async def test_search_returns_all_and_paginates(
         self,
         repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         result = await repository.admin_search(
             BatchQuerier(pagination=OffsetPagination(limit=2, offset=0))
         )
-        assert result.total_count == len(seeded_fragments)
+        assert result.total_count == len(fragments_across_scopes)
         assert len(result.items) == 2
         assert result.has_next_page is True
 
     async def test_filter_by_scope_type(
         self,
         repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         result = await repository.admin_search(
             BatchQuerier(
@@ -285,13 +285,15 @@ class TestSearch:
                 ],
             )
         )
-        expected = {f.id for f in seeded_fragments if f.scope_type is AppConfigScopeType.DOMAIN}
+        expected = {
+            f.id for f in fragments_across_scopes if f.scope_type is AppConfigScopeType.DOMAIN
+        }
         assert {item.id for item in result.items} == expected
 
     async def test_filter_by_scope_id(
         self,
         repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         result = await repository.admin_search(
             BatchQuerier(
@@ -299,16 +301,16 @@ class TestSearch:
                 conditions=[AppConfigFragmentConditions.by_scope_id_equals(_USER_ID)],
             )
         )
-        expected = {f.id for f in seeded_fragments if f.scope_id == _USER_ID}
+        expected = {f.id for f in fragments_across_scopes if f.scope_id == _USER_ID}
         assert {item.id for item in result.items} == expected
 
     async def test_order_by_rank_desc(
         self,
         repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         # Rank is monotonic per config_name, so scope to one config_name for a total order.
-        theme_fragments = [f for f in seeded_fragments if f.config_name == "theme"]
+        theme_fragments = [f for f in fragments_across_scopes if f.config_name == "theme"]
         result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
@@ -328,13 +330,13 @@ class TestScopedSearch:
     async def test_scoped_search_returns_only_that_config_name(
         self,
         repository: AppConfigFragmentRepository,
-        seeded_fragments: list[AppConfigFragmentData],
+        fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
             [ConfigNameSearchScope(config_name="theme")],
         )
-        expected = {f.id for f in seeded_fragments if f.config_name == "theme"}
+        expected = {f.id for f in fragments_across_scopes if f.config_name == "theme"}
         assert {item.id for item in result.items} == expected
         assert result.total_count == len(expected)
 
