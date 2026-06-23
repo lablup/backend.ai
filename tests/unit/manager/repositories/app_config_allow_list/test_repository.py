@@ -24,6 +24,9 @@ from ai.backend.manager.models.app_config_allow_list.conditions import (
 from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllowListOrders
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
     AppConfigAllowListCreatorSpec,
@@ -54,7 +57,11 @@ async def database(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     # FK order: app_config_definitions (parent) before app_config_allow_list (child).
-    async with with_tables(database_connection, [AppConfigDefinitionRow, AppConfigAllowListRow]):
+    # AssociationScopesEntitiesRow: definition create registers it as an RBAC object.
+    async with with_tables(
+        database_connection,
+        [AppConfigDefinitionRow, AppConfigAllowListRow, AssociationScopesEntitiesRow],
+    ):
         yield database_connection
 
 
