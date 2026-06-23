@@ -18,7 +18,6 @@ from ai.backend.manager.repositories.app_config_allow_list.repository import (
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import ConfigNameSearchScope
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
@@ -114,14 +113,15 @@ class AppConfigFragmentService:
     async def scoped_search(
         self, action: ScopedSearchAppConfigFragmentAction
     ) -> ScopedSearchAppConfigFragmentActionResult:
-        result = await self._repository.scoped_search(
-            action.querier, [ConfigNameSearchScope(config_name=action.config_name)]
-        )
+        targets = list(action.targets())
+        scopes = [t.to_search_scope() for t in targets]
+        result = await self._repository.scoped_search(action.querier, scopes)
         return ScopedSearchAppConfigFragmentActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            queried_refs=[t.to_rbac_element_ref() for t in targets],
         )
 
     async def update(

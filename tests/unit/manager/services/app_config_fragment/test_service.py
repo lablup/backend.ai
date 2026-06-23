@@ -51,6 +51,7 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
+    ConfigNameTarget,
     ScopedSearchAppConfigFragmentAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.update import (
@@ -208,10 +209,13 @@ class TestAppConfigFragmentService:
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
 
         result = await service.scoped_search(
-            ScopedSearchAppConfigFragmentAction(config_name="theme", querier=querier)
+            ScopedSearchAppConfigFragmentAction(
+                items=[ConfigNameTarget(config_name="theme")], querier=querier
+            )
         )
 
         assert result.data == [fragment]
+        assert [ref.element_id for ref in result.queried_refs] == ["theme"]
         mock_repository.scoped_search.assert_called_once()
         called_querier, called_scopes = mock_repository.scoped_search.call_args.args
         assert called_querier is querier
