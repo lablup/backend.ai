@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
@@ -19,6 +24,25 @@ from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigFragmentRepository",)
 
+app_config_fragment_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(
+                domain=DomainType.REPOSITORY,
+                layer=LayerType.APP_CONFIG_FRAGMENT_REPOSITORY,
+            )
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
+
 
 class AppConfigFragmentRepository:
     """Access to app config fragments."""
@@ -28,21 +52,27 @@ class AppConfigFragmentRepository:
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._db_source = AppConfigFragmentDBSource(ops_provider)
 
+    @app_config_fragment_repository_resilience.apply()
     async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
         return await self._db_source.create(spec)
 
+    @app_config_fragment_repository_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
         return await self._db_source.get_by_id(fragment_id)
 
+    @app_config_fragment_repository_resilience.apply()
     async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
         return await self._db_source.update(updater)
 
+    @app_config_fragment_repository_resilience.apply()
     async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
         return await self._db_source.purge(purger)
 
+    @app_config_fragment_repository_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
         return await self._db_source.admin_search(querier)
 
+    @app_config_fragment_repository_resilience.apply()
     async def scoped_search(
         self, querier: BatchQuerier, scopes: Sequence[SearchScope]
     ) -> AppConfigFragmentSearchResult:
