@@ -161,6 +161,8 @@ class DataLoaders:
             dtos = await adapter.batch_load_by_ids(ids)
             return [ACD.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
+        return DataLoader(load_fn=load_fn)
+
     @cached_property
     def audit_log_loader(
         self,
