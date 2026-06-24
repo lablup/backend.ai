@@ -10,13 +10,12 @@ import pytest
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
-from ai.backend.manager.errors.app_config import (
-    AppConfigDefinitionNotFound,
-    AppConfigFragmentNotFound,
-)
+from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
@@ -29,7 +28,10 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import ConfigNameSearchScope
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    DomainAppConfigFragmentSearchScope,
+    UserAppConfigFragmentSearchScope,
+)
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
 )
@@ -38,8 +40,10 @@ from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
-_DOMAIN_ID = str(uuid.uuid4())
-_USER_ID = str(uuid.uuid4())
+_DOMAIN_UUID = uuid.uuid4()
+_USER_UUID = uuid.uuid4()
+_DOMAIN_ID = str(_DOMAIN_UUID)
+_USER_ID = str(_USER_UUID)
 _OTHER_USER_ID = str(uuid.uuid4())
 
 
@@ -327,24 +331,66 @@ class TestSearch:
 
 
 class TestScopedSearch:
-    async def test_scoped_search_returns_only_that_config_name(
+    async def test_domain_scope_returns_only_that_domain(
         self,
         repository: AppConfigFragmentRepository,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [ConfigNameSearchScope(config_name="theme")],
+            [DomainAppConfigFragmentSearchScope(domain_id=DomainID(_DOMAIN_UUID))],
         )
-        expected = {f.id for f in fragments_across_scopes if f.config_name == "theme"}
+        # Only domain-scoped fragments of that domain — not the other domain, public, or users.
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID
+        }
         assert {item.id for item in result.items} == expected
         assert result.total_count == len(expected)
 
-    async def test_scoped_search_unregistered_config_name_raises(
+    async def test_user_scope_returns_only_that_user(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        result = await repository.scoped_search(
+            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+            [UserAppConfigFragmentSearchScope(user_id=UserID(_USER_UUID))],
+        )
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID
+        }
+        assert {item.id for item in result.items} == expected
+
+    async def test_scopes_or_combined_across_domain_and_user(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        result = await repository.scoped_search(
+            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+            [
+                DomainAppConfigFragmentSearchScope(domain_id=DomainID(_DOMAIN_UUID)),
+                UserAppConfigFragmentSearchScope(user_id=UserID(_USER_UUID)),
+            ],
+        )
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
+            or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+        }
+        assert {item.id for item in result.items} == expected
+
+    async def test_scoped_search_unknown_scope_returns_empty(
         self, repository: AppConfigFragmentRepository
     ) -> None:
-        with pytest.raises(AppConfigDefinitionNotFound):
-            await repository.scoped_search(
-                BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-                [ConfigNameSearchScope(config_name="unregistered")],
-            )
+        # Unconditional (no existence check): an unknown scope yields no rows, not an error.
+        result = await repository.scoped_search(
+            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+            [DomainAppConfigFragmentSearchScope(domain_id=DomainID(uuid.uuid4()))],
+        )
+        assert result.items == []

@@ -7,36 +7,54 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.app_config_fragment.types import ConfigNameSearchScope
-from ai.backend.manager.repositories.base import BatchQuerier, SearchScope
+from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    DomainAppConfigFragmentSearchScope,
+    UserAppConfigFragmentSearchScope,
+)
+from ai.backend.manager.repositories.base import BatchQuerier
 
 
 @dataclass(frozen=True)
-class ConfigNameTarget(SearchableActionTarget):
-    """Scope item keyed by a single ``config_name`` — all of its fragments."""
+class DomainAppConfigFragmentTarget(SearchableActionTarget):
+    """Scope item keyed by a domain — the fragments written at that domain scope."""
 
-    config_name: str
+    domain_id: DomainID
 
     @override
     def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.APP_CONFIG_FRAGMENT,
-            element_id=self.config_name,
-        )
+        return RBACElementRef(element_type=RBACElementType.DOMAIN, element_id=str(self.domain_id))
 
     @override
     def to_search_scope(self) -> SearchScope:
-        return ConfigNameSearchScope(config_name=self.config_name)
+        return DomainAppConfigFragmentSearchScope(domain_id=self.domain_id)
+
+
+@dataclass(frozen=True)
+class UserAppConfigFragmentTarget(SearchableActionTarget):
+    """Scope item keyed by a user — the fragments written at that user scope."""
+
+    user_id: UserID
+
+    @override
+    def to_rbac_element_ref(self) -> RBACElementRef:
+        return RBACElementRef(element_type=RBACElementType.USER, element_id=str(self.user_id))
+
+    @override
+    def to_search_scope(self) -> SearchScope:
+        return UserAppConfigFragmentSearchScope(user_id=self.user_id)
 
 
 @dataclass
 class ScopedSearchAppConfigFragmentAction(BaseBulkAction[SearchableActionTarget]):
-    """Scoped path: search the fragments of the given ``config_name`` targets."""
+    """Scoped path: search the fragments under the given domain/user scope targets."""
 
     items: list[SearchableActionTarget]
     querier: BatchQuerier

@@ -8,7 +8,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
@@ -50,8 +53,9 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
-    ConfigNameTarget,
+    DomainAppConfigFragmentTarget,
     ScopedSearchAppConfigFragmentAction,
+    UserAppConfigFragmentTarget,
 )
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
@@ -184,7 +188,7 @@ class TestAppConfigFragmentService:
         assert result.total_count == 1
         mock_repository.admin_search.assert_called_once_with(querier)
 
-    async def test_scoped_search_builds_config_name_scope(
+    async def test_scoped_search_builds_domain_and_user_scopes(
         self, service: AppConfigFragmentService, mock_repository: MagicMock
     ) -> None:
         fragment = _fragment(config_name="theme")
@@ -197,19 +201,26 @@ class TestAppConfigFragmentService:
             )
         )
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
+        domain_id = DomainID(uuid.uuid4())
 
         result = await service.scoped_search(
             ScopedSearchAppConfigFragmentAction(
-                items=[ConfigNameTarget(config_name="theme")], querier=querier
+                items=[
+                    DomainAppConfigFragmentTarget(domain_id=domain_id),
+                    UserAppConfigFragmentTarget(user_id=UserID(_USER_UUID)),
+                ],
+                querier=querier,
             )
         )
 
         assert result.data == [fragment]
-        assert [ref.element_id for ref in result.queried_refs] == ["theme"]
+        # queried_refs preserve the scoped principals (domain, then user).
+        assert [ref.element_id for ref in result.queried_refs] == [str(domain_id), _USER_ID]
         mock_repository.scoped_search.assert_called_once()
         called_querier, called_scopes = mock_repository.scoped_search.call_args.args
         assert called_querier is querier
-        assert [s.config_name for s in called_scopes] == ["theme"]
+        assert called_scopes[0].domain_id == domain_id
+        assert called_scopes[1].user_id == _USER_UUID
 
     # --- admin update ---
 
@@ -269,3 +280,33 @@ class TestAppConfigFragmentService:
 
         assert result.fragment == fragment
         mock_repository.purge.assert_called_once_with(purger)
+
+
+class TestCreateActionScope:
+    """The create action acts at the fragment's own scope — not admin-only/global."""
+
+    @pytest.mark.parametrize(
+        ("scope_type", "scope_id", "expected_scope_type", "expected_scope_id"),
+        [
+            (AppConfigScopeType.PUBLIC, "public", ScopeType.GLOBAL, ""),
+            (AppConfigScopeType.DOMAIN, "default", ScopeType.DOMAIN, "default"),
+            (AppConfigScopeType.USER, _USER_ID, ScopeType.USER, _USER_ID),
+        ],
+    )
+    def test_scope_follows_fragment_scope(
+        self,
+        scope_type: AppConfigScopeType,
+        scope_id: str,
+        expected_scope_type: ScopeType,
+        expected_scope_id: str,
+    ) -> None:
+        action = CreateAppConfigFragmentAction(
+            creator_spec=AppConfigFragmentCreatorSpec(
+                config_name="theme",
+                scope_type=scope_type,
+                scope_id=scope_id,
+                config={"k": "v"},
+            )
+        )
+        assert action.scope_type() == expected_scope_type
+        assert action.scope_id() == expected_scope_id
