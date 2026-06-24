@@ -62,6 +62,7 @@ class OrchestrationInput:
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
     replica_group_repository: ReplicaGroupRepository
+    idle_checker_repository: IdleCheckerRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     agent_client_pool: AgentClientPool
@@ -138,7 +139,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             scheduler_repository=setup_input.scheduler_repository,
             deployment_repository=setup_input.deployment_repository,
             replica_group_repository=setup_input.replica_group_repository,
-            idle_checker_repository=IdleCheckerRepository(setup_input.db),
+            idle_checker_repository=setup_input.idle_checker_repository,
             fair_share_repository=setup_input.fair_share_repository,
             resource_usage_repository=setup_input.resource_usage_repository,
             config_provider=setup_input.config_provider,

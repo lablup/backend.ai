@@ -267,6 +267,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 scheduler_repository=domain.repositories.scheduler.repository,
                 deployment_repository=domain.repositories.deployment.repository,
                 replica_group_repository=domain.repositories.replica_group.repository,
+                idle_checker_repository=domain.repositories.idle_checker.repository,
                 fair_share_repository=domain.repositories.fair_share.repository,
                 resource_usage_repository=domain.repositories.resource_usage_history.repository,
                 agent_client_pool=agents.agent_client_pool,

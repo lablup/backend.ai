@@ -59,6 +59,9 @@ class IdleCheckerDBSource:
             .join(ScalingGroupRow, SessionRow.scaling_group_name == ScalingGroupRow.name)
             .where(
                 sa.and_(
+                    # The caller (idle-check stage) owns which statuses are idle-check targets;
+                    # today that is RUNNING only. Kept as a parameter so the policy stays in the
+                    # stage's target_statuses rather than baked into this read.
                     SessionRow.status.in_(session_statuses),
                     SessionRow.session_type != SessionTypes.INFERENCE,
                     self._enabled_binding_exists_query(),
