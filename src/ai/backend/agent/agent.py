@@ -658,8 +658,11 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             terminfo_path = self.resolve_krunner_filepath("runner/terminfo.alpine3.8")
             _mount(MountTypes.BIND, terminfo_path, "/home/work/.terminfo")
 
+        setup_dist_environ_path = self.resolve_krunner_filepath("runner/setup_dist_environ.sh")
+
         _mount(MountTypes.BIND, dotfile_extractor_path, "/opt/kernel/extract_dotfiles.py")
         _mount(MountTypes.BIND, entrypoint_sh_path, "/opt/kernel/entrypoint.sh")
+        _mount(MountTypes.BIND, setup_dist_environ_path, "/opt/kernel/setup_dist_environ.sh")
         _mount(MountTypes.BIND, fantompass_path, "/opt/kernel/fantompass.py")
         _mount(MountTypes.BIND, hash_phrase_path, "/opt/kernel/hash_phrase.py")
         _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")

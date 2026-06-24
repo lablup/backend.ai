@@ -49,6 +49,13 @@ if [ $USER_ID -eq 0 ]; then
     fi
   fi
 
+  # Set up distributed training environment variables from BACKENDAI_* cluster vars.
+  if [ -f /opt/kernel/setup_dist_environ.sh ]; then
+    . /opt/kernel/setup_dist_environ.sh
+  else
+    echo "WARNING: /opt/kernel/setup_dist_environ.sh not found; distributed training environment variables were not initialized."
+  fi
+
   # Extract dotfiles
   /opt/backend.ai/bin/python -s /opt/kernel/extract_dotfiles.py
 
@@ -129,6 +136,13 @@ else
     else
       echo 'WARNING: /opt/container/bootstrap.sh exists but is not executable; bootstrap.sh execution was skipped.'
     fi
+  fi
+
+  # Set up distributed training environment variables from BACKENDAI_* cluster vars.
+  if [ -f /opt/kernel/setup_dist_environ.sh ]; then
+    . /opt/kernel/setup_dist_environ.sh
+  else
+    echo "WARNING: /opt/kernel/setup_dist_environ.sh not found; distributed training environment variables were not initialized."
   fi
 
   # Correct the ownership of agent socket.
