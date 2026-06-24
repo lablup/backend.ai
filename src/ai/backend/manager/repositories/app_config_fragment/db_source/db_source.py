@@ -23,10 +23,14 @@ from ai.backend.manager.errors.app_config import (
     AppConfigFragmentWriteNotAllowed,
 )
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
+from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
+)
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    AppConfigResolveScope,
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -35,6 +39,7 @@ from ai.backend.manager.repositories.base import (
     BulkConditionalUpdater,
     Creator,
     ExistsQuerier,
+    NoPagination,
     Purger,
     Querier,
     Updater,
@@ -245,3 +250,26 @@ class AppConfigFragmentDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def list_visible_fragments(
+        self, config_name: str, scope: AppConfigResolveScope
+    ) -> list[AppConfigFragmentData]:
+        """Fragments visible to ``scope`` for ``config_name``, ``rank``-ordered, in one query.
+
+        Filters on the fragment's own ``scope_type``/``scope_id`` columns: the public OR the
+        scope's domain OR the scope's user fragment. Each ``(config_name, scope_type,
+        scope_id)`` is unique, so the result is bounded (one per scope_type), ready to
+        deep-merge in order.
+        """
+        public = AppConfigFragmentConditions.by_public_visibility(config_name)
+        domain = AppConfigFragmentConditions.by_domain_visibility(config_name, str(scope.domain_id))
+        user = AppConfigFragmentConditions.by_user_visibility(config_name, str(scope.user_id))
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[lambda: sa.or_(public(), domain(), user())],
+            orders=[AppConfigFragmentRow.rank.asc()],
+        )
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(sa.select(AppConfigFragmentRow), querier)
+            return [row.AppConfigFragmentRow.to_data() for row in result.rows]
