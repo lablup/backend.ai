@@ -1,8 +1,0 @@
-schema {
-  query: PublicQueries
-}
-
-type PublicQueries {
-  """Placeholder public field; returns 'pong'."""
-  publicPing: String!
-}
