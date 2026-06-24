@@ -273,3 +273,33 @@ class AppConfigFragmentDBSource:
         async with self._ops.read_ops() as r:
             result = await r.batch_query_in_global(sa.select(AppConfigFragmentRow), querier)
             return [row.AppConfigFragmentRow.to_data() for row in result.rows]
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def list_visible_fragments_bulk(
+        self, config_names: list[str], scope: AppConfigResolveScope
+    ) -> list[AppConfigFragmentData]:
+        """Visible fragments for several ``config_names`` at once, in a single query.
+
+        The bulk form of :meth:`list_visible_fragments`: per name, the public OR the scope's
+        domain OR the scope's user fragment. Ordered by ``(config_name, rank)`` so the caller
+        can group by name and deep-merge each in order.
+        """
+        if not config_names:
+            return []
+        visibility = []
+        for config_name in config_names:
+            visibility.append(AppConfigFragmentConditions.by_public_visibility(config_name))
+            visibility.append(
+                AppConfigFragmentConditions.by_domain_visibility(config_name, str(scope.domain_id))
+            )
+            visibility.append(
+                AppConfigFragmentConditions.by_user_visibility(config_name, str(scope.user_id))
+            )
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[lambda: sa.or_(*(condition() for condition in visibility))],
+            orders=[AppConfigFragmentRow.config_name.asc(), AppConfigFragmentRow.rank.asc()],
+        )
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(sa.select(AppConfigFragmentRow), querier)
+            return [row.AppConfigFragmentRow.to_data() for row in result.rows]

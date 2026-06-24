@@ -855,3 +855,38 @@ class TestApplicableFragments:
             AppConfigResolveScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
         )
         assert applicable == []
+
+    async def test_bulk_returns_visible_fragments_for_all_names_ordered(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        applicable = await repository.list_visible_fragments_bulk(
+            ["theme", "menu"],
+            AppConfigResolveScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+        )
+        # public + the caller's domain + the caller's own user fragment, for both names.
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.config_name in ("theme", "menu")
+            and (
+                f.scope_type is AppConfigScopeType.PUBLIC
+                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
+                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+            )
+        }
+        assert {f.id for f in applicable} == expected
+        # Grouped by config_name, rank-ordered within each.
+        assert [f.config_name for f in applicable] == sorted(f.config_name for f in applicable)
+
+    async def test_bulk_empty_names_returns_empty(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        applicable = await repository.list_visible_fragments_bulk(
+            [],
+            AppConfigResolveScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+        )
+        assert applicable == []

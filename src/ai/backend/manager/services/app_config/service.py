@@ -14,6 +14,10 @@ from ai.backend.manager.services.app_config.actions.resolve import (
     ResolveAppConfigAction,
     ResolveAppConfigActionResult,
 )
+from ai.backend.manager.services.app_config.actions.resolve_bulk import (
+    ResolveBulkAppConfigAction,
+    ResolveBulkAppConfigActionResult,
+)
 
 __all__ = ("AppConfigService",)
 
@@ -59,3 +63,29 @@ class AppConfigService:
             config=self._merge_configs(fragments),
         )
         return ResolveAppConfigActionResult(app_config=app_config, user_id=action.user_id)
+
+    async def resolve_bulk(
+        self, action: ResolveBulkAppConfigAction
+    ) -> ResolveBulkAppConfigActionResult:
+        """Resolve several merged ``AppConfig``s for one principal in a single query.
+
+        Fetches the visible fragments of all ``config_names`` at once, groups them by name,
+        and deep-merges each in ``rank`` order. Returns one ``AppConfigData`` per requested
+        name, in request order (an unregistered name yields ``config = None``).
+        """
+        scope = AppConfigResolveScope(domain_id=action.domain_id, user_id=action.user_id)
+        fragments = await self._fragment_repository.list_visible_fragments_bulk(
+            action.config_names, scope
+        )
+        grouped: dict[str, list[AppConfigFragmentData]] = {}
+        for fragment in fragments:
+            grouped.setdefault(fragment.config_name, []).append(fragment)
+        app_configs = [
+            AppConfigData(
+                config_name=config_name,
+                fragments=grouped.get(config_name, []),
+                config=self._merge_configs(grouped.get(config_name, [])),
+            )
+            for config_name in action.config_names
+        ]
+        return ResolveBulkAppConfigActionResult(app_configs=app_configs, user_id=action.user_id)
