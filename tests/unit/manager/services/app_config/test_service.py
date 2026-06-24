@@ -23,6 +23,9 @@ from ai.backend.manager.services.app_config.actions.resolve import ResolveAppCon
 from ai.backend.manager.services.app_config.actions.resolve_bulk import (
     ResolveBulkAppConfigAction,
 )
+from ai.backend.manager.services.app_config.actions.resolve_public import (
+    ResolvePublicAppConfigAction,
+)
 from ai.backend.manager.services.app_config.service import AppConfigService
 
 _USER_UUID = uuid.uuid4()
@@ -149,3 +152,21 @@ class TestAppConfigService:
             ["theme", "menu", "unknown"],
             AppConfigResolveScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
         )
+
+    async def test_resolve_public_merges_public_fragments_only(
+        self, service: AppConfigService, mock_fragment_repository: MagicMock
+    ) -> None:
+        public = _fragment(
+            scope_type=AppConfigScopeType.PUBLIC,
+            scope_id="public",
+            rank=100,
+            config={"theme": "light", "lang": "en"},
+        )
+        mock_fragment_repository.list_public_fragments = AsyncMock(return_value=[public])
+
+        result = await service.resolve_public(ResolvePublicAppConfigAction(config_name="theme"))
+
+        assert result.app_config.config_name == "theme"
+        assert result.app_config.fragments == [public]
+        assert result.app_config.config == {"theme": "light", "lang": "en"}
+        mock_fragment_repository.list_public_fragments.assert_called_once_with("theme")

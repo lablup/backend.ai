@@ -303,3 +303,19 @@ class AppConfigFragmentDBSource:
         async with self._ops.read_ops() as r:
             result = await r.batch_query_in_global(sa.select(AppConfigFragmentRow), querier)
             return [row.AppConfigFragmentRow.to_data() for row in result.rows]
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def list_public_fragments(self, config_name: str) -> list[AppConfigFragmentData]:
+        """Public fragments of ``config_name``, ``rank``-ordered — the anonymous read view.
+
+        No principal: only ``public``-scope documents contribute, so a pre-login caller sees
+        the shared baseline config without any domain or user overlay.
+        """
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[AppConfigFragmentConditions.by_public_visibility(config_name)],
+            orders=[AppConfigFragmentRow.rank.asc()],
+        )
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(sa.select(AppConfigFragmentRow), querier)
+            return [row.AppConfigFragmentRow.to_data() for row in result.rows]
