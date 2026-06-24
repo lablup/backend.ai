@@ -12,6 +12,7 @@ from ai.backend.manager.sokovan.stages.group_autoscale import build_group_autosc
 from ai.backend.manager.sokovan.stages.group_draining import build_group_draining_stage
 from ai.backend.manager.sokovan.stages.group_rolling import build_group_rolling_stage
 from ai.backend.manager.sokovan.stages.group_scaling import build_group_scaling_stage
+from ai.backend.manager.sokovan.stages.idle_check import build_idle_check_stage
 from ai.backend.manager.types import DistributedLockFactory
 
 
@@ -27,6 +28,7 @@ def build_reconciler_coordinator(
         build_group_rolling_stage(replica_group_repository),
         build_group_draining_stage(replica_group_repository),
         build_group_autoscale_stage(replica_group_repository),
+        build_idle_check_stage(),
     ]
     stages: dict[str, ReconcilerStageRunner] = {}
     task_specs: list[ReconcilerTaskSpec] = []
