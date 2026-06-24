@@ -24,6 +24,7 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.errors.role_preset import RolePresetNotFound
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
@@ -35,7 +36,6 @@ from ai.backend.manager.repositories.base import (
     NoPagination,
     OffsetPagination,
 )
-from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.role_preset.creators import (

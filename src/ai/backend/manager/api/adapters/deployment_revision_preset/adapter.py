@@ -69,6 +69,7 @@ from ai.backend.manager.models.deployment_revision_preset.orders import (
     DeploymentRevisionPresetOrders,
 )
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.conditions import PresetResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
     ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
@@ -79,12 +80,7 @@ from ai.backend.manager.models.resource_slot.orders import (
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, combine_conditions_or
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
     DeploymentRevisionPresetCreatorSpec,

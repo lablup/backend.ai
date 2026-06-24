@@ -15,6 +15,7 @@ from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, 
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
@@ -23,7 +24,7 @@ from ai.backend.manager.models.resource_usage_history import (
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
+from ai.backend.manager.repositories.base import ExistenceCheck, SearchScope
 
 
 @dataclass(frozen=True)

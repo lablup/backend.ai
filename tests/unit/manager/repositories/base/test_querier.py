@@ -19,6 +19,7 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.manager.models.base import Base, IDColumn
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BatchQuerierResult,
@@ -26,7 +27,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     Querier,
     QuerierResult,
-    QueryCondition,
     SearchScope,
     execute_batch_querier,
     execute_querier,

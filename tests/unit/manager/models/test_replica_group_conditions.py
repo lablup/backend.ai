@@ -6,8 +6,8 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 def _compile(condition: QueryCondition) -> str:

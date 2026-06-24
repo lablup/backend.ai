@@ -67,8 +67,6 @@ from .types import (
     CursorConditionFactory,
     ExistenceCheck,
     IntegrityErrorCheck,
-    QueryCondition,
-    QueryOrder,
     SearchScope,
 )
 from .updater import (
@@ -101,8 +99,6 @@ from .utils import (
 
 __all__ = [
     # Types
-    "QueryCondition",
-    "QueryOrder",
     "CursorConditionFactory",
     "ExistenceCheck",
     "IntegrityErrorCheck",

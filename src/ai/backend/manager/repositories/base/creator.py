@@ -10,9 +10,10 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import sqlalchemy as sa
 
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.query_types import QueryCondition
 
 from .integrity import match_integrity_error, parse_integrity_error
-from .types import IntegrityErrorCheck, QueryCondition
+from .types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession

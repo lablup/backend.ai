@@ -15,13 +15,14 @@ from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
+from ai.backend.manager.repositories.base import ExistenceCheck, SearchScope
 
 __all__ = (
     "DomainUserSearchScope",

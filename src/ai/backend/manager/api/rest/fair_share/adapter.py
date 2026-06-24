@@ -75,13 +75,9 @@ from ai.backend.manager.models.fair_share.orders import (
     RGUserFairShareOrders,
     UserFairShareOrders,
 )
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.resource_usage_history.options import (
     DomainUsageBucketConditions,
     DomainUsageBucketOrders,

@@ -7,7 +7,7 @@ from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.condition_utils import make_string_in_factory
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 
 
 class QueryConditions:

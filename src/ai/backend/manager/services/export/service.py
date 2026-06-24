@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.repositories.base.types import QueryCondition
 
 from .actions import (
     GetReportAction,

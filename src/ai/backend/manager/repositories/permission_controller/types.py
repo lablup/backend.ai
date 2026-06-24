@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
 from ai.backend.manager.errors.permission import RoleNotFound
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -17,7 +18,7 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import BatchQuerierResult
-from ai.backend.manager.repositories.base.types import ExistenceCheck, QueryCondition, SearchScope
+from ai.backend.manager.repositories.base.types import ExistenceCheck, SearchScope
 
 
 class RoleBatchQuerierResult(BatchQuerierResult[RoleRow]):

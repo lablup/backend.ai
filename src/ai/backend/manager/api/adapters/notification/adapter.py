@@ -77,11 +77,10 @@ from ai.backend.manager.models.notification.orders import (
     NotificationChannelOrders,
     NotificationRuleOrders,
 )
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
-    QueryCondition,
-    QueryOrder,
     Updater,
     combine_conditions_or,
     negate_conditions,

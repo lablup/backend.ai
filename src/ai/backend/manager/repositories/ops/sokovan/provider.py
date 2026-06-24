@@ -18,7 +18,8 @@ import sqlalchemy as sa
 
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.mixins.history import ReconcileHistoryMixin
-from ai.backend.manager.repositories.base import Creator, QueryCondition, Updater, execute_updater
+from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.repositories.base import Creator, Updater, execute_updater
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider, RBACWriteOps
 
 

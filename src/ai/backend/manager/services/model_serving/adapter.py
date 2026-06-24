@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.models.query_types import QueryCondition
 
 if TYPE_CHECKING:
     from ai.backend.common.dto.manager.model_serving.request import ServiceFilterModel

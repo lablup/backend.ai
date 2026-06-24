@@ -10,11 +10,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.models.audit_log import AuditLogRow
-from ai.backend.manager.repositories.base import (
-    ExistenceCheck,
-    QueryCondition,
-    SearchScope,
-)
+from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.repositories.base import ExistenceCheck, SearchScope
 
 __all__ = (
     "EntityAuditLogSearchScope",

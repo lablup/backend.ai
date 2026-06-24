@@ -43,12 +43,8 @@ from ai.backend.manager.dto.response import (
 )
 from ai.backend.manager.errors.artifact import ArtifactImportDelegationError
 from ai.backend.manager.models.artifact import ArtifactRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.retrieve_model import RetrieveModelAction
 from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (

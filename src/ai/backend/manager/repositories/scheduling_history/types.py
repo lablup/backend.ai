@@ -12,6 +12,7 @@ from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
@@ -19,7 +20,7 @@ from ai.backend.manager.models.scheduling_history.conditions import (
     SessionSchedulingHistoryConditions,
 )
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.repositories.base import QueryCondition, SearchScope
+from ai.backend.manager.repositories.base import SearchScope
 from ai.backend.manager.repositories.base.types import ExistenceCheck
 
 __all__ = (

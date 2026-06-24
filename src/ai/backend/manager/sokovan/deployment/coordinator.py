@@ -39,8 +39,8 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.base.types import QueryCondition
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (

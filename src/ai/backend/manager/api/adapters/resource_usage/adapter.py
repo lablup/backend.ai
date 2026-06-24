@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.v2.resource_usage.types import (
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
@@ -52,8 +53,6 @@ from ai.backend.manager.models.resource_usage_history.row import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
-    QueryCondition,
-    QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )

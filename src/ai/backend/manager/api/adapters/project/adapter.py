@@ -51,11 +51,10 @@ from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.group.orders import GroupOrders
 from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
-    QueryCondition,
-    QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )

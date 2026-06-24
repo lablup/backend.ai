@@ -15,7 +15,7 @@ from ai.backend.common.data.filter_specs import (
     UUIDInMatchSpec,
 )
 from ai.backend.common.dto.manager.query import ArrayFilter, IntFilter, StringFilter, UUIDFilter
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.models.query_types import QueryCondition
 
 
 class BaseFilterAdapter:

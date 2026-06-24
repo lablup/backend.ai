@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.models.query_types import QueryCondition
 
 
 @dataclass

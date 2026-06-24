@@ -32,11 +32,10 @@ from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
-    QueryCondition,
-    QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )

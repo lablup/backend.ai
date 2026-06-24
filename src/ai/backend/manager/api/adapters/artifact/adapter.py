@@ -74,12 +74,11 @@ from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
 from ai.backend.manager.models.artifact_revision.orders import ArtifactRevisionOrders
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
-    QueryCondition,
-    QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )

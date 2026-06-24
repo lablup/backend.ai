@@ -26,13 +26,8 @@ from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
 )
 from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-    Updater,
-)
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
 from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,
 )

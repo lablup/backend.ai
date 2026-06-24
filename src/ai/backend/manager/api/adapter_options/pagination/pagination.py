@@ -10,12 +10,12 @@ from dataclasses import dataclass
 
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
+from ai.backend.manager.models.query_types import QueryOrder
 from ai.backend.manager.repositories.base import (
     CursorBackwardPagination,
     CursorConditionFactory,
     CursorForwardPagination,
     OffsetPagination,
-    QueryOrder,
     QueryPagination,
 )
 

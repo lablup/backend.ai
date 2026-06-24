@@ -7,7 +7,7 @@ from typing import cast
 import sqlalchemy as sa
 
 from ai.backend.manager.models.error_logs import ErrorLogRow
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.models.query_types import QueryCondition
 
 
 class ErrorLogConditions:

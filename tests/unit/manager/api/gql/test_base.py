@@ -17,7 +17,7 @@ from ai.backend.manager.api.gql.base import (
     encode_cursor,
 )
 from ai.backend.manager.errors.api import InvalidCursor
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.models.query_types import QueryCondition
 
 
 class TestEncodeCursor:

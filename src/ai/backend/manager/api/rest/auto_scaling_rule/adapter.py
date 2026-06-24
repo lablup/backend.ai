@@ -24,12 +24,8 @@ from ai.backend.manager.data.deployment.scale_modifier import ModelDeploymentAut
 from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
 from ai.backend.manager.models.endpoint.conditions import AutoScalingRuleConditions
 from ai.backend.manager.models.endpoint.orders import AutoScalingRuleOrders
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = ("AutoScalingRuleAdapter",)

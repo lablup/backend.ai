@@ -82,14 +82,10 @@ from ai.backend.manager.models.deployment_revision.conditions import RevisionCon
 from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.models.endpoint.orders import DeploymentOrders
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 
 __all__ = (
     "AddRevisionAdapter",

@@ -30,14 +30,10 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.auth.login_session_types import LoginSessionData
 from ai.backend.manager.models.login_session.row import LoginSessionRow
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.auth.options import LoginSessionConditions, LoginSessionOrders
 from ai.backend.manager.repositories.auth.types import MyLoginSessionSearchScope
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.services.auth.actions.revoke_login_session import (
     AdminRevokeLoginSessionAction,
     MyRevokeLoginSessionAction,

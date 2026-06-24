@@ -24,6 +24,7 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
@@ -34,7 +35,6 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
 from ai.backend.manager.repositories.base import BulkUpserter
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities

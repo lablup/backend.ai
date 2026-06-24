@@ -21,11 +21,8 @@ from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.types import ActionTarget, SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base.types import (
-    ExistenceCheck,
-    QueryCondition,
-    SearchScope,
-)
+from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.repositories.base.types import ExistenceCheck, SearchScope
 
 
 @dataclass(frozen=True)

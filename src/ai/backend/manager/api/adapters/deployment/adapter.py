@@ -210,6 +210,7 @@ from ai.backend.manager.models.endpoint.orders import (
     AutoScalingRuleOrders,
     DeploymentOrders,
 )
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.conditions import RevisionResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
     ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,
@@ -224,8 +225,6 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
     OffsetPagination,
-    QueryCondition,
-    QueryOrder,
     Updater,
     combine_conditions_and,
     combine_conditions_or,

@@ -190,6 +190,7 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData, RoleInvitationState
 from ai.backend.manager.errors.permission import ReplaceRolePermissionRoleIdMismatch
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -220,8 +221,6 @@ from ai.backend.manager.repositories.base import (
     NoPagination,
     OffsetPagination,
     Purger,
-    QueryCondition,
-    QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )

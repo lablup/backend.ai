@@ -27,7 +27,8 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.repositories.base.types import ExistenceCheck, QueryCondition, SearchScope
+from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.repositories.base.types import ExistenceCheck, SearchScope
 
 
 @dataclass

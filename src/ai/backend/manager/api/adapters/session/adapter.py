@@ -94,6 +94,7 @@ from ai.backend.manager.models.kernel.orders import (
 from ai.backend.manager.models.kernel.orders import (
     resolve_order as resolve_kernel_order,
 )
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import (
     DEFAULT_BACKWARD_ORDER as SESSION_DEFAULT_BACKWARD_ORDER,
@@ -112,8 +113,6 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
-    QueryCondition,
-    QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
