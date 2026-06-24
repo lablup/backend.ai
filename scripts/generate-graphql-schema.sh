@@ -11,7 +11,7 @@ echo "Generating GraphQL v1 schema..."
 echo "Generating GraphQL v2 schema..."
 ./backend.ai mgr api dump-gql-schema --v2 --output docs/manager/graphql-reference/v2-schema.graphql
 
-# Disabled until a real public field exists (public endpoint is not registered); re-enable to dump.
+# TODO(BA-6592): re-enable once a real public field exists (public endpoint is not registered yet).
 # echo "Generating GraphQL v2 public schema..."
 # ./backend.ai mgr api dump-gql-schema --public --output docs/manager/graphql-reference/v2-public-schema.graphql
 
