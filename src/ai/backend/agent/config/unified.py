@@ -1477,7 +1477,7 @@ class OverridableContainerConfig(BaseConfigSchema):
     stats_type: Annotated[
         StatModes | None,
         Field(
-            default=StatModes.DOCKER,
+            default=None,
             validation_alias=AliasChoices("stats-type", "stats_type"),
             serialization_alias="stats-type",
         ),
@@ -1485,8 +1485,10 @@ class OverridableContainerConfig(BaseConfigSchema):
             description=(
                 "Method for collecting container resource statistics. "
                 "'docker' uses Docker's stats API (most compatible). "
-                "'cgroup' reads from cgroup filesystem directly (more accurate, requires root). "
-                "'null' disables statistics collection."
+                "'cgroup' reads from cgroup filesystem directly (faster and more accurate, "
+                "requires root on Linux). "
+                "When unset, the agent auto-selects: cgroup on native Linux hosts "
+                "(with Docker API fallback on read failure) and docker elsewhere."
             ),
             added_version="25.12.0",
             example=ConfigExample(local="docker", prod="docker"),
@@ -1673,7 +1675,7 @@ class OverridableContainerConfig(BaseConfigSchema):
 
     @field_validator("stats_type", mode="after")
     @classmethod
-    def _validate_stats_type(cls, stats_type: StatModes) -> StatModes:
+    def _validate_stats_type(cls, stats_type: StatModes | None) -> StatModes | None:
         if stats_type == StatModes.CGROUP:
             if os.getuid() != 0:
                 raise ValueError(

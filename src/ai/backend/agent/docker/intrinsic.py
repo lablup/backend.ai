@@ -8,12 +8,13 @@ import platform
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, assert_never, cast
 
 import aiohttp
 import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
+from cachetools import LRUCache
 
 from ai.backend.agent import __version__  # pants: no-infer-dep
 from ai.backend.agent.alloc_map import AllocationStrategy
@@ -71,6 +72,33 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # "sockfs", "debugfs", etc.
 _CONTAINER_STAT_TIMEOUT: float = 2.0
 _INVALID_PID: int = 0
+
+# Tracks containers for which we have already logged a cgroup->Docker-API
+# fallback warning, to avoid log spam on persistent read failures.
+# Bounded LRU cache to prevent unbounded growth on hosts with high container churn;
+# oldest entries are evicted on overflow, so a recreated container may re-warn.
+# Shared across CPUPlugin / MemoryPlugin since keys are namespaced via the `plugin:` prefix.
+_CGROUP_FALLBACK_WARN_CACHE_SIZE = 1024
+_cgroup_fallback_warned: LRUCache[str, None] = LRUCache(
+    maxsize=_CGROUP_FALLBACK_WARN_CACHE_SIZE,
+)
+
+
+def _warn_cgroup_fallback_once(plugin: str, container_id: str) -> None:
+    key = f"{plugin}:{container_id}"
+    if key in _cgroup_fallback_warned:
+        return
+    _cgroup_fallback_warned[key] = None
+    log.warning(
+        "{0}: cgroup sysfs read failed for container {1}; falling back to Docker API",
+        plugin,
+        container_id[:7],
+    )
+
+
+def _is_linuxkit(local_config: Mapping[str, Any]) -> bool:
+    return cast(str, local_config["agent"]["docker-mode"]) == "linuxkit"
+
 
 # The list of pruned fstype when checking the filesystem usage statistics.
 pruned_disk_types = frozenset([
@@ -316,12 +344,20 @@ class CPUPlugin(AbstractComputePlugin):
             cpu_usage = cast(float, nmget(ret, "cpu_stats.cpu_usage.total_usage", 0))
             return cpu_usage / 1e6
 
-        if ctx.mode == StatModes.CGROUP:
-            impl = sysfs_impl
-        elif ctx.mode == StatModes.DOCKER:
-            impl = api_impl
-        else:
-            raise RuntimeError("should not reach here")
+        async def cgroup_first_impl(container_id: str) -> float | None:
+            cpu_used = await sysfs_impl(container_id)
+            if cpu_used is None:
+                _warn_cgroup_fallback_once("CPUPlugin", container_id)
+                return await api_impl(container_id)
+            return cpu_used
+
+        match ctx.mode:
+            case StatModes.CGROUP if not _is_linuxkit(self.local_config):
+                impl = cgroup_first_impl
+            case StatModes.CGROUP | StatModes.DOCKER:
+                impl = api_impl
+            case _:
+                assert_never(ctx.mode)
 
         tasks = []
         for cid in container_ids:
@@ -829,12 +865,22 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_size=scratch_sz,
             )
 
-        if ctx.mode == StatModes.CGROUP:
-            impl = sysfs_impl
-        elif ctx.mode == StatModes.DOCKER:
-            impl = api_impl
-        else:
-            raise RuntimeError("should not reach here")
+        async def cgroup_first_impl(
+            container_id: str,
+        ) -> tuple[int, int, int, int, int, int, int] | None:
+            result = await sysfs_impl(container_id)
+            if result is None:
+                _warn_cgroup_fallback_once("MemoryPlugin", container_id)
+                return await api_impl(container_id)
+            return result
+
+        match ctx.mode:
+            case StatModes.CGROUP if not _is_linuxkit(self.local_config):
+                impl = cgroup_first_impl
+            case StatModes.CGROUP | StatModes.DOCKER:
+                impl = api_impl
+            case _:
+                assert_never(ctx.mode)
 
         per_container_mem_used_bytes = {}
         per_container_io_read_bytes = {}

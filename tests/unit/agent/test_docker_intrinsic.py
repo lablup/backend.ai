@@ -10,10 +10,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.agent.docker import intrinsic
 from ai.backend.agent.docker.intrinsic import (
     ContainerNetStat,
     CPUPlugin,
     MemoryPlugin,
+    _warn_cgroup_fallback_once,
     read_proc_net_dev,
 )
 from ai.backend.agent.stats import StatModes
@@ -139,6 +141,40 @@ class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             await cpu_plugin.gather_container_measures(cpu_cgroup_context, container_ids)
             mock_docker_cls.assert_not_called()
 
+    async def test_cgroup_mode_falls_back_to_api_on_sysfs_failure(
+        self,
+        cpu_plugin: CPUPlugin,
+        container_ids: list[str],
+        cgroup_stat_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+    ) -> None:
+        """When sysfs read fails in CGROUP mode, the Docker API is used
+        as a per-read fallback instead of silently returning zero."""
+        # Arrange: cgroup version that triggers "return None" in sysfs_impl.
+        cgroup_stat_context.agent.docker_info = {"CgroupVersion": "invalid"}
+        cgroup_stat_context.agent.get_cgroup_path = MagicMock(return_value=MagicMock())
+
+        results = await cpu_plugin.gather_container_measures(cgroup_stat_context, container_ids)
+
+        assert mock_fetch_api_stats.call_count == len(container_ids)
+        # api_impl returns cpu_usage = 1_000_000_000 ns / 1e6 = 1000 msec
+        for cid in container_ids:
+            assert results[0].per_container[cid].value == 1000
+
+    async def test_linuxkit_forces_api_even_in_cgroup_mode(
+        self,
+        container_ids: list[str],
+        cpu_cgroup_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+    ) -> None:
+        """On linuxkit hosts the API path is used even when mode is CGROUP."""
+        plugin = CPUPlugin.__new__(CPUPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "linuxkit"}}
+        plugin._docker = AsyncMock()
+
+        await plugin.gather_container_measures(cpu_cgroup_context, container_ids)
+        assert mock_fetch_api_stats.call_count == len(container_ids)
+
 
 class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
     """Tests for MemoryPlugin Docker client lifecycle management."""
@@ -242,6 +278,79 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             await memory_plugin.gather_container_measures(memory_cgroup_context, container_ids)
             mock_docker_cls.assert_not_called()
+
+    async def test_cgroup_mode_falls_back_to_api_on_sysfs_failure(
+        self,
+        memory_plugin: MemoryPlugin,
+        container_ids: list[str],
+        cgroup_stat_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+    ) -> None:
+        """When sysfs read fails in CGROUP mode, the Docker API is used
+        as a per-read fallback instead of silently returning zero."""
+        # Arrange: cgroup version that triggers "return None" in sysfs_impl.
+        cgroup_stat_context.agent.get_cgroup_version = MagicMock(return_value="invalid")
+        cgroup_stat_context.agent.get_cgroup_path = MagicMock(return_value=MagicMock())
+
+        results = await memory_plugin.gather_container_measures(cgroup_stat_context, container_ids)
+
+        assert mock_fetch_api_stats.call_count == len(container_ids)
+        # api_impl returns mem_cur = 1024 * 1024 * 100 = 104857600 bytes
+        for cid in container_ids:
+            assert results[0].per_container[cid].value == 1024 * 1024 * 100
+
+    async def test_linuxkit_forces_api_even_in_cgroup_mode(
+        self,
+        container_ids: list[str],
+        cgroup_stat_context: MagicMock,
+        mock_fetch_api_stats: MagicMock,
+    ) -> None:
+        """On linuxkit hosts the API path is used even when mode is CGROUP."""
+        plugin = MemoryPlugin.__new__(MemoryPlugin)
+        plugin.local_config = {"agent": {"docker-mode": "linuxkit"}}
+        plugin._docker = AsyncMock()
+
+        await plugin.gather_container_measures(cgroup_stat_context, container_ids)
+        assert mock_fetch_api_stats.call_count == len(container_ids)
+
+
+class TestWarnCgroupFallbackOnce:
+    """Tests for _warn_cgroup_fallback_once() dedup and bounded-cache semantics."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_warn_cache(self) -> Generator[None, None, None]:
+        """Reset the module-level warn cache between tests to avoid bleed-through."""
+        intrinsic._cgroup_fallback_warned.clear()
+        yield
+        intrinsic._cgroup_fallback_warned.clear()
+
+    def test_deduplicates_per_container(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The helper logs once per (plugin, container_id) and stays silent on
+        subsequent calls for the same container."""
+        with caplog.at_level("WARNING", logger="ai.backend.agent.docker.intrinsic"):
+            _warn_cgroup_fallback_once("CPUPlugin", "container_abc")
+            _warn_cgroup_fallback_once("CPUPlugin", "container_abc")
+            _warn_cgroup_fallback_once("CPUPlugin", "container_abc")
+
+        warn_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warn_records) == 1
+
+        # A different container should still warn.
+        caplog.clear()
+        with caplog.at_level("WARNING", logger="ai.backend.agent.docker.intrinsic"):
+            _warn_cgroup_fallback_once("CPUPlugin", "container_xyz")
+        warn_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warn_records) == 1
+
+        # Same container under a different plugin namespace should also warn once.
+        caplog.clear()
+        with caplog.at_level("WARNING", logger="ai.backend.agent.docker.intrinsic"):
+            _warn_cgroup_fallback_once("MemoryPlugin", "container_abc")
+        warn_records = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warn_records) == 1
 
 
 class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
