@@ -14,8 +14,8 @@ from ai.backend.manager.data.deployment.types import (
     RouteSubStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class RouteConditions:

@@ -10,14 +10,17 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import sqlalchemy as sa
 
 from ai.backend.common.exception import BackendAIError
+from ai.backend.manager.models.query_types import (
+    QueryCondition as QueryCondition,
+)
+from ai.backend.manager.models.query_types import (
+    QueryOrder as QueryOrder,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
 
     from ai.backend.manager.errors.repository import RepositoryIntegrityError
-
-# QueryCondition now returns a ColumnElement (whereclause) instead of modifying stmt
-type QueryCondition = Callable[[], sa.sql.expression.ColumnElement[bool]]
 
 
 T = TypeVar("T")
@@ -63,8 +66,6 @@ class SearchScope(ABC):
         """
         raise NotImplementedError
 
-
-type QueryOrder = sa.sql.expression.UnaryExpression[Any] | sa.sql.expression.ColumnElement[Any]
 
 # Factory function that creates a cursor condition from a decoded cursor value (str or UUID)
 type CursorConditionFactory = Callable[[str], QueryCondition]

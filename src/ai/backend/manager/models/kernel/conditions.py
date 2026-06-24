@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import KernelRow
 

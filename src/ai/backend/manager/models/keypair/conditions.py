@@ -13,7 +13,7 @@ from ai.backend.common.data.filter_specs import (
 )
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
+from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 
 __all__ = (
     "KeypairConditions",

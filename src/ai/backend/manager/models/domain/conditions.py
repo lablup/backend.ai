@@ -14,9 +14,9 @@ from ai.backend.manager.models.condition_utils import (
     make_string_in_factory,
 )
 from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import DomainRow
 

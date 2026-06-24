@@ -5,7 +5,7 @@ from __future__ import annotations
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
-from ai.backend.manager.repositories.base import QueryOrder
+from ai.backend.manager.models.query_types import QueryOrder
 
 
 class PrometheusQueryPresetCategoryOrders:

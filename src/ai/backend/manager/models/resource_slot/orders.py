@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceAllocationOrderField,
     ResourceSlotTypeOrderField,
 )
+from ai.backend.manager.models.query_types import QueryOrder
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     DeploymentRevisionResourceSlotRow,
@@ -21,7 +22,6 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.repositories.base import QueryOrder
 
 _OrderColumn = sa.ColumnElement[Any] | InstrumentedAttribute[Any]
 

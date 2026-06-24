@@ -7,8 +7,8 @@ from typing import cast
 import sqlalchemy as sa
 
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.query_types import QueryOrder
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.repositories.base import QueryOrder
 
 
 class RevisionOrders:

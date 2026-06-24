@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.models.query_types import QueryOrder
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.repositories.base import QueryOrder
 
 __all__ = ("ScalingGroupOrders",)
 

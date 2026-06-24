@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.base import QueryOrder
+from ai.backend.manager.models.query_types import QueryOrder
 
 
 class PrometheusQueryPresetOrders:

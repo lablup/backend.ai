@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.models.query_types import QueryOrder
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
-from ai.backend.manager.repositories.base import QueryOrder
 
 __all__ = ("RolePermissionPresetOrders",)
 

@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.dto.manager.v2.vfolder.types import OrderDirection, VFolderOrderField
-from ai.backend.manager.repositories.base import QueryOrder
+from ai.backend.manager.models.query_types import QueryOrder
 
 from .row import VFolderRow
 

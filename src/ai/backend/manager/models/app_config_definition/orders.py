@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.repositories.base import QueryOrder
+from ai.backend.manager.models.query_types import QueryOrder
 
 __all__ = ("AppConfigDefinitionOrders",)
 

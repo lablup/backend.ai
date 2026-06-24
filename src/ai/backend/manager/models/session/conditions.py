@@ -20,7 +20,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.models.query_types import QueryCondition
 
 from .row import SessionRow
 

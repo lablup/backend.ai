@@ -9,8 +9,8 @@ from ai.backend.manager.models.fair_share.row import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.query_types import QueryOrder
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import QueryOrder
 
 
 class DomainFairShareOrders:

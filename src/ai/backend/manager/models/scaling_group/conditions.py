@@ -8,11 +8,11 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.models.condition_utils import make_string_in_factory
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForProjectRow,
     ScalingGroupRow,
 )
-from ai.backend.manager.repositories.base import QueryCondition
 
 __all__ = ("ScalingGroupConditions",)
 

@@ -18,8 +18,8 @@ from ai.backend.manager.models.fair_share.row import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class DomainFairShareConditions:

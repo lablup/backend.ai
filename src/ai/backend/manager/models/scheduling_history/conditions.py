@@ -15,7 +15,7 @@ from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.models.condition_utils import make_string_in_factory
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.models.query_types import QueryCondition
 
 from .row import (
     DeploymentHistoryRow,

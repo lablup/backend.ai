@@ -6,8 +6,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.models.condition_utils import make_string_in_factory
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 __all__ = ("ResourcePresetConditions",)
 

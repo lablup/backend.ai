@@ -13,8 +13,8 @@ from ai.backend.common.data.filter_specs import (
     UUIDInMatchSpec,
 )
 from ai.backend.manager.models.condition_utils import make_string_in_factory
+from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 __all__ = ("RuntimeVariantPresetConditions",)
 

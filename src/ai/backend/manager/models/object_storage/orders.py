@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.models.object_storage import ObjectStorageRow
-from ai.backend.manager.repositories.base import QueryOrder
+from ai.backend.manager.models.query_types import QueryOrder
 
 
 class ObjectStorageOrders:

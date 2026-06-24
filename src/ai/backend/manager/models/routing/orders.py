@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.models.query_types import QueryOrder
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base import QueryOrder
 
 
 class RouteOrders:
