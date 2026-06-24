@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerStageRunner, ReconcilerTaskSpec
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
@@ -19,6 +20,7 @@ from ai.backend.manager.types import DistributedLockFactory
 def build_reconciler_coordinator(
     *,
     replica_group_repository: ReplicaGroupRepository,
+    idle_checker_repository: IdleCheckerRepository,
     valkey_schedule: ValkeyScheduleClient,
     lock_factory: DistributedLockFactory,
     config_provider: ManagerConfigProvider,
@@ -28,7 +30,7 @@ def build_reconciler_coordinator(
         build_group_rolling_stage(replica_group_repository),
         build_group_draining_stage(replica_group_repository),
         build_group_autoscale_stage(replica_group_repository),
-        build_idle_check_stage(),
+        build_idle_check_stage(idle_checker_repository),
     ]
     stages: dict[str, ReconcilerStageRunner] = {}
     task_specs: list[ReconcilerTaskSpec] = []

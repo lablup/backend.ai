@@ -16,6 +16,7 @@ from ai.backend.manager.data.reconciler.types import (
 )
 from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.repositories.idle_checker.types import IdleCheckSnapshot
 from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerInfo,
     BaseReconcilerKind,
@@ -40,12 +41,12 @@ class IdleCheckTargetStatuses(BaseReconcilerTargetStatuses):
 
 @dataclass
 class IdleCheckReconcileInfo(BaseReconcilerInfo):
-    session_ids: Sequence[SessionId]
+    snapshot: IdleCheckSnapshot
     current_time: datetime
 
     @override
     def entity_ids(self) -> Sequence[UUID]:
-        return self.session_ids
+        return list(self.snapshot.session_views_by_id.keys())
 
     @override
     def now(self) -> datetime:
