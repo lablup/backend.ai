@@ -4,6 +4,7 @@ from typing import override
 
 import aiohttp
 
+from ai.backend.common.exception import ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
@@ -51,6 +52,9 @@ class GitHubRegistry(BaseContainerRegistry):
                     else:
                         break
                 else:
-                    raise RuntimeError(
-                        f"Failed to fetch repositories! {response.status} error occured."
+                    raise PassthroughError.from_http_status(
+                        response.status,
+                        domain=ErrorDomain.CONTAINER_REGISTRY,
+                        operation=ErrorOperation.LIST,
+                        error_message=f"Failed to fetch repositories! {response.status} error occurred.",
                     )

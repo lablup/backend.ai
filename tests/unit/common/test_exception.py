@@ -111,3 +111,40 @@ class TestBackendAIErrorCode:
 
         # Verify content type is application/problem+json
         assert resp.content_type == "application/problem+json"
+
+
+class TestPassthroughErrorFromHttpStatus:
+    def test_maps_status_to_error_code(self) -> None:
+        # 403 must surface as forbidden (the observed container-registry bug); this string is
+        # what the metric error_detail is derived from.
+        err = PassthroughError.from_http_status(
+            403,
+            domain=ErrorDomain.CONTAINER_REGISTRY,
+            operation=ErrorOperation.LIST,
+        )
+        assert str(err.error_code()) == "container-registry_list-query_forbidden"
+
+    def test_maps_server_error_status(self) -> None:
+        # The mapping covers server-error statuses too, not just 4xx.
+        err = PassthroughError.from_http_status(
+            503,
+            domain=ErrorDomain.CONTAINER_REGISTRY,
+            operation=ErrorOperation.READ,
+        )
+        assert err.error_code().error_detail == ErrorDetail.UNAVAILABLE
+
+    def test_unmapped_status_falls_back_to_internal(self) -> None:
+        err = PassthroughError.from_http_status(
+            429,
+            domain=ErrorDomain.CONTAINER_REGISTRY,
+            operation=ErrorOperation.READ,
+        )
+        assert err.error_code().error_detail == ErrorDetail.INTERNAL_ERROR
+
+    def test_preserves_original_status_code(self) -> None:
+        err = PassthroughError.from_http_status(
+            403,
+            domain=ErrorDomain.CONTAINER_REGISTRY,
+            operation=ErrorOperation.READ,
+        )
+        assert err.status_code == 403

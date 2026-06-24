@@ -13,6 +13,7 @@ import yarl
 
 from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
+from ai.backend.common.exception import ErrorDomain, ErrorOperation, PassthroughError
 from ai.backend.common.json import read_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.exceptions import (
@@ -186,7 +187,12 @@ class HarborRegistry_v2(BaseContainerRegistry):
                     if (
                         e.status != 404
                     ):  #  404 means image is already removed from harbor so we can just safely ignore the exception
-                        raise RuntimeError(f"Failed to untag {image}: {e.message}") from e
+                        raise PassthroughError.from_http_status(
+                            e.status,
+                            domain=ErrorDomain.CONTAINER_REGISTRY,
+                            operation=ErrorOperation.SOFT_DELETE,
+                            error_message=f"Failed to untag {image}: {e.message}",
+                        ) from e
 
     @override
     async def fetch_repositories(
@@ -215,10 +221,14 @@ class HarborRegistry_v2(BaseContainerRegistry):
             async with sess.get(repo_list_url, allow_redirects=False, **rqst_args) as resp:
                 items = await resp.json()
                 if isinstance(items, dict) and (errors := items.get("errors", [])):
-                    raise RuntimeError(
-                        f"failed to fetch repositories in project {self.registry_info.project}",
-                        errors[0]["code"],
-                        errors[0]["message"],
+                    code = errors[0].get("code")
+                    message = errors[0].get("message")
+                    raise PassthroughError.from_http_status(
+                        resp.status,
+                        domain=ErrorDomain.CONTAINER_REGISTRY,
+                        operation=ErrorOperation.LIST,
+                        error_message=f"failed to fetch repositories in project "
+                        f"{self.registry_info.project} (code={code}): {message}",
                     )
                 repos = [item["name"] for item in items]
                 for item in repos:
