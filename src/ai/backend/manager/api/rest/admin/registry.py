@@ -50,11 +50,12 @@ def register_admin_routes(
     # Anonymous public endpoint: no auth_required, so unauthenticated callers reach the handler.
     # It serves a separate PublicQueries schema that contains only public fields, so private
     # fields are physically absent and cannot be queried.
-    reg.add(
-        "POST",
-        "/gql/strawberry/public",
-        handler.handle_gql_strawberry_public,
-    )
+    # NOTE: disabled until a real public field exists; uncomment to re-enable.
+    # reg.add(
+    #     "POST",
+    #     "/gql/strawberry/public",
+    #     handler.handle_gql_strawberry_public,
+    # )
     reg.add(
         "GET",
         "/gql/strawberry",
