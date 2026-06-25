@@ -224,7 +224,7 @@ class SessionClient(BaseDomainClient):
         await self._client.typed_request_no_content(
             "POST",
             f"{_BASE_PATH}/{session_name}/shutdown-service",
-            request=request,
+            params=request.model_dump(mode="json", exclude_none=True),
         )
 
     # -----------------------------------------------------------------------
@@ -265,7 +265,7 @@ class SessionClient(BaseDomainClient):
             "POST",
             f"{_BASE_PATH}/{session_name}/imagify",
             response_model=ConvertSessionToImageResponse,
-            params=request.model_dump(mode="json", exclude_none=True),
+            request=request,
         )
 
     # -----------------------------------------------------------------------
@@ -409,7 +409,7 @@ class SessionClient(BaseDomainClient):
     ) -> bytes:
         return await self._client.download(
             f"{_BASE_PATH}/{session_name}/download",
-            json=request.model_dump(exclude_none=True),
+            params=request.model_dump(mode="json", exclude_none=True),
         )
 
     async def download_single(
