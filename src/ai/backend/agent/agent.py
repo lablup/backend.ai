@@ -615,7 +615,9 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             skip_missing: bool = False,
         ) -> None:
             resolved_path = self.resolve_krunner_filepath("runner/" + filename)
-            if not skip_missing and not resolved_path.exists():
+            if not resolved_path.exists():
+                if skip_missing:
+                    return
                 raise FileNotFoundError(resolved_path)
             _mount(MountTypes.BIND, resolved_path, target_path)
 
