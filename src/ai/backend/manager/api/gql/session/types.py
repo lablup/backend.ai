@@ -39,7 +39,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
 from ai.backend.common.dto.manager.v2.session.response import (
     SessionLifecycleInfoGQLDTO,
     SessionMetadataInfoGQLDTO,
-    SessionMount,
+    SessionMountDTO,
     SessionNetworkInfo,
     SessionNode,
     SessionResourceInfoGQLDTO,
@@ -86,10 +86,12 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+from ai.backend.manager.api.gql.vfolder_v2.types.enum import VFolderMountPermissionGQL
 from ai.backend.manager.errors.user import UserNotFound
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.replica import ModelReplica
+    from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
 
 
 @gql_enum(
@@ -299,22 +301,47 @@ class SessionV2NetworkInfoGQL:
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="A single virtual folder mount on a session.",
+        description=(
+            "A single virtual folder mount on a session. Holds mount-specific metadata "
+            "(subpath, mount destination, permission); folder attributes are resolved "
+            "through the associated `vfolder` node."
+        ),
     ),
-    model=SessionMount,
+    model=SessionMountDTO,
     name="SessionMount",
 )
 class SessionMountGQL:
     vfolder_id: UUID = gql_field(description="UUID of the mounted virtual folder.")
-    name: str = gql_field(description="Name of the mounted virtual folder.")
     subpath: str | None = gql_field(
         description="Subpath within the vfolder that is mounted. Null when the vfolder root is mounted."
     )
     mount_destination: str = gql_field(
         description="Mount destination (alias) path inside the session container."
     )
-    permission: str = gql_field(description="Effective mount permission (e.g., 'ro', 'rw').")
-    usage_mode: str = gql_field(description="Usage mode of the mounted virtual folder.")
+    permission: VFolderMountPermissionGQL = gql_field(
+        description="Effective mount permission for this mount (READ_ONLY, READ_WRITE, RW_DELETE)."
+    )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The virtual folder mounted here. Use this to query folder-level "
+                "attributes (name, usage mode, ownership, etc.) separately from the "
+                "mount-specific fields above."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def vfolder(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            VFolderGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.vfolder_v2.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.vfolder_loader.load(self.vfolder_id)
 
 
 # ========== Main Session Type ==========

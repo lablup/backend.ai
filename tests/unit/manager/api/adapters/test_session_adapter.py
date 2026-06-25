@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.data.vfolder.types import VFolderMountData
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.session.request import (
     BatchConfigInput,
@@ -177,11 +178,9 @@ class TestSessionMountsConversion:
         assert len(node.mounts) == 1
         m = node.mounts[0]
         assert m.vfolder_id == folder_id
-        assert m.name == "data"
         assert m.subpath == "inner/dir"
         assert m.mount_destination == "/home/work/data"
-        assert m.permission == MountPermission.READ_ONLY.value
-        assert m.usage_mode == VFolderUsageMode.GENERAL.value
+        assert m.permission == VFolderPermissionField.READ_ONLY
 
     def test_root_subpath_normalizes_to_none(self) -> None:
         """A '.' vfsubpath (vfolder root) should normalize to subpath=None."""
@@ -198,7 +197,7 @@ class TestSessionMountsConversion:
         node = SessionAdapter._session_data_to_node(data)
 
         assert node.mounts[0].subpath is None
-        assert node.mounts[0].permission == MountPermission.READ_WRITE.value
+        assert node.mounts[0].permission == VFolderPermissionField.READ_WRITE
 
 
 class TestEnqueueActionBuilding:

@@ -13,6 +13,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.types import SessionId
 
@@ -28,7 +29,7 @@ __all__ = (
     "SessionLogsPayload",
     "SessionMetadataInfo",
     "SessionMetadataInfoGQLDTO",
-    "SessionMount",
+    "SessionMountDTO",
     "SessionNetworkInfo",
     "SessionNode",
     "SessionResourceInfo",
@@ -145,11 +146,16 @@ class SessionNetworkInfo(BaseResponseModel):
     network_id: str | None = Field(default=None, description="ID of the network if applicable.")
 
 
-class SessionMount(BaseResponseModel):
-    """A single virtual folder mount on a session."""
+class SessionMountDTO(BaseResponseModel):
+    """A single virtual folder mount on a session.
+
+    Carries only mount-specific metadata. Folder attributes (name, usage mode,
+    etc.) are resolved separately through the associated vfolder node, keyed by
+    ``vfolder_id`` — the same vfolder may be mounted multiple times under
+    different subpaths.
+    """
 
     vfolder_id: UUID = Field(description="UUID of the mounted virtual folder.")
-    name: str = Field(description="Name of the mounted virtual folder.")
     subpath: str | None = Field(
         default=None,
         description="Subpath within the vfolder that is mounted. Null when the vfolder root is mounted.",
@@ -157,8 +163,9 @@ class SessionMount(BaseResponseModel):
     mount_destination: str = Field(
         description="Mount destination (alias) path inside the session container."
     )
-    permission: str = Field(description="Effective mount permission (e.g., 'ro', 'rw').")
-    usage_mode: str = Field(description="Usage mode of the mounted virtual folder.")
+    permission: VFolderPermissionField = Field(
+        description="Effective mount permission for this mount (ro/rw/wd)."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -189,11 +196,12 @@ class SessionNode(BaseResponseModel):
     lifecycle: SessionLifecycleInfoGQLDTO = Field(description="Lifecycle status and timestamps.")
     runtime: SessionRuntimeInfoGQLDTO = Field(description="Runtime execution configuration.")
     network: SessionNetworkInfo = Field(description="Network configuration.")
-    mounts: list[SessionMount] = Field(
+    mounts: list[SessionMountDTO] = Field(
         default_factory=list,
         description=(
             "Virtual folder mounts of this session, including per-mount subpath, "
-            "alias (mount destination), and permission."
+            "alias (mount destination), and permission. Folder details are available "
+            "through each mount's associated vfolder node."
         ),
     )
     replica_id: UUID | None = Field(
