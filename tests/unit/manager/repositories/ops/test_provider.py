@@ -193,13 +193,20 @@ class TestDependentCreate:
         assert child.label == "solo"
 
 
+@pytest.fixture
+async def seeded_parent(
+    database_connection: ExtendedAsyncSAEngine,
+    ops_tables: None,
+) -> None:
+    """Seed a single ("p1", "d1") parent row directly, independent of the create op."""
+    async with database_connection.begin() as conn:
+        await conn.execute(sa.insert(OpsTestParentRow).values(name="p1", domain_name="d1"))
+
+
 class TestExists:
     async def test_matching_condition_is_true_absent_is_false(
-        self, provider: DBOpsProvider, ops_tables: None
+        self, provider: DBOpsProvider, seeded_parent: None
     ) -> None:
-        async with provider.write_ops() as w:
-            await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
-
         async with provider.read_ops() as r:
             assert await r.exists(
                 ExistsQuerier(
@@ -214,10 +221,7 @@ class TestExists:
                 )
             )
 
-    async def test_conditions_are_anded(self, provider: DBOpsProvider, ops_tables: None) -> None:
-        async with provider.write_ops() as w:
-            await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
-
+    async def test_conditions_are_anded(self, provider: DBOpsProvider, seeded_parent: None) -> None:
         async with provider.read_ops() as r:
             assert await r.exists(
                 ExistsQuerier(
@@ -239,15 +243,15 @@ class TestExists:
                 )
             )
 
-    async def test_empty_conditions_check_any_row(
+    async def test_empty_conditions_false_on_empty_table(
         self, provider: DBOpsProvider, ops_tables: None
     ) -> None:
         async with provider.read_ops() as r:
             assert not await r.exists(ExistsQuerier(row_class=OpsTestParentRow))
 
-        async with provider.write_ops() as w:
-            await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
-
+    async def test_empty_conditions_true_when_any_row(
+        self, provider: DBOpsProvider, seeded_parent: None
+    ) -> None:
         async with provider.read_ops() as r:
             assert await r.exists(ExistsQuerier(row_class=OpsTestParentRow))
 
