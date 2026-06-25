@@ -15,8 +15,12 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
-from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
+from ai.backend.manager.errors.app_config import (
+    AppConfigFragmentNotFound,
+    AppConfigFragmentWriteNotAllowed,
+)
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
@@ -51,8 +55,11 @@ _OTHER_USER_ID = str(uuid.uuid4())
 async def database(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    # FK order: app_config_definitions (parent) before app_config_fragments (child).
-    async with with_tables(database_connection, [AppConfigDefinitionRow, AppConfigFragmentRow]):
+    # FK order: app_config_definitions (parent) before the allow-list and fragments (children).
+    async with with_tables(
+        database_connection,
+        [AppConfigDefinitionRow, AppConfigAllowListRow, AppConfigFragmentRow],
+    ):
         yield database_connection
 
 
@@ -63,7 +70,21 @@ def repository(database: ExtendedAsyncSAEngine) -> AppConfigFragmentRepository:
 
 @pytest.fixture
 async def theme_registered(database: ExtendedAsyncSAEngine) -> None:
-    """Situation: ``theme`` is registered (FK parent) but no fragments exist yet."""
+    """Situation: ``theme`` is registered and allow-listed at every scope; no fragments yet."""
+    async with database.begin_session() as db_sess:
+        db_sess.add(AppConfigDefinitionRow(config_name="theme"))
+        await db_sess.flush()
+        db_sess.add_all([
+            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.PUBLIC),
+            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.DOMAIN),
+            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.USER),
+        ])
+        await db_sess.flush()
+
+
+@pytest.fixture
+async def theme_defined_not_allow_listed(database: ExtendedAsyncSAEngine) -> None:
+    """Situation: ``theme`` is registered but has no allow-list row (writes are gated)."""
     async with database.begin_session() as db_sess:
         db_sess.add(AppConfigDefinitionRow(config_name="theme"))
         await db_sess.flush()
@@ -71,7 +92,31 @@ async def theme_registered(database: ExtendedAsyncSAEngine) -> None:
 
 @pytest.fixture
 async def domain_scoped_fragment(database: ExtendedAsyncSAEngine) -> AppConfigFragmentData:
-    """Situation: a single pre-existing ``theme``/domain fragment."""
+    """Situation: a pre-existing ``theme``/domain fragment, allow-listed at the domain scope."""
+    async with database.begin_session() as db_sess:
+        db_sess.add(AppConfigDefinitionRow(config_name="theme"))
+        await db_sess.flush()
+        db_sess.add(
+            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.DOMAIN)
+        )
+        row = AppConfigFragmentRow(
+            config_name="theme",
+            scope_type=AppConfigScopeType.DOMAIN,
+            scope_id=_DOMAIN_ID,
+            rank=100,
+            config={"k": "v"},
+        )
+        db_sess.add(row)
+        await db_sess.flush()
+        return row.to_data()
+
+
+@pytest.fixture
+async def fragment_not_allow_listed(database: ExtendedAsyncSAEngine) -> AppConfigFragmentData:
+    """Situation: a ``theme``/domain fragment whose ``(config_name, scope)`` is NOT allow-listed.
+
+    Models a row that survives after its allow-list entry was removed — writes must be gated.
+    """
     async with database.begin_session() as db_sess:
         db_sess.add(AppConfigDefinitionRow(config_name="theme"))
         await db_sess.flush()
@@ -171,6 +216,19 @@ class TestCreateAndGet:
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(AppConfigFragmentID(uuid.uuid4()))
 
+    async def test_create_rejected_when_not_allow_listed(
+        self, repository: AppConfigFragmentRepository, theme_defined_not_allow_listed: None
+    ) -> None:
+        with pytest.raises(AppConfigFragmentWriteNotAllowed):
+            await repository.create(
+                AppConfigFragmentCreatorSpec(
+                    config_name="theme",
+                    scope_type=AppConfigScopeType.PUBLIC,
+                    scope_id="public",
+                    config={"theme": "dark"},
+                )
+            )
+
     async def test_unique_constraint_violation(
         self,
         repository: AppConfigFragmentRepository,
@@ -242,6 +300,19 @@ class TestUpdate:
                 )
             )
 
+    async def test_update_rejected_when_not_allow_listed(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragment_not_allow_listed: AppConfigFragmentData,
+    ) -> None:
+        with pytest.raises(AppConfigFragmentWriteNotAllowed):
+            await repository.update(
+                Updater(
+                    spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
+                    pk_value=fragment_not_allow_listed.id,
+                )
+            )
+
 
 class TestPurge:
     async def test_purge_removes_row(
@@ -260,6 +331,16 @@ class TestPurge:
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.purge(
                 Purger(row_class=AppConfigFragmentRow, pk_value=AppConfigFragmentID(uuid.uuid4()))
+            )
+
+    async def test_purge_rejected_when_not_allow_listed(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragment_not_allow_listed: AppConfigFragmentData,
+    ) -> None:
+        with pytest.raises(AppConfigFragmentWriteNotAllowed):
+            await repository.purge(
+                Purger(row_class=AppConfigFragmentRow, pk_value=fragment_not_allow_listed.id)
             )
 
 

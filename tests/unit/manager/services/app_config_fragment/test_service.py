@@ -17,14 +17,8 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
-from ai.backend.manager.errors.app_config import (
-    AppConfigFragmentNotFound,
-    AppConfigFragmentWriteNotAllowed,
-)
+from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.app_config_allow_list.repository import (
-    AppConfigAllowListRepository,
-)
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
@@ -92,28 +86,17 @@ class TestAppConfigFragmentService:
         return MagicMock(spec=AppConfigFragmentRepository)
 
     @pytest.fixture
-    def mock_allow_list_repository(self) -> MagicMock:
-        return MagicMock(spec=AppConfigAllowListRepository)
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: MagicMock, mock_allow_list_repository: MagicMock
-    ) -> AppConfigFragmentService:
-        return AppConfigFragmentService(
-            repository=mock_repository,
-            allow_list_repository=mock_allow_list_repository,
-        )
+    def service(self, mock_repository: MagicMock) -> AppConfigFragmentService:
+        # The allow-list write-gate lives in the repository (atomic with the write); the
+        # service only delegates. Gate pass/reject is covered by the repository tests.
+        return AppConfigFragmentService(repository=mock_repository)
 
     # --- create ---
 
-    async def test_create_passes_write_gate(
-        self,
-        service: AppConfigFragmentService,
-        mock_repository: MagicMock,
-        mock_allow_list_repository: MagicMock,
+    async def test_create_delegates_to_repository(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
     ) -> None:
         fragment = _fragment()
-        mock_allow_list_repository.exists = AsyncMock(return_value=True)
         mock_repository.create = AsyncMock(return_value=fragment)
         spec = AppConfigFragmentCreatorSpec(
             config_name="theme",
@@ -126,25 +109,6 @@ class TestAppConfigFragmentService:
 
         assert result.fragment == fragment
         mock_repository.create.assert_called_once_with(spec)
-
-    async def test_create_rejected_when_not_allow_listed(
-        self,
-        service: AppConfigFragmentService,
-        mock_repository: MagicMock,
-        mock_allow_list_repository: MagicMock,
-    ) -> None:
-        mock_allow_list_repository.exists = AsyncMock(return_value=False)
-        mock_repository.create = AsyncMock()
-        spec = AppConfigFragmentCreatorSpec(
-            config_name="theme",
-            scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
-            config={"k": "v"},
-        )
-
-        with pytest.raises(AppConfigFragmentWriteNotAllowed):
-            await service.create(CreateAppConfigFragmentAction(creator_spec=spec))
-        mock_repository.create.assert_not_called()
 
     # --- get / search ---
 
@@ -222,22 +186,16 @@ class TestAppConfigFragmentService:
         assert called_scopes[0].domain_id == domain_id
         assert called_scopes[1].user_id == _USER_UUID
 
-    # --- admin update ---
+    # --- update ---
 
-    async def test_update_passes_write_gate(
-        self,
-        service: AppConfigFragmentService,
-        mock_repository: MagicMock,
-        mock_allow_list_repository: MagicMock,
+    async def test_update_delegates_to_repository(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
     ) -> None:
-        existing = _fragment()
         updated = _fragment()
-        mock_repository.get_by_id = AsyncMock(return_value=existing)
-        mock_allow_list_repository.exists = AsyncMock(return_value=True)
         mock_repository.update = AsyncMock(return_value=updated)
         updater = Updater(
             spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
-            pk_value=existing.id,
+            pk_value=updated.id,
         )
 
         result = await service.update(UpdateAppConfigFragmentAction(updater=updater))
@@ -245,39 +203,12 @@ class TestAppConfigFragmentService:
         assert result.fragment == updated
         mock_repository.update.assert_called_once_with(updater)
 
-    async def test_update_rejected_when_not_allow_listed(
-        self,
-        service: AppConfigFragmentService,
-        mock_repository: MagicMock,
-        mock_allow_list_repository: MagicMock,
-    ) -> None:
-        existing = _fragment()
-        mock_repository.get_by_id = AsyncMock(return_value=existing)
-        mock_allow_list_repository.exists = AsyncMock(return_value=False)
-        mock_repository.update = AsyncMock()
-
-        with pytest.raises(AppConfigFragmentWriteNotAllowed):
-            await service.update(
-                UpdateAppConfigFragmentAction(
-                    updater=Updater(
-                        spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
-                        pk_value=existing.id,
-                    )
-                )
-            )
-        mock_repository.update.assert_not_called()
-
     # --- purge ---
 
-    async def test_purge_passes_write_gate(
-        self,
-        service: AppConfigFragmentService,
-        mock_repository: MagicMock,
-        mock_allow_list_repository: MagicMock,
+    async def test_purge_delegates_to_repository(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
     ) -> None:
         fragment = _fragment()
-        mock_repository.get_by_id = AsyncMock(return_value=fragment)
-        mock_allow_list_repository.exists = AsyncMock(return_value=True)
         mock_repository.purge = AsyncMock(return_value=fragment)
         purger = Purger(row_class=AppConfigFragmentRow, pk_value=fragment.id)
 
@@ -285,22 +216,6 @@ class TestAppConfigFragmentService:
 
         assert result.fragment == fragment
         mock_repository.purge.assert_called_once_with(purger)
-
-    async def test_purge_rejected_when_not_allow_listed(
-        self,
-        service: AppConfigFragmentService,
-        mock_repository: MagicMock,
-        mock_allow_list_repository: MagicMock,
-    ) -> None:
-        fragment = _fragment()
-        mock_repository.get_by_id = AsyncMock(return_value=fragment)
-        mock_allow_list_repository.exists = AsyncMock(return_value=False)
-        mock_repository.purge = AsyncMock()
-        purger = Purger(row_class=AppConfigFragmentRow, pk_value=fragment.id)
-
-        with pytest.raises(AppConfigFragmentWriteNotAllowed):
-            await service.purge(PurgeAppConfigFragmentAction(purger=purger))
-        mock_repository.purge.assert_not_called()
 
 
 class TestCreateActionScope:
