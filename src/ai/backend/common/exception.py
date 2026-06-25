@@ -876,6 +876,26 @@ class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+# Standard HTTP error statuses -> ErrorDetail. Statuses without a corresponding ErrorDetail
+# (e.g. 405, 429) fall back to INTERNAL_ERROR.
+_HTTP_STATUS_TO_ERROR_DETAIL: dict[int, ErrorDetail] = {
+    400: ErrorDetail.BAD_REQUEST,
+    401: ErrorDetail.UNAUTHORIZED,
+    403: ErrorDetail.FORBIDDEN,
+    404: ErrorDetail.NOT_FOUND,
+    408: ErrorDetail.TIMEOUT,
+    409: ErrorDetail.CONFLICT,
+    410: ErrorDetail.GONE,
+    415: ErrorDetail.CONTENT_TYPE_MISMATCH,
+    422: ErrorDetail.INVALID_PARAMETERS,
+    500: ErrorDetail.INTERNAL_ERROR,
+    501: ErrorDetail.NOT_IMPLEMENTED,
+    502: ErrorDetail.UNREACHABLE,
+    503: ErrorDetail.UNAVAILABLE,
+    504: ErrorDetail.TIMEOUT,
+}
+
+
 class PassthroughError(BackendAIError):
     """
     Wraps and forwards errors from requests with original status code and message.
@@ -895,6 +915,26 @@ class PassthroughError(BackendAIError):
         self._error_code = error_code
         extra_msg = error_message or f"An error occurred with status code {status_code}"
         super().__init__(extra_msg=extra_msg)
+
+    @classmethod
+    def from_http_status(
+        cls,
+        status_code: int,
+        *,
+        domain: ErrorDomain,
+        operation: ErrorOperation,
+        error_message: str | None = None,
+    ) -> Self:
+        """
+        Build from an upstream HTTP status, mapping standard error statuses to an ErrorDetail
+        (unmapped statuses -> INTERNAL_ERROR) so the failure category is preserved.
+        """
+        error_detail = _HTTP_STATUS_TO_ERROR_DETAIL.get(status_code, ErrorDetail.INTERNAL_ERROR)
+        return cls(
+            status_code=status_code,
+            error_code=ErrorCode(domain=domain, operation=operation, error_detail=error_detail),
+            error_message=error_message,
+        )
 
     def error_code(self) -> ErrorCode:
         return self._error_code
