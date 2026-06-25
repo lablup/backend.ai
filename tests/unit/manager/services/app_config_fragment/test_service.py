@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
@@ -15,7 +16,6 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
-    AppConfigScopeType,
 )
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,

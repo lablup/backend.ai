@@ -8,9 +8,9 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope

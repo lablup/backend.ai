@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import cast
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
 from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowed
 from ai.backend.manager.models.app_config_allow_list.conditions import (
     AppConfigAllowListConditions,
