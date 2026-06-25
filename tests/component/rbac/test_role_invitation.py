@@ -88,7 +88,12 @@ def server_module_registries(
         RBACHandler(permission_controller=permission_controller_processors), route_deps
     )
     admin_registry = register_admin_routes(
-        AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()),
+        AdminHandler(
+            gql_schema=MagicMock(),
+            gql_deps=MagicMock(),
+            strawberry_schema=MagicMock(),
+            public_strawberry_schema=MagicMock(),
+        ),
         route_deps,
         sub_registries=[rbac_registry],
         gql_ws_handler=MagicMock(),
