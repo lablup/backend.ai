@@ -303,10 +303,14 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: list[str] | None = Field(
-        default=None, description="Command to start the model service."
+    command: str | None = Field(
+        default=None, description="Single-string command to start the model service."
     )
-    shell: str = Field(
+    start_command: list[str] | None = Field(
+        default=None,
+        description="Deprecated. Command to start the model service. Use `command` instead.",
+    )
+    shell: str | None = Field(
         default="/bin/bash",
         description="Shell configured for the model service.",
     )

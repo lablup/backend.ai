@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -1183,9 +1184,20 @@ class DeploymentAdapter(BaseAdapter):
                 environ=environ,
             )
 
-        model_definition = (
-            input.model_definition.to_draft() if input.model_definition is not None else None
-        )
+        # FIXME(BA-6550): temporary bridge — fold the single-string `command` into the
+        # str `start_command` so the ModelServiceConfigDraft validator wraps it.
+        model_definition: ModelDefinitionDraft | None = None
+        if input.model_definition is not None:
+            model_definition_payload = input.model_definition.model_dump(exclude_unset=True)
+            for model_payload in model_definition_payload.get("models") or []:
+                service_payload = model_payload.get("service")
+                if service_payload is None:
+                    continue
+                command = service_payload.pop("command", None)
+                if command is not None:
+                    service_payload["start_command"] = command
+            # ModelServiceConfig will convert the `start_command` string into a list of strings for the `start_command` field.
+            model_definition = ModelDefinitionDraft.model_validate(model_definition_payload)
 
         runtime_variant_preset_values = (
             [
