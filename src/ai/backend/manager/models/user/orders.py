@@ -6,10 +6,10 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import QueryOrder
 
 __all__ = ("UserOrders",)
 

@@ -16,13 +16,13 @@ from ai.backend.common.data.filter_specs import (
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
 )
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class DeploymentConditions:

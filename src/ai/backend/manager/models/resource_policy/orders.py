@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ai.backend.manager.repositories.base import QueryOrder
+from ai.backend.manager.models.clauses import QueryOrder
 
 from .row import KeyPairResourcePolicyRow, ProjectResourcePolicyRow, UserResourcePolicyRow
 

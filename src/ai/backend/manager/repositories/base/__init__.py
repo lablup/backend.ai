@@ -58,6 +58,7 @@ from .purger import (
 from .querier import (
     BatchQuerier,
     BatchQuerierResult,
+    ExistsQuerier,
     Querier,
     QuerierResult,
     execute_batch_querier,
@@ -65,11 +66,7 @@ from .querier import (
 )
 from .types import (
     CursorConditionFactory,
-    ExistenceCheck,
     IntegrityErrorCheck,
-    QueryCondition,
-    QueryOrder,
-    SearchScope,
 )
 from .updater import (
     BatchUpdater,
@@ -101,12 +98,8 @@ from .utils import (
 
 __all__ = [
     # Types
-    "QueryCondition",
-    "QueryOrder",
     "CursorConditionFactory",
-    "ExistenceCheck",
     "IntegrityErrorCheck",
-    "SearchScope",
     # Integrity
     "parse_integrity_error",
     "match_integrity_error",
@@ -131,6 +124,7 @@ __all__ = [
     "Querier",
     "QuerierResult",
     "execute_querier",
+    "ExistsQuerier",
     # BatchQuerier
     "BatchQuerier",
     "BatchQuerierResult",

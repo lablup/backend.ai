@@ -10,7 +10,8 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogListResult
 from ai.backend.manager.models.audit_log import AuditLogRow
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, SearchScope
+from ai.backend.manager.models.scopes import SearchScope
+from ai.backend.manager.repositories.base import BatchQuerier, Creator
 
 from .db_source import AuditLogDBSource
 

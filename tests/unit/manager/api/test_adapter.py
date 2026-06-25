@@ -13,8 +13,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
+from ai.backend.manager.models.clauses import QueryCondition
 
 if TYPE_CHECKING:
     from sqlalchemy.sql.expression import ColumnElement

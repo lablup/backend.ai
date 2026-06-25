@@ -1,3 +1,13 @@
+---
+name: bai-cli
+description: ./bai v2 CLI usage for testing/verifying API endpoints and managing resources — entity-command reference, login/config, search patterns, testing workflow (REST API client, NOT the v1 backend.ai CLI)
+tags:
+  - cli
+  - bai
+  - testing
+  - rest-api
+---
+
 # ./bai CLI Usage Guide
 
 Guide for testing and verifying API endpoints and managing resources with the Backend.AI **v2 CLI** (`./bai`).

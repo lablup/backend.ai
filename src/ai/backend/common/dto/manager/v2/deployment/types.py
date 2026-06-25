@@ -23,7 +23,6 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import (
     BackendAISchema,
     ClusterMode,
@@ -417,8 +416,7 @@ class ModelMountConfigInfoDTO(BaseResponseModel):
     subpath: str | None = Field(
         default=None,
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. "
-            "Subpath within the model vfolder. ``None`` means the vfolder root."
+            "Added in 26.4.4. Subpath within the model vfolder. ``None`` means the vfolder root."
         ),
     )
 
@@ -446,8 +444,7 @@ class ExtraVFolderMountGQLDTO(BaseResponseModel):
     subpath: str | None = Field(
         default=None,
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. "
-            "Subpath within the vfolder. ``None`` means the vfolder root."
+            "Added in 26.4.4. Subpath within the vfolder. ``None`` means the vfolder root."
         ),
     )
 

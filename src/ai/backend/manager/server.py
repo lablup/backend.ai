@@ -55,7 +55,6 @@ from ai.backend.logging.otel import (
 )
 
 from . import __version__
-from .api import ManagerStatus
 from .api.rest.app import _mount_registry_tree
 from .api.rest.internal.tree import build_internal_api_routes
 from .api.rest.middleware import (
@@ -65,6 +64,7 @@ from .api.rest.middleware import (
 from .api.rest.routing import RouteRegistry
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
+from .data.manager_status.types import ManagerStatus
 from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
 from .plugin.webapp import WebappPluginContext
 

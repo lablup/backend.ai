@@ -6,8 +6,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class ReplicaGroupHistoryConditions:

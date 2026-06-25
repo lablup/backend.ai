@@ -16,6 +16,15 @@ def admin() -> None:
     """Admin-only management commands (superadmin required)."""
 
 
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.app_config_definition:app_config_definition",
+    name="app-config-definition",
+)
+def app_config_definition() -> None:
+    """Admin app config definition commands."""
+
+
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.domain:domain")
 def domain() -> None:
     """Admin domain commands."""
@@ -34,6 +43,15 @@ def project() -> None:
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.agent:agent")
 def agent() -> None:
     """Admin agent commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.app_config_allow_list:app_config_allow_list",
+    name="app-config-allow-list",
+)
+def app_config_allow_list() -> None:
+    """Admin app config allow-list commands."""
 
 
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.deployment:deployment")

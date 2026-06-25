@@ -17,6 +17,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.errors.repository import EmptySearchScopeError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
@@ -33,12 +34,12 @@ from ai.backend.manager.repositories.base import (
     Creator,
     CreatorResult,
     DependentCreatorSpec,
+    ExistsQuerier,
     NextValuePolicy,
     Purger,
     PurgerResult,
     Querier,
     QuerierResult,
-    SearchScope,
     Updater,
     UpdaterResult,
     Upserter,
@@ -85,6 +86,19 @@ class ReadOps:
     async def query[TRow: Base](self, querier: Querier[TRow]) -> QuerierResult[TRow] | None:
         """Fetch a single row by primary key."""
         return await execute_querier(self._sess, querier)
+
+    async def exists[TRow: Base](self, querier: ExistsQuerier[TRow]) -> bool:
+        """Whether any row matches the querier's conditions.
+
+        Runs ``SELECT EXISTS(SELECT 1 FROM table WHERE ...)``; does not count or fetch rows.
+        """
+        inner = (
+            sa.select(sa.literal(True))
+            .select_from(querier.row_class.__table__)
+            .where(*[condition() for condition in querier.conditions])
+        )
+        result = await self._sess.execute(sa.select(inner.exists()))
+        return bool(result.scalar_one())
 
     async def batch_query_in_global(
         self,

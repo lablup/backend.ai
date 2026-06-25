@@ -26,12 +26,12 @@ from ai.backend.manager.data.deployment.types import (
     RouteSubStatus,
 )
 from ai.backend.manager.data.session.types import SchedulingResult
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
-    QueryCondition,
     combine_conditions_and,
     combine_conditions_or,
 )

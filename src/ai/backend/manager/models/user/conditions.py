@@ -11,6 +11,7 @@ from sqlalchemy.dialects import postgresql
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
     make_int_conditions,
     make_nested_string_in_factory,
@@ -19,7 +20,6 @@ from ai.backend.manager.models.condition_utils import (
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 __all__ = ("UserConditions",)
 

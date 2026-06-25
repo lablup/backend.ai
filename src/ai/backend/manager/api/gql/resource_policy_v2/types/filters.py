@@ -25,7 +25,6 @@ from ai.backend.common.dto.manager.v2.resource_policy.request import (
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     UserResourcePolicyOrder as UserResourcePolicyOrderDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntFilter,
@@ -47,7 +46,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Nested filter for keypairs assigned to a keypair resource policy. "
             "Filters policies linked to at least one keypair matching all specified conditions."
@@ -79,7 +78,7 @@ class KeypairResourcePolicyV2Filter(PydanticInputMixin[KeypairResourcePolicyFilt
     max_pending_session_count: IntFilter | None = None
     keypair: KeypairResourcePolicyKeypairNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Filter policies by their assigned keypairs. "
                 "A policy matches if at least one of its keypairs satisfies the conditions."

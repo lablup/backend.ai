@@ -125,8 +125,8 @@ class TestVFolderCreateErrors:
                     unmanaged_path="/mnt/forbidden",
                 ),
             )
-        # Server wraps Forbidden as InternalServerError (500) at the API boundary
-        assert exc_info.value.status == 500
+        # Forbidden propagates with its own 403 status (no longer masked as 500)
+        assert exc_info.value.status == 403
 
     async def test_dot_prefix_name_for_group_vfolder_raises_error(
         self,
@@ -158,8 +158,8 @@ class TestVFolderCreateErrors:
                     group_id=group_fixture,
                 ),
             )
-        # Server wraps Forbidden as InternalServerError (500) at the API boundary
-        assert exc_info.value.status == 500
+        # Forbidden propagates with its own 403 status (no longer masked as 500)
+        assert exc_info.value.status == 403
 
     async def test_duplicate_name_raises_conflict(
         self,

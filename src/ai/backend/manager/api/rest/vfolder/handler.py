@@ -97,7 +97,6 @@ from ai.backend.common.dto.manager.vfolder.response import (
     VFolderSharedInfoDTO,
     VolumeInfoDTO,
 )
-from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.types import ScopeType
@@ -276,8 +275,11 @@ class VFolderHandler:
             )
         except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
             raise InvalidAPIParameters(str(e)) from e
-        except BackendAIError as e:
-            raise InternalServerError(str(e)) from e
+        # Every other BackendAIError carries its own HTTP status (Forbidden ->
+        # 403, ProjectNotFound -> 404, VFolderCreationFailure -> 400); let it
+        # propagate so the exception middleware serializes the real error.
+        # Collapsing them into InternalServerError hid the actual cause behind
+        # a generic 500 "Internal server error." title.
 
         item = VFolderItemField(
             id=result.id.hex,

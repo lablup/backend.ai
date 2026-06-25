@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
-from .types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 
 if TYPE_CHECKING:
     from sqlalchemy.orm.attributes import InstrumentedAttribute

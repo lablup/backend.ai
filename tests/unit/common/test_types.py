@@ -20,6 +20,7 @@ from ai.backend.common.types import (
     MountInfoEntry,
     MountPermission,
     ResourceSlot,
+    ResourceSlotEntry,
     SlotName,
     SlotTypes,
     _stringify_number,
@@ -556,3 +557,69 @@ class TestMountInfoEntryLegacyShape:
                 "mount_destination": "/home/work/data",
                 "mount_perm": "rw",
             })
+
+
+@dataclass(frozen=True)
+class _QuantityCase:
+    """Pairs a resource entry quantity with the slot value it should parse to."""
+
+    resource_type: str
+    quantity: str
+    expected: Decimal
+
+
+class TestResourceSlotEntryToResourceSlot:
+    """``ResourceSlotEntry.to_resource_slot`` quantity parsing (BA-6576)."""
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            pytest.param(_QuantityCase("cpu", "2", Decimal("2")), id="plain-int"),
+            pytest.param(_QuantityCase("cpu", "0.5", Decimal("0.5")), id="fraction"),
+            pytest.param(
+                _QuantityCase("mem", "4294967296", Decimal("4294967296")), id="bytes-decimal"
+            ),
+            pytest.param(
+                _QuantityCase("mem", "4g", Decimal(BinarySize.from_str("4g"))),
+                id="human-readable-size",
+            ),
+        ],
+    )
+    def test_valid_quantity_is_parsed(self, case: _QuantityCase) -> None:
+        """Plain decimals and human-readable sizes such as ``"4g"`` for a memory
+        slot are parsed with BinarySize tolerance, matching the legacy enqueue
+        path, instead of raising and surfacing as a 500."""
+        entries = [ResourceSlotEntry(resource_type=case.resource_type, quantity=case.quantity)]
+        assert ResourceSlotEntry.inputs_to_resource_slot(entries) == ResourceSlot({
+            case.resource_type: case.expected
+        })
+
+    @pytest.mark.parametrize(
+        ("resource_type", "quantity"),
+        [
+            pytest.param("mem", "not-a-number", id="garbage"),
+            pytest.param("cpu", "abc", id="non-numeric"),
+            pytest.param("mem", "", id="empty"),
+            pytest.param("cpu", "-1", id="negative"),
+        ],
+    )
+    def test_invalid_quantity_raises_4xx(self, resource_type: str, quantity: str) -> None:
+        """A non-parseable or negative quantity is rejected with a 4xx
+        ``InvalidResourceSlotQuantity`` (BackendAIError) rather than letting
+        ``decimal.InvalidOperation`` propagate as an unhandled 500."""
+        entries = [ResourceSlotEntry(resource_type=resource_type, quantity=quantity)]
+        with pytest.raises(InvalidResourceSlotQuantity):
+            ResourceSlotEntry.inputs_to_resource_slot(entries)
+
+    def test_multiple_entries_are_merged(self) -> None:
+        entries = [
+            ResourceSlotEntry(resource_type="cpu", quantity="2"),
+            ResourceSlotEntry(resource_type="mem", quantity="4g"),
+        ]
+        assert ResourceSlotEntry.inputs_to_resource_slot(entries) == ResourceSlot({
+            "cpu": Decimal("2"),
+            "mem": Decimal(BinarySize.from_str("4g")),
+        })
+
+    def test_empty_entries(self) -> None:
+        assert ResourceSlotEntry.inputs_to_resource_slot([]) == ResourceSlot()

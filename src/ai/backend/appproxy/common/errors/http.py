@@ -120,6 +120,21 @@ class GenericForbidden(BackendAIError, web.HTTPForbidden):
         )
 
 
+class ClientIPNotAllowed(BackendAIError, web.HTTPForbidden):
+    """Raised when the client's address is not within a circuit's
+    ``allowed_client_ips`` allowlist."""
+
+    error_type = "https://api.backend.ai/probs/client-ip-not-allowed"
+    error_title = "Client address not allowed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class InsufficientPrivilege(BackendAIError, web.HTTPForbidden):
     """Raised when user has insufficient privileges."""
 

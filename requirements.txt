@@ -99,7 +99,7 @@ treelib~=1.7.0
 tt-smi~=3.0.36; sys_platform == 'linux' and platform_machine == 'x86_64'
 typeguard~=4.3
 typing_extensions~=4.11
-textual~=0.79.1
+textual~=6.2
 uvloop~=0.22.1; sys_platform != "Windows"
 valkey-glide~=2.3.1
 yarl~=1.19.0

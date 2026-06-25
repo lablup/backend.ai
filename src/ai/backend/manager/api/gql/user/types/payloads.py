@@ -47,7 +47,6 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload as UpdateUserPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -76,7 +75,7 @@ class CreateUserPayloadGQL(PydanticOutputMixin[CreateUserPayloadDTO]):
     user: UserV2GQL = gql_field(description="The newly created user.")
     keypair: CreateKeypairPayloadGQL = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "The default keypair automatically generated for the user, "
                 "including its one-time secret key."
@@ -122,7 +121,7 @@ class BulkCreateUsersV2PayloadGQL(PydanticOutputMixin[BulkCreateUsersPayloadDTO]
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Payload for bulk user creation, including each user's generated keypair.",
     ),
     model=BulkCreateUsersWithKeypairPayloadDTO,

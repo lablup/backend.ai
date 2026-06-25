@@ -51,6 +51,7 @@ def build_api_routes(
     passed to pure routing registrar functions.
     """
     # Lazy imports to avoid circular dependencies at module level
+    from ai.backend.manager.api.gql.schema import public_schema as public_strawberry_schema
     from ai.backend.manager.api.gql.schema import schema as strawberry_schema
     from ai.backend.manager.api.gql_legacy.schema import graphene_schema
 
@@ -260,6 +261,7 @@ def build_api_routes(
         gql_schema=graphene_schema,
         gql_deps=gql_context_deps,
         strawberry_schema=strawberry_schema,
+        public_strawberry_schema=public_strawberry_schema,
     )
 
     # Template sub-registries
@@ -296,6 +298,7 @@ def build_api_routes(
     stream_handler = StreamHandler(
         private_ctx=stream_ctx,
         stream_processors=stream_processors,
+        session_processors=processors.session,
         config_provider=config_provider,
         error_monitor=error_monitor,
     )

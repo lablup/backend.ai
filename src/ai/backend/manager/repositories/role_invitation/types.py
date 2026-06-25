@@ -9,8 +9,9 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
-from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 
 @dataclass

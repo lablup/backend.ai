@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
+from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.stream.handler import StreamHandler
@@ -28,7 +29,9 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.stream.repository import StreamRepository
+from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
 from ai.backend.testutils.fixtures import DomainFixtureData
@@ -76,9 +79,39 @@ def stream_processors(
 
 
 @pytest.fixture()
+async def session_processors(database_engine: ExtendedAsyncSAEngine) -> Any:
+    """Minimal real resolver for the stream handler.
+
+    Only ``resolve_session_name`` is wired to the real DB (via a real
+    ``SessionRepository``); that is all the stream handler uses to normalize a
+    UUID-shaped path reference to its canonical session name.
+    """
+    repo = SessionRepository(database_engine)
+    service = SessionService(
+        SessionServiceArgs(
+            agent_registry=AsyncMock(),
+            event_fetcher=AsyncMock(),
+            background_task_manager=AsyncMock(),
+            event_hub=AsyncMock(),
+            error_monitor=AsyncMock(),
+            idle_checker_host=AsyncMock(),
+            session_repository=repo,
+            scheduler_repository=AsyncMock(),
+            scheduling_controller=AsyncMock(),
+            appproxy_client_pool=AsyncMock(),
+            user_repository=AsyncMock(),
+        )
+    )
+    processors = MagicMock()
+    processors.resolve_session_name = ActionProcessor(service.resolve_session_name, [])
+    return processors
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     stream_processors: StreamProcessors,
+    session_processors: Any,
     config_provider: ManagerConfigProvider,
     error_monitor: ErrorPluginContext,
 ) -> list[RouteRegistry]:
@@ -88,6 +121,7 @@ def server_module_registries(
             StreamHandler(
                 private_ctx=MagicMock(),
                 stream_processors=stream_processors,
+                session_processors=session_processors,
                 config_provider=config_provider,
                 error_monitor=error_monitor,
             ),

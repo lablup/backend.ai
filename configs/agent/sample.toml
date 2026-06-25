@@ -237,15 +237,47 @@
     # Added in 25.12.0
     interval = 30.0
 
-  # Configuration for utilization metric collection. Controls the collection
-  # interval and, derived from it, the Valkey expiration of stored utilization
-  # values.
+  # Configuration for utilization metric collection. Holds per-node, per-
+  # container, and per-process settings, each with its own enable flag and
+  # collection interval.
   # Added in 26.4.4
   [agent.utilization-metric]
-    # Time interval in seconds between utilization metric collection cycles
-    # (per-node, per-container, and per-process statistics).
+
+    # Per-node and per-device utilization metric collection settings.
     # Added in 26.4.4
-    interval = 30.0
+    [agent.utilization-metric.node]
+      # Whether to collect per-node and per-device utilization metrics.
+      # Added in 26.4.4
+      enable = true
+      # Time interval in seconds between per-node utilization metric collection
+      # cycles.
+      # Added in 26.4.4
+      interval = 30.0
+
+    # Per-container utilization metric collection settings.
+    # Added in 26.4.4
+    [agent.utilization-metric.container]
+      # Whether to collect per-container utilization metrics.
+      # Added in 26.4.4
+      enable = true
+      # Time interval in seconds between per-container utilization metric
+      # collection cycles.
+      # Added in 26.4.4
+      interval = 30.0
+
+    # Per-process utilization metric collection settings.
+    # Added in 26.4.4
+    [agent.utilization-metric.process]
+      # Whether to collect per-process utilization metrics for each container.
+      # When disabled, the agent skips listing container processes and reporting
+      # per-process statistics, while per-node and per-container metrics are
+      # still collected.
+      # Added in 26.4.4
+      enable = true
+      # Time interval in seconds between per-process utilization metric
+      # collection cycles.
+      # Added in 26.4.4
+      interval = 30.0
 
 # Container runtime configuration including execution modes, user settings, and
 # networking. In multi-agent mode (when 'agents' field is populated), this

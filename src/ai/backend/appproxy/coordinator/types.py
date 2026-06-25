@@ -288,6 +288,10 @@ class CircuitManager:
             prefixes_to_remove.append(
                 f"{etcd_prefix}/middlewares/appproxy/plugin/bai_appproxy_plugin_{circuit.id}",
             )
+            # Removed even when the circuit had no allowlist.
+            prefixes_to_remove.append(
+                f"{etcd_prefix}/middlewares/bai_ipallowlist_{circuit.id}",
+            )
 
         for prefix in prefixes_to_remove:
             log.debug("traefik_etcd.delete_prefix {}", prefix)
@@ -357,6 +361,10 @@ class CircuitManager:
                         )
                         prefixes_to_remove.append(
                             f"{etcd_prefix}/middlewares/appproxy/plugin/bai_appproxy_plugin_{stale_id}"
+                        )
+                        # Removed even when the stale circuit had no allowlist.
+                        prefixes_to_remove.append(
+                            f"{etcd_prefix}/middlewares/bai_ipallowlist_{stale_id}"
                         )
                     for prefix in prefixes_to_remove:
                         try:
