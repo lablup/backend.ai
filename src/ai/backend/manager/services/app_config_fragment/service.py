@@ -4,9 +4,6 @@ from typing import cast
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.manager.data.app_config_allow_list.types import (
-    AppConfigScopeType as AllowListScopeType,
-)
 from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
 from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowed
 from ai.backend.manager.models.app_config_allow_list.conditions import (
@@ -78,9 +75,7 @@ class AppConfigFragmentService:
                     AppConfigAllowListConditions.by_config_name_equals(
                         StringMatchSpec(config_name, case_insensitive=False, negated=False)
                     ),
-                    AppConfigAllowListConditions.by_scope_type_equals(
-                        AllowListScopeType(scope_type.value)
-                    ),
+                    AppConfigAllowListConditions.by_scope_type_equals(scope_type),
                 ],
             )
         )
