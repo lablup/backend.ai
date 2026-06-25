@@ -22,7 +22,7 @@ from ai.backend.manager.actions.action.types import ActionTarget, SearchableActi
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.repositories.base.types import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 
 @dataclass(frozen=True)

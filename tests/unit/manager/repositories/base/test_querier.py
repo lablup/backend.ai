@@ -20,14 +20,13 @@ from ai.backend.common.exception import (
 )
 from ai.backend.manager.models.base import Base, IDColumn
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BatchQuerierResult,
-    ExistenceCheck,
     OffsetPagination,
     Querier,
     QuerierResult,
-    SearchScope,
     execute_batch_querier,
     execute_querier,
 )

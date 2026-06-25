@@ -16,9 +16,9 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import BatchQuerierResult
-from ai.backend.manager.repositories.base.types import ExistenceCheck, SearchScope
 
 
 class RoleBatchQuerierResult(BatchQuerierResult[RoleRow]):

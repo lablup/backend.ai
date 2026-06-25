@@ -21,8 +21,8 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import ExistenceCheck, SearchScope
 
 __all__ = (
     "DomainUserSearchScope",

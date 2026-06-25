@@ -17,7 +17,7 @@ from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.repositories.base import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 __all__ = (
     "GroupSearchResult",

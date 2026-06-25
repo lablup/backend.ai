@@ -19,16 +19,11 @@ from ai.backend.manager.data.app_config_fragment.types import (
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    Purger,
-    Querier,
-    SearchScope,
-    Updater,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, Purger, Querier, Updater
 from ai.backend.manager.repositories.base.creator import NextValuePolicy
 from ai.backend.manager.repositories.ops import DBOpsProvider
 

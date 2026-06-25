@@ -65,9 +65,7 @@ from .querier import (
 )
 from .types import (
     CursorConditionFactory,
-    ExistenceCheck,
     IntegrityErrorCheck,
-    SearchScope,
 )
 from .updater import (
     BatchUpdater,
@@ -100,9 +98,7 @@ from .utils import (
 __all__ = [
     # Types
     "CursorConditionFactory",
-    "ExistenceCheck",
     "IntegrityErrorCheck",
-    "SearchScope",
     # Integrity
     "parse_integrity_error",
     "match_integrity_error",

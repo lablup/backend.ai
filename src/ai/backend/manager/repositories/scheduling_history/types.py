@@ -19,9 +19,8 @@ from ai.backend.manager.models.scheduling_history.conditions import (
     RouteHistoryConditions,
     SessionSchedulingHistoryConditions,
 )
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.repositories.base import SearchScope
-from ai.backend.manager.repositories.base.types import ExistenceCheck
 
 __all__ = (
     "SessionSchedulingHistorySearchScope",

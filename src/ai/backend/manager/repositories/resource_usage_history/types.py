@@ -23,8 +23,8 @@ from ai.backend.manager.models.resource_usage_history import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import ExistenceCheck, SearchScope
 
 
 @dataclass(frozen=True)

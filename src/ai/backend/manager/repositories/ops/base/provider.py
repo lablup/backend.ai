@@ -17,6 +17,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.errors.repository import EmptySearchScopeError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchPurger,
@@ -38,7 +39,6 @@ from ai.backend.manager.repositories.base import (
     PurgerResult,
     Querier,
     QuerierResult,
-    SearchScope,
     Updater,
     UpdaterResult,
     Upserter,

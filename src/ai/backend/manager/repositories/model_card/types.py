@@ -19,7 +19,7 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.repositories.base import ExistenceCheck, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 __all__ = (
     "AvailablePresetsSearchResult",
