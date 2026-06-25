@@ -1,8 +1,4 @@
-import enum
+# Re-exported for backward compatibility; defined in the data layer.
+from ai.backend.manager.data.manager_status.types import ManagerStatus
 
-
-class ManagerStatus(enum.StrEnum):
-    TERMINATED = "terminated"  # deprecated
-    PREPARING = "preparing"  # deprecated
-    RUNNING = "running"
-    FROZEN = "frozen"
+__all__ = ["ManagerStatus"]

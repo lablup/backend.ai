@@ -430,17 +430,7 @@ async def call_non_bursty(
     return None
 
 
-class Singleton(type):
-    _instances: MutableMapping[Any, Any] = {}
-
-    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
-        if cls not in cls._instances:
-            cls._instances[cls] = super().__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class Undefined(metaclass=Singleton):
-    pass
-
-
-undefined = Undefined()
+# Re-exported for backward compatibility; defined in the data layer.
+from ai.backend.manager.data.common.sentinel import Singleton as Singleton  # noqa: E402
+from ai.backend.manager.data.common.sentinel import Undefined as Undefined  # noqa: E402
+from ai.backend.manager.data.common.sentinel import undefined as undefined  # noqa: E402
