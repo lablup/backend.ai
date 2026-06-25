@@ -21,6 +21,7 @@ from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import (
     GeneratedKeyPairData,
@@ -91,7 +92,6 @@ from ai.backend.manager.models.vfolder import (
     vfolders,
 )
 from ai.backend.manager.repositories.base.creator import (
-    BulkCreatorError,
     Creator,
     execute_creator,
 )
@@ -113,7 +113,7 @@ from ai.backend.manager.repositories.base.rbac.scope_binder import (
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     execute_rbac_scope_entity_unbinder,
 )
-from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater, execute_updater
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import ProjectUserMembershipCreatorSpec
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
@@ -442,7 +442,7 @@ class UserDBSource:
             return BulkUserCreateResultData(successes=[], failures=[])
 
         successes: list[UserCreateResultData] = []
-        failures: list[BulkCreatorError[UserRow]] = []
+        failures: list[BulkCreateFailure] = []
 
         async with self._db.begin_session() as db_session:
             for idx, item in enumerate(items):
@@ -455,7 +455,7 @@ class UserDBSource:
                         successes.append(created)
                 except Exception as e:
                     log.warning("Failed to create user {}: {}", spec.email, str(e))
-                    failures.append(BulkCreatorError(spec=spec, exception=e, index=idx))
+                    failures.append(BulkCreateFailure(index=idx, exception=e))
 
         return BulkUserCreateResultData(successes=successes, failures=failures)
 
@@ -551,7 +551,7 @@ class UserDBSource:
             return BulkUserUpdateResultData(successes=[], failures=[])
 
         successes: list[UserData] = []
-        failures: list[BulkUpdaterError[UserRow]] = []
+        failures: list[BulkUpdateFailure] = []
 
         async with self._db.begin_session() as session:
             for idx, item in enumerate(items):
@@ -563,9 +563,7 @@ class UserDBSource:
                         successes.append(updated_user)
                 except Exception as e:
                     log.warning("Failed to update user {}: {}", item.user_id, str(e))
-                    failures.append(
-                        BulkUpdaterError(spec=item.updater_spec, exception=e, index=idx)
-                    )
+                    failures.append(BulkUpdateFailure(index=idx, exception=e))
 
         return BulkUserUpdateResultData(successes=successes, failures=failures)
 
