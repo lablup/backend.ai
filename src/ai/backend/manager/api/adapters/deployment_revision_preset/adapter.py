@@ -254,18 +254,11 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         resource_opts = self._convert_resource_opts_input(input.resource_opts)
         environ = self._convert_environ_input(input.environ)
         preset_values = self._convert_preset_values_input(input.preset_values)
-        # FIXME: temporary bridge — fold the single-string `command` into the
-        # str `start_command` so the ModelServiceConfig validator wraps it.
-        model_def: ModelDefinition | None = None
-        if input.model_definition is not None:
-            model_definition_payload = input.model_definition.model_dump()
-            for model_payload in model_definition_payload["models"]:
-                service_payload = model_payload["service"]
-                command = service_payload.pop("command", None)
-                if command is not None:
-                    service_payload["start_command"] = command
-            # ModelServiceConfig will convert the `start_command` string into a list of strings for the `start_command` field.
-            model_def = ModelDefinition.model_validate(model_definition_payload)
+        model_def = (
+            ModelDefinition.model_validate(input.model_definition.model_dump())
+            if input.model_definition is not None
+            else None
+        )
         strategy, strategy_spec = self._convert_required_strategy_input(input.deployment_strategy)
 
         spec = DeploymentRevisionPresetCreatorSpec(
