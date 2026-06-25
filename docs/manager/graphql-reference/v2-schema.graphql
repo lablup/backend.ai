@@ -7016,11 +7016,14 @@ type ModelServiceConfig {
   """
   preStartActions: [PreStartAction!]!
 
-  """Command to start the model service."""
-  startCommand: [String!]
+  """Single-string command to start the model service."""
+  command: String
+
+  """Deprecated. Command to start the model service. Use `command` instead."""
+  startCommand: [String!] @deprecated(reason: "Use `command` instead.")
 
   """Shell configured for the model service."""
-  shell: String!
+  shell: String
 
   """Port number for the model service."""
   port: Int!
@@ -7038,8 +7041,11 @@ input ModelServiceConfigInput {
   """
   preStartActions: [PreStartActionInput!] = null
 
+  """Added in 26.7.0. Single-string command to start the model service."""
+  command: String = null
+
   """Command to start the model service."""
-  startCommand: [String!] = null
+  startCommand: [String!] = null @deprecated(reason: "Use `command` instead.")
 
   """Shell configured for the model service."""
   shell: String = null
@@ -8553,8 +8559,11 @@ input PresetModelServiceConfigInput {
   """
   preStartActions: [PreStartActionInput!]!
 
+  """Added in 26.7.0. Single-string command to start the model service."""
+  command: String = null
+
   """Command to start the model service."""
-  startCommand: [String!]!
+  startCommand: [String!] = null @deprecated(reason: "Use `command` instead.")
 
   """Shell configured for the model service."""
   shell: String! = "/bin/bash"
