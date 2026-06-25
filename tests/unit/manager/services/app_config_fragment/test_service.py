@@ -269,10 +269,15 @@ class TestAppConfigFragmentService:
 
     # --- purge ---
 
-    async def test_purge(
-        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    async def test_purge_passes_write_gate(
+        self,
+        service: AppConfigFragmentService,
+        mock_repository: MagicMock,
+        mock_allow_list_repository: MagicMock,
     ) -> None:
         fragment = _fragment()
+        mock_repository.get_by_id = AsyncMock(return_value=fragment)
+        mock_allow_list_repository.exists = AsyncMock(return_value=True)
         mock_repository.purge = AsyncMock(return_value=fragment)
         purger = Purger(row_class=AppConfigFragmentRow, pk_value=fragment.id)
 
@@ -280,6 +285,22 @@ class TestAppConfigFragmentService:
 
         assert result.fragment == fragment
         mock_repository.purge.assert_called_once_with(purger)
+
+    async def test_purge_rejected_when_not_allow_listed(
+        self,
+        service: AppConfigFragmentService,
+        mock_repository: MagicMock,
+        mock_allow_list_repository: MagicMock,
+    ) -> None:
+        fragment = _fragment()
+        mock_repository.get_by_id = AsyncMock(return_value=fragment)
+        mock_allow_list_repository.exists = AsyncMock(return_value=False)
+        mock_repository.purge = AsyncMock()
+        purger = Purger(row_class=AppConfigFragmentRow, pk_value=fragment.id)
+
+        with pytest.raises(AppConfigFragmentWriteNotAllowed):
+            await service.purge(PurgeAppConfigFragmentAction(purger=purger))
+        mock_repository.purge.assert_not_called()
 
 
 class TestCreateActionScope:

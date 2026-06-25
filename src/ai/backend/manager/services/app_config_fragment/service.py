@@ -49,16 +49,14 @@ __all__ = ("AppConfigFragmentService",)
 
 
 class AppConfigFragmentService:
-    """Admin write paths for app config fragments.
+    """Write paths for app config fragments (not admin-only).
 
-    ``create`` and ``update`` pass the allow-list write-gate: a fragment value may only be
-    written when an ``app_config_allow_list`` row exists for its ``(config_name,
-    scope_type)``. Because an allow-list row itself requires a registered ``config_name``
-    (FK to ``app_config_definitions``), this single check also enforces registration.
-
-    ``purge`` is deliberately NOT gated: removal is admin cleanup and must stay possible
-    even after a ``(config_name, scope_type)`` is de-allow-listed, so orphaned rows can
-    always be deleted.
+    ``create``, ``update``, and ``purge`` all pass the allow-list write-gate: a fragment may
+    only be written or removed when an ``app_config_allow_list`` row exists for its
+    ``(config_name, scope_type)``. Because an allow-list row itself requires a registered
+    ``config_name`` (FK to ``app_config_definitions``), this single check also enforces
+    registration. An allow-listed user may therefore manage their own ``user``-scope
+    fragment without admin privileges.
     """
 
     _repository: AppConfigFragmentRepository
@@ -142,5 +140,9 @@ class AppConfigFragmentService:
     async def purge(
         self, action: PurgeAppConfigFragmentAction
     ) -> PurgeAppConfigFragmentActionResult:
+        existing = await self._repository.get_by_id(
+            cast(AppConfigFragmentID, action.purger.pk_value)
+        )
+        await self._ensure_write_allowed(existing.config_name, existing.scope_type)
         data = await self._repository.purge(action.purger)
         return PurgeAppConfigFragmentActionResult(fragment=data)

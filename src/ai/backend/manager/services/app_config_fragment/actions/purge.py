@@ -17,7 +17,12 @@ from ai.backend.manager.services.app_config_fragment.actions.base import (
 
 @dataclass
 class PurgeAppConfigFragmentAction(AppConfigFragmentSingleEntityAction):
-    """Admin path: purge a fragment at any scope."""
+    """Purge a fragment — not admin-only.
+
+    Gated by the allow-list write-gate (service) against the fragment's
+    ``(config_name, scope_type)``, so an allow-listed user may purge their own
+    ``user``-scope fragment.
+    """
 
     purger: Purger[AppConfigFragmentRow]
 
