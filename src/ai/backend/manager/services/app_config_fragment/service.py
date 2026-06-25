@@ -50,7 +50,7 @@ class AppConfigFragmentService:
     async def create(
         self, action: CreateAppConfigFragmentAction
     ) -> CreateAppConfigFragmentActionResult:
-        data = await self._repository.create(action.creator_spec)
+        data = await self._repository.create(action.creator_spec, action.only_if)
         return CreateAppConfigFragmentActionResult(fragment=data)
 
     async def get(self, action: GetAppConfigFragmentAction) -> GetAppConfigFragmentActionResult:
@@ -85,11 +85,11 @@ class AppConfigFragmentService:
     async def update(
         self, action: UpdateAppConfigFragmentAction
     ) -> UpdateAppConfigFragmentActionResult:
-        data = await self._repository.update(action.updater)
+        data = await self._repository.update(action.updater, action.only_if)
         return UpdateAppConfigFragmentActionResult(fragment=data)
 
     async def purge(
         self, action: PurgeAppConfigFragmentAction
     ) -> PurgeAppConfigFragmentActionResult:
-        data = await self._repository.purge(action.purger)
+        data = await self._repository.purge(action.purger, action.only_if)
         return PurgeAppConfigFragmentActionResult(fragment=data)

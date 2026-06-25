@@ -7,7 +7,6 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -21,9 +20,6 @@ from ai.backend.manager.data.app_config_fragment.types import (
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
     AppConfigFragmentWriteNotAllowed,
-)
-from ai.backend.manager.models.app_config_allow_list.conditions import (
-    AppConfigAllowListConditions,
 )
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
@@ -76,33 +72,30 @@ class AppConfigFragmentDBSource:
         self._ops = ops_provider
 
     async def _ensure_write_allowed(
-        self, w: WriteOps, config_name: str, scope_type: AppConfigScopeType
+        self,
+        w: WriteOps,
+        only_if: ExistsQuerier[AppConfigAllowListRow],
+        config_name: str,
+        scope_type: AppConfigScopeType,
     ) -> None:
-        """Reject the write unless an allow-list row exists for ``(config_name, scope_type)``.
+        """Reject the write unless the caller-supplied gate ``only_if`` matches a row.
 
-        Runs inside the caller's write transaction (``WriteOps`` is read-capable), so the
-        gate check and the write commit atomically — no check-then-write race. Because an
-        allow-list row requires a registered ``config_name`` (FK), this also enforces
-        registration.
+        ``only_if`` is built by the caller (e.g. the API adapter) rather than here, so the
+        repository carries no allow-list policy. The check runs inside the caller's write
+        transaction, so the gate and the write commit atomically — no check-then-write race.
+        ``config_name`` / ``scope_type`` only phrase the rejection.
         """
-        allowed = await w.exists(
-            ExistsQuerier(
-                row_class=AppConfigAllowListRow,
-                conditions=[
-                    AppConfigAllowListConditions.by_config_name_equals(
-                        StringMatchSpec(config_name, case_insensitive=False, negated=False)
-                    ),
-                    AppConfigAllowListConditions.by_scope_type_equals(scope_type),
-                ],
-            )
-        )
-        if not allowed:
+        if not await w.exists(only_if):
             raise AppConfigFragmentWriteNotAllowed(
                 f"Writing app config {config_name!r} at scope {scope_type.value!r} is not allowed."
             )
 
     @app_config_fragment_db_source_resilience.apply()
-    async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
+    async def create(
+        self,
+        spec: AppConfigFragmentCreatorSpec,
+        only_if: ExistsQuerier[AppConfigAllowListRow],
+    ) -> AppConfigFragmentData:
         policy = NextValuePolicy(
             column=AppConfigFragmentRow.rank,
             scope_condition=lambda: AppConfigFragmentRow.config_name == spec.config_name,
@@ -112,7 +105,7 @@ class AppConfigFragmentDBSource:
             gap=RANK_GAP,
         )
         async with self._ops.write_ops() as w:
-            await self._ensure_write_allowed(w, spec.config_name, spec.scope_type)
+            await self._ensure_write_allowed(w, only_if, spec.config_name, spec.scope_type)
             created = await w.create_with_next_value(policy, spec)
             return created.row.to_data()
 
@@ -125,28 +118,40 @@ class AppConfigFragmentDBSource:
             return result.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
-    async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
+    async def update(
+        self,
+        updater: Updater[AppConfigFragmentRow],
+        only_if: ExistsQuerier[AppConfigAllowListRow],
+    ) -> AppConfigFragmentData:
         async with self._ops.write_ops() as w:
             existing = await w.query(
                 Querier(row_class=AppConfigFragmentRow, pk_value=updater.pk_value)
             )
             if existing is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {updater.pk_value} not found")
-            await self._ensure_write_allowed(w, existing.row.config_name, existing.row.scope_type)
+            await self._ensure_write_allowed(
+                w, only_if, existing.row.config_name, existing.row.scope_type
+            )
             result = await w.update(updater)
             if result is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {updater.pk_value} not found")
             return result.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
-    async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
+    async def purge(
+        self,
+        purger: Purger[AppConfigFragmentRow],
+        only_if: ExistsQuerier[AppConfigAllowListRow],
+    ) -> AppConfigFragmentData:
         async with self._ops.write_ops() as w:
             existing = await w.query(
                 Querier(row_class=AppConfigFragmentRow, pk_value=purger.pk_value)
             )
             if existing is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
-            await self._ensure_write_allowed(w, existing.row.config_name, existing.row.scope_type)
+            await self._ensure_write_allowed(
+                w, only_if, existing.row.config_name, existing.row.scope_type
+            )
             result = await w.purge(purger)
             if result is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")

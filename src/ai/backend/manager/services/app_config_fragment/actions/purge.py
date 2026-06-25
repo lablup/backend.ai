@@ -7,8 +7,9 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.base import Purger
+from ai.backend.manager.repositories.base import ExistsQuerier, Purger
 from ai.backend.manager.services.app_config_fragment.actions.base import (
     AppConfigFragmentSingleEntityAction,
     AppConfigFragmentSingleEntityActionResult,
@@ -19,12 +20,18 @@ from ai.backend.manager.services.app_config_fragment.actions.base import (
 class PurgeAppConfigFragmentAction(AppConfigFragmentSingleEntityAction):
     """Purge a fragment — not admin-only.
 
-    Gated by the allow-list write-gate (service) against the fragment's
+    Gated by the allow-list write-gate (``only_if``) against the fragment's
     ``(config_name, scope_type)``, so an allow-listed user may purge their own
     ``user``-scope fragment.
     """
 
     purger: Purger[AppConfigFragmentRow]
+    only_if: ExistsQuerier[AppConfigAllowListRow]
+    """Allow-list write-gate: the purge is committed only if this existence check passes.
+
+    Built by the caller (e.g. the API adapter) and enforced atomically by the repository
+    within the write transaction.
+    """
 
     @override
     @classmethod
