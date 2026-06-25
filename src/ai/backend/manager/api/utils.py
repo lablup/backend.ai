@@ -428,9 +428,3 @@ async def call_non_bursty(
             return await coro()
         return coro()
     return None
-
-
-# Re-exported for backward compatibility; defined in the data layer.
-from ai.backend.manager.data.common.sentinel import Singleton as Singleton  # noqa: E402
-from ai.backend.manager.data.common.sentinel import Undefined as Undefined  # noqa: E402
-from ai.backend.manager.data.common.sentinel import undefined as undefined  # noqa: E402
