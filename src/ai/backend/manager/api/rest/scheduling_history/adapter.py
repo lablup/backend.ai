@@ -33,7 +33,7 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SubStepResult,
 )
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
     RouteHistoryConditions,

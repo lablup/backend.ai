@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac_models.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.role import RoleRow

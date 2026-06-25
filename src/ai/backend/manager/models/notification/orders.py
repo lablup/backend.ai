@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
-from ai.backend.manager.models.query_types import QueryOrder
 
 
 class NotificationChannelOrders:

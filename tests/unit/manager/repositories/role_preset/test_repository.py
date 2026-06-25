@@ -24,7 +24,7 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.manager.errors.role_preset import RolePresetNotFound
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )

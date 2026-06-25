@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.query_types import QueryOrder
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )

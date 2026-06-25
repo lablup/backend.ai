@@ -24,7 +24,7 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource

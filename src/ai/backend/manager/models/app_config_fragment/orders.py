@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.models.query_types import QueryOrder
+from ai.backend.manager.models.clauses import QueryOrder
 
 __all__ = ("AppConfigFragmentOrders",)
 

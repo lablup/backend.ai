@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.kernel.conditions import KernelConditions
-from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.repositories.base import BulkCreator
 from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,

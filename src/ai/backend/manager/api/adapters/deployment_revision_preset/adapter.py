@@ -62,6 +62,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
 )
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
 from ai.backend.manager.models.base import ResourceOptsEntry
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.deployment_revision_preset.conditions import (
     DeploymentRevisionPresetConditions,
 )
@@ -69,7 +70,6 @@ from ai.backend.manager.models.deployment_revision_preset.orders import (
     DeploymentRevisionPresetOrders,
 )
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.conditions import PresetResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
     ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,

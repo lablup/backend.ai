@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.resource_slot.response import (
 )
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.conditions import ResourceSlotTypeConditions
 from ai.backend.manager.models.resource_slot.orders import ResourceSlotTypeOrders
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination

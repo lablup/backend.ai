@@ -9,12 +9,12 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
     make_nested_string_in_factory,
     make_string_in_factory,
 )
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
 

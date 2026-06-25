@@ -11,8 +11,8 @@ from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.service import RouteNotFound
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,

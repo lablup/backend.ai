@@ -26,7 +26,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
 from ai.backend.manager.models.runtime_variant.orders import RuntimeVariantOrders
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow

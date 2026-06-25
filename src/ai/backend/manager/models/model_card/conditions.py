@@ -13,12 +13,12 @@ from ai.backend.common.data.filter_specs import (
     UUIDInMatchSpec,
 )
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
     make_nested_string_in_factory,
     make_string_in_factory,
 )
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.vfolder.row import VFolderRow
 
 __all__ = ("ModelCardConditions",)

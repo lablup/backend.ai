@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryTypeFilter
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.conditions import ContainerRegistryConditions
 from ai.backend.manager.models.container_registry.orders import (
@@ -32,7 +33,6 @@ from ai.backend.manager.models.container_registry.orders import (
     TIEBREAKER_ORDER,
     resolve_order,
 )
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger

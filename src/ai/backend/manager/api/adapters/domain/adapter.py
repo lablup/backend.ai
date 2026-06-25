@@ -29,10 +29,10 @@ from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, Orde
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,

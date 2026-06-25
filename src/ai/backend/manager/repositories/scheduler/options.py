@@ -21,9 +21,9 @@ if TYPE_CHECKING:
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 

@@ -81,6 +81,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.orders import (
     DEFAULT_BACKWARD_ORDER as KERNEL_DEFAULT_BACKWARD_ORDER,
@@ -94,7 +95,6 @@ from ai.backend.manager.models.kernel.orders import (
 from ai.backend.manager.models.kernel.orders import (
     resolve_order as resolve_kernel_order,
 )
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import (
     DEFAULT_BACKWARD_ORDER as SESSION_DEFAULT_BACKWARD_ORDER,

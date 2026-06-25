@@ -1,7 +1,7 @@
 import uuid
 
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.routing.conditions import RouteConditions
 
 

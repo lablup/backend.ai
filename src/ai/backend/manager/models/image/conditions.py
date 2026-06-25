@@ -16,9 +16,9 @@ from ai.backend.common.data.filter_specs import (
 )
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.query_types import QueryCondition
 
 
 class ImageConditions:

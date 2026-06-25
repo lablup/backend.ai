@@ -27,9 +27,9 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
 from ai.backend.common.dto.manager.v2.object_storage.types import OrderDirection
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.object_storage.conditions import ObjectStorageConditions
 from ai.backend.manager.models.object_storage.orders import ObjectStorageOrders
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.object_storage import ObjectStorageCreatorSpec

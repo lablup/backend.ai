@@ -7,8 +7,8 @@ import uuid
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
-from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     DeploymentRevisionResourceSlotRow,

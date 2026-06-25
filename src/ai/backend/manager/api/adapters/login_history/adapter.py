@@ -24,8 +24,8 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.login_session.row import LoginHistoryRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.auth.options import LoginHistoryConditions, LoginHistoryOrders
 from ai.backend.manager.repositories.auth.types import MyLoginHistorySearchScope
 from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions

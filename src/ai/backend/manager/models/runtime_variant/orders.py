@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ai.backend.manager.models.query_types import QueryOrder
+from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 
 __all__ = ("RuntimeVariantOrders",)

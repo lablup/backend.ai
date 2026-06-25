@@ -11,7 +11,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     build_pagination,
 )
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier
 
 if TYPE_CHECKING:

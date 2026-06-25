@@ -81,7 +81,7 @@ from ai.backend.manager.data.scaling_group.types import (
     SchedulerType,
 )
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders

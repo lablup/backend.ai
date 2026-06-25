@@ -63,6 +63,7 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.fair_share.conditions import (
     DomainFairShareConditions,
     ProjectFairShareConditions,
@@ -84,7 +85,6 @@ from ai.backend.manager.models.fair_share.row import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareSearchScope,

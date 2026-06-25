@@ -12,8 +12,8 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base import ExistenceCheck, SearchScope

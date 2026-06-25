@@ -189,6 +189,7 @@ from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import EndpointTokenNotFound
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
@@ -210,7 +211,6 @@ from ai.backend.manager.models.endpoint.orders import (
     AutoScalingRuleOrders,
     DeploymentOrders,
 )
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.conditions import RevisionResourceSlotConditions
 from ai.backend.manager.models.resource_slot.orders import (
     ALLOCATED_SLOT_DEFAULT_BACKWARD_ORDER,

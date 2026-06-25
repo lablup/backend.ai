@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 
 
 def combine_conditions_or(conditions: list[QueryCondition]) -> QueryCondition:

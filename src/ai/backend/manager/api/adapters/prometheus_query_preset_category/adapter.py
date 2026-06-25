@@ -27,6 +27,7 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryData,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
 )
@@ -36,7 +37,6 @@ from ai.backend.manager.models.prometheus_query_preset_category.conditions impor
 from ai.backend.manager.models.prometheus_query_preset_category.orders import (
     PrometheusQueryPresetCategoryOrders,
 )
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.manager.repositories.prometheus_query_preset_category.creators import (
     PrometheusQueryPresetCategoryCreatorSpec,

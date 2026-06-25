@@ -5,7 +5,7 @@ import uuid
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     ResourceAllocationRow,

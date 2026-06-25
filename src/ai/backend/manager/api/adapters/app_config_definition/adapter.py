@@ -31,7 +31,7 @@ from ai.backend.manager.models.app_config_definition.conditions import (
 )
 from ai.backend.manager.models.app_config_definition.orders import AppConfigDefinitionOrders
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
 )

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 
 from .types import TRow
 

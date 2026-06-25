@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
 from ai.backend.manager.errors.permission import RoleNotFound
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )

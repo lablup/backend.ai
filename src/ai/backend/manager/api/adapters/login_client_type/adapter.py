@@ -25,10 +25,10 @@ from ai.backend.common.dto.manager.v2.login_client_type.types import (
 )
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
 from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater

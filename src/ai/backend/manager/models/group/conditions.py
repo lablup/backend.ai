@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
     make_nested_string_in_factory,
     make_string_in_factory,
@@ -18,7 +19,6 @@ from ai.backend.manager.models.condition_utils import (
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.user import UserRow
 
 __all__ = ("GroupConditions",)

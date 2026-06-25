@@ -63,11 +63,11 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.resource import ModelCardNotFound
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.model_card.conditions import ModelCardConditions
 from ai.backend.manager.models.model_card.orders import ModelCardOrders
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import combine_conditions_or, negate_conditions
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator

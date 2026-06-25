@@ -72,8 +72,8 @@ from ai.backend.manager.data.resource.types import (
     ProjectResourcePolicyData,
     UserResourcePolicyData,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.keypair.conditions import KeypairConditions
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,

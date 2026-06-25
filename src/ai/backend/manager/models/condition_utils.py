@@ -8,7 +8,7 @@ from typing import Any
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringInMatchSpec
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 
 
 def make_string_in_factory(

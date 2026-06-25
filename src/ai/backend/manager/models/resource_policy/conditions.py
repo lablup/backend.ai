@@ -7,9 +7,9 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_int_conditions, make_string_in_factory
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.query_types import QueryCondition
 
 from .row import KeyPairResourcePolicyRow, ProjectResourcePolicyRow, UserResourcePolicyRow
 

@@ -18,10 +18,10 @@ from ai.backend.common.dto.manager.domain import (
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.updaters import DomainUpdaterSpec

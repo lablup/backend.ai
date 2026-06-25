@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.query_types import QueryOrder
 
 __all__ = ("DeploymentRevisionPresetOrders",)
 

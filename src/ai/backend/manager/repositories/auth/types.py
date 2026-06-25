@@ -9,8 +9,8 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.exception import UserNotFound
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.types import ExistenceCheck, SearchScope
 

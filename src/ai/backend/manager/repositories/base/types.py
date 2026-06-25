@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import sqlalchemy as sa
 
 from ai.backend.common.exception import BackendAIError
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row

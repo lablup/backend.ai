@@ -18,7 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.errors.repository import EmptySearchScopeError
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
     BatchQuerier,

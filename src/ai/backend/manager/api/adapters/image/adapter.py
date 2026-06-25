@@ -47,6 +47,7 @@ from ai.backend.common.types import ImageID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.models.image.conditions import (
     ImageAliasConditions,
@@ -54,7 +55,6 @@ from ai.backend.manager.models.image.conditions import (
 )
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,

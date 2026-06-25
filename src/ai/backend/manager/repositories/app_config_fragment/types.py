@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.repositories.base import ExistenceCheck, SearchScope
 
 __all__ = ("ConfigNameSearchScope",)

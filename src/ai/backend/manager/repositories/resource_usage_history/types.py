@@ -13,9 +13,9 @@ import sqlalchemy as sa
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, ScalingGroupNotFound
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,

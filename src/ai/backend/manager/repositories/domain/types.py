@@ -9,7 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 from ai.backend.manager.repositories.base import ExistenceCheck, SearchScope
 

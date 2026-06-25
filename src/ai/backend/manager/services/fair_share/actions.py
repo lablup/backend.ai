@@ -15,7 +15,7 @@ from ai.backend.manager.data.fair_share import (
     ProjectFairShareData,
     UserFairShareData,
 )
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier, QueryPagination
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareSearchScope,

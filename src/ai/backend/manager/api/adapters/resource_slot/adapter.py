@@ -36,7 +36,7 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceAllocationData,
     ResourceSlotTypeData,
 )
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.conditions import (
     AgentResourceConditions,
     ResourceAllocationConditions,

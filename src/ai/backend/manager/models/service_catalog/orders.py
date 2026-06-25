@@ -11,7 +11,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
     OrderDirection,
     ServiceCatalogOrderField,
 )
-from ai.backend.manager.models.query_types import QueryOrder
+from ai.backend.manager.models.clauses import QueryOrder
 
 from .row import ServiceCatalogRow
 

@@ -34,7 +34,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
-from ai.backend.manager.models.query_types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.resource_preset.conditions import ResourcePresetConditions
 from ai.backend.manager.models.resource_preset.orders import ResourcePresetOrders
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow

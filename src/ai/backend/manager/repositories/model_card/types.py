@@ -13,9 +13,9 @@ from ai.backend.manager.data.deployment_revision_preset.types import DeploymentR
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.query_types import QueryCondition
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )

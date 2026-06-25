@@ -95,12 +95,12 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.conditions import KeypairConditions, KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.user.row import UserRole as UserRoleModel

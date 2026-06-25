@@ -7,8 +7,8 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
-from ai.backend.manager.models.query_types import QueryCondition
 
 
 class HuggingFaceRegistryConditions:

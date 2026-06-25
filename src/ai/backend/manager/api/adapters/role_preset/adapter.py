@@ -59,7 +59,7 @@ from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
     RolePresetData,
 )
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac_models.role_permission_preset.conditions import (
     RolePermissionPresetConditions,
 )

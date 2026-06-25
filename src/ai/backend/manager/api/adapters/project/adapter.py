@@ -47,11 +47,11 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.group.types import ProjectType as DataProjectType
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.group.orders import GroupOrders
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,

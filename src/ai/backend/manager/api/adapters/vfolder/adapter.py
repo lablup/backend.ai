@@ -78,8 +78,8 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.orders import (

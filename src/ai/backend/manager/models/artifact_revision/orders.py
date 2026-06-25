@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
-from ai.backend.manager.models.query_types import QueryOrder
+from ai.backend.manager.models.clauses import QueryOrder
 
 
 class ArtifactRevisionOrders:

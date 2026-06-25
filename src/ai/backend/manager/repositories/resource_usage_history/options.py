@@ -8,8 +8,8 @@ from datetime import date, datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import make_string_in_factory
-from ai.backend.manager.models.query_types import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
