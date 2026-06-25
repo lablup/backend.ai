@@ -12763,13 +12763,17 @@ enum SessionFailurePolicy {
   TOLERANT
 }
 
-"""Added in UNRELEASED. A single virtual folder mount on a session."""
+"""
+Added in UNRELEASED. A single virtual folder mount on a session. Holds mount-specific metadata (subpath, mount destination, permission); folder attributes are resolved through the associated `vfolder` node.
+"""
 type SessionMount {
+  """
+  Added in UNRELEASED. The virtual folder mounted here. Use this to query folder-level attributes (name, usage mode, ownership, etc.) separately from the mount-specific fields above.
+  """
+  vfolder: VFolder
+
   """UUID of the mounted virtual folder."""
   vfolderId: UUID!
-
-  """Name of the mounted virtual folder."""
-  name: String!
 
   """
   Subpath within the vfolder that is mounted. Null when the vfolder root is mounted.
@@ -12779,11 +12783,8 @@ type SessionMount {
   """Mount destination (alias) path inside the session container."""
   mountDestination: String!
 
-  """Effective mount permission (e.g., 'ro', 'rw')."""
-  permission: String!
-
-  """Usage mode of the mounted virtual folder."""
-  usageMode: String!
+  """Effective mount permission for this mount (ro/rw/wd)."""
+  permission: VFolderMountPermission!
 }
 
 """Added in 26.4.2. A virtual folder mount specification."""
