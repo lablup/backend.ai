@@ -189,6 +189,7 @@ from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import EndpointTokenNotFound
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
@@ -224,8 +225,6 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
     OffsetPagination,
-    QueryCondition,
-    QueryOrder,
     Updater,
     combine_conditions_and,
     combine_conditions_or,

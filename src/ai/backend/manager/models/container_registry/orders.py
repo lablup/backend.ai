@@ -11,7 +11,7 @@ from ai.backend.common.dto.manager.v2.container_registry.types import (
     ContainerRegistryOrderField,
     OrderDirection,
 )
-from ai.backend.manager.repositories.base import QueryOrder
+from ai.backend.manager.models.clauses import QueryOrder
 
 from .row import ContainerRegistryRow
 

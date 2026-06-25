@@ -13,13 +13,14 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentSearchResult,
 )
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Purger, SearchScope, Updater
+from ai.backend.manager.repositories.base import BatchQuerier, Purger, Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigFragmentRepository",)

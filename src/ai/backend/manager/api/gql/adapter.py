@@ -11,7 +11,8 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationSpec as PaginationSpec,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import build_pagination
-from ai.backend.manager.repositories.base import BatchQuerier, QueryOrder
+from ai.backend.manager.models.clauses import QueryOrder
+from ai.backend.manager.repositories.base import BatchQuerier
 
 
 class BaseGQLAdapter:

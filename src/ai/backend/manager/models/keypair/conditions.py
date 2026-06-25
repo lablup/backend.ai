@@ -11,9 +11,9 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
 
 __all__ = (
     "KeypairConditions",

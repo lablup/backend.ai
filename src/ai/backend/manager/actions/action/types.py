@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base.types import SearchScope
+from ai.backend.manager.models.scopes import SearchScope
 
 
 @dataclass

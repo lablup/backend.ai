@@ -68,6 +68,7 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.notification.conditions import (
     NotificationChannelConditions,
@@ -80,8 +81,6 @@ from ai.backend.manager.models.notification.orders import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
-    QueryCondition,
-    QueryOrder,
     Updater,
     combine_conditions_or,
     negate_conditions,

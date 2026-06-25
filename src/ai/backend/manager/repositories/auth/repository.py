@@ -14,6 +14,7 @@ from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -23,7 +24,6 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     LoginSessionCreationResult,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.types import SearchScope
 
 auth_repository_resilience = Resilience(
     policies=[

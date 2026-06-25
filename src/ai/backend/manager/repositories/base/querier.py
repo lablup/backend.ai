@@ -11,9 +11,10 @@ import sqlalchemy as sa
 
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 from .pagination import PageInfoResult, QueryPagination
-from .types import ExistenceCheck, QueryCondition, QueryOrder, SearchScope
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
