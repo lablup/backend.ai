@@ -58,7 +58,7 @@ class GitLabRegistry(BaseContainerRegistry):
                     raise PassthroughError.from_http_status(
                         response.status,
                         domain=ErrorDomain.CONTAINER_REGISTRY,
-                        operation=ErrorOperation.LIST,
+                        operation=ErrorOperation.UPDATE,
                         error_message=f"Failed to fetch repositories for project "
                         f"{self.registry_info.project}! {response.status} error occurred.",
                     )

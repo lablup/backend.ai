@@ -55,6 +55,6 @@ class GitHubRegistry(BaseContainerRegistry):
                     raise PassthroughError.from_http_status(
                         response.status,
                         domain=ErrorDomain.CONTAINER_REGISTRY,
-                        operation=ErrorOperation.LIST,
+                        operation=ErrorOperation.UPDATE,
                         error_message=f"Failed to fetch repositories! {response.status} error occurred.",
                     )

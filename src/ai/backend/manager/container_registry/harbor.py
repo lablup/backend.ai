@@ -190,7 +190,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         raise PassthroughError.from_http_status(
                             e.status,
                             domain=ErrorDomain.CONTAINER_REGISTRY,
-                            operation=ErrorOperation.SOFT_DELETE,
+                            operation=ErrorOperation.HARD_DELETE,
                             error_message=f"Failed to untag {image}: {e.message}",
                         ) from e
 
@@ -226,7 +226,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                     raise PassthroughError.from_http_status(
                         resp.status,
                         domain=ErrorDomain.CONTAINER_REGISTRY,
-                        operation=ErrorOperation.LIST,
+                        operation=ErrorOperation.UPDATE,
                         error_message=f"failed to fetch repositories in project "
                         f"{self.registry_info.project} (code={code}): {message}",
                     )
