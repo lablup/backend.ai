@@ -58,9 +58,11 @@ from .purger import (
 from .querier import (
     BatchQuerier,
     BatchQuerierResult,
+    ExistsQuerier,
     Querier,
     QuerierResult,
     execute_batch_querier,
+    execute_exists,
     execute_querier,
 )
 from .types import (
@@ -123,6 +125,8 @@ __all__ = [
     "Querier",
     "QuerierResult",
     "execute_querier",
+    "ExistsQuerier",
+    "execute_exists",
     # BatchQuerier
     "BatchQuerier",
     "BatchQuerierResult",

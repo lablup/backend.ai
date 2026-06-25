@@ -92,6 +92,41 @@ async def execute_querier[TRow: Base](
 
 
 # =============================================================================
+# Existence Querier (by conditions)
+# =============================================================================
+
+
+@dataclass
+class ExistsQuerier[TRow: Base]:
+    """Existence check over a table by a set of conditions (combined with AND).
+
+    Attributes:
+        row_class: ORM class for table access.
+        conditions: Query conditions; an empty list checks whether the table has any row.
+    """
+
+    row_class: type[TRow]
+    conditions: list[QueryCondition] = field(default_factory=list)
+
+
+async def execute_exists[TRow: Base](
+    db_sess: SASession,
+    querier: ExistsQuerier[TRow],
+) -> bool:
+    """Execute ``SELECT EXISTS(SELECT 1 FROM table WHERE ...)`` and return the boolean.
+
+    Does not count or fetch rows.
+    """
+    inner = (
+        sa.select(sa.literal(True))
+        .select_from(querier.row_class.__table__)
+        .where(*[condition() for condition in querier.conditions])
+    )
+    result = await db_sess.execute(sa.select(inner.exists()))
+    return bool(result.scalar_one())
+
+
+# =============================================================================
 # Batch Querier (with pagination)
 # =============================================================================
 

@@ -34,6 +34,7 @@ from ai.backend.manager.repositories.base import (
     Creator,
     CreatorResult,
     DependentCreatorSpec,
+    ExistsQuerier,
     NextValuePolicy,
     Purger,
     PurgerResult,
@@ -53,6 +54,7 @@ from ai.backend.manager.repositories.base import (
     execute_bulk_updater_partial,
     execute_creator,
     execute_dependent_creator,
+    execute_exists,
     execute_next_value_creator,
     execute_purger,
     execute_querier,
@@ -85,6 +87,10 @@ class ReadOps:
     async def query[TRow: Base](self, querier: Querier[TRow]) -> QuerierResult[TRow] | None:
         """Fetch a single row by primary key."""
         return await execute_querier(self._sess, querier)
+
+    async def exists[TRow: Base](self, querier: ExistsQuerier[TRow]) -> bool:
+        """Whether any row matches the querier's conditions (``SELECT EXISTS(...)``)."""
+        return await execute_exists(self._sess, querier)
 
     async def batch_query_in_global(
         self,
