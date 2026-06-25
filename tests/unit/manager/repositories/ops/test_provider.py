@@ -26,6 +26,7 @@ from ai.backend.manager.repositories.base import (
     Creator,
     CreatorSpec,
     DependentCreatorSpec,
+    ExistsQuerier,
     NoPagination,
     Purger,
     Querier,
@@ -190,6 +191,65 @@ class TestDependentCreate:
 
         assert child.parent_id == parent.id
         assert child.label == "solo"
+
+
+class TestExists:
+    async def test_matching_condition_is_true_absent_is_false(
+        self, provider: DBOpsProvider, ops_tables: None
+    ) -> None:
+        async with provider.write_ops() as w:
+            await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
+
+        async with provider.read_ops() as r:
+            assert await r.exists(
+                ExistsQuerier(
+                    row_class=OpsTestParentRow,
+                    conditions=[lambda: OpsTestParentRow.name == "p1"],
+                )
+            )
+            assert not await r.exists(
+                ExistsQuerier(
+                    row_class=OpsTestParentRow,
+                    conditions=[lambda: OpsTestParentRow.name == "absent"],
+                )
+            )
+
+    async def test_conditions_are_anded(self, provider: DBOpsProvider, ops_tables: None) -> None:
+        async with provider.write_ops() as w:
+            await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
+
+        async with provider.read_ops() as r:
+            assert await r.exists(
+                ExistsQuerier(
+                    row_class=OpsTestParentRow,
+                    conditions=[
+                        lambda: OpsTestParentRow.name == "p1",
+                        lambda: OpsTestParentRow.domain_name == "d1",
+                    ],
+                )
+            )
+            # name matches but domain_name does not — the AND must fail.
+            assert not await r.exists(
+                ExistsQuerier(
+                    row_class=OpsTestParentRow,
+                    conditions=[
+                        lambda: OpsTestParentRow.name == "p1",
+                        lambda: OpsTestParentRow.domain_name == "d2",
+                    ],
+                )
+            )
+
+    async def test_empty_conditions_check_any_row(
+        self, provider: DBOpsProvider, ops_tables: None
+    ) -> None:
+        async with provider.read_ops() as r:
+            assert not await r.exists(ExistsQuerier(row_class=OpsTestParentRow))
+
+        async with provider.write_ops() as w:
+            await w.create(Creator(spec=ParentCreatorSpec(name="p1", domain_name="d1")))
+
+        async with provider.read_ops() as r:
+            assert await r.exists(ExistsQuerier(row_class=OpsTestParentRow))
 
 
 class TestScopeFiltering:

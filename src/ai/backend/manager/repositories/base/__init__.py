@@ -62,7 +62,6 @@ from .querier import (
     Querier,
     QuerierResult,
     execute_batch_querier,
-    execute_exists,
     execute_querier,
 )
 from .types import (
@@ -126,7 +125,6 @@ __all__ = [
     "QuerierResult",
     "execute_querier",
     "ExistsQuerier",
-    "execute_exists",
     # BatchQuerier
     "BatchQuerier",
     "BatchQuerierResult",

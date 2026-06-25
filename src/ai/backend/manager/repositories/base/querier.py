@@ -109,23 +109,6 @@ class ExistsQuerier[TRow: Base]:
     conditions: list[QueryCondition] = field(default_factory=list)
 
 
-async def execute_exists[TRow: Base](
-    db_sess: SASession,
-    querier: ExistsQuerier[TRow],
-) -> bool:
-    """Execute ``SELECT EXISTS(SELECT 1 FROM table WHERE ...)`` and return the boolean.
-
-    Does not count or fetch rows.
-    """
-    inner = (
-        sa.select(sa.literal(True))
-        .select_from(querier.row_class.__table__)
-        .where(*[condition() for condition in querier.conditions])
-    )
-    result = await db_sess.execute(sa.select(inner.exists()))
-    return bool(result.scalar_one())
-
-
 # =============================================================================
 # Batch Querier (with pagination)
 # =============================================================================
