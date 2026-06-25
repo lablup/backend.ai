@@ -11,6 +11,7 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     AppConfigAllowListFilter as AppConfigAllowListFilterDTO,
 )
@@ -31,9 +32,6 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     PurgeAppConfigAllowListPayload as PurgeAppConfigAllowListPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
-    AppConfigScopeType,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,

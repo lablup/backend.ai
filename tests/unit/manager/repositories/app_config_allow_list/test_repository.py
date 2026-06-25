@@ -7,11 +7,11 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListData,
-    AppConfigScopeType,
 )
 from ai.backend.manager.errors.app_config import AppConfigAllowListNotFound
 from ai.backend.manager.errors.repository import (

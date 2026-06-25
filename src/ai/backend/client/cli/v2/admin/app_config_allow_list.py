@@ -13,7 +13,7 @@ from ai.backend.client.cli.v2.helpers import (
     parse_order_options,
     print_result,
 )
-from ai.backend.common.dto.manager.v2.app_config_allow_list.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 
 
 @click.group()

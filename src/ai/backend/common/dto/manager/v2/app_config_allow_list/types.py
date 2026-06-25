@@ -7,18 +7,12 @@ from enum import StrEnum
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 
 __all__ = (
-    "AppConfigScopeType",
     "AppConfigScopeTypeFilter",
     "AppConfigAllowListOrderField",
 )
-
-
-class AppConfigScopeType(StrEnum):
-    PUBLIC = "public"
-    DOMAIN = "domain"
-    USER = "user"
 
 
 class AppConfigScopeTypeFilter(BaseRequestModel):

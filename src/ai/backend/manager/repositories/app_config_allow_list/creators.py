@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.data.app_config_allow_list.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
