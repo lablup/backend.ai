@@ -21,7 +21,13 @@ from ai.backend.manager.data.app_config_allow_list.types import (
 )
 from ai.backend.manager.errors.app_config import AppConfigAllowListNotFound
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger, Querier
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    ExistsQuerier,
+    Purger,
+    Querier,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigAllowListDBSource",)
@@ -89,3 +95,9 @@ class AppConfigAllowListDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    @app_config_allow_list_db_source_resilience.apply()
+    async def exists(self, querier: ExistsQuerier[AppConfigAllowListRow]) -> bool:
+        """Whether any allow-list row matches the querier's conditions."""
+        async with self._ops.read_ops() as r:
+            return await r.exists(querier)
