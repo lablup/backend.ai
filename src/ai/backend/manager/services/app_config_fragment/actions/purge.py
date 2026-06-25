@@ -27,11 +27,6 @@ class PurgeAppConfigFragmentAction(AppConfigFragmentSingleEntityAction):
 
     purger: Purger[AppConfigFragmentRow]
     only_if: ExistsQuerier[AppConfigAllowListRow]
-    """Allow-list write-gate: the purge is committed only if this existence check passes.
-
-    Built by the caller (e.g. the API adapter) and enforced atomically by the repository
-    within the write transaction.
-    """
 
     @override
     @classmethod

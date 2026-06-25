@@ -31,11 +31,6 @@ class CreateAppConfigFragmentAction(AppConfigFragmentScopeAction):
 
     creator_spec: AppConfigFragmentCreatorSpec
     only_if: ExistsQuerier[AppConfigAllowListRow]
-    """Allow-list write-gate: the create is committed only if this existence check passes.
-
-    Built by the caller (e.g. the API adapter) and enforced atomically by the repository
-    within the write transaction.
-    """
 
     @override
     @classmethod
