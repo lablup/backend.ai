@@ -10,7 +10,7 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationSpec,
     build_pagination,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier
 

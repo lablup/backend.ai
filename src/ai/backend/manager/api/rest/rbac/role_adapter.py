@@ -20,7 +20,7 @@ from ai.backend.common.dto.manager.rbac import (
     SearchRolesRequest,
     UpdateRoleRequest,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac_models.conditions import RoleConditions

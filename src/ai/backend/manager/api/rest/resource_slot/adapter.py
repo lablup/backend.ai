@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.resource_slot.response import (
     NumberFormatDTO,
     ResourceSlotTypeDTO,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.conditions import ResourceSlotTypeConditions

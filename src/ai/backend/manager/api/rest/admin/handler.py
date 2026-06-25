@@ -20,7 +20,6 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.dto.manager.admin.request import GraphQLRequest
 from ai.backend.common.dto.manager.admin.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.base import DataLoaderManager
@@ -32,6 +31,7 @@ from ai.backend.manager.api.gql_legacy.schema import (
 )
 from ai.backend.manager.api.graphql_rules import CustomIntrospectionRule
 from ai.backend.manager.api.rest.types import GQLContextDeps
+from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import GraphQLError as BackendGQLError
 from ai.backend.manager.errors.common import ServerFrozen

@@ -92,7 +92,7 @@ if TYPE_CHECKING:
         SlotName,
         SlotTypes,
     )
-    from ai.backend.manager.api import ManagerStatus
+    from ai.backend.manager.data.manager_status.types import ManagerStatus
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.storage import StorageSessionManager
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

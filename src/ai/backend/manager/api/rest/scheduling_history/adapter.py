@@ -26,8 +26,8 @@ from ai.backend.common.dto.manager.scheduling_history import (
     SessionHistoryOrderField,
     SubStepResultDTO,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
     SessionSchedulingHistoryData,

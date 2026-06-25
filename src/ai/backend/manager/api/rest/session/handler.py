@@ -87,7 +87,7 @@ from ai.backend.common.types import (
     KernelId,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.utils import undefined
+from ai.backend.manager.data.common.sentinel import undefined
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAPI
