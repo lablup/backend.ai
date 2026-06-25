@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.manager.data.app_config_fragment.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
 

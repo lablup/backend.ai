@@ -8,11 +8,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListData,
     AppConfigAllowListSearchResult,
-    AppConfigScopeType,
 )
 from ai.backend.manager.errors.app_config import AppConfigAllowListNotFound
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow

@@ -1,19 +1,11 @@
 from __future__ import annotations
 
-import enum
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-
-
-class AppConfigScopeType(enum.StrEnum):
-    """Scope at which an app config fragment is written (BEP-1052)."""
-
-    PUBLIC = "public"
-    DOMAIN = "domain"
-    USER = "user"
 
 
 @dataclass(frozen=True)

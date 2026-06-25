@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.dto.manager.v2.app_config_allow_list.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 
 __all__ = (
     "AppConfigAllowListNode",

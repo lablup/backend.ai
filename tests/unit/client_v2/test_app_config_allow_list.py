@@ -8,6 +8,7 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains_v2.app_config_allow_list import V2AppConfigAllowListClient
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
@@ -18,7 +19,6 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     PurgeAppConfigAllowListPayload,
     SearchAppConfigAllowListPayload,
 )
-from ai.backend.common.dto.manager.v2.app_config_allow_list.types import AppConfigScopeType
 
 from .conftest import MockAuth
 
