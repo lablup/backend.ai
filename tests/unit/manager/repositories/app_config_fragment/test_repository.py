@@ -304,7 +304,11 @@ class TestUpdate:
         assert updated.config == {"b": 2}
         assert (await repository.get_by_id(domain_scoped_fragment.id)).config == {"b": 2}
 
-    async def test_update_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
+    async def test_update_missing_raises(
+        self, repository: AppConfigFragmentRepository, theme_registered: None
+    ) -> None:
+        # Writes are allow-listed (gate open), so a missing fragment surfaces as NotFound
+        # rather than the write-gate rejection.
         missing_id = AppConfigFragmentID(uuid.uuid4())
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.update(
@@ -344,7 +348,11 @@ class TestPurge:
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(domain_scoped_fragment.id)
 
-    async def test_purge_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
+    async def test_purge_missing_raises(
+        self, repository: AppConfigFragmentRepository, theme_registered: None
+    ) -> None:
+        # Writes are allow-listed (gate open), so a missing fragment surfaces as NotFound
+        # rather than the write-gate rejection.
         missing_id = AppConfigFragmentID(uuid.uuid4())
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.purge(

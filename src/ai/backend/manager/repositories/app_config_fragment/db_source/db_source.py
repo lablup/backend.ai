@@ -109,16 +109,12 @@ class AppConfigFragmentDBSource:
         updater: Updater[AppConfigFragmentRow],
         only_if: ExistsQuerier[AppConfigAllowListRow],
     ) -> AppConfigFragmentData:
+        # Gate first, then write — both in one transaction so the check and the write commit
+        # atomically. A missing fragment surfaces as the update returning None below.
         async with self._ops.write_ops() as w:
-            existing = await w.query(
-                Querier(row_class=AppConfigFragmentRow, pk_value=updater.pk_value)
-            )
-            if existing is None:
-                raise AppConfigFragmentNotFound(f"App config fragment {updater.pk_value} not found")
             if not await w.exists(only_if):
                 raise AppConfigFragmentWriteNotAllowed(
-                    f"Writing app config {existing.row.config_name!r} at scope "
-                    f"{existing.row.scope_type.value!r} is not allowed."
+                    f"Writing app config fragment {updater.pk_value} is not allowed."
                 )
             result = await w.update(updater)
             if result is None:
@@ -131,16 +127,12 @@ class AppConfigFragmentDBSource:
         purger: Purger[AppConfigFragmentRow],
         only_if: ExistsQuerier[AppConfigAllowListRow],
     ) -> AppConfigFragmentData:
+        # Gate first, then write — both in one transaction so the check and the write commit
+        # atomically. A missing fragment surfaces as the purge returning None below.
         async with self._ops.write_ops() as w:
-            existing = await w.query(
-                Querier(row_class=AppConfigFragmentRow, pk_value=purger.pk_value)
-            )
-            if existing is None:
-                raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
             if not await w.exists(only_if):
                 raise AppConfigFragmentWriteNotAllowed(
-                    f"Writing app config {existing.row.config_name!r} at scope "
-                    f"{existing.row.scope_type.value!r} is not allowed."
+                    f"Writing app config fragment {purger.pk_value} is not allowed."
                 )
             result = await w.purge(purger)
             if result is None:
