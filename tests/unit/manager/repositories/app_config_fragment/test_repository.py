@@ -20,7 +20,6 @@ from ai.backend.manager.errors.app_config import (
     AppConfigFragmentWriteNotAllowed,
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
-from ai.backend.manager.models.app_config_allow_list.conditions import AppConfigAllowListConditions
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
@@ -56,21 +55,6 @@ _USER_UUID = uuid.uuid4()
 _DOMAIN_ID = str(_DOMAIN_UUID)
 _USER_ID = str(_USER_UUID)
 _OTHER_USER_ID = str(uuid.uuid4())
-
-
-def _allow_list_gate(
-    config_name: str, scope_type: AppConfigScopeType
-) -> ExistsQuerier[AppConfigAllowListRow]:
-    """The allow-list write-gate the caller passes as ``only_if`` (built here as the adapter would)."""
-    return ExistsQuerier(
-        row_class=AppConfigAllowListRow,
-        conditions=[
-            AppConfigAllowListConditions.by_config_name_equals(
-                StringMatchSpec(config_name, case_insensitive=False, negated=False)
-            ),
-            AppConfigAllowListConditions.by_scope_type_equals(scope_type),
-        ],
-    )
 
 
 @pytest.fixture
@@ -227,7 +211,7 @@ class TestCreateAndGet:
                 scope_id="public",
                 config={"theme": "dark"},
             ),
-            _allow_list_gate("theme", AppConfigScopeType.PUBLIC),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         fetched = await repository.get_by_id(created.id)
         assert fetched.id == created.id
@@ -250,7 +234,7 @@ class TestCreateAndGet:
                     scope_id="public",
                     config={"theme": "dark"},
                 ),
-                _allow_list_gate("theme", AppConfigScopeType.PUBLIC),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
     async def test_unique_constraint_violation(
@@ -266,9 +250,7 @@ class TestCreateAndGet:
                     scope_id=domain_scoped_fragment.scope_id,
                     config={"k": "v"},
                 ),
-                _allow_list_gate(
-                    domain_scoped_fragment.config_name, domain_scoped_fragment.scope_type
-                ),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
 
@@ -283,7 +265,7 @@ class TestRankAssignment:
                 scope_id="public",
                 config={"k": "v"},
             ),
-            _allow_list_gate("theme", AppConfigScopeType.PUBLIC),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         second = await repository.create(
             AppConfigFragmentCreatorSpec(
@@ -292,7 +274,7 @@ class TestRankAssignment:
                 scope_id=_DOMAIN_ID,
                 config={"k": "v"},
             ),
-            _allow_list_gate("theme", AppConfigScopeType.DOMAIN),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         third = await repository.create(
             AppConfigFragmentCreatorSpec(
@@ -301,7 +283,7 @@ class TestRankAssignment:
                 scope_id=_USER_ID,
                 config={"k": "v"},
             ),
-            _allow_list_gate("theme", AppConfigScopeType.USER),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         assert first.rank < second.rank < third.rank
 
@@ -317,7 +299,7 @@ class TestUpdate:
                 spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
                 pk_value=domain_scoped_fragment.id,
             ),
-            _allow_list_gate(domain_scoped_fragment.config_name, domain_scoped_fragment.scope_type),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         assert updated.config == {"b": 2}
         assert (await repository.get_by_id(domain_scoped_fragment.id)).config == {"b": 2}
@@ -330,7 +312,7 @@ class TestUpdate:
                     spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({})),
                     pk_value=missing_id,
                 ),
-                _allow_list_gate("theme", AppConfigScopeType.DOMAIN),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
     async def test_update_rejected_when_not_allow_listed(
@@ -344,9 +326,7 @@ class TestUpdate:
                     spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
                     pk_value=fragment_not_allow_listed.id,
                 ),
-                _allow_list_gate(
-                    fragment_not_allow_listed.config_name, fragment_not_allow_listed.scope_type
-                ),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
 
@@ -358,7 +338,7 @@ class TestPurge:
     ) -> None:
         purged = await repository.purge(
             Purger(row_class=AppConfigFragmentRow, pk_value=domain_scoped_fragment.id),
-            _allow_list_gate(domain_scoped_fragment.config_name, domain_scoped_fragment.scope_type),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         assert purged.id == domain_scoped_fragment.id
         with pytest.raises(AppConfigFragmentNotFound):
@@ -369,7 +349,7 @@ class TestPurge:
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.purge(
                 Purger(row_class=AppConfigFragmentRow, pk_value=missing_id),
-                _allow_list_gate("theme", AppConfigScopeType.DOMAIN),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
     async def test_purge_rejected_when_not_allow_listed(
@@ -380,9 +360,7 @@ class TestPurge:
         with pytest.raises(AppConfigFragmentWriteNotAllowed):
             await repository.purge(
                 Purger(row_class=AppConfigFragmentRow, pk_value=fragment_not_allow_listed.id),
-                _allow_list_gate(
-                    fragment_not_allow_listed.config_name, fragment_not_allow_listed.scope_type
-                ),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
 
