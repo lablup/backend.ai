@@ -85,7 +85,6 @@ from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
     VFolderRow,
     VFolderStatusSet,
-    initiate_vfolder_deletion,
     vfolder_invitations,
     vfolder_permissions,
     vfolder_status_map,
@@ -138,6 +137,7 @@ from ai.backend.manager.repositories.user.types import (
     RoleUserSearchScope,
 )
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserUpdateSpec
+from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
