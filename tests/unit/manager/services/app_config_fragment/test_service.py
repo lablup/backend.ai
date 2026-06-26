@@ -14,6 +14,7 @@ from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigFragmentBulkWriteResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
@@ -31,6 +32,12 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    BulkConditionalCreator,
+    BulkConditionalPurger,
+    BulkConditionalUpdater,
+    ConditionalCreator,
+    ConditionalPurger,
+    ConditionalUpdater,
     ExistsQuerier,
     OffsetPagination,
     Purger,
@@ -38,6 +45,15 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_create import (
+    BulkCreateAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
+    BulkPurgeAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_update import (
+    BulkUpdateAppConfigFragmentAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
@@ -223,6 +239,86 @@ class TestAppConfigFragmentService:
 
         assert result.fragment == fragment
         mock_repository.purge.assert_called_once_with(purger, gate)
+
+    # --- bulk ---
+
+    async def test_bulk_create_delegates_to_repository(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    ) -> None:
+        fragments = [_fragment(), _fragment()]
+        mock_repository.bulk_create = AsyncMock(
+            return_value=AppConfigFragmentBulkWriteResult(succeeded=fragments, failed=[])
+        )
+        bulk = BulkConditionalCreator(
+            specs=[
+                ConditionalCreator(
+                    spec=AppConfigFragmentCreatorSpec(
+                        config_name="theme",
+                        scope_type=AppConfigScopeType.USER,
+                        scope_id=_USER_ID,
+                        config={"k": "v"},
+                    ),
+                    only_if=ExistsQuerier(row_class=AppConfigAllowListRow),
+                )
+            ]
+        )
+
+        result = await service.bulk_create(BulkCreateAppConfigFragmentAction(bulk_creator=bulk))
+
+        assert result.succeeded == fragments
+        assert result.failed == []
+        mock_repository.bulk_create.assert_called_once_with(bulk)
+
+    async def test_bulk_update_delegates_to_repository(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    ) -> None:
+        fragments = [_fragment(), _fragment()]
+        mock_repository.bulk_update = AsyncMock(
+            return_value=AppConfigFragmentBulkWriteResult(succeeded=fragments, failed=[])
+        )
+        bulk = BulkConditionalUpdater(
+            updaters=[
+                ConditionalUpdater(
+                    updater=Updater(
+                        spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
+                        pk_value=fragments[0].id,
+                    ),
+                    only_if=ExistsQuerier(row_class=AppConfigAllowListRow),
+                )
+            ]
+        )
+
+        result = await service.bulk_update(BulkUpdateAppConfigFragmentAction(bulk_updater=bulk))
+
+        assert result.succeeded == fragments
+        assert result.failed == []
+        mock_repository.bulk_update.assert_called_once_with(bulk)
+
+    async def test_bulk_purge_delegates_to_repository(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    ) -> None:
+        fragments = [_fragment(), _fragment()]
+        mock_repository.bulk_purge = AsyncMock(
+            return_value=AppConfigFragmentBulkWriteResult(succeeded=fragments, failed=[])
+        )
+        bulk = BulkConditionalPurger(
+            purgers=[
+                ConditionalPurger(
+                    purger=Purger(row_class=AppConfigFragmentRow, pk_value=fragments[0].id),
+                    only_if=ExistsQuerier(row_class=AppConfigAllowListRow),
+                ),
+                ConditionalPurger(
+                    purger=Purger(row_class=AppConfigFragmentRow, pk_value=fragments[1].id),
+                    only_if=ExistsQuerier(row_class=AppConfigAllowListRow),
+                ),
+            ]
+        )
+
+        result = await service.bulk_purge(BulkPurgeAppConfigFragmentAction(bulk_purger=bulk))
+
+        assert result.succeeded == fragments
+        assert result.failed == []
+        mock_repository.bulk_purge.assert_called_once_with(bulk)
 
 
 class TestCreateActionScope:
