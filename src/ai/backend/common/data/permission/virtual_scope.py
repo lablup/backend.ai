@@ -15,7 +15,7 @@ __all__ = (
 
 @dataclass(frozen=True)
 class VirtualScopeData:
-    virtual_scope_id: VirtualScopeID
+    id: VirtualScopeID
 
 
 @dataclass(frozen=True)
