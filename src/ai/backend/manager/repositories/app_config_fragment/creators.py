@@ -7,15 +7,26 @@ from typing import Any, override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
+from ai.backend.manager.repositories.base.creator import CreatorSpec
+
+# Merge precedence by scope: lower ranks merge first, so a more specific scope (higher rank)
+# overrides a broader one. Within one resolve there is at most one fragment per scope_type
+# (unique on ``(config_name, scope_type, scope_id)``), so these ranks are distinct per merge.
+_SCOPE_RANK: dict[AppConfigScopeType, int] = {
+    AppConfigScopeType.PUBLIC: 100,
+    AppConfigScopeType.DOMAIN: 200,
+    AppConfigScopeType.USER: 300,
+}
 
 
 @dataclass
-class AppConfigFragmentCreatorSpec(DependentCreatorSpec[int, AppConfigFragmentRow]):
-    """Fragment creator whose ``rank`` is assigned by the ops layer (next-value) at execution.
+class AppConfigFragmentCreatorSpec(CreatorSpec[AppConfigFragmentRow]):
+    """Fragment creator whose ``rank`` is derived from its ``scope_type`` (scope precedence).
 
-    ``build_row`` receives the computed next rank, so a newly created fragment is placed
-    after the existing fragments for the same ``config_name``.
+    A fragment's rank is fixed by its scope (``public`` < ``domain`` < ``user``), so a more
+    specific scope overrides a broader one when fragments are merged — independent of creation
+    order. Being a plain ``CreatorSpec`` (rank known at build time), it composes with
+    ``BulkConditionalCreator`` for gated bulk inserts.
     """
 
     config_name: str
@@ -24,11 +35,11 @@ class AppConfigFragmentCreatorSpec(DependentCreatorSpec[int, AppConfigFragmentRo
     config: dict[str, Any]
 
     @override
-    def build_row(self, next_rank: int) -> AppConfigFragmentRow:
+    def build_row(self) -> AppConfigFragmentRow:
         return AppConfigFragmentRow(
             config_name=self.config_name,
             scope_type=self.scope_type,
             scope_id=self.scope_id,
-            rank=next_rank,
+            rank=_SCOPE_RANK[self.scope_type],
             config=self.config,
         )

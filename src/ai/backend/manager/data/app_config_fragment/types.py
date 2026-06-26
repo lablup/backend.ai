@@ -30,3 +30,23 @@ class AppConfigFragmentSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass(frozen=True)
+class AppConfigFragmentBulkItemError:
+    """One failed item of a partial bulk mutation: its batch position and a reason."""
+
+    index: int
+    message: str
+
+
+@dataclass(frozen=True)
+class AppConfigFragmentBulkWriteResult:
+    """Partial-success result of a bulk mutation.
+
+    ``succeeded`` are the fragments that were created/updated/purged; ``failed`` are the items
+    whose gate was rejected or whose write failed, each with its batch ``index`` and a reason.
+    """
+
+    succeeded: list[AppConfigFragmentData]
+    failed: list[AppConfigFragmentBulkItemError]
