@@ -1,5 +1,6 @@
 """Data types for Sokovan scheduler."""
 
+from .agent import AgentInfo
 from .allocation import (
     AgentAllocation,
     AllocationBatch,
@@ -9,6 +10,7 @@ from .allocation import (
     SessionAllocation,
 )
 from .config import NetworkSetup, ScalingGroupInfo, SchedulingConfig
+from .handler import HandlerKernelData, HandlerSessionData
 from .image import ImageConfigData, ImageIdentifier
 from .lifecycle import (
     KernelBindingData,
@@ -54,6 +56,8 @@ from .workload import (
 )
 
 __all__ = [
+    # agent
+    "AgentInfo",
     # allocation
     "AgentAllocation",
     "AllocationBatch",
@@ -65,6 +69,9 @@ __all__ = [
     "NetworkSetup",
     "ScalingGroupInfo",
     "SchedulingConfig",
+    # handler
+    "HandlerKernelData",
+    "HandlerSessionData",
     # image
     "ImageConfigData",
     "ImageIdentifier",

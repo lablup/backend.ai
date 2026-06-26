@@ -11,6 +11,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
+    ResourceSlot,
     SessionId,
     SlotQuantity,
 )
@@ -18,6 +19,8 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.sokovan import (
     AgentAllocation,
+    AgentInfo,
+    AgentOccupancy,
     AllocationBatch,
     KernelAllocation,
     KeypairOccupancy,
@@ -39,6 +42,7 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
 )
+from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
 from ai.backend.manager.sokovan.recorder import (
     ExecutionRecord,
     RecorderContext,
@@ -52,7 +56,6 @@ from .selectors.dispersed import DispersedAgentSelector
 from .selectors.legacy import LegacyAgentSelector
 from .selectors.roundrobin import RoundRobinAgentSelector
 from .selectors.selector import (
-    AgentInfo,
     AgentSelection,
     AgentSelectionConfig,
     AgentSelectionCriteria,
@@ -233,8 +236,7 @@ class SessionProvisioner:
             else {}
         )
         mutable_agents = [
-            AgentInfo.from_meta_and_occupancy(agent, agent_occupancy)
-            for agent in scheduling_data.agents
+            self._build_agent_info(agent, agent_occupancy) for agent in scheduling_data.agents
         ]
         session_allocations: list[SessionAllocation] = []
         scheduling_failures: list[SchedulingFailure] = []
@@ -479,6 +481,27 @@ class SessionProvisioner:
             session_workload,
             selections,
             scaling_group,
+        )
+
+    @staticmethod
+    def _build_agent_info(
+        meta: AgentMeta,
+        occupancy_map: Mapping[AgentId, AgentOccupancy],
+    ) -> AgentInfo:
+        """Create an AgentInfo from agent metadata and occupancy mapping."""
+        occupancy = occupancy_map.get(meta.id)
+        if occupancy:
+            occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in occupancy.occupied_slots})
+        else:
+            occupied = ResourceSlot()
+        return AgentInfo(
+            agent_id=meta.id,
+            agent_addr=meta.addr,
+            architecture=meta.architecture,
+            scaling_group=meta.scaling_group,
+            available_slots=meta.available_slots,
+            occupied_slots=occupied,
+            container_count=occupancy.container_count if occupancy else 0,
         )
 
     @staticmethod

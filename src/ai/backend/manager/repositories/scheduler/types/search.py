@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.manager.data.sokovan import (
+    HandlerSessionData,
     ImageConfigData,
     SessionDataForPull,
     SessionDataForStart,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduler.results import HandlerSessionData
 
 
 @dataclass
