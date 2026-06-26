@@ -989,7 +989,11 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
         default=None,
     )
     start_command: list[str] | None = gql_field(
-        description="Command to start the model service.",
+        description=(
+            "Deprecated since 26.7.0. Command to start the model service. Do "
+            "not set together with `command`; when both are set, `command` takes precedence and "
+            "this field is ignored."
+        ),
         default=None,
         deprecation_reason="Use `command` instead.",
     )

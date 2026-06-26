@@ -7016,10 +7016,12 @@ type ModelServiceConfig {
   """
   preStartActions: [PreStartAction!]!
 
-  """Single-string command to start the model service."""
+  """Added in 26.7.0. Single-string command to start the model service."""
   command: String
 
-  """Deprecated. Command to start the model service. Use `command` instead."""
+  """
+  Deprecated since 26.7.0. Command to start the model service. Do not set together with `command`; when both are set, `command` takes precedence and this field is ignored.
+  """
   startCommand: [String!] @deprecated(reason: "Use `command` instead.")
 
   """Shell configured for the model service."""
@@ -7044,7 +7046,9 @@ input ModelServiceConfigInput {
   """Added in 26.7.0. Single-string command to start the model service."""
   command: String = null
 
-  """Command to start the model service."""
+  """
+  Deprecated since 26.7.0. Command to start the model service. Do not set together with `command`; when both are set, `command` takes precedence and this field is ignored.
+  """
   startCommand: [String!] = null @deprecated(reason: "Use `command` instead.")
 
   """Shell configured for the model service."""
@@ -8562,7 +8566,9 @@ input PresetModelServiceConfigInput {
   """Added in 26.7.0. Single-string command to start the model service."""
   command: String = null
 
-  """Command to start the model service."""
+  """
+  Deprecated since 26.7.0. Command to start the model service. Do not set together with `command`; when both are set, `command` takes precedence and this field is ignored.
+  """
   startCommand: [String!] = null @deprecated(reason: "Use `command` instead.")
 
   """Shell configured for the model service."""

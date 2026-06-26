@@ -203,6 +203,12 @@ class TestPresetModelDefinitionInput:
         assert service.command == "python server.py"
         assert service.start_command is None
 
+    def test_accepts_service_with_start_command_only(self) -> None:
+        # Deprecated ``start_command`` still works on its own when ``command`` is unset.
+        service = PresetModelServiceConfigInput(port=8080, start_command=["python", "server.py"])
+        assert service.start_command == ["python", "server.py"]
+        assert service.command is None
+
     def test_accepts_fully_populated(self) -> None:
         dto = PresetModelDefinitionInput(
             models=[

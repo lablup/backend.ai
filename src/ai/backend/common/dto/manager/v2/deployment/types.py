@@ -304,11 +304,16 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
         description="List of pre-start actions to execute before starting the model service.",
     )
     command: str | None = Field(
-        default=None, description="Single-string command to start the model service."
+        default=None,
+        description=("Added in 26.7.0. Single-string command to start the model service."),
     )
     start_command: list[str] | None = Field(
         default=None,
-        description="Deprecated. Command to start the model service. Use `command` instead.",
+        description=(
+            "Deprecated since 26.7.0. Command to start the model service. Do "
+            "not set together with `command`; when both are set, `command` takes precedence and "
+            "this field is ignored."
+        ),
     )
     shell: str | None = Field(
         default="/bin/bash",
