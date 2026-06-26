@@ -7,6 +7,18 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.bulk_create import (
+    BulkCreateAppConfigFragmentAction,
+    BulkCreateAppConfigFragmentActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
+    BulkPurgeAppConfigFragmentAction,
+    BulkPurgeAppConfigFragmentActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_update import (
+    BulkUpdateAppConfigFragmentAction,
+    BulkUpdateAppConfigFragmentActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
     CreateAppConfigFragmentActionResult,
@@ -93,3 +105,27 @@ class AppConfigFragmentService:
     ) -> PurgeAppConfigFragmentActionResult:
         data = await self._repository.purge(action.purger, action.only_if)
         return PurgeAppConfigFragmentActionResult(fragment=data)
+
+    async def bulk_create(
+        self, action: BulkCreateAppConfigFragmentAction
+    ) -> BulkCreateAppConfigFragmentActionResult:
+        result = await self._repository.bulk_create(action.bulk_creator)
+        return BulkCreateAppConfigFragmentActionResult(
+            succeeded=result.succeeded, failed=result.failed
+        )
+
+    async def bulk_update(
+        self, action: BulkUpdateAppConfigFragmentAction
+    ) -> BulkUpdateAppConfigFragmentActionResult:
+        result = await self._repository.bulk_update(action.bulk_updater)
+        return BulkUpdateAppConfigFragmentActionResult(
+            succeeded=result.succeeded, failed=result.failed
+        )
+
+    async def bulk_purge(
+        self, action: BulkPurgeAppConfigFragmentAction
+    ) -> BulkPurgeAppConfigFragmentActionResult:
+        result = await self._repository.bulk_purge(action.bulk_purger)
+        return BulkPurgeAppConfigFragmentActionResult(
+            succeeded=result.succeeded, failed=result.failed
+        )

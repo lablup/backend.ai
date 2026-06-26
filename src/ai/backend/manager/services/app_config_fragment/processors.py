@@ -11,6 +11,18 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.bulk_create import (
+    BulkCreateAppConfigFragmentAction,
+    BulkCreateAppConfigFragmentActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
+    BulkPurgeAppConfigFragmentAction,
+    BulkPurgeAppConfigFragmentActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_update import (
+    BulkUpdateAppConfigFragmentAction,
+    BulkUpdateAppConfigFragmentActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
     CreateAppConfigFragmentActionResult,
@@ -51,6 +63,15 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     purge: SingleEntityActionProcessor[
         PurgeAppConfigFragmentAction, PurgeAppConfigFragmentActionResult
     ]
+    bulk_create: BulkActionProcessor[
+        BulkCreateAppConfigFragmentAction, BulkCreateAppConfigFragmentActionResult
+    ]
+    bulk_update: BulkActionProcessor[
+        BulkUpdateAppConfigFragmentAction, BulkUpdateAppConfigFragmentActionResult
+    ]
+    bulk_purge: BulkActionProcessor[
+        BulkPurgeAppConfigFragmentAction, BulkPurgeAppConfigFragmentActionResult
+    ]
 
     def __init__(
         self,
@@ -63,6 +84,9 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.scoped_search = BulkActionProcessor(service.scoped_search, monitors=action_monitors)
         self.update = SingleEntityActionProcessor(service.update, action_monitors)
         self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
+        self.bulk_create = BulkActionProcessor(service.bulk_create, monitors=action_monitors)
+        self.bulk_update = BulkActionProcessor(service.bulk_update, monitors=action_monitors)
+        self.bulk_purge = BulkActionProcessor(service.bulk_purge, monitors=action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -73,4 +97,7 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
             ScopedSearchAppConfigFragmentAction.spec(),
             UpdateAppConfigFragmentAction.spec(),
             PurgeAppConfigFragmentAction.spec(),
+            BulkCreateAppConfigFragmentAction.spec(),
+            BulkUpdateAppConfigFragmentAction.spec(),
+            BulkPurgeAppConfigFragmentAction.spec(),
         ]
