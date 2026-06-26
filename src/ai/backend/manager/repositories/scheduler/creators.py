@@ -36,12 +36,12 @@ from uuid import UUID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import ClusterMode, ResourceSlot, ResourceSlotEntry
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.spec import KernelSpec, SessionSpec
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
-from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
 
 __all__ = (
     "KernelRowFromSpec",

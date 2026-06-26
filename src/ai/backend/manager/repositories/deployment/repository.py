@@ -82,6 +82,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -103,7 +104,6 @@ from ai.backend.manager.repositories.base.updater import (
     Updater,
 )
 from ai.backend.manager.repositories.base.upserter import Upserter
-from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 
 from .db_source import DeploymentDBSource

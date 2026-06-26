@@ -27,13 +27,13 @@ from decimal import Decimal
 from typing import Any
 
 from ai.backend.common.types import BinarySize, ResourceSlotEntry
+from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     SessionSpecDraft,
 )
 from ai.backend.manager.data.session.options import ResourceOpts
 from ai.backend.manager.defs import DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
-from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
     SessionSpecPreparationContext,

@@ -14,12 +14,12 @@ from ai.backend.common.config import (
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import MountPermission
 from ai.backend.manager.data.deployment.types import ModelRevisionData
-from ai.backend.manager.data.session.draft import KernelExecutionSpecDraft
-from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.repositories.scheduler.types.session_creation import (
+from ai.backend.manager.data.session.creation import (
     DeploymentContext,
     ResolvedPresetValues,
 )
+from ai.backend.manager.data.session.draft import KernelExecutionSpecDraft
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.sokovan.deployment.deployment_draft_builder import (
     DeploymentSessionDraftBuilder,
 )

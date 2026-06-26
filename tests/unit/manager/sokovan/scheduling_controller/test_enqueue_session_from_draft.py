@@ -54,6 +54,11 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, SlotTypePolicy
+from ai.backend.manager.data.session.creation import (
+    ContainerUserInfo,
+    ImageInfo,
+    ScalingGroupNetworkInfo,
+)
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -74,9 +79,6 @@ from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    ContainerUserInfo,
-    ImageInfo,
-    ScalingGroupNetworkInfo,
     SessionSpecContextFetch,
 )
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (

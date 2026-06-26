@@ -20,9 +20,9 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.manager.data.resource.types import SlotTypePolicy
+from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.spec import KernelSpec, SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import (
     image_min_slots,
     parse_quantity,
