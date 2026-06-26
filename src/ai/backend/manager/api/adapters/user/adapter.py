@@ -584,8 +584,10 @@ class UserAdapter(BaseAdapter):
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
-                username=cast(UserCreatorSpec, error.spec).username,
-                email=cast(UserCreatorSpec, error.spec).email,
+                username=(
+                    spec := cast(UserCreatorSpec, action.items[error.index].creator.spec)
+                ).username,
+                email=spec.email,
                 message=str(error.exception),
             )
             for error in result.data.failures
@@ -610,8 +612,10 @@ class UserAdapter(BaseAdapter):
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
-                username=cast(UserCreatorSpec, error.spec).username,
-                email=cast(UserCreatorSpec, error.spec).email,
+                username=(
+                    spec := cast(UserCreatorSpec, action.items[error.index].creator.spec)
+                ).username,
+                email=spec.email,
                 message=str(error.exception),
             )
             for error in result.data.failures

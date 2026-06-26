@@ -4,7 +4,7 @@ import enum
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Self, override
+from typing import Any, Self, override
 from uuid import UUID
 
 from sqlalchemy.engine import Row
@@ -12,6 +12,7 @@ from sqlalchemy.engine import Row
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import (
@@ -20,11 +21,6 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.user import UserRow
-    from ai.backend.manager.repositories.base.creator import BulkCreatorError
-    from ai.backend.manager.repositories.base.updater import BulkUpdaterError
 
 
 class UserStatus(enum.StrEnum):
@@ -185,7 +181,7 @@ class BulkUserCreateResultData:
     """
 
     successes: list[UserCreateResultData] = field(default_factory=list)
-    failures: list[BulkCreatorError[UserRow]] = field(default_factory=list)
+    failures: list[BulkCreateFailure] = field(default_factory=list)
 
     def success_count(self) -> int:
         """Get count of successfully created users."""
@@ -206,7 +202,7 @@ class BulkUserUpdateResultData:
     """
 
     successes: list[UserData] = field(default_factory=list)
-    failures: list[BulkUpdaterError[UserRow]] = field(default_factory=list)
+    failures: list[BulkUpdateFailure] = field(default_factory=list)
 
     def success_count(self) -> int:
         """Get count of successfully updated users."""
