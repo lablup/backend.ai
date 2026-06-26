@@ -7,7 +7,7 @@ import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SessionResult
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,

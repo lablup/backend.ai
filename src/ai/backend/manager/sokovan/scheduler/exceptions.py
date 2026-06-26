@@ -11,7 +11,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.manager.sokovan.data import SchedulingPredicate
+from ai.backend.manager.data.sokovan import SchedulingPredicate
 
 
 class SchedulingError(BackendAIError, ABC):

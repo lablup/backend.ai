@@ -20,13 +20,13 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.models.network import NetworkType
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ImageConfigData,
     KernelBindingData,
     SessionDataForPull,
     SessionDataForStart,
 )
+from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,

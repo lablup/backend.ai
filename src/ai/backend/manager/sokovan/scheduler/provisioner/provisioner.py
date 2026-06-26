@@ -9,12 +9,24 @@ from datetime import datetime
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import (
+    AgentId,
     AgentSelectionStrategy,
     SessionId,
     SlotQuantity,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.sokovan import (
+    AgentAllocation,
+    AllocationBatch,
+    KernelAllocation,
+    KeypairOccupancy,
+    SchedulingFailure,
+    SchedulingPredicate,
+    SessionAllocation,
+    SessionWorkload,
+    SystemSnapshot,
+)
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
@@ -26,15 +38,6 @@ from ai.backend.manager.repositories.resource_slot.types import (
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
-)
-from ai.backend.manager.sokovan.data import (
-    AllocationBatch,
-    KeypairOccupancy,
-    SchedulingFailure,
-    SchedulingPredicate,
-    SessionAllocation,
-    SessionWorkload,
-    SystemSnapshot,
 )
 from ai.backend.manager.sokovan.recorder import (
     ExecutionRecord,
@@ -50,6 +53,7 @@ from .selectors.legacy import LegacyAgentSelector
 from .selectors.roundrobin import RoundRobinAgentSelector
 from .selectors.selector import (
     AgentInfo,
+    AgentSelection,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
@@ -471,10 +475,57 @@ class SessionProvisioner:
         )
 
         # Build session allocation from selections
-        return SessionAllocation.from_agent_selections(
+        return self._build_session_allocation(
             session_workload,
             selections,
             scaling_group,
+        )
+
+    @staticmethod
+    def _build_session_allocation(
+        session_workload: SessionWorkload,
+        selections: list[AgentSelection],
+        scaling_group: str,
+    ) -> SessionAllocation:
+        """Build a SessionAllocation from agent selection results."""
+        kernel_allocations: list[KernelAllocation] = []
+        agent_allocation_map: dict[AgentId, AgentAllocation] = {}
+
+        for selection in selections:
+            resource_req = selection.resource_requirements
+            selected_agent = selection.selected_agent
+
+            # Track resource allocation for this agent
+            if selected_agent.agent_id not in agent_allocation_map:
+                agent_allocation_map[selected_agent.agent_id] = AgentAllocation(
+                    agent_id=selected_agent.agent_id,
+                    allocated_slots=[],
+                )
+            agent_allocation_map[selected_agent.agent_id].allocated_slots.append(
+                resource_req.requested_slots
+            )
+
+            # Create kernel allocations
+            for kernel_id in resource_req.kernel_ids:
+                kernel_allocations.append(
+                    KernelAllocation(
+                        kernel_id=kernel_id,
+                        agent_id=selected_agent.agent_id,
+                        agent_addr=selected_agent.agent_addr,
+                        scaling_group=selected_agent.scaling_group,
+                    )
+                )
+
+        agent_allocations = list(agent_allocation_map.values())
+
+        return SessionAllocation(
+            session_id=session_workload.session_id,
+            session_type=session_workload.session_type,
+            cluster_mode=session_workload.cluster_mode,
+            scaling_group=scaling_group,
+            kernel_allocations=kernel_allocations,
+            agent_allocations=agent_allocations,
+            access_key=session_workload.access_key,
         )
 
     @staticmethod

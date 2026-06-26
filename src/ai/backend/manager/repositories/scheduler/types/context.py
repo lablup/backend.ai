@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ScalingGroupInfo,
     SchedulingConfig,
     SessionWorkload,

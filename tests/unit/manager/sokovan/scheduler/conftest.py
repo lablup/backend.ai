@@ -24,7 +24,7 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,

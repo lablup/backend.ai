@@ -1,7 +1,7 @@
 import pytest
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,

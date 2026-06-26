@@ -35,8 +35,8 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.data.sokovan import AgentOccupancy
     from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
-    from ai.backend.manager.sokovan.data import AgentOccupancy
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
