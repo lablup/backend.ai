@@ -136,3 +136,6 @@ class AppConfigFragmentRepository:
         self, config_names: list[str], scope: AppConfigResolveScope
     ) -> list[AppConfigFragmentData]:
         return await self._db_source.list_visible_fragments_bulk(config_names, scope)
+
+    async def list_public_fragments(self, config_name: str) -> list[AppConfigFragmentData]:
+        return await self._db_source.list_public_fragments(config_name)

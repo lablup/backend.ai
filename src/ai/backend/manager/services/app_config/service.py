@@ -18,6 +18,10 @@ from ai.backend.manager.services.app_config.actions.resolve_bulk import (
     ResolveBulkAppConfigAction,
     ResolveBulkAppConfigActionResult,
 )
+from ai.backend.manager.services.app_config.actions.resolve_public import (
+    ResolvePublicAppConfigAction,
+    ResolvePublicAppConfigActionResult,
+)
 
 __all__ = ("AppConfigService",)
 
@@ -89,3 +93,19 @@ class AppConfigService:
             for config_name in action.config_names
         ]
         return ResolveBulkAppConfigActionResult(app_configs=app_configs, user_id=action.user_id)
+
+    async def resolve_public(
+        self, action: ResolvePublicAppConfigAction
+    ) -> ResolvePublicAppConfigActionResult:
+        """Resolve the merged ``AppConfig`` from ``public`` fragments only (anonymous read).
+
+        No principal is involved, so only public-scope documents are fetched (``rank``-ordered)
+        and deep-merged. An unregistered name yields an empty merge (``config`` is ``None``).
+        """
+        fragments = await self._fragment_repository.list_public_fragments(action.config_name)
+        app_config = AppConfigData(
+            config_name=action.config_name,
+            fragments=fragments,
+            config=self._merge_configs(fragments),
+        )
+        return ResolvePublicAppConfigActionResult(app_config=app_config)

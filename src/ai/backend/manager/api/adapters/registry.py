@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
+from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
@@ -78,6 +79,7 @@ class Adapters:
     def __init__(
         self,
         agent: AgentAdapter,
+        app_config: AppConfigAdapter,
         app_config_allow_list: AppConfigAllowListAdapter,
         app_config_definition: AppConfigDefinitionAdapter,
         artifact: ArtifactAdapter,
@@ -121,6 +123,7 @@ class Adapters:
         vfs_storage: VFSStorageAdapter,
     ) -> None:
         self.agent = agent
+        self.app_config = app_config
         self.app_config_allow_list = app_config_allow_list
         self.app_config_definition = app_config_definition
         self.artifact = artifact
@@ -183,6 +186,7 @@ class Adapters:
         """
         return cls(
             agent=AgentAdapter(processors),
+            app_config=AppConfigAdapter(processors),
             app_config_allow_list=AppConfigAllowListAdapter(processors),
             app_config_definition=AppConfigDefinitionAdapter(processors),
             artifact=ArtifactAdapter(processors),
