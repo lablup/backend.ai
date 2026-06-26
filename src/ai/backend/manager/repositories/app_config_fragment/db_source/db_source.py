@@ -13,6 +13,8 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigFragmentBulkItemError,
+    AppConfigFragmentBulkWriteResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
@@ -21,7 +23,6 @@ from ai.backend.manager.errors.app_config import (
     AppConfigFragmentWriteNotAllowed,
 )
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.creators import (
@@ -29,18 +30,18 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    BulkConditionalCreator,
+    BulkConditionalPurger,
+    BulkConditionalUpdater,
+    Creator,
     ExistsQuerier,
     Purger,
     Querier,
     Updater,
 )
-from ai.backend.manager.repositories.base.creator import NextValuePolicy
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops import DBOpsProvider, WriteOps
 
 __all__ = ("AppConfigFragmentDBSource",)
-
-# Gap between successive ranks, leaving room to re-order fragments without renumbering.
-RANK_GAP = 100
 
 app_config_fragment_db_source_resilience = Resilience(
     policies=[
@@ -70,29 +71,62 @@ class AppConfigFragmentDBSource:
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._ops = ops_provider
 
+    async def _update_in_tx(
+        self,
+        w: WriteOps,
+        updater: Updater[AppConfigFragmentRow],
+        only_if: ExistsQuerier[AppConfigAllowListRow],
+    ) -> AppConfigFragmentData:
+        """Gate + update one fragment inside the caller's write transaction.
+
+        A missing fragment surfaces as the update returning None below.
+        """
+        if not await w.exists(only_if):
+            raise AppConfigFragmentWriteNotAllowed(
+                f"Writing app config fragment {updater.pk_value} is not allowed."
+            )
+        result = await w.update(updater)
+        if result is None:
+            raise AppConfigFragmentNotFound(f"App config fragment {updater.pk_value} not found")
+        return result.row.to_data()
+
+    async def _purge_in_tx(
+        self,
+        w: WriteOps,
+        purger: Purger[AppConfigFragmentRow],
+        only_if: ExistsQuerier[AppConfigAllowListRow],
+    ) -> AppConfigFragmentData:
+        """Gate + purge one fragment inside the caller's write transaction.
+
+        A missing fragment surfaces as the purge returning None below.
+        """
+        if not await w.exists(only_if):
+            raise AppConfigFragmentWriteNotAllowed(
+                f"Writing app config fragment {purger.pk_value} is not allowed."
+            )
+        result = await w.purge(purger)
+        if result is None:
+            raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
+        return result.row.to_data()
+
     @app_config_fragment_db_source_resilience.apply()
     async def create(
         self,
         spec: AppConfigFragmentCreatorSpec,
         only_if: ExistsQuerier[AppConfigAllowListRow],
     ) -> AppConfigFragmentData:
-        policy = NextValuePolicy(
-            column=AppConfigFragmentRow.rank,
-            scope_condition=lambda: AppConfigFragmentRow.config_name == spec.config_name,
-            lock_selector=sa.select(AppConfigDefinitionRow).where(
-                AppConfigDefinitionRow.config_name == spec.config_name
-            ),
-            gap=RANK_GAP,
-        )
-        # ``only_if`` (built by the caller) and the write run in one transaction, so the gate
-        # check and the write commit atomically — no check-then-write race.
+        """Gate + create one fragment in a single write transaction.
+
+        The gate check and the write run in one transaction, so they commit atomically —
+        no check-then-write race. ``rank`` is derived from the fragment's ``scope_type``.
+        """
         async with self._ops.write_ops() as w:
             if not await w.exists(only_if):
                 raise AppConfigFragmentWriteNotAllowed(
                     f"Writing app config {spec.config_name!r} at scope "
                     f"{spec.scope_type.value!r} is not allowed."
                 )
-            created = await w.create_with_next_value(policy, spec)
+            created = await w.create(Creator(spec=spec))
             return created.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
@@ -109,17 +143,8 @@ class AppConfigFragmentDBSource:
         updater: Updater[AppConfigFragmentRow],
         only_if: ExistsQuerier[AppConfigAllowListRow],
     ) -> AppConfigFragmentData:
-        # Gate first, then write — both in one transaction so the check and the write commit
-        # atomically. A missing fragment surfaces as the update returning None below.
         async with self._ops.write_ops() as w:
-            if not await w.exists(only_if):
-                raise AppConfigFragmentWriteNotAllowed(
-                    f"Writing app config fragment {updater.pk_value} is not allowed."
-                )
-            result = await w.update(updater)
-            if result is None:
-                raise AppConfigFragmentNotFound(f"App config fragment {updater.pk_value} not found")
-            return result.row.to_data()
+            return await self._update_in_tx(w, updater, only_if)
 
     @app_config_fragment_db_source_resilience.apply()
     async def purge(
@@ -127,17 +152,69 @@ class AppConfigFragmentDBSource:
         purger: Purger[AppConfigFragmentRow],
         only_if: ExistsQuerier[AppConfigAllowListRow],
     ) -> AppConfigFragmentData:
-        # Gate first, then write — both in one transaction so the check and the write commit
-        # atomically. A missing fragment surfaces as the purge returning None below.
         async with self._ops.write_ops() as w:
-            if not await w.exists(only_if):
-                raise AppConfigFragmentWriteNotAllowed(
-                    f"Writing app config fragment {purger.pk_value} is not allowed."
-                )
-            result = await w.purge(purger)
-            if result is None:
-                raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
-            return result.row.to_data()
+            return await self._purge_in_tx(w, purger, only_if)
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def bulk_create(
+        self,
+        bulk: BulkConditionalCreator[AppConfigFragmentRow, AppConfigAllowListRow],
+    ) -> AppConfigFragmentBulkWriteResult:
+        """Create many fragments with partial success.
+
+        Each item is gated and inserted independently in its own savepoint: a rejected gate or a
+        failed insert is reported in ``failed`` (with its batch index) while the rest are
+        created. The whole batch shares one transaction, so the successful inserts commit together.
+        """
+        async with self._ops.write_ops() as w:
+            result = await w.bulk_conditional_create_partial(bulk)
+            return AppConfigFragmentBulkWriteResult(
+                succeeded=[row.to_data() for row in result.successes],
+                failed=[
+                    AppConfigFragmentBulkItemError(index=e.index, message=str(e.exception))
+                    for e in result.errors
+                ],
+            )
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def bulk_update(
+        self,
+        bulk: BulkConditionalUpdater[AppConfigFragmentRow, AppConfigAllowListRow],
+    ) -> AppConfigFragmentBulkWriteResult:
+        """Update many fragments with partial success.
+
+        Each item is gated and updated independently in its own savepoint: a rejected gate, a
+        missing target, or a failed update is reported in ``failed`` while the rest are updated.
+        """
+        async with self._ops.write_ops() as w:
+            result = await w.bulk_conditional_update_partial(bulk)
+            return AppConfigFragmentBulkWriteResult(
+                succeeded=[row.to_data() for row in result.successes],
+                failed=[
+                    AppConfigFragmentBulkItemError(index=e.index, message=str(e.exception))
+                    for e in result.errors
+                ],
+            )
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def bulk_purge(
+        self,
+        bulk: BulkConditionalPurger[AppConfigFragmentRow, AppConfigAllowListRow],
+    ) -> AppConfigFragmentBulkWriteResult:
+        """Purge many fragments with partial success.
+
+        Each item is gated and deleted independently in its own savepoint: a rejected gate, a
+        missing target, or a failed delete is reported in ``failed`` while the rest are purged.
+        """
+        async with self._ops.write_ops() as w:
+            result = await w.bulk_conditional_purge_partial(bulk)
+            return AppConfigFragmentBulkWriteResult(
+                succeeded=[row.to_data() for row in result.successes],
+                failed=[
+                    AppConfigFragmentBulkItemError(index=e.index, message=str(e.exception))
+                    for e in result.errors
+                ],
+            )
 
     @app_config_fragment_db_source_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
