@@ -111,6 +111,46 @@ class AppConfigFragmentConditions:
 
         return inner
 
+    # --- per-scope visibility filters (one scope_type each) for a config_name ---
+
+    @staticmethod
+    def by_public_visibility(config_name: str) -> QueryCondition:
+        """The ``public`` fragment of ``config_name`` (public has no per-entity scope_id)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                AppConfigFragmentRow.config_name == config_name,
+                AppConfigFragmentRow.scope_type == AppConfigScopeType.PUBLIC,
+            )
+
+        return inner
+
+    @staticmethod
+    def by_domain_visibility(config_name: str, domain: str) -> QueryCondition:
+        """The ``domain`` fragment of ``config_name`` for ``domain``."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                AppConfigFragmentRow.config_name == config_name,
+                AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
+                AppConfigFragmentRow.scope_id == domain,
+            )
+
+        return inner
+
+    @staticmethod
+    def by_user_visibility(config_name: str, user_id: str) -> QueryCondition:
+        """The ``user`` fragment of ``config_name`` for ``user_id``."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                AppConfigFragmentRow.config_name == config_name,
+                AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
+                AppConfigFragmentRow.scope_id == user_id,
+            )
+
+        return inner
+
     # --- created_at / updated_at datetime filters ---
 
     @staticmethod

@@ -22,6 +22,9 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    AppConfigResolveScope,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkConditionalCreator,
@@ -121,3 +124,15 @@ class AppConfigFragmentRepository:
         bulk: BulkConditionalPurger[AppConfigFragmentRow, AppConfigAllowListRow],
     ) -> AppConfigFragmentBulkWriteResult:
         return await self._db_source.bulk_purge(bulk)
+
+    @app_config_fragment_repository_resilience.apply()
+    async def list_visible_fragments(
+        self, config_name: str, scope: AppConfigResolveScope
+    ) -> list[AppConfigFragmentData]:
+        return await self._db_source.list_visible_fragments(config_name, scope)
+
+    @app_config_fragment_repository_resilience.apply()
+    async def list_visible_fragments_bulk(
+        self, config_names: list[str], scope: AppConfigResolveScope
+    ) -> list[AppConfigFragmentData]:
+        return await self._db_source.list_visible_fragments_bulk(config_names, scope)
