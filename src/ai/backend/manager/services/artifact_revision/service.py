@@ -29,7 +29,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
-from ai.backend.common.types import VFolderID
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -44,6 +44,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.dto.request import (
     DelegateImportArtifactsReq,
     ImportArtifactsOptions,
@@ -59,6 +60,7 @@ from ai.backend.manager.errors.artifact_registry import (
 )
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.storage import UnsupportedStorageTypeError
+from ai.backend.manager.errors.vfolder import VFolderQuotaExceededError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -421,6 +423,10 @@ class ArtifactRevisionService:
                 if vfolder_data:
                     vfolder_id = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
                     _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
+
+                    # Pre-validate VFolder quota before starting import
+                    if revision_data.size is not None:
+                        await self._check_vfolder_quota(vfolder_data, revision_data.size)
 
             task_id: UUID
             match artifact.registry_type:
@@ -812,3 +818,77 @@ class ArtifactRevisionService:
             artifact_revision.status == ArtifactStatus.AVAILABLE
             and artifact_revision.digest == latest_commit_hash
         )
+
+    async def _check_vfolder_quota(
+        self,
+        vfolder_data: VFolderData,
+        additional_size: int,
+    ) -> None:
+        """
+        Check the quota scope limit for a VFolder before importing artifacts.
+
+        This pre-validation prevents failed imports mid-way when storage proxy
+        detects quota exceeded, avoiding partial downloads.
+
+        :param vfolder_data: VFolder data containing quota_scope_id and host
+        :param additional_size: Size of the artifact to be imported (in bytes)
+        :raises VFolderQuotaExceededError: If the quota limit would be exceeded
+        """
+        quota_scope_id = vfolder_data.quota_scope_id
+        if quota_scope_id is None:
+            # No quota scope configured for this VFolder
+            return
+
+        _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
+
+        # 1. Get current quota scope usage from storage proxy
+        storage_client = self._storage_manager.get_manager_facing_client(vfolder_data.host)
+        usage_response = await storage_client.get_quota_scope(volume_name, str(quota_scope_id))
+        used_bytes = int(usage_response.get("used_bytes", 0))
+
+        # 2. Get limit from resource policy
+        max_size = await self._get_quota_scope_limit(quota_scope_id, vfolder_data.domain_name)
+
+        # -1 or 0 means unlimited
+        if max_size <= 0:
+            return
+
+        # 3. Check if limit would be exceeded
+        if used_bytes + additional_size > max_size:
+            vfolder_id = VFolderID(quota_scope_id, vfolder_data.id)
+            raise VFolderQuotaExceededError(
+                vfolder_id=vfolder_id,
+                quota_scope_id=quota_scope_id,
+                current_size=used_bytes,
+                max_size=max_size,
+                requested_size=additional_size,
+            )
+
+    async def _get_quota_scope_limit(self, quota_scope_id: QuotaScopeID, domain_name: str) -> int:
+        """
+        Get the quota scope limit from the appropriate resource policy.
+
+        :param quota_scope_id: The quota scope ID to get the limit for
+        :param domain_name: The domain name for project scope queries
+        :return: The max_quota_scope_size in bytes, or -1 if unlimited
+        """
+        match quota_scope_id.scope_type:
+            case QuotaScopeType.USER:
+                user_result = await self._vfolder_repository.get_user_resource_info(
+                    quota_scope_id.scope_id
+                )
+                if user_result is None:
+                    # User not found, treat as unlimited
+                    return -1
+                _, max_quota_scope_size, _ = user_result
+                return max_quota_scope_size
+
+            case QuotaScopeType.PROJECT:
+                group_result = await self._vfolder_repository.get_group_resource_info(
+                    quota_scope_id.scope_id, domain_name
+                )
+                if group_result is None:
+                    # Group not found, treat as unlimited
+                    return -1
+                _, _, max_quota_scope_size, _ = group_result
+                return max_quota_scope_size
