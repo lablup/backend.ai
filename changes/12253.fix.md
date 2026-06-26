@@ -1,0 +1,1 @@
+Fix legacy `POST /services` raising `RuntimeVariantNotFound` after the deployment is already created, by reading the create response through the full (legacy) endpoint getter that eagerly loads the revision data.
