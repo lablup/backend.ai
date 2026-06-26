@@ -38,7 +38,10 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
+from ai.backend.manager.clients.valkey_client.statistics import (
+    EndpointStatistics,
+    KernelStatistics,
+)
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
