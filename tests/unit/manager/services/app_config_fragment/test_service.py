@@ -14,6 +14,8 @@ from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigFragmentBulkItemError,
+    AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
@@ -30,6 +32,7 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    BulkCreator,
     Creator,
     OffsetPagination,
     Purger,
@@ -37,6 +40,15 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_create import (
+    BulkCreateAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
+    BulkPurgeAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_update import (
+    BulkUpdateAppConfigFragmentAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
@@ -216,6 +228,92 @@ class TestAppConfigFragmentService:
 
         assert result.fragment == fragment
         mock_repository.purge.assert_called_once_with(purger)
+
+    # --- bulk ---
+
+    async def test_bulk_create_delegates_to_repository(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    ) -> None:
+        fragments = [_fragment(), _fragment()]
+        mock_repository.bulk_create = AsyncMock(
+            return_value=AppConfigFragmentBulkResult(succeeded=fragments, failed=[])
+        )
+        specs = [
+            AppConfigFragmentCreatorSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_ID,
+                config={"k": "v"},
+            )
+        ]
+
+        result = await service.bulk_create(BulkCreateAppConfigFragmentAction(creator_specs=specs))
+
+        assert result.succeeded == fragments
+        assert result.failed == []
+        mock_repository.bulk_create.assert_called_once_with(BulkCreator(specs=specs))
+
+    async def test_bulk_update_delegates_to_repository(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    ) -> None:
+        fragments = [_fragment(), _fragment()]
+        mock_repository.bulk_update = AsyncMock(
+            return_value=AppConfigFragmentBulkResult(succeeded=fragments, failed=[])
+        )
+        updaters = [
+            Updater(
+                spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
+                pk_value=fragments[0].id,
+            )
+        ]
+
+        result = await service.bulk_update(BulkUpdateAppConfigFragmentAction(updaters=updaters))
+
+        assert result.succeeded == fragments
+        assert result.failed == []
+        mock_repository.bulk_update.assert_called_once_with(updaters)
+
+    async def test_bulk_purge_delegates_to_repository(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    ) -> None:
+        fragments = [_fragment(), _fragment()]
+        mock_repository.bulk_purge = AsyncMock(
+            return_value=AppConfigFragmentBulkResult(succeeded=fragments, failed=[])
+        )
+        purgers = [
+            Purger(row_class=AppConfigFragmentRow, pk_value=fragments[0].id),
+            Purger(row_class=AppConfigFragmentRow, pk_value=fragments[1].id),
+        ]
+
+        result = await service.bulk_purge(BulkPurgeAppConfigFragmentAction(purgers=purgers))
+
+        assert result.succeeded == fragments
+        assert result.failed == []
+        mock_repository.bulk_purge.assert_called_once_with(purgers)
+
+    async def test_bulk_create_propagates_partial_failures(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    ) -> None:
+        # Partial success: the service must surface the repository's per-item failures
+        # (index + reason) on the action result, not just the succeeded fragments.
+        succeeded = [_fragment()]
+        failed = [AppConfigFragmentBulkItemError(index=1, message="write not allowed")]
+        mock_repository.bulk_create = AsyncMock(
+            return_value=AppConfigFragmentBulkResult(succeeded=succeeded, failed=failed)
+        )
+        specs = [
+            AppConfigFragmentCreatorSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_ID,
+                config={"k": "v"},
+            )
+        ]
+
+        result = await service.bulk_create(BulkCreateAppConfigFragmentAction(creator_specs=specs))
+
+        assert result.succeeded == succeeded
+        assert result.failed == failed
 
 
 class TestCreateActionScope:
