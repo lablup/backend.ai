@@ -7,8 +7,8 @@ from uuid import UUID
 from ai.backend.common.types import SessionId
 
 if TYPE_CHECKING:
+    from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-    from ai.backend.manager.api.gql_legacy.schema import GraphQueryContext
 
 
 __all__ = (
@@ -24,18 +24,18 @@ class KernelStatistics:
         valkey_stat_client: ValkeyStatClient,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Mapping[str, Any] | None]:
-        """For cases where required to collect kernel metrics in bulk internally"""
+        """For cases where required to collect kernel metrics in bulk internally."""
         session_ids_str = [str(sess_id) for sess_id in session_ids]
         return await valkey_stat_client.get_session_statistics_batch(session_ids_str)
 
     @classmethod
     async def batch_load_inference_metrics_by_kernel(
         cls,
-        ctx: GraphQueryContext,
+        valkey_live_client: ValkeyLiveClient,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Mapping[str, Any] | None]:
         session_ids_str = [str(sess_id) for sess_id in session_ids]
-        return await ctx.valkey_live.get_session_statistics_batch(session_ids_str)
+        return await valkey_live_client.get_session_statistics_batch(session_ids_str)
 
 
 class EndpointStatistics:
