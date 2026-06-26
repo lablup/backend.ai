@@ -6,12 +6,10 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.model_serving.exceptions import (
-    GenericForbidden,
-    InvalidAPIParameters,
-)
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user_uuid
 
 

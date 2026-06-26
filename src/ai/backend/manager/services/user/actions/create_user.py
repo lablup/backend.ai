@@ -10,13 +10,12 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import BulkUserCreateResultData, UserCreateResultData
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
 from ai.backend.manager.services.user.actions.base import (
     UserAction,
     UserScopeAction,
     UserScopeActionResult,
 )
-from ai.backend.manager.services.user.types import UserCreateSpec
 
 __all__ = (
     "CreateUserAction",

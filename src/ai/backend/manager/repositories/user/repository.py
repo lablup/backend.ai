@@ -42,13 +42,14 @@ from ai.backend.manager.repositories.keypair.types import (
     KeypairResourcePolicyKeypairSearchScope,
     UserKeypairSearchScope,
 )
+from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
     ProjectUserSearchScope,
     RoleUserSearchScope,
 )
-from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
+from ai.backend.manager.repositories.user.updaters import UserUpdateSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

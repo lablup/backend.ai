@@ -11,12 +11,12 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import BulkUserUpdateResultData, UserData
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.user.updaters import UserUpdateSpec
 from ai.backend.manager.services.user.actions.base import (
     UserAction,
     UserSingleEntityAction,
     UserSingleEntityActionResult,
 )
-from ai.backend.manager.services.user.types import UserUpdateSpec
 
 __all__ = (
     "ModifyUserAction",

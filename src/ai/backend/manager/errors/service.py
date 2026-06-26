@@ -177,3 +177,14 @@ class EndpointAccessForbiddenError(GenericForbidden):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
+
+
+class EndpointAutoScalingRuleNotFound(ObjectNotFound):
+    object_name = "endpoint auto scaling rule"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT_AUTO_SCALING,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )

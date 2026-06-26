@@ -85,6 +85,8 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.errors.service import (
     EndpointAccessForbiddenError,
@@ -154,10 +156,6 @@ from ai.backend.manager.services.model_serving.actions.update_route import (
 from ai.backend.manager.services.model_serving.actions.validate_model_service import (
     ValidateModelServiceAction,
     ValidateModelServiceActionResult,
-)
-from ai.backend.manager.services.model_serving.exceptions import (
-    GenericForbidden,
-    InvalidAPIParameters,
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController

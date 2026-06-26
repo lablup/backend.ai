@@ -10,7 +10,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.user import UserCreationBadRequest
 from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.creator import Creator, CreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
@@ -86,3 +86,11 @@ class UserCreatorSpec(CreatorSpec[UserRow]):
             container_gids=self.container_gids,
             integration_id=self.integration_name,  # DB column is integration_id
         )
+
+
+@dataclass
+class UserCreateSpec:
+    """Specification for creating a single user, including group assignments."""
+
+    creator: Creator[UserRow]
+    group_ids: list[str] | None = None
