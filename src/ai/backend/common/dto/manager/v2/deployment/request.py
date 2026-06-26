@@ -150,6 +150,7 @@ class ModelMetadataInput(BaseRequestModel):
 
 class ModelServiceConfigInput(BaseRequestModel):
     pre_start_actions: list[PreStartAction] | None = None
+    command: str | None = None
     start_command: list[str] | None = None
     shell: str | None = None
     port: int | None = None

@@ -148,7 +148,12 @@ DEFAULT_SHELL = "/bin/bash"
 def _wrap_str_start_command_into_argv(service: Any) -> Any:
     if not isinstance(service, dict):
         return service
-    sc = service.get("start_command")
+    # FIXME: temporary bridge — fold the single-string `command` into the str `start_command`
+    # so the ModelServiceConfigDraft validator wraps it.
+    command = service.get("command")
+    service = {k: v for k, v in service.items() if k != "command"}
+    # Override `start_command` with `command` if both are present as start_command is deprecated.
+    sc = command if command is not None else service.get("start_command")
     if not isinstance(sc, str):
         return service
     shell = service.get("shell")

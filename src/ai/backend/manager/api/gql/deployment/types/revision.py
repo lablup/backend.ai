@@ -105,6 +105,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RuntimeVariantPresetValueInfoDTO,
 )
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -424,10 +425,21 @@ class ModelServiceConfigGQL:
     pre_start_actions: list[PreStartActionGQL] = gql_field(
         description="List of pre-start actions to execute before starting the model service."
     )
-    start_command: list[str] | None = gql_field(
-        description="Command to start the model service.", default=None
+    command: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Single-string command to start the model service.",
+        ),
+        default=None,
     )
-    shell: str = gql_field(description="Shell configured for the model service.")
+    start_command: list[str] | None = gql_field(
+        description="Command to start the model service.",
+        default=None,
+        deprecation_reason="Use `command` instead.",
+    )
+    shell: str | None = gql_field(
+        description="Shell configured for the model service.", default="/bin/bash"
+    )
     port: int = gql_field(description="Port number for the model service.")
     health_check: ModelHealthCheckGQL | None = gql_field(
         description="Health check configuration for the model service.",
@@ -969,8 +981,21 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
         description="List of pre-start actions to execute before starting the model service.",
         default=None,
     )
+    command: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Single-string command to start the model service.",
+        ),
+        default=None,
+    )
     start_command: list[str] | None = gql_field(
-        description="Command to start the model service.", default=None
+        description=(
+            "Deprecated since 26.7.0. Command to start the model service. Do "
+            "not set together with `command`; when both are set, `command` takes precedence and "
+            "this field is ignored."
+        ),
+        default=None,
+        deprecation_reason="Use `command` instead.",
     )
     shell: str | None = gql_field(
         description="Shell configured for the model service.", default=None

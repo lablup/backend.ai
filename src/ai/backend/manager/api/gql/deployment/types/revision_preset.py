@@ -78,6 +78,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
     UpdateDeploymentRevisionPresetPayload as UpdatePayloadDTO,
 )
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.common.types import (
@@ -522,7 +523,22 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
         description="Pre-start actions to execute before starting the model service. "
         "Provide an empty list when no pre-start actions are needed.",
     )
-    start_command: list[str] = gql_field(description="Command to start the model service.")
+    command: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Single-string command to start the model service.",
+        ),
+        default=None,
+    )
+    start_command: list[str] | None = gql_field(
+        description=(
+            "Deprecated since 26.7.0. Command to start the model service. Do "
+            "not set together with `command`; when both are set, `command` takes precedence and "
+            "this field is ignored."
+        ),
+        default=None,
+        deprecation_reason="Use `command` instead.",
+    )
     shell: str = gql_field(
         description="Shell configured for the model service.", default=DEFAULT_SHELL
     )
