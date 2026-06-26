@@ -12,6 +12,7 @@ from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -345,7 +346,7 @@ async def admin_bulk_update_users_v2(
             ),
         )
 
-        items.append(UserUpdateSpec(user_id=user_item.user_id, updater_spec=updater_spec))
+        items.append(UserUpdateSpec(user_id=UserID(user_item.user_id), updater_spec=updater_spec))
 
     action = BulkModifyUserAction(items=items)
     payload = await ctx.adapters.user.bulk_modify_users(action)

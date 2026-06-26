@@ -14,6 +14,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -42,7 +43,8 @@ from ai.backend.manager.data.model_serving.types import (
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
-from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -83,11 +85,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
 )
 from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
-from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
-from ai.backend.manager.services.model_serving.exceptions import (
-    GenericForbidden,
-    InvalidAPIParameters,
-)
 from ai.backend.manager.types import MountOptionModel, UserScope
 from ai.backend.manager.utils import query_userinfo
 
@@ -763,7 +760,8 @@ class ModelServingRepository:
     @model_serving_repository_resilience.apply()
     async def modify_endpoint_fields(
         self,
-        action: ModifyEndpointAction,
+        deployment_id: DeploymentID,
+        updater: Updater[EndpointRow],
         agent_registry: AgentRegistry,
         legacy_etcd_config_loader: LegacyEtcdLoader,
     ) -> MutationResult:
@@ -779,7 +777,7 @@ class ModelServingRepository:
                 try:
                     endpoint_row = await EndpointRow.get(
                         db_session,
-                        action.deployment_id,
+                        deployment_id,
                         load_session_owner=True,
                         load_revisions=True,
                         load_routes=True,
@@ -807,7 +805,7 @@ class ModelServingRepository:
                 ):
                     raise InvalidAPIParameters("Cannot update endpoint marked for removal")
 
-                spec = cast(EndpointUpdaterSpec, action.updater.spec)
+                spec = cast(EndpointUpdaterSpec, updater.spec)
 
                 # Apply endpoint-level changes (replicas, resource_group, etc.)
                 spec.apply_to_row(endpoint_row)

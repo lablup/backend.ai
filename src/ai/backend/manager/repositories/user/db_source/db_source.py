@@ -124,7 +124,7 @@ from ai.backend.manager.repositories.keypair.types import (
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
 from ai.backend.manager.repositories.user.purgers import (
     UserBatchPurgerSpec,
     create_user_error_log_purger,
@@ -137,8 +137,7 @@ from ai.backend.manager.repositories.user.types import (
     ProjectUserSearchScope,
     RoleUserSearchScope,
 )
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserUpdateSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

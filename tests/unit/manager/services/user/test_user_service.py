@@ -16,6 +16,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
@@ -408,7 +409,7 @@ class TestBulkModifyUser:
 
         items = [
             UserUpdateSpec(
-                user_id=uuid.uuid4(),
+                user_id=UserID(uuid.uuid4()),
                 updater_spec=UserUpdaterSpec(
                     full_name=TriState.update(f"User {i}"),
                 ),
@@ -443,7 +444,7 @@ class TestBulkModifyUser:
 
         items = [
             UserUpdateSpec(
-                user_id=uuid.uuid4(),
+                user_id=UserID(uuid.uuid4()),
                 updater_spec=UserUpdaterSpec(
                     full_name=TriState.update(f"User {i}"),
                 ),
