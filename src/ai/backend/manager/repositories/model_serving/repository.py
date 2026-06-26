@@ -6,6 +6,7 @@ from typing import Any, cast
 import sqlalchemy as sa
 from pydantic import HttpUrl
 from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
+from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
@@ -24,6 +25,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AccessKey,
     ResourceSlot,
+    SessionTypes,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.types import RouteHealthStatus
@@ -44,7 +46,7 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
+from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound, ServiceUnavailable
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
@@ -71,6 +73,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
 from ai.backend.manager.models.vfolder.row import query_accessible_vfolders, vfolders
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.registry import check_scaling_group as registry_check_scaling_group
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
@@ -110,6 +113,46 @@ class ModelServingRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    async def _check_inference_scaling_group(
+        self,
+        conn: AsyncConnection,
+        scaling_group: str,
+        owner_access_key: AccessKey,
+        target_domain: str,
+        target_project: str | ProjectID,
+    ) -> str:
+        """
+        Wrapper of ``registry.check_scaling_group()`` with additional guards flavored for
+        model service included.
+        """
+        checked_scaling_group = await registry_check_scaling_group(
+            conn,
+            scaling_group,
+            SessionTypes.INFERENCE,
+            owner_access_key,
+            target_domain,
+            target_project,
+        )
+
+        query = (
+            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
+            .select_from(scaling_groups)
+            .where(scaling_groups.c.name == checked_scaling_group)
+        )
+
+        result = await conn.execute(query)
+        sgroup = result.first()
+        if sgroup is None:
+            raise ServiceUnavailable("Scaling group not found")
+        wsproxy_addr = sgroup.wsproxy_addr
+        if not wsproxy_addr:
+            raise ServiceUnavailable("No coordinator configured for this resource group")
+
+        if not sgroup.wsproxy_api_token:
+            raise ServiceUnavailable("Scaling group not ready to start model service")
+
+        return checked_scaling_group
 
     @model_serving_repository_resilience.apply()
     async def get_endpoint_by_id(self, endpoint_id: uuid.UUID) -> EndpointData | None:
@@ -822,7 +865,7 @@ class ModelServingRepository:
                 if conn is None:
                     raise DatabaseConnectionUnavailable("Database connection is not available")
 
-                await ModelServiceHelper.check_scaling_group(
+                await self._check_inference_scaling_group(
                     conn,
                     endpoint_row.resource_group,
                     AccessKey(session_owner.main_access_key),
@@ -948,7 +991,7 @@ class ModelServingRepository:
         used by ``SchedulerRepository.prepare_vfolder_mounts``.
         """
         async with self._db.begin_readonly() as conn:
-            checked_scaling_group = await ModelServiceHelper.check_scaling_group(
+            checked_scaling_group = await self._check_inference_scaling_group(
                 conn,
                 scaling_group,
                 owner_access_key,

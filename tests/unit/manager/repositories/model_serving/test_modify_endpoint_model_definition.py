@@ -382,9 +382,10 @@ class TestModifyEndpointModelDefinitionRefresh:
 
         with (
             with_user(user_context),
-            patch(
-                "ai.backend.manager.repositories.model_serving.repository.ModelServiceHelper",
-                check_scaling_group=AsyncMock(),
+            patch.object(
+                repository,
+                "_check_inference_scaling_group",
+                AsyncMock(),
             ),
         ):
             result = await repository.modify_endpoint_fields(
