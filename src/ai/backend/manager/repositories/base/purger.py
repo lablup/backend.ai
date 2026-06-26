@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID
@@ -14,6 +15,7 @@ from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyE
 from ai.backend.manager.models.base import Base
 
 from .integrity import parse_integrity_error
+from .querier import ExistsQuerier
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -44,6 +46,38 @@ class PurgerResult[TRow: Base]:
     """Result of executing a single-row delete operation."""
 
     row: TRow
+
+
+@dataclass
+class ConditionalPurger[TRow: Base, TGateRow: Base]:
+    """A purger paired with the existence gate (``only_if``) that authorizes it.
+
+    The gate is checked (``SELECT EXISTS``) inside the same write transaction as the delete,
+    so the authorization and the write commit atomically. One item of a
+    :class:`BulkConditionalPurger`.
+
+    Attributes:
+        purger: The single-row delete to apply.
+        only_if: Existence check that must hold for the delete to proceed.
+    """
+
+    purger: Purger[TRow]
+    only_if: ExistsQuerier[TGateRow]
+
+
+@dataclass
+class BulkConditionalPurger[TRow: Base, TGateRow: Base]:
+    """Bundles gated purgers for a partial-success conditional bulk delete.
+
+    Each item carries its own ``only_if`` gate and runs in its own savepoint: a rejected gate,
+    a missing target, or a failed delete is reported as a per-item failure and skips only that
+    item, while the rest proceed. See ``WriteOps.bulk_conditional_purge_partial``.
+
+    Attributes:
+        purgers: Gated purgers to apply, each independently.
+    """
+
+    purgers: Sequence[ConditionalPurger[TRow, TGateRow]]
 
 
 @dataclass

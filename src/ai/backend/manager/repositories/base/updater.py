@@ -16,6 +16,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 
 from .integrity import match_integrity_error, parse_integrity_error
+from .querier import ExistsQuerier
 from .types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
@@ -116,6 +117,38 @@ class Updater[TRow: Base]:
 
     spec: UpdaterSpec[TRow]
     pk_value: UUID | str | int
+
+
+@dataclass
+class ConditionalUpdater[TRow: Base, TGateRow: Base]:
+    """An updater paired with the existence gate (``only_if``) that authorizes it.
+
+    The gate is checked (``SELECT EXISTS``) inside the same write transaction as the update,
+    so the authorization and the write commit atomically. One item of a
+    :class:`BulkConditionalUpdater`.
+
+    Attributes:
+        updater: The single-row update to apply.
+        only_if: Existence check that must hold for the update to proceed.
+    """
+
+    updater: Updater[TRow]
+    only_if: ExistsQuerier[TGateRow]
+
+
+@dataclass
+class BulkConditionalUpdater[TRow: Base, TGateRow: Base]:
+    """Bundles gated updaters for a partial-success conditional bulk update.
+
+    Each item carries its own ``only_if`` gate and runs in its own savepoint: a rejected gate,
+    a missing target, or a failed update is reported as a per-item failure and skips only that
+    item, while the rest proceed. See ``WriteOps.bulk_conditional_update_partial``.
+
+    Attributes:
+        updaters: Gated updaters to apply, each independently.
+    """
+
+    updaters: Sequence[ConditionalUpdater[TRow, TGateRow]]
 
 
 @dataclass

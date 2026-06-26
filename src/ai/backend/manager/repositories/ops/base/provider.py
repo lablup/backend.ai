@@ -15,7 +15,12 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
-from ai.backend.manager.errors.repository import EmptySearchScopeError
+from ai.backend.manager.errors.common import ObjectNotFound
+from ai.backend.manager.errors.repository import (
+    ConditionalMutationForbidden,
+    EmptySearchScopeError,
+    UnsupportedCompositePrimaryKeyError,
+)
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -26,10 +31,16 @@ from ai.backend.manager.repositories.base import (
     BatchQuerierResult,
     BatchUpdater,
     BatchUpdaterResult,
+    BulkConditionalCreator,
+    BulkConditionalPurger,
+    BulkConditionalUpdater,
     BulkCreator,
+    BulkCreatorError,
     BulkCreatorResult,
     BulkCreatorResultWithFailures,
+    BulkPurgerError,
     BulkPurgerResultWithFailures,
+    BulkUpdaterError,
     BulkUpdaterResult,
     Creator,
     CreatorResult,
@@ -55,10 +66,10 @@ from ai.backend.manager.repositories.base import (
     execute_creator,
     execute_dependent_creator,
     execute_next_value_creator,
-    execute_purger,
     execute_querier,
-    execute_updater,
     execute_upserter,
+    match_integrity_error,
+    parse_integrity_error,
 )
 
 if TYPE_CHECKING:
@@ -153,6 +164,147 @@ class WriteOps(ReadOps):
         """Insert multiple rows, isolating each via a savepoint for partial success."""
         return await execute_bulk_creator_partial(self._sess, bulk)
 
+    async def bulk_conditional_create_partial[TRow: Base, TGateRow: Base](
+        self,
+        bulk: BulkConditionalCreator[TRow, TGateRow],
+    ) -> BulkCreatorResultWithFailures[TRow]:
+        """Insert each gated item independently — partial success.
+
+        Per item: the ``only_if`` gate is checked (``SELECT EXISTS``), then the row is inserted
+        inside a savepoint. A rejected gate (``ConditionalMutationForbidden``) or a failed insert
+        records a failure and rolls back only that item; the rest proceed. Must be used inside
+        ``write_ops()``.
+        """
+        successes: list[TRow] = []
+        errors: list[BulkCreatorError[TRow]] = []
+        for index, conditional in enumerate(bulk.specs):
+            if not await self.exists(conditional.only_if):
+                errors.append(
+                    BulkCreatorError(
+                        spec=conditional.spec,
+                        exception=ConditionalMutationForbidden(
+                            f"Conditional create rejected: gate failed for item at index {index}."
+                        ),
+                        index=index,
+                    )
+                )
+                continue
+            async with self._sess.begin_nested():
+                try:
+                    row = conditional.spec.build_row()
+                    self._sess.add(row)
+                    await self._sess.flush()
+                    successes.append(row)
+                except sa.exc.IntegrityError as e:
+                    parsed = parse_integrity_error(e)
+                    checks = conditional.spec.integrity_error_checks
+                    if checks:
+                        try:
+                            match_integrity_error(parsed, checks)
+                        except Exception as domain_error:
+                            errors.append(
+                                BulkCreatorError(
+                                    spec=conditional.spec, exception=domain_error, index=index
+                                )
+                            )
+                    else:
+                        errors.append(
+                            BulkCreatorError(spec=conditional.spec, exception=parsed, index=index)
+                        )
+                except Exception as e:
+                    errors.append(BulkCreatorError(spec=conditional.spec, exception=e, index=index))
+        return BulkCreatorResultWithFailures(successes=successes, errors=errors)
+
+    async def bulk_conditional_update_partial[TRow: Base, TGateRow: Base](
+        self,
+        bulk: BulkConditionalUpdater[TRow, TGateRow],
+    ) -> BulkUpdaterResult[TRow]:
+        """Update each gated item independently — partial success.
+
+        Per item: the ``only_if`` gate is checked, then the row is updated by primary key inside
+        a savepoint. A rejected gate, a missing target (recorded as ``ObjectNotFound``), or a
+        failed update records a failure and rolls back only that item; the rest proceed. Must be
+        used inside ``write_ops()``.
+        """
+        successes: list[TRow] = []
+        errors: list[BulkUpdaterError[TRow]] = []
+        for index, conditional in enumerate(bulk.updaters):
+            if not await self.exists(conditional.only_if):
+                errors.append(
+                    BulkUpdaterError(
+                        spec=conditional.updater.spec,
+                        exception=ConditionalMutationForbidden(
+                            f"Conditional update rejected: gate failed for item at index {index}."
+                        ),
+                        index=index,
+                    )
+                )
+                continue
+            try:
+                async with self._sess.begin_nested():
+                    result = await self._execute_updater(conditional.updater)
+                    if result is None:
+                        errors.append(
+                            BulkUpdaterError(
+                                spec=conditional.updater.spec,
+                                exception=ObjectNotFound(
+                                    f"Update target not found for item at index {index}."
+                                ),
+                                index=index,
+                            )
+                        )
+                    else:
+                        successes.append(result.row)
+            except Exception as e:
+                errors.append(
+                    BulkUpdaterError(spec=conditional.updater.spec, exception=e, index=index)
+                )
+        return BulkUpdaterResult(successes=successes, errors=errors)
+
+    async def bulk_conditional_purge_partial[TRow: Base, TGateRow: Base](
+        self,
+        bulk: BulkConditionalPurger[TRow, TGateRow],
+    ) -> BulkPurgerResultWithFailures[TRow]:
+        """Delete each gated item independently — partial success.
+
+        Per item: the ``only_if`` gate is checked, then the row is deleted by primary key inside
+        a savepoint. A rejected gate, a missing target (recorded as ``ObjectNotFound``), or a
+        failed delete records a failure and rolls back only that item; the rest proceed. Must be
+        used inside ``write_ops()``.
+        """
+        successes: list[TRow] = []
+        errors: list[BulkPurgerError[TRow]] = []
+        for index, conditional in enumerate(bulk.purgers):
+            if not await self.exists(conditional.only_if):
+                errors.append(
+                    BulkPurgerError(
+                        purger=conditional.purger,
+                        exception=ConditionalMutationForbidden(
+                            f"Conditional purge rejected: gate failed for item at index {index}."
+                        ),
+                        index=index,
+                    )
+                )
+                continue
+            try:
+                async with self._sess.begin_nested():
+                    result = await self._execute_purger(conditional.purger)
+                    if result is None:
+                        errors.append(
+                            BulkPurgerError(
+                                purger=conditional.purger,
+                                exception=ObjectNotFound(
+                                    f"Purge target not found for item at index {index}."
+                                ),
+                                index=index,
+                            )
+                        )
+                    else:
+                        successes.append(result.row)
+            except Exception as e:
+                errors.append(BulkPurgerError(purger=conditional.purger, exception=e, index=index))
+        return BulkPurgerResultWithFailures(successes=successes, errors=errors)
+
     async def create_dependent[TDependency, TRow: Base](
         self,
         spec: DependentCreatorSpec[TDependency, TRow],
@@ -191,9 +343,46 @@ class WriteOps(ReadOps):
         """
         return await execute_next_value_creator(self._sess, policy, spec)
 
+    async def _execute_updater[TRow: Base](
+        self, updater: Updater[TRow]
+    ) -> UpdaterResult[TRow] | None:
+        """Update a single row by primary key (shared by ``update`` and the bulk paths)."""
+        row_class = updater.spec.row_class
+        table = row_class.__table__
+        pk_columns = list(table.primary_key.columns)
+        if len(pk_columns) != 1:
+            raise UnsupportedCompositePrimaryKeyError(
+                "Updater only supports single-column primary keys",
+            )
+        values = updater.spec.build_values()
+        if not values:
+            # No columns to update: return the current row if it exists so callers can tell
+            # "nothing to change" apart from "row not found". None means not found only.
+            existing = await self._sess.execute(
+                sa.select(row_class).where(pk_columns[0] == updater.pk_value)
+            )
+            current_row = existing.scalar_one_or_none()
+            return UpdaterResult(row=current_row) if current_row is not None else None
+        update_stmt = (
+            sa.update(table)
+            .values(values)
+            .where(pk_columns[0] == updater.pk_value)
+            .returning(*table.columns)
+        )
+        select_stmt = sa.select(row_class).from_statement(update_stmt)
+        try:
+            result = await self._sess.execute(select_stmt)
+        except sa.exc.IntegrityError as e:
+            parsed = parse_integrity_error(e)
+            match_integrity_error(parsed, updater.spec.integrity_error_checks)
+        updated_row = result.scalar_one_or_none()
+        if updated_row is None:
+            return None
+        return UpdaterResult(row=updated_row)
+
     async def update[TRow: Base](self, updater: Updater[TRow]) -> UpdaterResult[TRow] | None:
         """Update a single row by primary key."""
-        return await execute_updater(self._sess, updater)
+        return await self._execute_updater(updater)
 
     async def batch_update[TRow: Base](self, updater: BatchUpdater[TRow]) -> BatchUpdaterResult:
         """Update all rows matching the updater conditions."""
@@ -214,9 +403,29 @@ class WriteOps(ReadOps):
         """Insert or update a single row on conflict."""
         return await execute_upserter(self._sess, upserter, index_elements=index_elements)
 
+    async def _execute_purger[TRow: Base](self, purger: Purger[TRow]) -> PurgerResult[TRow] | None:
+        """Delete a single row by primary key (shared by ``purge`` and the bulk paths)."""
+        row_class = purger.row_class
+        table = row_class.__table__
+        pk_columns = list(table.primary_key.columns)
+        if len(pk_columns) != 1:
+            raise UnsupportedCompositePrimaryKeyError(
+                f"Purger only supports single-column primary keys (table: {table.name})",
+            )
+        stmt = sa.delete(table).where(pk_columns[0] == purger.pk_value).returning(*table.columns)
+        try:
+            result = await self._sess.execute(stmt)
+        except sa.exc.IntegrityError as e:
+            raise parse_integrity_error(e) from e
+        row_data = result.fetchone()
+        if row_data is None:
+            return None
+        deleted_row: TRow = row_class(**dict(row_data._mapping))
+        return PurgerResult(row=deleted_row)
+
     async def purge[TRow: Base](self, purger: Purger[TRow]) -> PurgerResult[TRow] | None:
         """Delete a single row by primary key."""
-        return await execute_purger(self._sess, purger)
+        return await self._execute_purger(purger)
 
     async def batch_purge[TRow: Base](self, purger: BatchPurger[TRow]) -> BatchPurgerResult:
         """Delete rows in batches matching the purger subquery."""
