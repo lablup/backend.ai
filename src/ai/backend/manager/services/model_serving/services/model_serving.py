@@ -811,7 +811,8 @@ class ModelServingService:
         # 1. Apply endpoint-level changes (name, resource_group, replicas)
         #    via the existing repository method (which only writes endpoint columns).
         result = await self._repository.modify_endpoint_fields(
-            action,
+            action.deployment_id,
+            action.updater,
             self._agent_registry,
             self._config_provider.legacy_etcd_config_loader,
         )

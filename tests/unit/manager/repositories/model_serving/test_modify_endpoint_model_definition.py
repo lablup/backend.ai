@@ -53,7 +53,6 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import Updater
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
-from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.types import TriState
 from ai.backend.testutils.db import with_tables
 
@@ -379,10 +378,7 @@ class TestModifyEndpointModelDefinitionRefresh:
         endpoint_id, _ = endpoint_and_revision
         deployment_id = DeploymentID(endpoint_id)
         spec = EndpointUpdaterSpec(environ=TriState.update({"NEW_VAR": "1"}))
-        action = ModifyEndpointAction(
-            deployment_id=deployment_id,
-            updater=Updater(spec=spec, pk_value=deployment_id),
-        )
+        updater = Updater(spec=spec, pk_value=deployment_id)
 
         with (
             with_user(user_context),
@@ -392,7 +388,8 @@ class TestModifyEndpointModelDefinitionRefresh:
             ),
         ):
             result = await repository.modify_endpoint_fields(
-                action,
+                deployment_id,
+                updater,
                 agent_registry=MagicMock(),
                 legacy_etcd_config_loader=MagicMock(),
             )
