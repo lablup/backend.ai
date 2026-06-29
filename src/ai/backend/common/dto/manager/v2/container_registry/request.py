@@ -4,7 +4,7 @@ Request DTOs for container registry DTO v2.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Self
 from uuid import UUID
 
 from pydantic import Field, field_validator
@@ -154,6 +154,12 @@ class ContainerRegistryFilter(BaseRequestModel):
         default=None, description="Filter by registry type."
     )
     is_global: bool | None = Field(default=None, description="Filter by global accessibility.")
+    AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
+    OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
+    NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
+
+
+ContainerRegistryFilter.model_rebuild()
 
 
 class ContainerRegistryOrder(BaseRequestModel):

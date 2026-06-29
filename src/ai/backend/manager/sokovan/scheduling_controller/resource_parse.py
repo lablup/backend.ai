@@ -18,7 +18,7 @@ from decimal import Decimal
 from typing import Any
 
 from ai.backend.common.types import BinarySize
-from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
+from ai.backend.manager.data.session.creation import ImageInfo
 
 
 def parse_quantity(raw: Any) -> Decimal:

@@ -31,7 +31,6 @@ from sqlalchemy.orm import (
 
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
@@ -40,7 +39,6 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     ResourceSlot,
-    SessionTypes,
     VFolderID,
     VFolderMount,
     VFolderMountOptions,
@@ -80,7 +78,7 @@ from ai.backend.manager.data.model_serving.types import (
     ScalingState,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import ObjectNotFound, ServiceUnavailable
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -89,7 +87,6 @@ from ai.backend.manager.models.base import (
     StrEnumType,
 )
 from ai.backend.manager.models.routing import RouteStatus
-from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 from ai.backend.manager.types import MountOptionModel, UserScope
@@ -1239,48 +1236,6 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
 
 
 class ModelServiceHelper:
-    @staticmethod
-    async def check_scaling_group(
-        conn: AsyncConnection,
-        scaling_group: str,
-        owner_access_key: AccessKey,
-        target_domain: str,
-        target_project: str | ProjectID,
-    ) -> str:
-        """
-        Wrapper of `registry.check_scaling_group()` with additional guards flavored for
-        model service included
-        """
-        from ai.backend.manager.registry import check_scaling_group
-
-        checked_scaling_group = await check_scaling_group(
-            conn,
-            scaling_group,
-            SessionTypes.INFERENCE,
-            owner_access_key,
-            target_domain,
-            target_project,
-        )
-
-        query = (
-            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
-            .select_from(scaling_groups)
-            .where(scaling_groups.c.name == checked_scaling_group)
-        )
-
-        result = await conn.execute(query)
-        sgroup = result.first()
-        if sgroup is None:
-            raise ServiceUnavailable("Scaling group not found")
-        wsproxy_addr = sgroup.wsproxy_addr
-        if not wsproxy_addr:
-            raise ServiceUnavailable("No coordinator configured for this resource group")
-
-        if not sgroup.wsproxy_api_token:
-            raise ServiceUnavailable("Scaling group not ready to start model service")
-
-        return checked_scaling_group
-
     @staticmethod
     async def check_extra_mounts(
         conn: AsyncConnection,

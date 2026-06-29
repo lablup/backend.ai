@@ -17,7 +17,7 @@ The decay formula is:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, TypedDict
@@ -34,7 +34,14 @@ if TYPE_CHECKING:
         UserFairShareData,
     )
 
-from ai.backend.manager.data.fair_share import UserProjectKey
+from ai.backend.manager.data.fair_share import (
+    DomainFactorResult,
+    FairShareFactorCalculationResult,
+    ProjectFactorResult,
+    UserFactorResult,
+    UserProjectKey,
+    UserSchedulingRank,
+)
 
 
 class DecayedUsagesByLevel(TypedDict):
@@ -58,48 +65,6 @@ SECONDS_PER_DAY = Decimal("86400")
 
 
 @dataclass(frozen=True)
-class DomainFactorResult:
-    """Factor calculation result for a domain."""
-
-    domain_name: str
-    total_decayed_usage: ResourceSlot
-    normalized_usage: Decimal
-    fair_share_factor: Decimal
-
-
-@dataclass(frozen=True)
-class ProjectFactorResult:
-    """Factor calculation result for a project."""
-
-    project_id: UUID
-    domain_name: str
-    total_decayed_usage: ResourceSlot
-    normalized_usage: Decimal
-    fair_share_factor: Decimal
-
-
-@dataclass(frozen=True)
-class UserFactorResult:
-    """Factor calculation result for a user."""
-
-    user_uuid: UUID
-    project_id: UUID
-    domain_name: str
-    total_decayed_usage: ResourceSlot
-    normalized_usage: Decimal
-    fair_share_factor: Decimal
-
-
-@dataclass(frozen=True)
-class UserSchedulingRank:
-    """Scheduling rank for a user within a project."""
-
-    user_uuid: UUID
-    project_id: UUID
-    rank: int  # 1 = highest priority
-
-
-@dataclass(frozen=True)
 class _UserFactorForRanking:
     """Internal dataclass for sorting users by hierarchical factors."""
 
@@ -112,16 +77,6 @@ class _UserFactorForRanking:
     def sort_key(self) -> tuple[Decimal, Decimal, Decimal]:
         """Return sort key for descending order (higher factor = higher priority)."""
         return (-self.domain_factor, -self.project_factor, -self.user_factor)
-
-
-@dataclass
-class FairShareFactorCalculationResult:
-    """Result of fair share factor calculation for all levels."""
-
-    domain_results: dict[str, DomainFactorResult] = field(default_factory=dict)
-    project_results: dict[UUID, ProjectFactorResult] = field(default_factory=dict)
-    user_results: dict[UserProjectKey, UserFactorResult] = field(default_factory=dict)
-    scheduling_ranks: list[UserSchedulingRank] = field(default_factory=list)
 
 
 class FairShareFactorCalculator:

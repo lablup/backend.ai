@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Self
 from uuid import UUID
 
 from strawberry.relay import Connection, Edge, NodeID
@@ -51,6 +52,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption as UIOptionDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -254,6 +256,24 @@ class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
     runtime_variant_id: UUIDFilterGQL | None = gql_field(
         default=None, description="Variant ID filter."
+    )
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
+        ),
+        default=None,
     )
 
 

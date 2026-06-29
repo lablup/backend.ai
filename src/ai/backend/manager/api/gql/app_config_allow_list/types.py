@@ -42,6 +42,7 @@ from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, Stri
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -167,6 +168,24 @@ class AppConfigAllowListFilterGQL(PydanticInputMixin[AppConfigAllowListFilterDTO
     )
     updated_at: DateTimeFilter | None = gql_field(
         description="Filter by last update datetime.", default=None
+    )
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
+        ),
+        default=None,
     )
 
 

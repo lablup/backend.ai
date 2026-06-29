@@ -20,8 +20,8 @@ from ai.backend.common.types import SlotName, SlotTypes
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, SlotTypePolicy
+from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.spec import SessionSpec
-from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

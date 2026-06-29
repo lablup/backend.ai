@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.sokovan.data import ConcurrencySnapshot
+from ai.backend.manager.data.sokovan import ConcurrencySnapshot
 
 if TYPE_CHECKING:
     pass

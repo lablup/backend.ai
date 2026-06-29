@@ -33,7 +33,12 @@ from ai.backend.manager.models.container_registry.orders import (
     TIEBREAKER_ORDER,
     resolve_order,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    OffsetPagination,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -206,6 +211,21 @@ class ContainerRegistryAdapter(BaseAdapter):
             conditions.extend(self._convert_type_filter(filter.type))
         if filter.is_global is not None:
             conditions.append(ContainerRegistryConditions.by_is_global(filter.is_global))
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(self._convert_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(self._convert_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:

@@ -40,7 +40,11 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
     AppConfigAllowListCreatorSpec,
 )
-from ai.backend.manager.repositories.base import Purger
+from ai.backend.manager.repositories.base import (
+    Purger,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.services.app_config_allow_list.actions.create import (
     CreateAppConfigAllowListAction,
@@ -189,6 +193,21 @@ class AppConfigAllowListAdapter(BaseAdapter):
             )
             if condition:
                 conditions.append(condition)
+        if filter_.AND:
+            for sub_filter in filter_.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if filter_.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter_.OR:
+                or_conditions.extend(self._convert_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter_.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter_.NOT:
+                not_conditions.extend(self._convert_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     @staticmethod

@@ -37,7 +37,13 @@ from ai.backend.manager.models.prometheus_query_preset_category.conditions impor
 from ai.backend.manager.models.prometheus_query_preset_category.orders import (
     PrometheusQueryPresetCategoryOrders,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    OffsetPagination,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.prometheus_query_preset_category.creators import (
     PrometheusQueryPresetCategoryCreatorSpec,
 )
@@ -155,6 +161,22 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(self._convert_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(self._convert_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
 
         return conditions
 

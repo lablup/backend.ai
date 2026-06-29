@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Self
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
@@ -64,6 +66,12 @@ class LoginClientTypeFilter(BaseRequestModel):
     modified_at: DateTimeFilter | None = Field(
         default=None, description="Filter by last modification datetime."
     )
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
+
+
+LoginClientTypeFilter.model_rebuild()
 
 
 class LoginClientTypeOrder(BaseRequestModel):

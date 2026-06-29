@@ -19,6 +19,7 @@ import pytest
 
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import BinarySize, ResourceSlotEntry
+from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -26,7 +27,6 @@ from ai.backend.manager.data.session.draft import (
     SessionSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions, ResourceOpts
-from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
 from ai.backend.manager.sokovan.scheduling_controller.preparers.compute_kernel_resources_rule import (
     ComputeKernelResourcesRule,
 )

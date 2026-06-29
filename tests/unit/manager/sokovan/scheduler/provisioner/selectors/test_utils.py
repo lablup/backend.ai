@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentInfo
+from ai.backend.manager.data.sokovan import AgentInfo
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.utils import (
     count_unutilized_capabilities,
     order_slots_by_priority,

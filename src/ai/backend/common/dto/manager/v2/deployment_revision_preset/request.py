@@ -68,7 +68,13 @@ class PresetModelServiceConfigInput(BaseRequestModel):
         default_factory=list,
         description="Pre-start actions to execute before starting the model service. May be empty.",
     )
-    start_command: list[str] = Field(description="Command to start the model service.")
+    command: str | None = Field(
+        default=None, description="Single-string command to start the model service."
+    )
+    start_command: list[str] | None = Field(
+        default=None,
+        description="Deprecated. Command to start the model service. Use `command` instead.",
+    )
     shell: str = Field(default=DEFAULT_SHELL, description="Shell configured for the model service.")
     port: int = Field(
         gt=1, description="Port number for the model service. Must be greater than 1."
