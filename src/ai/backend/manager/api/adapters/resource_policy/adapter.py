@@ -89,6 +89,10 @@ from ai.backend.manager.models.resource_policy.orders import (
     ProjectResourcePolicyOrders,
     UserResourcePolicyOrders,
 )
+from ai.backend.manager.repositories.base import (
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair_resource_policy.creators import (
@@ -733,6 +737,21 @@ class ResourcePolicyAdapter(BaseAdapter):
             cond = self._convert_keypair_nested_filter(filter.keypair)
             if cond is not None:
                 conditions.append(cond)
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_keypair_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(self._convert_keypair_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(self._convert_keypair_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     def _convert_keypair_nested_filter(
@@ -810,6 +829,21 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_user_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(self._convert_user_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(self._convert_user_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     def _convert_project_filter(self, filter: ProjectResourcePolicyFilter) -> list[QueryCondition]:
@@ -854,6 +888,21 @@ class ResourcePolicyAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_project_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(self._convert_project_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(self._convert_project_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     # ── Order resolvers ──

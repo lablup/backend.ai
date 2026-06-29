@@ -956,6 +956,15 @@ input AppConfigAllowListFilter
 
   """Filter by last update datetime."""
   updatedAt: DateTimeFilter = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [AppConfigAllowListFilter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [AppConfigAllowListFilter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [AppConfigAllowListFilter!] = null
 }
 
 """Added in 26.7.0. Specifies ordering for app config allow-list results."""
@@ -1040,6 +1049,15 @@ input AppConfigDefinitionFilter
 
   """Filter by last update datetime."""
   updatedAt: DateTimeFilter = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [AppConfigDefinitionFilter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [AppConfigDefinitionFilter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [AppConfigDefinitionFilter!] = null
 }
 
 """Added in 26.7.0. Specifies ordering for app config definition results."""
@@ -2692,6 +2710,15 @@ input CategoryFilter
 {
   """Filter by name."""
   name: StringFilter = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [CategoryFilter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [CategoryFilter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [CategoryFilter!] = null
 }
 
 """Added in 26.3.0. Specifies ordering for query preset category results."""
@@ -3331,6 +3358,15 @@ input ContainerRegistryV2Filter
   registryName: StringFilter = null
   type: ContainerRegistryTypeFilter = null
   isGlobal: Boolean = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [ContainerRegistryV2Filter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [ContainerRegistryV2Filter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [ContainerRegistryV2Filter!] = null
 }
 
 """Added in 26.4.2. Ordering specification for container registries."""
@@ -5816,6 +5852,15 @@ input DeploymentRevisionPresetFilter
 
   """Variant ID filter."""
   runtimeVariantId: UUIDFilter = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [DeploymentRevisionPresetFilter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [DeploymentRevisionPresetFilter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [DeploymentRevisionPresetFilter!] = null
 }
 
 """Added in 26.4.2. Order specification for deployment revision presets."""
@@ -8841,6 +8886,15 @@ input KeypairResourcePolicyV2Filter
   Added in 26.4.4. Filter policies by their assigned keypairs. A policy matches if at least one of its keypairs satisfies the conditions.
   """
   keypair: KeypairResourcePolicyKeypairNestedFilter = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [KeypairResourcePolicyV2Filter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [KeypairResourcePolicyV2Filter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [KeypairResourcePolicyV2Filter!] = null
 }
 
 """Added in 26.4.2. Ordering specification for keypair resource policies."""
@@ -9125,6 +9179,15 @@ input LoginClientTypeFilter
 
   """Filter by last modification datetime."""
   modifiedAt: DateTimeFilter = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [LoginClientTypeFilter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [LoginClientTypeFilter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [LoginClientTypeFilter!] = null
 }
 
 """Added in 26.4.2. Specifies ordering for login client type results."""
@@ -13340,6 +13403,15 @@ input ProjectResourcePolicyV2Filter
   maxVfolderCount: IntFilter = null
   maxQuotaScopeSize: IntFilter = null
   maxNetworkCount: IntFilter = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [ProjectResourcePolicyV2Filter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [ProjectResourcePolicyV2Filter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [ProjectResourcePolicyV2Filter!] = null
 }
 
 """Added in 26.4.2. Ordering specification for project resource policies."""
@@ -17335,6 +17407,15 @@ input RuntimeVariantFilter
 {
   """Name filter."""
   name: StringFilter = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [RuntimeVariantFilter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [RuntimeVariantFilter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [RuntimeVariantFilter!] = null
 }
 
 """Added in 24.03.5."""
@@ -17450,6 +17531,15 @@ input RuntimeVariantPresetFilter
 
   """Variant ID filter."""
   runtimeVariantId: UUIDFilter = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [RuntimeVariantPresetFilter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [RuntimeVariantPresetFilter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [RuntimeVariantPresetFilter!] = null
 }
 
 """Added in 26.4.2. Order specification."""
@@ -20628,6 +20718,15 @@ input UserResourcePolicyV2Filter
   maxQuotaScopeSize: IntFilter = null
   maxSessionCountPerModelSession: IntFilter = null
   maxCustomizedImageCount: IntFilter = null
+
+  """Added in 26.7.0. Match all of the given sub-filters."""
+  AND: [UserResourcePolicyV2Filter!] = null
+
+  """Added in 26.7.0. Match any of the given sub-filters."""
+  OR: [UserResourcePolicyV2Filter!] = null
+
+  """Added in 26.7.0. Negate the given sub-filters."""
+  NOT: [UserResourcePolicyV2Filter!] = null
 }
 
 """Added in 26.4.2. Ordering specification for user resource policies."""

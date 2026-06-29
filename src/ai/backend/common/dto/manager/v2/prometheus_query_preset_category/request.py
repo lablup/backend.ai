@@ -4,6 +4,7 @@ Request DTOs for prometheus_query_preset_category DTO v2.
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
 from pydantic import Field, field_validator
@@ -49,6 +50,12 @@ class CategoryFilter(BaseRequestModel):
     """Filter for prometheus query preset category search."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name")
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
+
+
+CategoryFilter.model_rebuild()
 
 
 class CategoryOrder(BaseRequestModel):
