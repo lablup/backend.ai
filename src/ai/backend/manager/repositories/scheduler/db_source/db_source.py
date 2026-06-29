@@ -53,6 +53,11 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import SlotTypePolicy
+from ai.backend.manager.data.session.creation import (
+    ContainerUserInfo,
+    ImageInfo,
+    ScalingGroupNetworkInfo,
+)
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -137,9 +142,6 @@ from ai.backend.manager.repositories.scheduler.types.session import (
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
-    ContainerUserInfo,
-    ImageInfo,
-    ScalingGroupNetworkInfo,
     SessionSpecContextFetch,
 )
 from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePolicies, SnapshotData

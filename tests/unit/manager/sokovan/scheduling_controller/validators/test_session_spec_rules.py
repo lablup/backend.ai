@@ -32,6 +32,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, SlotTypePolicy
+from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.options import (
     KernelExecutionSpec,
     ResourceOpts,
@@ -51,7 +52,6 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import QuotaExceeded
 from ai.backend.manager.errors.storage import DotfileVFolderPathConflict
 from ai.backend.manager.models.network import NetworkType
-from ai.backend.manager.repositories.scheduler.types.session_creation import ImageInfo
 from ai.backend.manager.sokovan.scheduling_controller.validators.container_limit_rule import (
     ContainerLimitRule,
 )
