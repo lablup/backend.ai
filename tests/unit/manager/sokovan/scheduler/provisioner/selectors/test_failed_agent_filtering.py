@@ -113,12 +113,13 @@ class TestFailedAgentFiltering:
         """
         criteria = _make_criteria_with_failed_agents(failed_agent_ids=frozenset({AGENT_A}))
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
+        result = await concentrated_selector.select_agents_for_batch_requirements(
             agents, criteria, selection_config
         )
 
-        assert len(selections) == 1
-        assert selections[0].selected_agent.agent_id == AGENT_B
+        assert len(result.selections) == 1
+        assert not result.failures
+        assert result.selections[0].selected_agent.agent_id == AGENT_B
 
     async def test_all_agents_failed_fallback(
         self,
@@ -137,12 +138,13 @@ class TestFailedAgentFiltering:
         """
         criteria = _make_criteria_with_failed_agents(failed_agent_ids=frozenset({AGENT_A, AGENT_B}))
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
+        result = await concentrated_selector.select_agents_for_batch_requirements(
             agents, criteria, selection_config
         )
 
-        assert len(selections) == 1
-        assert selections[0].selected_agent.agent_id in {AGENT_A, AGENT_B}
+        assert len(result.selections) == 1
+        assert not result.failures
+        assert result.selections[0].selected_agent.agent_id in {AGENT_A, AGENT_B}
 
     async def test_no_failed_agents_no_change(
         self,
@@ -161,11 +163,12 @@ class TestFailedAgentFiltering:
         """
         criteria = _make_criteria_with_failed_agents(failed_agent_ids=frozenset())
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
+        result = await concentrated_selector.select_agents_for_batch_requirements(
             agents, criteria, selection_config
         )
 
-        assert len(selections) == 1
+        assert len(result.selections) == 1
+        assert not result.failures
 
     async def test_designated_agent_overrides_failed_filter(
         self,
@@ -184,15 +187,16 @@ class TestFailedAgentFiltering:
         """
         criteria = _make_criteria_with_failed_agents(failed_agent_ids=frozenset({AGENT_A}))
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
+        result = await concentrated_selector.select_agents_for_batch_requirements(
             agents,
             criteria,
             selection_config,
             designated_agent_ids=[AGENT_A],
         )
 
-        assert len(selections) == 1
-        assert selections[0].selected_agent.agent_id == AGENT_A
+        assert len(result.selections) == 1
+        assert not result.failures
+        assert result.selections[0].selected_agent.agent_id == AGENT_A
 
     async def test_failed_filter_works_with_dispersed_strategy(
         self,
@@ -212,12 +216,13 @@ class TestFailedAgentFiltering:
         """
         criteria = _make_criteria_with_failed_agents(failed_agent_ids=frozenset({AGENT_A}))
 
-        selections = await dispersed_selector.select_agents_for_batch_requirements(
+        result = await dispersed_selector.select_agents_for_batch_requirements(
             agents, criteria, selection_config
         )
 
-        assert len(selections) == 1
-        assert selections[0].selected_agent.agent_id == AGENT_B
+        assert len(result.selections) == 1
+        assert not result.failures
+        assert result.selections[0].selected_agent.agent_id == AGENT_B
 
     async def test_failed_agent_not_in_pool_is_ignored(
         self,
@@ -239,9 +244,10 @@ class TestFailedAgentFiltering:
             failed_agent_ids=frozenset({AgentId("agent-nonexistent")})
         )
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
+        result = await concentrated_selector.select_agents_for_batch_requirements(
             agents, criteria, selection_config
         )
 
-        assert len(selections) == 1
-        assert selections[0].selected_agent.agent_id in {AGENT_A, AGENT_B}
+        assert len(result.selections) == 1
+        assert not result.failures
+        assert result.selections[0].selected_agent.agent_id in {AGENT_A, AGENT_B}

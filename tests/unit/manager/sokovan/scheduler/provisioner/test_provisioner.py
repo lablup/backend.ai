@@ -48,6 +48,7 @@ from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelector,
+    BatchAgentSelectionResult,
 )
 
 
@@ -186,7 +187,9 @@ def mock_sequencer() -> MagicMock:
 def mock_agent_selector() -> MagicMock:
     """Create mock agent selector."""
     selector = MagicMock()
-    selector.select_agents_for_batch_requirements = AsyncMock(return_value=[])
+    selector.select_agents_for_batch_requirements = AsyncMock(
+        return_value=BatchAgentSelectionResult(selections=[], failures=[])
+    )
     selector.strategy_name = MagicMock(return_value="test-strategy")
     selector.strategy_success_message = MagicMock(return_value="Agent selection succeeded")
     return selector
@@ -208,7 +211,9 @@ def mock_selector_pool() -> dict[AgentSelectionStrategy, MagicMock]:
     mock_selectors = {s: MagicMock(spec=AgentSelector) for s in AgentSelectionStrategy}
 
     for mock_selector in mock_selectors.values():
-        mock_selector.select_agents_for_batch_requirements = AsyncMock(return_value=[])
+        mock_selector.select_agents_for_batch_requirements = AsyncMock(
+            return_value=BatchAgentSelectionResult(selections=[], failures=[])
+        )
         mock_selector.strategy_name = MagicMock(return_value="test-strategy")
         mock_selector.strategy_success_message = MagicMock(return_value="Selection succeeded")
 

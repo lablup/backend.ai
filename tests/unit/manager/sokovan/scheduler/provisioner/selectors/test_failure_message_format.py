@@ -129,17 +129,19 @@ class TestNoAvailableAgentErrorAggregationFormat:
             ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"]),
         )
 
-        with pytest.raises(NoAvailableAgentError) as exc_info:
-            await selector.select_agents_for_batch_requirements(
-                heterogeneous_failing_agents,
-                criteria,
-                config,
-            )
+        result = await selector.select_agents_for_batch_requirements(
+            heterogeneous_failing_agents,
+            criteria,
+            config,
+        )
+        assert len(result.failures) == 1
+        error = result.failures[0].error
+        assert isinstance(error, NoAvailableAgentError)
 
         # Inspect the raw payload we constructed (not the aiohttp title wrapper),
         # since SchedulingFailure.msg is derived from str(e) but the format
         # contract lives in extra_msg.
-        message = exc_info.value.extra_msg or ""
+        message = error.extra_msg or ""
         lines = message.splitlines()
         assert lines[0].startswith("no available agents for kernels [")
         assert "arch=x86_64" in lines[0]
@@ -248,18 +250,20 @@ class TestDesignatedAgentFailureFormat:
             ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"]),
         )
 
-        with pytest.raises(NoAvailableAgentError) as exc_info:
-            await selector.select_agents_for_batch_requirements(
-                two_designated_candidates,
-                criteria,
-                config,
-                designated_agent_ids=[
-                    AgentId("designated-a"),
-                    AgentId("designated-b"),
-                ],
-            )
+        result = await selector.select_agents_for_batch_requirements(
+            two_designated_candidates,
+            criteria,
+            config,
+            designated_agent_ids=[
+                AgentId("designated-a"),
+                AgentId("designated-b"),
+            ],
+        )
+        assert len(result.failures) == 1
+        error = result.failures[0].error
+        assert isinstance(error, NoAvailableAgentError)
 
-        message = exc_info.value.extra_msg or ""
+        message = error.extra_msg or ""
         assert message.startswith("no designated agent is compatible for kernels [")
         assert "designated agent 'designated-a'" in message
         assert "designated agent 'designated-b'" in message
@@ -464,12 +468,14 @@ class TestGoldenNoAvailableAgentError:
             ConcentratedAgentSelector(agent_selection_resource_priority=["cpu"]),
         )
 
-        with pytest.raises(NoAvailableAgentError) as exc_info:
-            await selector.select_agents_for_batch_requirements(
-                agents_with_two_failure_modes,
-                criteria,
-                config,
-            )
+        result = await selector.select_agents_for_batch_requirements(
+            agents_with_two_failure_modes,
+            criteria,
+            config,
+        )
+        assert len(result.failures) == 1
+        error = result.failures[0].error
+        assert isinstance(error, NoAvailableAgentError)
 
         expected = (
             f"no available agents for kernels [{_GOLDEN_KERNEL_ID}]"
@@ -478,7 +484,7 @@ class TestGoldenNoAvailableAgentError:
             "    - cpu: requested=4, available=1\n"
             "- Agent agent-b container limit exceeded: current=10, max=10"
         )
-        assert exc_info.value.extra_msg == expected
+        assert error.extra_msg == expected
 
 
 class TestGoldenNoDesignatedAgentCompatible:
@@ -542,16 +548,18 @@ class TestGoldenNoDesignatedAgentCompatible:
             ConcentratedAgentSelector(agent_selection_resource_priority=["cpu"]),
         )
 
-        with pytest.raises(NoAvailableAgentError) as exc_info:
-            await selector.select_agents_for_batch_requirements(
-                designated_agents_plus_fallback,
-                criteria,
-                config,
-                designated_agent_ids=[
-                    AgentId("designated-a"),
-                    AgentId("designated-b"),
-                ],
-            )
+        result = await selector.select_agents_for_batch_requirements(
+            designated_agents_plus_fallback,
+            criteria,
+            config,
+            designated_agent_ids=[
+                AgentId("designated-a"),
+                AgentId("designated-b"),
+            ],
+        )
+        assert len(result.failures) == 1
+        error = result.failures[0].error
+        assert isinstance(error, NoAvailableAgentError)
 
         expected = (
             f"no designated agent is compatible for kernels [{_GOLDEN_KERNEL_ID}]"
@@ -562,7 +570,7 @@ class TestGoldenNoDesignatedAgentCompatible:
             "- designated agent 'designated-b': Agent designated-b"
             " container limit exceeded: current=10, max=10"
         )
-        assert exc_info.value.extra_msg == expected
+        assert error.extra_msg == expected
 
 
 class TestGoldenNoAvailableAgentDirectConstruction:

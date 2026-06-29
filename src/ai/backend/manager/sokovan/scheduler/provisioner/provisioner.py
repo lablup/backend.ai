@@ -53,6 +53,7 @@ from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from .allocators.allocator import SchedulingAllocator
 from .selectors.concentrated import ConcentratedAgentSelector
 from .selectors.dispersed import DispersedAgentSelector
+from .selectors.exceptions import BatchAgentSelectionFailedError
 from .selectors.legacy import LegacyAgentSelector
 from .selectors.roundrobin import RoundRobinAgentSelector
 from .selectors.selector import (
@@ -469,17 +470,22 @@ class SessionProvisioner:
 
         # Use batch selection method - it will get resource requirements internally
         # and apply state changes to agents_info
-        selections = await agent_selector.select_agents_for_batch_requirements(
+        selection_result = await agent_selector.select_agents_for_batch_requirements(
             agents_info,
             criteria,
             selection_config,
             session_workload.designated_agent_ids,
         )
 
+        if selection_result.failures:
+            raise BatchAgentSelectionFailedError([
+                failure.error for failure in selection_result.failures
+            ])
+
         # Build session allocation from selections
         return self._build_session_allocation(
             session_workload,
-            selections,
+            selection_result.selections,
             scaling_group,
         )
 
