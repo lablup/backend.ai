@@ -80,7 +80,11 @@ from ai.backend.manager.models.resource_slot.orders import (
 from ai.backend.manager.models.runtime_variant_preset.types import (
     RuntimeVariantPresetValueEntry,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, combine_conditions_or
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
     DeploymentRevisionPresetCreatorSpec,
@@ -502,6 +506,12 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
                 or_conds.extend(self._convert_filter(sub))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
+        if filter_.NOT:
+            not_conds: list[QueryCondition] = []
+            for sub in filter_.NOT:
+                not_conds.extend(self._convert_filter(sub))
+            if not_conds:
+                conditions.append(negate_conditions(not_conds))
         return conditions
 
     def _convert_orders(self, orders: list[DeploymentRevisionPresetOrder]) -> list[QueryOrder]:

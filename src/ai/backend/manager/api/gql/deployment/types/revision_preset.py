@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Self
 from uuid import UUID
 
 import strawberry
@@ -413,6 +413,24 @@ class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
     runtime_variant_id: UUIDFilterGQL | None = gql_field(
         default=None, description="Variant ID filter."
+    )
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
+        ),
+        default=None,
     )
 
 

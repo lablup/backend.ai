@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
 from pydantic import Field
@@ -56,6 +57,12 @@ class AppConfigAllowListFilter(BaseRequestModel):
     updated_at: DateTimeFilter | None = Field(
         default=None, description="Filter by last update datetime."
     )
+    AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
+    OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
+    NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
+
+
+AppConfigAllowListFilter.model_rebuild()
 
 
 class AppConfigAllowListOrder(BaseRequestModel):
