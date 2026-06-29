@@ -19,6 +19,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
+from ai.backend.manager.models.base import ensure_all_tables_registered
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -37,6 +38,8 @@ from ai.backend.manager.repositories.deployment_revision_preset.updaters import 
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
+
+ensure_all_tables_registered()
 
 # Shared runtime variant id; the preset's rank scope and the FOR UPDATE lock target it.
 _VARIANT_ID = RuntimeVariantID(uuid4())
