@@ -8572,7 +8572,7 @@ input PresetModelServiceConfigInput {
   startCommand: [String!] = null @deprecated(reason: "Use `command` instead.")
 
   """Shell configured for the model service."""
-  shell: String! = "/bin/bash"
+  shell: String = "/bin/bash"
 
   """Port number for the model service. Must be greater than 1."""
   port: Int!
