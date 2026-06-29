@@ -11,7 +11,6 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -24,6 +23,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.sokovan import AgentInfo
 
 from .exceptions import (
     ContainerLimitExceededError,
@@ -34,62 +34,7 @@ from .exceptions import (
     TrackerCompatibilityError,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.data.sokovan import AgentOccupancy
-    from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class AgentInfo:
-    """Essential information about an agent for selection."""
-
-    # Unique identifier of the agent
-    agent_id: AgentId
-    # Network address of the agent
-    agent_addr: str
-    # Architecture of the agent (e.g., "x86_64", "aarch64")
-    architecture: str
-    # Available resource slots on the agent
-    available_slots: ResourceSlot
-    # Currently occupied resource slots
-    occupied_slots: ResourceSlot
-    # Scaling group the agent belongs to
-    scaling_group: str
-    # Number of containers currently running on the agent
-    container_count: int
-
-    @classmethod
-    def from_meta_and_occupancy(
-        cls,
-        meta: AgentMeta,
-        occupancy_map: Mapping[AgentId, AgentOccupancy],
-    ) -> AgentInfo:
-        """
-        Create an AgentInfo from agent metadata and occupancy mapping.
-
-        Args:
-            meta: Agent metadata containing static information
-            occupancy_map: Mapping of agent IDs to occupancy data
-
-        Returns:
-            AgentInfo instance with occupancy data looked up by agent ID
-        """
-        occupancy = occupancy_map.get(meta.id)
-        if occupancy:
-            occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in occupancy.occupied_slots})
-        else:
-            occupied = ResourceSlot()
-        return cls(
-            agent_id=meta.id,
-            agent_addr=meta.addr,
-            architecture=meta.architecture,
-            scaling_group=meta.scaling_group,
-            available_slots=meta.available_slots,
-            occupied_slots=occupied,
-            container_count=occupancy.container_count if occupancy else 0,
-        )
 
 
 @dataclass

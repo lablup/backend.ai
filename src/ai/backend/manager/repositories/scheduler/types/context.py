@@ -3,12 +3,12 @@
 from dataclasses import dataclass
 
 from ai.backend.manager.data.sokovan import (
+    AgentInfo,
     ScalingGroupInfo,
     SchedulingConfig,
     SessionWorkload,
     SystemSnapshot,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentInfo
 
 
 @dataclass

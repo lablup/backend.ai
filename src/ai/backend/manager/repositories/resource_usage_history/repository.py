@@ -36,6 +36,7 @@ from .types import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.data.fair_share import UsageBucketAggregationResult
     from ai.backend.manager.models.resource_usage_history import (
         DomainUsageBucketRow,
         KernelUsageRecordRow,
@@ -43,7 +44,6 @@ if TYPE_CHECKING:
         UserUsageBucketRow,
     )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.sokovan.scheduler.fair_share import UsageBucketAggregationResult
 
 
 __all__ = ("ResourceUsageHistoryRepository",)
