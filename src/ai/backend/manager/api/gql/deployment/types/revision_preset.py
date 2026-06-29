@@ -539,7 +539,7 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
         default=None,
         deprecation_reason="Use `command` instead.",
     )
-    shell: str = gql_field(
+    shell: str | None = gql_field(
         description="Shell configured for the model service.", default=DEFAULT_SHELL
     )
     port: int = gql_field(
