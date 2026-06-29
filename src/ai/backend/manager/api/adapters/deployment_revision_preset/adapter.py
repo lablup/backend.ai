@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from typing import Any
 from uuid import UUID
 
@@ -147,10 +148,20 @@ def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoD
     )
 
 
+def _legacy_start_command_to_dto(start_command: str | None) -> list[str] | None:
+    if start_command is None:
+        return None
+    try:
+        return shlex.split(start_command)
+    except ValueError:
+        return [start_command]
+
+
 def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
     return ModelServiceConfigInfoDTO(
         pre_start_actions=[_pre_start_action_to_dto(a) for a in service.pre_start_actions],
-        start_command=service.start_command,
+        command=service.start_command,
+        start_command=_legacy_start_command_to_dto(service.start_command),
         shell=service.shell,
         port=service.port,
         health_check=(

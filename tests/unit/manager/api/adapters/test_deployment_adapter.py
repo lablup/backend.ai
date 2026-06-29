@@ -62,7 +62,7 @@ class TestRevisionDataToDTO:
                         name="demo-model",
                         model_path="/models/demo",
                         service=ModelServiceConfig(
-                            start_command=["python", "serve.py"],
+                            start_command="python serve.py",
                             port=8000,
                         ),
                     ),
