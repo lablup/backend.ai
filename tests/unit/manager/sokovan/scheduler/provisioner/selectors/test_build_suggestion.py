@@ -12,6 +12,8 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions impor
     NoAgentsInResourceGroupError,
     NoAvailableAgentError,
     NoCompatibleAgentError,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
     SuggestionKind,
 )
 
@@ -121,4 +123,5 @@ class TestNoAvailableAgentSuggestion:
         assert suggestion.kind == SuggestionKind.CHANGE_DESIGNATED_AGENT
         assert suggestion.available_agent_ids == [AgentId("designated-a")]
         # a reduction is still offered since the designated agent only lacks resources
-        assert suggestion.required_reduction == ResourceSlot({"cpu": Decimal("1")})
+        # (designated-a is short by cpu 3 = requested 4 - available 1)
+        assert suggestion.required_reduction == ResourceSlot({"cpu": Decimal("3")})
