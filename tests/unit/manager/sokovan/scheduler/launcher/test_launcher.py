@@ -15,7 +15,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ImageConfigData,
     SessionDataForPull,
     SessionDataForStart,

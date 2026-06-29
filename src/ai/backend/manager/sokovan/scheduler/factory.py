@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
-from ai.backend.manager.sokovan.data import PromotionSpec
+from ai.backend.manager.data.sokovan import PromotionSpec
 from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,

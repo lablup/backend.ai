@@ -15,7 +15,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     KernelWorkload,
     SchedulingConfig,
     SessionWorkload,

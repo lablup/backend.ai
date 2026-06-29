@@ -60,6 +60,26 @@ from ai.backend.manager.data.session.creation import (
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
+from ai.backend.manager.data.sokovan import (
+    AgentOccupancy,
+    AllocationBatch,
+    ImageConfigData,
+    KernelBindingData,
+    KernelCreationInfo,
+    KeypairOccupancy,
+    KeyPairResourcePolicy,
+    ResourceOccupancySnapshot,
+    SessionAllocation,
+    SessionDataForPull,
+    SessionDataForStart,
+    SessionDependencyInfo,
+    SessionDependencySnapshot,
+    SessionRunningData,
+    SessionsForPullWithImages,
+    SessionsForStartWithImages,
+    SessionWithKernels,
+    UserResourcePolicy,
+)
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import ImageNotFound
@@ -147,26 +167,6 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
 from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePolicies, SnapshotData
 from ai.backend.manager.repositories.scheduling_history import (
     SessionSchedulingHistoryCreatorSpec,
-)
-from ai.backend.manager.sokovan.data import (
-    AgentOccupancy,
-    AllocationBatch,
-    ImageConfigData,
-    KernelBindingData,
-    KernelCreationInfo,
-    KeypairOccupancy,
-    KeyPairResourcePolicy,
-    ResourceOccupancySnapshot,
-    SessionAllocation,
-    SessionDataForPull,
-    SessionDataForStart,
-    SessionDependencyInfo,
-    SessionDependencySnapshot,
-    SessionRunningData,
-    SessionsForPullWithImages,
-    SessionsForStartWithImages,
-    SessionWithKernels,
-    UserResourcePolicy,
 )
 from ai.backend.manager.types import UserScope
 

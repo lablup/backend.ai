@@ -24,6 +24,10 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.manager.data.sokovan import (
+    ResourceOccupancySnapshot,
+    SessionDependencySnapshot,
+)
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
 from ai.backend.manager.repositories.scheduler.types.base import SchedulingSpec
@@ -36,10 +40,6 @@ from ai.backend.manager.repositories.scheduler.types.session import (
 from ai.backend.manager.repositories.scheduler.types.snapshot import (
     ResourcePolicies,
     SnapshotData,
-)
-from ai.backend.manager.sokovan.data import (
-    ResourceOccupancySnapshot,
-    SessionDependencySnapshot,
 )
 from ai.backend.manager.sokovan.recorder import RecorderContext
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
