@@ -1,20 +1,19 @@
-"""Repository result types that carry the typed (model-layer) checker spec."""
+"""Repository result types for the idle-check reconciler batch."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.types import SessionId
-from ai.backend.manager.data.idle_checker.types import IdleCheckSessionView, ScopeRef
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession, ScopeRef
 
 
 @dataclass(frozen=True)
-class IdleCheckerRef:
-    """A bound idle checker definition with its typed, loaded spec."""
+class IdleCheckerDefinition:
+    """An idle checker definition with its typed, loaded spec."""
 
     checker_id: IdleCheckerID
     checker_type: CheckerType
@@ -22,24 +21,27 @@ class IdleCheckerRef:
 
 
 @dataclass(frozen=True)
-class IdleCheckerBindingRef:
-    """One enabled scope binding for an idle checker.
+class BoundChecker:
+    """A checker applied through a concrete scope binding.
 
-    ``binding_created_at`` is the stable tiebreak within a scope.
+    ``binding_created_at`` is the stable tiebreak within the same scope.
     """
 
+    scope: ScopeRef
     binding_created_at: datetime
-    checker_id: IdleCheckerID
+    checker: IdleCheckerDefinition
 
 
 @dataclass(frozen=True)
-class IdleCheckSnapshot:
-    """Normalized idle-check source data.
+class IdleCheckTarget:
+    """One session and the checkers applicable to it in this batch."""
 
-    Session views carry their applicable scopes, scopes reference their checker bindings, and
-    checker specs are loaded once by id.
-    """
+    session: IdleCheckSession
+    checkers: Sequence[BoundChecker]
 
-    session_views_by_id: Mapping[SessionId, IdleCheckSessionView]
-    bindings_by_scope: Mapping[ScopeRef, Sequence[IdleCheckerBindingRef]]
-    checkers_by_id: Mapping[IdleCheckerID, IdleCheckerRef]
+
+@dataclass(frozen=True)
+class IdleCheckBatch:
+    """Handler-oriented idle-check input for one reconciler tick."""
+
+    targets: Sequence[IdleCheckTarget]

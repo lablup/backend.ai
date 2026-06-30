@@ -26,7 +26,5 @@ class IdleCheckSource(
         category: IdleCheckCategory,
         target_statuses: IdleCheckTargetStatuses,
     ) -> IdleCheckReconcileInfo:
-        snapshot = await self._repository.fetch_idle_check_snapshot(
-            target_statuses.session_statuses
-        )
-        return IdleCheckReconcileInfo(snapshot=snapshot, current_time=datetime.now(UTC))
+        batch = await self._repository.fetch_idle_check_batch(target_statuses.session_statuses)
+        return IdleCheckReconcileInfo(batch=batch, current_time=datetime.now(UTC))

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import enum
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -26,10 +25,9 @@ class ScopeRef:
 
 
 @dataclass(frozen=True)
-class IdleCheckSessionView:
-    """A session projection used by the idle-check source."""
+class IdleCheckSession:
+    """Session fields needed to evaluate idle checkers."""
 
     session_id: SessionId
     created_at: datetime
     starts_at: datetime | None
-    scopes: Sequence[ScopeRef]
