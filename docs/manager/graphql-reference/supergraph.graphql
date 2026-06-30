@@ -6949,8 +6949,13 @@ input EnqueueSessionInput
   """Resource slot allocations."""
   resourceEntries: [SessionResourceSlotEntryInput!]!
 
-  """Scaling group name."""
-  resourceGroup: String = null
+  """
+  Deprecated since 26.7.0. Use resource_group_id instead. Scaling group name.
+  """
+  resourceGroup: String = null @deprecated(reason: "Use resource_group_id instead.")
+
+  """Added in 26.7.0. Resource group UUID. Auto-selected if omitted."""
+  resourceGroupId: ID = null
 
   """Additional resource options."""
   resourceOpts: SessionResourceOptsInput = null
