@@ -150,14 +150,16 @@ def _resolve_start_command(service: Any) -> Any:
     if not isinstance(service, dict):
         return service
 
-    result = {k: v for k, v in service.items() if k not in ("command", "start-command")}
+    result = {
+        k: v for k, v in service.items() if k not in ("command", "start_command", "start-command")
+    }
     # Override deprecated ``start_command`` with the new ``command`` when supplied.
     start_command = service.get("command")
     if start_command is None:
         start_command = service.get("start_command", service.get("start-command"))
     if isinstance(start_command, list):
         start_command = shlex.join(start_command)
-    if start_command is not None or "start-command" in service:
+    if start_command is not None or "start_command" in service or "start-command" in service:
         result["start_command"] = start_command
     return result
 
