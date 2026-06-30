@@ -1585,15 +1585,18 @@ class SessionService:
         dependencies = tuple(SessionID(dep_id) for dep_id in (action.scheduling.dependencies or ()))
         callback_url = yarl.URL(action.callback_url) if action.callback_url else None
 
-        if action.resource.resource_group:
-            resource_group_name = ResourceGroupName(action.resource.resource_group)
+        if action.resource.resource_group_id is not None:
             resource_group_id = action.resource.resource_group_id
-            if resource_group_id is None:
-                resource_group_id = (
-                    await self._scaling_group_repository.get_resource_group_id_by_name(
-                        resource_group_name
-                    )
+            resource_group_name = (
+                await self._scaling_group_repository.get_resource_group_name_by_id(
+                    resource_group_id
                 )
+            )
+        elif action.resource.resource_group:
+            resource_group_name = ResourceGroupName(action.resource.resource_group)
+            resource_group_id = await self._scaling_group_repository.get_resource_group_id_by_name(
+                resource_group_name
+            )
         else:
             resource_group = await self._scheduler_repository.pick_default_resource_group(
                 access_key=access_key,

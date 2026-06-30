@@ -127,6 +127,16 @@ class ScalingGroupDBSource:
                 raise ScalingGroupNotFound(name)
             return resource_group_id
 
+    async def get_resource_group_name_by_id(
+        self, resource_group_id: ResourceGroupID
+    ) -> ResourceGroupName:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(ScalingGroupRow.name).where(ScalingGroupRow.id == resource_group_id)
+            resource_group_name = await db_sess.scalar(query)
+            if resource_group_name is None:
+                raise ScalingGroupNotFound(f"Scaling group not found (id:{resource_group_id})")
+            return ResourceGroupName(resource_group_name)
+
     async def get_scaling_group_by_name(
         self,
         name: str,

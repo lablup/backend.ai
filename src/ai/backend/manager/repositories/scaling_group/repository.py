@@ -94,6 +94,12 @@ class ScalingGroupRepository:
         return await self._db_source.get_resource_group_id_by_name(name)
 
     @scaling_group_repository_resilience.apply()
+    async def get_resource_group_name_by_id(
+        self, resource_group_id: ResourceGroupID
+    ) -> ResourceGroupName:
+        return await self._db_source.get_resource_group_name_by_id(resource_group_id)
+
+    @scaling_group_repository_resilience.apply()
     async def get_scaling_group_by_name(
         self,
         name: str,

@@ -1783,6 +1783,50 @@ class TestEnqueueSession:
         )
 
     @pytest.fixture
+    def enqueue_action_with_rg_id(
+        self,
+        enqueue_action_without_rg: EnqueueSessionAction,
+    ) -> EnqueueSessionAction:
+        """Same action but with the user supplying only the resource group id."""
+        return EnqueueSessionAction(
+            session_name=enqueue_action_without_rg.session_name,
+            session_type=enqueue_action_without_rg.session_type,
+            image_id=enqueue_action_without_rg.image_id,
+            resource=SessionResourceSpec(
+                entries=enqueue_action_without_rg.resource.entries,
+                resource_group=None,
+                resource_group_id=ResourceGroupID(uuid4()),
+            ),
+            scheduling=enqueue_action_without_rg.scheduling,
+            user_id=enqueue_action_without_rg.user_id,
+            access_key=enqueue_action_without_rg.access_key,
+            domain_name=enqueue_action_without_rg.domain_name,
+            group_id=enqueue_action_without_rg.group_id,
+        )
+
+    @pytest.fixture
+    def enqueue_action_with_rg_and_id(
+        self,
+        enqueue_action_with_rg: EnqueueSessionAction,
+    ) -> EnqueueSessionAction:
+        """Same action but with both legacy name and the new resource group id."""
+        return EnqueueSessionAction(
+            session_name=enqueue_action_with_rg.session_name,
+            session_type=enqueue_action_with_rg.session_type,
+            image_id=enqueue_action_with_rg.image_id,
+            resource=SessionResourceSpec(
+                entries=enqueue_action_with_rg.resource.entries,
+                resource_group=enqueue_action_with_rg.resource.resource_group,
+                resource_group_id=ResourceGroupID(uuid4()),
+            ),
+            scheduling=enqueue_action_with_rg.scheduling,
+            user_id=enqueue_action_with_rg.user_id,
+            access_key=enqueue_action_with_rg.access_key,
+            domain_name=enqueue_action_with_rg.domain_name,
+            group_id=enqueue_action_with_rg.group_id,
+        )
+
+    @pytest.fixture
     def configured_session_service(
         self,
         session_service: SessionService,
@@ -1808,6 +1852,9 @@ class TestEnqueueSession:
         cast(
             Any, session_service._scaling_group_repository.get_resource_group_id_by_name
         ).return_value = ResourceGroupID(uuid4())
+        cast(
+            Any, session_service._scaling_group_repository.get_resource_group_name_by_id
+        ).return_value = ResourceGroupName("id-picked-rg")
         return session_service
 
     async def test_auto_picks_default_when_resource_group_omitted(
@@ -1845,3 +1892,45 @@ class TestEnqueueSession:
         mock_scheduler_repository.pick_default_resource_group.assert_not_called()
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
         assert str(draft.scope.resource_group_name) == "user-picked-rg"
+
+    async def test_uses_user_supplied_resource_group_id(
+        self,
+        configured_session_service: SessionService,
+        mock_scheduler_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        enqueue_action_with_rg_id: EnqueueSessionAction,
+    ) -> None:
+        """When only the new resource group id is supplied, the auto-picker must not run."""
+        await configured_session_service.enqueue_session(enqueue_action_with_rg_id)
+
+        mock_scheduler_repository.pick_default_resource_group.assert_not_called()
+        cast(
+            Any, configured_session_service._scaling_group_repository.get_resource_group_name_by_id
+        ).assert_awaited_once_with(enqueue_action_with_rg_id.resource.resource_group_id)
+        draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
+        assert draft.scope.resource_group_id == enqueue_action_with_rg_id.resource.resource_group_id
+        assert draft.scope.resource_group_name == ResourceGroupName("id-picked-rg")
+
+    async def test_prefers_resource_group_id_over_resource_group_name(
+        self,
+        configured_session_service: SessionService,
+        mock_scheduler_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        enqueue_action_with_rg_and_id: EnqueueSessionAction,
+    ) -> None:
+        """When both fields are supplied, resolve the name from the resource group id."""
+        await configured_session_service.enqueue_session(enqueue_action_with_rg_and_id)
+
+        mock_scheduler_repository.pick_default_resource_group.assert_not_called()
+        cast(
+            Any, configured_session_service._scaling_group_repository.get_resource_group_id_by_name
+        ).assert_not_called()
+        cast(
+            Any, configured_session_service._scaling_group_repository.get_resource_group_name_by_id
+        ).assert_awaited_once_with(enqueue_action_with_rg_and_id.resource.resource_group_id)
+        draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
+        assert (
+            draft.scope.resource_group_id
+            == enqueue_action_with_rg_and_id.resource.resource_group_id
+        )
+        assert draft.scope.resource_group_name == ResourceGroupName("id-picked-rg")

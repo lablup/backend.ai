@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -1448,4 +1448,25 @@ class TestScalingGroupRepositoryDB:
         with pytest.raises(ScalingGroupNotFound):
             await scaling_group_repository.get_resource_group_id_by_name(
                 ResourceGroupName("nonexistent-scaling-group")
+            )
+
+    async def test_get_resource_group_name_by_id_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_groups_small: list[str],
+    ) -> None:
+        target_name = sample_scaling_groups_small[0]
+        fetched = await scaling_group_repository.get_scaling_group_by_name(target_name)
+        resource_group_name = await scaling_group_repository.get_resource_group_name_by_id(
+            fetched.id
+        )
+        assert resource_group_name == ResourceGroupName(target_name)
+
+    async def test_get_resource_group_name_by_id_not_found(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+    ) -> None:
+        with pytest.raises(ScalingGroupNotFound):
+            await scaling_group_repository.get_resource_group_name_by_id(
+                ResourceGroupID(uuid.uuid4())
             )
