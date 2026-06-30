@@ -34,6 +34,7 @@ from .exceptions import (
     NoCompatibleAgentError,
     TrackerCompatibilityError,
 )
+from .types import ResourceRequirements
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -92,20 +93,6 @@ class KernelResourceSpec:
     requested_slots: ResourceSlot
     # Architecture required
     required_architecture: str
-
-
-@dataclass
-class ResourceRequirements:
-    """Resource requirements for allocation."""
-
-    # Resource slots required
-    requested_slots: ResourceSlot
-    # Architecture required
-    required_architecture: str
-    # Kernel IDs that these requirements are for
-    # For single-node, this includes all kernel IDs
-    # For multi-node, this includes only one kernel ID
-    kernel_ids: Sequence[KernelId]
 
 
 @dataclass

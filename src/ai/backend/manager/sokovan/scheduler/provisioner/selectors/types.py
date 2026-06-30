@@ -8,9 +8,24 @@ the selection logic. These types depend only on common value types.
 from __future__ import annotations
 
 import enum
+from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ai.backend.common.types import AgentId, ResourceSlot
+from ai.backend.common.types import AgentId, KernelId, ResourceSlot
+
+
+@dataclass
+class ResourceRequirements:
+    """Resource requirements for allocation."""
+
+    # Resource slots required
+    requested_slots: ResourceSlot
+    # Architecture required
+    required_architecture: str
+    # Kernel IDs that these requirements are for
+    # For single-node, this includes all kernel IDs
+    # For multi-node, this includes only one kernel ID
+    kernel_ids: Sequence[KernelId]
 
 
 class SuggestionKind(enum.StrEnum):

@@ -8,8 +8,6 @@ from .exceptions import (
     NoAvailableAgentError,
     NoCompatibleAgentError,
 )
-
-# Then import selector which depends on exceptions
 from .selector import (
     AbstractAgentSelector,
     AgentSelection,
@@ -17,9 +15,11 @@ from .selector import (
     AgentSelectionCriteria,
     AgentSelector,
     KernelResourceSpec,
-    ResourceRequirements,
     SessionMetadata,
 )
+
+# Then import selector which depends on exceptions
+from .types import ResourceRequirements
 
 __all__ = [
     # Exceptions

@@ -36,6 +36,8 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
     AgentSelector,
     BatchAgentSelectionResult,
     RequirementSelectionFailure,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
     ResourceRequirements,
 )
 
