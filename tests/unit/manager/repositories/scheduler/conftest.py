@@ -34,6 +34,12 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.sokovan import AllocationBatch, KernelCreationInfo
+from ai.backend.manager.data.sokovan.allocation import (
+    AgentAllocation,
+    KernelAllocation,
+    SessionAllocation,
+)
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -60,12 +66,6 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.sokovan.data import AllocationBatch, KernelCreationInfo
-from ai.backend.manager.sokovan.data.allocation import (
-    AgentAllocation,
-    KernelAllocation,
-    SessionAllocation,
-)
 from ai.backend.testutils.db import with_tables
 
 # Tables required to satisfy FK constraints for ScheduleDBSource, in dependency order.

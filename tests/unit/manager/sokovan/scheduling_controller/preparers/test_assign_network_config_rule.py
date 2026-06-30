@@ -14,15 +14,15 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.manager.data.session.creation import (
+    ScalingGroupNetworkInfo,
+)
 from ai.backend.manager.data.session.draft import (
     SessionNetworkDraft,
     SessionSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.network import NetworkType
-from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    ScalingGroupNetworkInfo,
-)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.assign_network_config_rule import (
     AssignNetworkConfigRule,
 )

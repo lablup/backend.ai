@@ -8,6 +8,7 @@ SearchReplicas, SearchAccessTokens, SyncReplica, GetRevisionById.
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -195,7 +196,7 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         )
         mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
         mock_deployment_controller.add_deployment_revision = AsyncMock()
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_legacy_endpoint_info = AsyncMock(return_value=endpoint_info)
 
         action = CreateLegacyDeploymentAction(draft=draft)
         result = await processors.create_legacy_deployment.wait_for_complete(action)
@@ -218,7 +219,7 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         )
         mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
         mock_deployment_controller.add_deployment_revision = AsyncMock()
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_legacy_endpoint_info = AsyncMock(return_value=endpoint_info)
 
         action = CreateLegacyDeploymentAction(draft=draft)
         await processors.create_legacy_deployment.wait_for_complete(action)
@@ -227,6 +228,74 @@ class TestCreateLegacyDeployment(DeploymentCRUDBaseFixtures):
         kwargs = mock_deployment_controller.add_deployment_revision.await_args.kwargs
         assert kwargs["deployment_id"] == endpoint_info.id
         assert kwargs["auto_activate"] is True
+
+    @pytest.fixture
+    def populated_revision(self) -> ModelRevisionData:
+        """A fully-populated revision, as the eager (legacy) getter returns."""
+        return ModelRevisionData(
+            id=DeploymentRevisionID(uuid.uuid4()),
+            deployment_id=DeploymentID(uuid.uuid4()),
+            revision_number=1,
+            cluster_config=ClusterConfigData(mode=ClusterMode.SINGLE_NODE, size=1),
+            resource_config=ResourceConfigData(
+                resource_group_name="default",
+                resource_slot=ResourceSlot({"cpu": "4", "mem": "8g"}),
+            ),
+            model_runtime_config=ModelRuntimeConfigData(
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
+            ),
+            model_mount_config=ModelMountConfigData(
+                vfolder_id=VFolderUUID(uuid.uuid4()),
+                mount_destination="/models",
+                definition_path="model-definition.yaml",
+                extra_mounts=[],
+                model_mount_perm=MountPermission.READ_ONLY,
+            ),
+            image_id=ImageID(uuid.uuid4()),
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+            execution=ExecutionData(startup_command=None, bootstrap_script=None, callback_url=None),
+            revision_preset=PresetAttributionData(preset_id=None, values=[]),
+        )
+
+    async def test_response_carries_eagerly_loaded_revision(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        mock_deployment_controller: MagicMock,
+        endpoint_info: DeploymentInfo,
+        populated_revision: ModelRevisionData,
+        draft: MagicMock,
+    ) -> None:
+        """Regression (#12251): the legacy create response must carry the
+        eagerly-loaded revision data so the REST v1 handler can resolve the
+        runtime variant. The modern ids-only read path drops
+        ``current_revision`` / ``deploying_revision`` (both ``None``), which made
+        the handler raise ``RuntimeVariantNotFound`` even though the deployment
+        was created. Here the eager (legacy) read returns a populated
+        ``deploying_revision`` while the modern read would return ``None``; the
+        result must expose the revision regardless of which getter is wired.
+        """
+        eager_info = replace(endpoint_info, deploying_revision=populated_revision)
+        mock_deployment_controller.build_creator_from_legacy_draft = AsyncMock(
+            return_value=(MagicMock(), MagicMock())
+        )
+        mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
+        mock_deployment_controller.add_deployment_revision = AsyncMock()
+        # Eager getter carries the revision; modern getter would drop it (None).
+        mock_deployment_repository.get_legacy_endpoint_info = AsyncMock(return_value=eager_info)
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+
+        action = CreateLegacyDeploymentAction(draft=draft)
+        result = await processors.create_legacy_deployment.wait_for_complete(action)
+
+        # The target revision (current or deploying) the REST v1 handler reads
+        # must be present — this is what fails when the modern getter is used.
+        target_revision = result.data.current_revision or result.data.deploying_revision
+        assert target_revision is not None
+        assert (
+            target_revision.model_runtime_config.runtime_variant_id
+            == populated_revision.model_runtime_config.runtime_variant_id
+        )
 
     async def test_non_existent_domain_raises(
         self,

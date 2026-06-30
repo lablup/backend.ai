@@ -27,6 +27,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionData
+from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -45,7 +46,6 @@ from ai.backend.manager.data.session.options import (
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.deployment import RevisionMissingModelVFolder
-from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 
 class DeploymentSessionDraftBuilder:

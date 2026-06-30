@@ -14,11 +14,11 @@ from ai.backend.manager.types import OptionalState
 class AppConfigFragmentUpdaterSpec(UpdaterSpec[AppConfigFragmentRow]):
     """UpdaterSpec for app config fragment updates.
 
-    ``config`` is replaced wholesale; ``rank`` may be set explicitly for admin re-ordering.
+    Only ``config`` is updatable (replaced wholesale). ``rank`` is assigned at create and is
+    never updatable — re-ordering is not exposed through the update path.
     """
 
     config: OptionalState[dict[str, Any]] = field(default_factory=OptionalState[dict[str, Any]].nop)
-    rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
 
     @property
     @override
@@ -29,5 +29,4 @@ class AppConfigFragmentUpdaterSpec(UpdaterSpec[AppConfigFragmentRow]):
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.config.update_dict(to_update, "config")
-        self.rank.update_dict(to_update, "rank")
         return to_update

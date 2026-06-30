@@ -6,9 +6,9 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import QueryOrder
 
 from .row import DomainRow
 

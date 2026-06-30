@@ -13,12 +13,12 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
     make_int_conditions,
     make_string_in_factory,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class RevisionConditions:

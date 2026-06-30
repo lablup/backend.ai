@@ -11,9 +11,10 @@ import sqlalchemy as sa
 
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 from .pagination import PageInfoResult, QueryPagination
-from .types import ExistenceCheck, QueryCondition, QueryOrder, SearchScope
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -88,6 +89,24 @@ async def execute_querier[TRow: Base](
 
     fetched_row: TRow = row_class(**dict(row_data._mapping))
     return QuerierResult(row=fetched_row)
+
+
+# =============================================================================
+# Existence Querier (by conditions)
+# =============================================================================
+
+
+@dataclass
+class ExistsQuerier[TRow: Base]:
+    """Existence check over a table by a set of conditions (combined with AND).
+
+    Attributes:
+        row_class: ORM class for table access.
+        conditions: Query conditions; an empty list checks whether the table has any row.
+    """
+
+    row_class: type[TRow]
+    conditions: list[QueryCondition] = field(default_factory=list)
 
 
 # =============================================================================

@@ -17,6 +17,7 @@ from sqlalchemy.engine.default import DefaultDialect
 
 from ai.backend.common.config import (
     ModelDefinition,
+    ModelServiceConfig,
     ModelServiceConfigDraft,
 )
 from ai.backend.manager.models.base import PydanticColumn
@@ -77,6 +78,48 @@ class TestPydanticInputCompat:
             payload["shell"] = shell
         draft = ModelServiceConfigDraft.model_validate(payload)
         assert draft.start_command == expected
+
+
+class TestCommandFoldsIntoStartCommand:
+    """``command`` (single string) folds into the argv ``start_command``.
+
+    PR #12418 adds ``command``, which supersedes the deprecated ``start_command``.
+    The shared ``_wrap_str_start_command_into_argv`` validator wraps it with the
+    same shell rules, lets it take precedence over ``start_command``, and strips it
+    so it is not persisted via ``extra="allow"``.
+    """
+
+    @pytest.mark.parametrize(("raw", "shell", "expected"), START_COMMAND_CASES)
+    def test_command_is_wrapped(self, raw: str, shell: str | None, expected: list[str]) -> None:
+        payload: dict[str, Any] = {"command": raw, "port": 8080}
+        if shell is not None:
+            payload["shell"] = shell
+        resolved = ModelServiceConfig.model_validate(payload)
+        assert resolved.start_command == expected
+
+    @pytest.mark.parametrize(
+        "start_command",
+        [
+            pytest.param("python old.py", id="str-start_command"),
+            pytest.param(["python", "old.py"], id="list-start_command"),
+        ],
+    )
+    def test_command_takes_precedence_over_start_command(
+        self, start_command: str | list[str]
+    ) -> None:
+        resolved = ModelServiceConfig.model_validate({
+            "command": "python new.py",
+            "start_command": start_command,
+            "port": 8080,
+        })
+        assert resolved.start_command == ["python new.py"]
+
+    def test_command_is_not_persisted_as_extra(self) -> None:
+        resolved = ModelServiceConfig.model_validate({
+            "command": "python service.py",
+            "port": 8080,
+        })
+        assert "command" not in resolved.model_dump()
 
 
 class TestModelDefinitionInputCompat:

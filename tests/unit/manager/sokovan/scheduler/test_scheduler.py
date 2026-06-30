@@ -15,7 +15,8 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
+    AgentInfo,
     KernelWorkload,
     SchedulingConfig,
     SessionWorkload,
@@ -29,7 +30,6 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions impor
     NoCompatibleAgentError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentInfo,
     AgentSelection,
     AgentSelectionConfig,
     AgentSelectionCriteria,

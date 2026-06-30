@@ -15,6 +15,12 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.fair_share import (
+    BucketDelta,
+    DomainUsageBucketKey,
+    UsageBucketAggregationResult,
+    UserUsageBucketKey,
+)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -41,12 +47,6 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_usage_history.db_source.db_source import (
     ResourceUsageHistoryDBSource,
-)
-from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import (
-    BucketDelta,
-    DomainUsageBucketKey,
-    UsageBucketAggregationResult,
-    UserUsageBucketKey,
 )
 from ai.backend.testutils.db import with_tables
 

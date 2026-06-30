@@ -7,11 +7,11 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListData,
-    AppConfigScopeType,
 )
 from ai.backend.manager.errors.app_config import AppConfigAllowListNotFound
 from ai.backend.manager.errors.repository import (
@@ -42,6 +42,7 @@ from ai.backend.manager.repositories.base import (
     Creator,
     CursorBackwardPagination,
     CursorForwardPagination,
+    ExistsQuerier,
     OffsetPagination,
     Purger,
 )
@@ -335,3 +336,39 @@ class TestSearch:
             )
         )
         assert {item.id for item in result.items} == {entry.id for entry in by_created_asc[1:]}
+
+
+class TestExists:
+    @staticmethod
+    def _querier(
+        config_name: str, scope_type: AppConfigScopeType
+    ) -> ExistsQuerier[AppConfigAllowListRow]:
+        return ExistsQuerier(
+            row_class=AppConfigAllowListRow,
+            conditions=[
+                AppConfigAllowListConditions.by_config_name_equals(
+                    StringMatchSpec(config_name, case_insensitive=False, negated=False)
+                ),
+                AppConfigAllowListConditions.by_scope_type_equals(scope_type),
+            ],
+        )
+
+    # existing_entry seeds a single ("theme", PUBLIC) row.
+    @pytest.mark.parametrize(
+        ("config_name", "scope_type", "expected"),
+        [
+            ("theme", AppConfigScopeType.PUBLIC, True),
+            ("theme", AppConfigScopeType.USER, False),
+            ("unregistered", AppConfigScopeType.PUBLIC, False),
+        ],
+    )
+    async def test_exists(
+        self,
+        repository: AppConfigAllowListRepository,
+        existing_entry: AppConfigAllowListData,
+        config_name: str,
+        scope_type: AppConfigScopeType,
+        expected: bool,
+    ) -> None:
+        querier = self._querier(config_name, scope_type)
+        assert await repository.exists(querier) is expected

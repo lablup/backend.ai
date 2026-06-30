@@ -23,6 +23,7 @@ from ai.backend.manager.data.permission.types import (
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
@@ -36,7 +37,6 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class RoleConditions:

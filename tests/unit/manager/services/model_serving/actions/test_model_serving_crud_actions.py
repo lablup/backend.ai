@@ -24,6 +24,7 @@ from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import MutationResult
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.service import (
     EndpointAccessForbiddenError,
     ModelServiceNotFound,
@@ -43,7 +44,6 @@ from ai.backend.manager.services.model_serving.actions.force_sync import (
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
     ModifyEndpointAction,
 )
-from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )

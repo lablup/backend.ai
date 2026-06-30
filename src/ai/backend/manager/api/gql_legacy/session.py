@@ -35,6 +35,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.manager.api.gql.base import resolve_global_id
+from ai.backend.manager.clients.valkey_client.statistics import KernelStatistics
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import NotImplementedAPI
@@ -1136,8 +1137,9 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         self, info: graphene.ResolveInfo
     ) -> Mapping[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(
-            graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx.valkey_live,
+            KernelStatistics.batch_load_inference_metrics_by_kernel,
         )
         return cast(Mapping[str, Any] | None, await loader.load(self.id))
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from functools import lru_cache
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigScopeType as AppConfigScopeTypeDTO
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     AppConfigAllowListFilter,
     AppConfigAllowListOrder,
@@ -22,29 +24,26 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigAllowListOrderField,
     AppConfigScopeTypeFilter,
 )
-from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
-    AppConfigScopeType as AppConfigScopeTypeDTO,
-)
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListData,
-    AppConfigScopeType,
 )
 from ai.backend.manager.models.app_config_allow_list.conditions import (
     AppConfigAllowListConditions,
 )
 from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllowListOrders
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
     AppConfigAllowListCreatorSpec,
 )
 from ai.backend.manager.repositories.base import (
     Purger,
-    QueryCondition,
-    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.services.app_config_allow_list.actions.create import (
@@ -194,6 +193,21 @@ class AppConfigAllowListAdapter(BaseAdapter):
             )
             if condition:
                 conditions.append(condition)
+        if filter_.AND:
+            for sub_filter in filter_.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if filter_.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter_.OR:
+                or_conditions.extend(self._convert_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter_.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter_.NOT:
+                not_conditions.extend(self._convert_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     @staticmethod

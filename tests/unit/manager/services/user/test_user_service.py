@@ -16,8 +16,10 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
@@ -30,11 +32,10 @@ from ai.backend.manager.data.user.types import (
 )
 from ai.backend.manager.errors.user import UserConflict, UserNotFound, UserPurgeFailure
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base.creator import BulkCreatorError, Creator
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.types import (
@@ -303,17 +304,10 @@ class TestBulkCreateUser:
             )
             for i in [0, 1, 3, 4]
         ]
-        failures: list[BulkCreatorError[UserRow]] = [
-            BulkCreatorError(
-                spec=UserCreatorSpec(
-                    email="u2@example.com",
-                    username="u2",
-                    password=_make_password_info(),
-                    need_password_change=False,
-                    domain_name="default",
-                ),
-                exception=InvalidAPIParameters("Duplicate email"),
+        failures: list[BulkCreateFailure] = [
+            BulkCreateFailure(
                 index=2,
+                exception=InvalidAPIParameters("Duplicate email"),
             ),
         ]
         mock_user_repository.bulk_create_users_validated = AsyncMock(
@@ -415,7 +409,7 @@ class TestBulkModifyUser:
 
         items = [
             UserUpdateSpec(
-                user_id=uuid.uuid4(),
+                user_id=UserID(uuid.uuid4()),
                 updater_spec=UserUpdaterSpec(
                     full_name=TriState.update(f"User {i}"),
                 ),
@@ -438,13 +432,10 @@ class TestBulkModifyUser:
         successes = [
             _make_user_data(email=f"u{i}@example.com", username=f"u{i}") for i in [0, 1, 2, 4]
         ]
-        failures: list[BulkUpdaterError[UserRow]] = [
-            BulkUpdaterError(
-                spec=UserUpdaterSpec(
-                    full_name=TriState.update("User 3"),
-                ),
-                exception=UserNotFound("User not found"),
+        failures: list[BulkUpdateFailure] = [
+            BulkUpdateFailure(
                 index=3,
+                exception=UserNotFound("User not found"),
             ),
         ]
         mock_user_repository.bulk_update_users_validated = AsyncMock(
@@ -453,7 +444,7 @@ class TestBulkModifyUser:
 
         items = [
             UserUpdateSpec(
-                user_id=uuid.uuid4(),
+                user_id=UserID(uuid.uuid4()),
                 updater_spec=UserUpdaterSpec(
                     full_name=TriState.update(f"User {i}"),
                 ),

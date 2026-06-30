@@ -54,12 +54,7 @@ from ai.backend.manager.data.session.types import (
     SessionNetwork,
     SessionStatus,
 )
-from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.repositories.scheduler.types.session import (
-    TerminatingKernelData,
-    TerminatingSessionData,
-)
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ImageConfigData,
     KernelBindingData,
     SessionDataForPull,
@@ -67,6 +62,11 @@ from ai.backend.manager.sokovan.data import (
     SessionsForPullWithImages,
     SessionsForStartWithImages,
     SessionWithKernels,
+)
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.repositories.scheduler.types.session import (
+    TerminatingKernelData,
+    TerminatingSessionData,
 )
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 

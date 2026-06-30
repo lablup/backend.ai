@@ -46,10 +46,10 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.data.common.sentinel import undefined
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,

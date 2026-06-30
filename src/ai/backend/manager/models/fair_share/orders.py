@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
@@ -10,7 +11,6 @@ from ai.backend.manager.models.fair_share.row import (
 )
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import QueryOrder
 
 
 class DomainFairShareOrders:

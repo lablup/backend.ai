@@ -17,8 +17,8 @@ from ai.backend.common.api_handlers import BodyParam, PathParam, QueryParam
 from ai.backend.common.json import pretty_json_str
 from ai.backend.common.types import BackendAISchema
 from ai.backend.manager import __version__
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api.utils import Undefined, undefined
+from ai.backend.manager.data.common.sentinel import Undefined, undefined
+from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
 
 

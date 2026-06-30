@@ -4,6 +4,8 @@ Request DTOs for resource policy DTO v2.
 
 from __future__ import annotations
 
+from typing import Self
+
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
@@ -321,6 +323,9 @@ class KeypairResourcePolicyFilter(BaseRequestModel):
     max_pending_session_count: IntFilter | None = Field(
         default=None, description="Filter by max pending session count."
     )
+    AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
+    OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
+    NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
 
 
 class UserResourcePolicyFilter(BaseRequestModel):
@@ -343,6 +348,9 @@ class UserResourcePolicyFilter(BaseRequestModel):
     max_customized_image_count: IntFilter | None = Field(
         default=None, description="Filter by max customized image count."
     )
+    AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
+    OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
+    NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
 
 
 class ProjectResourcePolicyFilter(BaseRequestModel):
@@ -359,6 +367,14 @@ class ProjectResourcePolicyFilter(BaseRequestModel):
     max_network_count: IntFilter | None = Field(
         default=None, description="Filter by max network count."
     )
+    AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
+    OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
+    NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
+
+
+KeypairResourcePolicyFilter.model_rebuild()
+UserResourcePolicyFilter.model_rebuild()
+ProjectResourcePolicyFilter.model_rebuild()
 
 
 class KeypairResourcePolicyOrder(BaseRequestModel):

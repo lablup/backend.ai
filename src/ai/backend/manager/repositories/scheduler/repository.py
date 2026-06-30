@@ -36,14 +36,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
-from ai.backend.manager.exceptions import ErrorStatusInfo
-from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     AllocationBatch,
     KernelCreationInfo,
     SessionRunningData,
@@ -51,6 +44,13 @@ from ai.backend.manager.sokovan.data import (
     SessionsForStartWithImages,
     SessionWithKernels,
 )
+from ai.backend.manager.exceptions import ErrorStatusInfo
+from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.types import UserScope
 
 from .cache_source.cache_source import ScheduleCacheSource

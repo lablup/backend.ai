@@ -35,7 +35,7 @@ from ai.backend.manager.api.rest.session.handler import (
     _merge_resolved_legacy_mounts,
     _route_legacy_uuid_mounts,
 )
-from ai.backend.manager.api.utils import undefined
+from ai.backend.manager.data.common.sentinel import undefined
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionRoutingInfo,

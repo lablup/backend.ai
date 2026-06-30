@@ -30,12 +30,13 @@ from ai.backend.common.dto.manager.notification import (
     WebhookSpecResponse,
 )
 from ai.backend.common.dto.manager.notification.response import EmailSpecResponse
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
 )
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.notification.conditions import (
     NotificationChannelConditions,
@@ -45,12 +46,7 @@ from ai.backend.manager.models.notification.orders import (
     NotificationChannelOrders,
     NotificationRuleOrders,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification.updaters import (
     NotificationChannelUpdaterSpec,

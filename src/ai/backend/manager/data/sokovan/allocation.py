@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.types import (
@@ -15,13 +15,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-
-from .workload import SessionWorkload
-
-if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-        AgentSelection,
-    )
 
 
 @dataclass
@@ -86,63 +79,6 @@ class SessionAllocation:
     passed_phases: list[SchedulingPredicate] = field(default_factory=list)
     # Phases that failed during scheduling (normally empty for successful allocations)
     failed_phases: list[SchedulingPredicate] = field(default_factory=list)
-
-    @classmethod
-    def from_agent_selections(
-        cls,
-        session_workload: SessionWorkload,
-        selections: list[AgentSelection],
-        scaling_group: str,
-    ) -> SessionAllocation:
-        """
-        Build a SessionAllocation from agent selection results.
-
-        :param session_workload: The original session workload
-        :param selections: List of agent selection results
-        :param scaling_group: The scaling group name
-        :param access_key: The access key associated with the session
-        :return: SessionAllocation with kernel and agent allocations
-        """
-        kernel_allocations: list[KernelAllocation] = []
-        agent_allocation_map: dict[AgentId, AgentAllocation] = {}
-
-        for selection in selections:
-            resource_req = selection.resource_requirements
-            selected_agent = selection.selected_agent
-
-            # Track resource allocation for this agent
-            if selected_agent.agent_id not in agent_allocation_map:
-                agent_allocation_map[selected_agent.agent_id] = AgentAllocation(
-                    agent_id=selected_agent.agent_id,
-                    allocated_slots=[],
-                )
-            agent_allocation_map[selected_agent.agent_id].allocated_slots.append(
-                resource_req.requested_slots
-            )
-
-            # Create kernel allocations
-            for kernel_id in resource_req.kernel_ids:
-                kernel_allocations.append(
-                    KernelAllocation(
-                        kernel_id=kernel_id,
-                        agent_id=selected_agent.agent_id,
-                        agent_addr=selected_agent.agent_addr,
-                        scaling_group=selected_agent.scaling_group,
-                    )
-                )
-
-        # Create session allocation
-        agent_allocations = list(agent_allocation_map.values())
-
-        return cls(
-            session_id=session_workload.session_id,
-            session_type=session_workload.session_type,
-            cluster_mode=session_workload.cluster_mode,
-            scaling_group=scaling_group,
-            kernel_allocations=kernel_allocations,
-            agent_allocations=agent_allocations,
-            access_key=session_workload.access_key,
-        )
 
     def unique_agent_ids(self) -> list[AgentId]:
         """Extract unique agent IDs from kernel allocations."""

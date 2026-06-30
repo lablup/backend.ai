@@ -7,17 +7,20 @@ from collections.abc import AsyncGenerator
 
 import pytest
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
-    AppConfigScopeType,
 )
 from ai.backend.manager.errors.app_config import (
-    AppConfigDefinitionNotFound,
     AppConfigFragmentNotFound,
+    AppConfigFragmentWriteNotAllowed,
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
@@ -29,17 +32,28 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import ConfigNameSearchScope
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    DomainAppConfigFragmentSearchScope,
+    UserAppConfigFragmentSearchScope,
+)
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Purger, Updater
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    ExistsQuerier,
+    OffsetPagination,
+    Purger,
+    Updater,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
-_DOMAIN_ID = str(uuid.uuid4())
-_USER_ID = str(uuid.uuid4())
+_DOMAIN_UUID = uuid.uuid4()
+_USER_UUID = uuid.uuid4()
+_DOMAIN_ID = str(_DOMAIN_UUID)
+_USER_ID = str(_USER_UUID)
 _OTHER_USER_ID = str(uuid.uuid4())
 
 
@@ -47,8 +61,11 @@ _OTHER_USER_ID = str(uuid.uuid4())
 async def database(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    # FK order: app_config_definitions (parent) before app_config_fragments (child).
-    async with with_tables(database_connection, [AppConfigDefinitionRow, AppConfigFragmentRow]):
+    # FK order: app_config_definitions (parent) before the allow-list and fragments (children).
+    async with with_tables(
+        database_connection,
+        [AppConfigDefinitionRow, AppConfigAllowListRow, AppConfigFragmentRow],
+    ):
         yield database_connection
 
 
@@ -59,7 +76,21 @@ def repository(database: ExtendedAsyncSAEngine) -> AppConfigFragmentRepository:
 
 @pytest.fixture
 async def theme_registered(database: ExtendedAsyncSAEngine) -> None:
-    """Situation: ``theme`` is registered (FK parent) but no fragments exist yet."""
+    """Situation: ``theme`` is registered and allow-listed at every scope; no fragments yet."""
+    async with database.begin_session() as db_sess:
+        db_sess.add(AppConfigDefinitionRow(config_name="theme"))
+        await db_sess.flush()
+        db_sess.add_all([
+            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.PUBLIC),
+            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.DOMAIN),
+            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.USER),
+        ])
+        await db_sess.flush()
+
+
+@pytest.fixture
+async def theme_defined_not_allow_listed(database: ExtendedAsyncSAEngine) -> None:
+    """Situation: ``theme`` is registered but has no allow-list row (writes are gated)."""
     async with database.begin_session() as db_sess:
         db_sess.add(AppConfigDefinitionRow(config_name="theme"))
         await db_sess.flush()
@@ -67,7 +98,31 @@ async def theme_registered(database: ExtendedAsyncSAEngine) -> None:
 
 @pytest.fixture
 async def domain_scoped_fragment(database: ExtendedAsyncSAEngine) -> AppConfigFragmentData:
-    """Situation: a single pre-existing ``theme``/domain fragment."""
+    """Situation: a pre-existing ``theme``/domain fragment, allow-listed at the domain scope."""
+    async with database.begin_session() as db_sess:
+        db_sess.add(AppConfigDefinitionRow(config_name="theme"))
+        await db_sess.flush()
+        db_sess.add(
+            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.DOMAIN)
+        )
+        row = AppConfigFragmentRow(
+            config_name="theme",
+            scope_type=AppConfigScopeType.DOMAIN,
+            scope_id=_DOMAIN_ID,
+            rank=100,
+            config={"k": "v"},
+        )
+        db_sess.add(row)
+        await db_sess.flush()
+        return row.to_data()
+
+
+@pytest.fixture
+async def fragment_not_allow_listed(database: ExtendedAsyncSAEngine) -> AppConfigFragmentData:
+    """Situation: a ``theme``/domain fragment whose ``(config_name, scope)`` is NOT allow-listed.
+
+    Models a row that survives after its allow-list entry was removed — writes must be gated.
+    """
     async with database.begin_session() as db_sess:
         db_sess.add(AppConfigDefinitionRow(config_name="theme"))
         await db_sess.flush()
@@ -155,7 +210,8 @@ class TestCreateAndGet:
                 scope_type=AppConfigScopeType.PUBLIC,
                 scope_id="public",
                 config={"theme": "dark"},
-            )
+            ),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         fetched = await repository.get_by_id(created.id)
         assert fetched.id == created.id
@@ -166,6 +222,20 @@ class TestCreateAndGet:
     async def test_get_by_id_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(AppConfigFragmentID(uuid.uuid4()))
+
+    async def test_create_rejected_when_not_allow_listed(
+        self, repository: AppConfigFragmentRepository, theme_defined_not_allow_listed: None
+    ) -> None:
+        with pytest.raises(AppConfigFragmentWriteNotAllowed):
+            await repository.create(
+                AppConfigFragmentCreatorSpec(
+                    config_name="theme",
+                    scope_type=AppConfigScopeType.PUBLIC,
+                    scope_id="public",
+                    config={"theme": "dark"},
+                ),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
+            )
 
     async def test_unique_constraint_violation(
         self,
@@ -179,7 +249,8 @@ class TestCreateAndGet:
                     scope_type=domain_scoped_fragment.scope_type,
                     scope_id=domain_scoped_fragment.scope_id,
                     config={"k": "v"},
-                )
+                ),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
 
@@ -193,7 +264,8 @@ class TestRankAssignment:
                 scope_type=AppConfigScopeType.PUBLIC,
                 scope_id="public",
                 config={"k": "v"},
-            )
+            ),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         second = await repository.create(
             AppConfigFragmentCreatorSpec(
@@ -201,7 +273,8 @@ class TestRankAssignment:
                 scope_type=AppConfigScopeType.DOMAIN,
                 scope_id=_DOMAIN_ID,
                 config={"k": "v"},
-            )
+            ),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         third = await repository.create(
             AppConfigFragmentCreatorSpec(
@@ -209,7 +282,8 @@ class TestRankAssignment:
                 scope_type=AppConfigScopeType.USER,
                 scope_id=_USER_ID,
                 config={"k": "v"},
-            )
+            ),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         assert first.rank < second.rank < third.rank
 
@@ -224,18 +298,39 @@ class TestUpdate:
             Updater(
                 spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
                 pk_value=domain_scoped_fragment.id,
-            )
+            ),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         assert updated.config == {"b": 2}
         assert (await repository.get_by_id(domain_scoped_fragment.id)).config == {"b": 2}
 
-    async def test_update_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
+    async def test_update_missing_raises(
+        self, repository: AppConfigFragmentRepository, theme_registered: None
+    ) -> None:
+        # Writes are allow-listed (gate open), so a missing fragment surfaces as NotFound
+        # rather than the write-gate rejection.
+        missing_id = AppConfigFragmentID(uuid.uuid4())
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.update(
                 Updater(
                     spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({})),
-                    pk_value=AppConfigFragmentID(uuid.uuid4()),
-                )
+                    pk_value=missing_id,
+                ),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
+            )
+
+    async def test_update_rejected_when_not_allow_listed(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragment_not_allow_listed: AppConfigFragmentData,
+    ) -> None:
+        with pytest.raises(AppConfigFragmentWriteNotAllowed):
+            await repository.update(
+                Updater(
+                    spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
+                    pk_value=fragment_not_allow_listed.id,
+                ),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
 
@@ -246,16 +341,34 @@ class TestPurge:
         domain_scoped_fragment: AppConfigFragmentData,
     ) -> None:
         purged = await repository.purge(
-            Purger(row_class=AppConfigFragmentRow, pk_value=domain_scoped_fragment.id)
+            Purger(row_class=AppConfigFragmentRow, pk_value=domain_scoped_fragment.id),
+            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         assert purged.id == domain_scoped_fragment.id
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(domain_scoped_fragment.id)
 
-    async def test_purge_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
+    async def test_purge_missing_raises(
+        self, repository: AppConfigFragmentRepository, theme_registered: None
+    ) -> None:
+        # Writes are allow-listed (gate open), so a missing fragment surfaces as NotFound
+        # rather than the write-gate rejection.
+        missing_id = AppConfigFragmentID(uuid.uuid4())
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.purge(
-                Purger(row_class=AppConfigFragmentRow, pk_value=AppConfigFragmentID(uuid.uuid4()))
+                Purger(row_class=AppConfigFragmentRow, pk_value=missing_id),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
+            )
+
+    async def test_purge_rejected_when_not_allow_listed(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragment_not_allow_listed: AppConfigFragmentData,
+    ) -> None:
+        with pytest.raises(AppConfigFragmentWriteNotAllowed):
+            await repository.purge(
+                Purger(row_class=AppConfigFragmentRow, pk_value=fragment_not_allow_listed.id),
+                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
 
@@ -327,24 +440,66 @@ class TestSearch:
 
 
 class TestScopedSearch:
-    async def test_scoped_search_returns_only_that_config_name(
+    async def test_domain_scope_returns_only_that_domain(
         self,
         repository: AppConfigFragmentRepository,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [ConfigNameSearchScope(config_name="theme")],
+            [DomainAppConfigFragmentSearchScope(domain_id=DomainID(_DOMAIN_UUID))],
         )
-        expected = {f.id for f in fragments_across_scopes if f.config_name == "theme"}
+        # Only domain-scoped fragments of that domain — not the other domain, public, or users.
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID
+        }
         assert {item.id for item in result.items} == expected
         assert result.total_count == len(expected)
 
-    async def test_scoped_search_unregistered_config_name_raises(
+    async def test_user_scope_returns_only_that_user(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        result = await repository.scoped_search(
+            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+            [UserAppConfigFragmentSearchScope(user_id=UserID(_USER_UUID))],
+        )
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID
+        }
+        assert {item.id for item in result.items} == expected
+
+    async def test_scopes_or_combined_across_domain_and_user(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        result = await repository.scoped_search(
+            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+            [
+                DomainAppConfigFragmentSearchScope(domain_id=DomainID(_DOMAIN_UUID)),
+                UserAppConfigFragmentSearchScope(user_id=UserID(_USER_UUID)),
+            ],
+        )
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
+            or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+        }
+        assert {item.id for item in result.items} == expected
+
+    async def test_scoped_search_unknown_scope_returns_empty(
         self, repository: AppConfigFragmentRepository
     ) -> None:
-        with pytest.raises(AppConfigDefinitionNotFound):
-            await repository.scoped_search(
-                BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-                [ConfigNameSearchScope(config_name="unregistered")],
-            )
+        # Unconditional (no existence check): an unknown scope yields no rows, not an error.
+        result = await repository.scoped_search(
+            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+            [DomainAppConfigFragmentSearchScope(domain_id=DomainID(uuid.uuid4()))],
+        )
+        assert result.items == []

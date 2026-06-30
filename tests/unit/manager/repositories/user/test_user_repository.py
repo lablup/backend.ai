@@ -18,6 +18,7 @@ from ai.backend.common.data.permission.types import (
     RoleSource,
     ScopeType,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ReadableCIDR, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData
@@ -61,10 +62,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserUpdateSpec
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
@@ -1171,7 +1171,7 @@ class TestUserRepository:
                 description=TriState.update(f"Updated Description {i}"),
             )
             update_items.append(
-                UserUpdateSpec(user_id=created.user.uuid, updater_spec=updater_spec)
+                UserUpdateSpec(user_id=UserID(created.user.uuid), updater_spec=updater_spec)
             )
 
         result = await user_repository.bulk_update_users_validated(update_items)
@@ -1224,13 +1224,13 @@ class TestUserRepository:
         non_existent_user_id = uuid.uuid4()
         update_items: list[UserUpdateSpec] = [
             UserUpdateSpec(
-                user_id=real_user.uuid,
+                user_id=UserID(real_user.uuid),
                 updater_spec=UserUpdaterSpec(
                     full_name=TriState.update("Updated Name"),
                 ),
             ),
             UserUpdateSpec(
-                user_id=non_existent_user_id,
+                user_id=UserID(non_existent_user_id),
                 updater_spec=UserUpdaterSpec(
                     full_name=TriState.update("Should Fail"),
                 ),

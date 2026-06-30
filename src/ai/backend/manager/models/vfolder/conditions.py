@@ -15,8 +15,8 @@ from uuid import UUID
 
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
-from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import VFolderRow
 

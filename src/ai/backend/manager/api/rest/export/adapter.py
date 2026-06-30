@@ -24,9 +24,9 @@ from ai.backend.common.dto.manager.v2.export import (
     UserExportFilter,
     UserExportOrder,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.errors.export import InvalidExportFieldKeys
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
     ExportFieldType,

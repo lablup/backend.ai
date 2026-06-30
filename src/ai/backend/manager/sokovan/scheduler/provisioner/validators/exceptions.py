@@ -15,7 +15,7 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.data import SchedulingPredicate
+from ai.backend.manager.data.sokovan import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 
 

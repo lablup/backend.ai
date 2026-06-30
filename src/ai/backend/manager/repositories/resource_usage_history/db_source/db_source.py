@@ -50,14 +50,14 @@ from ai.backend.manager.repositories.resource_usage_history.types import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.sokovan.scheduler.fair_share import (
+    from ai.backend.manager.data.fair_share import (
         BucketDelta,
         DomainUsageBucketKey,
         ProjectUsageBucketKey,
         UsageBucketAggregationResult,
         UserUsageBucketKey,
     )
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

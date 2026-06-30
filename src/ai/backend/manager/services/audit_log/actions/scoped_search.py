@@ -13,11 +13,12 @@ from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.audit_log.types import (
     EntityAuditLogSearchScope,
     TriggeredByAuditLogSearchScope,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, SearchScope
+from ai.backend.manager.repositories.base import BatchQuerier
 
 
 @dataclass(frozen=True)

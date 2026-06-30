@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigAllowListOrderField,
-    AppConfigScopeType,
     AppConfigScopeTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -56,6 +57,12 @@ class AppConfigAllowListFilter(BaseRequestModel):
     updated_at: DateTimeFilter | None = Field(
         default=None, description="Filter by last update datetime."
     )
+    AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
+    OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
+    NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
+
+
+AppConfigAllowListFilter.model_rebuild()
 
 
 class AppConfigAllowListOrder(BaseRequestModel):

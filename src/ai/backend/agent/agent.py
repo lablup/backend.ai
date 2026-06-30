@@ -615,7 +615,9 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             skip_missing: bool = False,
         ) -> None:
             resolved_path = self.resolve_krunner_filepath("runner/" + filename)
-            if not skip_missing and not resolved_path.exists():
+            if not resolved_path.exists():
+                if skip_missing:
+                    return
                 raise FileNotFoundError(resolved_path)
             _mount(MountTypes.BIND, resolved_path, target_path)
 
@@ -632,6 +634,10 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         mount_static_binary("all-smi.1", "/usr/local/share/man/man1/all-smi.1", skip_missing=True)
         mount_static_binary(f"bssh.{arch}.bin", "/usr/local/bin/bssh")
         mount_static_binary("bssh.1", "/usr/local/share/man/man1/bssh.1", skip_missing=True)
+        mount_static_binary(f"bssh-server.{arch}.bin", "/opt/kernel/bssh-server", skip_missing=True)
+        mount_static_binary(
+            "bssh-server.1", "/usr/local/share/man/man1/bssh-server.1", skip_missing=True
+        )
 
         jail_path: Path | None
         if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL:

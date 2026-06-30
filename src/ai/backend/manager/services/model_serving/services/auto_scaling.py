@@ -5,7 +5,14 @@ import logging
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.service import EndpointAccessForbiddenError
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.service import (
+    EndpointAccessForbiddenError,
+    EndpointAutoScalingRuleNotFound,
+    EndpointNotFound,
+    ModelServiceNotFound,
+)
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
@@ -22,13 +29,6 @@ from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule 
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
-)
-from ai.backend.manager.services.model_serving.exceptions import (
-    EndpointAutoScalingRuleNotFound,
-    EndpointNotFound,
-    GenericForbidden,
-    InvalidAPIParameters,
-    ModelServiceNotFound,
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 
