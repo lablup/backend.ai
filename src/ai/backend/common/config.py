@@ -20,6 +20,7 @@ from pydantic import (
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
+from .model_service_start_command_compat import resolve_model_service_start_command
 from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
 __all__ = (
@@ -146,24 +147,6 @@ agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
 DEFAULT_SHELL = "/bin/bash"
 
 
-def _resolve_start_command(service: Any) -> Any:
-    if not isinstance(service, dict):
-        return service
-
-    result = {
-        k: v for k, v in service.items() if k not in ("command", "start_command", "start-command")
-    }
-    # Override deprecated ``start_command`` with the new ``command`` when supplied.
-    start_command = service.get("command")
-    if start_command is None:
-        start_command = service.get("start_command", service.get("start-command"))
-    if isinstance(start_command, list):
-        start_command = shlex.join(start_command)
-    if start_command is not None or "start_command" in service or "start-command" in service:
-        result["start_command"] = start_command
-    return result
-
-
 class PreStartAction(BaseConfigModel):
     action: str = Field(
         description="The name of the pre-start action to execute.",
@@ -267,7 +250,10 @@ class ModelServiceConfig(BaseConfigModel):
     )
     shell: str | None = Field(
         default=DEFAULT_SHELL,
-        description="Shell configured for the model service. Null or empty disables shell use.",
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
         examples=[DEFAULT_SHELL],
     )
     port: int = Field(
@@ -283,7 +269,7 @@ class ModelServiceConfig(BaseConfigModel):
     @model_validator(mode="before")
     @classmethod
     def _resolve_start_command(cls, data: Any) -> Any:
-        return _resolve_start_command(data)
+        return resolve_model_service_start_command(data)
 
 
 class ModelMetadata(BaseConfigModel):
@@ -578,7 +564,7 @@ class ModelServiceConfigDraft(BaseConfigModel):
     @model_validator(mode="before")
     @classmethod
     def _resolve_start_command(cls, data: Any) -> Any:
-        return _resolve_start_command(data)
+        return resolve_model_service_start_command(data)
 
     def to_resolved(self) -> ModelServiceConfig:
         # Drop unset (None) scalars so the strict type's ``Field(default=...)``

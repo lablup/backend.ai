@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.config import DEFAULT_SHELL, ModelConfig, ModelDefinition
+from ai.backend.common.config import DEFAULT_SHELL, ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
@@ -111,7 +111,13 @@ class TestModelDefinitionToDTO:
 
     def test_converts_config_to_info_dto(self) -> None:
         config_model_def = ModelDefinition(
-            models=[ModelConfig(name="llama", model_path="/models/llama")],
+            models=[
+                ModelConfig(
+                    name="llama",
+                    model_path="/models/llama",
+                    service=ModelServiceConfig(start_command="python serve.py", port=8080),
+                )
+            ],
         )
 
         info_dto = _model_definition_to_dto(config_model_def)
@@ -120,6 +126,10 @@ class TestModelDefinitionToDTO:
         assert len(info_dto.models) == 1
         assert info_dto.models[0].name == "llama"
         assert info_dto.models[0].model_path == "/models/llama"
+        service = info_dto.models[0].service
+        assert service is not None
+        assert service.command == "python serve.py"
+        assert service.start_command == ["python", "serve.py"]
 
     def test_returns_none_for_none(self) -> None:
         assert _model_definition_to_dto(None) is None
