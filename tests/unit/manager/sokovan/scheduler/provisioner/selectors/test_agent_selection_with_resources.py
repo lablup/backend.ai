@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
+import pytest
+
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.data.sokovan import AgentInfo
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
@@ -14,7 +16,7 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import
     DispersedAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-    NoAvailableAgentError,
+    BatchAgentSelectionFailedError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionConfig,
@@ -80,7 +82,7 @@ class TestAgentSelectionWithResources:
         # - agent-high: 14 CPU, 28672 memory (sufficient)
 
         # Use batch selection API
-        result = await selector.select_agents_for_batch_requirements(
+        selections = await selector.select_agents_for_batch_requirements(
             agents_for_resource_requirements_test,
             criteria,
             config,
@@ -88,9 +90,8 @@ class TestAgentSelectionWithResources:
         )
 
         # For single-node, there should be one selection with aggregated resources
-        assert len(result.selections) == 1
-        assert not result.failures
-        selected_agent = result.selections[0].selected_agent
+        assert len(selections) == 1
+        selected_agent = selections[0].selected_agent
 
         # Only agent-high has enough resources for aggregated requirements
         assert selected_agent.agent_id == AgentId("agent-high")
@@ -140,7 +141,7 @@ class TestAgentSelectionWithResources:
         selector = AgentSelector(strategy)
 
         # Use batch selection API
-        result = await selector.select_agents_for_batch_requirements(
+        selections = await selector.select_agents_for_batch_requirements(
             agents_for_resource_requirements_test,
             criteria,
             config,
@@ -148,12 +149,11 @@ class TestAgentSelectionWithResources:
         )
 
         # For multi-node, should have 2 selections (one per kernel)
-        assert len(result.selections) == 2
-        assert not result.failures
+        assert len(selections) == 2
 
         # Both requirements can be satisfied by any agent
         # Dispersed selector should prefer agents with more available resources
-        selected_agents = [sel.selected_agent.agent_id for sel in result.selections]
+        selected_agents = [sel.selected_agent.agent_id for sel in selections]
         assert all(agent_id is not None for agent_id in selected_agents)
 
     async def test_designated_agent_with_resource_requirements(
@@ -189,19 +189,17 @@ class TestAgentSelectionWithResources:
         selector = AgentSelector(strategy)
 
         # Try to select designated agent
-        result = await selector.select_agents_for_batch_requirements(
-            agents_for_designated_agent_test,
-            criteria,
-            config,
-            designated_agent_ids=[AgentId("designated")],
-        )
+        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
+            await selector.select_agents_for_batch_requirements(
+                agents_for_designated_agent_test,
+                criteria,
+                config,
+                designated_agent_ids=[AgentId("designated")],
+            )
 
         # Should report a failure because designated agent lacks resources
-        assert not result.selections
-        assert len(result.failures) == 1
-        error = result.failures[0].error
-        assert isinstance(error, NoAvailableAgentError)
-        message = str(error)
+        assert len(exc_info.value.errors) == 1
+        message = exc_info.value.errors[0].extra_msg or ""
         assert "no designated agent is compatible" in message
         assert "designated agent 'designated'" in message
         assert "insufficient resources" in message
@@ -243,7 +241,7 @@ class TestAgentSelectionWithResources:
         strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         selector = AgentSelector(strategy)
 
-        result = await selector.select_agents_for_batch_requirements(
+        selections = await selector.select_agents_for_batch_requirements(
             agents_for_container_limit_test,
             criteria,
             config,
@@ -251,9 +249,8 @@ class TestAgentSelectionWithResources:
         )
 
         # Should select "available" agent since "busy" is at container limit
-        assert len(result.selections) == 1
-        assert not result.failures
-        assert result.selections[0].selected_agent.agent_id == AgentId("available")
+        assert len(selections) == 1
+        assert selections[0].selected_agent.agent_id == AgentId("available")
 
     async def test_architecture_mismatch_with_resource_requirements(
         self,
@@ -286,7 +283,7 @@ class TestAgentSelectionWithResources:
         strategy = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         selector = AgentSelector(strategy)
 
-        result = await selector.select_agents_for_batch_requirements(
+        selections = await selector.select_agents_for_batch_requirements(
             agents_for_architecture_test,
             criteria,
             config,
@@ -294,6 +291,5 @@ class TestAgentSelectionWithResources:
         )
 
         # Should select ARM agent
-        assert len(result.selections) == 1
-        assert not result.failures
-        assert result.selections[0].selected_agent.agent_id == AgentId("arm")
+        assert len(selections) == 1
+        assert selections[0].selected_agent.agent_id == AgentId("arm")

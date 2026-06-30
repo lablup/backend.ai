@@ -34,12 +34,8 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
-    BatchAgentSelectionResult,
-    RequirementSelectionFailure,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
-    ResourceRequirements,
-)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
 
 
 def create_session_workload(
@@ -199,7 +195,7 @@ class TestProvisionerAllocation:
 
             if not best_agent:
                 raise NoCompatibleAgentError(
-                    required_architecture=resource_req.required_architecture,
+                    resource_requirement=resource_req,
                     available_architectures=sorted({a.architecture for a in agents}),
                 )
 
@@ -211,11 +207,11 @@ class TestProvisionerAllocation:
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
             designated_agent: AgentId | None = None,
-        ) -> BatchAgentSelectionResult:
+        ) -> list[AgentSelection]:
             # Extract resource requirements from criteria
             resource_requirements = criteria.get_resource_requirements()
             selections = []
-            failures = []
+            errors = []
             for resource_req in resource_requirements:
                 # Mirror the real batch method: record failures, keep going.
                 try:
@@ -223,12 +219,7 @@ class TestProvisionerAllocation:
                         agents, resource_req, criteria, config, designated_agent
                     )
                 except NoCompatibleAgentError as e:
-                    failures.append(
-                        RequirementSelectionFailure(
-                            resource_requirement=resource_req,
-                            error=e,
-                        )
-                    )
+                    errors.append(e)
                     continue
                 # Update agent state
                 agent.occupied_slots = agent.occupied_slots + resource_req.requested_slots
@@ -240,7 +231,9 @@ class TestProvisionerAllocation:
                         selected_agent=agent,
                     )
                 )
-            return BatchAgentSelectionResult(selections=selections, failures=failures)
+            if errors:
+                raise BatchAgentSelectionFailedError(errors)
+            return selections
 
         # Make call_history accessible as an attribute
         selector.select_agents_for_batch_requirements = AsyncMock(
@@ -506,16 +499,12 @@ class TestProvisionerAllocation:
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
             designated_agent_ids: list[AgentId] | None,
-        ) -> BatchAgentSelectionResult:
+        ) -> list[AgentSelection]:
             resource_requirements = criteria.get_resource_requirements()
             selections = []
             if not designated_agent_ids:
                 raise NoCompatibleAgentError(
-                    required_architecture=(
-                        resource_requirements[0].required_architecture
-                        if resource_requirements
-                        else ""
-                    ),
+                    resource_requirement=resource_requirements[0],
                     available_architectures=[],
                 )
             for resource_req in resource_requirements:
@@ -530,10 +519,10 @@ class TestProvisionerAllocation:
                         break
                 else:
                     raise NoCompatibleAgentError(
-                        required_architecture=resource_req.required_architecture,
+                        resource_requirement=resource_req,
                         available_architectures=[],
                     )
-            return BatchAgentSelectionResult(selections=selections, failures=[])
+            return selections
 
         mock_selector = cast(Mock, provisioner._default_agent_selector)
         mock_selector.select_agents_for_batch_requirements.side_effect = return_designated_batch
