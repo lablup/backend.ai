@@ -10,10 +10,10 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
@@ -146,8 +146,10 @@ def _spec(
             user_uuid=uuid.uuid4(),
         ),
         scope=SessionScope(
+            domain_id=DomainID(uuid.uuid4()),
             domain_name=DomainName("default"),
             project_id=ProjectID(uuid.uuid4()),
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group_name=ResourceGroupName("default"),
         ),
         classification=SessionClassification(session_type=session_type),

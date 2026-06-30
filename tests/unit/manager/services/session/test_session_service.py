@@ -16,7 +16,8 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeCompletionResult
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -48,6 +49,7 @@ from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
+from ai.backend.manager.repositories.scheduler.types.session_creation import ResourceGroupIdentifier
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.actions.complete import (
     CompleteAction,
@@ -203,6 +205,8 @@ async def session_service(
         idle_checker_host=mock_idle_checker_host,
         session_repository=mock_session_repository,
         scheduler_repository=mock_scheduler_repository,
+        domain_repository=AsyncMock(),
+        scaling_group_repository=AsyncMock(),
         scheduling_controller=mock_scheduling_controller,
         appproxy_client_pool=mock_appproxy_client_pool,
         user_repository=MagicMock(),
@@ -1724,8 +1728,11 @@ class TestEnqueueSession:
         return uuid4()
 
     @pytest.fixture
-    def picked_resource_group(self) -> ResourceGroupName:
-        return ResourceGroupName("auto-picked-rg")
+    def picked_resource_group(self) -> ResourceGroupIdentifier:
+        return ResourceGroupIdentifier(
+            id=ResourceGroupID(uuid4()),
+            name=ResourceGroupName("auto-picked-rg"),
+        )
 
     @pytest.fixture
     def enqueue_action_without_rg(
@@ -1784,7 +1791,7 @@ class TestEnqueueSession:
         mock_scheduler_repository: MagicMock,
         sample_session_id: SessionId,
         sample_session_data: SessionData,
-        picked_resource_group: ResourceGroupName,
+        picked_resource_group: ResourceGroupIdentifier,
     ) -> SessionService:
         """Wire async mocks every ``enqueue_session`` exercise needs."""
         mock_session_repository.resolve_image_by_id = AsyncMock()
@@ -1795,6 +1802,12 @@ class TestEnqueueSession:
         mock_scheduler_repository.pick_default_resource_group = AsyncMock(
             return_value=picked_resource_group
         )
+        cast(Any, session_service._domain_repository.get_domain_id_by_name).return_value = DomainID(
+            uuid4()
+        )
+        cast(
+            Any, session_service._scaling_group_repository.get_resource_group_id_by_name
+        ).return_value = ResourceGroupID(uuid4())
         return session_service
 
     async def test_auto_picks_default_when_resource_group_omitted(
@@ -1803,7 +1816,7 @@ class TestEnqueueSession:
         mock_scheduler_repository: MagicMock,
         mock_scheduling_controller: MagicMock,
         enqueue_action_without_rg: EnqueueSessionAction,
-        picked_resource_group: ResourceGroupName,
+        picked_resource_group: ResourceGroupIdentifier,
     ) -> None:
         """BA-5917: when ``action.resource.resource_group`` is None, the
         service calls ``pick_default_resource_group`` and feeds the
@@ -1814,7 +1827,8 @@ class TestEnqueueSession:
 
         mock_scheduler_repository.pick_default_resource_group.assert_awaited_once()
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
-        assert draft.scope.resource_group_name == picked_resource_group
+        assert draft.scope.resource_group_id == picked_resource_group.id
+        assert draft.scope.resource_group_name == picked_resource_group.name
 
     async def test_uses_user_supplied_resource_group(
         self,

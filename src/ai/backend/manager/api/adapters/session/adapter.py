@@ -65,6 +65,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     UpdateSessionPayload,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -273,6 +274,11 @@ class SessionAdapter(BaseAdapter):
                     for e in input.resource_entries
                 ],
                 resource_group=input.resource_group,
+                resource_group_id=(
+                    ResourceGroupID(input.resource_group_id)
+                    if input.resource_group_id is not None
+                    else None
+                ),
                 shmem=input.resource_opts.shmem.expr
                 if input.resource_opts and input.resource_opts.shmem
                 else None,

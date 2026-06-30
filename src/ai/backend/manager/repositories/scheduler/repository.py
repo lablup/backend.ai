@@ -15,9 +15,10 @@ if TYPE_CHECKING:
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -67,7 +68,7 @@ from .types.session import (
     TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
-from .types.session_creation import SessionSpecContextFetch
+from .types.session_creation import ResourceGroupIdentifier, SessionSpecContextFetch
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -263,13 +264,21 @@ class SchedulerRepository:
         access_key: AccessKey,
         domain_name: str,
         project_id: ProjectID,
-    ) -> ResourceGroupName:
+    ) -> ResourceGroupIdentifier:
         """Return the first resource group from the owner's allowlist."""
         return await self._db_source.pick_default_resource_group(
             access_key=access_key,
             domain_name=domain_name,
             project_id=project_id,
         )
+
+    @scheduler_repository_resilience.apply()
+    async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
+        return await self._db_source.get_resource_group_id_by_name(name)
+
+    @scheduler_repository_resilience.apply()
+    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
+        return await self._db_source.get_domain_id_by_name(name)
 
     @scheduler_repository_resilience.apply()
     async def prepare_vfolder_mounts(

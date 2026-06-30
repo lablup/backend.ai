@@ -255,6 +255,8 @@ def create_services(args: ServiceArgs) -> Services:
                 idle_checker_host=args.idle_checker_host,
                 session_repository=repositories.session.repository,
                 scheduler_repository=repositories.scheduler.repository,
+                domain_repository=repositories.domain.repository,
+                scaling_group_repository=repositories.scaling_group.repository,
                 scheduling_controller=args.scheduling_controller,
                 appproxy_client_pool=args.appproxy_client_pool,
                 user_repository=repositories.user.repository,

@@ -300,7 +300,11 @@ class EnqueueSessionInput(BaseRequestModel):
         description="Resource slot allocations.",
     )
     resource_group: str | None = Field(
-        default=None, description="Scaling group name. Auto-selected if omitted."
+        default=None,
+        description="Deprecated since 26.7.0. Use resource_group_id instead. Scaling group name.",
+    )
+    resource_group_id: UUID | None = Field(
+        default=None, description="Resource group UUID. Auto-selected if omitted."
     )
     resource_opts: ResourceOptsInput | None = Field(
         default=None, description="Additional resource options."

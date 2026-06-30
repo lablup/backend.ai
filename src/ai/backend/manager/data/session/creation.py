@@ -11,6 +11,8 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
 
 
@@ -62,7 +64,9 @@ class DeploymentContext:
     created_user: UserContext
     session_owner: UserContext
     container_user: ContainerUserContext
+    domain_id: DomainID
     group_id: UUID
+    resource_group_id: ResourceGroupID
     resource_policy: dict[str, Any]
     image: ImageContext
     resolved_presets: ResolvedPresetValues | None = None

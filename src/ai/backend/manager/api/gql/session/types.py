@@ -602,7 +602,18 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     resource_entries: list[SessionResourceSlotEntryInputGQL] = gql_field(
         description="Resource slot allocations."
     )
-    resource_group: str | None = gql_field(default=None, description="Scaling group name.")
+    resource_group: str | None = gql_field(
+        default=None,
+        description="Deprecated since 26.7.0. Use resource_group_id instead. Scaling group name.",
+        deprecation_reason="Use resource_group_id instead.",
+    )
+    resource_group_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            description="Resource group UUID. Auto-selected if omitted.",
+            added_version="26.7.0",
+        ),
+        default=None,
+    )
     resource_opts: SessionResourceOptsInputGQL | None = gql_field(
         default=None, description="Additional resource options."
     )

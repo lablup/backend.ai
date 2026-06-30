@@ -97,6 +97,8 @@ from ai.backend.manager.models.session import (
     KernelLoadingStrategy,
 )
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
@@ -255,6 +257,8 @@ class SessionServiceArgs:
     idle_checker_host: IdleCheckerHost
     session_repository: SessionRepository
     scheduler_repository: SchedulerRepository
+    domain_repository: DomainRepository
+    scaling_group_repository: ScalingGroupRepository
     scheduling_controller: SchedulingController
     appproxy_client_pool: AppProxyClientPool
     user_repository: UserRepository
@@ -269,6 +273,8 @@ class SessionService:
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
     _scheduler_repository: SchedulerRepository
+    _domain_repository: DomainRepository
+    _scaling_group_repository: ScalingGroupRepository
     _user_repository: UserRepository
     _scheduling_controller: SchedulingController
     _appproxy_client_pool: AppProxyClientPool
@@ -287,6 +293,8 @@ class SessionService:
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
         self._scheduler_repository = args.scheduler_repository
+        self._domain_repository = args.domain_repository
+        self._scaling_group_repository = args.scaling_group_repository
         self._user_repository = args.user_repository
         self._scheduling_controller = args.scheduling_controller
         self._appproxy_client_pool = args.appproxy_client_pool
@@ -1579,12 +1587,22 @@ class SessionService:
 
         if action.resource.resource_group:
             resource_group_name = ResourceGroupName(action.resource.resource_group)
+            resource_group_id = action.resource.resource_group_id
+            if resource_group_id is None:
+                resource_group_id = (
+                    await self._scaling_group_repository.get_resource_group_id_by_name(
+                        resource_group_name
+                    )
+                )
         else:
-            resource_group_name = await self._scheduler_repository.pick_default_resource_group(
+            resource_group = await self._scheduler_repository.pick_default_resource_group(
                 access_key=access_key,
                 domain_name=domain_name,
                 project_id=ProjectID(action.group_id),
             )
+            resource_group_name = resource_group.name
+            resource_group_id = resource_group.id
+        domain_id = await self._domain_repository.get_domain_id_by_name(DomainName(domain_name))
         kernel_groups = await self._resolve_kernel_groups(
             cluster_size=action.resource.cluster_size,
             preopen_ports=preopen_ports,
@@ -1610,8 +1628,10 @@ class SessionService:
                 user_uuid=user_id,
             ),
             scope=SessionScopeDraft(
+                domain_id=domain_id,
                 domain_name=DomainName(domain_name),
                 project_id=ProjectID(action.group_id),
+                resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
             ),
             classification=SessionClassificationDraft(

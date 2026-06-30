@@ -175,6 +175,8 @@ async def session_service(
         idle_checker_host=mock_idle_checker_host,
         session_repository=mock_session_repository,
         scheduler_repository=MagicMock(),
+        domain_repository=MagicMock(),
+        scaling_group_repository=MagicMock(),
         scheduling_controller=mock_scheduling_controller,
         appproxy_client_pool=mock_appproxy_client_pool,
         user_repository=MagicMock(),
