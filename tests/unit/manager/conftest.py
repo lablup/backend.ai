@@ -18,7 +18,6 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -147,6 +146,12 @@ def domain_factory() -> DomainFactory:
     exposes both ``domain_name`` and ``domain_id`` so call sites are ready for
     the upcoming domain PK migration to UUID.
     """
+    # Imported lazily so that merely loading this shared conftest does not register
+    # DomainRow on the global SQLAlchemy registry. DomainRow has string-based
+    # relationships (e.g. "ScalingGroupForDomainRow") that only resolve when the
+    # whole model graph is imported; registering it for tests that never use a
+    # domain would break their mapper configuration when run in isolation.
+    from ai.backend.manager.models.domain import domains
 
     async def _create(
         engine: ExtendedAsyncSAEngine,
