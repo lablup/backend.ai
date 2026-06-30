@@ -264,14 +264,20 @@ class Context(metaclass=ABCMeta):
         if self.install_info.type == InstallType.SOURCE:
             # Develop mode: use ./backend.ai from current directory
             cmd_str = " ".join(cmdargs)
-            await self.run_shell(f"./backend.ai {cmd_str}")
+            exit_code = await self.run_shell(f"./backend.ai {cmd_str}")
 
         elif self.install_info.type == InstallType.PACKAGE:
             # Package mode: use backendai-manager from base_path
             executable = Path(self.install_info.base_path) / "backendai-manager"
-            await self.run_exec(
+            exit_code = await self.run_exec(
                 [str(executable), *cmdargs],
                 cwd=self.install_info.base_path,
+            )
+        else:
+            raise RuntimeError(f"Unsupported install type: {self.install_info.type}")
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Manager CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
             )
 
     @actxmgr
@@ -947,13 +953,13 @@ class Context(metaclass=ABCMeta):
         if halfstack.redis_addr is None:
             raise RuntimeError("redis_addr must be configured")
 
-        # use FQDN if provided, otherwise use public_facing_address
+        local_proxy_port = service.local_proxy_addr.face.port
         if fqdn_prefix is not None:
             # With FQDN prefix, use public storage address with https
-            wsproxy_url = f"https://{storage_public_address}:5050"
+            wsproxy_url = f"https://{storage_public_address}:{local_proxy_port}"
         else:
             # Without FQDN prefix, use public_facing_address with http
-            wsproxy_url = f"http://{public_facing_address}:5050"
+            wsproxy_url = f"http://{public_facing_address}:{local_proxy_port}"
         # Use sed_in_place for dotted key wsproxy.url
         self.sed_in_place(
             conf_path,
@@ -2116,6 +2122,11 @@ class PackageContext(Context):
                 "--with-harbor is supported only in DEVELOP/SOURCE install modes; "
                 "package mode does not provision a local Harbor registry."
             )
+        if self.install_variable.with_sftp_agent:
+            raise PrerequisiteError(
+                "--with-sftp-agent is supported only in DEVELOP/SOURCE install modes; "
+                "package mode does not provision a dedicated SFTP agent."
+            )
 
     async def _validate_checksum(self, pkg_path: Path, csum_path: Path) -> None:
         proc = await asyncio.create_subprocess_exec(
@@ -2316,6 +2327,7 @@ class PackageContext(Context):
         await self.configure_client()
         self.log_header("Loading fixtures...")
         await self.load_fixtures()
+        await self.configure_appproxy_fixture()
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
         # TODO: install as systemd services?
