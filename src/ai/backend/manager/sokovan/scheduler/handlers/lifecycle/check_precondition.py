@@ -62,8 +62,14 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
-        """Include sessions where kernels are in SCHEDULED status."""
-        return [KernelStatus.SCHEDULED]
+        """Include sessions with kernels in SCHEDULED or PULLING status.
+
+        PULLING is included so that a session stuck in PREPARING whose
+        kernels have already advanced to PULLING (but whose pull-completion
+        event was lost) is still picked up and has its image pull
+        re-triggered.
+        """
+        return [KernelStatus.SCHEDULED, KernelStatus.PULLING]
 
     @classmethod
     def status_transitions(cls) -> StatusTransitions:
