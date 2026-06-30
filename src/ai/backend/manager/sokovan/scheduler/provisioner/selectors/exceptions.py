@@ -7,6 +7,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
+from typing import override
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -28,6 +29,7 @@ class AgentSelectionError(SchedulingError):
     error_type = "https://api.backend.ai/probs/agent-selection-failed"
     error_title = "Agent selection failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -35,6 +37,7 @@ class AgentSelectionError(SchedulingError):
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
+    @override
     def failed_predicates(self) -> list[SchedulingPredicate]:
         """Return list of failed predicates for this error."""
         return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
@@ -66,6 +69,7 @@ class NoAgentsInResourceGroupError(AgentSelectionError):
         self._resource_group = resource_group
         super().__init__(f"No agents available in resource group '{resource_group}'")
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -73,6 +77,7 @@ class NoAgentsInResourceGroupError(AgentSelectionError):
             error_detail=ErrorDetail.UNAVAILABLE,
         )
 
+    @override
     def build_suggestion(self) -> Suggestion:
         # The resource group has no candidate agents at all; nothing the caller
         # can adjust on the request itself fixes this.
@@ -112,6 +117,7 @@ class NoAvailableAgentError(AgentSelectionError):
         self._designated_agent_ids = designated_agent_ids
         super().__init__(self._build_message())
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -119,6 +125,7 @@ class NoAvailableAgentError(AgentSelectionError):
             error_detail=ErrorDetail.UNAVAILABLE,
         )
 
+    @override
     def build_suggestion(self) -> Suggestion:
         # Node-axis MIN: the smallest per-slot reduction that makes the kernel fit
         # on its best-fitting candidate node. Only resource-shortage nodes can be
@@ -213,7 +220,6 @@ class NoCompatibleAgentError(AgentSelectionError):
     error_type = "https://api.backend.ai/probs/no-compatible-agents"
     error_title = "No agents meet the resource requirements."
 
-    _required_architecture: str
     _available_architectures: Sequence[str]
 
     def __init__(
@@ -222,13 +228,13 @@ class NoCompatibleAgentError(AgentSelectionError):
         required_architecture: str,
         available_architectures: Sequence[str],
     ) -> None:
-        self._required_architecture = required_architecture
         self._available_architectures = available_architectures
         super().__init__(
             f"No agents with required architecture '{required_architecture}'. "
             f"Available architectures: {', '.join(available_architectures)}"
         )
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -236,6 +242,7 @@ class NoCompatibleAgentError(AgentSelectionError):
             error_detail=ErrorDetail.UNAVAILABLE,
         )
 
+    @override
     def build_suggestion(self) -> Suggestion:
         return Suggestion(
             kind=SuggestionKind.CHANGE_ARCH,
@@ -255,6 +262,7 @@ class BatchAgentSelectionFailedError(SchedulingError):
         self._errors = errors
         super().__init__(self._build_message())
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -262,6 +270,7 @@ class BatchAgentSelectionFailedError(SchedulingError):
             error_detail=ErrorDetail.UNAVAILABLE,
         )
 
+    @override
     def failed_predicates(self) -> list[SchedulingPredicate]:
         predicates: list[SchedulingPredicate] = []
         for err in self._errors:
@@ -303,6 +312,7 @@ class ArchitectureIncompatibleError(TrackerCompatibilityError):
             f" does not match required architecture '{required_arch}'"
         )
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -347,6 +357,7 @@ class InsufficientResourcesError(TrackerCompatibilityError):
 
         super().__init__(f"Agent {agent_id} has insufficient resources:\n{details_msg}")
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -385,6 +396,7 @@ class ContainerLimitExceededError(TrackerCompatibilityError):
             f"Agent {agent_id} container limit exceeded: current={current_count}, max={max_count}"
         )
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
