@@ -30,11 +30,14 @@ from ai.backend.common.docker import (
 )
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import (
+    BackendAIError,
     InvalidImageName,
     InvalidImageTag,
     ProjectMismatchWithCanonical,
 )
 from ai.backend.common.json import read_json
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
@@ -61,6 +64,18 @@ progress_reporter: ContextVar[ProgressReporter | None] = ContextVar(
     "progress_reporter", default=None
 )
 all_updates: ContextVar[dict[ImageIdentifier, dict[str, Any]]] = ContextVar("all_updates")
+commit_rescan_result_resilience = Resilience(
+    policies=[
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -176,97 +191,121 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
     async def commit_rescan_result(self) -> list[ImageData]:
         scanned_images: list[ImageData] = []
-        _all_updates = all_updates.get()
-        if not _all_updates:
+        original_updates = all_updates.get()
+        if not original_updates:
             log.info("No images found in registry {0}", self.registry_url)
         else:
-            image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
-            async with self.db.begin_session() as session:
-                existing_images = await session.scalars(
-                    sa.select(ImageRow).where(
-                        sa.func.ROW(ImageRow.name, ImageRow.architecture).in_(image_identifiers),
-                    )
-                )
-                is_local = self.registry_name == "local"
+            image_identifiers = [(k.canonical, k.architecture) for k in original_updates.keys()]
 
-                for image_row in existing_images:
-                    image_ref = image_row.image_ref
-                    update_key = ImageIdentifier(image_ref.canonical, image_ref.architecture)
-                    if update := _all_updates.pop(update_key, None):
-                        image_row.config_digest = update["config_digest"]
-                        image_row.size_bytes = update["size_bytes"]
-                        image_row.accelerators = update.get("accels")
-                        image_row.labels = update["labels"]
-                        image_row.is_local = is_local
-                        scanned_images.append(image_row.to_dataclass())
-
-                        if image_row.status == ImageStatus.DELETED:
-                            image_row.status = ImageStatus.ALIVE
-
-                            progress_msg = f"Restored deleted image - {image_ref.canonical}/{image_ref.architecture} ({update['config_digest']})"
-                            log.info(progress_msg)
-
-                            if (reporter := progress_reporter.get()) is not None:
-                                await reporter.update(1, message=progress_msg)
-
-                rbac_creators: list[RBACEntityCreator[ImageRow]] = []
-                for image_identifier, update in _all_updates.items():
-                    try:
-                        parsed_img = ImageRef.from_image_str(
-                            image_identifier.canonical,
-                            self.registry_info.project,
-                            self.registry_info.registry_name,
-                            is_local=is_local,
-                        )
-                    except (ProjectMismatchWithCanonical, ValueError) as e:
-                        skip_reason = str(e)
-                        progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
-                        log.warning(progress_msg)
-                        if (reporter := progress_reporter.get()) is not None:
-                            await reporter.update(1, message=progress_msg)
-                        continue
-
-                    rbac_creators.append(
-                        RBACEntityCreator(
-                            spec=ImageRowCreatorSpec(
-                                name=parsed_img.canonical,
-                                project=self.registry_info.project,
-                                architecture=image_identifier.architecture,
-                                registry_id=self.registry_info.id,
-                                is_local=is_local,
-                                registry=parsed_img.registry,
-                                image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
-                                tag=parsed_img.tag,
-                                config_digest=update["config_digest"],
-                                size_bytes=update["size_bytes"],
-                                type=ImageType.COMPUTE,
-                                accelerators=update.get("accels"),
-                                labels=update["labels"],
-                                status=ImageStatus.ALIVE,
-                            ),
-                            scope_ref=RBACElementRef(
-                                RBACElementType.CONTAINER_REGISTRY,
-                                str(self.registry_info.id),
-                            ),
-                            additional_scope_refs=self._determine_additional_image_scopes(
-                                update["labels"]
-                            ),
-                            element_type=RBACElementType.IMAGE,
-                        ),
-                    )
-
-                bulk_result = await execute_rbac_entity_creators(session, rbac_creators)
-                for row in bulk_result.rows:
-                    scanned_images.append(row.to_dataclass())
-                    progress_msg = (
-                        f"Updated image - {row.name}/{row.architecture} ({row.config_digest})"
-                    )
+            scanned_images, progress_events = await self._commit_rescan_result_once(
+                original_updates,
+                image_identifiers,
+            )
+            for level, progress_msg in progress_events:
+                if level == "warning":
+                    log.warning(progress_msg)
+                else:
                     log.info(progress_msg)
-                    if (reporter := progress_reporter.get()) is not None:
-                        await reporter.update(1, message=progress_msg)
-
-                await session.flush()
+                if (reporter := progress_reporter.get()) is not None:
+                    await reporter.update(1, message=progress_msg)
         return scanned_images
+
+    @commit_rescan_result_resilience.apply()
+    async def _commit_rescan_result_once(
+        self,
+        original_updates: dict[ImageIdentifier, dict[str, Any]],
+        image_identifiers: list[tuple[str, str]],
+    ) -> tuple[list[ImageData], list[tuple[str, str]]]:
+        scanned_images: list[ImageData] = []
+        progress_events: list[tuple[str, str]] = []
+        pending_updates = dict(original_updates)
+
+        async with self.db.begin_session() as session:
+            existing_images = await session.scalars(
+                sa.select(ImageRow).where(
+                    sa.func.ROW(ImageRow.name, ImageRow.architecture).in_(image_identifiers),
+                )
+            )
+            is_local = self.registry_name == "local"
+
+            for image_row in existing_images:
+                image_ref = image_row.image_ref
+                update_key = ImageIdentifier(image_ref.canonical, image_ref.architecture)
+                if update := pending_updates.pop(update_key, None):
+                    image_row.config_digest = update["config_digest"]
+                    image_row.size_bytes = update["size_bytes"]
+                    image_row.accelerators = update.get("accels")
+                    image_row.labels = update["labels"]
+                    image_row.is_local = is_local
+                    scanned_images.append(image_row.to_dataclass())
+
+                    if image_row.status == ImageStatus.DELETED:
+                        image_row.status = ImageStatus.ALIVE
+
+                        progress_msg = (
+                            f"Restored deleted image - {image_ref.canonical}/"
+                            f"{image_ref.architecture} ({update['config_digest']})"
+                        )
+                        progress_events.append(("info", progress_msg))
+
+            rbac_creators: list[RBACEntityCreator[ImageRow]] = []
+            for image_identifier, update in pending_updates.items():
+                try:
+                    parsed_img = ImageRef.from_image_str(
+                        image_identifier.canonical,
+                        self.registry_info.project,
+                        self.registry_info.registry_name,
+                        is_local=is_local,
+                    )
+                except (ProjectMismatchWithCanonical, ValueError) as e:
+                    skip_reason = str(e)
+                    progress_msg = (
+                        f"Skipped image - {image_identifier.canonical}/"
+                        f"{image_identifier.architecture} ({skip_reason})"
+                    )
+                    progress_events.append(("warning", progress_msg))
+                    continue
+
+                rbac_creators.append(
+                    RBACEntityCreator(
+                        spec=ImageRowCreatorSpec(
+                            name=parsed_img.canonical,
+                            project=self.registry_info.project,
+                            architecture=image_identifier.architecture,
+                            registry_id=self.registry_info.id,
+                            is_local=is_local,
+                            registry=parsed_img.registry,
+                            image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
+                            tag=parsed_img.tag,
+                            config_digest=update["config_digest"],
+                            size_bytes=update["size_bytes"],
+                            type=ImageType.COMPUTE,
+                            accelerators=update.get("accels"),
+                            labels=update["labels"],
+                            status=ImageStatus.ALIVE,
+                        ),
+                        scope_ref=RBACElementRef(
+                            RBACElementType.CONTAINER_REGISTRY,
+                            str(self.registry_info.id),
+                        ),
+                        additional_scope_refs=self._determine_additional_image_scopes(
+                            update["labels"]
+                        ),
+                        element_type=RBACElementType.IMAGE,
+                    ),
+                )
+
+            bulk_result = await execute_rbac_entity_creators(session, rbac_creators)
+            for row in bulk_result.rows:
+                scanned_images.append(row.to_dataclass())
+                progress_msg = (
+                    f"Updated image - {row.name}/{row.architecture} ({row.config_digest})"
+                )
+                progress_events.append(("info", progress_msg))
+
+            await session.flush()
+
+        return scanned_images, progress_events
 
     async def scan_single_ref(self, image: str) -> RescanImagesResult:
         all_updates_token = all_updates.set({})
