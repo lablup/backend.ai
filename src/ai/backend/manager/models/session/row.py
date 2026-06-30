@@ -39,6 +39,8 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -453,6 +455,9 @@ class SessionRow(Base):  # type: ignore[misc]
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
+    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+        "resource_group_id", GUID, index=True, nullable=True
+    )
     scaling_group_name: Mapped[str | None] = mapped_column(
         "scaling_group_name", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
     )
@@ -469,6 +474,7 @@ class SessionRow(Base):  # type: ignore[misc]
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
+    domain_id: Mapped[DomainID | None] = mapped_column("domain_id", GUID, index=True, nullable=True)
     domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="sessions")
     group_id: Mapped[UUID] = mapped_column(
         "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
