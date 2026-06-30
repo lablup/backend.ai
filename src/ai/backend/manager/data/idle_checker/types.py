@@ -9,14 +9,6 @@ from datetime import datetime
 from ai.backend.common.types import SessionId
 
 
-class CheckerType(enum.StrEnum):
-    """Discriminator for the kind of idle checker; selects the concrete spec."""
-
-    SESSION_LIFETIME = "session_lifetime"
-    NETWORK_TIMEOUT = "network_timeout"
-    UTILIZATION = "utilization"
-
-
 class ScopeType(enum.StrEnum):
     """Scope a binding attaches a checker to. Declared most- to least-specific."""
 
