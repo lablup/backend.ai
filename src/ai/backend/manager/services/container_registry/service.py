@@ -12,6 +12,10 @@ from ai.backend.manager.errors.image import (
     ContainerRegistryWebhookAuthorizationFailed,
     HarborWebhookContainerRegistryRowNotFound,
 )
+from ai.backend.manager.models.container_registry import (
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
@@ -107,6 +111,14 @@ class ContainerRegistryService:
         self, action: ModifyContainerRegistryAction
     ) -> ModifyContainerRegistryActionResult:
         data = await self._container_registry_repository.modify_registry(action.updater)
+        validator = ContainerRegistryValidator(
+            ContainerRegistryValidatorArgs(
+                type=data.type,
+                project=data.project,
+                url=data.url,
+            )
+        )
+        validator.validate()
         return ModifyContainerRegistryActionResult(data=data)
 
     async def delete_container_registry(
