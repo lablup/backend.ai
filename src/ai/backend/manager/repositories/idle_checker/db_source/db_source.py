@@ -40,7 +40,7 @@ class IdleCheckerDBSource:
                 IdleCheckerBindingRow.idle_checker_id,
                 IdleCheckerRow.id.label("checker_id"),
                 IdleCheckerRow.checker_type,
-                IdleCheckerRow.spec,  # typed: ABCColumn loads it to a concrete IdleCheckerSpec
+                IdleCheckerRow.spec,  # typed: PydanticColumn loads it to an IdleCheckerSpec
             )
             .join(IdleCheckerRow, IdleCheckerBindingRow.idle_checker_id == IdleCheckerRow.id)
             .where(IdleCheckerBindingRow.enabled == sa.true())

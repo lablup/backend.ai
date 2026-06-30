@@ -6,10 +6,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
+from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.idle_checker.types import CheckerType, IdleCheckSessionView, ScopeRef
-from ai.backend.manager.models.idle_checker.spec import IdleCheckerSpecABC
+from ai.backend.manager.data.idle_checker.types import IdleCheckSessionView, ScopeRef
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class IdleCheckerRef:
 
     checker_id: IdleCheckerID
     checker_type: CheckerType
-    spec: IdleCheckerSpecABC
+    spec: IdleCheckerSpec
 
 
 @dataclass(frozen=True)
