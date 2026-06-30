@@ -77,7 +77,10 @@ class PresetModelServiceConfigInput(BaseRequestModel):
     )
     shell: str | None = Field(
         default=DEFAULT_SHELL,
-        description="Shell configured for the model service. Null or empty disables shell use.",
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
     )
     port: int = Field(
         gt=1, description="Port number for the model service. Must be greater than 1."

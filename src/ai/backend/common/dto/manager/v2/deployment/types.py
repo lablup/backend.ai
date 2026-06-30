@@ -4,7 +4,6 @@ Common types for Deployment DTO v2.
 
 from __future__ import annotations
 
-import shlex
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -318,31 +317,15 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
     )
     shell: str | None = Field(
         default="/bin/bash",
-        description="Shell configured for the model service.",
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
     )
     port: int = Field(description="Port number for the model service.")
     health_check: ModelHealthCheckInfoDTO | None = Field(
         default=None, description="Health check configuration for the model service."
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _populate_command_from_internal_start_command(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        start_command = data.get("start_command")
-        if isinstance(start_command, str):
-            data = dict(data)
-            if data.get("command") is None:
-                data["command"] = start_command
-            try:
-                data["start_command"] = shlex.split(start_command)
-            except ValueError:
-                data["start_command"] = [start_command]
-        elif isinstance(start_command, list) and data.get("command") is None:
-            data = dict(data)
-            data["command"] = shlex.join(start_command)
-        return data
 
 
 class ModelMetadataInfoDTO(BaseResponseModel):

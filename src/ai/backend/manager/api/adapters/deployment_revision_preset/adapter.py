@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shlex
 from typing import Any
 from uuid import UUID
 
@@ -54,6 +53,9 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AllocatedResourceSlotNode,
     SearchAllocatedResourceSlotsPayload,
+)
+from ai.backend.common.model_service_start_command_compat import (
+    normalize_model_service_command_response,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -144,20 +146,14 @@ def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoD
     )
 
 
-def _legacy_start_command_to_dto(start_command: str | None) -> list[str] | None:
-    if start_command is None:
-        return None
-    try:
-        return shlex.split(start_command)
-    except ValueError:
-        return [start_command]
-
-
 def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
+    command_fields = normalize_model_service_command_response({
+        "start_command": service.start_command,
+    })
     return ModelServiceConfigInfoDTO(
         pre_start_actions=[_pre_start_action_to_dto(a) for a in service.pre_start_actions],
-        command=service.start_command,
-        start_command=_legacy_start_command_to_dto(service.start_command),
+        command=command_fields["command"],
+        start_command=command_fields["start_command"],
         shell=service.shell,
         port=service.port,
         health_check=(
