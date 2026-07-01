@@ -297,8 +297,9 @@ class TestServices:
         method, url, body = _last_request_call(mock_session)
         assert method == "POST"
         assert "/session/my-sess/shutdown-service" in url
-        assert body is not None
-        assert body["service_name"] == "jupyter"
+        assert body is None
+        _, kwargs = mock_session.request.call_args
+        assert kwargs["params"]["service_name"] == "jupyter"
 
 
 # ---------------------------------------------------------------------------
@@ -343,9 +344,13 @@ class TestCommitAndImage:
 
         assert isinstance(result, ConvertSessionToImageResponse)
         assert result.task_id == "task-abc"
-        method, url, _ = _last_request_call(mock_session)
+        method, url, body = _last_request_call(mock_session)
         assert method == "POST"
         assert "/session/my-sess/imagify" in url
+        # imagify is a body endpoint (manager reads BodyParam), so image_name
+        # must travel in the JSON body, not the query string.
+        assert body is not None
+        assert body["image_name"] == "my-custom-img"
 
 
 # ---------------------------------------------------------------------------
@@ -505,7 +510,10 @@ class TestBinaryOperations:
         mock_download.assert_awaited_once()
         call_args = mock_download.call_args
         assert "/session/my-sess/download" in call_args.args[0]
-        assert call_args.kwargs["json"]["files"] == ["a.txt", "b.txt"]
+        # download is a query-string endpoint (manager reads QueryParam), so the
+        # files list must travel in the query string, not the JSON body.
+        assert call_args.kwargs.get("json") is None
+        assert call_args.kwargs["params"]["files"] == ["a.txt", "b.txt"]
 
     async def test_download_single(self) -> None:
         mock_client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), MagicMock())

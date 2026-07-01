@@ -22,6 +22,13 @@ from uuid import UUID
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.fair_share import (
+    BucketDelta,
+    DomainUsageBucketKey,
+    ProjectUsageBucketKey,
+    UsageBucketAggregationResult,
+    UserUsageBucketKey,
+)
 from ai.backend.manager.repositories.resource_usage_history import (
     KernelUsageRecordCreatorSpec,
 )
@@ -33,50 +40,6 @@ SLICE_DURATION_SECONDS = 300
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.kernel.types import KernelInfo
-
-
-# =============================================================================
-# Bucket Key Types
-# =============================================================================
-
-
-@dataclass(frozen=True)
-class UserUsageBucketKey:
-    """Key for user usage bucket aggregation.
-
-    Uniquely identifies a user's usage bucket within a resource group and time period.
-    """
-
-    user_uuid: UUID
-    project_id: UUID
-    domain_name: str
-    resource_group: str
-    period_date: date
-
-
-@dataclass(frozen=True)
-class ProjectUsageBucketKey:
-    """Key for project usage bucket aggregation.
-
-    Uniquely identifies a project's usage bucket within a resource group and time period.
-    """
-
-    project_id: UUID
-    domain_name: str
-    resource_group: str
-    period_date: date
-
-
-@dataclass(frozen=True)
-class DomainUsageBucketKey:
-    """Key for domain usage bucket aggregation.
-
-    Uniquely identifies a domain's usage bucket within a resource group and time period.
-    """
-
-    domain_name: str
-    resource_group: str
-    period_date: date
 
 
 # =============================================================================
@@ -97,39 +60,6 @@ class KernelUsagePreparationResult:
     specs: list[KernelUsageRecordCreatorSpec] = field(default_factory=list)
     kernel_observation_times: dict[UUID, datetime] = field(default_factory=dict)
     observed_count: int = 0
-
-
-@dataclass
-class BucketDelta:
-    """Separated resource amount and duration for a usage bucket.
-
-    Stores raw resource amounts and duration separately instead of
-    pre-multiplied resource-seconds.  The product ``amount * duration_seconds``
-    is computed at SQL query time where PostgreSQL auto-extends NUMERIC precision,
-    eliminating overflow risk for large memory values.
-
-    Attributes:
-        slots: Raw resource amounts (e.g., {"cpu": 2, "mem": 4096000000})
-        duration_seconds: Total usage duration in seconds
-    """
-
-    slots: ResourceSlot = field(default_factory=ResourceSlot)
-    duration_seconds: int = 0
-
-
-@dataclass
-class UsageBucketAggregationResult:
-    """Result of aggregating kernel usage into daily buckets.
-
-    Attributes:
-        user_usage_deltas: Aggregated usage deltas by user for bucket updates
-        project_usage_deltas: Aggregated usage deltas by project for bucket updates
-        domain_usage_deltas: Aggregated usage deltas by domain for bucket updates
-    """
-
-    user_usage_deltas: dict[UserUsageBucketKey, BucketDelta] = field(default_factory=dict)
-    project_usage_deltas: dict[ProjectUsageBucketKey, BucketDelta] = field(default_factory=dict)
-    domain_usage_deltas: dict[DomainUsageBucketKey, BucketDelta] = field(default_factory=dict)
 
 
 class FairShareAggregator:

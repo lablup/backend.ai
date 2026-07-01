@@ -20,12 +20,13 @@ from ai.backend.common.dto.manager.v2.export import (
     ProjectExportOrder,
     SessionExportFilter,
     SessionExportOrder,
+    SessionExportUserNestedFilter,
     UserExportFilter,
     UserExportOrder,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.errors.export import InvalidExportFieldKeys
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
     ExportFieldType,
@@ -119,7 +120,7 @@ class ExportAdapter(BaseFilterAdapter):
         conditions = self._build_session_conditions(report, filter)
         orders = self._build_session_orders(report, order)
 
-        # Collect all required JOINs from selected fields
+        # Collect all required JOINs from selected output fields
         all_joins = self._collect_joins(selected_fields)
 
         # Build select_from with dynamic JOINs
@@ -416,6 +417,13 @@ class ExportAdapter(BaseFilterAdapter):
                 if cond:
                     conditions.append(cond)
 
+        # user filter (nested): filter by the owning user's columns without joining users
+        # into the main FROM clause.
+        if filter.user is not None:
+            user_cond = self._build_session_user_filter_condition(report, filter.user)
+            if user_cond is not None:
+                conditions.append(user_cond)
+
         # status filter (IN query)
         if filter.status is not None:
             field = report.get_field("status")
@@ -444,6 +452,60 @@ class ExportAdapter(BaseFilterAdapter):
                 conditions.extend(self._build_datetime_conditions(filter.terminated_at, field))
 
         return conditions
+
+    def _build_session_user_filter_condition(
+        self,
+        report: ReportDef,
+        user_filter: SessionExportUserNestedFilter,
+    ) -> QueryCondition | None:
+        """Build the nested user filter as a correlated EXISTS over the users table.
+
+        Filters sessions by the owning user's columns (email/username) without joining
+        users into the main FROM clause — which would risk a cartesian product when the
+        user is filtered but not selected. The users table and the correlation condition
+        come from the user field's declared joins (ReportDef metadata), so this needs no
+        ORM model imports.
+
+        Returns None when the filter contributes no condition.
+        """
+        user_conditions: list[QueryCondition] = []
+        user_joins: set[JoinDef] = set()
+        if user_filter.email is not None:
+            field = report.get_field("user_email")
+            if field:
+                user_joins.update(field.joins or ())
+                cond = self._build_string_condition(user_filter.email, field)
+                if cond:
+                    user_conditions.append(cond)
+        if user_filter.username is not None:
+            field = report.get_field("user_username")
+            if field:
+                user_joins.update(field.joins or ())
+                cond = self._build_string_condition(user_filter.username, field)
+                if cond:
+                    user_conditions.append(cond)
+
+        if not user_conditions or not user_joins:
+            return None
+
+        joins = list(user_joins)
+
+        def owning_user_exists() -> sa.sql.expression.ColumnElement[bool]:
+            where_clauses = [join.condition for join in joins]
+            where_clauses.extend(cond() for cond in user_conditions)
+            # correlate_except keeps the joined table(s) in the subquery's own FROM so that
+            # auto-correlation only pulls in the base table. Without it, selecting a user
+            # column (which LEFT JOINs users into the outer query) makes the subquery's users
+            # auto-correlate out, leaving it with no FROM clause.
+            subquery = (
+                sa.select(sa.literal(1))
+                .select_from(*(join.table for join in joins))
+                .where(sa.and_(*where_clauses))
+                .correlate_except(*(join.table for join in joins))
+            )
+            return subquery.exists()
+
+        return owning_user_exists
 
     def _build_session_orders(
         self,

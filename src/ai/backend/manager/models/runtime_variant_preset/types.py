@@ -1,5 +1,13 @@
-"""Re-export UIOption from DTO for PydanticColumn usage."""
+from __future__ import annotations
 
-from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import UIOption
+from pydantic import Field
 
-__all__ = ("UIOption",)
+from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.types import BackendAISchema
+
+
+class RuntimeVariantPresetValueEntry(BackendAISchema):
+    """A concrete value bound to a runtime variant preset, stored as JSONB."""
+
+    preset_id: RuntimeVariantPresetID = Field(description="Runtime variant preset ID.")
+    value: str = Field(description="Value for this preset.")

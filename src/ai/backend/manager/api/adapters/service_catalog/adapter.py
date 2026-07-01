@@ -20,6 +20,7 @@ from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.service_catalog.conditions import ServiceCatalogConditions
 from ai.backend.manager.models.service_catalog.orders import (
     DEFAULT_FORWARD_ORDER,
@@ -29,8 +30,6 @@ from ai.backend.manager.models.service_catalog.orders import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
-    QueryCondition,
-    QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )

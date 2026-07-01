@@ -5,7 +5,7 @@ from datetime import datetime
 from dateutil.tz import tzutc
 
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
+from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
 from .exceptions import ReservedBatchSessionNotReady
 from .validator import ValidatorRule

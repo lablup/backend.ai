@@ -20,6 +20,7 @@ from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     DomainFairShareSearchResult,
     FairShareCalculationContext,
+    FairShareFactorCalculationResult,
     ProjectFairShareData,
     ProjectFairShareSearchResult,
     ProjectUserIds,
@@ -53,7 +54,6 @@ if TYPE_CHECKING:
         UserFairShareRow,
     )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.sokovan.scheduler.fair_share import FairShareFactorCalculationResult
 
 
 __all__ = ("FairShareRepository",)

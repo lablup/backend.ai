@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Self
 
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     ContainerRegistryFilter as ContainerRegistryFilterDTO,
@@ -13,6 +14,7 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
 from ai.backend.common.dto.manager.v2.container_registry.types import (
     ContainerRegistryTypeFilter as ContainerRegistryTypeFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -20,6 +22,7 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryTypeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_pydantic_input,
@@ -52,6 +55,24 @@ class ContainerRegistryV2Filter(PydanticInputMixin[ContainerRegistryFilterDTO]):
     registry_name: StringFilter | None = None
     type: ContainerRegistryTypeFilterGQL | None = None
     is_global: bool | None = None
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
+        ),
+        default=None,
+    )
 
 
 @gql_enum(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -11,14 +12,21 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
 )
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 __all__ = ("RuntimeVariantPresetConditions",)
 
 
 class RuntimeVariantPresetConditions:
+    @staticmethod
+    def by_ids(ids: Collection[UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RuntimeVariantPresetRow.id.in_(ids)
+
+        return inner
+
     @staticmethod
     def by_runtime_variant_id(variant_id: UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:

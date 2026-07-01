@@ -18,6 +18,7 @@ from ai.backend.manager.data.fair_share import (
     FairShareCalculationContext,
     FairShareCalculationSnapshot,
     FairShareData,
+    FairShareFactorCalculationResult,
     FairSharesByLevel,
     FairShareSpec,
     ProjectFairShareData,
@@ -73,7 +74,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.sokovan.scheduler.fair_share import FairShareFactorCalculationResult
 
 
 __all__ = ("FairShareDBSource",)

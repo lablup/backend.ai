@@ -13,10 +13,11 @@ import sqlalchemy as sa
 
 from ai.backend.common.exception import KeypairResourcePolicyNotFound
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 __all__ = (
     "UserKeypairSearchScope",

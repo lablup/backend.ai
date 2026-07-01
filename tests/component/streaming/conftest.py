@@ -88,6 +88,7 @@ def server_module_registries(
             StreamHandler(
                 private_ctx=MagicMock(),
                 stream_processors=stream_processors,
+                session_processors=MagicMock(),
                 config_provider=config_provider,
                 error_monitor=error_monitor,
             ),

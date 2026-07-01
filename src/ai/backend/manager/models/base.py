@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import enum
 import ipaddress
 import json
@@ -342,7 +343,7 @@ class IntFlagType[T_IntFlag: enum.IntFlag](TypeDecorator[T_IntFlag]):
     ) -> int | None:
         if value is None:
             return None
-        return int(value.value)
+        return int(value)
 
     def process_result_value(
         self,
@@ -635,6 +636,60 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]])
 
     def copy(self, **_kw: Any) -> Self:
         return PydanticListColumn(self._schema)  # type: ignore[return-value]
+
+
+class ABCColumnPayload(abc.ABC):
+    """
+    Storage contract for :class:`ABCColumn`: ``serialize`` produces a JSONB
+    dict, ``load`` rehydrates one (and may dispatch by discriminator to a
+    concrete subtype). Informal abstracts rather than ``@abc.abstractmethod`` so
+    the base can be passed to ``ABCColumn(...)`` without tripping mypy's
+    ``type-abstract`` check; subclasses must override both.
+    """
+
+    def serialize(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @classmethod
+    def load(cls, raw: dict[str, Any]) -> ABCColumnPayload:
+        raise NotImplementedError
+
+
+class ABCColumn(TypeDecorator[ABCColumnPayload]):
+    """Polymorphic JSONB column: stores ``value.serialize()``, reads via
+    ``schema.load(...)``. Domain-agnostic; modeled on :class:`PydanticColumn`."""
+
+    impl = JSONB
+    cache_ok = True
+
+    _schema: type[ABCColumnPayload]
+
+    def __init__(self, schema: type[ABCColumnPayload]) -> None:
+        super().__init__()
+        self._schema = schema
+
+    def process_bind_param(
+        self,
+        value: ABCColumnPayload | None,
+        dialect: Dialect,
+    ) -> dict[str, Any] | None:
+        # JSONB accepts Python objects directly, not JSON strings
+        if value is None:
+            return None
+        return value.serialize()
+
+    def process_result_value(
+        self,
+        value: dict[str, Any] | None,
+        dialect: Dialect,
+    ) -> ABCColumnPayload | None:
+        # JSONB returns already parsed Python objects, not strings
+        if value is None:
+            return None
+        return self._schema.load(value)
+
+    def copy(self, **_kw: Any) -> Self:
+        return ABCColumn(self._schema)  # type: ignore[return-value]
 
 
 class URLColumn(TypeDecorator[yarl.URL]):

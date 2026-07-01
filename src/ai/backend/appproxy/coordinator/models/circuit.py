@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from yarl import URL
 
+from ai.backend.appproxy.common.client_ip import ClientIPValidator
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.errors import ObjectNotFound, UnsupportedProtocol
 from ai.backend.appproxy.common.types import (
@@ -293,10 +295,22 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         worker: Worker = self.worker_row
         return f"{worker.authority}:{self.port or self.subdomain}"
 
+    @cached_property
+    def _ip_validator(self) -> ClientIPValidator:
+        """Client-IP allowlist parsed once from ``allowed_client_ips``."""
+        return ClientIPValidator(self.allowed_client_ips)
+
     @property
     def traefik_rule(self) -> str:
         match self.protocol:
             case ProxyProtocol.TCP:
+                # TCP routers cannot use HTTP middlewares, so the allowlist is
+                # encoded into the router's ClientIP match rule: connections from
+                # other sources match no router and are dropped. Falls back to
+                # accepting any source when unrestricted.
+                ranges = self._ip_validator.ranges
+                if ranges:
+                    return "ClientIP(" + ", ".join(f"`{cidr}`" for cidr in ranges) + ")"
                 return "ClientIP(`0.0.0.0/0`)"
             case _:
                 match self.frontend_mode:
@@ -329,15 +343,21 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
     def traefik_routers(self) -> dict[str, Any]:
         match self.protocol:
             case ProxyProtocol.HTTP:
+                # The ipAllowList middleware must precede the auth plugins so that
+                # disallowed clients are rejected before any credential handling.
+                middlewares = ["CORSHeaders"]
+                ranges = self._ip_validator.ranges
+                if ranges:
+                    middlewares.append(f"bai_ipallowlist_{self.id}")
+                middlewares += [
+                    f"bai_appproxy_plugin_{self.id}",
+                    f"bai_appproxy_plugin_{self.id}_go",
+                ]
                 base = {
                     "rule": self.traefik_rule,
                     "service": f"bai_service_{self.id}",
                     "entrypoints": [self.traefik_entrypoint],
-                    "middlewares": [
-                        "CORSHeaders",
-                        f"bai_appproxy_plugin_{self.id}",
-                        f"bai_appproxy_plugin_{self.id}_go",
-                    ],
+                    "middlewares": middlewares,
                 }
                 if self.worker_row.tls_listen:
                     base["tls"] = ""
@@ -435,7 +455,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 if not traefik_config:
                     raise MissingTraefikConfigError("Traefik configuration is required")
 
-                return {
+                middlewares: dict[str, Any] = {
                     "CORSHeaders": {
                         "headers": {
                             "accessControlAllowHeaders": "*",
@@ -465,4 +485,25 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                         }
                     },
                 }
+                ranges = self._ip_validator.ranges
+                if ranges:
+                    # ipAllowList matches against the IP Traefik selects per its
+                    # ipStrategy. Without a strategy Traefik uses the direct
+                    # connection address (correct when Traefik is directly
+                    # exposed); behind a load balancer, client_ip_strategy must
+                    # be configured so the real client IP is read from
+                    # X-Forwarded-For instead of the balancer's address.
+                    ip_allowlist: dict[str, Any] = {"sourceRange": ranges}
+                    strategy = traefik_config.client_ip_strategy
+                    if strategy is not None:
+                        if strategy.depth is not None:
+                            ip_allowlist["ipStrategy"] = {"depth": strategy.depth}
+                        elif strategy.excluded_ips:
+                            ip_allowlist["ipStrategy"] = {
+                                "excludedIPs": [str(net) for net in strategy.excluded_ips],
+                            }
+                    middlewares[f"bai_ipallowlist_{self.id}"] = {
+                        "ipAllowList": ip_allowlist,
+                    }
+                return middlewares
         return {}

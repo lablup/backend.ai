@@ -928,7 +928,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             b"start-model-service",
             _dump_json_bytes(model_info),
         ])
-        if health_check_info := model_info.get("service", {}).get("health_check"):
+        health_check_info = model_info.get("service", {}).get("health_check")
+        if health_check_info and health_check_info.get("enable"):
             timeout_seconds = (
                 health_check_info["max_retries"] * health_check_info["max_wait_time"] + 10
             )

@@ -778,7 +778,13 @@ install_editable_webui() {
   fi
   pushd ./packages/backend.ai-ui && pnpm install && popd
   pnpm i
-  make compile
+  # The production Web UI build can exceed Node's ~2GB default old-space heap and
+  # crash with "JavaScript heap out of memory" (exit code 134) on low-RAM machines
+  # (e.g. WSL2). Scope a larger heap to the build only, so users don't have to
+  # export NODE_OPTIONS globally before running this script. We append rather than
+  # replace, so an explicit user NODE_OPTIONS (e.g. a higher --max-old-space-size)
+  # still wins via Node's last-flag-wins rule.
+  NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=4096" make compile
   cd ../../../..
 }
 
@@ -1020,6 +1026,16 @@ setup_environment() {
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel03/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
+
+    # macOS only (BA-6289): Docker Desktop's bridge IPs aren't routable from the
+    # host, so uncomment announce-hostnames to reach master/replicas by hostname
+    # (node01-03) via /etc/hosts. Linux routes bridge IPs directly, so it stays
+    # commented.
+    if [ "$DISTRO" = "Darwin" ]; then
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel01_cfg_path"
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel02_cfg_path"
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel03_cfg_path"
+    fi
   else
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
     SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"

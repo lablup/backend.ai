@@ -9,7 +9,9 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.runtime_variant_preset.types import (
+    RuntimeVariantPresetValueEntry,
+)
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -36,8 +38,8 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     environ: OptionalState[dict[str, str]] = field(
         default_factory=OptionalState[dict[str, str]].nop
     )
-    preset_values: OptionalState[list[PresetValueEntry]] = field(
-        default_factory=OptionalState[list[PresetValueEntry]].nop
+    runtime_variant_preset_values: OptionalState[list[RuntimeVariantPresetValueEntry]] = field(
+        default_factory=OptionalState[list[RuntimeVariantPresetValueEntry]].nop
     )
     open_to_public: TriState[bool] = field(default_factory=TriState[bool].nop)
     replica_count: TriState[int] = field(default_factory=TriState[int].nop)
@@ -69,7 +71,8 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
         self.startup_command.update_dict(to_update, "startup_command")
         self.bootstrap_script.update_dict(to_update, "bootstrap_script")
         self.environ.update_dict(to_update, "environ")
-        self.preset_values.update_dict(to_update, "preset_values")
+        # DB column name stays ``preset_values`` (ORM attr unchanged).
+        self.runtime_variant_preset_values.update_dict(to_update, "preset_values")
         self.open_to_public.update_dict(to_update, "open_to_public")
         self.replica_count.update_dict(to_update, "replica_count")
         self.revision_history_limit.update_dict(to_update, "revision_history_limit")

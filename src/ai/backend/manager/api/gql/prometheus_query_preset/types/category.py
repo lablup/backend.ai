@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Self
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
@@ -24,12 +25,14 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
     DeleteCategoryPayload as DeleteCategoryPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_pydantic_input,
@@ -68,6 +71,24 @@ class CategoryGQL(PydanticOutputMixin[CategoryNode]):
 )
 class CategoryFilterGQL(PydanticInputMixin[CategoryFilterDTO]):
     name: StringFilter | None = gql_field(description="Filter by name.", default=None)
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
+        ),
+        default=None,
+    )
 
 
 @gql_enum(

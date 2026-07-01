@@ -8,13 +8,13 @@ from uuid import uuid4
 import yarl
 
 from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
-from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.data.deployment.types import MountMetadata, RevisionDraft
-from ai.backend.manager.data.deployment_revision_preset.types import PresetValueData
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 
 
 def _merge_all(*drafts: RevisionDraft) -> RevisionDraft:
@@ -27,6 +27,7 @@ def _mounts(model_definition_path: str | None) -> MountMetadata:
         model_definition_path=model_definition_path,
         model_mount_destination="/models",
         extra_mounts=[],
+        model_mount_perm=None,
     )
 
 
@@ -108,13 +109,37 @@ class TestRevisionDraftMerge:
         merged = earlier.merge(later)
         assert merged.model_definition is override
 
-    def test_preset_values_replaced_by_latest_non_none(self) -> None:
-        first = [PresetValueData(preset_id=DeploymentPresetID(uuid4()), value="a")]
-        second = [PresetValueData(preset_id=DeploymentPresetID(uuid4()), value="b")]
-        earlier = RevisionDraft(preset_values=first)
-        later = RevisionDraft(preset_values=second)
-        merged = earlier.merge(later)
-        assert merged.preset_values == second
+    def test_preset_values_same_id_overridden_by_upper(self) -> None:
+        preset_id = RuntimeVariantPresetID(uuid4())
+        lower = RevisionDraft(
+            runtime_variant_preset_values=[
+                RuntimeVariantPresetValueData(preset_id=preset_id, value="old")
+            ]
+        )
+        upper = RevisionDraft(
+            runtime_variant_preset_values=[
+                RuntimeVariantPresetValueData(preset_id=preset_id, value="new")
+            ]
+        )
+        merged = lower.merge(upper)
+        assert merged.runtime_variant_preset_values == [
+            RuntimeVariantPresetValueData(preset_id=preset_id, value="new")
+        ]
+
+    def test_preset_values_distinct_ids_preserved(self) -> None:
+        # Partial override: ids only on one side survive, so template entries the
+        # request does not touch are kept.
+        template = RuntimeVariantPresetValueData(
+            preset_id=RuntimeVariantPresetID(uuid4()), value="template"
+        )
+        override = RuntimeVariantPresetValueData(
+            preset_id=RuntimeVariantPresetID(uuid4()), value="override"
+        )
+        merged = RevisionDraft(runtime_variant_preset_values=[template]).merge(
+            RevisionDraft(runtime_variant_preset_values=[override])
+        )
+        assert merged.runtime_variant_preset_values is not None
+        assert set(merged.runtime_variant_preset_values) == {template, override}
 
     def test_model_definition_uses_lower_model_path_when_higher_omits_it(self) -> None:
         base = RevisionDraft(

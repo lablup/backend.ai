@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RBACElementTypeFilter as RBACElementTypeFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -65,7 +64,7 @@ class ScopeInputGQL(PydanticInputMixin[ScopeInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Entity reference parametrized by RBAC element type.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="EntityTypeScope",
 )
@@ -81,7 +80,7 @@ class EntityTypeScopeGQL(PydanticInputMixin[EntityTypeScope]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Single-UUID scope item wrapper.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="UUIDScope",
 )
@@ -97,7 +96,7 @@ class UUIDScopeGQL(PydanticInputMixin[UUIDScope]):
             "Filter for RBAC element type fields (scope_type / entity_type). "
             "Supports equals / in / not_equals / not_in."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="RBACElementTypeFilter",
 )

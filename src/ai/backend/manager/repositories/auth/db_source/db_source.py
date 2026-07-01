@@ -37,6 +37,7 @@ from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSe
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
@@ -48,7 +49,6 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.types import SearchScope
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import (
     RoleManager,

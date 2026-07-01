@@ -31,6 +31,7 @@ from ai.backend.common.types import (
     AgentId,
     BinarySize,
     ClusterMode,
+    MountPermission,
     QuotaScopeID,
     ResourceSlot,
     ServicePort,
@@ -1708,6 +1709,7 @@ class TestDeploymentRevisionOperations:
             cluster_size=1,
             model_vfolder_id=test_vfolder_id,
             model_mount_destination="/models",
+            model_mount_perm=MountPermission.READ_ONLY,
             vfolder_subpath=None,
             model_definition_path=None,
             model_definition=None,
@@ -1753,6 +1755,7 @@ class TestDeploymentRevisionOperations:
                 cluster_size=1,
                 model_vfolder_id=test_vfolder_id,
                 model_mount_destination="/models",
+                model_mount_perm=MountPermission.READ_ONLY,
                 vfolder_subpath=None,
                 model_definition_path=None,
                 model_definition=None,
@@ -1800,6 +1803,7 @@ class TestDeploymentRevisionOperations:
                 cluster_size=1,
                 model_vfolder_id=test_vfolder_id,
                 model_mount_destination="/models",
+                model_mount_perm=MountPermission.READ_ONLY,
                 vfolder_subpath=None,
                 model_definition_path=None,
                 model_definition=None,
@@ -1844,6 +1848,7 @@ class TestDeploymentRevisionOperations:
             cluster_size=1,
             model_vfolder_id=test_vfolder_id,
             model_mount_destination="/models",
+            model_mount_perm=MountPermission.READ_ONLY,
             vfolder_subpath=None,
             model_definition_path=None,
             model_definition=None,
@@ -2071,6 +2076,9 @@ class TestDeploymentRevisionOperations:
             endpoint = result.scalar_one()
             assert endpoint.name == new_name
             assert endpoint.replicas == new_replica_count
+            # Manual scale syncs desired_replicas so the COALESCE(desired_replicas,
+            # replicas) scaling goal reflects the new count immediately.
+            assert endpoint.desired_replicas == new_replica_count
 
     async def test_retire_replica_groups_on_destroy(
         self,

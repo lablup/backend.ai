@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
-from ai.backend.manager.sokovan.data import PromotionSpec
+from ai.backend.manager.data.sokovan import PromotionSpec
 from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,
@@ -309,11 +309,11 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
             success_status=SessionStatus.RUNNING,
             reason="triggered-by-scheduler",
         ),
-        # Promote to TERMINATED when all kernels are TERMINATED
+        # Promote to TERMINATED when all kernels are in terminal states
         ScheduleType.CHECK_TERMINATING_PROGRESS: PromotionSpec(
             name="promote-to-terminated",
             target_statuses=[SessionStatus.TERMINATING],
-            target_kernel_statuses=[KernelStatus.TERMINATED],
+            target_kernel_statuses=list(KernelStatus.terminal_statuses()),
             kernel_match_type=KernelMatchType.ALL,
             success_status=SessionStatus.TERMINATED,
             reason="triggered-by-scheduler",

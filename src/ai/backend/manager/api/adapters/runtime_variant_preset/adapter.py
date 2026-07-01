@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
@@ -35,14 +36,15 @@ from ai.backend.manager.data.runtime_variant_preset.types import (
     UIOptionData,
 )
 from ai.backend.manager.errors.resource import RuntimeVariantPresetNotFound
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.runtime_variant_preset.conditions import (
     RuntimeVariantPresetConditions,
 )
 from ai.backend.manager.models.runtime_variant_preset.orders import RuntimeVariantPresetOrders
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
+    BatchQuerier,
+    OffsetPagination,
     combine_conditions_or,
     negate_conditions,
 )
@@ -139,6 +141,20 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         if not result.items:
             raise RuntimeVariantPresetNotFound()
         return self._data_to_node(result.items[0])
+
+    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[RuntimeVariantPresetNode | None]:
+        """Batch-load presets by id, aligned to ``ids`` order (``None`` for missing)."""
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[RuntimeVariantPresetConditions.by_ids(ids)],
+        )
+        result = await self._processors.runtime_variant_preset.search.wait_for_complete(
+            SearchRuntimeVariantPresetsAction(querier=querier)
+        )
+        node_map = {item.id: self._data_to_node(item) for item in result.items}
+        return [node_map.get(preset_id) for preset_id in ids]
 
     async def create(
         self,

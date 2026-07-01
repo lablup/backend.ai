@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING, Any, Final
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.utils import set_handler_attr
+from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.errors.common import ServerFrozen, ServiceUnavailable
 
 from .types import RouteMiddleware

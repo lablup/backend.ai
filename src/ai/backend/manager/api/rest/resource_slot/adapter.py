@@ -15,16 +15,12 @@ from ai.backend.common.dto.manager.resource_slot.response import (
     NumberFormatDTO,
     ResourceSlotTypeDTO,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot.conditions import ResourceSlotTypeConditions
 from ai.backend.manager.models.resource_slot.orders import ResourceSlotTypeOrders
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 
 __all__ = ("ResourceSlotAdapter",)
 

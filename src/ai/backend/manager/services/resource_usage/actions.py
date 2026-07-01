@@ -8,12 +8,8 @@ from typing import override
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    QueryCondition,
-    QueryOrder,
-    QueryPagination,
-)
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import BatchQuerier, QueryPagination
 from ai.backend.manager.repositories.resource_usage_history import (
     DomainUsageBucketData,
     DomainUsageBucketSearchScope,

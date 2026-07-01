@@ -34,11 +34,10 @@ from ai.backend.manager.models.agent.orders import (
     TIEBREAKER_ORDER,
     resolve_order,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
-    QueryCondition,
-    QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )

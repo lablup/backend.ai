@@ -82,7 +82,6 @@ from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValida
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
 from ai.backend.manager.agent_cache import AgentRPCCache
-from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
 from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -107,6 +106,7 @@ from ai.backend.manager.config.unified import (
     ManagerUnifiedConfig,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts

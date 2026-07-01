@@ -34,6 +34,7 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SubStepResult,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
     RouteHistoryConditions,
@@ -56,8 +57,6 @@ from ai.backend.manager.models.scheduling_history.orders import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
-    QueryCondition,
-    QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )

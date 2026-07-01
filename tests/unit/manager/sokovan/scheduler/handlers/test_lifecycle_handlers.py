@@ -17,15 +17,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.repositories.scheduler.types.session import (
-    TerminatingSessionData,
-)
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     SessionsForPullWithImages,
     SessionsForStartWithImages,
     SessionWithKernels,
 )
-from ai.backend.manager.sokovan.data.allocation import SchedulingFailure
+from ai.backend.manager.data.sokovan.allocation import SchedulingFailure
+from ai.backend.manager.repositories.scheduler.types.session import (
+    TerminatingSessionData,
+)
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
 )

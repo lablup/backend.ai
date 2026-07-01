@@ -25,14 +25,15 @@ from ai.backend.common.dto.manager.v2.login_client_type.types import (
 )
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.login_client_type.conditions import LoginClientTypeConditions
 from ai.backend.manager.models.login_client_type.orders import LoginClientTypeOrders
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
-    QueryCondition,
-    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -218,5 +219,21 @@ class LoginClientTypeAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(self._convert_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(self._convert_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
 
         return conditions

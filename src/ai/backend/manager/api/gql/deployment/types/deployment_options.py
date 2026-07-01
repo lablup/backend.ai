@@ -31,7 +31,6 @@ from ai.backend.common.dto.manager.v2.session_options.response import (
 from ai.backend.common.dto.manager.v2.session_options.response import (
     HandlerOptionsInfo as HandlerOptionsInfoDTO,
 )
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -42,7 +41,7 @@ from ai.backend.manager.api.gql.decorators import (
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Per-handler scheduler policy fields for deployment handler options.",
     ),
     name="HandlerOptionsInput",
@@ -54,7 +53,7 @@ class HandlerOptionsInputGQL(PydanticInputMixin[HandlerOptionsInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A single (handler_name, options) entry for deployment handler options.",
     ),
     name="HandlerOptionsEntryInput",
@@ -67,7 +66,7 @@ class HandlerOptionsEntryInputGQL(PydanticInputMixin[HandlerOptionsEntryInputDTO
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Deployment handler-options policy input.",
     ),
     name="DeploymentHandlerOptionsInput",
@@ -79,7 +78,7 @@ class DeploymentHandlerOptionsInputGQL(PydanticInputMixin[DeploymentHandlerOptio
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Deployment options payload input.",
     ),
     name="DeploymentOptionsInput",
@@ -90,7 +89,7 @@ class DeploymentOptionsInputGQL(PydanticInputMixin[DeploymentOptionsInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Per-handler scheduler policy snapshot for deployment handler options.",
     ),
     model=HandlerOptionsInfoDTO,
@@ -103,7 +102,7 @@ class HandlerOptionsInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A single (handler_name, options) entry response for deployment handler options.",
     ),
     model=HandlerOptionsEntryInfoDTO,
@@ -117,7 +116,7 @@ class HandlerOptionsEntryInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Deployment handler-options policy response.",
     ),
     model=DeploymentHandlerOptionsInfoDTO,
@@ -130,7 +129,7 @@ class DeploymentHandlerOptionsInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Deployment options payload response.",
     ),
     model=DeploymentOptionsInfoDTO,

@@ -31,10 +31,12 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import Subdomain
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import GUID, Base, BaseMixin, EnumType, StrEnumType
 from .circuit import Circuit
+from .subdomain import SubdomainGenerator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -138,12 +140,15 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         worker_id: UUID,
         load_filters: bool = False,
         load_circuits: bool = False,
+        for_update: bool = False,
     ) -> "Worker":
         query = sa.select(Worker).filter(Worker.id == worker_id)
         if load_filters:
             query = query.options(selectinload(Worker.filters))
         if load_circuits:
             query = query.options(selectinload(Worker.circuits))
+        if for_update:
+            query = query.with_for_update()
         worker = await session.scalar(query)
         if not worker:
             raise ObjectNotFound(object_name="worker")
@@ -404,6 +409,7 @@ async def pick_worker(
         session,
         worker.id,
         load_circuits=True,
+        for_update=True,
     )
 
 
@@ -427,7 +433,7 @@ async def add_circuit(
     if envs is None:
         envs = {}
     if worker_id:
-        worker = await Worker.get(session, worker_id, load_circuits=True)
+        worker = await Worker.get(session, worker_id, load_circuits=True, for_update=True)
         if worker.available_slots - worker.occupied_slots <= 0 and worker.available_slots >= 0:
             raise WorkerNotAvailable
     else:
@@ -436,17 +442,12 @@ async def add_circuit(
     circuit_params: dict[str, Any] = {}
 
     if worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
-        acquired_subdomains = [c.subdomain for c in worker.circuits]
-        if _requested_subdomain := preferred_subdomain:
-            subdomain = _requested_subdomain
-        else:
-            sub_id = str(uuid.uuid4()).split("-")[0]
-            subdomain = f"app-{sub_id}"
-
-        while subdomain in acquired_subdomains:
-            sub_id = str(uuid.uuid4()).split("-")[0]
-            subdomain = f"{_requested_subdomain}-{sub_id}"
-        circuit_params["subdomain"] = subdomain
+        generator = SubdomainGenerator()
+        preferred = Subdomain(preferred_subdomain) if preferred_subdomain else None
+        # Subdomains already taken on this worker; the generator avoids
+        # collisions against them while normalizing the requested name.
+        taken: set[Subdomain] = {Subdomain(c.subdomain) for c in worker.circuits if c.subdomain}
+        circuit_params["subdomain"] = generator.generate_subdomain(preferred, taken)
     else:
         acquired_ports = {c.port for c in worker.circuits}
         port_range = worker.port_range

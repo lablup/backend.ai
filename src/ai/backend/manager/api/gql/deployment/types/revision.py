@@ -65,6 +65,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelServiceConfigInput as ModelServiceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    PresetValueInput as PresetValueInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceConfigInput as ResourceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -99,9 +102,10 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelServiceConfigInfoDTO,
     PreStartActionInfoDTO,
     ResourceConfigInfoDTO,
+    RuntimeVariantPresetValueInfoDTO,
 )
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -109,7 +113,6 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
     UUIDFilter,
-    to_global_id,
 )
 from ai.backend.manager.api.gql.common.types import (
     ClusterModeGQL,
@@ -133,9 +136,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.federation import ResourceGroup
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import VFolder
-from ai.backend.manager.api.gql_legacy.image import ImageNode
-from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
-from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
 
 from .resource_slot import (
     RESOURCE_SLOTS_FETCH_LIMIT,
@@ -147,6 +147,7 @@ from .resource_slot import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.image.types import ImageV2GQL
     from ai.backend.manager.api.gql.runtime_variant.types import RuntimeVariantGQL
+    from ai.backend.manager.api.gql.runtime_variant_preset.types import RuntimeVariantPresetGQL
 
     from .deployment import ModelDeployment
     from .policy import DeploymentPolicyGQL
@@ -223,10 +224,36 @@ class ResourceConfig:
     @gql_field(description="The resource group of this entity.")  # type: ignore[misc]
     def resource_group(self) -> ResourceGroup | None:
         """Resolves the federated ResourceGroup."""
-        global_id = to_global_id(
-            ScalingGroupNode, self.resource_group_name, is_target_graphene_object=True
-        )
-        return ResourceGroup(id=ID(global_id))
+        # Federated ScalingGroupNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return ResourceGroup(id=ID(str(self.resource_group_name)))
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description="A runtime variant preset value materialised on a revision.",
+    ),
+    model=RuntimeVariantPresetValueInfoDTO,
+    name="RuntimeVariantPresetValue",
+)
+class RuntimeVariantPresetValueGQL:
+    preset_id: UUID = gql_field(description="The preset this value is bound to.")
+    value: str = gql_field(description="Value bound to the preset.")
+
+    @gql_field(
+        description="The runtime variant preset this value is bound to, resolved via DataLoader."
+    )  # type: ignore[misc]
+    async def preset(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            RuntimeVariantPresetGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.runtime_variant_preset.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.runtime_variant_preset_loader.load(self.preset_id)
 
 
 @gql_pydantic_type(
@@ -247,10 +274,16 @@ class ModelRuntimeConfig:
         description="Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0.",
         default=None,
     )
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueGQL] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="Preset values materialised on this revision.",
+        ),
+    )
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="The runtime variant referenced by this runtime config.",
         )
     )  # type: ignore[misc]
@@ -284,7 +317,7 @@ class ModelMountConfig:
     )
     subpath: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Subpath within the model vfolder. ``null`` means the vfolder root.",
         ),
         default=None,
@@ -292,10 +325,9 @@ class ModelMountConfig:
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
-        vfolder_global_id = to_global_id(
-            VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
-        )
-        return VFolder(id=ID(vfolder_global_id))
+        # Federated VirtualFolderNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return VFolder(id=ID(str(UUID(str(self.vfolder_id)))))
 
 
 @gql_pydantic_type(
@@ -313,7 +345,7 @@ class ExtraVFolderMountInfoGQL:
     )
     mount_perm: MountPermission = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "The concrete permission snapshot fixed at revision-write time; "
                 "later vfolder permission changes do not retroactively affect it."
@@ -322,7 +354,7 @@ class ExtraVFolderMountInfoGQL:
     )
     subpath: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Subpath within the vfolder. ``null`` means the vfolder root.",
         ),
         default=None,
@@ -330,10 +362,9 @@ class ExtraVFolderMountInfoGQL:
 
     @gql_field(description="The vfolder of this entity.")  # type: ignore[misc]
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder | None:
-        vfolder_global_id = to_global_id(
-            VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
-        )
-        return VFolder(id=ID(vfolder_global_id))
+        # Federated VirtualFolderNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return VFolder(id=ID(str(UUID(str(self.vfolder_id)))))
 
 
 @gql_pydantic_type(
@@ -360,7 +391,7 @@ class PreStartActionGQL:
 class ModelHealthCheckGQL:
     enable: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Whether the route is health-checked. When false the route activates "
                 "immediately and the remaining fields are ignored."
@@ -394,10 +425,21 @@ class ModelServiceConfigGQL:
     pre_start_actions: list[PreStartActionGQL] = gql_field(
         description="List of pre-start actions to execute before starting the model service."
     )
-    start_command: list[str] | None = gql_field(
-        description="Command to start the model service.", default=None
+    command: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Single-string command to start the model service.",
+        ),
+        default=None,
     )
-    shell: str = gql_field(description="Shell configured for the model service.")
+    start_command: list[str] | None = gql_field(
+        description="Command to start the model service.",
+        default=None,
+        deprecation_reason="Use `command` instead.",
+    )
+    shell: str | None = gql_field(
+        description="Shell configured for the model service.", default="/bin/bash"
+    )
     port: int = gql_field(description="Port number for the model service.")
     health_check: ModelHealthCheckGQL | None = gql_field(
         description="Health check configuration for the model service.",
@@ -479,7 +521,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     id: NodeID[str]
     revision_number: int = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Per-deployment sequential revision number assigned at "
                 "insert time (UNIQUE per deployment). Use this to surface "
@@ -509,7 +551,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     )
     revision_preset_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "ID of the deployment-level preset that produced this "
                 "revision. ``None`` when the revision was created without a "
@@ -522,7 +564,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     )
     deployment_id: ID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "ID of the parent deployment that owns this revision. "
                 "Exposed alongside the resolved ``deployment`` node so "
@@ -537,10 +579,9 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         deprecation_reason="Use image_v2 instead.",
     )  # type: ignore[misc]
     async def image(self, info: Info[StrawberryGQLContext]) -> Image | None:
-        image_global_id = to_global_id(
-            ImageNode, UUID(str(self.image_id)), is_target_graphene_object=True
-        )
-        return Image(id=ID(image_global_id))
+        # Federated ImageNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return Image(id=ID(str(UUID(str(self.image_id)))))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -563,7 +604,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "The deployment-level preset that produced this revision, "
                 "resolved via DataLoader. ``None`` when the revision was "
@@ -588,7 +629,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="The parent deployment owning this revision, resolved via DataLoader.",
         )
     )  # type: ignore[misc]
@@ -808,12 +849,43 @@ class EnvironmentVariablesInputGQL(PydanticInputMixin[EnvironmentVariablesInputD
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "A concrete value for one of a runtime variant's configurable presets, keyed by the "
+            "runtime variant preset ID (from the runtimeVariantPresets query). Distinct from a "
+            "DeploymentRevisionPreset, which is a saved template selected via revision_preset_id."
+        ),
+        added_version="26.4.4",
+    ),
+    name="RuntimeVariantPresetValueInput",
+)
+class RuntimeVariantPresetValueInputGQL(PydanticInputMixin[PresetValueInputDTO]):
+    preset_id: UUID = gql_field(
+        description="The runtime variant preset (from runtimeVariantPresets) this value applies to."
+    )
+    value: str = gql_field(
+        description="The concrete value to set for the referenced runtime variant preset parameter."
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
 class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
     runtime_variant_id: UUID
     environ: EnvironmentVariablesInputGQL | None = gql_field(
         description="Environment variables for the service.", default=None
+    )
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueInputGQL] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description=(
+                "Concrete values for the runtime variant's configurable presets, each keyed by the "
+                "runtime variant preset ID. Overrides matching presets from a revision_preset_id "
+                "template (merged by preset_id)."
+            ),
+        ),
+        default=None,
     )
 
 
@@ -826,7 +898,7 @@ class ModelMountConfigInput(PydanticInputMixin[ModelMountConfigInputDTO]):
     definition_path: str | None = None
     subpath: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Subpath within the model vfolder. ``null`` (default) mounts the vfolder root."
             ),
@@ -843,7 +915,7 @@ class ExtraVFolderMountInput(PydanticInputMixin[ExtraVFolderMountInputDTO]):
     mount_destination: str | None
     subpath: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=("Subpath within the vfolder. ``null`` (default) mounts the vfolder root."),
         ),
         default=None,
@@ -909,8 +981,21 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
         description="List of pre-start actions to execute before starting the model service.",
         default=None,
     )
+    command: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Single-string command to start the model service.",
+        ),
+        default=None,
+    )
     start_command: list[str] | None = gql_field(
-        description="Command to start the model service.", default=None
+        description=(
+            "Deprecated since 26.7.0. Command to start the model service. Do "
+            "not set together with `command`; when both are set, `command` takes precedence and "
+            "this field is ignored."
+        ),
+        default=None,
+        deprecation_reason="Use `command` instead.",
     )
     shell: str | None = gql_field(
         description="Shell configured for the model service.", default=None
@@ -1071,7 +1156,7 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionInputDTO]):
     )
     options: AddRevisionOptionsGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Additional options for the add revision operation.",
         ),
         default=None,

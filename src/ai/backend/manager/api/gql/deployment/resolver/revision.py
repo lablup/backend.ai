@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchRevisionsInput,
 )
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -109,9 +108,7 @@ async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | 
     BackendAIGQLMeta(
         added_version="25.16.0", description="Get JSON Schema for inference runtime configuration"
     ),
-    deprecation_reason=(
-        f"Deprecated since {NEXT_RELEASE_VERSION}. Use the runtime_variant resources instead."
-    ),
+    deprecation_reason=("Deprecated since 26.4.4. Use the runtime_variant resources instead."),
 )  # type: ignore[misc]
 async def inference_runtime_config(name: str) -> JSON | None:
     match name.lower():
@@ -137,9 +134,7 @@ async def inference_runtime_config(name: str) -> JSON | None:
         added_version="25.16.0",
         description="Get configuration JSON Schemas for all inference runtimes.",
     ),
-    deprecation_reason=(
-        f"Deprecated since {NEXT_RELEASE_VERSION}. Use the runtime_variant resources instead."
-    ),
+    deprecation_reason=("Deprecated since 26.4.4. Use the runtime_variant resources instead."),
 )  # type: ignore[misc]
 async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON | None:
     return cast(

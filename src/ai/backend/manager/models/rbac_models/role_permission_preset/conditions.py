@@ -9,10 +9,10 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType, OperationType
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
-from ai.backend.manager.repositories.base import QueryCondition
 
 __all__ = ("RolePermissionPresetConditions",)
 

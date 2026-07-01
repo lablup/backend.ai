@@ -79,7 +79,12 @@ def server_module_registries(
     """Load both v1 and v2 image route trees for image-domain tests."""
     image_registry = register_image_routes(ImageHandler(image=image_processors), route_deps)
     admin_registry = register_admin_routes(
-        AdminHandler(gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()),
+        AdminHandler(
+            gql_schema=MagicMock(),
+            gql_deps=MagicMock(),
+            strawberry_schema=MagicMock(),
+            public_strawberry_schema=MagicMock(),
+        ),
         route_deps,
         sub_registries=[image_registry],
         gql_ws_handler=MagicMock(),

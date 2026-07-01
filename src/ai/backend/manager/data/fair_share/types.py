@@ -308,3 +308,127 @@ class FairShareCalculationContext:
     """Mapping from project_id to domain_name.
     Used as fallback when fair_shares.project doesn't contain the project
     (new projects with usage but no fair share record yet)."""
+
+
+# =============================================================================
+# Fair share factor calculation results
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class DomainFactorResult:
+    """Factor calculation result for a domain."""
+
+    domain_name: str
+    total_decayed_usage: ResourceSlot
+    normalized_usage: Decimal
+    fair_share_factor: Decimal
+
+
+@dataclass(frozen=True)
+class ProjectFactorResult:
+    """Factor calculation result for a project."""
+
+    project_id: uuid.UUID
+    domain_name: str
+    total_decayed_usage: ResourceSlot
+    normalized_usage: Decimal
+    fair_share_factor: Decimal
+
+
+@dataclass(frozen=True)
+class UserFactorResult:
+    """Factor calculation result for a user."""
+
+    user_uuid: uuid.UUID
+    project_id: uuid.UUID
+    domain_name: str
+    total_decayed_usage: ResourceSlot
+    normalized_usage: Decimal
+    fair_share_factor: Decimal
+
+
+@dataclass(frozen=True)
+class UserSchedulingRank:
+    """Scheduling rank for a user within a project."""
+
+    user_uuid: uuid.UUID
+    project_id: uuid.UUID
+    rank: int  # 1 = highest priority
+
+
+@dataclass
+class FairShareFactorCalculationResult:
+    """Result of fair share factor calculation for all levels."""
+
+    domain_results: dict[str, DomainFactorResult] = field(default_factory=dict)
+    project_results: dict[uuid.UUID, ProjectFactorResult] = field(default_factory=dict)
+    user_results: dict[UserProjectKey, UserFactorResult] = field(default_factory=dict)
+    scheduling_ranks: list[UserSchedulingRank] = field(default_factory=list)
+
+
+# =============================================================================
+# Usage bucket aggregation results
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class UserUsageBucketKey:
+    """Key for user usage bucket aggregation.
+
+    Uniquely identifies a user's usage bucket within a resource group and time period.
+    """
+
+    user_uuid: uuid.UUID
+    project_id: uuid.UUID
+    domain_name: str
+    resource_group: str
+    period_date: date
+
+
+@dataclass(frozen=True)
+class ProjectUsageBucketKey:
+    """Key for project usage bucket aggregation.
+
+    Uniquely identifies a project's usage bucket within a resource group and time period.
+    """
+
+    project_id: uuid.UUID
+    domain_name: str
+    resource_group: str
+    period_date: date
+
+
+@dataclass(frozen=True)
+class DomainUsageBucketKey:
+    """Key for domain usage bucket aggregation.
+
+    Uniquely identifies a domain's usage bucket within a resource group and time period.
+    """
+
+    domain_name: str
+    resource_group: str
+    period_date: date
+
+
+@dataclass
+class BucketDelta:
+    """Separated resource amount and duration for a usage bucket.
+
+    Stores raw resource amounts and duration separately instead of
+    pre-multiplied resource-seconds.  The product ``amount * duration_seconds``
+    is computed at SQL query time where PostgreSQL auto-extends NUMERIC precision,
+    eliminating overflow risk for large memory values.
+    """
+
+    slots: ResourceSlot = field(default_factory=ResourceSlot)
+    duration_seconds: int = 0
+
+
+@dataclass
+class UsageBucketAggregationResult:
+    """Result of aggregating kernel usage into daily buckets."""
+
+    user_usage_deltas: dict[UserUsageBucketKey, BucketDelta] = field(default_factory=dict)
+    project_usage_deltas: dict[ProjectUsageBucketKey, BucketDelta] = field(default_factory=dict)
+    domain_usage_deltas: dict[DomainUsageBucketKey, BucketDelta] = field(default_factory=dict)

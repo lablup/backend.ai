@@ -95,6 +95,7 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -108,8 +109,6 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
     OffsetPagination,
-    QueryCondition,
-    QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
@@ -585,8 +584,10 @@ class UserAdapter(BaseAdapter):
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
-                username=cast(UserCreatorSpec, error.spec).username,
-                email=cast(UserCreatorSpec, error.spec).email,
+                username=(
+                    spec := cast(UserCreatorSpec, action.items[error.index].creator.spec)
+                ).username,
+                email=spec.email,
                 message=str(error.exception),
             )
             for error in result.data.failures
@@ -611,8 +612,10 @@ class UserAdapter(BaseAdapter):
         failed = [
             BulkCreateUserV2Error(
                 index=error.index,
-                username=cast(UserCreatorSpec, error.spec).username,
-                email=cast(UserCreatorSpec, error.spec).email,
+                username=(
+                    spec := cast(UserCreatorSpec, action.items[error.index].creator.spec)
+                ).username,
+                email=spec.email,
                 message=str(error.exception),
             )
             for error in result.data.failures

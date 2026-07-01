@@ -35,7 +35,6 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     RolePermissionPresetNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -67,7 +66,7 @@ from ai.backend.manager.api.gql.rbac.types import (
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A stored permission entry under a role preset.",
     ),
     name="RolePermissionPreset",
@@ -87,7 +86,7 @@ RolePermissionPresetEdge = Edge[RolePermissionPresetGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Paginated connection for role permission preset entries.",
     ),
 )
@@ -111,7 +110,7 @@ class RolePermissionPresetConnection(Connection[RolePermissionPresetGQL]):
             "`permission_presets` field resolver on a role preset (the resolver injects "
             "`role_preset_id` from its parent)."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="RolePermissionPresetFilter",
 )
@@ -144,7 +143,7 @@ class RolePermissionPresetFilterGQL(PydanticInputMixin[RolePermissionPresetFilte
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Fields available for ordering role permission preset entries.",
     ),
     name="RolePermissionPresetOrderField",
@@ -158,7 +157,7 @@ class RolePermissionPresetOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Specifies ordering for role permission preset entries.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="RolePermissionPresetOrderBy",
 )
@@ -172,7 +171,7 @@ class RolePermissionPresetOrderByGQL(PydanticInputMixin[RolePermissionPresetOrde
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Failure detail for a single permission entry in a bulk operation.",
     ),
     model=BulkRolePermissionPresetFailureInfoDTO,
@@ -189,7 +188,7 @@ class BulkRolePermissionPresetFailureInfoGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Failure detail for a single permission entry in a bulk add operation.",
     ),
     model=BulkAddRolePermissionPresetFailureInfoDTO,
@@ -209,7 +208,7 @@ class BulkAddRolePermissionPresetFailureInfoGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Payload returned after bulk-adding permission entries to a role preset.",
     ),
     model=BulkAddRolePermissionPresetsPayloadDTO,
@@ -228,7 +227,7 @@ class BulkAddRolePermissionPresetsPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Payload returned after bulk-removing permission entries from a role preset.",
     ),
     model=BulkRemoveRolePermissionPresetsPayloadDTO,

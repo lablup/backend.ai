@@ -102,6 +102,9 @@ class EntityType(enum.StrEnum):
 
     # === Standalone entity types ===
     AGENT = "agent"
+    APP_CONFIG_DEFINITION = "app_config_definition"
+    APP_CONFIG_ALLOW_LIST = "app_config_allow_list"
+    APP_CONFIG_FRAGMENT = "app_config_fragment"
     AUTH = "auth"
     PROJECT_ADMIN_PAGE = "project_admin_page"
     DOMAIN_ADMIN_PAGE = "domain_admin_page"
@@ -404,6 +407,9 @@ class RBACElementType(enum.StrEnum):
     ARTIFACT_REGISTRY = "artifact_registry"
     SESSION_TEMPLATE = "session_template"
     APP_CONFIG = "app_config"
+    APP_CONFIG_DEFINITION = "app_config_definition"
+    APP_CONFIG_ALLOW_LIST = "app_config_allow_list"
+    APP_CONFIG_FRAGMENT = "app_config_fragment"
     MODEL_CARD = "model_card"
 
     # === Root-query-enabled entities (superadmin-only) ===

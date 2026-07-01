@@ -91,7 +91,6 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -159,7 +158,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
     deleted_at: datetime | None
     auto_assign: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "When true, the role is automatically granted to a user when the user is added "
                 "to a scope this role is registered in."
@@ -518,7 +517,7 @@ class RoleStatusFilterGQL(PydanticInputMixin[RoleStatusFilterDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter roles by their user assignments.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="RoleUserNestedFilter",
 )
@@ -626,7 +625,7 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     source: RoleSourceGQL = RoleSourceGQL.CUSTOM
     auto_assign: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "When true, the role is automatically granted to a user when the user is added "
                 "to a scope this role is registered in."
@@ -647,7 +646,7 @@ class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
     status: RoleStatusGQL | None = UNSET
     auto_assign: bool | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Updated value for the `auto_assign` flag. When true, the role is automatically "
                 "granted to a user when the user is added to a scope this role is registered in."

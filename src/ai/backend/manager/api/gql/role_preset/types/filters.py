@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
 from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetOrder as RolePresetOrderDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -26,7 +25,7 @@ from ai.backend.manager.api.gql.rbac.types import RBACElementTypeFilterGQL
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for querying role presets.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="RolePresetFilter",
 )
@@ -59,7 +58,7 @@ class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Fields available for ordering role preset results.",
     ),
     name="RolePresetOrderField",
@@ -74,7 +73,7 @@ class RolePresetOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Specifies ordering for role preset results.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
     ),
     name="RolePresetOrderBy",
 )

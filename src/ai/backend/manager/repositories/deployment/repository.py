@@ -38,7 +38,10 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.gql_legacy.statistics import EndpointStatistics, KernelStatistics
+from ai.backend.manager.clients.valkey_client.statistics import (
+    EndpointStatistics,
+    KernelStatistics,
+)
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
@@ -79,6 +82,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
+from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
@@ -100,7 +104,6 @@ from ai.backend.manager.repositories.base.updater import (
     Updater,
 )
 from ai.backend.manager.repositories.base.upserter import Upserter
-from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 
 from .db_source import DeploymentDBSource
@@ -536,6 +539,21 @@ class DeploymentRepository:
         (minimal) check set.
         """
         return await self._db_source.resolve_vfolder_permissions(vfolder_ids)
+
+    @deployment_repository_resilience.apply()
+    async def resolve_user_vfolder_permissions(
+        self,
+        user_id: uuid.UUID,
+        vfolder_ids: Sequence[VFolderUUID],
+    ) -> dict[VFolderUUID, MountPermission]:
+        """Resolve the requester's effective permission on each vfolder.
+
+        Used at revision-write time to ground the model vfolder mount
+        permission into the requesting user's own permission (and to reject
+        a request exceeding it) — see
+        ``DeploymentDBSource.resolve_user_vfolder_permissions``.
+        """
+        return await self._db_source.resolve_user_vfolder_permissions(user_id, vfolder_ids)
 
     @deployment_repository_resilience.apply()
     async def fetch_deployment_config(

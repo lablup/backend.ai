@@ -99,15 +99,17 @@ async def test_set_content_type_nosniff_policy(async_handler: Handler) -> None:
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
 
-async def test_csp_policy_injects_nonce_into_script_and_style_src(async_handler: Handler) -> None:
+async def test_csp_policy_injects_nonce_into_directives_with_keyword(
+    async_handler: Handler,
+) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[],
         response_policies=[
             csp_policy_builder({
                 "default-src": ["'self'"],
-                "script-src": ["'self'"],
-                "style-src": ["'self'", "'unsafe-inline'"],
+                "script-src": ["'self'", "'nonce'"],
+                "style-src": ["'self'", "'nonce'"],
             })
         ],
     )
@@ -125,15 +127,82 @@ async def test_csp_policy_injects_nonce_into_script_and_style_src(async_handler:
     assert style_nonce is not None
     # Same nonce is shared across directives within a single request.
     assert script_nonce.group(1) == style_nonce.group(1)
-    # default-src is not a nonce-able directive, so it stays untouched.
+    # The placeholder keyword is replaced in place, not left behind.
+    assert "'nonce'" not in script_directive
+    # default-src has no nonce keyword, so it stays untouched.
     assert _NONCE_RE.search(default_directive) is None
+
+
+async def test_csp_policy_skips_directive_without_nonce_keyword(async_handler: Handler) -> None:
+    test_app = web.Application()
+    test_app["security_policy"] = SecurityPolicy(
+        request_policies=[],
+        response_policies=[csp_policy_builder({"script-src": ["'self'"]})],
+    )
+    request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=test_app)
+    response = await security_policy_middleware(request, async_handler)
+
+    assert response.headers["Content-Security-Policy"] == "script-src 'self';"
+
+
+async def test_csp_policy_drops_nonce_when_unsafe_inline_present(
+    async_handler: Handler, caplog: pytest.LogCaptureFixture
+) -> None:
+    test_app = web.Application()
+    test_app["security_policy"] = SecurityPolicy(
+        request_policies=[],
+        response_policies=[
+            csp_policy_builder({"style-src": ["'self'", "'unsafe-inline'", "'nonce'"]})
+        ],
+    )
+    request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=test_app)
+    with caplog.at_level("WARNING"):
+        response = await security_policy_middleware(request, async_handler)
+
+    csp = response.headers["Content-Security-Policy"]
+    # The nonce is dropped and the placeholder keyword is removed, but 'unsafe-inline' stays.
+    assert _NONCE_RE.search(csp) is None
+    assert "'nonce'" not in csp
+    assert "'unsafe-inline'" in csp
+    assert any("unsafe-inline" in record.message for record in caplog.records)
+
+
+async def test_csp_policy_keeps_nonce_with_other_unsafe_keywords(async_handler: Handler) -> None:
+    # Only 'unsafe-inline' conflicts with a nonce; 'unsafe-eval' is orthogonal and coexists.
+    test_app = web.Application()
+    test_app["security_policy"] = SecurityPolicy(
+        request_policies=[],
+        response_policies=[
+            csp_policy_builder({"script-src": ["'self'", "'unsafe-eval'", "'nonce'"]})
+        ],
+    )
+    request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=test_app)
+    response = await security_policy_middleware(request, async_handler)
+
+    csp = response.headers["Content-Security-Policy"]
+    assert _NONCE_RE.search(csp) is not None
+    assert "'unsafe-eval'" in csp
+    assert "'nonce'" not in csp
+
+
+async def test_csp_policy_nonces_any_directive_with_keyword(async_handler: Handler) -> None:
+    # The nonce keyword is honored regardless of the directive name.
+    test_app = web.Application()
+    test_app["security_policy"] = SecurityPolicy(
+        request_policies=[],
+        response_policies=[csp_policy_builder({"style-src-elem": ["'self'", "'nonce'"]})],
+    )
+    request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=test_app)
+    response = await security_policy_middleware(request, async_handler)
+
+    assert _NONCE_RE.search(response.headers["Content-Security-Policy"]) is not None
 
 
 async def test_csp_policy_uses_new_nonce_per_request(async_handler: Handler) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[],
-        response_policies=[csp_policy_builder({"script-src": ["'self'"]})],
+        response_policies=[csp_policy_builder({"script-src": ["'self'", "'nonce'"]})],
     )
 
     def nonce_of(response: web.StreamResponse) -> str:

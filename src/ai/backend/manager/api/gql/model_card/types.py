@@ -75,7 +75,6 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -547,7 +546,7 @@ class DeployModelCardPayloadGQL(PydanticOutputMixin[DeployPayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Options for the model card delete operation.",
     ),
     name="DeleteModelCardV2Options",
@@ -566,7 +565,7 @@ class DeleteModelCardOptionsGQL(PydanticInputMixin[DeleteOptionsDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Input for bulk-deleting multiple model cards.",
     ),
     name="BulkDeleteModelCardsV2Input",
@@ -581,7 +580,7 @@ class BulkDeleteModelCardsV2InputGQL(PydanticInputMixin[BulkDeleteCardsInputDTO]
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Error information for a model card that failed during bulk deletion.",
     ),
     model=BulkDeleteModelCardV2ErrorDTO,
@@ -594,7 +593,7 @@ class BulkDeleteModelCardV2ErrorGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Payload for bulk model card deletion.",
     ),
     model=BulkDeleteCardsPayloadDTO,

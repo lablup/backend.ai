@@ -41,7 +41,6 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
     ImageTagInfo,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -447,7 +446,7 @@ class ImageV2FilterGQL(PydanticInputMixin[ImageFilterInputDTO], GQLFilter):
     name: StringFilter | None = None
     architecture: StringFilter | None = None
     id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by image UUID."),
+        BackendAIGQLMeta(added_version="26.4.4", description="Filter by image UUID."),
         default=None,
     )
     registry_id: UUIDFilter | None = gql_added_field(

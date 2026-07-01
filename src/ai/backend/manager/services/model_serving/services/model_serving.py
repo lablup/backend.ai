@@ -85,6 +85,8 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import RuntimeVariantNotFound
 from ai.backend.manager.errors.service import (
     EndpointAccessForbiddenError,
@@ -154,10 +156,6 @@ from ai.backend.manager.services.model_serving.actions.update_route import (
 from ai.backend.manager.services.model_serving.actions.validate_model_service import (
     ValidateModelServiceAction,
     ValidateModelServiceActionResult,
-)
-from ai.backend.manager.services.model_serving.exceptions import (
-    GenericForbidden,
-    InvalidAPIParameters,
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -394,6 +392,7 @@ class ModelServingService:
                 model_vfolder_id=model_vfolder_id,
                 model_definition_path=None,
                 model_mount_destination=action.config.model_mount_destination,
+                model_mount_perm=MountPermission.READ_ONLY,
                 extra_mounts=[
                     MountInfoEntry(
                         vfolder_id=VFolderUUID(m.vfid.folder_id),
@@ -812,7 +811,8 @@ class ModelServingService:
         # 1. Apply endpoint-level changes (name, resource_group, replicas)
         #    via the existing repository method (which only writes endpoint columns).
         result = await self._repository.modify_endpoint_fields(
-            action,
+            action.deployment_id,
+            action.updater,
             self._agent_registry,
             self._config_provider.legacy_etcd_config_loader,
         )
@@ -839,6 +839,7 @@ class ModelServingService:
                     model_definition_path=definition_path_override,
                     model_mount_destination=latest_draft.mounts.model_mount_destination,
                     extra_mounts=list(latest_draft.mounts.extra_mounts),
+                    model_mount_perm=latest_draft.mounts.model_mount_perm,
                     vfolder_subpath=latest_draft.mounts.vfolder_subpath,
                 )
             )

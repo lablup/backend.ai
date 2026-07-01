@@ -45,7 +45,7 @@ class TestEtcdProvider:
         )
 
         # Create traefik config
-        traefik_config = TraefikConfig(etcd=etcd_config)
+        traefik_config = TraefikConfig(etcd=etcd_config, client_ip_strategy=None)
 
         # Create configs with Mock
         proxy_config = Mock(spec=ProxyCoordinatorConfig)

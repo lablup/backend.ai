@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
+from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
+from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
@@ -14,6 +16,12 @@ if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.rbac.response import EntityNode  # pants: no-infer-dep
     from ai.backend.manager.api.adapters.registry import Adapters  # pants: no-infer-dep
     from ai.backend.manager.api.gql.agent.types import AgentV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.app_config_allow_list.types import (  # pants: no-infer-dep
+        AppConfigAllowListGQL,
+    )
+    from ai.backend.manager.api.gql.app_config_definition.types import (  # pants: no-infer-dep
+        AppConfigDefinitionGQL,
+    )
     from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
         ArtifactRevision,
     )
@@ -86,6 +94,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
         RuntimeVariantGQL,
     )
+    from ai.backend.manager.api.gql.runtime_variant_preset.types import (  # pants: no-infer-dep
+        RuntimeVariantPresetGQL,
+    )
     from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
         DeploymentHistory,
         RouteHistory,
@@ -115,6 +126,42 @@ class DataLoaders:
 
     def __init__(self, adapters: Adapters) -> None:
         self._adapters = adapters
+
+    @cached_property
+    def app_config_allow_list_loader(
+        self,
+    ) -> DataLoader[AppConfigAllowListID, AppConfigAllowListGQL | None]:
+        adapter = self._adapters.app_config_allow_list
+
+        async def load_fn(
+            ids: list[AppConfigAllowListID],
+        ) -> list[AppConfigAllowListGQL | None]:
+            from ai.backend.manager.api.gql.app_config_allow_list.types import (  # pants: no-infer-dep
+                AppConfigAllowListGQL as ACL,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [ACL.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def app_config_definition_loader(
+        self,
+    ) -> DataLoader[AppConfigDefinitionID, AppConfigDefinitionGQL | None]:
+        adapter = self._adapters.app_config_definition
+
+        async def load_fn(
+            ids: list[AppConfigDefinitionID],
+        ) -> list[AppConfigDefinitionGQL | None]:
+            from ai.backend.manager.api.gql.app_config_definition.types import (  # pants: no-infer-dep
+                AppConfigDefinitionGQL as ACD,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [ACD.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
 
     @cached_property
     def audit_log_loader(
@@ -826,6 +873,22 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [RV.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def runtime_variant_preset_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, RuntimeVariantPresetGQL | None]:
+        adapter = self._adapters.runtime_variant_preset
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[RuntimeVariantPresetGQL | None]:
+            from ai.backend.manager.api.gql.runtime_variant_preset.types import (  # pants: no-infer-dep
+                RuntimeVariantPresetGQL as RVP,
+            )
+
+            nodes = await adapter.batch_load_by_ids(ids)
+            return [RVP.from_pydantic(node) if node is not None else None for node in nodes]
 
         return DataLoader(load_fn=load_fn)
 

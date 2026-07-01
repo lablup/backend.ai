@@ -59,6 +59,7 @@ only the **required** services start. To include optional ones, pass `--profile 
 | `backendai-half-otel-collector` | OTel Collector | Trace / metric export | `telemetry`, `observability` |
 | `backendai-half-loki` | Loki | Log aggregation | `telemetry`, `observability` |
 | `backendai-half-grafana` | Grafana | Dashboards | `observability` |
+| `backendai-half-grafana-mcp` | mcp/grafana | Grafana MCP server (streamable-http on :3001/mcp) — Claude queries logs/metrics through it | `observability` |
 | `backendai-half-tempo` | Tempo | Tracing | `observability` |
 | `backendai-half-pyroscope` | Pyroscope | Profiling | `observability` |
 | `backendai-half-db-exporter` | postgres-exporter | Postgres metrics | `observability` |

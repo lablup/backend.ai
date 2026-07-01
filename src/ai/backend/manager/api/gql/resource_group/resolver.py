@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     ReplaceResourceGroupDefaultSessionOptionsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import DeleteResourceGroupPayload
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -228,7 +227,7 @@ async def admin_update_resource_group(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Fully replace a resource group's ``default_deployment_options`` (admin only)."
             " Replace semantics — the supplied payload is the complete new value."
@@ -263,7 +262,7 @@ async def replace_resource_group_default_deployment_options(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Fully replace a resource group's ``default_session_options`` (admin only)."
             " Replace semantics — the supplied payload is the complete new value."

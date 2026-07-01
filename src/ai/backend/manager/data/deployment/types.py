@@ -30,6 +30,7 @@ from ai.backend.common.identifier.deployment_revision import DeploymentRevisionI
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.data.session.options import HandlerOptions
@@ -50,10 +51,10 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
-    PresetValueData,
     ResourceSlotEntryData,
 )
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
+from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 
 
 class DeploymentConfig(BackendAISchema):
@@ -418,6 +419,12 @@ class MountMetadata:
     model_definition_path: str | None
     model_mount_destination: str
     extra_mounts: list[MountInfoEntry]
+    # Resolved permission for the model vfolder mount, frozen at
+    # revision-write time (READ_ONLY for vfolder/model-card deploy, the
+    # requester's own effective permission for deployment create/revision
+    # add). ``None`` means "not yet resolved"; the draft builder falls back
+    # to READ_ONLY so legacy rows keep their historical behavior.
+    model_mount_perm: MountPermission | None
     # Subpath within the model vfolder. ``None`` means the vfolder root.
     vfolder_subpath: str | None = None
 
@@ -586,10 +593,10 @@ class ExecutionSpec(ConfiguredModel):
     inference_runtime_config: Mapping[str, Any] | None = None
 
 
-class PresetValueSpec(ConfiguredModel):
+class RuntimeVariantPresetValueSpec(ConfiguredModel):
     """A runtime variant preset value binding stored in a deployment revision."""
 
-    preset_id: DeploymentPresetID
+    preset_id: RuntimeVariantPresetID
     value: str
 
 
@@ -604,7 +611,7 @@ class ModelRevisionSpec(ConfiguredModel):
     mounts: MountMetadata
     execution: ExecutionSpec
     model_definition: ModelDefinition | None = None
-    preset_values: list[PresetValueSpec] = Field(default_factory=list)
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueSpec] = Field(default_factory=list)
     # Original deployment-level preset selection used to build this revision.
     # ``None`` for legacy rows and revisions created without a preset; the
     # materialised effects still live on ``preset_values`` and the resolved
@@ -689,8 +696,8 @@ class RevisionDraft:
     # Model definition (draft form — partial fields allowed; merged then resolved
     # to a strict ``ModelDefinition`` at the persistence boundary).
     model_definition: ModelDefinitionDraft | None = None
-    # Preset values (carried alongside; not field-merged)
-    preset_values: list[PresetValueData] | None = None
+    # Runtime variant preset values (carried alongside; merged by ``preset_id``)
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueData] | None = None
 
     def merge(self, other: RevisionDraft) -> RevisionDraft:
         """Return a new draft with ``other`` layered on top of ``self``."""
@@ -722,9 +729,9 @@ class RevisionDraft:
             if other.inference_runtime_config is not None
             else self.inference_runtime_config,
             model_definition=_merge_model_definition(self.model_definition, other.model_definition),
-            preset_values=list(other.preset_values)
-            if other.preset_values is not None
-            else (list(self.preset_values) if self.preset_values is not None else None),
+            runtime_variant_preset_values=_merge_preset_values(
+                self.runtime_variant_preset_values, other.runtime_variant_preset_values
+            ),
         )
 
     def to_model_revision_spec(self) -> ModelRevisionSpec:
@@ -777,6 +784,7 @@ def _merge_mounts(
             model_definition_path=upper.model_definition_path,
             model_mount_destination=upper.model_mount_destination,
             extra_mounts=list(upper.extra_mounts),
+            model_mount_perm=upper.model_mount_perm,
             vfolder_subpath=upper.vfolder_subpath,
         )
     return MountMetadata(
@@ -786,6 +794,9 @@ def _merge_mounts(
         else lower.model_definition_path,
         model_mount_destination=upper.model_mount_destination,
         extra_mounts=list(upper.extra_mounts),
+        model_mount_perm=upper.model_mount_perm
+        if upper.model_mount_perm is not None
+        else lower.model_mount_perm,
         vfolder_subpath=upper.vfolder_subpath if upper.vfolder_subpath else lower.vfolder_subpath,
     )
 
@@ -802,6 +813,28 @@ def _merge_mappings(
     if upper is not None:
         merged.update(upper)
     return merged or None
+
+
+def _merge_preset_values(
+    lower: list[RuntimeVariantPresetValueData] | None,
+    upper: list[RuntimeVariantPresetValueData] | None,
+) -> list[RuntimeVariantPresetValueData] | None:
+    """Merge runtime-variant preset values by ``preset_id``.
+
+    ``upper`` (higher-priority source, e.g. the user request) overrides
+    ``lower`` (e.g. the revision-preset template) per ``preset_id``; preset_ids
+    only present in ``lower`` are preserved. ``None`` on a side means "this
+    source supplied no values" and is skipped. Returns ``None`` only when both
+    sides are ``None``.
+    """
+    if lower is None and upper is None:
+        return None
+    merged: dict[RuntimeVariantPresetID, RuntimeVariantPresetValueData] = {}
+    for pv in lower or []:
+        merged[pv.preset_id] = pv
+    for pv in upper or []:
+        merged[pv.preset_id] = pv
+    return list(merged.values())
 
 
 def _merge_model_definition(
@@ -942,14 +975,6 @@ class ScaleOutDecision:
     target_revision_id: DeploymentRevisionID | None = None
 
 
-_HEALTH_TERMINATION_PRIORITY: dict[RouteHealthStatus, int] = {
-    RouteHealthStatus.UNHEALTHY: 1,
-    RouteHealthStatus.DEGRADED: 2,
-    RouteHealthStatus.NOT_CHECKED: 3,
-    RouteHealthStatus.HEALTHY: 4,
-}
-
-
 @dataclass
 class RouteInfo:
     """Route information for deployment."""
@@ -966,17 +991,6 @@ class RouteInfo:
     health_check: ModelHealthCheck | None
     replica_group_id: ReplicaGroupID | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def termination_priority(self) -> int:
-        """Priority for scale-in termination (lower = terminated first).
-
-        Non-RUNNING routes are terminated first (0).
-        Among RUNNING routes: UNHEALTHY(1) > DEGRADED(2) > NOT_CHECKED(3) > HEALTHY(4).
-        """
-        if self.status != RouteStatus.RUNNING:
-            return 0
-        return _HEALTH_TERMINATION_PRIORITY.get(self.health_status, 0)
 
 
 @dataclass
@@ -1054,6 +1068,7 @@ class ModelRuntimeConfigData:
     runtime_variant_id: RuntimeVariantID
     inference_runtime_config: Mapping[str, Any] | None = None
     environ: dict[str, Any] | None = None
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueData] = field(default_factory=list)
 
 
 @dataclass
@@ -1065,6 +1080,10 @@ class ModelMountConfigData:
     # this data-layer projection — keeps ``mount_perm`` visible end-to-end
     # so modify flows can carry it over without information loss.
     extra_mounts: list[MountInfoEntry]
+    # Resolved permission of the model vfolder mount, frozen on the revision.
+    # Always concrete (the row column is NOT NULL; legacy rows backfilled to
+    # ``ro``), so refresh/rebuild flows preserve the original permission.
+    model_mount_perm: MountPermission
     # Subpath within the model vfolder. ``None`` means the vfolder root.
     subpath: str | None = None
 
@@ -1104,7 +1123,8 @@ class PresetAttributionData:
     """
 
     preset_id: DeploymentPresetID | None
-    values: list[PresetValueData]
+    # value fields are not used, currently dead code
+    values: list[RuntimeVariantPresetValueData]
 
 
 @dataclass
@@ -1127,7 +1147,7 @@ class ModelRevisionData:
     # Mount
     model_mount_config: ModelMountConfigData
     # Preset attribution
-    preset: PresetAttributionData
+    revision_preset: PresetAttributionData
     # Model definition (resolved against the model vfolder at
     # persistence time; ``None`` if the source had none).
     model_definition: ModelDefinition | None = None
@@ -1142,7 +1162,7 @@ class ModelRevisionData:
         ``model_runtime_config`` (runtime variant + environ +
         inference_runtime_config), ``execution`` (startup_command /
         bootstrap_script / callback_url), and ``model_definition`` —
-        flows back into the draft as the baseline; preset /
+        flows back into the draft as the baseline; revision_preset /
         ``deployment-config.yaml`` / ``model-definition.yaml`` / user
         request layers then override on top via ``merge_revision_drafts``.
         """
@@ -1162,6 +1182,7 @@ class ModelRevisionData:
                     model_definition_path=self.model_mount_config.definition_path or None,
                     model_mount_destination=self.model_mount_config.mount_destination or "/models",
                     extra_mounts=list(self.model_mount_config.extra_mounts),
+                    model_mount_perm=self.model_mount_config.model_mount_perm,
                     vfolder_subpath=self.model_mount_config.subpath,
                 )
                 if self.model_mount_config.vfolder_id is not None
@@ -1178,6 +1199,10 @@ class ModelRevisionData:
             callback_url=self.execution.callback_url,
             inference_runtime_config=self.model_runtime_config.inference_runtime_config,
             model_definition=model_definition_draft,
+            runtime_variant_preset_values=list(
+                self.model_runtime_config.runtime_variant_preset_values
+            )
+            or None,
         )
 
 

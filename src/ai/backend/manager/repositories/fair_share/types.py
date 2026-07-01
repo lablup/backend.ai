@@ -21,10 +21,11 @@ from ai.backend.manager.errors.resource import (
     ProjectNotFound,
     ScalingGroupNotFound,
 )
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 __all__ = (
     # Scope types

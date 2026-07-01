@@ -36,6 +36,11 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
+from ai.backend.manager.data.sokovan import (
+    KernelCreationInfo,
+    PromotionSpec,
+    SessionWithKernels,
+)
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.session.conditions import SessionConditions
@@ -47,11 +52,6 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
 from ai.backend.manager.repositories.scheduling_history.creators import (
     SessionSchedulingHistoryCreatorSpec,
-)
-from ai.backend.manager.sokovan.data import (
-    KernelCreationInfo,
-    PromotionSpec,
-    SessionWithKernels,
 )
 from ai.backend.manager.sokovan.recorder.pool import RecordPool
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord

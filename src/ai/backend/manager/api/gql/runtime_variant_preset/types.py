@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Self
 from uuid import UUID
 
 from strawberry.relay import Connection, Edge, NodeID
@@ -217,7 +218,7 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     )
     required: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Whether this preset parameter must be supplied when building a deployment revision.",
         )
     )
@@ -256,6 +257,24 @@ class RuntimeVariantPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     runtime_variant_id: UUIDFilterGQL | None = gql_field(
         default=None, description="Variant ID filter."
     )
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
@@ -291,7 +310,7 @@ class CreateRuntimeVariantPresetInputGQL(PydanticInputMixin[CreateInputDTO]):
     )
     required: bool = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Whether this preset parameter must be supplied when building a deployment revision.",
         ),
         default=False,
@@ -312,7 +331,7 @@ class UpdateRuntimeVariantPresetInputGQL(PydanticInputMixin[UpdateInputDTO]):
     default_value: str | None = gql_field(default=None, description="New default value.")
     key: str | None = gql_field(default=None, description="New key.")
     required: bool | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="New required flag."),
+        BackendAIGQLMeta(added_version="26.4.4", description="New required flag."),
         default=None,
     )
 

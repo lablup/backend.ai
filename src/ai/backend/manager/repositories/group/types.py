@@ -11,12 +11,13 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import DomainNotFound
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 __all__ = (
     "GroupSearchResult",

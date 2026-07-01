@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.v2.role_preset.response import (
 from ai.backend.common.dto.manager.v2.role_preset.response import (
     UpdateRolePresetPayload as UpdateRolePresetPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -35,7 +34,7 @@ from .node import RolePresetGQL
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Payload returned after creating a role preset.",
     ),
     model=CreateRolePresetPayloadDTO,
@@ -47,7 +46,7 @@ class CreateRolePresetPayloadGQL(PydanticOutputMixin[CreateRolePresetPayloadDTO]
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Payload returned after updating a role preset.",
     ),
     model=UpdateRolePresetPayloadDTO,
@@ -59,7 +58,7 @@ class UpdateRolePresetPayloadGQL(PydanticOutputMixin[UpdateRolePresetPayloadDTO]
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Failure detail for a single role preset ID in a bulk operation.",
     ),
     model=BulkRolePresetFailureInfoDTO,
@@ -72,7 +71,7 @@ class BulkRolePresetFailureInfoGQL(PydanticOutputMixin[BulkRolePresetFailureInfo
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Payload returned after bulk-soft-deleting role presets.",
     ),
     model=BulkDeleteRolePresetsPayloadDTO,
@@ -87,7 +86,7 @@ class BulkDeleteRolePresetsPayloadGQL(PydanticOutputMixin[BulkDeleteRolePresetsP
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Payload returned after bulk-restoring soft-deleted role presets.",
     ),
     model=BulkRestoreRolePresetsPayloadDTO,
@@ -102,7 +101,7 @@ class BulkRestoreRolePresetsPayloadGQL(PydanticOutputMixin[BulkRestoreRolePreset
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Payload returned after bulk-hard-deleting role presets.",
     ),
     model=BulkPurgeRolePresetsPayloadDTO,

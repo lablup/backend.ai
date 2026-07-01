@@ -461,6 +461,7 @@ class VirtualFolderConnection(Connection):
         description = "Added in 24.03.4"
 
 
+@graphene_federation.key("id")
 class ModelCard(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
@@ -700,6 +701,11 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
             readme=readme,
             readme_filetype=readme_filetype,
         )
+
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> ModelCard | None:
+        return await ModelCard.get_node(info, self.id)
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:

@@ -118,15 +118,17 @@ async def test_autoscale_rearms_scaling_when_live_routes_drop() -> None:
     assert decision.next_desired_current_replica_count == 4
 
 
-async def test_autoscale_rearms_scaling_when_serving_short_of_live() -> None:
-    # A leftover PROVISIONING route counts as live but not serving yet.
+async def test_autoscale_stays_stable_when_serving_short_but_count_met() -> None:
+    # Resource-starved steady state: count is met (live == goal) but some routes never reach
+    # serving. Health is judged separately, so scaling must NOT re-arm here — otherwise the
+    # group oscillates STABLE<->SCALING and a falling goal (scale-down) would never apply.
     view = _autoscale_view(
         current_live=4,
         current_serving=3,
         current_revision_id=DeploymentRevisionID(uuid.uuid4()),
     )
     decision = await _autoscale_decision(view)
-    assert decision.outcome() is HandlerOutcome.FAILURE
+    assert decision.outcome() is HandlerOutcome.SUCCESS
 
 
 async def test_autoscale_rearms_scaling_when_goal_changes() -> None:

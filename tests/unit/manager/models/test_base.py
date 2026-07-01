@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import sqlalchemy as sa
+from sqlalchemy.engine.default import DefaultDialect
 
 from ai.backend.manager.api.gql_legacy.base import batch_result_in_scalar_stream
-from ai.backend.manager.models.base import DecimalType
+from ai.backend.manager.models.base import ABCColumn, ABCColumnPayload, DecimalType
 
 
 async def test_batch_result_in_scalar_stream() -> None:
@@ -86,3 +88,52 @@ class TestDecimalType:
         decimal_type = DecimalType()
         result = decimal_type.process_result_value(None, None)  # type: ignore[arg-type]
         assert result is None
+
+
+class _Shape(ABCColumnPayload):
+    """Test-only polymorphic payload base; `load` dispatches by the `kind` tag."""
+
+    @classmethod
+    def load(cls, raw: dict[str, Any]) -> _Shape:
+        kind = raw["kind"]
+        if kind == "circle":
+            return _Circle(radius=raw["radius"])
+        if kind == "square":
+            return _Square(side=raw["side"])
+        raise ValueError(f"unknown shape kind: {kind!r}")
+
+
+@dataclass
+class _Circle(_Shape):
+    radius: float
+
+    def serialize(self) -> dict[str, Any]:
+        return {"kind": "circle", "radius": self.radius}
+
+
+@dataclass
+class _Square(_Shape):
+    side: float
+
+    def serialize(self) -> dict[str, Any]:
+        return {"kind": "square", "side": self.side}
+
+
+class TestABCColumn:
+    def test_process_bind_param_serializes_to_dict(self) -> None:
+        column = ABCColumn(_Shape)
+        result = column.process_bind_param(_Circle(radius=2.0), DefaultDialect())
+        assert result == {"kind": "circle", "radius": 2.0}
+
+    def test_process_result_value_rehydrates_typed_object(self) -> None:
+        column = ABCColumn(_Shape)
+        result = column.process_result_value({"kind": "square", "side": 3.0}, DefaultDialect())
+        assert result == _Square(side=3.0)
+
+    def test_roundtrip_preserves_concrete_subtype(self) -> None:
+        column = ABCColumn(_Shape)
+        original = _Circle(radius=1.5)
+        stored = column.process_bind_param(original, DefaultDialect())
+        restored = column.process_result_value(stored, DefaultDialect())
+        assert restored == original
+        assert type(restored) is _Circle

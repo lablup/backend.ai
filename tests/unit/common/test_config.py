@@ -6,12 +6,14 @@ import tomli
 
 from ai.backend.common.config import (
     ModelConfig,
+    ModelConfigDraft,
     ModelDefinition,
     ModelDefinitionDraft,
     ModelHealthCheck,
     ModelHealthCheckDraft,
     ModelMetadata,
     ModelServiceConfig,
+    ModelServiceConfigDraft,
     _merge_config,
     _merge_config_draft,
     _merge_definition,
@@ -338,6 +340,62 @@ class TestHealthCheckEnable:
         result = _merge_service_config(base, override)
         assert result.health_check is not None
         assert result.health_check.enable is True
+
+
+class TestModelDefinitionDraftMerge:
+    """Tests for patch-style draft model-definition merge."""
+
+    def test_null_service_fields_do_not_override_baseline(self) -> None:
+        base = ModelConfigDraft(
+            name="base",
+            model_path="/models",
+            service=ModelServiceConfigDraft(
+                pre_start_actions=[],
+                start_command=["/models/start.sh"],
+                shell="/bin/sh",
+                port=8000,
+                health_check=ModelHealthCheckDraft(
+                    enable=True,
+                    interval=10.0,
+                    path="/health",
+                    max_retries=80,
+                    max_wait_time=30.0,
+                    expected_status_code=200,
+                    initial_delay=300.0,
+                ),
+            ),
+        )
+        override = ModelConfigDraft(
+            name=None,
+            model_path=None,
+            service=ModelServiceConfigDraft(
+                pre_start_actions=None,
+                start_command=None,
+                shell=None,
+                port=None,
+                health_check=ModelHealthCheckDraft(
+                    enable=False,
+                    interval=1.0,
+                    path="/override",
+                    max_retries=1,
+                    max_wait_time=1.0,
+                    expected_status_code=101,
+                    initial_delay=1.0,
+                ),
+            ),
+        )
+
+        merged = _merge_config_draft(base, override).to_resolved()
+
+        assert merged.name == "base"
+        assert merged.model_path == "/models"
+        assert merged.service is not None
+        assert merged.service.port == 8000
+        assert merged.service.start_command == ["/models/start.sh"]
+        assert merged.service.health_check is not None
+        assert merged.service.health_check.enable is False
+        assert merged.service.health_check.path == "/override"
+        assert merged.service.health_check.expected_status_code == 101
 
 
 class TestHealthCheckJudgment:
