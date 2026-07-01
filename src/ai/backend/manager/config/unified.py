@@ -1912,6 +1912,25 @@ class InterContainerNetworkConfig(BaseConfigSchema):
             example=ConfigExample(local="{}", prod="{}"),
         ),
     ]
+    forced_backend: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("forced_backend", "forced-backend"),
+            serialization_alias="forced-backend",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Pins the cluster-network data-plane backend when default_driver='cni'. "
+                "One of 'vxlan', 'host-gw', or 'wireguard'. "
+                "When unset (null), the backend is selected per session from agent capabilities "
+                "('host-gw' if all members support native routing, otherwise 'vxlan'). "
+                "See BEP-1055."
+            ),
+            added_version="25.14.0",
+            example=ConfigExample(local="vxlan", prod="null"),
+        ),
+    ]
 
 
 class SubnetNetworkConfig(BaseConfigSchema):
