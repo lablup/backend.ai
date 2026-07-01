@@ -18,9 +18,11 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 class _SqlStateError(Exception):
     sqlstate: str
+    pgcode: str
 
     def __init__(self, sqlstate: str) -> None:
         self.sqlstate = sqlstate
+        self.pgcode = sqlstate
 
 
 class _FakeImageRow:
@@ -53,11 +55,17 @@ class _FakeSession:
     def __init__(self, db: _FakeDB) -> None:
         self._db = db
 
+    async def execute(self, _stmt: Any) -> None:
+        self._db.lock_count += 1
+        self._db.operations.append("lock")
+
     async def scalars(self, _stmt: Any) -> list[_FakeImageRow]:
+        self._db.operations.append("scan")
         return [self._db.image_row]
 
     async def flush(self) -> None:
         self._db.flush_count += 1
+        self._db.operations.append("flush")
         if self._db.flush_count == 1:
             raise DBAPIError(None, None, _SqlStateError("40001"))
 
@@ -65,12 +73,16 @@ class _FakeSession:
 class _FakeDB:
     image_row: _FakeImageRow
     begin_count: int
+    lock_count: int
     flush_count: int
+    operations: list[str]
 
     def __init__(self, image_row: _FakeImageRow) -> None:
         self.image_row = image_row
         self.begin_count = 0
+        self.lock_count = 0
         self.flush_count = 0
+        self.operations = []
 
     @asynccontextmanager
     async def begin_session(self) -> AsyncIterator[_FakeSession]:
@@ -194,6 +206,8 @@ class TestCommitRescanResult:
         assert active_updates[update_key]["config_digest"] == "sha256:updated"
         assert result == [image_data]
         assert db.begin_count == 2
+        assert db.lock_count == 2
+        assert db.operations[:2] == ["lock", "scan"]
         assert db.flush_count == 2
         assert image_row.config_digest == "sha256:updated"
         assert image_row.size_bytes == 1024

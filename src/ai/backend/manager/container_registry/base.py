@@ -8,7 +8,6 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from typing import (
-    TYPE_CHECKING,
     Any,
     Final,
     cast,
@@ -50,6 +49,7 @@ from ai.backend.manager.data.image.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.manager.exceptions import ScanImageError, ScanTagError
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
@@ -76,9 +76,6 @@ commit_rescan_result_resilience = Resilience(
         ),
     ]
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
@@ -221,6 +218,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         pending_updates = dict(original_updates)
 
         async with self.db.begin_session() as session:
+            # Serialize commits per registry. Some images may not exist yet, so locking
+            # only ImageRow cannot prevent concurrent insert races for the same registry.
+            await session.execute(
+                sa.select(ContainerRegistryRow.id)
+                .where(ContainerRegistryRow.id == self.registry_info.id)
+                .with_for_update()
+            )
             existing_images = await session.scalars(
                 sa.select(ImageRow).where(
                     sa.func.ROW(ImageRow.name, ImageRow.architecture).in_(image_identifiers),
