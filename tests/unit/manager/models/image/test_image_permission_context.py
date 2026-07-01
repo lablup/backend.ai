@@ -25,9 +25,6 @@ from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.image import ImageRow
@@ -38,20 +35,12 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
-)
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
@@ -65,16 +54,7 @@ PROJECT_RESOURCE_POLICY_NAME = "test-project-policy"
 
 _ORM_CLUSTER = (
     AgentRow,
-    DeploymentAutoScalingPolicyRow,
-    DeploymentPolicyRow,
-    DeploymentRevisionRow,
-    ReplicaGroupRow,
-    ResourcePresetRow,
-    RuntimeVariantRow,
     ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
 )
 
 

@@ -14,37 +14,17 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.group.row import resolve_group_name_or_id
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
-)
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
-    DeploymentAutoScalingPolicyRow,
-    DeploymentPolicyRow,
-    DeploymentRevisionRow,
-    ReplicaGroupRow,
-    ResourcePresetRow,
-    RuntimeVariantRow,
     ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
 )
 
 

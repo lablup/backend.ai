@@ -12,95 +12,11 @@ import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
-
-# ORM cluster registration: configure_mappers() (triggered when this isolated
-# test registers a domain-cluster row) resolves string relationships against the
-# registry. These rows are reachable via relationships but are not otherwise
-# imported/registered by this test; _ORM_CLUSTER keeps them live.
-from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-from ai.backend.manager.models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
-)
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import (
-    EndpointAutoScalingRuleRow,
-    EndpointRow,
-    EndpointTokenRow,
-)
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.network import NetworkRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_policy import (
-    KeyPairResourcePolicyRow,
-    ProjectResourcePolicyRow,
-    UserResourcePolicyRow,
-)
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.resource_slot import (
-    AgentResourceRow,
-    DeploymentRevisionResourceSlotRow,
-    ResourceSlotTypeRow,
-)
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
-)
-from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderInvitationRow, VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.testutils.db import with_tables
-
-_ORM_CLUSTER = (
-    AgentResourceRow,
-    AgentRow,
-    AssocGroupUserRow,
-    AssociationContainerRegistriesGroupsRow,
-    ContainerRegistryRow,
-    DeploymentAutoScalingPolicyRow,
-    DeploymentPolicyRow,
-    DeploymentRevisionResourceSlotRow,
-    DeploymentRevisionRow,
-    DomainRow,
-    EndpointAutoScalingRuleRow,
-    EndpointRow,
-    EndpointTokenRow,
-    GroupRow,
-    ImageAliasRow,
-    ImageRow,
-    KernelRow,
-    KeyPairResourcePolicyRow,
-    KeyPairRow,
-    NetworkRow,
-    ProjectResourcePolicyRow,
-    ReplicaGroupRow,
-    ResourcePresetRow,
-    ResourceSlotTypeRow,
-    RoutingRow,
-    RuntimeVariantRow,
-    ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
-    SessionRow,
-    UserResourcePolicyRow,
-    VFolderInvitationRow,
-    VFolderPermissionRow,
-    VFolderRow,
-)
 
 
 class TestArtifactRegistryRepository:

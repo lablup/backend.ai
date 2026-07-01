@@ -28,22 +28,11 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
-)
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
@@ -66,16 +55,7 @@ CREATE_ROLE_TABLES: Sequence[TableOrORM] = [
 
 _ORM_CLUSTER = (
     AgentRow,
-    DeploymentAutoScalingPolicyRow,
-    DeploymentPolicyRow,
-    DeploymentRevisionRow,
-    ReplicaGroupRow,
-    ResourcePresetRow,
-    RuntimeVariantRow,
     ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
 )
 
 

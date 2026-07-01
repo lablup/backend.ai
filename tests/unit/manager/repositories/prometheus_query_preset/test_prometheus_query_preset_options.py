@@ -13,15 +13,6 @@ import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
-
-# ORM cluster registration: configure_mappers() (triggered when this isolated
-# test registers a domain-cluster row) resolves string relationships against the
-# registry. These rows are reachable via relationships but are not otherwise
-# imported/registered by this test; _ORM_CLUSTER keeps them live.
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
@@ -30,15 +21,6 @@ from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQ
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
 from ai.backend.manager.models.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryRow,
-)
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
@@ -49,20 +31,6 @@ from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.testutils.db import with_tables
-
-_ORM_CLUSTER = (
-    AgentRow,
-    DeploymentAutoScalingPolicyRow,
-    DeploymentPolicyRow,
-    DeploymentRevisionRow,
-    ReplicaGroupRow,
-    ResourcePresetRow,
-    RuntimeVariantRow,
-    ScalingGroupForDomainRow,
-    ScalingGroupForKeypairsRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
-)
 
 
 @dataclass(frozen=True)
