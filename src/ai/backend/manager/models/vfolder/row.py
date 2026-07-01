@@ -19,7 +19,6 @@ from typing import (
     override,
 )
 
-import aiotools
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.dialects import postgresql as pgsql
@@ -28,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -36,9 +36,17 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderID,
     VFolderMount,
+    VFolderMountOptions,
+    VFolderMountRequest,
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.permission.types import (
+    EntityType as PermissionEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as PermissionScopeType,
+)
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderInvitationState,
@@ -55,7 +63,6 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
     InsufficientStoragePermission,
-    VFolderGone,
     VFolderNotFound,
     VFolderOperationFailed,
     VFolderPermissionError,
@@ -68,7 +75,7 @@ from ai.backend.manager.models.base import (
     StrEnumType,
     metadata,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -86,6 +93,9 @@ from ai.backend.manager.models.rbac.exceptions import NotEnoughPermission
 from ai.backend.manager.models.rbac.permission_defs import StorageHostPermission
 from ai.backend.manager.models.rbac.permission_defs import (
     VFolderPermission as VFolderRBACPermission,
+)
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.storage import PermissionContext as StorageHostPermissionContext
@@ -123,7 +133,6 @@ __all__: Sequence[str] = (
     "filter_host_allowed_permission",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
-    "initiate_vfolder_deletion",
     "prepare_vfolder_mounts",
     "query_accessible_vfolders",
     "update_vfolder_status",
@@ -287,8 +296,11 @@ class VFolderCloneInfo(NamedTuple):
 class VFolderRow(Base):  # type: ignore[misc]
     __tablename__ = "vfolders"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[VFolderUUID] = mapped_column(
+        "id",
+        GUID(VFolderUUID),
+        primary_key=True,
+        server_default=sa.text("uuid_generate_v4()"),
     )
     # host will be '' if vFolder is unmanaged
     host: Mapped[str] = mapped_column("host", sa.String(length=128), nullable=False, index=True)
@@ -323,8 +335,16 @@ class VFolderRow(Base):  # type: ignore[misc]
     last_used: Mapped[datetime | None] = mapped_column(
         "last_used", sa.DateTime(timezone=True), nullable=True
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+        onupdate=sa.func.now(),
+    )
     # creator is always set to the user who created vfolder (regardless user/project types)
     creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
+    creator_id: Mapped[uuid.UUID | None] = mapped_column("creator_id", GUID, nullable=True)
     # unmanaged vfolder represents the host-side absolute path instead of storage-based path.
     unmanaged_path: Mapped[str | None] = mapped_column(
         "unmanaged_path", sa.String(length=512), nullable=True
@@ -430,7 +450,9 @@ class VFolderRow(Base):  # type: ignore[misc]
             cur_size=self.cur_size or 0,
             created_at=self.created_at or datetime.now(UTC),
             last_used=self.last_used,
+            updated_at=self.updated_at,
             creator=self.creator,
+            creator_id=self.creator_id,
             unmanaged_path=self.unmanaged_path,
             ownership_type=self.ownership_type,
             user=self.user,
@@ -487,9 +509,9 @@ class VFolderInvitationRow(Base):  # type: ignore[misc]
         nullable=True,
         onupdate=sa.func.current_timestamp(),
     )
-    vfolder: Mapped[uuid.UUID] = mapped_column(
+    vfolder: Mapped[VFolderUUID] = mapped_column(
         "vfolder",
-        GUID,
+        GUID(VFolderUUID),
         sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
@@ -512,9 +534,9 @@ class VFolderPermissionRow(Base):  # type: ignore[misc]
     permission: Mapped[VFolderPermission | None] = mapped_column(
         "permission", EnumValueType(VFolderPermission), default=VFolderPermission.READ_WRITE
     )
-    vfolder: Mapped[uuid.UUID] = mapped_column(
+    vfolder: Mapped[VFolderUUID] = mapped_column(
         "vfolder",
-        GUID,
+        GUID(VFolderUUID),
         sa.ForeignKey("vfolders.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
@@ -559,7 +581,6 @@ async def query_accessible_vfolders(
     extra_vf_group_conds: Any = None,
     allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[Mapping[str, Any]]:
-    from ai.backend.manager.models.group import association_groups_users as agus
     from ai.backend.manager.models.group import groups
     from ai.backend.manager.models.user import users
 
@@ -575,12 +596,14 @@ async def query_accessible_vfolders(
         vfolders.c.usage_mode,
         vfolders.c.created_at,
         vfolders.c.last_used,
+        vfolders.c.updated_at,
         vfolders.c.max_files,
         vfolders.c.max_size,
         vfolders.c.ownership_type,
         vfolders.c.user,
         vfolders.c.group,
         vfolders.c.creator,
+        vfolders.c.creator_id,
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
         vfolders.c.status,
@@ -611,12 +634,14 @@ async def query_accessible_vfolders(
                 "usage_mode": row.vfolders_usage_mode,
                 "created_at": row.vfolders_created_at,
                 "last_used": row.vfolders_last_used,
+                "updated_at": row.vfolders_updated_at,
                 "max_size": row.vfolders_max_size,
                 "max_files": row.vfolders_max_files,
                 "ownership_type": row.vfolders_ownership_type,
                 "user": str(row.vfolders_user) if row.vfolders_user else None,
                 "group": str(row.vfolders_group) if row.vfolders_group else None,
                 "creator": row.vfolders_creator,
+                "creator_id": row.vfolders_creator_id,
                 "user_email": row.users_email if "users_email" in row_keys else None,
                 "group_name": row.groups_name if "groups_name" in row_keys else None,
                 "is_owner": _is_owner,
@@ -688,11 +713,26 @@ async def query_accessible_vfolders(
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
-            j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select(agus.c.group_id).select_from(j).where(agus.c.user_id == user_uuid)
+            query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+                AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+            )
             result = await conn.execute(query)
             grps = result.fetchall()
-            group_ids = [g.group_id for g in grps]
+            group_ids = [uuid.UUID(g.scope_id) for g in grps]
+            # Include MODEL_STORE projects in the same domain for cross-project model access
+            from ai.backend.manager.data.group.types import ProjectType
+
+            model_store_query = sa.select(groups.c.id).where(
+                sa.and_(
+                    groups.c.domain_name == domain_name,
+                    groups.c.type == ProjectType.MODEL_STORE,
+                )
+            )
+            model_store_result = await conn.execute(model_store_query)
+            model_store_gids = [row.id for row in model_store_result.fetchall()]
+            group_ids = list({*group_ids, *model_store_gids})
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
         query = (
             sa.select(*vfolders_selectors, vfolders.c.permission, groups.c.name)
@@ -777,8 +817,8 @@ async def get_allowed_vfolder_hosts_by_group(
             result_hosts = allowed_hosts | values
             allowed_hosts = result_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    final_result: VFolderHostPermissionMap = (
-        allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    final_result: VFolderHostPermissionMap = allowed_hosts | resource_policy.get(
+        "allowed_vfolder_hosts", VFolderHostPermissionMap()
     )
     return final_result
 
@@ -796,7 +836,7 @@ async def get_allowed_vfolder_hosts_by_user(
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     """
     from ai.backend.manager.models.domain import domains
-    from ai.backend.manager.models.group import association_groups_users, groups
+    from ai.backend.manager.models.group import groups
 
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = VFolderHostPermissionMap()
@@ -807,37 +847,26 @@ async def get_allowed_vfolder_hosts_by_user(
         result_hosts: VFolderHostPermissionMap = allowed_hosts | values
         allowed_hosts = result_hosts
     # User's Groups' allowed_vfolder_hosts.
+    join_cond = sa.and_(
+        sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+        AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+        AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+        AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+    )
     if group_id is not None:
-        j = groups.join(
-            association_groups_users,
-            (
-                (groups.c.id == association_groups_users.c.group_id)
-                & (groups.c.id == group_id)
-                & (association_groups_users.c.user_id == user_uuid)
-            ),
-        )
-    else:
-        j = groups.join(
-            association_groups_users,
-            (
-                (groups.c.id == association_groups_users.c.group_id)
-                & (association_groups_users.c.user_id == user_uuid)
-            ),
-        )
+        join_cond = sa.and_(join_cond, groups.c.id == group_id)
     query = (
         sa.select(groups.c.allowed_vfolder_hosts)
-        .select_from(j)
-        .where(
-            (groups.c.domain_name == domain_name) & (groups.c.is_active),
-        )
+        .select_from(groups.join(AssociationScopesEntitiesRow, join_cond))
+        .where(groups.c.domain_name == domain_name, groups.c.is_active)
     )
     if rows := (await conn.execute(query)).fetchall():
         for row in rows:
             result_hosts = allowed_hosts | row.allowed_vfolder_hosts
             allowed_hosts = result_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    final_result: VFolderHostPermissionMap = (
-        allowed_hosts | resource_policy["allowed_vfolder_hosts"]
+    final_result: VFolderHostPermissionMap = allowed_hosts | resource_policy.get(
+        "allowed_vfolder_hosts", VFolderHostPermissionMap()
     )
     return final_result
 
@@ -865,65 +894,77 @@ def check_overlapping_mounts(mounts: Iterable[str] | Iterable[PurePosixPath]) ->
                 )
 
 
+def _normalize_mount_subpath(raw_subpath: str | None) -> str:
+    """Normalize a UUID-keyed mount's ``subpath`` option and reject any
+    attempt to escape the vfolder root.
+
+    Returns the normalized subpath (or ``"."`` when nothing was supplied).
+    Raises :class:`InvalidAPIParameters` when the normalized form would
+    leave the vfolder root via ``..``, ``../…``, or an absolute path.
+
+    Note: ``PurePosixPath('..').is_relative_to('.')`` is ``True`` in
+    Python ≥ 3.12, so the ``is_relative_to`` shorthand cannot be used
+    as the escape guard — the explicit checks below are required.
+    """
+    candidate = raw_subpath if raw_subpath else "."
+    normed = os.path.normpath(candidate)
+    if normed == ".." or normed.startswith("../") or PurePosixPath(normed).is_absolute():
+        raise InvalidAPIParameters(
+            f"The subpath '{candidate}' must not escape the vfolder root.",
+        )
+    return normed
+
+
 async def prepare_vfolder_mounts(
     conn: SAConnection,
     storage_manager: StorageSessionManager,
     allowed_vfolder_types: Sequence[str],
     user_scope: UserScope,
     resource_policy: Mapping[str, Any],
-    requested_mount_references: Sequence[str | uuid.UUID],
-    requested_mount_reference_map: Mapping[str | uuid.UUID, str],
-    requested_mount_reference_options: Mapping[str | uuid.UUID, Any],
+    mount_requests: Sequence[VFolderMountRequest],
 ) -> Sequence[VFolderMount]:
     """
     Determine the actual mount information from the requested vfolder lists,
     vfolder configurations, and the given user scope.
     """
-    # TODO: Refactor the whole function:
-    # - Replace 'requested_mount_references', 'requested_mount_reference_map' and 'requested_mount_reference_options' with one mapping parameter.
-    # - DO NOT validate value of subdirectories here.
-    requested_mounts: list[str] = [
-        name for name in requested_mount_references if isinstance(name, str)
-    ]
-    requested_mount_name_map: dict[str, str] = {
-        name: path for name, path in requested_mount_reference_map.items() if isinstance(name, str)
-    }
-    requested_mount_map: dict[uuid.UUID, str] = {
-        vfolder_uuid: path
-        for vfolder_uuid, path in requested_mount_reference_map.items()
-        if isinstance(vfolder_uuid, uuid.UUID)
-    }
-    requested_mount_options: dict[str | uuid.UUID, dict[str, Any]] = {
-        name: options
-        for name, options in requested_mount_reference_options.items()
-        if isinstance(name, str)
-    }
-
-    requested_vfolder_names: dict[str | uuid.UUID, str] = {}
+    requested_mounts: list[str] = []
+    requested_vfolder_names: dict[str | uuid.UUID | int, str] = {}
     requested_vfolder_ids: set[uuid.UUID] = set()
-    requested_vfolder_subpaths: dict[str | uuid.UUID, str] = {}
-    requested_vfolder_dstpaths: dict[str | uuid.UUID, str] = {}
+    requested_vfolder_subpaths: dict[str | uuid.UUID | int, str] = {}
+    requested_vfolder_dstpaths: dict[str | uuid.UUID | int, str] = {}
+    requested_mount_options: dict[str | uuid.UUID | int, VFolderMountOptions] = {}
     matched_vfolder_mounts: list[VFolderMount] = []
     _already_resolved: set[str] = set()
+    # A vfolder referenced by UUID may be requested several times, each with a
+    # different subpath/destination. Key each such request by its index in
+    # ``mount_requests`` instead of the bare UUID so the entries no longer
+    # collapse to one-per-vfolder; ``uuid_request_indices`` records which
+    # request keys target each vfolder UUID (lablup/backend.ai#11936).
+    uuid_request_indices: dict[uuid.UUID, list[int]] = {}
 
-    # Split the vfolder name and subpaths
-    for key in requested_mount_references:
-        if isinstance(key, uuid.UUID):
-            requested_vfolder_ids.add(key)
-            continue
-        name, _, subpath = key.partition("/")
-        if not PurePosixPath(os.path.normpath(key)).is_relative_to(name):
-            raise InvalidAPIParameters(
-                f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
-            )
-        requested_vfolder_names[key] = name
-        requested_vfolder_subpaths[key] = os.path.normpath(subpath)
-        _already_resolved.add(name)
-    for vfolder_uuid, value in requested_mount_map.items():
-        requested_vfolder_subpaths[vfolder_uuid] = "."
-        requested_vfolder_dstpaths[vfolder_uuid] = value
-    for key, value in requested_mount_name_map.items():
-        requested_vfolder_dstpaths[key] = value
+    # Split the requests into the UUID-referenced and name-referenced surfaces,
+    # capturing each request's subpath, destination, and options up front.
+    for index, req in enumerate(mount_requests):
+        if isinstance(req.ref, uuid.UUID):
+            requested_vfolder_ids.add(req.ref)
+            uuid_request_indices.setdefault(req.ref, []).append(index)
+            requested_mount_options[index] = req.options
+            requested_vfolder_subpaths[index] = _normalize_mount_subpath(req.options.subpath)
+            if req.dst_path is not None:
+                requested_vfolder_dstpaths[index] = req.dst_path
+        else:
+            name, _, subpath = req.ref.partition("/")
+            if not PurePosixPath(os.path.normpath(req.ref)).is_relative_to(name):
+                raise InvalidAPIParameters(
+                    f"The subpath '{subpath}' should designate a subdirectory of the vfolder '{name}'.",
+                )
+            requested_mounts.append(req.ref)
+            requested_mount_options[req.ref] = req.options
+            requested_vfolder_names[req.ref] = name
+            requested_vfolder_subpaths[req.ref] = os.path.normpath(subpath)
+            _already_resolved.add(name)
+            if req.dst_path is not None:
+                requested_vfolder_dstpaths[req.ref] = req.dst_path
 
     # Check if there are overlapping mount sources
     for p1 in requested_mounts:
@@ -935,6 +976,19 @@ async def prepare_vfolder_mounts(
                     f"VFolder source path '{p1}' overlaps with '{p2}'",
                 )
 
+    # Fetch MODEL_STORE project IDs for cross-project mount allowance
+    from ai.backend.manager.data.group.types import ProjectType as DataProjectType
+    from ai.backend.manager.models.group import groups as groups_table
+
+    _ms_query = sa.select(groups_table.c.id).where(
+        sa.and_(
+            groups_table.c.domain_name == user_scope.domain_name,
+            groups_table.c.type == DataProjectType.MODEL_STORE,
+        )
+    )
+    _ms_result = await conn.execute(_ms_query)
+    model_store_project_ids: set[str] = {str(row.id) for row in _ms_result.fetchall()}
+
     # Query the accessible vfolders that satisfy either:
     # - the name matches with the requested vfolder name, or
     # - the name starts with a dot (dot-prefixed vfolder) for automatic mounting.
@@ -942,11 +996,6 @@ async def prepare_vfolder_mounts(
     if requested_vfolder_names:
         extra_vf_conds = sa.or_(
             extra_vf_conds, vfolders.c.name.in_(requested_vfolder_names.values())
-        )
-    if requested_mount_map:
-        extra_vf_conds = sa.or_(
-            extra_vf_conds,
-            VFolderRow.id.in_(requested_mount_map.keys()),
         )
     if requested_vfolder_ids:
         extra_vf_conds = sa.or_(
@@ -965,27 +1014,40 @@ async def prepare_vfolder_mounts(
 
     # Fast-path for empty requested mounts
     if not accessible_vfolders:
-        if requested_vfolder_names:
+        if requested_vfolder_names or requested_vfolder_ids:
             raise VFolderNotFound("There is no accessible vfolders at all.")
         return []
 
     requested_names = set(requested_vfolder_names.values())
+    resolved_vfolder_ids: set[uuid.UUID] = set()
     for row in accessible_vfolders:
         vfid = row["id"]
         name = row["name"]
         if vfid in requested_vfolder_ids:
-            requested_vfolder_names[vfid] = name
-            requested_vfolder_subpaths[vfid] = "."
+            resolved_vfolder_ids.add(vfid)
+            # Bind every UUID-referenced request for this vfolder to its
+            # resolved name. Each request keeps its own subpath/destination/
+            # options (captured above), so multiple subpaths of one vfolder
+            # all survive into the mount loop (lablup/backend.ai#11936). Source
+            # overlap for these is enforced later by ``is_mount_duplicate``.
+            for index in uuid_request_indices.get(vfid, ()):
+                requested_vfolder_names[index] = name
+            continue
         if name in _already_resolved:
             continue
         if name not in requested_names:
             requested_vfolder_names[vfid] = name
         requested_mounts.append(name)
-        if path := requested_mount_reference_map.get(vfid):
-            requested_mount_name_map[name] = path
-        if options := requested_mount_reference_options.get(vfid):
-            requested_mount_options[name] = options
-            requested_mount_options[vfid] = options
+
+    # A UUID-referenced request that matched no accessible vfolder would
+    # otherwise be silently dropped (its index never enters the mount loop
+    # below). Surface it like the name-referenced path does, so the caller
+    # learns the requested mount was not honored (lablup/backend.ai#11936).
+    if unresolved_vfolder_ids := (requested_vfolder_ids - resolved_vfolder_ids):
+        raise VFolderNotFound(
+            "VFolder(s) not found or accessible: "
+            + ", ".join(sorted(str(vfid) for vfid in unresolved_vfolder_ids))
+        )
 
     # Check if there are overlapping mount sources
     check_overlapping_mounts(requested_mounts)
@@ -1046,10 +1108,17 @@ async def prepare_vfolder_mounts(
                 )
             )
             continue
-        if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
-            # User's accessible group vfolders should not be mounted
-            # if they do not belong to the execution kernel.
-            continue
+        is_cross_project = vfolder["group"] is not None and vfolder["group"] != str(
+            user_scope.group_id
+        )
+        is_model_store_vfolder = (
+            vfolder["group"] is not None and vfolder["group"] in model_store_project_ids
+        )
+        if is_cross_project:
+            if is_model_store_vfolder and vfolder["usage_mode"] == VFolderUsageMode.MODEL:
+                pass  # Allow cross-project MODEL_STORE model vfolders (read-only)
+            else:
+                continue
         try:
             proxy_name, volume_name = storage_manager.get_proxy_and_volume(vfolder["host"])
             manager_client = storage_manager.get_manager_facing_client(proxy_name)
@@ -1102,20 +1171,23 @@ async def prepare_vfolder_mounts(
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
                     kernel_path = PurePosixPath("/home/work", kernel_path_raw)
-            match requested_perm := requested_mount_options.get(requested_key, {}).get(
-                "permission"
-            ):
-                case MountPermission.READ_ONLY:
-                    mount_perm = MountPermission.READ_ONLY
-                case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
-                    if vfolder["permission"] == VFolderPermission.READ_ONLY:
-                        raise VFolderPermissionError(
-                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
-                            f"but attempted with '{requested_perm.value}' mode."
-                        )
-                    mount_perm = requested_perm
-                case _:  # None if unset
-                    mount_perm = vfolder["permission"]
+            mount_opts = requested_mount_options.get(requested_key, VFolderMountOptions())
+            if is_cross_project and is_model_store_vfolder:
+                mount_perm = MountPermission.READ_ONLY
+            else:
+                match mount_opts.permission:
+                    case MountPermission.READ_ONLY:
+                        mount_perm = MountPermission.READ_ONLY
+                    case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
+                        if vfolder["permission"] == VFolderPermission.READ_ONLY:
+                            raise VFolderPermissionError(
+                                f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
+                                f"but attempted with '{mount_opts.permission.value}' mode."
+                            )
+                        mount_perm = mount_opts.permission
+                    case _:  # None if unset
+                        mount_perm = vfolder["permission"]
+
             matched_vfolder_mounts.append(
                 VFolderMount(
                     name=vfolder["name"],
@@ -1279,79 +1351,11 @@ async def delete_vfolder_relation_rows(
     await execute_with_txn_retry(_delete, begin_session, db_conn)
 
 
-async def initiate_vfolder_deletion(
-    db_engine: ExtendedAsyncSAEngine,
-    requested_vfolders: Sequence[VFolderDeletionInfo],
-    storage_manager: StorageSessionManager,
-    _storage_ptask_group: aiotools.PersistentTaskGroup | None = None,
-    *,
-    force: bool = False,
-) -> int:
-    """Purges VFolder content from storage host."""
-    # Lazy import to avoid circular import
-    from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
-    from ai.backend.manager.repositories.vfolder.purgers import (
-        VFolderInvitationBatchPurgerSpec,
-        VFolderPermissionBatchPurgerSpec,
-    )
-
-    vfolder_info_len = len(requested_vfolders)
-    vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in requested_vfolders)
-    if vfolder_info_len == 0:
-        return 0
-
-    async with db_engine.begin_session() as db_session:
-        await execute_batch_purger(
-            db_session,
-            BatchPurger(spec=VFolderInvitationBatchPurgerSpec(vfolder_ids=vfolder_ids)),
-        )
-        await execute_batch_purger(
-            db_session,
-            BatchPurger(spec=VFolderPermissionBatchPurgerSpec(vfolder_ids=vfolder_ids)),
-        )
-    await update_vfolder_status(
-        db_engine,
-        vfolder_ids,
-        VFolderOperationStatus.DELETE_ONGOING,
-        do_log=False,
-        force=force,
-    )
-
-    already_deleted: list[VFolderDeletionInfo] = []
-
-    for vfolder_info in requested_vfolders:
-        folder_id, host_name, unmanaged_path = vfolder_info
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(
-            host_name, is_unmanaged(unmanaged_path)
-        )
-        try:
-            manager_client = storage_manager.get_manager_facing_client(proxy_name)
-            await manager_client.delete_folder(volume_name, str(folder_id))
-        except (VFolderOperationFailed, InvalidAPIParameters) as e:
-            if e.status == 410:
-                already_deleted.append(vfolder_info)
-        except VFolderGone:
-            already_deleted.append(vfolder_info)
-    if already_deleted:
-        vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in already_deleted)
-
-        await update_vfolder_status(
-            db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
-        )
-        log.info("vfolders already deleted {}", [str(x) for x in vfolder_ids])
-
-    log.info("Started purging vfolders {}", [str(x) for x in vfolder_ids])
-
-    return vfolder_info_len
-
-
 async def ensure_quota_scope_accessible_by_user(
     conn: SASession,
     quota_scope: QuotaScopeID,
     user: Mapping[str, Any],
 ) -> None:
-    from ai.backend.manager.models.group import association_groups_users as agus
-
     # Lookup user table to match if quota is scoped to the user
     query = sa.select(UserRow).where(UserRow.uuid == quota_scope.scope_id)
     quota_scope_user: UserRow | None = await conn.scalar(query)
@@ -1378,14 +1382,13 @@ async def ensure_quota_scope_accessible_by_user(
                 if quota_scope_group.domain_name == user["domain_name"]:
                     return
             case _:
-                query = (
-                    sa.select(agus.c.group_id)
-                    .select_from(agus)
-                    .where(
-                        (agus.c.group_id == quota_scope.scope_id) & (agus.c.user_id == user["uuid"])
-                    )
+                membership_query = sa.select(AssociationScopesEntitiesRow.scope_id).where(
+                    AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+                    AssociationScopesEntitiesRow.scope_id == str(quota_scope.scope_id),
+                    AssociationScopesEntitiesRow.entity_id == str(user["uuid"]),
                 )
-                matched_group_id = await conn.scalar(query)
+                matched_group_id = await conn.scalar(membership_query)
                 if matched_group_id:
                     return
 
@@ -1423,7 +1426,11 @@ type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expressi
 OWNER_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     perm for perm in VFolderRBACPermission
 ])
-ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset()
+ADMIN_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
+    VFolderRBACPermission.READ_ATTRIBUTE,
+    VFolderRBACPermission.UPDATE_ATTRIBUTE,
+    VFolderRBACPermission.DELETE_VFOLDER,
+])
 MONITOR_PERMISSIONS: frozenset[VFolderRBACPermission] = frozenset([
     VFolderRBACPermission.READ_ATTRIBUTE,
     VFolderRBACPermission.UPDATE_ATTRIBUTE,
@@ -1506,7 +1513,7 @@ _STORAGE_HOST_PERMISSION_TO_VFOLDER_PERMISSION_MAP: Mapping[
 # RBAC
 @dataclass
 class VFolderPermissionContext(
-    AbstractPermissionContext[VFolderRBACPermission, VFolderRow, uuid.UUID]
+    AbstractPermissionContext[VFolderRBACPermission, VFolderRow, VFolderUUID]
 ):
     host_permission_ctx: StorageHostPermissionContext | None = None
 
@@ -1675,17 +1682,18 @@ class VFolderPermissionContextBuilder(
 
         j = sa.join(
             GroupRow,
-            AssocGroupUserRow,
-            GroupRow.id == AssocGroupUserRow.group_id,
+            AssociationScopesEntitiesRow,
+            sa.and_(
+                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+                AssociationScopesEntitiesRow.scope_type == PermissionScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == PermissionEntityType.USER,
+                AssociationScopesEntitiesRow.entity_id == str(ctx.user_id),
+            ),
         )
         _project_stmt = (
             sa.select(GroupRow)
             .select_from(j)
-            .where(
-                sa.and_(
-                    GroupRow.domain_name == domain_name, AssocGroupUserRow.user_id == ctx.user_id
-                )
-            )
+            .where(GroupRow.domain_name == domain_name)
             .options(load_only(GroupRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):

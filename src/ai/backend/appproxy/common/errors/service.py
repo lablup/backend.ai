@@ -1,6 +1,16 @@
-"""Service-related errors for App Proxy."""
+"""Service-related errors for App Proxy.
+
+Every BackendAIError subclass MUST also inherit from a concrete
+``aiohttp.web.HTTP*`` class so that the resulting HTTP status code is
+well-defined. ``web.HTTPError.status_code`` defaults to ``-1``, which
+aiohttp falls back to ``200 OK`` for — meaning errors that miss the
+HTTP base class get returned to clients with a 200 status and an
+error body, which is impossible to handle correctly.
+"""
 
 from __future__ import annotations
+
+from aiohttp import web
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -11,7 +21,7 @@ from ai.backend.common.exception import (
 )
 
 
-class WorkerNotAvailable(BackendAIError):
+class WorkerNotAvailable(BackendAIError, web.HTTPServiceUnavailable):
     """Raised when worker is not available."""
 
     error_type = "https://api.backend.ai/probs/appproxy/worker-not-available"
@@ -25,7 +35,7 @@ class WorkerNotAvailable(BackendAIError):
         )
 
 
-class PortNotAvailable(BackendAIError):
+class PortNotAvailable(BackendAIError, web.HTTPConflict):
     """Raised when designated port is already occupied."""
 
     error_type = "https://api.backend.ai/probs/appproxy/port-not-available"
@@ -39,7 +49,7 @@ class PortNotAvailable(BackendAIError):
         )
 
 
-class UnsupportedProtocol(BackendAIError):
+class UnsupportedProtocol(BackendAIError, web.HTTPBadRequest):
     """Raised when protocol is not supported."""
 
     error_type = "https://api.backend.ai/probs/appproxy/unsupported-protocol"
@@ -53,7 +63,7 @@ class UnsupportedProtocol(BackendAIError):
         )
 
 
-class DatabaseError(BackendAIError):
+class DatabaseError(BackendAIError, web.HTTPInternalServerError):
     """Raised when error occurs while communicating with database."""
 
     error_type = "https://api.backend.ai/probs/appproxy/database-error"
@@ -67,7 +77,7 @@ class DatabaseError(BackendAIError):
         )
 
 
-class ContainerConnectionRefused(BackendAIError):
+class ContainerConnectionRefused(BackendAIError, web.HTTPBadGateway):
     """Raised when connection to Backend.AI kernel is refused."""
 
     error_type = "https://api.backend.ai/probs/appproxy/container-connection-refused"
@@ -81,7 +91,7 @@ class ContainerConnectionRefused(BackendAIError):
         )
 
 
-class WorkerRegistrationError(BackendAIError):
+class WorkerRegistrationError(BackendAIError, web.HTTPForbidden):
     """Raised when worker registration fails."""
 
     error_type = "https://api.backend.ai/probs/appproxy/worker-registration-error"
@@ -95,7 +105,7 @@ class WorkerRegistrationError(BackendAIError):
         )
 
 
-class CoordinatorConnectionError(BackendAIError):
+class CoordinatorConnectionError(BackendAIError, web.HTTPBadGateway):
     """Raised when communication with coordinator fails."""
 
     error_type = "https://api.backend.ai/probs/appproxy/coordinator-connection-error"

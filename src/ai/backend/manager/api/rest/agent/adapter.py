@@ -14,15 +14,11 @@ from ai.backend.common.dto.manager.agent import (
     OrderDirection,
     SearchAgentsRequest,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 
 __all__ = ("AgentAdapter",)
 
@@ -94,6 +90,7 @@ class AgentAdapter(BaseFilterAdapter):
                 equals_factory=QueryConditions.by_resource_group_equals,
                 starts_with_factory=QueryConditions.by_resource_group_starts_with,
                 ends_with_factory=QueryConditions.by_resource_group_ends_with,
+                in_factory=QueryConditions.by_resource_group_in,
             )
             if condition is not None:
                 conditions.append(condition)

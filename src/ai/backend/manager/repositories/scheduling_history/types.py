@@ -7,9 +7,11 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.service import RouteNotFound
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history.conditions import (
@@ -17,9 +19,8 @@ from ai.backend.manager.models.scheduling_history.conditions import (
     RouteHistoryConditions,
     SessionSchedulingHistoryConditions,
 )
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.repositories.base import QueryCondition, SearchScope
-from ai.backend.manager.repositories.base.types import ExistenceCheck
 
 __all__ = (
     "SessionSchedulingHistorySearchScope",
@@ -100,7 +101,7 @@ class RouteHistorySearchScope(SearchScope):
     Used for entity-scoped queries where route_id is the scope parameter.
     """
 
-    route_id: UUID
+    route_id: ReplicaID
     """Required. The route to search history for."""
 
     def to_condition(self) -> QueryCondition:

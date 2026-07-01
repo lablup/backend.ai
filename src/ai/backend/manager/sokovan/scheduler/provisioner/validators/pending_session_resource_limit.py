@@ -1,7 +1,7 @@
 """Validator for pending session resource limits."""
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
+from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
 from .exceptions import PendingSessionResourceLimitExceeded
 from .validator import ValidatorRule
@@ -43,8 +43,6 @@ class PendingSessionResourceLimitValidator(ValidatorRule):
         # Check if adding this workload would exceed the limit
         total_after = current_pending_slots
         if total_after > pending_resource_limit:
-            # Format the current usage for human-readable output
-            usage_str = " ".join(f"{k}={v}" for k, v in current_pending_slots.items() if v)
             raise PendingSessionResourceLimitExceeded(
-                f"Your pending session quota is exceeded. ({usage_str})"
+                current_pending_slots=current_pending_slots,
             )

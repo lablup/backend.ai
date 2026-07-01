@@ -11,7 +11,6 @@ from strawberry.relay import PageInfo
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
     AdminSearchResourcePresetsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -40,7 +39,7 @@ from .types import (
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List resource presets (admin only).",
     )
 )  # type: ignore[misc]
@@ -90,7 +89,7 @@ async def admin_resource_presets_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single resource preset by ID (admin only).",
     )
 )  # type: ignore[misc]
@@ -108,14 +107,14 @@ async def admin_resource_preset_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a new resource preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     input: CreateResourcePresetInputGQL,
-) -> CreateResourcePresetPayloadGQL:
+) -> CreateResourcePresetPayloadGQL | None:
     check_admin_only()
 
     dto = input.to_pydantic()
@@ -133,14 +132,14 @@ async def admin_create_resource_preset_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update a resource preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateResourcePresetInputGQL,
-) -> UpdateResourcePresetPayloadGQL:
+) -> UpdateResourcePresetPayloadGQL | None:
     check_admin_only()
 
     dto = input.to_pydantic()
@@ -150,14 +149,14 @@ async def admin_update_resource_preset_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete a resource preset (admin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteResourcePresetPayloadGQL:
+) -> DeleteResourcePresetPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.resource_preset.delete(id)
     return DeleteResourcePresetPayloadGQL.from_pydantic(payload)

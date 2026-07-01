@@ -5,16 +5,20 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
-from decimal import Decimal
 from typing import Any
 
+from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.data.model_deployment.types import (
+    ActivenessStatus,
     DeploymentStrategy,
+    LivenessStatus,
     ModelDeploymentStatus,
+    ReadinessStatus,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.common.dto.manager.v2.common import ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ActivateDeploymentPayload,
     AddRevisionPayload,
@@ -22,6 +26,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     DeleteDeploymentPayload,
     DeploymentNode,
     ExtraVFolderMountNode,
+    ReplicaNode,
     RevisionNode,
     RouteNode,
     ScaleDeploymentPayload,
@@ -42,10 +47,18 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ResourceConfigInfoDTO,
     RollingUpdateConfigInfo,
 )
-from ai.backend.common.dto.manager.v2.fair_share.types import (
-    ResourceSlotEntryInfo,
-    ResourceSlotInfo,
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    DeploymentHandlerOptionsInfo,
+    DeploymentOptionsInfo,
 )
+from ai.backend.common.dto.manager.v2.session_options.response import (
+    HandlerOptionsInfo,
+)
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import MountPermission
 
 
 def _make_cluster_config(**kwargs: object) -> ClusterConfigInfoDTO:
@@ -57,16 +70,10 @@ def _make_cluster_config(**kwargs: object) -> ClusterConfigInfoDTO:
     return ClusterConfigInfoDTO(**defaults)
 
 
-def _make_resource_slots() -> ResourceSlotInfo:
-    return ResourceSlotInfo(
-        entries=[ResourceSlotEntryInfo(resource_type="cpu", quantity=Decimal("2"))]
-    )
-
-
 def _make_resource_config(**kwargs: object) -> ResourceConfigInfoDTO:
     defaults: dict[str, Any] = {
         "resource_group_name": "default",
-        "resource_slots": _make_resource_slots(),
+        "resource_slots": ResourceSlotInfo(entries=[]),
         "resource_opts": None,
     }
     defaults.update(kwargs)
@@ -75,12 +82,23 @@ def _make_resource_config(**kwargs: object) -> ResourceConfigInfoDTO:
 
 def _make_model_runtime_config(**kwargs: object) -> ModelRuntimeConfigInfoDTO:
     defaults: dict[str, Any] = {
-        "runtime_variant": "CUSTOM",
+        "runtime_variant_id": RuntimeVariantID(uuid.uuid4()),
         "inference_runtime_config": None,
         "environ": None,
     }
     defaults.update(kwargs)
     return ModelRuntimeConfigInfoDTO(**defaults)
+
+
+def _make_deployment_options(**kwargs: object) -> DeploymentOptionsInfo:
+    defaults: dict[str, Any] = {
+        "handler_options": DeploymentHandlerOptionsInfo(
+            default=HandlerOptionsInfo(timeout_sec=None, max_retry_count=None),
+            by_handler=[],
+        ),
+    }
+    defaults.update(kwargs)
+    return DeploymentOptionsInfo(**defaults)
 
 
 def _make_deployment_metadata(**kwargs: object) -> DeploymentMetadataInfoDTO:
@@ -91,6 +109,7 @@ def _make_deployment_metadata(**kwargs: object) -> DeploymentMetadataInfoDTO:
         "name": "test-deployment",
         "status": ModelDeploymentStatus.READY,
         "tags": [],
+        "resource_group_name": "default",
         "created_at": now,
         "updated_at": now,
     }
@@ -128,8 +147,9 @@ def _make_deployment_strategy(**kwargs: object) -> DeploymentStrategyInfoDTO:
 def _make_revision_node(**kwargs: object) -> RevisionNode:
     defaults: dict[str, Any] = {
         "id": uuid.uuid4(),
-        "name": "v1",
-        "image_id": uuid.uuid4(),
+        "deployment_id": uuid.uuid4(),
+        "revision_number": 1,
+        "image_id": ImageID(uuid.uuid4()),
         "cluster_config": _make_cluster_config(),
         "resource_config": _make_resource_config(),
         "model_runtime_config": _make_model_runtime_config(),
@@ -144,12 +164,14 @@ def _make_revision_node(**kwargs: object) -> RevisionNode:
 
 def _make_deployment_node(**kwargs: object) -> DeploymentNode:
     defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
+        "id": DeploymentID(uuid.uuid4()),
         "metadata": _make_deployment_metadata(),
         "network_access": _make_network_access(),
         "replica_state": _make_replica_state(),
         "default_deployment_strategy": _make_deployment_strategy(),
         "created_user_id": uuid.uuid4(),
+        "options": _make_deployment_options(),
+        "scaling_state": ScalingState.STABLE,
         "current_revision_id": None,
         "policy": None,
     }
@@ -161,18 +183,29 @@ class TestExtraVFolderMountNode:
     """Tests for ExtraVFolderMountNode model."""
 
     def test_valid_creation(self) -> None:
-        vfolder_id = uuid.uuid4()
-        node = ExtraVFolderMountNode(vfolder_id=vfolder_id, mount_destination="/data")
+        vfolder_id = VFolderUUID(uuid.uuid4())
+        node = ExtraVFolderMountNode(
+            vfolder_id=vfolder_id,
+            mount_destination="/data",
+            mount_perm=MountPermission.READ_ONLY,
+        )
         assert node.vfolder_id == vfolder_id
         assert node.mount_destination == "/data"
 
     def test_mount_destination_defaults_to_none(self) -> None:
-        node = ExtraVFolderMountNode(vfolder_id=uuid.uuid4())
+        node = ExtraVFolderMountNode(
+            vfolder_id=VFolderUUID(uuid.uuid4()),
+            mount_perm=MountPermission.READ_ONLY,
+        )
         assert node.mount_destination is None
 
     def test_round_trip(self) -> None:
-        vfolder_id = uuid.uuid4()
-        node = ExtraVFolderMountNode(vfolder_id=vfolder_id, mount_destination="/data")
+        vfolder_id = VFolderUUID(uuid.uuid4())
+        node = ExtraVFolderMountNode(
+            vfolder_id=vfolder_id,
+            mount_destination="/data",
+            mount_perm=MountPermission.READ_ONLY,
+        )
         json_str = node.model_dump_json()
         restored = ExtraVFolderMountNode.model_validate_json(json_str)
         assert restored.vfolder_id == vfolder_id
@@ -184,11 +217,13 @@ class TestRevisionNode:
 
     def test_creation_with_all_fields(self) -> None:
         revision_id = uuid.uuid4()
+        deployment_id = uuid.uuid4()
         now = datetime.now(tz=UTC)
         node = RevisionNode(
             id=revision_id,
-            name="v1",
-            image_id=uuid.uuid4(),
+            deployment_id=deployment_id,
+            revision_number=1,
+            image_id=ImageID(uuid.uuid4()),
             cluster_config=_make_cluster_config(),
             resource_config=_make_resource_config(),
             model_runtime_config=_make_model_runtime_config(),
@@ -196,15 +231,16 @@ class TestRevisionNode:
             extra_mounts=[],
         )
         assert node.id == revision_id
-        assert node.name == "v1"
+        assert node.deployment_id == deployment_id
         assert node.created_at == now
         assert node.extra_mounts == []
 
     def test_extra_mounts_defaults_to_empty_list(self) -> None:
         node = RevisionNode(
             id=uuid.uuid4(),
-            name="v1",
-            image_id=uuid.uuid4(),
+            deployment_id=uuid.uuid4(),
+            revision_number=1,
+            image_id=ImageID(uuid.uuid4()),
             cluster_config=_make_cluster_config(),
             resource_config=_make_resource_config(),
             model_runtime_config=_make_model_runtime_config(),
@@ -240,7 +276,7 @@ class TestRevisionNode:
                     "name": "sample-model",
                     "model_path": "/models/sample",
                     "service": {
-                        "start_command": "python serve.py",
+                        "start_command": ["python", "serve.py"],
                         "port": 8000,
                     },
                 }
@@ -251,19 +287,18 @@ class TestRevisionNode:
         assert node.model_definition is not None
         assert node.model_definition.models[0].name == "sample-model"
         assert node.model_definition.models[0].service is not None
+        assert node.model_definition.models[0].service.start_command == ["python", "serve.py"]
         assert node.model_definition.models[0].service.port == 8000
 
     def test_round_trip(self) -> None:
         revision_id = uuid.uuid4()
         node = _make_revision_node(
             id=revision_id,
-            name="v2",
             model_definition={"models": [{"name": "v2-model", "model_path": "/models/v2"}]},
         )
         json_str = node.model_dump_json()
         restored = RevisionNode.model_validate_json(json_str)
         assert restored.id == revision_id
-        assert restored.name == "v2"
         assert restored.model_definition is not None
         assert restored.model_definition.models[0].name == "v2-model"
 
@@ -272,7 +307,7 @@ class TestDeploymentNode:
     """Tests for DeploymentNode model."""
 
     def test_creation_with_required_fields(self) -> None:
-        deployment_id = uuid.uuid4()
+        deployment_id = DeploymentID(uuid.uuid4())
         node = DeploymentNode(
             id=deployment_id,
             metadata=_make_deployment_metadata(),
@@ -280,6 +315,8 @@ class TestDeploymentNode:
             replica_state=_make_replica_state(),
             default_deployment_strategy=_make_deployment_strategy(),
             created_user_id=uuid.uuid4(),
+            options=_make_deployment_options(),
+            scaling_state=ScalingState.STABLE,
         )
         assert node.id == deployment_id
         assert node.current_revision_id is None
@@ -456,6 +493,42 @@ class TestRouteNode:
         assert restored.error_data == {"message": "ok"}
 
 
+class TestReplicaNode:
+    """Tests for ReplicaNode model (user-facing view of a routing row)."""
+
+    def _make(self, **overrides: Any) -> ReplicaNode:
+        defaults: dict[str, Any] = dict(
+            id=uuid.uuid4(),
+            deployment_id=uuid.uuid4(),
+            revision_id=uuid.uuid4(),
+            session_id=None,
+            readiness_status=ReadinessStatus.HEALTHY,
+            liveness_status=LivenessStatus.HEALTHY,
+            activeness_status=ActivenessStatus.ACTIVE,
+            status=RouteStatus.RUNNING,
+            traffic_status=RouteTrafficStatus.ACTIVE,
+            health_status=RouteHealthStatus.HEALTHY,
+            created_at=datetime.now(tz=UTC),
+        )
+        defaults.update(overrides)
+        return ReplicaNode(**defaults)
+
+    def test_creation_includes_deployment_id(self) -> None:
+        deployment_id = uuid.uuid4()
+        node = self._make(deployment_id=deployment_id)
+        assert node.deployment_id == deployment_id
+
+    def test_session_id_defaults_to_none(self) -> None:
+        assert self._make().session_id is None
+
+    def test_round_trip_preserves_deployment_id(self) -> None:
+        deployment_id = uuid.uuid4()
+        node = self._make(deployment_id=deployment_id)
+        restored = ReplicaNode.model_validate_json(node.model_dump_json())
+        assert restored.deployment_id == deployment_id
+        assert restored.id == node.id
+
+
 class TestCreateDeploymentPayload:
     """Tests for CreateDeploymentPayload model."""
 
@@ -554,16 +627,14 @@ class TestAddRevisionPayload:
 
     def test_creation_with_revision_node(self) -> None:
         revision_id = uuid.uuid4()
-        rev = _make_revision_node(id=revision_id, name="v2")
+        rev = _make_revision_node(id=revision_id)
         payload = AddRevisionPayload(revision=rev)
         assert payload.revision.id == revision_id
-        assert payload.revision.name == "v2"
 
     def test_round_trip(self) -> None:
         revision_id = uuid.uuid4()
-        rev = _make_revision_node(id=revision_id, name="v2")
+        rev = _make_revision_node(id=revision_id)
         payload = AddRevisionPayload(revision=rev)
         json_str = payload.model_dump_json()
         restored = AddRevisionPayload.model_validate_json(json_str)
         assert restored.revision.id == revision_id
-        assert restored.revision.name == "v2"

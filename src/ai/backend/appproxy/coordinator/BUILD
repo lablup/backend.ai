@@ -5,7 +5,18 @@ python_sources(
     name="src",
     sources=["**/*.py"],
     dependencies=[
+        "src/ai/backend/cli:src",  # explicit: provides the `backend.ai` console script
         ":resources",
+    ],
+)
+
+visibility_private_component(
+    allowed_dependents=[],
+    allowed_dependencies=[
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//src/ai/backend/appproxy/common/**",
     ],
 )
 

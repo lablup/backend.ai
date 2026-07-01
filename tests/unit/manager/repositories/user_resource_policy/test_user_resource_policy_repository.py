@@ -7,9 +7,11 @@ import pytest
 from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -17,6 +19,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -24,6 +27,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -40,7 +44,7 @@ from ai.backend.manager.repositories.user_resource_policy.repository import (
 from ai.backend.manager.repositories.user_resource_policy.updaters import (
     UserResourcePolicyUpdaterSpec,
 )
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
@@ -67,15 +71,19 @@ class TestUserResourcePolicyRepository:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -290,3 +298,57 @@ class TestUserResourcePolicyRepository:
             == retrieved.max_session_count_per_model_session
         )
         assert created.max_customized_image_count == retrieved.max_customized_image_count
+
+    @pytest.mark.parametrize(
+        "max_concurrent_logins",
+        [None, 0, 10],
+        ids=["none-unlimited", "zero", "ten"],
+    )
+    async def test_create_and_get_roundtrip_max_concurrent_logins(
+        self,
+        repository: UserResourcePolicyRepository,
+        max_concurrent_logins: int | None,
+    ) -> None:
+        """Test that max_concurrent_logins round-trips correctly for None, 0, and positive values."""
+        policy_name = f"test-policy-mcl-{max_concurrent_logins}"
+        created = await repository.create(
+            Creator(
+                spec=UserResourcePolicyCreatorSpec(
+                    name=policy_name,
+                    max_vfolder_count=5,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=3,
+                    max_customized_image_count=2,
+                    max_concurrent_logins=max_concurrent_logins,
+                )
+            )
+        )
+        retrieved = await repository.get_by_name(created.name)
+
+        assert retrieved.max_concurrent_logins == max_concurrent_logins
+
+    async def test_update_max_concurrent_logins_nullify_clears_to_none(
+        self,
+        repository: UserResourcePolicyRepository,
+        sample_policy: UserResourcePolicyData,
+    ) -> None:
+        """Test that TriState.nullify() clears max_concurrent_logins back to None."""
+        # First, set a non-null value
+        updater_set = Updater(
+            spec=UserResourcePolicyUpdaterSpec(
+                max_concurrent_logins=TriState.update(7),
+            ),
+            pk_value=sample_policy.name,
+        )
+        result_set = await repository.update(updater_set)
+        assert result_set.max_concurrent_logins == 7
+
+        # Then nullify it
+        updater_clear = Updater(
+            spec=UserResourcePolicyUpdaterSpec(
+                max_concurrent_logins=TriState.nullify(),
+            ),
+            pk_value=sample_policy.name,
+        )
+        result_cleared = await repository.update(updater_clear)
+        assert result_cleared.max_concurrent_logins is None

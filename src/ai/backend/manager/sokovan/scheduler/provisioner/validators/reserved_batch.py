@@ -5,9 +5,9 @@ from datetime import datetime
 from dateutil.tz import tzutc
 
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
+from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
-from .exceptions import SchedulingValidationError
+from .exceptions import ReservedBatchSessionNotReady
 from .validator import ValidatorRule
 
 
@@ -30,4 +30,4 @@ class ReservedBatchSessionValidator(ValidatorRule):
         if workload.session_type == SessionTypes.BATCH and workload.starts_at is not None:
             # Check if the current time is before the scheduled start time
             if datetime.now(tzutc()) < workload.starts_at:
-                raise SchedulingValidationError("Before start time")
+                raise ReservedBatchSessionNotReady(scheduled_start=workload.starts_at)

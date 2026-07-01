@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.base import QueryOrder
 
 
 class PrometheusQueryPresetOrders:
@@ -20,6 +20,12 @@ class PrometheusQueryPresetOrders:
         if ascending:
             return PrometheusQueryPresetRow.created_at.asc()
         return PrometheusQueryPresetRow.created_at.desc()
+
+    @staticmethod
+    def rank(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PrometheusQueryPresetRow.rank.asc()
+        return PrometheusQueryPresetRow.rank.desc()
 
     @staticmethod
     def updated_at(ascending: bool = True) -> QueryOrder:

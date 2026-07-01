@@ -10,6 +10,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
+    RouteSubStatus,
     RouteTargetStatuses,
     RouteTransitionTarget,
 )
@@ -24,7 +25,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class RunningRouteHandler(RouteHandler):
-    """Handler for checking running routes (HEALTHY/UNHEALTHY)."""
+    """Checks that RUNNING routes still have live sessions; terminates dead ones."""
 
     def __init__(
         self,
@@ -51,8 +52,7 @@ class RunningRouteHandler(RouteHandler):
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
-            lifecycle=[RouteStatus.RUNNING, RouteStatus.FAILED_TO_START],
-            health=list(RouteHealthStatus),
+            lifecycle=[RouteStatus.RUNNING],
         )
 
     @classmethod
@@ -63,6 +63,7 @@ class RunningRouteHandler(RouteHandler):
             failure=RouteTransitionTarget(
                 status=RouteStatus.TERMINATING,
                 health_status=RouteHealthStatus.NOT_CHECKED,
+                sub_status=RouteSubStatus.DRAINING,
             ),
             stale=None,
         )

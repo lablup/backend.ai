@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.login_history.request import (
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.login_history import LoginHistoryAdapter
+    from ai.backend.manager.api.adapters.login_history.adapter import LoginHistoryAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

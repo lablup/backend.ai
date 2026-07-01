@@ -9,6 +9,7 @@ from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
 from .types import (
     AgentResourceOrderField,
+    AllocatedResourceSlotOrderField,
     OrderDirection,
     ResourceAllocationOrderField,
     ResourceSlotTypeOrderField,
@@ -20,10 +21,13 @@ __all__ = (
     "AdminSearchResourceSlotTypesInput",
     "AgentResourceFilter",
     "AgentResourceOrder",
+    "AllocatedResourceSlotFilter",
+    "AllocatedResourceSlotOrder",
     "ResourceAllocationFilter",
     "ResourceAllocationOrder",
     "ResourceSlotTypeFilter",
     "ResourceSlotTypeOrder",
+    "SearchAllocatedResourceSlotsInput",
 )
 
 
@@ -160,22 +164,63 @@ class ResourceAllocationOrder(BaseRequestModel):
 
 
 class AdminSearchResourceAllocationsInput(BaseRequestModel):
-    """Input for searching resource allocations with filters, orders, and pagination.
-
-    Supports two pagination modes (mutually exclusive):
-    - Cursor-based: first/after (forward) or last/before (backward)
-    - Offset-based: limit/offset
-    """
+    """Input for searching resource allocations with filters, orders, and pagination."""
 
     filter: ResourceAllocationFilter | None = Field(default=None, description="Filter conditions.")
     order: list[ResourceAllocationOrder] | None = Field(
         default=None, description="Order specifications."
     )
-    # Cursor-based pagination (Relay)
     first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
     after: str | None = Field(default=None, description="Cursor to paginate forward from.")
     last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
     before: str | None = Field(default=None, description="Cursor to paginate backward from.")
-    # Offset-based pagination
+    limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
+
+
+# ========== AllocatedResourceSlot (revision/preset shared) ==========
+
+
+class AllocatedResourceSlotFilter(BaseRequestModel):
+    """Filter conditions for allocated resource slot search."""
+
+    slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
+    AND: list[AllocatedResourceSlotFilter] | None = Field(
+        default=None, description="Logical AND of multiple filter conditions."
+    )
+    OR: list[AllocatedResourceSlotFilter] | None = Field(
+        default=None, description="Logical OR of multiple filter conditions."
+    )
+    NOT: list[AllocatedResourceSlotFilter] | None = Field(
+        default=None, description="Logical NOT of filter conditions."
+    )
+
+
+AllocatedResourceSlotFilter.model_rebuild()
+
+
+class AllocatedResourceSlotOrder(BaseRequestModel):
+    """Order specification for allocated resource slot search."""
+
+    field: AllocatedResourceSlotOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
+
+
+class SearchAllocatedResourceSlotsInput(BaseRequestModel):
+    """Input for searching allocated resource slots with filters, orders, and pagination.
+
+    Shared by both deployment revision and preset resource slot connections.
+    """
+
+    filter: AllocatedResourceSlotFilter | None = Field(
+        default=None, description="Filter conditions."
+    )
+    order: list[AllocatedResourceSlotOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
     limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
     offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")

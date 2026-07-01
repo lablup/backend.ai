@@ -8,6 +8,7 @@ from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
 )
 from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
@@ -19,6 +20,7 @@ class CreateRoleAction(RoleAction):
     object_permissions: Sequence[ObjectPermissionCreateInputBeforeRoleCreation] = field(
         default_factory=tuple
     )
+    scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
 
     @override
     def entity_id(self) -> str | None:

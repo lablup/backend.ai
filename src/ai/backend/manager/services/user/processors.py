@@ -6,7 +6,10 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
+from ai.backend.manager.actions.validator.scope import ScopeActionValidator
+from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
     AdminMonthStatsActionResult,
@@ -32,8 +35,14 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairActionResult,
     AdminDeleteKeypairAction,
     AdminDeleteKeypairActionResult,
+    AdminDeleteSSHKeypairAction,
+    AdminDeleteSSHKeypairActionResult,
     AdminGetKeypairAction,
     AdminGetKeypairActionResult,
+    AdminGetSSHKeypairAction,
+    AdminGetSSHKeypairActionResult,
+    AdminRegisterSSHKeypairAction,
+    AdminRegisterSSHKeypairActionResult,
     AdminSearchKeypairsAction,
     AdminSearchKeypairsActionResult,
     AdminUpdateKeypairAction,
@@ -42,6 +51,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
     RevokeMyKeypairActionResult,
+    SearchKeypairsByResourcePolicyAction,
+    SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
     SwitchMyMainAccessKeyAction,
@@ -98,6 +109,9 @@ class UserProcessors(AbstractProcessorPackage):
         SearchUsersByProjectAction, SearchUsersByProjectActionResult
     ]
     search_users_by_role: ActionProcessor[SearchUsersByRoleAction, SearchUsersByRoleActionResult]
+    search_keypairs_by_resource_policy: ScopeActionProcessor[
+        SearchKeypairsByResourcePolicyAction, SearchKeypairsByResourcePolicyActionResult
+    ]
     # Single entity actions with RBAC
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
     modify_user: SingleEntityActionProcessor[ModifyUserAction, ModifyUserActionResult]
@@ -129,6 +143,14 @@ class UserProcessors(AbstractProcessorPackage):
         AdminSearchKeypairsAction, AdminSearchKeypairsActionResult
     ]
     admin_get_keypair: ActionProcessor[AdminGetKeypairAction, AdminGetKeypairActionResult]
+    # Admin SSH keypair operations
+    admin_register_ssh_keypair: ActionProcessor[
+        AdminRegisterSSHKeypairAction, AdminRegisterSSHKeypairActionResult
+    ]
+    admin_delete_ssh_keypair: ActionProcessor[
+        AdminDeleteSSHKeypairAction, AdminDeleteSSHKeypairActionResult
+    ]
+    admin_get_ssh_keypair: ActionProcessor[AdminGetSSHKeypairAction, AdminGetSSHKeypairActionResult]
 
     def __init__(
         self,
@@ -136,9 +158,21 @@ class UserProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        # Scope actions with RBAC
+        # Scope actions with RBAC — create_user is also invoked from gql_legacy,
+        # so use the non-enforcing legacy validator to avoid breaking callers.
+        # Mocked test fixtures do not provide a legacy_rbac, so isinstance
+        # guards against MagicMock attribute access returning a truthy mock.
+        legacy_rbac = validators.legacy_rbac
+        if isinstance(legacy_rbac, LegacyRBACValidators):
+            legacy_scope_validator: ScopeActionValidator = legacy_rbac.scope
+            legacy_single_entity_validator: SingleEntityActionValidator = legacy_rbac.single_entity
+        else:
+            legacy_scope_validator = validators.rbac.scope
+            legacy_single_entity_validator = validators.rbac.single_entity
         self.create_user = ScopeActionProcessor(
-            user_service.create_user, action_monitors, validators=[validators.rbac.scope]
+            user_service.create_user,
+            action_monitors,
+            validators=[legacy_scope_validator],
         )
         self.search_users_by_domain = ActionProcessor(
             user_service.search_users_by_domain, action_monitors
@@ -151,12 +185,20 @@ class UserProcessors(AbstractProcessorPackage):
         self.search_users_by_role = ActionProcessor(
             user_service.search_users_by_role, action_monitors
         )
+        self.search_keypairs_by_resource_policy = ScopeActionProcessor(
+            user_service.search_keypairs_by_resource_policy,
+            action_monitors,
+            validators=[validators.rbac.scope],
+        )
         # Single entity actions with RBAC
         self.get_user = SingleEntityActionProcessor(
             user_service.get_user, action_monitors, validators=[validators.rbac.single_entity]
         )
+        # modify_user is also invoked from gql_legacy — non-enforcing validator.
         self.modify_user = SingleEntityActionProcessor(
-            user_service.modify_user, action_monitors, validators=[validators.rbac.single_entity]
+            user_service.modify_user,
+            action_monitors,
+            validators=[legacy_single_entity_validator],
         )
         self.modify_user_by_id = SingleEntityActionProcessor(
             user_service.modify_user_by_id,
@@ -169,8 +211,11 @@ class UserProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=[validators.rbac.single_entity],
         )
+        # purge_user is invoked only from gql_legacy — non-enforcing validator.
         self.purge_user = SingleEntityActionProcessor(
-            user_service.purge_user, action_monitors, validators=[validators.rbac.single_entity]
+            user_service.purge_user,
+            action_monitors,
+            validators=[legacy_single_entity_validator],
         )
         self.purge_user_by_id = SingleEntityActionProcessor(
             user_service.purge_user_by_id,
@@ -206,6 +251,16 @@ class UserProcessors(AbstractProcessorPackage):
             user_service.admin_search_keypairs, action_monitors
         )
         self.admin_get_keypair = ActionProcessor(user_service.admin_get_keypair, action_monitors)
+        # Admin SSH keypair operations
+        self.admin_register_ssh_keypair = ActionProcessor(
+            user_service.admin_register_ssh_keypair, action_monitors
+        )
+        self.admin_delete_ssh_keypair = ActionProcessor(
+            user_service.admin_delete_ssh_keypair, action_monitors
+        )
+        self.admin_get_ssh_keypair = ActionProcessor(
+            user_service.admin_get_ssh_keypair, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -232,9 +287,13 @@ class UserProcessors(AbstractProcessorPackage):
             SwitchMyMainAccessKeyAction.spec(),
             UpdateMyKeypairAction.spec(),
             SearchMyKeypairsAction.spec(),
+            SearchKeypairsByResourcePolicyAction.spec(),
             AdminCreateKeypairAction.spec(),
             AdminUpdateKeypairAction.spec(),
             AdminDeleteKeypairAction.spec(),
             AdminSearchKeypairsAction.spec(),
             AdminGetKeypairAction.spec(),
+            AdminRegisterSSHKeypairAction.spec(),
+            AdminDeleteSSHKeypairAction.spec(),
+            AdminGetSSHKeypairAction.spec(),
         ]

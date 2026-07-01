@@ -9,7 +9,6 @@ from ai.backend.common.dto.manager.v2.login_history.request import (
     AdminSearchLoginHistoryInput,
     MySearchLoginHistoryInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -28,7 +27,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Query login history with pagination and filtering. (admin only)",
     )
 )  # type: ignore[misc]
@@ -42,7 +41,7 @@ async def admin_login_history_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> LoginHistoryV2ConnectionGQL:
+) -> LoginHistoryV2ConnectionGQL | None:
     check_admin_only()
     result = await info.context.adapters.login_history.admin_search(
         AdminSearchLoginHistoryInput(
@@ -72,7 +71,7 @@ async def admin_login_history_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Query login history of the current user with pagination and filtering.",
     )
 )  # type: ignore[misc]
@@ -86,7 +85,7 @@ async def my_login_history_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> LoginHistoryV2ConnectionGQL:
+) -> LoginHistoryV2ConnectionGQL | None:
     result = await info.context.adapters.login_history.my_search(
         MySearchLoginHistoryInput(
             filter=filter.to_pydantic() if filter else None,

@@ -107,7 +107,6 @@ class LockID(enum.IntEnum):
     LOCKID_DEPLOYMENT_PROVISIONING_ROUTES = 223  # Lock for provisioning routes
     LOCKID_DEPLOYMENT_HEALTH_CHECK_ROUTES = 224  # Lock for health check routes
     LOCKID_DEPLOYMENT_RUNNING_ROUTES = 225  # Lock for running routes
-    LOCKID_DEPLOYMENT_CHECK_PENDING = 226  # For operations checking PENDING sessions
     LOCKID_DEPLOYMENT_CHECK_REPLICA = 227  # For operations checking REPLICA sessions
     LOCKID_DEPLOYMENT_DESTROYING = 228  # For operations destroying deployments
     LOCKID_DEPLOYMENT_DEPLOYING = 229  # For operations deploying deployments
@@ -116,12 +115,22 @@ class LockID(enum.IntEnum):
     LOCKID_SOKOVAN_TARGET_PREPARING = 231  # For operations targeting PREPARING/PULLING sessions
     LOCKID_SOKOVAN_TARGET_CREATING = 232  # For operations targeting CREATING/PREPARED sessions
     LOCKID_SOKOVAN_TARGET_TERMINATING = 233  # For operations targeting TERMINATING sessions
+    LOCKID_SOKOVAN_CLEANUP_FORCE_TERMINATED_TIMER = 234  # Timer for force-terminated cleanup
+    # Reconciler stage locks
+    LOCKID_REPLICA_GROUP_SCALING_RECONCILE = 235  # For replica-group scaling reconcile
+    LOCKID_REPLICA_GROUP_ROLLING_RECONCILE = 236  # For replica-group rolling reconcile
+    LOCKID_REPLICA_GROUP_DRAINING_RECONCILE = 237  # For replica-group draining reconcile
+    LOCKID_REPLICA_GROUP_AUTOSCALE_RECONCILE = (
+        238  # For replica-group steady-state autoscale reconcile
+    )
+    LOCKID_IDLE_CHECK_RECONCILE = 239  # For idle-check reconcile
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable
 
 DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME: Final = "default"
 DEFAULT_KEYPAIR_RATE_LIMIT: Final = 10000
+DEFAULT_PROJECT_NAME: Final = "default"
 
 DEFAULT_SHARED_MEMORY_SIZE: Final[str] = "64m"
 START_SESSION_TIMEOUT_SEC: Final[float] = 60 * 30  # 30 min

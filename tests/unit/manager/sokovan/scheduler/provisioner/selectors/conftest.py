@@ -9,7 +9,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AgentId, ResourceSlot
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentInfo
+from ai.backend.manager.data.sokovan import AgentInfo
 
 
 def _create_agent_info(

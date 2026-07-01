@@ -30,6 +30,7 @@ class VFolderCreatorSpec(CreatorSpec[VFolderRow]):
     quota_scope_id: str
     host: str
     creator: str
+    creator_id: uuid.UUID
     ownership_type: VFolderOwnershipType
     usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
     permission: VFolderMountPermission = VFolderMountPermission.READ_WRITE
@@ -51,6 +52,7 @@ class VFolderCreatorSpec(CreatorSpec[VFolderRow]):
             last_used=None,
             host=self.host,
             creator=self.creator,
+            creator_id=self.creator_id,
             ownership_type=self.ownership_type,
             user=self.user,
             group=self.group,

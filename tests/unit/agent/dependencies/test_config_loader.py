@@ -9,6 +9,7 @@ from ai.backend.agent.dependencies.bootstrap.config import (
     AgentConfigLoaderDependency,
     AgentConfigLoaderInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.logging.types import LogLevel
 
 
@@ -101,7 +102,7 @@ reserved-cpu = 1
             log_level=LogLevel.WARNING,
         )
 
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             async with loader.provide(input_data):
                 pass
 

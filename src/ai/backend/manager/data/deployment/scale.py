@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
+from ai.backend.common.types import AutoScalingMetricSource
 
 
 # Dataclasses for auto scaling rules used in Model Service (legacy)
@@ -11,8 +11,9 @@ from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetr
 class AutoScalingCondition:
     metric_source: AutoScalingMetricSource
     metric_name: str
-    threshold: str
-    comparator: AutoScalingMetricComparator
+    scale_up_threshold: Decimal | None
+    scale_down_threshold: Decimal | None
+    prometheus_query_preset_id: UUID | None = None
 
 
 @dataclass
@@ -50,6 +51,7 @@ class ModelDeploymentAutoScalingRuleCreator:
     time_window: int
     min_replicas: int | None
     max_replicas: int | None
+    prometheus_query_preset_id: UUID | None = None
 
 
 @dataclass
@@ -64,3 +66,4 @@ class ModelDeploymentAutoScalingRule:
     time_window: int
     min_replicas: int | None
     max_replicas: int | None
+    prometheus_query_preset_id: UUID | None = None

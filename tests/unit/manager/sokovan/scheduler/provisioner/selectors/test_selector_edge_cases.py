@@ -7,7 +7,15 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
+from ai.backend.manager.data.sokovan import AgentInfo
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
 )
@@ -19,7 +27,6 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.roundrobin impor
     RoundRobinAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,
@@ -61,7 +68,7 @@ class TestSelectorEdgeCases:
         """Test handling of empty resource requirements."""
         # Empty resource request
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({}),  # No resources requested
             required_architecture="x86_64",
         )
@@ -92,7 +99,7 @@ class TestSelectorEdgeCases:
         """Test handling of zero resource values in requests."""
         # Request with zero values
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("0"),
                 "mem": Decimal("0"),
@@ -117,7 +124,7 @@ class TestSelectorEdgeCases:
         """Test when requested resource type doesn't exist on any agent."""
         # Request TPU which no agent has
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -143,7 +150,7 @@ class TestSelectorEdgeCases:
     ) -> None:
         """Test handling of very large resource values."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -173,7 +180,7 @@ class TestSelectorEdgeCases:
     ) -> None:
         """Test handling of decimal precision edge cases."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("0.000000000000000000000001"),
                 "mem": Decimal("0.000000000000000000000001"),
@@ -196,7 +203,7 @@ class TestSelectorEdgeCases:
     ) -> None:
         """Test all strategies with only one agent available."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -222,7 +229,7 @@ class TestSelectorEdgeCases:
     ) -> None:
         """Test when all agents have zero available resources."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -243,7 +250,7 @@ class TestSelectorEdgeCases:
     ) -> None:
         """Test resource priority list containing non-existent resource types."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -266,7 +273,7 @@ class TestSelectorEdgeCases:
     ) -> None:
         """Test handling of special characters in resource names."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("1"),
                 "mem": Decimal("2048"),

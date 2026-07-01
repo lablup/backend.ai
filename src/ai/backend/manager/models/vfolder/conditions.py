@@ -11,15 +11,32 @@ import sqlalchemy as sa
 if TYPE_CHECKING:
     from ai.backend.common.data.filter_specs import StringMatchSpec
 
+from uuid import UUID
+
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 
 from .row import VFolderRow
 
 
 class VFolderConditions:
     """Query conditions for vfolders."""
+
+    @staticmethod
+    def by_id(vfolder_id: UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.id == vfolder_id
+
+        return inner
+
+    @staticmethod
+    def by_ids(vfolder_ids: Collection[UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.id.in_(vfolder_ids)
+
+        return inner
 
     # ── name string filter factories ──
 
@@ -129,6 +146,9 @@ class VFolderConditions:
 
         return inner
 
+    by_name_in = staticmethod(make_string_in_factory(VFolderRow.name))
+    by_host_in = staticmethod(make_string_in_factory(VFolderRow.host))
+
     # ── boolean filter factories ──
 
     @staticmethod
@@ -141,9 +161,23 @@ class VFolderConditions:
     # ── enum filter factories ──
 
     @staticmethod
+    def by_status_equals(status: VFolderOperationStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.status == status
+
+        return inner
+
+    @staticmethod
     def by_status_in(statuses: Collection[VFolderOperationStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return VFolderRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_status_not_equals(status: VFolderOperationStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.status != status
 
         return inner
 
@@ -155,9 +189,23 @@ class VFolderConditions:
         return inner
 
     @staticmethod
+    def by_usage_mode_equals(mode: VFolderUsageMode) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.usage_mode == mode
+
+        return inner
+
+    @staticmethod
     def by_usage_mode_in(modes: Collection[VFolderUsageMode]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return VFolderRow.usage_mode.in_(modes)
+
+        return inner
+
+    @staticmethod
+    def by_usage_mode_not_equals(mode: VFolderUsageMode) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return VFolderRow.usage_mode != mode
 
         return inner
 

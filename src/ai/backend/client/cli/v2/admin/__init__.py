@@ -16,6 +16,15 @@ def admin() -> None:
     """Admin-only management commands (superadmin required)."""
 
 
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.app_config_definition:app_config_definition",
+    name="app-config-definition",
+)
+def app_config_definition() -> None:
+    """Admin app config definition commands."""
+
+
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.domain:domain")
 def domain() -> None:
     """Admin domain commands."""
@@ -34,6 +43,15 @@ def project() -> None:
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.agent:agent")
 def agent() -> None:
     """Admin agent commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.app_config_allow_list:app_config_allow_list",
+    name="app-config-allow-list",
+)
+def app_config_allow_list() -> None:
+    """Admin app config allow-list commands."""
 
 
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.deployment:deployment")
@@ -104,6 +122,15 @@ def prometheus_query_preset() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.prometheus_query_preset_category:prometheus_query_preset_category",
+    name="prometheus-query-definition-category",
+)
+def prometheus_query_preset_category() -> None:
+    """Admin prometheus query definition category commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.resource_allocation:resource_allocation",
     name="resource-allocation",
 )
@@ -123,6 +150,24 @@ def resource_policy() -> None:
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.keypair:keypair")
 def keypair() -> None:
     """Admin keypair commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.resource_group:resource_group",
+    name="resource-group",
+)
+def resource_group() -> None:
+    """Admin resource group commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.login_client_type:login_client_type",
+    name="login-client-type",
+)
+def login_client_type() -> None:
+    """Admin login client type commands."""
 
 
 @admin.group(
@@ -159,3 +204,29 @@ def runtime_variant_preset() -> None:
 )
 def model_card() -> None:
     """Admin model card commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.scheduling_handler:scheduling_handler",
+    name="scheduling-handler",
+)
+def scheduling_handler() -> None:
+    """Admin scheduling handler commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.invitation:invitation",
+)
+def invitation() -> None:
+    """Admin role invitation commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.role_preset:role_preset",
+    name="role-preset",
+)
+def role_preset() -> None:
+    """Admin role preset commands."""

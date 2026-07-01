@@ -229,10 +229,10 @@ async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Artifac
         added_version="25.14.0",
         description="Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use",
     )
-)  # type: ignore[misc]
+)
 async def scan_artifacts(
     input: ScanArtifactsInput, info: Info[StrawberryGQLContext]
-) -> ScanArtifactsPayload:
+) -> ScanArtifactsPayload | None:
     if input.limit > ARTIFACT_MAX_SCAN_LIMIT:
         raise ArtifactScanLimitExceededError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
 
@@ -265,10 +265,10 @@ async def scan_artifacts(
         added_version="25.14.0",
         description="Import scanned artifact revisions from external registries. Downloads the actual files for the specified artifact revisions, transitioning them from SCANNED → PULLING → VERIFYING → AVAILABLE status. Returns background tasks that can be monitored for import progress. Once AVAILABLE, artifacts can be used by users in their sessions",
     )
-)  # type: ignore[misc]
+)
 async def import_artifacts(
     input: ImportArtifactsInput, info: Info[StrawberryGQLContext]
-) -> ImportArtifactsPayload:
+) -> ImportArtifactsPayload | None:
     imported_artifacts = []
     tasks = []
     vfolder_id = UUID(input.vfolder_id) if input.vfolder_id else None
@@ -316,10 +316,10 @@ async def import_artifacts(
         added_version="25.15.0",
         description="Triggers artifact scanning on a remote reservoir registry. This mutation instructs a reservoir-type registry to initiate a scan of artifacts from its associated remote reservoir registry source. The scan process will discover and catalog artifacts available in the remote reservoir, making them accessible through the local reservoir registry. Requirements: - The delegator registry must be of type 'reservoir' - The delegator reservoir registry must have a valid remote registry configuration",
     )
-)  # type: ignore[misc]
+)
 async def delegate_scan_artifacts(
     input: DelegateScanArtifactsInput, info: Info[StrawberryGQLContext]
-) -> DelegateScanArtifactsPayload:
+) -> DelegateScanArtifactsPayload | None:
     if input.limit > ARTIFACT_MAX_SCAN_LIMIT:
         raise ArtifactScanLimitExceededError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
 
@@ -355,10 +355,10 @@ async def delegate_scan_artifacts(
         added_version="25.15.0",
         description="Trigger import of artifact revisions from a remote reservoir registry. This mutation instructs a reservoir-type registry to import specific artifact revisions that were previously discovered during a scan from its remote registry. Note that this operation does not import the artifacts directly into the local registry, but only into the delegator reservoir's storage. Requirements: - The delegator registry must be of type 'reservoir' - The delegator registry must have a valid remote registry configuration",
     )
-)  # type: ignore[misc]
+)
 async def delegate_import_artifacts(
     input: DelegateImportArtifactsInput, info: Info[StrawberryGQLContext]
-) -> DelegateImportArtifactsPayload:
+) -> DelegateImportArtifactsPayload | None:
     tasks = []
 
     options = input.options or ImportArtifactsOptionsGQL()
@@ -413,10 +413,10 @@ async def delegate_import_artifacts(
         added_version="25.14.0",
         description="Update artifact metadata properties. Modifies artifact metadata such as readonly status and description. This operation does not affect the actual artifact files or revisions",
     )
-)  # type: ignore[misc]
+)
 async def update_artifact(
     input: UpdateArtifactInput, info: Info[StrawberryGQLContext]
-) -> UpdateArtifactPayload:
+) -> UpdateArtifactPayload | None:
     pydantic_input = UpdateArtifactInputDTO(
         readonly=input.readonly if input.readonly is not UNSET else None,
         description=input.description if input.description is not UNSET else SENTINEL,
@@ -445,10 +445,10 @@ async def update_artifact(
         added_version="25.14.0",
         description="Clean up stored artifact revision data to free storage space. Removes the downloaded files for the specified artifact revisions and transitions them back to SCANNED status. The metadata remains, allowing the artifacts to be re-imported later if needed. Use this operation to manage storage usage by removing unused artifacts",
     )
-)  # type: ignore[misc]
+)
 async def cleanup_artifact_revisions(
     input: CleanupArtifactRevisionsInput, info: Info[StrawberryGQLContext]
-) -> CleanupArtifactRevisionsPayload:
+) -> CleanupArtifactRevisionsPayload | None:
     cleaned_artifact_revisions: list[ArtifactRevision] = []
     # TODO: Refactor with asyncio.gather()
     pydantic_input = input.to_pydantic()
@@ -480,10 +480,10 @@ async def cleanup_artifact_revisions(
         added_version="25.15.0",
         description="Soft-delete artifacts from the system. Marks artifacts as deleted without permanently removing them. Deleted artifacts can be restored using the restore_artifacts mutation",
     )
-)  # type: ignore[misc]
+)
 async def delete_artifacts(
     input: DeleteArtifactsInput, info: Info[StrawberryGQLContext]
-) -> DeleteArtifactsPayload:
+) -> DeleteArtifactsPayload | None:
     pydantic_input = input.to_pydantic()
     payload = await info.context.adapters.artifact.delete(pydantic_input)
 
@@ -507,10 +507,10 @@ async def delete_artifacts(
         added_version="25.15.0",
         description="Restore previously deleted artifacts. Reverses the soft-delete operation, making the artifacts available again for use in the system",
     )
-)  # type: ignore[misc]
+)
 async def restore_artifacts(
     input: RestoreArtifactsInput, info: Info[StrawberryGQLContext]
-) -> RestoreArtifactsPayload:
+) -> RestoreArtifactsPayload | None:
     artifact_node_list = await info.context.adapters.artifact.restore(
         artifact_ids=[UUID(id) for id in input.artifact_ids],
     )
@@ -535,10 +535,10 @@ async def restore_artifacts(
         added_version="25.14.0",
         description="Cancel an in-progress artifact import operation. Stops the download process for the specified artifact revision and reverts its status back to SCANNED. The partially downloaded data is cleaned up",
     )
-)  # type: ignore[misc]
+)
 async def cancel_import_artifact(
     input: CancelArtifactInput, info: Info[StrawberryGQLContext]
-) -> CancelImportArtifactPayload:
+) -> CancelImportArtifactPayload | None:
     # TODO: Cancel actual import bgtask
     pydantic_input = input.to_pydantic()
     revision_node = await info.context.adapters.artifact.cancel_import(
@@ -555,10 +555,10 @@ async def cancel_import_artifact(
         added_version="25.14.0",
         description="Approve an artifact revision for general use. Admin-only operation to approve artifact revisions, typically used in environments with approval workflows for artifact deployment",
     )
-)  # type: ignore[misc]
+)
 async def approve_artifact_revision(
     input: ApproveArtifactInput, info: Info[StrawberryGQLContext]
-) -> ApproveArtifactPayload:
+) -> ApproveArtifactPayload | None:
     revision_node = await info.context.adapters.artifact.approve_revision(
         UUID(input.artifact_revision_id)
     )
@@ -570,10 +570,10 @@ async def approve_artifact_revision(
         added_version="25.14.0",
         description="Reject an artifact revision, preventing its use. Admin-only operation to reject artifact revisions, typically used in environments with approval workflows for artifact deployment",
     )
-)  # type: ignore[misc]
+)
 async def reject_artifact_revision(
     input: RejectArtifactInput, info: Info[StrawberryGQLContext]
-) -> RejectArtifactPayload:
+) -> RejectArtifactPayload | None:
     revision_node = await info.context.adapters.artifact.reject_revision(
         UUID(input.artifact_revision_id)
     )
@@ -585,10 +585,10 @@ async def reject_artifact_revision(
         added_version="25.14.0",
         description="Perform detailed scanning of specific models. Unlike the general scan_artifacts operation, this performs immediate detailed scanning of specified models including README content and file sizes. Returns artifact revisions with complete metadata ready for use",
     )
-)  # type: ignore[misc]
+)
 async def scan_artifact_models(
     input: ScanArtifactModelsInput, info: Info[StrawberryGQLContext]
-) -> ScanArtifactModelsPayload:
+) -> ScanArtifactModelsPayload | None:
     results = await info.context.adapters.artifact.retrieve_models(
         models=[m.to_pydantic() for m in input.models],
         registry_id=input.registry_id,
@@ -619,7 +619,7 @@ async def scan_artifact_models(
 
 
 # Subscriptions
-@gql_subscription(  # type: ignore[misc]
+@gql_subscription(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description=(
@@ -637,7 +637,7 @@ async def artifact_status_changed(
     yield  # type: ignore[unreachable]  # Makes this an async generator
 
 
-@gql_subscription(  # type: ignore[misc]
+@gql_subscription(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description=(

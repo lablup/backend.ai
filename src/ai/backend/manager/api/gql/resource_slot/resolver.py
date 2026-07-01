@@ -54,7 +54,7 @@ async def resource_slot_types(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ResourceSlotTypeConnectionGQL:
+) -> ResourceSlotTypeConnectionGQL | None:
     search_input = AdminSearchResourceSlotTypesInput(
         filter=filter.to_pydantic() if filter is not None else None,
         order=[o.to_pydantic() for o in order_by] if order_by is not None else None,

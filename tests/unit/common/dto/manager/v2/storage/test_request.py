@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.storage.request import (
     VFSDownloadFileInput,
     VFSListFilesInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestListVFSStorageInput:
@@ -31,15 +32,15 @@ class TestListVFSStorageInput:
         assert req.limit == MAX_PAGE_LIMIT
 
     def test_limit_exceeds_max_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListVFSStorageInput(limit=MAX_PAGE_LIMIT + 1)
 
     def test_limit_below_1_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListVFSStorageInput(limit=0)
 
     def test_negative_offset_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ListVFSStorageInput(offset=-1)
 
     def test_custom_limit_and_offset(self) -> None:
@@ -75,7 +76,7 @@ class TestVFSDownloadFileInput:
         assert req.filepath == "/data/file.bin"
 
     def test_empty_filepath_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             VFSDownloadFileInput(filepath="")
 
     def test_round_trip(self) -> None:
@@ -92,7 +93,7 @@ class TestVFSListFilesInput:
         assert req.directory == "/models"
 
     def test_empty_directory_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             VFSListFilesInput(directory="")
 
     def test_round_trip(self) -> None:

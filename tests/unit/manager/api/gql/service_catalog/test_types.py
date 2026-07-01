@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     ServiceCatalogFilter as ServiceCatalogFilterDTO,
@@ -58,7 +59,7 @@ class TestServiceCatalogEndpointGQL:
         assert endpoint.address == "10.0.0.1"
         assert endpoint.port == 8080
         assert endpoint.protocol == "grpc"
-        assert endpoint.metadata == {"key": "value"}
+        assert cast(dict[str, Any], endpoint.metadata) == {"key": "value"}
 
     def test_from_pydantic_null_metadata(self) -> None:
         """from_pydantic should handle None metadata."""
@@ -117,7 +118,7 @@ class TestServiceCatalogGQL:
         assert gql.instance_id == "mgr-001"
         assert gql.display_name == "Manager Instance 1"
         assert gql.version == "26.3.0"
-        assert gql.labels == {"region": "us-east-1"}
+        assert cast(dict[str, Any], gql.labels) == {"region": "us-east-1"}
         assert gql.status == ServiceCatalogStatusGQL.HEALTHY
         assert gql.startup_time == now
         assert gql.registered_at == now

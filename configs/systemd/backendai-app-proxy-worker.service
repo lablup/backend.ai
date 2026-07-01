@@ -1,0 +1,22 @@
+[Unit]
+Description=Backend.AI App Proxy Worker
+Requires=network.target
+After=network.target remote-fs.target backendai-app-proxy-coordinator.service
+
+[Service]
+Type=simple
+ExecStart=/home/ubuntu/backend.ai/backend.ai app-proxy-worker start-server --debug
+WorkingDirectory=/home/ubuntu/backend.ai
+User=ubuntu
+Group=ubuntu
+TimeoutStopSec=5
+KillMode=process
+KillSignal=SIGTERM
+PrivateTmp=false
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=5242880
+LimitNPROC=131072
+
+[Install]
+WantedBy=multi-user.target

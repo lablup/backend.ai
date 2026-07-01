@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, override
 
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.stream.actions.base import StreamAction
@@ -12,7 +12,7 @@ from ai.backend.manager.services.stream.actions.base import StreamAction
 @dataclass(frozen=True)
 class ExecuteInStreamAction(StreamAction):
     session_name: str
-    access_key: AccessKey
+    user_uuid: uuid.UUID
     api_version: tuple[int, str]
     run_id: str
     mode: str

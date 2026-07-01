@@ -14,6 +14,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import SessionId
 
 __all__ = (
     "AdminSearchSessionsPayload",
@@ -152,6 +153,13 @@ class SessionNode(BaseResponseModel):
     """Node model representing a session entity with nested info sub-models."""
 
     id: UUID = Field(description="Session ID.")
+    image_ids: list[UUID] | None = Field(
+        default=None,
+        description=(
+            "UUIDs of the images used by this session. "
+            "Multiple images are possible in multi-kernel (cluster) sessions."
+        ),
+    )
     domain_name: str = Field(description="Domain name the session belongs to.")
     user_id: UUID = Field(description="UUID of the user who owns this session.")
     project_id: UUID = Field(description="Group (project) ID the session belongs to.")
@@ -164,6 +172,10 @@ class SessionNode(BaseResponseModel):
     lifecycle: SessionLifecycleInfoGQLDTO = Field(description="Lifecycle status and timestamps.")
     runtime: SessionRuntimeInfoGQLDTO = Field(description="Runtime execution configuration.")
     network: SessionNetworkInfo = Field(description="Network configuration.")
+    replica_id: UUID | None = Field(
+        default=None,
+        description="UUID of the routing replica this session serves, if any.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -230,16 +242,16 @@ class AdminSearchSessionsPayload(BaseResponseModel):
 class TerminateSessionsPayload(BaseResponseModel):
     """Payload for session termination with per-session outcome."""
 
-    cancelled: list[UUID] = Field(
+    cancelled: list[SessionId] = Field(
         default_factory=list, description="Sessions cancelled from PENDING."
     )
-    terminating: list[UUID] = Field(
+    terminating: list[SessionId] = Field(
         default_factory=list, description="Sessions marked TERMINATING."
     )
-    force_terminated: list[UUID] = Field(
+    force_terminated: list[SessionId] = Field(
         default_factory=list, description="Sessions force-terminated."
     )
-    skipped: list[UUID] = Field(
+    skipped: list[SessionId] = Field(
         default_factory=list, description="Sessions already terminated or not found."
     )
 

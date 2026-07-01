@@ -8,11 +8,17 @@ from datetime import datetime
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringInMatchSpec,
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class ImageConditions:
@@ -22,6 +28,26 @@ class ImageConditions:
     def by_ids(image_ids: Collection[ImageID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ImageRow.id.in_(image_ids)
+
+        return inner
+
+    @staticmethod
+    def by_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = ImageRow.id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = ImageRow.id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -71,6 +97,26 @@ class ImageConditions:
     def by_registry_id(registry_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ImageRow.registry_id == registry_id
+
+        return inner
+
+    @staticmethod
+    def by_registry_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = ImageRow.registry_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_registry_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = ImageRow.registry_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -176,6 +222,26 @@ class ImageConditions:
                 condition = ImageRow.architecture.like(f"%{spec.value}")
             if spec.negated:
                 condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_name_in = staticmethod(make_string_in_factory(ImageRow.name))
+    by_architecture_in = staticmethod(make_string_in_factory(ImageRow.architecture))
+
+    @staticmethod
+    def by_alias_in(spec: StringInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(ImageAliasRow.image_id == ImageRow.id)
+            if spec.case_insensitive:
+                subq = subq.where(
+                    sa.func.lower(ImageAliasRow.alias).in_([v.lower() for v in spec.values])
+                )
+            else:
+                subq = subq.where(ImageAliasRow.alias.in_(spec.values))
+            condition: sa.sql.expression.ColumnElement[bool] = sa.exists(subq)
+            if spec.negated:
+                condition = ~condition
             return condition
 
         return inner
@@ -358,6 +424,8 @@ class ImageAliasConditions:
             return condition
 
         return inner
+
+    by_alias_in = staticmethod(make_string_in_factory(ImageAliasRow.alias))
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:

@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     UpdateContainerRegistryPayload as UpdateContainerRegistryPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.container_registry.types import (
     ContainerRegistryGQL,
     ContainerRegistryTypeGQL,
@@ -37,9 +36,10 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, Pydan
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating a container registry.",
-    )
+    ),
+    name="CreateContainerRegistryInputV2",
 )
 class CreateContainerRegistryInputGQL(PydanticInputMixin[CreateContainerRegistryInputDTO]):
     url: str = gql_field(description="URL of the container registry.")
@@ -55,9 +55,10 @@ class CreateContainerRegistryInputGQL(PydanticInputMixin[CreateContainerRegistry
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for updating a container registry. All fields optional except id.",
-    )
+    ),
+    name="UpdateContainerRegistryInput",
 )
 class UpdateContainerRegistryInputGQL(PydanticInputMixin[UpdateContainerRegistryInputDTO]):
     id: str = gql_field(description="ID of the registry to update.")
@@ -77,10 +78,11 @@ class UpdateContainerRegistryInputGQL(PydanticInputMixin[UpdateContainerRegistry
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for container registry create/update mutations.",
     ),
     model=CreateContainerRegistryPayloadDTO,
+    name="CreateContainerRegistryPayload",
 )
 class CreateContainerRegistryPayloadGQL(PydanticOutputMixin[CreateContainerRegistryPayloadDTO]):
     registry: ContainerRegistryGQL = gql_field(description="The container registry.")
@@ -88,10 +90,11 @@ class CreateContainerRegistryPayloadGQL(PydanticOutputMixin[CreateContainerRegis
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for container registry update mutation.",
     ),
     model=UpdateContainerRegistryPayloadDTO,
+    name="UpdateContainerRegistryPayload",
 )
 class UpdateContainerRegistryPayloadGQL(PydanticOutputMixin[UpdateContainerRegistryPayloadDTO]):
     registry: ContainerRegistryGQL = gql_field(description="The updated container registry.")
@@ -99,10 +102,11 @@ class UpdateContainerRegistryPayloadGQL(PydanticOutputMixin[UpdateContainerRegis
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for container registry deletion.",
     ),
     model=DeleteContainerRegistryPayloadDTO,
+    name="DeleteContainerRegistryPayload",
 )
 class DeleteContainerRegistryPayloadGQL(PydanticOutputMixin[DeleteContainerRegistryPayloadDTO]):
     id: str = gql_field(description="ID of the deleted registry.")

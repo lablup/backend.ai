@@ -5,9 +5,12 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    ReplaceResourceGroupDefaultDeploymentOptionsInput,
+    ReplaceResourceGroupDefaultSessionOptionsInput,
     UpdateAllowedDomainsForResourceGroupInput,
     UpdateAllowedProjectsForResourceGroupInput,
     UpdateAllowedResourceGroupsForDomainInput,
@@ -23,12 +26,16 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedResourceGroupsPayload,
     CreateResourceGroupPayload,
     DeleteResourceGroupPayload,
-    ResourceGroupNode,
+    ReplaceResourceGroupDefaultDeploymentOptionsPayload,
+    ReplaceResourceGroupDefaultSessionOptionsPayload,
+    ResourceGroupDetailNode,
     ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
     UpdateResourceGroupFairShareSpecPayloadNode,
     UpdateResourceGroupPayload,
 )
+from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 
 _PATH = "/v2/resource-groups"
 
@@ -56,12 +63,12 @@ class V2ResourceGroupClient(BaseDomainClient):
             response_model=CreateResourceGroupPayload,
         )
 
-    async def get(self, name: str) -> ResourceGroupNode:
+    async def get(self, name: str) -> ResourceGroupDetailNode:
         """Retrieve a single resource group by name."""
         return await self._client.typed_request(
             "GET",
             f"{_PATH}/{name}",
-            response_model=ResourceGroupNode,
+            response_model=ResourceGroupDetailNode,
         )
 
     async def update(
@@ -209,4 +216,60 @@ class V2ResourceGroupClient(BaseDomainClient):
             f"{_PATH}/{name}/allowed-projects",
             request=request,
             response_model=AllowedProjectsPayload,
+        )
+
+    # ------------------------------------------------------------------
+    # Default deployment options (admin only)
+    # ------------------------------------------------------------------
+
+    async def admin_get_default_deployment_options(
+        self, name: ResourceGroupName
+    ) -> DeploymentOptionsInfo:
+        """Read the current ``default_deployment_options`` of a resource group.
+
+        Reads the full RG detail node and returns its
+        ``default_deployment_options`` field.
+        """
+        node = await self.get(name)
+        return node.default_deployment_options
+
+    async def admin_replace_default_deployment_options(
+        self,
+        name: ResourceGroupName,
+        body: ReplaceResourceGroupDefaultDeploymentOptionsInput,
+    ) -> ReplaceResourceGroupDefaultDeploymentOptionsPayload:
+        """Fully replace a resource group's ``default_deployment_options`` (superadmin only)."""
+        return await self._client.typed_request(
+            "PUT",
+            f"{_PATH}/{name}/default-options",
+            request=body,
+            response_model=ReplaceResourceGroupDefaultDeploymentOptionsPayload,
+        )
+
+    # ------------------------------------------------------------------
+    # Default session options (admin only)
+    # ------------------------------------------------------------------
+
+    async def admin_get_default_session_options(
+        self, name: ResourceGroupName
+    ) -> DefaultSessionOptionsInfo:
+        """Read the current ``default_session_options`` of a resource group.
+
+        Reads the full RG detail node and returns its
+        ``default_session_options`` field.
+        """
+        node = await self.get(name)
+        return node.default_session_options
+
+    async def admin_replace_default_session_options(
+        self,
+        name: ResourceGroupName,
+        body: ReplaceResourceGroupDefaultSessionOptionsInput,
+    ) -> ReplaceResourceGroupDefaultSessionOptionsPayload:
+        """Fully replace a resource group's ``default_session_options`` (superadmin only)."""
+        return await self._client.typed_request(
+            "PUT",
+            f"{_PATH}/{name}/default-session-options",
+            request=body,
+            response_model=ReplaceResourceGroupDefaultSessionOptionsPayload,
         )

@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ConcurrencySnapshot,
     KeypairOccupancy,
     PendingSessionSnapshot,

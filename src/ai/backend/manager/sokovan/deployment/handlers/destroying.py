@@ -5,8 +5,10 @@ from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    DeploymentHandlerCategory,
     DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
+    DeploymentTargetStatuses,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
@@ -42,15 +44,19 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         """Get the name of the handler."""
         return "destroying-deployments"
 
+    @classmethod
+    def category(cls) -> DeploymentHandlerCategory:
+        return DeploymentHandlerCategory.LIFECYCLE
+
     @property
     def lock_id(self) -> LockID | None:
         """Lock for destroying deployments."""
         return LockID.LOCKID_DEPLOYMENT_DESTROYING
 
     @classmethod
-    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
+    def target_statuses(cls) -> DeploymentTargetStatuses:
         """Get the target deployment statuses for this handler."""
-        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYING)]
+        return DeploymentTargetStatuses(lifecycle_stages=[EndpointLifecycle.DESTROYING])
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
@@ -80,4 +86,5 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         log.info("Destroyed {} deployments", len(result.successes))
         if result.successes:
             # Clean up routes associated with destroyed deployments
-            await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.TERMINATING)
+            # (draining is the first stage of the termination pipeline)
+            await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.DRAINING)

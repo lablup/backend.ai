@@ -13,6 +13,10 @@ from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 __all__ = (
     "BinarySizeInfo",
     "BinarySizeInput",
+    "EnvironmentVariableEntryInfo",
+    "EnvironmentVariableEntryInput",
+    "EnvironmentVariablesInfo",
+    "EnvironmentVariablesInput",
     "OrderDirection",
     "ResourceLimitEntryInfo",
     "ResourceSlotEntryInfo",
@@ -109,4 +113,37 @@ class VFolderHostPermissionEntryInput(BaseRequestModel):
     host: str = Field(description="Virtual folder host name (e.g., 'default', 'nfs-vol1').")
     permissions: list[str] = Field(
         description="List of permission values (e.g., 'mount-in-session', 'upload-file')."
+    )
+
+
+class EnvironmentVariableEntryInput(BaseRequestModel):
+    """A single environment variable entry with key and value.
+
+    Shared across all domains that accept environment variable lists (session, deployment, etc.).
+    """
+
+    key: str = Field(description="Environment variable key.")
+    value: str = Field(description="Environment variable value.")
+
+
+class EnvironmentVariablesInput(BaseRequestModel):
+    """A collection of environment variable entries."""
+
+    entries: list[EnvironmentVariableEntryInput] = Field(
+        description="List of environment variable entries."
+    )
+
+
+class EnvironmentVariableEntryInfo(BaseResponseModel):
+    """A single environment variable entry with key and value."""
+
+    key: str = Field(description="Environment variable key.")
+    value: str = Field(description="Environment variable value.")
+
+
+class EnvironmentVariablesInfo(BaseResponseModel):
+    """A collection of environment variable entries."""
+
+    entries: list[EnvironmentVariableEntryInfo] = Field(
+        description="List of environment variable entries."
     )

@@ -43,6 +43,7 @@ class VolumeService:
     _volume_pool: VolumePool
     _event_producer: EventProducer
     _deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task[Any]]
+    _background_tasks: set[asyncio.Task[Any]]
 
     def __init__(
         self,
@@ -52,6 +53,7 @@ class VolumeService:
         self._volume_pool = volume_pool
         self._event_producer = event_producer
         self._deletion_tasks = weakref.WeakValueDictionary[VFolderID, asyncio.Task[Any]]()
+        self._background_tasks = set()
 
     async def _get_capabilities(self, volume_id: VolumeID) -> list[str]:
         async with self._volume_pool.get_volume(volume_id) as volume:
@@ -89,7 +91,7 @@ class VolumeService:
         except OSError as e:
             msg = str(e) if e.strerror is None else e.strerror
             msg = f"{msg} (errno:{e.errno})"
-            log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{msg})")
+            log.exception("VFolder deletion task failed. (vfolder_id:{}, e:{})", vfolder_id, msg)
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
@@ -97,7 +99,7 @@ class VolumeService:
                 )
             )
         except Exception as e:
-            log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{e!s})")
+            log.exception("VFolder deletion task failed. (vfolder_id:{}, e:{!s})", vfolder_id, e)
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
@@ -105,9 +107,9 @@ class VolumeService:
                 )
             )
         except asyncio.CancelledError:
-            log.warning(f"Vfolder deletion task cancelled. (vfolder_id:{vfolder_id})")
+            log.warning("Vfolder deletion task cancelled. (vfolder_id:{})", vfolder_id)
         else:
-            log.info(f"VFolder deletion task successed. (vfolder_id:{vfolder_id})")
+            log.info("VFolder deletion task succeeded. (vfolder_id:{})", vfolder_id)
             await self._event_producer.anycast_event(VFolderDeletionSuccessEvent(vfolder_id))
 
     async def get_volume(self, volume_id: VolumeID) -> VolumeMeta:
@@ -126,11 +128,11 @@ class VolumeService:
         volumes = self._volume_pool.list_volumes()
         return [
             VolumeMeta(
-                volume_id=uuid.UUID(volume_id),
+                volume_id=VolumeID(uuid.UUID(volume_id)),
                 backend=info.backend,
                 path=info.path,
                 fsprefix=info.fsprefix,
-                capabilities=await self._get_capabilities(uuid.UUID(volume_id)),
+                capabilities=await self._get_capabilities(VolumeID(uuid.UUID(volume_id))),
             )
             for volume_id, info in volumes.items()
         ]
@@ -256,5 +258,7 @@ class VolumeService:
         else:
             ongoing_task = self._deletion_tasks.get(vfolder_id)
             if ongoing_task is not None and ongoing_task.done():
-                asyncio.create_task(self._delete_vfolder(vfolder_key))
+                task = asyncio.create_task(self._delete_vfolder(vfolder_key))
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
         return

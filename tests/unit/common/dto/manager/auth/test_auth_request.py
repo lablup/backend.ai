@@ -17,13 +17,14 @@ from ai.backend.common.dto.manager.auth.request import (
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 
 
-def test_authorize_request_creation() -> None:
+def test_authorize_request_creation(sample_client_type_id: UUID) -> None:
     req = AuthorizeRequest(
         type=AuthTokenType.KEYPAIR,
         domain="default",
         username="user@example.com",
         password="secret",
         stoken="abc123",
+        client_type_id=sample_client_type_id,
     )
     assert req.type == AuthTokenType.KEYPAIR
     assert req.domain == "default"
@@ -32,35 +33,38 @@ def test_authorize_request_creation() -> None:
     assert req.stoken == "abc123"
 
 
-def test_authorize_request_stoken_alias() -> None:
+def test_authorize_request_stoken_alias(sample_client_type_id: UUID) -> None:
     req = AuthorizeRequest.model_validate({
         "type": "keypair",
         "domain": "default",
         "username": "user@example.com",
         "password": "secret",
         "sToken": "from_alias",
+        "client_type_id": str(sample_client_type_id),
     })
     assert req.stoken == "from_alias"
 
 
-def test_authorize_request_otp_field() -> None:
+def test_authorize_request_otp_field(sample_client_type_id: UUID) -> None:
     req = AuthorizeRequest.model_validate({
         "type": "keypair",
         "domain": "default",
         "username": "user@example.com",
         "password": "secret",
         "otp": "123456",
+        "client_type_id": str(sample_client_type_id),
     })
     assert req.otp == "123456"
     assert req.stoken is None
 
 
-def test_authorize_request_stoken_default_none() -> None:
+def test_authorize_request_stoken_default_none(sample_client_type_id: UUID) -> None:
     req = AuthorizeRequest(
         type=AuthTokenType.JWT,
         domain="default",
         username="user@example.com",
         password="secret",
+        client_type_id=sample_client_type_id,
     )
     assert req.stoken is None
 
@@ -198,13 +202,14 @@ def test_request_models_have_field_descriptions() -> None:
             )
 
 
-def test_request_serialization_round_trip() -> None:
+def test_request_serialization_round_trip(sample_client_type_id: UUID) -> None:
     req = AuthorizeRequest(
         type=AuthTokenType.KEYPAIR,
         domain="default",
         username="user@example.com",
         password="secret",
         stoken="token123",
+        client_type_id=sample_client_type_id,
     )
     json_data = req.model_dump_json()
     restored = AuthorizeRequest.model_validate_json(json_data)

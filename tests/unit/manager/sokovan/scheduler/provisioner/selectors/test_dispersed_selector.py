@@ -7,7 +7,15 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
+from ai.backend.manager.data.sokovan import AgentInfo
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
 )
@@ -15,7 +23,6 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import
     DispersedAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,
@@ -62,7 +69,7 @@ class TestDispersedAgentSelector:
     ) -> None:
         """Test that dispersed selector prefers agents with more available resources."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -93,7 +100,7 @@ class TestDispersedAgentSelector:
         """Test preference for agents with fewer unutilized resource types."""
         # Request only CPU and memory (explicitly no GPU)
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
@@ -125,7 +132,7 @@ class TestDispersedAgentSelector:
         selector = DispersedAgentSelector(agent_selection_resource_priority=["mem", "cpu"])
 
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             required_architecture="x86_64",
         )
@@ -152,7 +159,7 @@ class TestDispersedAgentSelector:
     ) -> None:
         """Test behavior when some agents have zero available resources."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -178,7 +185,7 @@ class TestDispersedAgentSelector:
     ) -> None:
         """Test consistent tie-breaking when agents have identical resources."""
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
@@ -216,7 +223,7 @@ class TestDispersedAgentSelector:
         """Test selection with heterogeneous resource types."""
         # Request only CPU and memory
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             required_architecture="x86_64",
         )
@@ -248,7 +255,7 @@ class TestDispersedAgentSelector:
         concentrated = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
 
         resource_req = ResourceRequirements(
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
             requested_slots=ResourceSlot({"cpu": Decimal("0.5"), "mem": Decimal("1024")}),
             required_architecture="x86_64",
         )

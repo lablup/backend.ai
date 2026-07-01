@@ -5,9 +5,14 @@ import logging
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.service import EndpointAccessForbiddenError
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.repositories.model_serving.options import EndpointConditions
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.service import (
+    EndpointAccessForbiddenError,
+    EndpointAutoScalingRuleNotFound,
+    EndpointNotFound,
+    ModelServiceNotFound,
+)
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
@@ -24,17 +29,6 @@ from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule 
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
     ScaleServiceReplicasActionResult,
-)
-from ai.backend.manager.services.model_serving.actions.search_auto_scaling_rules import (
-    SearchAutoScalingRulesAction,
-    SearchAutoScalingRulesActionResult,
-)
-from ai.backend.manager.services.model_serving.exceptions import (
-    EndpointAutoScalingRuleNotFound,
-    EndpointNotFound,
-    GenericForbidden,
-    InvalidAPIParameters,
-    ModelServiceNotFound,
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 
@@ -79,7 +73,7 @@ class AutoScalingService:
             raise ModelServiceNotFound
 
         return ScaleServiceReplicasActionResult(
-            current_route_count=len(endpoint_data.routings) if endpoint_data.routings else 0,
+            current_route_count=len(endpoint_data.routings),
             target_count=action.to,
         )
 
@@ -95,7 +89,7 @@ class AutoScalingService:
 
         # Validate access to the endpoint first
         validation_data = await self._repository.get_endpoint_access_validation_data(
-            action.endpoint_id
+            action.deployment_id
         )
         if not validation_data:
             raise EndpointNotFound
@@ -104,7 +98,7 @@ class AutoScalingService:
 
         # Create auto scaling rule (access already validated)
         created_rule = await self._repository.create_auto_scaling_rule(
-            endpoint_id=action.endpoint_id,
+            endpoint_id=action.deployment_id,
             metric_source=action.creator.metric_source,
             metric_name=action.creator.metric_name,
             threshold=_threshold,
@@ -174,36 +168,4 @@ class AutoScalingService:
 
         return DeleteEndpointAutoScalingRuleActionResult(
             success=True,
-        )
-
-    async def search_auto_scaling_rules(
-        self, action: SearchAutoScalingRulesAction
-    ) -> SearchAutoScalingRulesActionResult:
-        """Searches endpoint auto scaling rules."""
-        await self.check_user_access()
-
-        # Apply access control conditions based on role
-        user_data = current_user()
-        if user_data is None:
-            raise GenericForbidden("User context not available.")
-
-        match user_data.role:
-            case UserRole.SUPERADMIN | UserRole.MONITOR:
-                pass  # No additional conditions for SUPERADMIN and MONITOR
-            case UserRole.ADMIN:
-                action.querier.conditions.append(
-                    EndpointConditions.by_domain(user_data.domain_name)
-                )
-            case UserRole.USER:
-                action.querier.conditions.append(
-                    EndpointConditions.by_session_owner(user_data.user_id)
-                )
-
-        result = await self._repository.search_auto_scaling_rules(querier=action.querier)
-
-        return SearchAutoScalingRulesActionResult(
-            rules=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
         )

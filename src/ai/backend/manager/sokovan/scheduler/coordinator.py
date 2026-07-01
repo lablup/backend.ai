@@ -5,6 +5,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final
+from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
@@ -35,7 +36,11 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
+from ai.backend.manager.data.sokovan import (
+    KernelCreationInfo,
+    PromotionSpec,
+    SessionWithKernels,
+)
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.session.conditions import SessionConditions
@@ -48,20 +53,17 @@ from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatc
 from ai.backend.manager.repositories.scheduling_history.creators import (
     SessionSchedulingHistoryCreatorSpec,
 )
-from ai.backend.manager.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.data import (
-    KernelCreationInfo,
-    PromotionSpec,
-    SessionWithKernels,
-)
+from ai.backend.manager.sokovan.recorder.pool import RecordPool
 from ai.backend.manager.sokovan.recorder.types import ExecutionRecord
 from ai.backend.manager.sokovan.recorder.utils import extract_sub_steps_for_entity
 from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
 
 from .factory import CoordinatorHandlers
 from .handlers import SessionLifecycleHandler
+from .handlers.cleanup import CleanupHandler
 from .handlers.kernel import KernelLifecycleHandler
 from .handlers.observer import KernelObserver
 from .hooks.registry import HookRegistry
@@ -83,14 +85,6 @@ from .results import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-# Status timeout thresholds (in seconds) for failure classification
-# Sessions exceeding these times in a status are classified as 'expired'
-STATUS_TIMEOUT_MAP: dict[SessionStatus, float] = {
-    SessionStatus.PREPARING: 900.0,  # 15 minutes
-    SessionStatus.PULLING: 900.0,  # 15 minutes
-    SessionStatus.CREATING: 600.0,  # 10 minutes
-}
 
 # Batch size for observer kernel processing
 _OBSERVER_BATCH_SIZE: Final[int] = 500
@@ -144,8 +138,11 @@ class FailureClassificationResult:
     """Result of classifying failures into give_up, expired, and need_retry.
 
     Classification priority (first match wins):
-    1. give_up: phase_attempts >= SERVICE_MAX_RETRIES
-    2. expired: status_changed elapsed > STATUS_TIMEOUT_MAP threshold
+    1. give_up: per-handler ``max_retry_count`` is set AND
+       ``phase_attempts`` reached it. ``None`` means "no retry limit"
+       — give-up never fires.
+    2. expired: per-handler ``timeout`` is set AND phase elapsed time
+       exceeded it. ``None`` means "no timeout" — expired never fires.
     3. need_retry: default (can be retried)
     """
 
@@ -215,6 +212,24 @@ class ScheduleCoordinator:
             scheduling_controller,
         )
 
+    def registered_lifecycle_handlers(self) -> tuple[SessionLifecycleHandler, ...]:
+        """Return the unique set of lifecycle handlers attached to this
+        coordinator.
+
+        Used by the ResourceGroup admin-replace path to validate
+        ``SessionHandlerOptions.by_handler`` keys against the live registry.
+        Deduplicates on ``id()`` because a single handler instance may
+        be registered under multiple ``ScheduleType`` keys.
+        """
+        seen: set[int] = set()
+        unique: list[SessionLifecycleHandler] = []
+        for handler in self._handlers.lifecycle_handlers.values():
+            if id(handler) in seen:
+                continue
+            seen.add(id(handler))
+            unique.append(handler)
+        return tuple(unique)
+
     async def process_lifecycle_schedule(
         self,
         schedule_type: ScheduleType,
@@ -258,6 +273,10 @@ class ScheduleCoordinator:
         if lifecycle_handler:
             return await self._process_lifecycle_handler_schedule(schedule_type, lifecycle_handler)
 
+        cleanup_handler = self._handlers.cleanup_handlers.get(schedule_type)
+        if cleanup_handler:
+            return await self._process_cleanup_schedule(schedule_type, cleanup_handler)
+
         log.warning("No handler for schedule type: {}", schedule_type.value)
         return False
 
@@ -283,7 +302,7 @@ class ScheduleCoordinator:
                     )
 
                 # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+                scaling_groups = await self._repository.get_all_scaling_groups()
 
                 results = await asyncio.gather(
                     *[
@@ -327,8 +346,9 @@ class ScheduleCoordinator:
             log.debug("Processing promotion schedule type: {}", schedule_type.value)
 
             with self._operation_metrics.measure_operation(spec.name):
-                # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+                # Promotions update session status based on kernel state and
+                # must run even when there are no schedulable or alive agents.
+                scaling_groups = await self._repository.get_all_scaling_groups()
 
                 results = await asyncio.gather(
                     *[
@@ -387,7 +407,7 @@ class ScheduleCoordinator:
                     )
 
                 # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+                scaling_groups = await self._repository.get_all_scaling_groups()
 
                 results = await asyncio.gather(
                     *[
@@ -445,7 +465,7 @@ class ScheduleCoordinator:
                 stack.enter_context(self._operation_metrics.measure_operation(observer.name()))
 
                 # Process each scaling group in parallel
-                scaling_groups = await self._repository.get_schedulable_scaling_groups()
+                scaling_groups = await self._repository.get_all_scaling_groups()
 
                 log.debug(
                     "[Coordinator] Found {} scaling groups to observe: {}",
@@ -477,6 +497,41 @@ class ScheduleCoordinator:
         except Exception as e:
             log.exception(
                 "Error processing observer schedule type {}: {}",
+                schedule_type.value,
+                e,
+            )
+            raise
+
+    async def _process_cleanup_schedule(
+        self,
+        schedule_type: ScheduleType,
+        handler: CleanupHandler,
+    ) -> bool:
+        """Process a cleanup handler schedule type.
+
+        Cleanup handlers read work items from Valkey and perform cleanup operations
+        directly. Unlike other handler types, they do not query DB sessions by status,
+        do not iterate over scaling groups, and do not apply status transitions.
+
+        The coordinator sets up RecorderContext so that downstream components
+        (e.g., SessionTerminator) can use shared_phase/shared_step as usual.
+        """
+        try:
+            log.debug("Processing cleanup schedule type: {}", schedule_type.value)
+
+            with self._operation_metrics.measure_operation(handler.name()):
+                session_ids = await handler.fetch_session_ids()
+                if not session_ids:
+                    return True
+
+                recorder_scope = f"{schedule_type.value}:cleanup"
+                with SessionRecorderContext.scope(recorder_scope, entity_ids=list(session_ids)):
+                    await handler.execute(session_ids)
+
+            return True
+        except Exception as e:
+            log.exception(
+                "Error processing cleanup schedule type {}: {}",
                 schedule_type.value,
                 e,
             )
@@ -802,11 +857,8 @@ class ScheduleCoordinator:
                             )
                         )
 
-            # Get recorded steps for history
-            all_records = pool.build_all_records()
-
             # Phase 2: Apply status transitions (includes hook execution)
-            await self._handle_promotion_status_transitions(spec, result, all_records)
+            await self._handle_promotion_status_transitions(spec, result, pool)
 
             # Emit metrics per scaling group
             self._operation_metrics.observe_success(
@@ -827,6 +879,7 @@ class ScheduleCoordinator:
                     )
 
             # Log recorded steps for this scaling group
+            all_records = pool.get_all_records()
             if all_records:
                 log.debug(
                     "Recorded {} sessions with execution records for {} in scaling group {}",
@@ -839,7 +892,7 @@ class ScheduleCoordinator:
         self,
         spec: PromotionSpec,
         result: SessionExecutionResult,
-        records: Mapping[SessionId, ExecutionRecord],
+        pool: RecordPool[SessionId],
     ) -> None:
         """Apply status transitions for promotion spec results.
 
@@ -858,7 +911,7 @@ class ScheduleCoordinator:
         Args:
             spec: The promotion spec that defines the transition
             result: Execution result containing successes
-            records: Mapping of session IDs to their execution records for sub_steps
+            pool: Recorder pool for the scope; records are built after hooks run
         """
         if not result.successes:
             return
@@ -877,6 +930,10 @@ class ScheduleCoordinator:
                 to_status,
             )
             sessions_to_transition = hook_result.successful_sessions
+
+        # Build records only after hooks have run so hook-recorded sub-steps
+        # (e.g. terminate_cleanup) are captured in the persisted history.
+        records = pool.build_all_records()
 
         # Apply status transition for sessions that passed hooks
         if sessions_to_transition:
@@ -1087,44 +1144,64 @@ class ScheduleCoordinator:
                     result.successes, transitions.success.session
                 )
 
-        # FAILURE transitions - Coordinator classifies failures into give_up/expired/need_retry
+        # FAILURE transitions - Coordinator classifies failures into give_up/expired/need_retry.
+        # A classification without a declared transition keeps the current status but
+        # still records history so the phase attempt counter keeps incrementing.
         if result.failures:
-            classified = self._classify_failures(result.failures, sessions, current_time)
+            classified = self._classify_failures(
+                result.failures, sessions, current_time, handler_name
+            )
 
-            # Apply transitions for each classification
-            if classified.give_up and transitions.give_up:
-                await self._apply_transition(
-                    handler_name,
-                    classified.give_up,
-                    transitions.give_up,
-                    SchedulingResult.GIVE_UP,
-                    records,
-                    current_time,
-                )
+            if classified.give_up:
+                if transitions.give_up:
+                    await self._apply_transition(
+                        handler_name,
+                        classified.give_up,
+                        transitions.give_up,
+                        SchedulingResult.GIVE_UP,
+                        records,
+                        current_time,
+                    )
+                else:
+                    await self._record_history_without_transition(
+                        handler_name, classified.give_up, records, SchedulingResult.GIVE_UP
+                    )
 
-            if classified.expired and transitions.expired:
-                await self._apply_transition(
-                    handler_name,
-                    classified.expired,
-                    transitions.expired,
-                    SchedulingResult.EXPIRED,
-                    records,
-                    current_time,
-                )
+            if classified.expired:
+                if transitions.expired:
+                    await self._apply_transition(
+                        handler_name,
+                        classified.expired,
+                        transitions.expired,
+                        SchedulingResult.EXPIRED,
+                        records,
+                        current_time,
+                    )
+                else:
+                    await self._record_history_without_transition(
+                        handler_name, classified.expired, records, SchedulingResult.EXPIRED
+                    )
 
-            if classified.need_retry and transitions.need_retry:
-                await self._apply_transition(
-                    handler_name,
-                    classified.need_retry,
-                    transitions.need_retry,
-                    SchedulingResult.NEED_RETRY,
-                    records,
-                    current_time,
-                )
+            if classified.need_retry:
+                if transitions.need_retry:
+                    await self._apply_transition(
+                        handler_name,
+                        classified.need_retry,
+                        transitions.need_retry,
+                        SchedulingResult.NEED_RETRY,
+                        records,
+                        current_time,
+                    )
+                else:
+                    await self._record_history_without_transition(
+                        handler_name, classified.need_retry, records, SchedulingResult.NEED_RETRY
+                    )
 
         # SKIPPED - Record history without status change
         if result.skipped:
-            await self._record_skipped_history(handler_name, result.skipped, records)
+            await self._record_history_without_transition(
+                handler_name, result.skipped, records, SchedulingResult.SKIPPED
+            )
 
         return classified
 
@@ -1133,21 +1210,31 @@ class ScheduleCoordinator:
         failures: list[SessionTransitionInfo],
         sessions: list[SessionWithKernels],
         current_time: datetime,
+        handler_name: str,
     ) -> FailureClassificationResult:
         """Classify failures into give_up, expired, need_retry.
 
         Pure classification based on conditions only. The caller (_handle_result)
         decides whether to apply transitions based on handler's transition definitions.
 
+        Per-session ``handler_options`` (frozen on the session at enqueue
+        time) drives the policy: ``resolve(handler_name).max_retry_count``
+        and ``resolve(handler_name).timeout`` give the give-up and
+        timeout thresholds. ``None`` on either field means "no limit"
+        for that dimension — give-up never fires when ``max_retry_count``
+        is ``None``; ``expired`` never fires when ``timeout`` is ``None``.
+
         Classification priority (first match wins):
-        1. give_up: phase_attempts >= SERVICE_MAX_RETRIES
-        2. expired: timeout exceeded
+        1. give_up: max_retry_count set AND phase_attempts >= max_retry_count
+        2. expired: timeout set AND phase elapsed > timeout
         3. need_retry: default
 
         Args:
             failures: Failed session transition info
             sessions: Original sessions with phase_attempts and phase_started_at populated
             current_time: Current database time for timeout comparison
+            handler_name: ``SessionLifecycleHandler.name()`` for resolving
+                per-handler policy from ``SessionHandlerOptions``
 
         Returns:
             FailureClassificationResult with give_up, expired, need_retry lists
@@ -1164,20 +1251,17 @@ class ScheduleCoordinator:
                 # Session not found - skip (shouldn't happen)
                 continue
 
+            policy = session.session_info.handler_options.resolve(handler_name)
+
             # 1. Check max retries exceeded → give_up
-            if session.phase_attempts >= SERVICE_MAX_RETRIES:
+            if policy.is_retry_exhausted(session.phase_attempts):
                 give_up_failures.append(failure)
                 continue
 
             # 2. Check timeout exceeded → expired
-            if session.phase_started_at:
-                status = session.session_info.lifecycle.status
-                timeout = STATUS_TIMEOUT_MAP.get(status)
-                if timeout:
-                    elapsed = (current_time - session.phase_started_at).total_seconds()
-                    if elapsed > timeout:
-                        expired_failures.append(failure)
-                        continue
+            if policy.is_timed_out(session.phase_started_at, current_time):
+                expired_failures.append(failure)
+                continue
 
             # 3. Default → need_retry
             retry_failures.append(failure)
@@ -1302,21 +1386,25 @@ class ScheduleCoordinator:
             len(session_ids),
         )
 
-    async def _record_skipped_history(
+    async def _record_history_without_transition(
         self,
         handler_name: str,
         session_infos: list[SessionTransitionInfo],
         records: Mapping[SessionId, ExecutionRecord],
+        scheduling_result: SchedulingResult,
     ) -> None:
-        """Record history for skipped sessions without status change.
+        """Record history for sessions that stay in their current status.
 
-        Skipped sessions are those that were not processed due to being blocked
-        by other sessions (e.g., scheduling attempt blocked by higher priority sessions).
+        Used for skipped sessions and for classified failures whose handler
+        declares no target transition (e.g., need_retry staying PENDING).
+        Recording keeps the merged ``attempts`` counter incrementing so
+        retry-based classification (give_up) can eventually fire.
 
         Args:
             handler_name: Name of the handler for history recording
-            session_infos: List of skipped session information
+            session_infos: List of session information to record
             records: Mapping of session IDs to their execution records for sub_steps
+            scheduling_result: Result type to record in history
         """
         if not session_infos:
             return
@@ -1325,8 +1413,8 @@ class ScheduleCoordinator:
             SessionSchedulingHistoryCreatorSpec(
                 session_id=info.session_id,
                 phase=handler_name,
-                result=SchedulingResult.SKIPPED,
-                message=info.reason or f"{handler_name} skipped",
+                result=scheduling_result,
+                message=info.reason or f"{handler_name} {scheduling_result.value.lower()}",
                 from_status=info.from_status,
                 to_status=info.from_status,  # No status change
                 error_code=info.error_code,
@@ -1336,9 +1424,10 @@ class ScheduleCoordinator:
         ]
         await self._repository.create_scheduling_history(BulkCreator(specs=history_specs))
         log.debug(
-            "{}: Recorded {} skipped sessions in history",
+            "{}: Recorded {} sessions in history as {} without status change",
             handler_name,
             len(session_infos),
+            scheduling_result.value,
         )
 
     def _collect_target_statuses(
@@ -1542,10 +1631,11 @@ class ScheduleCoordinator:
         agent_id: AgentId,
         image: str,
         image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> None:
         """Update kernel status from PREPARING to PULLING for the specified image on an agent."""
         await self._kernel_state_engine.update_kernels_to_pulling_for_image(
-            agent_id, image, image_ref
+            agent_id, image, image_ref, image_id=image_id
         )
 
     async def update_kernels_to_prepared_for_image(
@@ -1553,10 +1643,11 @@ class ScheduleCoordinator:
         agent_id: AgentId,
         image: str,
         image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> None:
         """Update kernel status to PREPARED for the specified image on an agent."""
         result = await self._kernel_state_engine.update_kernels_to_prepared_for_image(
-            agent_id, image, image_ref
+            agent_id, image, image_ref, image_id=image_id
         )
         if result > 0:
             log.info(
@@ -1576,10 +1667,11 @@ class ScheduleCoordinator:
         image: str,
         error_msg: str,
         image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> None:
         """Cancel kernels for an image that failed to be available on an agent."""
         await self._kernel_state_engine.cancel_kernels_for_failed_image(
-            agent_id, image, error_msg, image_ref
+            agent_id, image, error_msg, image_ref, image_id=image_id
         )
         # No need to request scheduling for cancelled kernels
 
@@ -1608,6 +1700,12 @@ class ScheduleCoordinator:
             ),
             SchedulerTaskSpec(
                 ScheduleType.TERMINATE,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            SchedulerTaskSpec(
+                ScheduleType.DEPRIORITIZE,
                 short_interval=2.0,
                 long_interval=60.0,
                 initial_delay=30.0,
@@ -1658,6 +1756,13 @@ class ScheduleCoordinator:
                 short_interval=None,  # No short-cycle task for observation
                 long_interval=300.0,  # 5 minutes
                 initial_delay=60.0,  # Start 1 minute after manager starts
+            ),
+            # Cleanup containers for force-terminated sessions
+            SchedulerTaskSpec(
+                ScheduleType.CLEANUP_FORCE_TERMINATED,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
             ),
         ]
 

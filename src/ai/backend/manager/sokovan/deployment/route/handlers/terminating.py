@@ -10,6 +10,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
+    RouteSubStatus,
     RouteTargetStatuses,
     RouteTransitionTarget,
 )
@@ -24,7 +25,12 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class TerminatingRouteHandler(RouteHandler):
-    """Handler for terminating routes (TERMINATING -> TERMINATED)."""
+    """Handler for terminating routes (TERMINATING+COOLING_DOWN → TERMINATED).
+
+    Second stage of the TERMINATING pipeline: traffic was already removed
+    in the DRAINING stage; this stage waits out each route's termination
+    grace period and then cleans up the session.
+    """
 
     def __init__(
         self,
@@ -52,12 +58,16 @@ class TerminatingRouteHandler(RouteHandler):
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.TERMINATING],
-            health=list(RouteHealthStatus),
+            sub_status=[RouteSubStatus.COOLING_DOWN],
         )
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Terminating → TERMINATED on success, reset health to NOT_CHECKED."""
+        """Terminating → TERMINATED on success, reset health to NOT_CHECKED.
+
+        Stale (still inside the termination grace period) has no target:
+        the route stays COOLING_DOWN and is re-checked on the next cycle.
+        """
         return RouteStatusTransitions(
             success=RouteTransitionTarget(
                 status=RouteStatus.TERMINATED,
@@ -68,16 +78,20 @@ class TerminatingRouteHandler(RouteHandler):
         )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Execute termination for routes."""
-        log.debug("Terminating {} routes", len(routes))
+        """Execute termination for routes.
 
-        # Execute route termination logic via executor
+        ``RouteExecutor.terminate_routes`` destroys only the sessions
+        whose termination grace period has elapsed, so this handler just
+        delegates to it.
+        """
+        log.debug("Terminating {} routes", len(routes))
         return await self._route_executor.terminate_routes(routes)
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after terminating routes."""
         log.info(
-            "Terminated {} routes successfully, {} failed",
+            "Terminated {} routes successfully, {} failed, {} cooling down",
             len(result.successes),
             len(result.errors),
+            len(result.stale),
         )

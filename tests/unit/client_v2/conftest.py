@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from datetime import datetime
+from uuid import UUID, uuid4
 
 import pytest
 from yarl import URL
@@ -31,3 +32,8 @@ def mock_auth() -> AuthStrategy:
 @pytest.fixture
 def sample_config() -> ClientConfig:
     return ClientConfig(endpoint=URL("https://api.example.com"))
+
+
+@pytest.fixture
+def sample_client_type_id() -> UUID:
+    return uuid4()

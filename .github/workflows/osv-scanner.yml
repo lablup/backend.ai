@@ -48,7 +48,7 @@ jobs:
       id: set-matrix
       run: |
         echo "Scanning all Dockerfiles"
-        DOCKERFILES=$(find docker -type f -name "*.dockerfile")
+        DOCKERFILES=$(find docker -type f -name "*.dockerfile" ! -name "backend.ai-*.dockerfile")
 
         # Build JSON matrix
         MATRIX_JSON=$(echo "$DOCKERFILES" | jq -R -s -c '
@@ -84,6 +84,12 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
+    - name: Resolve project Python version
+      id: pyver
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "version=$PYTHON_VERSION" >> "$GITHUB_OUTPUT"
+
     - name: Build Docker image
       uses: docker/build-push-action@v6
       with:
@@ -94,18 +100,27 @@ jobs:
         load: true
         cache-from: type=gha,scope=${{ matrix.name }}
         cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+        build-args: |
+          PYTHON_VERSION=${{ steps.pyver.outputs.version }}
+
+    - name: Save Docker image as archive
+      run: docker save backendai-${{ matrix.name }}:scan -o image.tar
 
     - name: Run OSV Scanner on Docker image
       uses: google/osv-scanner-action/osv-scanner-action@6fc714450122bda9d00e4ad5d639ad6a39eedb1f # v2.0.1
       with:
         scan-args: |-
-          --format sarif
-          --docker backendai-${{ matrix.name }}:scan
+          --format=sarif
+          --output=results.sarif
+          scan
+          image
+          --archive
+          image.tar
       continue-on-error: true
 
     - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      uses: github/codeql-action/upload-sarif@v4
+      if: always() && hashFiles('results.sarif') != ''
       with:
         sarif_file: results.sarif
         category: container-${{ matrix.name }}

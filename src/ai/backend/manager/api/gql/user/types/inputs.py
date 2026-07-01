@@ -39,7 +39,6 @@ from ai.backend.common.dto.manager.v2.user.request import (
 from ai.backend.common.dto.manager.v2.user.request import (
     UpdateUserInput as UpdateUserInputDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -211,7 +210,7 @@ class DeleteUsersInputGQL(PydanticInputMixin[DeleteUsersInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Options for single user purge operation.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="PurgeUserV2Options",
 )
@@ -242,7 +241,7 @@ class PurgeUserInputGQL(PydanticInputMixin[PurgeUserV2InputDTO]):
     options: PurgeUserV2OptionsGQL | None = gql_added_field(
         BackendAIGQLMeta(
             description="Options for the purge operation.",
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
         ),
         default=None,
     )

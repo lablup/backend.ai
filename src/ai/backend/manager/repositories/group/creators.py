@@ -6,9 +6,12 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.models.group import GroupRow, ProjectType
-from ai.backend.manager.models.group.row import AssocGroupUserRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -23,7 +26,7 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
     is_active: bool | None = None
     total_resource_slots: ResourceSlot | None = None
     allowed_vfolder_hosts: VFolderHostPermissionMap | None = None
-    integration_id: str | None = None
+    integration_name: str | None = None
     resource_policy: str | None = None
     container_registry: dict[str, str] | None = None
     dotfiles: bytes | None = None
@@ -38,7 +41,7 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
             is_active=self.is_active if self.is_active is not None else True,
             total_resource_slots=self.total_resource_slots or ResourceSlot(),
             allowed_vfolder_hosts=self.allowed_vfolder_hosts or VFolderHostPermissionMap(),
-            integration_id=self.integration_id,
+            integration_id=self.integration_name,  # DB column is integration_id
             resource_policy=self.resource_policy,
             dotfiles=self.dotfiles,
             container_registry=self.container_registry,
@@ -46,15 +49,18 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
 
 
 @dataclass
-class AssocGroupUserCreatorSpec(CreatorSpec[AssocGroupUserRow]):
-    """CreatorSpec for user-project association."""
+class ProjectUserMembershipCreatorSpec(CreatorSpec[AssociationScopesEntitiesRow]):
+    """CreatorSpec for user-project membership (PROJECT/USER ASE row)."""
 
     user_id: UUID
-    group_id: UUID
+    project_id: UUID
 
     @override
-    def build_row(self) -> AssocGroupUserRow:
-        return AssocGroupUserRow(
-            user_id=self.user_id,
-            group_id=self.group_id,
+    def build_row(self) -> AssociationScopesEntitiesRow:
+        return AssociationScopesEntitiesRow(
+            scope_type=ScopeType.PROJECT,
+            scope_id=str(self.project_id),
+            entity_type=EntityType.USER,
+            entity_id=str(self.user_id),
+            relation_type=RelationType.AUTO,
         )

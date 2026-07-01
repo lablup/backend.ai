@@ -4,30 +4,46 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from typing import Any
+from uuid import UUID
 
-from strawberry.relay import Connection, Edge, NodeID
+from strawberry import Info
+from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_field,
     gql_node_type,
 )
+from ai.backend.manager.api.gql.model_card.types import (
+    ModelCardFilterGQL,
+    ModelCardGQL,
+    ModelCardOrderByGQL,
+    ModelCardV2Connection,
+    ModelCardV2Edge,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import VFolderOperationStatusGQL
+from ai.backend.manager.repositories.model_card.types import VFolderModelCardSearchScope
 
 from .nested import (
     VFolderAccessControlInfoGQL,
     VFolderMetadataInfoGQL,
     VFolderOwnershipInfoGQL,
+    VFolderQuotaInfoGQL,
+    VFolderUsageInfoGQL,
 )
 
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Virtual folder entity with structured field groups. "
             "Provides comprehensive vfolder information organized "
@@ -64,6 +80,83 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         )
     )
     unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
+    quota: VFolderQuotaInfoGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="Quota limits (maxSize, maxFiles) configured for the folder.",
+        )
+    )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description=(
+                "Usage statistics (numFiles, usedBytes) measured on demand through "
+                "the storage proxy when this field is selected. This is a very slow "
+                "operation: every selection makes a round-trip to the storage proxy, "
+                "and the measurement cost depends on the storage backend (e.g., a "
+                "full directory walk on vfs). Select only when needed. "
+                "Null for unmanaged vfolders."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def usage(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> VFolderUsageInfoGQL | None:
+        result = await info.context.adapters.vfolder.get_folder_usage(UUID(self.id))
+        if result is None:
+            return None
+        return VFolderUsageInfoGQL(
+            num_files=result.num_files,
+            used_bytes=BinarySizeInfoGQL.from_pydantic(result.used_bytes),
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="Model cards backed by this vfolder.",
+        )
+    )  # type: ignore[misc]
+    async def model_cards(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: ModelCardFilterGQL | None = None,
+        order_by: list[ModelCardOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> ModelCardV2Connection | None:
+        result = await info.context.adapters.model_card.search_by_vfolder(
+            scope=VFolderModelCardSearchScope(vfolder_id=VFolderUUID(UUID(self.id))),
+            input=SearchModelCardsInput(
+                filter=filter.to_pydantic() if filter is not None else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        edges = [
+            ModelCardV2Edge(node=ModelCardGQL.from_pydantic(item), cursor=str(item.id))
+            for item in result.items
+        ]
+        return ModelCardV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=result.total_count,
+        )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -84,7 +177,7 @@ VFolderEdge = Edge[VFolderGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Paginated connection for virtual folder records. "
             "Provides relay-style cursor-based pagination for efficient traversal of vfolder data. "

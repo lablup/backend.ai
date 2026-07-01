@@ -15,10 +15,10 @@ from typing import (
 
 import attr
 from graphql import UndefinedType
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, Field
 from strawberry.types.unset import UnsetType
 
-from ai.backend.common.types import MountPermission, MountTypes
+from ai.backend.common.types import BackendAISchema, MountPermission, MountTypes
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
@@ -54,7 +54,7 @@ class DistributedLockFactory(Protocol):
     def __call__(self, lock_id: LockID, lifetime_hint: float) -> AbstractDistributedLock: ...
 
 
-class MountOptionModel(BaseModel):
+class MountOptionModel(BackendAISchema):
     mount_destination: Annotated[
         str | None,
         Field(description="Mount destination, defaults to /home/work/{folder_name}.", default=None),
@@ -63,6 +63,10 @@ class MountOptionModel(BaseModel):
     permission: Annotated[
         MountPermission | None,
         Field(validation_alias=AliasChoices("permission", "perm"), default=None),
+    ]
+    subpath: Annotated[
+        str | None,
+        Field(description="Subpath within the vfolder to mount.", default=None),
     ]
 
 
@@ -116,6 +120,13 @@ class TriState[TVal]:
         return cls.update(value)
 
     @classmethod
+    def from_nullable(cls, value: TVal | None) -> TriState[TVal]:
+        """None → nop (leave unchanged, not nullify), value → update."""
+        if value is None:
+            return cls.nop()
+        return cls.update(value)
+
+    @classmethod
     def update(cls, value: TVal) -> TriState[TVal]:
         return cls(state=_TriStateEnum.UPDATE, value=value)
 
@@ -137,6 +148,18 @@ class TriState[TVal]:
         if self._value is None:
             raise ValueError("TriState value is not set when state is UPDATE")
         return self._value
+
+    def is_nop(self) -> bool:
+        """Return True when the attribute must be left unchanged."""
+        return self._state == _TriStateEnum.NOP
+
+    def is_nullify(self) -> bool:
+        """Return True when the attribute must be set to None / cleared."""
+        return self._state == _TriStateEnum.NULLIFY
+
+    def is_update(self) -> bool:
+        """Return True when the attribute must be replaced with a new value."""
+        return self._state == _TriStateEnum.UPDATE
 
     def optional_value(self) -> TVal | None:
         """
@@ -192,6 +215,13 @@ class OptionalState[TVal]:
         if value is None:
             raise ValueError("OptionalState cannot be NULLIFY")
         return OptionalState.update(value)
+
+    @classmethod
+    def from_nullable(cls, value: TVal | None) -> OptionalState[TVal]:
+        """None → nop (leave unchanged), value → update."""
+        if value is None:
+            return cls.nop()
+        return cls.update(value)
 
     @classmethod
     def update(cls, value: TVal) -> OptionalState[TVal]:

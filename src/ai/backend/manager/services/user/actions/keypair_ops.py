@@ -6,14 +6,20 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.types import (
+    KeypairResourcePolicyKeypairSearchScope,
+    UserKeypairSearchScope,
+)
 from ai.backend.manager.services.user.actions.base import UserAction
 
 
@@ -251,6 +257,60 @@ class AdminSearchKeypairsActionResult(BaseActionResult):
 
 
 @dataclass
+class SearchKeypairsByResourcePolicyAction(BaseScopeAction):
+    """Action for searching keypairs assigned to a keypair resource policy.
+
+    RBAC validation checks if the user has READ permission on the keypair
+    resource policy scope. Superadmins bypass the check; other users must hold
+    a role granting read access, so a regular user cannot enumerate keypairs
+    owned by others through the resource policy node.
+    """
+
+    scope: KeypairResourcePolicyKeypairSearchScope
+    querier: BatchQuerier
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.KEYPAIR
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.KEYPAIR_RESOURCE_POLICY
+
+    @override
+    def scope_id(self) -> str:
+        return self.scope.resource_policy_name
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            RBACElementType.KEYPAIR_RESOURCE_POLICY, self.scope.resource_policy_name
+        )
+
+
+@dataclass
+class SearchKeypairsByResourcePolicyActionResult(BaseScopeActionResult):
+    """Result of searching keypairs by resource policy."""
+
+    result: SearchResult[KeyPairData]
+    resource_policy_name: str
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.KEYPAIR_RESOURCE_POLICY
+
+    @override
+    def scope_id(self) -> str:
+        return self.resource_policy_name
+
+
+@dataclass
 class AdminGetKeypairAction(UserAction):
     """Admin action to get a single keypair by access key."""
 
@@ -273,3 +333,84 @@ class AdminGetKeypairActionResult(BaseActionResult):
     @override
     def entity_id(self) -> str | None:
         return str(self.keypair.access_key)
+
+
+# ------------------------------------------------------------------ admin SSH keypair actions
+
+
+@dataclass
+class AdminRegisterSSHKeypairAction(UserAction):
+    """Admin action to register (overwrite) a user's SSH keypair."""
+
+    access_key: str
+    ssh_public_key: str
+    ssh_private_key: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+@dataclass
+class AdminRegisterSSHKeypairActionResult(BaseActionResult):
+    access_key: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key
+
+
+@dataclass
+class AdminDeleteSSHKeypairAction(UserAction):
+    """Admin action to clear a user's SSH keypair."""
+
+    access_key: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+@dataclass
+class AdminDeleteSSHKeypairActionResult(BaseActionResult):
+    access_key: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key
+
+
+@dataclass
+class AdminGetSSHKeypairAction(UserAction):
+    """Admin action to look up a user's SSH public key."""
+
+    access_key: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+@dataclass
+class AdminGetSSHKeypairActionResult(BaseActionResult):
+    access_key: str
+    ssh_public_key: str | None
+
+    @override
+    def entity_id(self) -> str | None:
+        return self.access_key

@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
@@ -14,13 +14,13 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.base impor
 
 @dataclass
 class GetDeploymentPolicyAction(DeploymentPolicyBaseAction):
-    """Action to get a deployment policy by endpoint ID."""
+    """Action to get a deployment policy by deployment ID."""
 
-    endpoint_id: UUID
+    deployment_id: DeploymentID
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.endpoint_id)
+        return str(self.deployment_id)
 
     @override
     @classmethod

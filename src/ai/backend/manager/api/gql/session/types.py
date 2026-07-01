@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -51,8 +51,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
     ClusterModeGQL,
@@ -86,6 +85,9 @@ from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.errors.user import UserNotFound
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.deployment.types.replica import ModelReplica
 
 
 @gql_enum(
@@ -127,8 +129,12 @@ class SessionV2OrderFieldGQL(StrEnum):
     name="SessionV2StatusFilter",
 )
 class SessionV2StatusFilterGQL(PydanticInputMixin[SessionStatusFilter]):
+    equals: SessionV2StatusGQL | None = None
     in_: list[SessionV2StatusGQL] | None = gql_field(
         description="The in  field.", name="in", default=None
+    )
+    not_equals: SessionV2StatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
     )
     not_in: list[SessionV2StatusGQL] | None = None
 
@@ -168,7 +174,7 @@ class SessionV2OrderByGQL(PydanticInputMixin[SessionOrder]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Scope for session operations within a specific project.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="ProjectSessionV2Scope",
 )
@@ -303,10 +309,24 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     id: NodeID[str]
 
+    # Image IDs for this session (used by images resolver)
+    image_ids: list[strawberry.ID] | None = gql_field(
+        description=(
+            "UUIDs of the images used by this session. "
+            "Multiple images are possible in multi-kernel (cluster) sessions."
+        ),
+    )
+
     # Fields used as keys for dynamic resolvers
     domain_name: str
     user_id: ID
     project_id: ID
+    replica_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="UUID of the model deployment replica served by this session.",
+        )
+    )
 
     metadata: SessionV2MetadataInfoGQL = gql_field(
         description="Metadata including domain, project, and user information."
@@ -361,19 +381,46 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version="26.3.0",
+            added_version="26.4.3",
             description="The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.",
         )
     )  # type: ignore[misc]
-    async def images(self) -> ImageV2ConnectionGQL:
-        raise NotImplementedError
+    async def images(self, info: Info[StrawberryGQLContext]) -> ImageV2ConnectionGQL | None:
+        from ai.backend.manager.api.gql.image.types import ImageV2EdgeGQL
+
+        if not self.image_ids:
+            return ImageV2ConnectionGQL(
+                edges=[],
+                page_info=strawberry.relay.PageInfo(
+                    has_next_page=False,
+                    has_previous_page=False,
+                    start_cursor=None,
+                    end_cursor=None,
+                ),
+                count=0,
+            )
+
+        unique_ids = list(dict.fromkeys(ImageID(UUID(str(iid))) for iid in self.image_ids))
+        results = await info.context.data_loaders.image_loader.load_many(unique_ids)
+        nodes = [img for img in results if img is not None]
+        edges = [ImageV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return ImageV2ConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=len(nodes),
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.3.0", description="The kernels belonging to this session."
         )
     )  # type: ignore[misc]
-    async def kernels(self, info: Info[StrawberryGQLContext]) -> KernelV2ConnectionGQL:
+    async def kernels(self, info: Info[StrawberryGQLContext]) -> KernelV2ConnectionGQL | None:
         user = current_user()
         if user is None:
             raise UserNotFound("User not found in context")
@@ -394,6 +441,29 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             ),
             count=payload.total_count,
         )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description=(
+                "The model deployment replica served by this session: a single replica "
+                "instance of a model deployment that runs in this compute session and serves "
+                "inference requests. Null for non-inference sessions."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def replica(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ModelReplica,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.replica"),
+        ]
+        | None
+    ):
+        if self.replica_id is None:
+            return None
+        return await info.context.data_loaders.replica_loader.load(UUID(str(self.replica_id)))
 
     # TODO: Add `vfolder_mounts` dynamic field (VFolder connection type needed)
 
@@ -437,7 +507,7 @@ class SessionV2ConnectionGQL(Connection[SessionV2GQL]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Session types allowed for user-initiated creation.",
     ),
     name="CreateSessionType",
@@ -449,7 +519,7 @@ class CreateSessionTypeGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Cluster networking modes for session creation.",
     ),
     name="SessionClusterMode",
@@ -462,7 +532,7 @@ class SessionClusterModeGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="A single resource slot allocation entry.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="SessionResourceSlotEntryInput",
 )
@@ -474,7 +544,7 @@ class SessionResourceSlotEntryInputGQL(PydanticInputMixin[ResourceSlotEntryInput
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Additional resource options for session creation.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="SessionResourceOptsInput",
 )
@@ -487,7 +557,7 @@ class SessionResourceOptsInputGQL(PydanticInputMixin[ResourceOptsInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="A virtual folder mount specification.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="SessionMountItemInput",
 )
@@ -495,12 +565,19 @@ class SessionMountItemInputGQL(PydanticInputMixin[MountItemInputDTO]):
     vfolder_id: ID = gql_field(description="Virtual folder UUID.")
     mount_path: str | None = gql_field(default=None, description="Custom mount path.")
     permission: str | None = gql_field(default=None, description="Mount permission ('rw' or 'ro').")
+    subpath: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="Subpath within the vfolder to mount. Null mounts the vfolder root.",
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Batch session specific configuration.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="SessionBatchConfigInput",
 )
@@ -513,7 +590,7 @@ class SessionBatchConfigInputGQL(PydanticInputMixin[BatchConfigInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for creating a new compute session.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="EnqueueSessionInput",
 )
@@ -564,7 +641,7 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after creating a session.",
     ),
     model=EnqueueSessionPayloadDTO,
@@ -576,7 +653,7 @@ class EnqueueSessionPayloadGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload returned after terminating sessions.",
     ),
     model=TerminateSessionsPayloadDTO,

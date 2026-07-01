@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -12,6 +13,20 @@ from ai.backend.manager.bgtask.tasks.commit_session import (
     CommitSessionResult,
 )
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
+from ai.backend.manager.errors.kernel import SessionNotFound
+
+
+@pytest.fixture
+def sample_manifest() -> CommitSessionManifest:
+    return CommitSessionManifest(
+        session_id=SessionId(uuid.uuid4()),
+        registry_hostname="registry.example.com",
+        registry_project="test-project",
+        image_name="test-image",
+        image_visibility=CustomizedImageVisibilityScope.USER,
+        image_owner_id="user-123",
+        user_email="test@example.com",
+    )
 
 
 class TestCommitSessionHandler:
@@ -21,19 +36,6 @@ class TestCommitSessionHandler:
     def sample_session_id(self) -> SessionId:
         """Sample session ID for testing."""
         return SessionId(uuid.uuid4())
-
-    @pytest.fixture
-    def sample_manifest(self, sample_session_id: SessionId) -> CommitSessionManifest:
-        """Sample manifest for testing."""
-        return CommitSessionManifest(
-            session_id=sample_session_id,
-            registry_hostname="registry.example.com",
-            registry_project="test-project",
-            image_name="test-image",
-            image_visibility=CustomizedImageVisibilityScope.USER,
-            image_owner_id="user-123",
-            user_email="test@example.com",
-        )
 
     def test_handler_name(self) -> None:
         """Test handler returns correct name."""
@@ -81,34 +83,63 @@ class TestCommitSessionHandler:
         """Test result default values are None."""
         result = CommitSessionResult()
         assert result.image_id is None
-        assert result.error_message is None
 
     def test_result_success_serialization(self) -> None:
         """Test result can be serialized and deserialized with success case."""
         image_id = uuid.uuid4()
-        result = CommitSessionResult(image_id=image_id, error_message=None)
+        result = CommitSessionResult(image_id=image_id)
 
         # Serialize to dict
         data = result.model_dump(mode="json")
         assert data["image_id"] == str(image_id)
-        assert data["error_message"] is None
 
         # Deserialize back
         restored = CommitSessionResult.model_validate(data)
         assert restored.image_id == image_id
-        assert restored.error_message is None
 
-    def test_result_error_serialization(self) -> None:
-        """Test result can be serialized and deserialized with error case."""
-        error_msg = "Session not found"
-        result = CommitSessionResult(image_id=None, error_message=error_msg)
 
-        # Serialize to dict
-        data = result.model_dump(mode="json")
-        assert data["image_id"] is None
-        assert data["error_message"] == error_msg
+class TestCommitSessionExecute:
+    """Regression tests for CommitSessionHandler.execute() (PR #12168)."""
 
-        # Deserialize back
-        restored = CommitSessionResult.model_validate(data)
-        assert restored.image_id is None
-        assert restored.error_message == error_msg
+    def _make_handler(self, session_repository: AsyncMock) -> CommitSessionHandler:
+        return CommitSessionHandler(
+            session_repository=session_repository,
+            image_repository=AsyncMock(),
+            agent_registry=AsyncMock(),
+            event_hub=MagicMock(),
+            event_fetcher=MagicMock(),
+        )
+
+    async def test_failure_raises_instead_of_returning_result(
+        self, sample_manifest: CommitSessionManifest
+    ) -> None:
+        # Failures must propagate as exceptions (-> bgtask_failed) instead of
+        # being swallowed into a success-typed CommitSessionResult.
+        session_repository = AsyncMock()
+        session_repository.get_session_by_id.return_value = None
+        handler = self._make_handler(session_repository)
+
+        with pytest.raises(SessionNotFound):
+            await handler.execute(sample_manifest)
+
+    async def test_base_image_resolved_including_deleted(
+        self, sample_manifest: CommitSessionManifest
+    ) -> None:
+        # A running session's base image may have been deleted, so it must be
+        # resolved with alive_only=False.
+        session = MagicMock()
+        session.main_kernel.image = "registry.example.com/base:latest"
+        session.main_kernel.architecture = "x86_64"
+
+        session_repository = AsyncMock()
+        session_repository.get_session_by_id.return_value = session
+        session_repository.get_container_registry.return_value = MagicMock()
+        # Stop right after resolve_image to keep the test focused.
+        session_repository.resolve_image.side_effect = RuntimeError("stop here")
+        handler = self._make_handler(session_repository)
+
+        with pytest.raises(RuntimeError):
+            await handler.execute(sample_manifest)
+
+        _, kwargs = session_repository.resolve_image.call_args
+        assert kwargs["alive_only"] is False

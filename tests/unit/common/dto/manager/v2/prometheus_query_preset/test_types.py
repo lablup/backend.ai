@@ -48,7 +48,7 @@ class TestQueryDefinitionOrderField:
         assert QueryDefinitionOrderField.UPDATED_AT.value == "updated_at"
 
     def test_member_count(self) -> None:
-        assert len(QueryDefinitionOrderField) == 3
+        assert len(QueryDefinitionOrderField) == 4
 
     def test_is_str_enum(self) -> None:
         assert isinstance(QueryDefinitionOrderField.NAME, str)

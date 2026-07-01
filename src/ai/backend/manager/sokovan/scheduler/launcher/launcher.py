@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
 from itertools import groupby
 from typing import Any
+from uuid import UUID
 
 import async_timeout
 from cryptography.hazmat.backends import default_backend
@@ -30,6 +31,13 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.sokovan import (
+    ImageConfigData,
+    KernelBindingData,
+    NetworkSetup,
+    SessionDataForPull,
+    SessionDataForStart,
+)
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
@@ -39,13 +47,6 @@ from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
-)
-from ai.backend.manager.sokovan.data import (
-    ImageConfigData,
-    KernelBindingData,
-    NetworkSetup,
-    SessionDataForPull,
-    SessionDataForStart,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 
@@ -89,7 +90,7 @@ class SessionLauncher:
     async def trigger_image_pulling(
         self,
         sessions: list[SessionDataForPull],
-        image_configs: dict[str, ImageConfigData],
+        image_configs: dict[UUID, ImageConfigData],
     ) -> None:
         """
         Trigger image checking and pulling on agents for the given sessions.
@@ -99,14 +100,14 @@ class SessionLauncher:
         after coordinator queries sessions.
 
         :param sessions: List of sessions with kernels
-        :param image_configs: Image configurations indexed by image name
+        :param image_configs: Image configurations indexed by image ID
         """
         await self._trigger_image_pulling_for_sessions(sessions, image_configs)
 
     async def _trigger_image_pulling_for_sessions(
         self,
         sessions: list[SessionDataForPull],
-        image_configs: dict[str, ImageConfigData],
+        image_configs: dict[UUID, ImageConfigData],
     ) -> None:
         """
         Trigger image checking and pulling on agents for the given sessions.
@@ -114,7 +115,7 @@ class SessionLauncher:
         Internal implementation method.
 
         :param sessions: List of sessions with kernels
-        :param image_configs: Image configurations indexed by image name
+        :param image_configs: Image configurations indexed by image ID
         """
         auto_pull = self._config_provider.config.docker.image.auto_pull.value
 
@@ -125,9 +126,9 @@ class SessionLauncher:
         for session in sessions:
             for kernel in session.kernels:
                 agent_id = kernel.agent_id
-                if agent_id:
+                if agent_id and kernel.image_id is not None:
                     # Image config must exist since we queried based on kernels
-                    img_cfg = image_configs[kernel.image]
+                    img_cfg = image_configs[kernel.image_id]
 
                     # Convert ImageConfigData to ImageConfig format
                     # Use canonical as key for agent_image_configs to avoid duplicates
@@ -161,7 +162,7 @@ class SessionLauncher:
     async def start_sessions_for_handler(
         self,
         sessions: list[SessionDataForStart],
-        image_configs: dict[str, ImageConfigData],
+        image_configs: dict[UUID, ImageConfigData],
     ) -> None:
         """
         Start sessions on agents for the given sessions.
@@ -173,7 +174,7 @@ class SessionLauncher:
         Note: Status transition is handled by the Coordinator, not here.
 
         :param sessions: List of sessions with full data for starting
-        :param image_configs: Image configurations indexed by image name
+        :param image_configs: Image configurations indexed by image ID
         """
         with RecorderContext[SessionId].shared_phase(
             "trigger_kernel_creation",
@@ -188,13 +189,13 @@ class SessionLauncher:
     async def _start_sessions_concurrently(
         self,
         sessions: list[SessionDataForStart],
-        image_configs: dict[str, ImageConfigData],
+        image_configs: dict[UUID, ImageConfigData],
     ) -> None:
         """
         Start multiple sessions concurrently with individual timeouts.
 
         :param sessions: List of sessions to start
-        :param image_configs: Image configurations for the sessions
+        :param image_configs: Image configurations indexed by image ID
         """
 
         async def start_with_timeout(session: SessionDataForStart) -> None:
@@ -216,13 +217,13 @@ class SessionLauncher:
     async def _start_single_session(
         self,
         session: SessionDataForStart,
-        image_configs: dict[str, ImageConfigData],
+        image_configs: dict[UUID, ImageConfigData],
     ) -> None:
         """
         Start a single session by creating kernels on agents.
 
         :param session: Session data to start
-        :param image_configs: Image configurations for the session
+        :param image_configs: Image configurations indexed by image ID
         """
         log_fmt = "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
         log_args = (
@@ -292,10 +293,10 @@ class SessionLauncher:
             ssh_keypair = await self._create_cluster_ssh_keypair()
 
             # Convert ImageConfigData to ImageConfig format for agents
-            image_configs_by_canonical: dict[str, ImageConfig] = {}
-            for image_key, img_cfg in image_configs.items():
-                image_config = img_cfg.to_image_config(AutoPullBehavior.DIGEST)
-                image_configs_by_canonical[image_key] = image_config
+            # Build a mapping from image ID to agent-compatible ImageConfig
+            image_configs_by_id: dict[UUID, ImageConfig] = {}
+            for img_id, img_cfg in image_configs.items():
+                image_configs_by_id[img_id] = img_cfg.to_image_config(AutoPullBehavior.DIGEST)
 
             # Create kernels on each agent
             async def create_kernels_on_agent(
@@ -311,18 +312,20 @@ class SessionLauncher:
                     kernel_id_str = str(k.kernel_id)
                     image_str = k.image
 
-                    # Use resolved image config or fallback
-                    if image_str not in image_configs_by_canonical:
-                        # This should not happen - all images should be resolved by precondition check
+                    # Use resolved image config by image_id
+                    if k.image_id is None or k.image_id not in image_configs_by_id:
                         log.error(
-                            "Image {} not found in resolved configs - this indicates precondition check failed",
+                            "Image ID {} (canonical: {}) not found in resolved configs"
+                            " - this indicates precondition check failed",
+                            k.image_id,
                             image_str,
                         )
                         raise ValueError(
-                            f"Image {image_str} not found in database - session start failed"
+                            f"Image {image_str} (id={k.image_id}) not found in database"
+                            " - session start failed"
                         )
 
-                    kernel_image_config = image_configs_by_canonical[image_str]
+                    kernel_image_config = image_configs_by_id[k.image_id]
 
                     # Use cluster configuration from kernel data
                     cluster_role = k.cluster_role
@@ -482,7 +485,7 @@ class SessionLauncher:
                     async with self._agent_client_pool.acquire(first_kernel.agent_id) as client:
                         await client.create_local_network(network_name)
                 except Exception:
-                    log.exception(f"Failed to create agent-local network {network_name}")
+                    log.exception("Failed to create agent-local network {}", network_name)
                     raise
                 network_config = {
                     "mode": "bridge",
@@ -498,8 +501,9 @@ class SessionLauncher:
                 if driver not in self._network_plugin_ctx.plugins:
                     available_plugins = list(self._network_plugin_ctx.plugins.keys())
                     log.error(
-                        f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
-                        f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
+                        "Network plugin '{}' not found. Available plugins: {}. For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'.",
+                        driver,
+                        available_plugins,
                     )
                     raise KeyError(
                         f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
@@ -515,7 +519,7 @@ class SessionLauncher:
                     network_name = network_info.network_id
                 except Exception:
                     log.exception(
-                        f"Failed to create the inter-container network (plugin: {driver})"
+                        "Failed to create the inter-container network (plugin: {})", driver
                     )
                     raise
         elif network_type == NetworkType.HOST:
@@ -528,7 +532,8 @@ class SessionLauncher:
                 for kernel in session.kernels:
                     if not kernel.agent_id:
                         log.warning(
-                            f"No agent assigned for kernel {kernel.kernel_id}, skipping port mapping"
+                            "No agent assigned for kernel {}, skipping port mapping",
+                            kernel.kernel_id,
                         )
                         continue
                     async with self._agent_client_pool.acquire(kernel.agent_id) as client:

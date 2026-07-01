@@ -2,16 +2,43 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ai.backend.manager.data.model_card.types import ModelCardData
-from ai.backend.manager.models.base import GUID, Base, PydanticColumn
-from ai.backend.manager.models.model_card.types import MinResourceSpec
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.manager.data.model_card.types import ModelCardData, ResourceRequirementEntry
+from ai.backend.manager.models.base import GUID, Base
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 
 __all__ = ("ModelCardRow",)
+
+
+def _format_min_quantity(value: Decimal | str) -> str:
+    """Format a Numeric column value as a canonical string.
+
+    The underlying ``model_card_resource_requirements.min_quantity`` column
+    is ``sa.Numeric(precision=24, scale=6)``, so freshly-read rows come
+    back as ``Decimal("2.000000")``. ``str()`` of that keeps the trailing
+    zeros, which then drifts from the string the caller supplied on create
+    (e.g. ``"2"``) and from the "2" stored in ``to_data()`` before the
+    session was flushed. Collapse integer-equivalent values to ``"2"`` and
+    strip trailing zeros from genuinely fractional values so that
+    ``to_data()`` is stable across create / refetch / update paths.
+
+    The ORM attribute is typed ``Decimal`` but before flush it may still
+    be the raw string the creator handed in (e.g. ``"2"``); normalize
+    into ``Decimal`` first so both pre- and post-flush paths converge.
+    """
+    decimal_value = value if isinstance(value, Decimal) else Decimal(value)
+    if decimal_value == decimal_value.to_integral_value():
+        return str(int(decimal_value))
+    return format(decimal_value.normalize(), "f")
 
 
 class ModelCardRow(Base):  # type: ignore[misc]
@@ -25,9 +52,9 @@ class ModelCardRow(Base):  # type: ignore[misc]
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=512), nullable=False)
-    vfolder: Mapped[uuid.UUID] = mapped_column(
+    vfolder: Mapped[VFolderUUID] = mapped_column(
         "vfolder",
-        GUID,
+        GUID(VFolderUUID),
         sa.ForeignKey("vfolders.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -68,10 +95,10 @@ class ModelCardRow(Base):  # type: ignore[misc]
         "label", pgsql.ARRAY(sa.String), nullable=False, server_default="{}"
     )
     license: Mapped[str | None] = mapped_column("license", sa.String(length=128), nullable=True)
-    min_resource: Mapped[MinResourceSpec | None] = mapped_column(
-        "min_resource", PydanticColumn(MinResourceSpec), nullable=True
-    )
     readme: Mapped[str | None] = mapped_column("readme", sa.Text, nullable=True)
+    access_level: Mapped[str] = mapped_column(
+        "access_level", sa.String(length=32), nullable=False, default="internal"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -86,7 +113,20 @@ class ModelCardRow(Base):  # type: ignore[misc]
         onupdate=sa.func.now(),
     )
 
+    resource_requirement_rows: Mapped[list[ModelCardResourceRequirementRow]] = relationship(
+        "ModelCardResourceRequirementRow",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
     def to_data(self) -> ModelCardData:
+        min_resource = [
+            ResourceRequirementEntry(
+                slot_name=r.slot_name,
+                min_quantity=_format_min_quantity(r.min_quantity),
+            )
+            for r in self.resource_requirement_rows
+        ]
         return ModelCardData(
             id=self.id,
             name=self.name,
@@ -104,8 +144,9 @@ class ModelCardRow(Base):  # type: ignore[misc]
             framework=self.framework or [],
             label=self.label or [],
             license=self.license,
-            min_resource=self.min_resource.slots if self.min_resource else None,
+            min_resource=min_resource,
             readme=self.readme,
+            access_level=self.access_level,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

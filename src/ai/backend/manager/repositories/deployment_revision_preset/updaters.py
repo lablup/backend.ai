@@ -1,27 +1,32 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, override
 
 from ai.backend.common.config import ModelDefinition
-from ai.backend.manager.models.base import ResourceOptsEntry, ResourceSlotEntry
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
+from ai.backend.manager.models.runtime_variant_preset.types import (
+    RuntimeVariantPresetValueEntry,
+)
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
 class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRow]):
+    runtime_variant: OptionalState[RuntimeVariantID] = field(
+        default_factory=OptionalState[RuntimeVariantID].nop
+    )
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    image: TriState[str] = field(default_factory=TriState[str].nop)
+    image_id: TriState[uuid.UUID] = field(default_factory=TriState[uuid.UUID].nop)
     model_definition: TriState[ModelDefinition] = field(
         default_factory=TriState[ModelDefinition].nop
-    )
-    resource_slots: OptionalState[list[ResourceSlotEntry]] = field(
-        default_factory=OptionalState[list[ResourceSlotEntry]].nop
     )
     resource_opts: OptionalState[list[ResourceOptsEntry]] = field(
         default_factory=OptionalState[list[ResourceOptsEntry]].nop
@@ -33,8 +38,17 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     environ: OptionalState[dict[str, str]] = field(
         default_factory=OptionalState[dict[str, str]].nop
     )
-    preset_values: OptionalState[list[PresetValueEntry]] = field(
-        default_factory=OptionalState[list[PresetValueEntry]].nop
+    runtime_variant_preset_values: OptionalState[list[RuntimeVariantPresetValueEntry]] = field(
+        default_factory=OptionalState[list[RuntimeVariantPresetValueEntry]].nop
+    )
+    open_to_public: TriState[bool] = field(default_factory=TriState[bool].nop)
+    replica_count: TriState[int] = field(default_factory=TriState[int].nop)
+    revision_history_limit: TriState[int] = field(default_factory=TriState[int].nop)
+    deployment_strategy: TriState[DeploymentStrategy] = field(
+        default_factory=TriState[DeploymentStrategy].nop
+    )
+    deployment_strategy_spec: TriState[dict[str, Any]] = field(
+        default_factory=TriState[dict[str, Any]].nop
     )
 
     @property
@@ -45,17 +59,23 @@ class DeploymentRevisionPresetUpdaterSpec(UpdaterSpec[DeploymentRevisionPresetRo
     @override
     def build_values(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
+        self.runtime_variant.update_dict(to_update, "runtime_variant")
         self.name.update_dict(to_update, "name")
         self.description.update_dict(to_update, "description")
         self.rank.update_dict(to_update, "rank")
-        self.image.update_dict(to_update, "image")
+        self.image_id.update_dict(to_update, "image_id")
         self.model_definition.update_dict(to_update, "model_definition")
-        self.resource_slots.update_dict(to_update, "resource_slots")
         self.resource_opts.update_dict(to_update, "resource_opts")
         self.cluster_mode.update_dict(to_update, "cluster_mode")
         self.cluster_size.update_dict(to_update, "cluster_size")
         self.startup_command.update_dict(to_update, "startup_command")
         self.bootstrap_script.update_dict(to_update, "bootstrap_script")
         self.environ.update_dict(to_update, "environ")
-        self.preset_values.update_dict(to_update, "preset_values")
+        # DB column name stays ``preset_values`` (ORM attr unchanged).
+        self.runtime_variant_preset_values.update_dict(to_update, "preset_values")
+        self.open_to_public.update_dict(to_update, "open_to_public")
+        self.replica_count.update_dict(to_update, "replica_count")
+        self.revision_history_limit.update_dict(to_update, "revision_history_limit")
+        self.deployment_strategy.update_dict(to_update, "deployment_strategy")
+        self.deployment_strategy_spec.update_dict(to_update, "deployment_strategy_spec")
         return to_update

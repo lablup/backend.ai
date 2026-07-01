@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Self
+from typing import Self
 
 from pydantic import (
     AliasChoices,
@@ -21,6 +21,7 @@ from pydantic import (
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.session.types import MountOption
 from ai.backend.common.types import RuntimeVariant
 
 __all__ = (
@@ -84,8 +85,17 @@ class ServiceConfigModel(BaseRequestModel):
         ),
         alias="modelMountDestination",
     )
+    vfolder_subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the model VFolder to mount. ``null`` (default) mounts the vfolder root."
+            " Empty string is rejected; omit the field to mount the root."
+        ),
+        alias="vfolderSubpath",
+    )
 
-    extra_mounts: dict[uuid.UUID, dict[str, Any]] = Field(
+    extra_mounts: dict[uuid.UUID, MountOption] = Field(
         description=(
             "Specifications about extra VFolders mounted to model service session. "
             "MODEL type VFolders are not allowed to be attached to model service session"
@@ -103,7 +113,9 @@ class ServiceConfigModel(BaseRequestModel):
         examples=["nvidia-H100"],
         alias="scalingGroup",
     )
-    resources: dict[str, str | int] | None = Field(
+    # TODO: Consider aligning with the compute session pattern (ResourceSlotEntryInput)
+    #  which accepts quantity as str and defers numeric parsing to ResourceSlot.
+    resources: dict[str, str | int | NonNegativeFloat] | None = Field(
         default=None, examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}]
     )
     resource_opts: dict[str, str | int | bool] | None = Field(
@@ -136,7 +148,7 @@ class NewServiceRequestModel(BaseRequestModel):
     )
     runtime_variant: RuntimeVariant = Field(
         description="Type of the inference runtime the image will try to load.",
-        default=RuntimeVariant.CUSTOM,
+        default=RuntimeVariant("custom"),
     )
     architecture: str | None = Field(
         description=(

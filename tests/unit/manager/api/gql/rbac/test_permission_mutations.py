@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,10 +15,8 @@ from ai.backend.common.dto.manager.v2.rbac.response import PermissionNode
 from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO, RBACElementTypeDTO
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
 from ai.backend.manager.api.gql.rbac.types import PermissionGQL, UpdatePermissionInput
-from ai.backend.manager.api.gql.rbac.types.permission import (
-    OperationTypeGQL,
-    RBACElementTypeGQL,
-)
+from ai.backend.manager.api.gql.rbac.types.permission import OperationTypeGQL
+from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeGQL
 
 
 def _make_permission_node(
@@ -73,7 +72,7 @@ class TestAdminUpdatePermission:
             operation=OperationTypeGQL.UPDATE,
         )
 
-        resolver_fn = permission_resolver.admin_update_permission.base_resolver
+        resolver_fn = cast(Any, permission_resolver.admin_update_permission).base_resolver
         result = await resolver_fn(info=info, input=input_data)
 
         mock_adapter_method.assert_called_once()
@@ -103,7 +102,7 @@ class TestAdminUpdatePermission:
         assert dto.scope_id is None
         assert dto.entity_type is None
 
-        resolver_fn = permission_resolver.admin_update_permission.base_resolver
+        resolver_fn = cast(Any, permission_resolver.admin_update_permission).base_resolver
         result = await resolver_fn(info=info, input=input_data)
         assert isinstance(result, PermissionGQL)
 
@@ -137,7 +136,7 @@ class TestAdminUpdatePermission:
         assert dto.entity_type is not None
         assert dto.operation is not None
 
-        resolver_fn = permission_resolver.admin_update_permission.base_resolver
+        resolver_fn = cast(Any, permission_resolver.admin_update_permission).base_resolver
         result = await resolver_fn(info=info, input=input_data)
         assert isinstance(result, PermissionGQL)
 
@@ -156,7 +155,7 @@ class TestAdminUpdatePermission:
             operation=OperationTypeGQL.READ,
         )
 
-        resolver_fn = permission_resolver.admin_update_permission.base_resolver
+        resolver_fn = cast(Any, permission_resolver.admin_update_permission).base_resolver
         with pytest.raises(ValueError):
             await resolver_fn(info=info, input=input_data)
 
@@ -182,7 +181,7 @@ class TestAdminUpdatePermission:
             operation=OperationTypeGQL.READ,
         )
 
-        resolver_fn = permission_resolver.admin_update_permission.base_resolver
+        resolver_fn = cast(Any, permission_resolver.admin_update_permission).base_resolver
         result = await resolver_fn(info=info, input=input_data)
 
         assert isinstance(result, PermissionGQL)
@@ -201,6 +200,6 @@ class TestAdminUpdatePermissionAccessControl:
             operation=OperationTypeGQL.READ,
         )
 
-        resolver_fn = permission_resolver.admin_update_permission.base_resolver
+        resolver_fn = cast(Any, permission_resolver.admin_update_permission).base_resolver
         with pytest.raises(HTTPForbidden):
             await resolver_fn(info=info, input=input_data)

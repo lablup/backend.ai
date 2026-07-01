@@ -11,6 +11,14 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.data.permission.types import (
+    EntityType,
+    OperationType,
+    Permission,
+    RelationType,
+    RoleStatus,
+    ScopeType,
+)
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import (
     HostPortPair,
@@ -33,6 +41,7 @@ from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.vfolder.types import (
     VFolderInvitationState,
     VFolderMountPermission,
@@ -41,6 +50,12 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import (
@@ -59,6 +74,7 @@ from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 _VFOLDER_SERVER_SUBAPP_MODULES = (_auth_api,)
 
@@ -115,7 +131,7 @@ def vfolder_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
         ),
     )
 
@@ -138,7 +154,7 @@ def vfolder_file_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
         ),
     )
 
@@ -159,7 +175,7 @@ def vfolder_invite_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
         ),
     )
 
@@ -180,7 +196,7 @@ def vfolder_sharing_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
         ),
     )
 
@@ -213,7 +229,7 @@ def server_module_registries(
 @pytest.fixture()
 async def vfolder_host_permission_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[None]:
     """Update allowed_vfolder_hosts on the test domain and keypair resource policy.
@@ -226,7 +242,7 @@ async def vfolder_host_permission_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.update(domains)
-            .where(domains.c.name == domain_fixture)
+            .where(domains.c.name == domain_fixture.domain_name)
             .values(allowed_vfolder_hosts=host_perms)
         )
         await conn.execute(
@@ -247,7 +263,7 @@ async def vfolder_host_permission_fixture(
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.update(domains)
-            .where(domains.c.name == domain_fixture)
+            .where(domains.c.name == domain_fixture.domain_name)
             .values(allowed_vfolder_hosts=empty_perms)
         )
         await conn.execute(
@@ -260,7 +276,7 @@ async def vfolder_host_permission_fixture(
 @pytest.fixture()
 async def vfolder_factory(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     admin_user_fixture: Any,
     vfolder_host_permission_fixture: None,
 ) -> AsyncIterator[VFolderFactory]:
@@ -283,7 +299,7 @@ async def vfolder_factory(
             "id": vfolder_id,
             "name": f"test-vfolder-{unique}",
             "host": "local",
-            "domain_name": domain_fixture,
+            "domain_name": domain_fixture.domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": VFolderUsageMode.GENERAL,
             "permission": VFolderMountPermission.READ_WRITE,
@@ -368,3 +384,72 @@ async def invitation_factory(
             await conn.execute(
                 vfolder_invitations.delete().where(vfolder_invitations.c.id == inv_id)
             )
+
+
+@pytest.fixture()
+async def user_system_role(
+    db_engine: SAEngine,
+    regular_user_fixture: Any,
+) -> AsyncIterator[uuid.UUID]:
+    """Provision the RBAC SYSTEM role for the regular user.
+
+    Replicates what RoleManager does at user-creation time:
+    RoleRow (source=SYSTEM) + UserRoleRow + scope mapping + owner PermissionRows.
+    The base regular_user_fixture inserts user rows directly and skips this, so
+    flows that resolve the user's system role (e.g. accept_invitation) require it.
+    """
+    role_id = uuid.uuid4()
+    user_uuid = regular_user_fixture.user_uuid
+
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(RoleRow.__table__).values(
+                id=role_id,
+                name=f"user-{str(user_uuid)[:8]}",
+                source=RoleSource.SYSTEM,
+                status=RoleStatus.ACTIVE,
+            )
+        )
+        await conn.execute(
+            sa.insert(UserRoleRow.__table__).values(
+                user_id=user_uuid,
+                role_id=role_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(AssociationScopesEntitiesRow.__table__).values(
+                scope_type=ScopeType.USER,
+                scope_id=str(user_uuid),
+                entity_type=EntityType.ROLE,
+                entity_id=str(role_id),
+                relation_type=RelationType.AUTO,
+            )
+        )
+        for entity_type in EntityType.owner_accessible_entity_types_in_user():
+            for operation in OperationType.owner_operations():
+                await conn.execute(
+                    sa.insert(PermissionRow.__table__).values(
+                        role_id=role_id,
+                        scope_type=ScopeType.USER,
+                        scope_id=str(user_uuid),
+                        entity_type=entity_type,
+                        operation=operation,
+                        permission=Permission.from_operation(operation),
+                    )
+                )
+
+    yield role_id
+
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            PermissionRow.__table__.delete().where(PermissionRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(
+            AssociationScopesEntitiesRow.__table__.delete().where(
+                AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id)
+            )
+        )
+        await conn.execute(
+            UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))

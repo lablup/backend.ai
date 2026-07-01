@@ -6,10 +6,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, NewType, Protocol, Self
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from pydantic_core import ValidationError
 
 from ai.backend.common.json import dump_json, load_json
+from ai.backend.common.types import BackendAISchema
 
 from .exception import InvalidTaskMetadataError
 
@@ -25,6 +26,15 @@ class BgtaskStatus(enum.StrEnum):
 
     def finished(self) -> bool:
         return self in {self.DONE, self.CANCELLED, self.FAILED, self.PARTIAL_SUCCESS}
+
+    def to_task_status(self) -> TaskStatus:
+        match self:
+            case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
+                return TaskStatus.SUCCESS
+            case BgtaskStatus.CANCELLED | BgtaskStatus.FAILED:
+                return TaskStatus.FAILURE
+            case _:
+                return TaskStatus.ONGOING
 
 
 class BgtaskNameBase(Protocol):
@@ -109,7 +119,7 @@ class TaskStatus(enum.StrEnum):
     FAILURE = "failure"
 
 
-class TaskSubKeyInfo(BaseModel):
+class TaskSubKeyInfo(BackendAISchema):
     """
     Status information for a specific task key.
     """

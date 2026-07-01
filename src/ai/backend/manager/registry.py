@@ -15,7 +15,6 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import (
     Any,
-    Literal,
     cast,
 )
 
@@ -48,36 +47,35 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
-from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
+from ai.backend.common.dto.agent.response import (
+    CodeCompletionResp,
+    DeviceHardwareInfo,
+    PurgeImageResp,
+    PurgeImagesResp,
+)
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
+    EndpointTagsModel,
+    SessionTagsModel,
+    TagsModel,
+)
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.kernel.anycast import (
-    KernelCancelledAnycastEvent,
-    KernelTerminatedAnycastEvent,
-    KernelTerminatingAnycastEvent,
-)
-from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    EndpointRouteListUpdatedEvent,
-)
-from ai.backend.common.events.event_types.session.anycast import (
-    SessionCancelledAnycastEvent,
-    SessionStartedAnycastEvent,
-    SessionTerminatingAnycastEvent,
-)
 from ai.backend.common.events.event_types.session.broadcast import (
     SchedulingBroadcastEvent,
-    SessionCancelledBroadcastEvent,
-    SessionTerminatingBroadcastEvent,
 )
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.exception import AliasResolutionFailed
-from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
-    MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReport,
     AccessKey,
     AgentId,
@@ -91,8 +89,10 @@ from ai.backend.common.types import (
     ImageRegistry,
     KernelEnqueueingConfig,
     KernelId,
+    MountInfoEntry,
+    MountPermission,
     ResourceSlot,
-    RuntimeVariant,
+    ResourceSlotEntry,
     SessionEnqueueingConfig,
     SessionId,
     SessionTypes,
@@ -100,31 +100,41 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.appproxy.types import (
-    CreateEndpointRequestBody,
-    EndpointTagsModel,
-    SessionTagsModel,
-    TagsModel,
-)
+from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.session.draft import (
+    KernelExecutionSpecDraft,
+    KernelGroupDraft,
+    SchedulingTargetDraft,
+    SessionClassificationDraft,
+    SessionIdentityDraft,
+    SessionNetworkDraft,
+    SessionOptionsDraft,
+    SessionScopeDraft,
+    SessionSpecDraft,
+)
+from ai.backend.manager.data.session.options import (
+    InternalDataExtras,
+    ResourceOpts,
+    SessionHandlerOptions,
+)
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.endpoint import ModelServiceHelper
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
+from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
-from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
 
 from .agent_cache import AgentRPCCache
 from .clients.agent import AgentClientPool
 from .clients.appproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from .errors.api import InvalidAPIParameters
-from .errors.common import GenericForbidden, RejectedByHook
 from .errors.image import ImageNotFound
 from .errors.kernel import (
     InvalidKernelConfig,
@@ -154,10 +164,10 @@ from .models.kernel import (
 )
 from .models.keypair import query_bootstrap_script
 from .models.network import NetworkRow, NetworkType
+from .models.runtime_variant.row import RuntimeVariantRow
 from .models.scaling_group import query_allowed_sgroups, scaling_groups
 from .models.session import (
     PRIVATE_SESSION_TYPES,
-    SESSION_KERNEL_STATUS_MAPPING,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ConcurrencyUsed,
     KernelLoadingStrategy,
@@ -165,17 +175,15 @@ from .models.session import (
     handle_session_exception,
 )
 from .models.storage import StorageSessionManager
-from .models.user import UserRole, UserRow
+from .models.user import UserRow
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
-    execute_with_txn_retry,
     reenter_txn_session,
-    sql_json_merge,
 )
-from .models.vfolder import VFolderRow, verify_vfolder_name
-from .scheduler.types import KernelAgentBinding
-from .services.session.lifecycle import SessionLifecycleManager
+from .models.vfolder import (
+    verify_vfolder_name,
+)
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
@@ -198,6 +206,7 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
     _scheduling_controller: SchedulingController
+    _scheduler_repository: SchedulerRepository
     _event_hub: EventHub
 
     session_creation_tracker: dict[str, asyncio.Event]
@@ -206,6 +215,71 @@ class AgentRegistry:
     webhook_ptask_group: aiotools.PersistentTaskGroup
     _client_pool: ClientPool
     _agent_client_pool: AgentClientPool
+
+    @staticmethod
+    def _mount_entries_from_creation_config(
+        creation_config: Mapping[str, Any],
+    ) -> tuple[MountInfoEntry, ...]:
+        """Project legacy ``creation_config`` mount dict keys into typed
+        :class:`MountInfoEntry` tuples.
+
+        Reads UUID-keyed ``mount_ids`` / ``mount_id_map`` / ``mount_options``
+        (modern v1 session-service path). Name-keyed ``mounts`` entries
+        are not handled here — :class:`SessionService` resolves those into
+        the UUID-keyed buckets upstream before any code in this module
+        runs.
+        """
+        mount_ids = creation_config.get("mount_ids") or []
+        mount_id_map: Mapping[Any, str] = creation_config.get("mount_id_map") or {}
+        mount_options: Mapping[Any, Mapping[str, Any]] = creation_config.get("mount_options") or {}
+
+        entries: list[MountInfoEntry] = []
+        for raw_id in mount_ids:
+            try:
+                vfolder_uuid = uuid.UUID(str(raw_id))
+            except (ValueError, TypeError):
+                continue
+            opts = mount_options.get(raw_id) or mount_options.get(vfolder_uuid) or {}
+            raw_perm = opts.get("permission")
+            perm: MountPermission | None = None
+            if isinstance(raw_perm, MountPermission):
+                perm = raw_perm
+            elif isinstance(raw_perm, str):
+                try:
+                    perm = MountPermission(raw_perm)
+                except ValueError:
+                    perm = None
+            raw_subpath = opts.get("subpath")
+            subpath_value = str(raw_subpath) if raw_subpath is not None else None
+            dst_path = mount_id_map.get(vfolder_uuid) or mount_id_map.get(raw_id)
+            entries.append(
+                MountInfoEntry(
+                    vfolder_id=VFolderUUID(vfolder_uuid),
+                    mount_destination=dst_path,
+                    mount_perm=perm,
+                    subpath=subpath_value,
+                )
+            )
+        return tuple(entries)
+
+    @staticmethod
+    def _resource_entries_from_legacy_dict(
+        resources: Mapping[str, Any],
+    ) -> tuple[ResourceSlotEntry, ...]:
+        """Project a legacy ``{slot_name: quantity}`` dict into the typed
+        :class:`ResourceSlotEntry` tuple the draft expects.
+
+        Legacy callers may hand in BinarySize shortcuts (``"512m"``,
+        ``"1g"``) for memory-like slots; normalise them to plain decimal
+        strings so downstream ``Decimal(quantity)`` calls in the scheduler
+        and ``ResourceSlotEntry.to_resource_slot`` keep working unchanged.
+        """
+        if not resources:
+            return ()
+        return tuple(
+            ResourceSlotEntry(resource_type=str(k), quantity=str(parse_quantity(v)))
+            for k, v in resources.items()
+        )
 
     def __init__(
         self,
@@ -222,6 +296,7 @@ class AgentRegistry:
         hook_plugin_ctx: HookPluginContext,
         network_plugin_ctx: NetworkPluginContext,
         scheduling_controller: SchedulingController,
+        scheduler_repository: SchedulerRepository,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
@@ -242,18 +317,11 @@ class AgentRegistry:
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self._scheduling_controller = scheduling_controller
+        self._scheduler_repository = scheduler_repository
         self.debug = debug
         self.rpc_keepalive_timeout = int(config_provider.config.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
-        self.session_lifecycle_mgr = SessionLifecycleManager(
-            db,
-            valkey_stat,
-            valkey_live,
-            event_producer,
-            hook_plugin_ctx,
-            self,
-        )
         self._client_pool = ClientPool(tcp_client_session_factory)
 
     async def init(self) -> None:
@@ -304,11 +372,11 @@ class AgentRegistry:
 
         await execute_with_retry(_update)
 
-    async def gather_agent_hwinfo(self, instance_id: AgentId) -> Mapping[str, HardwareMetadata]:
+    async def gather_agent_hwinfo(self, instance_id: AgentId) -> list[DeviceHardwareInfo]:
         agent_id = await self.get_instance(instance_id)
         async with self._agent_client_pool.acquire(agent_id) as client:
             result = await client.gather_hwinfo()
-        return {k: check_type(v, HardwareMetadata) for k, v in result.items()}
+        return result.devices
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
         proxy_name, volume_name = self.storage_manager.get_proxy_and_volume(vfolder_host)
@@ -929,42 +997,174 @@ class AgentRegistry:
         startup_command: str | None,
         is_preemptible: bool,
     ) -> SessionId:
-        """Enqueue session using Sokovan scheduling controller."""
+        """Enqueue session via the Sokovan draft path.
+
+        Legacy v1 REST/GraphQL surface: receives already-expanded
+        ``kernel_configs`` (one per replica) inside ``session_enqueue_configs``
+        and the session-level ``creation_config`` dict. Groups the
+        per-replica configs by ``cluster_role`` into
+        :class:`KernelGroupDraft` entries before handing the draft to
+        the scheduling controller.
+        """
         kernel_enqueue_configs: list[KernelEnqueueingConfig] = session_enqueue_configs[
             "kernel_configs"
         ]
+        creation_config: dict[str, Any] = session_enqueue_configs["creation_config"]
 
-        # Create SessionCreationSpec
-        spec = SessionCreationSpec(
-            session_creation_id=session_creation_id,
-            session_name=session_name,
-            access_key=access_key,
-            user_scope=user_scope,
-            session_type=session_type,
-            cluster_mode=cluster_mode,
-            cluster_size=cluster_size,
-            priority=priority,
-            resource_policy=resource_policy,
-            kernel_specs=kernel_enqueue_configs,
-            creation_spec=session_enqueue_configs["creation_config"],
-            scaling_group=scaling_group,
-            session_tag=session_tag,
-            starts_at=starts_at,
-            batch_timeout=batch_timeout,
-            dependency_sessions=list(dependency_sessions) if dependency_sessions else None,
-            callback_url=callback_url,
-            route_id=route_id,
-            sudo_session_enabled=sudo_session_enabled,
-            network=network,
-            designated_agent_list=list(agent_list) if agent_list else None,
-            internal_data=internal_data,
-            public_sgroup_only=public_sgroup_only,
-            startup_command=startup_command,
-            is_preemptible=is_preemptible,
+        # Legacy name-keyed ``mounts`` are resolved into UUID-keyed buckets
+        # upstream in ``SessionService`` (via ``VFolderProcessors``), so by
+        # the time control reaches here the config carries only ``mount_ids``
+        # / ``mount_id_map`` / ``mount_options``.
+        mount_entries = self._mount_entries_from_creation_config(creation_config)
+        resource_entries = self._resource_entries_from_legacy_dict(
+            creation_config.get("resources") or {}
+        )
+        resource_opts = ResourceOpts.model_validate(creation_config.get("resource_opts") or {})
+        environ_dict = dict(creation_config.get("environ") or {})
+        preopen_ports = tuple(creation_config.get("preopen_ports") or ())
+        # Session-level fields (callback, dependencies, etc.) flow onto
+        # the draft directly. ``agent_list`` maps onto the scheduling
+        # target's designated agents.
+        dependencies = tuple(SessionID(dep_id) for dep_id in (dependency_sessions or ()))
+        network_id = str(network.id) if network is not None else None
+        batch_timeout_sec = (
+            int(batch_timeout.total_seconds()) if batch_timeout is not None else None
         )
 
-        # Delegate to scheduling controller
-        return await self._scheduling_controller.enqueue_session(spec)
+        # Project legacy per-replica configs into ``KernelGroupDraft``
+        # instances. Two distinct legacy shapes need to survive this
+        # transition; both get mapped to the same ``main``/``sub``
+        # layout the old ``ClusterConfigurationRule`` produced so rows
+        # written on the new path stay wire/DB-compatible with the
+        # historical data (``cluster_role`` values of ``main`` + ``sub``,
+        # hostnames ``main1`` + ``sub1..subN-1``):
+        #
+        #   (a) ``create_session`` path: one kernel_config entry and a
+        #       separate ``cluster_size`` parameter. When size > 1 the
+        #       old rule auto-expanded into 1 ``main`` + (N-1) ``sub``
+        #       kernels; ``replica_count`` on a single draft group would
+        #       instead produce N ``main`` kernels, which breaks queries
+        #       filtering on ``cluster_role='sub'``.
+        #
+        #   (b) ``create_cluster`` path: multiple kernel_configs already
+        #       expanded per replica with ``cluster_role`` set per
+        #       entry. These just need to be grouped by role.
+        #
+        # Legacy ``KernelEnqueueingConfig`` carries an ``ImageRef`` only,
+        # so resolve it to ``ImageID`` here and hand the id down to the
+        # controller — the scheduler repository expects spec drafts with
+        # ``image_id`` already populated (task #29 migrates the read path
+        # to persist ``ImageID`` end-to-end).
+        image_id_by_ref: dict[ImageRef, ImageID] = {}
+        async with self.db.begin_readonly_session() as db_sess:
+            for kernel in kernel_enqueue_configs:
+                image_ref = kernel["image_ref"]
+                if image_ref in image_id_by_ref:
+                    continue
+                image_row = await ImageRow.resolve(db_sess, [image_ref])
+                image_id_by_ref[image_ref] = ImageID(image_row.id)
+
+        def _build_execution_spec(
+            kernel: KernelEnqueueingConfig,
+        ) -> KernelExecutionSpecDraft:
+            return KernelExecutionSpecDraft(
+                image_id=image_id_by_ref[kernel["image_ref"]],
+                resources=resource_entries,
+                resource_opts=resource_opts,
+                environ=environ_dict,
+                mounts=mount_entries,
+                startup_command=kernel.get("startup_command") or startup_command,
+                bootstrap_script=kernel.get("bootstrap_script") or None,
+                starts_at=starts_at,
+                batch_timeout_sec=batch_timeout_sec,
+            )
+
+        groups_by_role: dict[str, KernelGroupDraft] = {}
+        if len(kernel_enqueue_configs) == 1 and cluster_size > 1:
+            # Shape (a): auto-expand to 1 main + (cluster_size-1) sub.
+            only_kernel = kernel_enqueue_configs[0]
+            execution_spec = _build_execution_spec(only_kernel)
+            groups_by_role[DEFAULT_ROLE] = KernelGroupDraft(
+                role=DEFAULT_ROLE,
+                replica_count=1,
+                preopen_ports=preopen_ports,
+                execution_spec=execution_spec,
+            )
+            groups_by_role["sub"] = KernelGroupDraft(
+                role="sub",
+                replica_count=cluster_size - 1,
+                preopen_ports=preopen_ports,
+                execution_spec=execution_spec,
+            )
+        else:
+            # Shape (b): each config already corresponds to one replica;
+            # group by the caller-supplied ``cluster_role``. Preserve the
+            # legacy "idx==0 → main, idx>0 → sub" fallback for entries
+            # that omit ``cluster_role`` entirely.
+            for idx, kernel in enumerate(kernel_enqueue_configs):
+                role = kernel.get("cluster_role") or (DEFAULT_ROLE if idx == 0 else "sub")
+                existing = groups_by_role.get(role)
+                if existing is None:
+                    groups_by_role[role] = KernelGroupDraft(
+                        role=role,
+                        replica_count=1,
+                        preopen_ports=preopen_ports,
+                        execution_spec=_build_execution_spec(kernel),
+                    )
+                else:
+                    groups_by_role[role] = existing.model_copy(
+                        update={"replica_count": existing.replica_count + 1}
+                    )
+
+        if not groups_by_role:
+            raise InvalidAPIParameters("No kernel groups resolved from the enqueue request.")
+
+        if scaling_group:
+            resource_group_name = ResourceGroupName(scaling_group)
+        else:
+            resource_group_name = await self._scheduler_repository.pick_default_resource_group(
+                access_key=access_key,
+                domain_name=user_scope.domain_name,
+                project_id=ProjectID(user_scope.group_id),
+            )
+
+        draft = SessionSpecDraft(
+            identity=SessionIdentityDraft(
+                session_id=SessionID(uuid.uuid4()),
+                creation_id=session_creation_id,
+                session_name=session_name,
+                access_key=access_key,
+                user_uuid=user_scope.user_uuid,
+            ),
+            scope=SessionScopeDraft(
+                domain_name=DomainName(user_scope.domain_name),
+                project_id=ProjectID(user_scope.group_id),
+                resource_group_name=resource_group_name,
+            ),
+            classification=SessionClassificationDraft(
+                session_type=session_type,
+                tag=session_tag,
+            ),
+            network=SessionNetworkDraft(network_id=network_id),
+            callback_url=callback_url,
+            dependencies=dependencies,
+            options=SessionOptionsDraft(
+                priority=priority,
+                is_preemptible=is_preemptible,
+                cluster_mode=cluster_mode,
+                cluster_size=cluster_size,
+                scheduling_target=SchedulingTargetDraft(
+                    designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
+                ),
+                kernel_groups=tuple(groups_by_role.values()),
+                handler_options=SessionHandlerOptions(),
+            ),
+            internal_data_extras=InternalDataExtras(
+                sudo_session_enabled=sudo_session_enabled,
+            ),
+        )
+
+        return await self._scheduling_controller.enqueue_session_from_draft(draft)
 
     async def enqueue_session(
         self,
@@ -1182,47 +1382,6 @@ class AgentRegistry:
         async with self._agent_client_pool.acquire(verified_agent_id) as client:
             await client.update_scaling_group(scaling_group)
 
-    async def settle_agent_alloc(
-        self,
-        kernel_agent_bindings: Sequence[KernelAgentBinding],
-    ) -> None:
-        """
-        Tries to settle down agent row's occupied_slots with real value. This must be called
-        after kernel creation is completed, to prevent fraction of resource dropped by agent scheduler
-        during kernel creation still being reported as used.
-        """
-
-        keyfunc = lambda item: item.agent_alloc_ctx.agent_id
-        for agent_id, group_iterator in itertools.groupby(
-            sorted(kernel_agent_bindings, key=keyfunc),
-            key=keyfunc,
-        ):
-            actual_allocated_slots = ResourceSlot()
-            requested_slots = ResourceSlot()
-
-            for kernel_agent_binding in group_iterator:
-                # this value must be set while running _post_create_kernel
-                actual_allocated_slot = self._kernel_actual_allocated_resources.get(
-                    kernel_agent_binding.kernel.id
-                )
-                requested_slots += kernel_agent_binding.kernel.requested_slots
-                if actual_allocated_slot is not None:
-                    actual_allocated_slots += ResourceSlot.from_json(actual_allocated_slot)
-                    del self._kernel_actual_allocated_resources[kernel_agent_binding.kernel.id]
-                else:  # something's wrong; just fall back to requested slot value
-                    actual_allocated_slots += kernel_agent_binding.kernel.requested_slots
-
-            # Phase 3 (BA-4308): Legacy JSONB write to agents.occupied_slots removed.
-            # Agent occupied slots are now solely managed by the normalized
-            # agent_resources table.  The agents.occupied_slots JSONB column is
-            # retained for historical audit but no longer written to.
-            if actual_allocated_slots != requested_slots:
-                log.debug(
-                    "agent {} has slot calibration diff (requested != actual); "
-                    "agent_resources table is the source of truth",
-                    agent_id,
-                )
-
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
             access_key_to_concurrency_used: dict[AccessKey, ConcurrencyUsed] = {}
@@ -1262,13 +1421,27 @@ class AgentRegistry:
         await self._reconcile_agent_resources()
 
     async def _reconcile_agent_resources(self) -> None:
-        """Reconcile agent_resources.used against actual resource_allocations.
+        """Clean up orphaned allocations and reconcile agent_resources.
 
-        Delegates to ResourceSlotRepository for DB operations and logs any drift found.
+        Delegates to ResourceSlotRepository which runs both steps in a single
+        transaction: orphan cleanup first, then drift correction.
         """
         repo = ResourceSlotRepository(self.db)
-        drifts = await repo.reconcile_agent_resources()
-        for d in drifts:
+        result = await repo.reconcile_agent_resources()
+        for r in result.reconciled_terminal_kernels:
+            log.warning(
+                "reconciled terminal-session kernel drift: kernel={}, session={}, {} -> CANCELLED",
+                r.kernel_id,
+                r.session_id,
+                r.from_kernel_status,
+            )
+        for o in result.orphaned_allocations:
+            log.warning(
+                "freed orphaned resource allocation: kernel={}, slot={}",
+                o.kernel_id,
+                o.slot_name,
+            )
+        for d in result.agent_resource_drifts:
             log.warning(
                 "agent_resources drift detected for {}:{}: tracked={}, actual={}",
                 d.agent_id,
@@ -1315,454 +1488,6 @@ class AgentRegistry:
             if system_concurrency_map:
                 await self.valkey_stat.update_system_concurrency_by_map(system_concurrency_map)
 
-    async def destroy_session_lowlevel(
-        self,
-        session_id: SessionId,
-        kernels: Sequence[
-            Mapping[str, Any]
-        ],  # should have (id, agent, agent_addr, container_id) columns
-        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.FAILED_TO_START,
-    ) -> None:
-        """
-        Destroy the kernels that belongs the to given session unconditionally
-        and without generation of any relevant events nor invocation of plugin hooks.
-        """
-        keyfunc = lambda item: item["agent"] if item["agent"] is not None else ""
-        for agent_id, group_iterator in itertools.groupby(
-            sorted(kernels, key=keyfunc),
-            key=keyfunc,
-        ):
-            rpc_coros = []
-            destroyed_kernels: list[Mapping[str, Any]] = []
-            grouped_kernels = [*group_iterator]
-            kernel: Mapping[str, Any]
-            for kernel in grouped_kernels:
-                if kernel.get("container_id") is not None and kernel.get("agent_addr") is not None:
-                    destroyed_kernels.append(kernel)
-            if not destroyed_kernels:
-                return
-            for kernel in destroyed_kernels:
-
-                async def destroy_kernel() -> None:
-                    async with self._agent_client_pool.acquire(
-                        AgentId(destroyed_kernels[0]["agent"])
-                    ) as client:
-                        await client.destroy_kernel(
-                            KernelId(kernel["id"]),
-                            session_id,
-                            reason,
-                            suppress_events=True,
-                        )
-
-                # internally it enqueues a "destroy" lifecycle event.
-                rpc_coros.append(destroy_kernel())
-            await asyncio.gather(*rpc_coros)
-
-    async def destroy_session(
-        self,
-        session: SessionRow,
-        *,
-        forced: bool = False,
-        reason: KernelLifecycleEventReason | None = None,
-        user_role: UserRole | None = None,
-    ) -> Mapping[str, Any]:
-        """
-        Destroy session kernels. Do not destroy
-        CREATING/TERMINATING/ERROR and PULLING sessions.
-
-        :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
-        :param reason: Reason to destroy a session if client wants to specify it manually.
-        :param user_role: Role of the user who requested the session destruction.
-        """
-        session_id = session.id
-        if not reason:
-            reason = (
-                KernelLifecycleEventReason.FORCE_TERMINATED
-                if forced
-                else KernelLifecycleEventReason.USER_REQUESTED
-            )
-        hook_result = await self.hook_plugin_ctx.dispatch(
-            "PRE_DESTROY_SESSION",
-            (session_id, session.name, session.access_key),
-            return_when=ALL_COMPLETED,
-        )
-        if hook_result.status != PASSED:
-            raise RejectedByHook.from_hook_result(hook_result)
-
-        async def _force_destroy_for_superadmin(
-            target_status: Literal[SessionStatus.CANCELLED, SessionStatus.TERMINATED],
-        ) -> None:
-            current_time = datetime.now(tzutc())
-            destroy_reason = str(KernelLifecycleEventReason.FORCE_TERMINATED)
-
-            async def _destroy(db_session: AsyncSession) -> SessionRow:
-                _stmt = (
-                    sa.select(SessionRow)
-                    .where(SessionRow.id == session_id)
-                    .options(selectinload(SessionRow.kernels))
-                )
-                session_row = await db_session.scalar(_stmt)
-                if session_row is None:
-                    raise SessionNotFound(f"Session not found (id: {session_id})")
-                kernel_rows = session_row.kernels
-                kernel_target_status = SESSION_KERNEL_STATUS_MAPPING[target_status]
-                for kern in kernel_rows:
-                    kern.status = kernel_target_status
-                    kern.terminated_at = current_time
-                    kern.status_info = destroy_reason
-                    kern.status_history = sql_json_merge(
-                        KernelRow.__table__.c.status_history,
-                        (),
-                        {
-                            kernel_target_status.name: current_time.isoformat(),
-                        },
-                    )
-                session_row.status = target_status
-                session_row.terminated_at = current_time
-                session_row.status_info = destroy_reason
-                session_row.status_history = sql_json_merge(
-                    SessionRow.__table__.c.status_history,
-                    (),
-                    {
-                        target_status.name: current_time.isoformat(),
-                    },
-                )
-                return session_row
-
-            async with self.db.connect() as db_conn:
-                await execute_with_txn_retry(_destroy, self.db.begin_session, db_conn)
-            await self.recalc_resource_usage()
-
-        async with handle_session_exception(
-            self.db,
-            "destroy_session",
-            session_id,
-            set_error=True,
-        ):
-            query = (
-                sa.select(SessionRow)
-                .where(SessionRow.id == session_id)
-                .options(
-                    noload("*"),
-                    load_only(
-                        SessionRow.creation_id,
-                        SessionRow.status,
-                        SessionRow.access_key,
-                        SessionRow.session_type,
-                    ),
-                    selectinload(SessionRow.kernels).options(
-                        noload("*"),
-                        load_only(
-                            KernelRow.id,
-                            KernelRow.access_key,
-                            KernelRow.status,
-                            KernelRow.container_id,
-                            KernelRow.cluster_role,
-                            KernelRow.agent,
-                            KernelRow.agent_addr,
-                        ),
-                    ),
-                )
-            )
-            async with self.db.begin_readonly_session() as db_session:
-                target_session = (await db_session.scalars(query)).first()
-            if not target_session:
-                raise SessionNotFound
-
-            async def _decrease_concurrency_used(access_key: AccessKey, is_private: bool) -> None:
-                await self.valkey_stat.decrement_keypair_concurrency(
-                    access_key=str(access_key),
-                    is_private=is_private,
-                )
-
-            match target_session.status:
-                case SessionStatus.PENDING:
-                    await SessionRow.set_session_status(
-                        self.db, session_id, SessionStatus.CANCELLED
-                    )
-                case (
-                    SessionStatus.SCHEDULED
-                    | SessionStatus.PREPARING
-                    | SessionStatus.PULLING
-                    | SessionStatus.PREPARED
-                    | SessionStatus.CREATING
-                    | SessionStatus.TERMINATING
-                    | SessionStatus.ERROR
-                ):
-                    if not forced:
-                        raise GenericForbidden(
-                            "Cannot destroy sessions in scheduled/preparing/pulling/prepared/creating/terminating/error"
-                            " status",
-                        )
-                    log.warning(
-                        "force-terminating session (s:{}, status:{})",
-                        session_id,
-                        target_session.status,
-                    )
-                    await _decrease_concurrency_used(
-                        AccessKey(target_session.access_key)
-                        if target_session.access_key
-                        else AccessKey(""),
-                        target_session.is_private,
-                    )
-                    if user_role == UserRole.SUPERADMIN:
-                        # Exceptionally let superadmins set the session status to 'TERMINATED' and finish the function.
-                        # TODO: refactor Session/Kernel status management and remove this.
-                        await _force_destroy_for_superadmin(SessionStatus.TERMINATED)
-                        return {}
-                    await SessionRow.set_session_status(
-                        self.db, session_id, SessionStatus.TERMINATING
-                    )
-                    await self.event_producer.anycast_and_broadcast_event(
-                        SessionTerminatingAnycastEvent(session_id, reason),
-                        SessionTerminatingBroadcastEvent(session_id, reason),
-                    )
-                case SessionStatus.TERMINATED:
-                    raise GenericForbidden(
-                        "Cannot destroy sessions that has already been already terminated"
-                    )
-                case SessionStatus.CANCELLED:
-                    raise GenericForbidden(
-                        "Cannot destroy sessions that has already been already cancelled"
-                    )
-                case _:
-                    await _decrease_concurrency_used(
-                        AccessKey(target_session.access_key)
-                        if target_session.access_key
-                        else AccessKey(""),
-                        target_session.is_private,
-                    )
-                    await SessionRow.set_session_status(
-                        self.db, session_id, SessionStatus.TERMINATING
-                    )
-                    await self.event_producer.anycast_and_broadcast_event(
-                        SessionTerminatingAnycastEvent(session_id, reason),
-                        SessionTerminatingBroadcastEvent(session_id, reason),
-                    )
-
-            kernel_list = target_session.kernels
-            main_stat = {}
-            per_agent_tasks = []
-            now = datetime.now(tzutc())
-            to_be_terminated = []
-
-            keyfunc = lambda item: item.agent if item.agent is not None else ""
-            for agent_id, group_iterator in itertools.groupby(
-                sorted(kernel_list, key=keyfunc),
-                key=keyfunc,
-            ):
-                destroyed_kernels = []
-                grouped_kernels = [*group_iterator]
-                kernel: KernelRow
-                for kernel in grouped_kernels:
-                    match kernel.status:
-                        case KernelStatus.PENDING | KernelStatus.PULLING:
-                            await KernelRow.set_kernel_status(
-                                self.db,
-                                kernel.id,
-                                KernelStatus.CANCELLED,
-                                reason=reason,
-                                status_changed_at=now,
-                            )
-                            await self.event_producer.anycast_event(
-                                KernelCancelledAnycastEvent(kernel.id, session_id, reason),
-                            )
-                            if kernel.cluster_role == DEFAULT_ROLE:
-                                main_stat = {"status": "cancelled"}
-                                await SessionRow.set_session_status(
-                                    self.db,
-                                    session_id,
-                                    SessionStatus.CANCELLED,
-                                    reason=reason,
-                                    status_changed_at=now,
-                                )
-                                await self.event_producer.anycast_and_broadcast_event(
-                                    SessionCancelledAnycastEvent(
-                                        session_id,
-                                        target_session.creation_id or "",
-                                        reason,
-                                    ),
-                                    SessionCancelledBroadcastEvent(
-                                        session_id,
-                                        target_session.creation_id or "",
-                                        reason,
-                                    ),
-                                )
-                        case (
-                            KernelStatus.SCHEDULED
-                            | KernelStatus.PREPARING
-                            | KernelStatus.PREPARED
-                            | KernelStatus.CREATING
-                            | KernelStatus.TERMINATING
-                            | KernelStatus.ERROR
-                        ):
-                            if not forced:
-                                raise GenericForbidden(
-                                    "Cannot destroy kernels in"
-                                    " scheduled/prepared/preparing/terminating/error status",
-                                )
-                            log.warning(
-                                "force-terminating kernel (k:{}, status:{})",
-                                kernel.id,
-                                kernel.status,
-                            )
-                            if kernel.container_id is not None:
-                                destroyed_kernels.append(kernel)
-                            else:
-                                to_be_terminated.append(kernel)
-
-                            async def _update() -> None:
-                                kern_stat = await self.valkey_stat.get_kernel_statistics(
-                                    str(kernel.id)
-                                )
-                                async with self.db.begin_session() as db_sess:
-                                    values = {
-                                        "status": KernelStatus.TERMINATED,
-                                        "status_info": reason,
-                                        "status_changed": now,
-                                        "terminated_at": now,
-                                        "status_history": sql_json_merge(
-                                            KernelRow.__table__.c.status_history,
-                                            (),
-                                            {
-                                                KernelStatus.TERMINATED.name: now.isoformat(),
-                                            },
-                                        ),
-                                    }
-                                    if kern_stat:
-                                        values["last_stat"] = kern_stat
-                                    await db_sess.execute(
-                                        sa.update(KernelRow)
-                                        .values(**values)
-                                        .where(KernelRow.id == kernel.id),
-                                    )
-
-                            await execute_with_retry(_update)
-                            await self.event_producer.anycast_event(
-                                KernelTerminatedAnycastEvent(kernel.id, target_session.id, reason),
-                            )
-                        case KernelStatus.TERMINATED | KernelStatus.CANCELLED:
-                            log.debug(
-                                "skip destroying kernel already in terminal state (k:{}, status:{})",
-                                kernel.id,
-                                kernel.status,
-                            )
-                            continue
-                        case _:
-
-                            async def _update() -> None:
-                                async with self.db.begin_session() as db_sess:
-                                    values = {
-                                        "status": KernelStatus.TERMINATING,
-                                        "status_info": reason,
-                                        "status_changed": now,
-                                        "status_data": {
-                                            "kernel": {"exit_code": None},
-                                            "session": {"status": "terminating"},
-                                        },
-                                        "status_history": sql_json_merge(
-                                            KernelRow.__table__.c.status_history,
-                                            (),
-                                            {
-                                                KernelStatus.TERMINATING.name: now.isoformat(),
-                                            },
-                                        ),
-                                    }
-                                    await db_sess.execute(
-                                        sa.update(KernelRow)
-                                        .values(**values)
-                                        .where(KernelRow.id == kernel.id),
-                                    )
-
-                            await execute_with_retry(_update)
-                            await self.event_producer.anycast_event(
-                                KernelTerminatingAnycastEvent(kernel.id, target_session.id, reason),
-                            )
-
-                    if kernel.agent_addr is None:
-                        async with self.db.connect() as db_conn:
-                            await self.mark_kernel_terminated(
-                                db_conn, kernel.id, target_session.id, "missing-agent-allocation"
-                            )
-                        if kernel.cluster_role == DEFAULT_ROLE:
-                            main_stat = {"status": "terminated"}
-                    else:
-                        destroyed_kernels.append(kernel)
-
-                async def _destroy_kernels_in_agent(
-                    session: SessionRow, destroyed_kernels: list[KernelRow]
-                ) -> None:
-                    nonlocal main_stat
-                    rpc_coros = []
-                    for kernel in destroyed_kernels:
-                        # internally it enqueues a "destroy" lifecycle event.
-                        if kernel.status != KernelStatus.SCHEDULED:
-
-                            async def destroy_kernel() -> None:
-                                agent_id = destroyed_kernels[0].agent
-                                if agent_id is None:
-                                    raise AgentNotAllocated(
-                                        f"Kernel {destroyed_kernels[0].id} has no agent allocated"
-                                    )
-                                async with self._agent_client_pool.acquire(
-                                    AgentId(agent_id)
-                                ) as client:
-                                    await client.destroy_kernel(
-                                        kernel.id,
-                                        session.id,
-                                        reason,
-                                        suppress_events=True,
-                                    )
-
-                            rpc_coros.append(destroy_kernel())
-                    try:
-                        await asyncio.gather(*rpc_coros)
-                    except Exception:
-                        log.exception(
-                            "destroy_kernels_in_agent(a:{}, s:{}): unexpected error",
-                            destroyed_kernels[0].agent,
-                            session.id,
-                        )
-                    for kernel in destroyed_kernels:
-                        last_stat: dict[str, Any] | None
-                        last_stat = None
-                        try:
-                            last_stat = await self.valkey_stat.get_kernel_statistics(
-                                str(kernel.id),
-                            )
-                            if last_stat is not None:
-                                last_stat["version"] = 2
-                        except TimeoutError:
-                            log.debug(
-                                "Timeout while fetching last statistics for kernel {}",
-                                kernel.id,
-                                exc_info=True,
-                            )
-                            pass
-                        if kernel.cluster_role == DEFAULT_ROLE:
-                            main_stat = {
-                                **(last_stat if last_stat is not None else {}),
-                                "status": "terminated",
-                            }
-
-                if destroyed_kernels:
-                    per_agent_tasks.append(_destroy_kernels_in_agent(session, destroyed_kernels))
-                    to_be_terminated.extend(destroyed_kernels)
-
-            if per_agent_tasks:
-                await asyncio.gather(*per_agent_tasks, return_exceptions=True)
-            for kernel in to_be_terminated:
-                await self.event_producer.anycast_event(
-                    KernelTerminatedAnycastEvent(kernel.id, target_session.id, reason),
-                )
-            await self.hook_plugin_ctx.notify(
-                "POST_DESTROY_SESSION",
-                (session_id, session.name, session.access_key),
-            )
-            if forced:
-                await self.recalc_resource_usage()
-            return main_stat
-
     async def clean_session(
         self,
         session_id: SessionId,
@@ -1806,7 +1531,7 @@ class AgentRegistry:
                                 await client.destroy_local_network(network_ref_name)
                         except Exception:
                             log.exception(
-                                f"Failed to destroy the agent-local network {network_ref_name}"
+                                "Failed to destroy the agent-local network {}", network_ref_name
                             )
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
@@ -1820,106 +1545,9 @@ class AgentRegistry:
                 try:
                     await network_plugin.destroy_network(network_ref_name)
                 except Exception:
-                    log.exception(f"Failed to destroy the overlay network {network_ref_name}")
+                    log.exception("Failed to destroy the overlay network {}", network_ref_name)
             else:
                 pass
-
-    async def restart_session(
-        self,
-        session: SessionRow,
-    ) -> None:
-        log.warning("restart_session({})", session.id)
-
-        async def _restarting_session() -> None:
-            async with self.db.begin_session() as db_sess:
-                query = (
-                    sa.update(SessionRow)
-                    .values(
-                        status=SessionStatus.RESTARTING,
-                        status_history=sql_json_merge(
-                            SessionRow.__table__.c.status_history,
-                            (),
-                            {
-                                SessionStatus.RESTARTING.name: datetime.now(tzutc()).isoformat(),
-                            },
-                        ),
-                    )
-                    .where(SessionRow.id == session.id)
-                )
-                await db_sess.execute(query)
-
-        await execute_with_retry(_restarting_session)
-
-        kernel_list = session.kernels
-
-        async def _restart_kernel(kernel: KernelRow) -> None:
-            try:
-                updated_config: dict[str, Any] = {
-                    # TODO: support rescaling of sub-containers
-                }
-                if kernel.image is None:
-                    raise InvalidKernelConfig(f"Kernel {kernel.id} has no image specified")
-                if kernel.architecture is None:
-                    raise InvalidKernelConfig(f"Kernel {kernel.id} has no architecture specified")
-                async with self.db.begin_session() as db_sess:
-                    image_row = await ImageRow.resolve(
-                        db_sess, [ImageIdentifier(kernel.image, kernel.architecture)]
-                    )
-
-                agent_id = kernel.agent
-                if agent_id is None:
-                    raise AgentNotAllocated(f"Kernel {kernel.id} has no agent allocated")
-                async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
-                    kernel_info = await client.restart_kernel(
-                        kernel.session_id,
-                        kernel.id,
-                        image_row.image_ref,
-                        updated_config,
-                    )
-
-                now = datetime.now(tzutc())
-                update_data = {
-                    "container_id": kernel_info["container_id"],
-                    "repl_in_port": kernel_info["repl_in_port"],
-                    "repl_out_port": kernel_info["repl_out_port"],
-                    "stdin_port": kernel_info["stdin_port"],
-                    "stdout_port": kernel_info["stdout_port"],
-                    "service_ports": kernel_info.get("service_ports", []),
-                    "status_history": sql_json_merge(
-                        KernelRow.__table__.c.status_history,
-                        (),
-                        {
-                            KernelStatus.RUNNING.name: now.isoformat(),
-                        },
-                    ),
-                }
-                await KernelRow.update_kernel(
-                    self.db, kernel.id, KernelStatus.RUNNING, update_data=update_data
-                )
-            except Exception:
-                log.exception("unexpected-error in _restart_kernel() for kernel {}", kernel.id)
-
-        restart_coros = []
-        for kernel in kernel_list:
-            restart_coros.append(_restart_kernel(kernel))
-        async with handle_session_exception(
-            self.db,
-            "restart_session",
-            session.id,
-            set_error=True,
-        ):
-            await asyncio.gather(*restart_coros)
-
-        await SessionRow.set_session_status(self.db, session.id, SessionStatus.RUNNING)
-
-        # NOTE: If the restarted session is a batch-type one, then the startup command
-        #       will be executed again after restart.
-        await self.event_producer.anycast_event(
-            SessionStartedAnycastEvent(session.id, session.creation_id or "")
-        )
-
-        if session.session_type == SessionTypes.BATCH:
-            await self.trigger_batch_execution(session)
 
     async def execute(
         self,
@@ -1932,7 +1560,7 @@ class AgentRegistry:
         *,
         flush_timeout: float | None = None,
     ) -> Mapping[str, Any]:
-        async with handle_session_exception(self.db, "execute", session.id):
+        async with handle_session_exception("execute"):
             # The agent aggregates at most 2 seconds of outputs
             # if the kernel runs for a long time.
             major_api_version = api_version[0]
@@ -1957,7 +1585,7 @@ class AgentRegistry:
         self,
         session: SessionRow,
     ) -> None:
-        async with handle_session_exception(self.db, "trigger_batch_execution", session.id):
+        async with handle_session_exception("trigger_batch_execution"):
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -1973,7 +1601,7 @@ class AgentRegistry:
         self,
         session: SessionRow,
     ) -> Mapping[str, Any]:
-        async with handle_session_exception(self.db, "execute", session.id):
+        async with handle_session_exception("execute"):
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -1986,7 +1614,7 @@ class AgentRegistry:
         text: str,
         opts: Mapping[str, Any],
     ) -> CodeCompletionResp:
-        async with handle_session_exception(self.db, "execute", session.id):
+        async with handle_session_exception("execute"):
             # NOTE: Callosum serialize all inputs to dict and upack all array inputs to tuples
             agent_id = session.main_kernel.agent
             if agent_id is None:
@@ -1997,23 +1625,21 @@ class AgentRegistry:
 
     async def start_service(
         self,
-        session: SessionRow,
+        main_kernel_id: KernelId,
+        agent_id: AgentId,
         service: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        async with handle_session_exception(self.db, "execute", session.id):
-            agent_id = session.main_kernel.agent
-            if agent_id is None:
-                raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
-            async with self._agent_client_pool.acquire(AgentId(agent_id)) as client:
-                return await client.start_service(session.main_kernel.id, service, opts)
+        async with handle_session_exception("execute"):
+            async with self._agent_client_pool.acquire(agent_id) as client:
+                return await client.start_service(main_kernel_id, service, opts)
 
     async def shutdown_service(
         self,
         session: SessionRow,
         service: str,
     ) -> None:
-        async with handle_session_exception(self.db, "shutdown_service", session.id):
+        async with handle_session_exception("shutdown_service"):
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -2026,7 +1652,7 @@ class AgentRegistry:
         filename: str,
         payload: bytes,
     ) -> Mapping[str, Any]:
-        async with handle_session_exception(self.db, "upload_file", session.id):
+        async with handle_session_exception("upload_file"):
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -2039,7 +1665,7 @@ class AgentRegistry:
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
-        async with handle_session_exception(self.db, "download_file", kernel.session_id):
+        async with handle_session_exception("download_file"):
             agent_id = kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Kernel {kernel.id} has no agent allocated")
@@ -2053,7 +1679,7 @@ class AgentRegistry:
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
-        async with handle_session_exception(self.db, "download_single", kernel.session_id):
+        async with handle_session_exception("download_single"):
             agent_id = kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Kernel {kernel.id} has no agent allocated")
@@ -2065,7 +1691,7 @@ class AgentRegistry:
         session: SessionRow,
         path: str,
     ) -> Mapping[str, Any]:
-        async with handle_session_exception(self.db, "list_files", session.id):
+        async with handle_session_exception("list_files"):
             agent_id = session.main_kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
@@ -2077,7 +1703,7 @@ class AgentRegistry:
         session: SessionRow,
         kernel_id: KernelId | None = None,
     ) -> str:
-        async with handle_session_exception(self.db, "get_logs_from_agent", session.id):
+        async with handle_session_exception("get_logs_from_agent"):
             kernel = (
                 session.get_kernel_by_id(kernel_id)
                 if kernel_id is not None
@@ -2090,45 +1716,6 @@ class AgentRegistry:
             async with self._agent_client_pool.acquire(AgentId(kernel.agent)) as client:
                 reply = await client.get_logs(kernel.id)
             return reply["logs"]
-
-    async def increment_session_usage(
-        self,
-        session: SessionRow,
-    ) -> None:
-        # noop for performance reasons
-        pass
-
-    async def sync_kernel_stats(
-        self,
-        kernel_ids: Sequence[KernelId],
-    ) -> None:
-        per_kernel_updates = {}
-        log.debug("sync_kernel_stats(k:{!r})", kernel_ids)
-        for kernel_id in kernel_ids:
-            raw_kernel_id = str(kernel_id)
-            kern_stat = await self.valkey_stat.get_kernel_statistics(raw_kernel_id)
-            if kern_stat is None:
-                log.warning("sync_kernel_stats(k:{}): no statistics updates", kernel_id)
-                continue
-            per_kernel_updates[kernel_id] = kern_stat
-
-        async def _update() -> None:
-            async with self.db.begin() as conn:
-                update_query = (
-                    sa.update(kernels)
-                    .where(kernels.c.id == sa.bindparam("kernel_id"))
-                    .values({kernels.c.last_stat: sa.bindparam("last_stat")})
-                )
-                params = []
-                for kernel_id, updates in per_kernel_updates.items():
-                    params.append({
-                        "kernel_id": kernel_id,
-                        "last_stat": updates,
-                    })
-                await conn.execute(update_query, params)
-
-        if per_kernel_updates:
-            await execute_with_retry(_update)
 
     async def sync_agent_kernel_registry(self, agent_id: AgentId) -> None:
         """
@@ -2159,84 +1746,6 @@ class AgentRegistry:
                     (kernel.id, kernel.session_id) for kernel in grouped_kernels
                 ])
             return
-
-    async def mark_kernel_terminated(
-        self,
-        db_conn: SAConnection,
-        kernel_id: KernelId,
-        session_id: SessionId,
-        reason: str,
-        exit_code: int | None = None,
-    ) -> None:
-        """
-        Mark the kernel (individual worker) terminated and release
-        the resource slots occupied by it.
-        """
-        last_stat = await self.valkey_stat.get_kernel_statistics(str(kernel_id))
-        now = datetime.now(tzutc())
-
-        async def _get_and_transit(
-            db_session: AsyncSession,
-        ) -> KernelRow | None:
-            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
-            is_terminated = kernel_row.transit_status(
-                KernelStatus.TERMINATED,
-                reason,
-                status_data=sql_json_merge(
-                    KernelRow.__table__.c.status_data,
-                    ("kernel",),
-                    {"exit_code": exit_code},
-                ),
-                status_changed_at=now,
-            )
-            if not is_terminated:
-                return None
-            if last_stat is not None:
-                kernel_row.last_stat = last_stat
-            return kernel_row
-
-        result = await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
-
-        if result is None:
-            return
-
-        # Free resources in normalized tables
-        if result.agent is not None:
-            await self._free_kernel_resources(kernel_id, result.agent)
-
-        await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
-
-    async def _free_kernel_resources(
-        self,
-        kernel_id: uuid.UUID,
-        agent_id: str,
-    ) -> int:
-        """Free normalized resource allocations and decrement agent_resources.used."""
-        ar = AgentResourceRow.__table__
-        async with self.db.begin_session() as db_sess:
-            released = (
-                await db_sess.execute(
-                    sa.update(ResourceAllocationRow)
-                    .where(
-                        ResourceAllocationRow.kernel_id == kernel_id,
-                        ResourceAllocationRow.free_at.is_(None),
-                    )
-                    .values(free_at=sa.func.now())
-                    .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
-                )
-            ).all()
-            if not released:
-                return 0
-            for r in released:
-                if r.used is None:
-                    continue
-                new_used = sa.func.greatest(ar.c.used - r.used, 0)
-                await db_sess.execute(
-                    sa.update(ar)
-                    .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
-                    .values(used=new_used)
-                )
-            return len(released)
 
     async def _get_user_email(
         self,
@@ -2280,7 +1789,7 @@ class AgentRegistry:
                 " currently not in RUNNING state."
             )
         email = await self._get_user_email(kernel)
-        async with handle_session_exception(self.db, "commit_session", session.id):
+        async with handle_session_exception("commit_session"):
             agent_id = kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Kernel {kernel.id} has no agent allocated")
@@ -2334,7 +1843,7 @@ class AgentRegistry:
         img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
-        async with handle_session_exception(self.db, "commit_session_to_file", session.id):
+        async with handle_session_exception("commit_session_to_file"):
             agent_id = kernel.agent
             if agent_id is None:
                 raise AgentNotAllocated(f"Kernel {kernel.id} has no agent allocated")
@@ -2382,85 +1891,19 @@ class AgentRegistry:
             "abuse_report": result,
         }
 
-    async def get_health_check_info(
-        self, endpoint: EndpointData, model: VFolderRow
-    ) -> ModelHealthCheck | None:
-        _info: ModelHealthCheck | None = None
+    @staticmethod
+    def _resolve_health_check(endpoint: EndpointData) -> ModelHealthCheck | None:
+        """Pull health-check config from the endpoint's current revision.
 
-        if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
-            _info = ModelHealthCheck(path=_path)
-
-        if endpoint.runtime_variant == RuntimeVariant.CUSTOM:
-            # CUSTOM: full validation required
-            model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
-                self.storage_manager,
-                model.host,
-                model.vfid,
-                endpoint.model_definition_path,
-            )
-            model_definition = await ModelServiceHelper.validate_model_definition(
-                self.storage_manager,
-                model.host,
-                model.vfid,
-                model_definition_path,
-            )
-
-            for model_info in model_definition["models"]:
-                if health_check_info := model_info.get("service", {}).get("health_check"):
-                    _info = ModelHealthCheck.model_validate(health_check_info)
-                    break
-        elif (
-            self.config_provider.config.deployment.enable_model_definition_override
-            and endpoint.model_definition_path
-        ):
-            # non-CUSTOM with override: read raw definition and override non-None values only
-            try:
-                model_definition_path = (
-                    await ModelServiceHelper.validate_model_definition_file_exists(
-                        self.storage_manager,
-                        model.host,
-                        model.vfid,
-                        endpoint.model_definition_path,
-                    )
-                )
-                raw_model_definition = await ModelServiceHelper._read_model_definition(
-                    self.storage_manager,
-                    model.host,
-                    model.vfid,
-                    model_definition_path,
-                )
-
-                for model_info in raw_model_definition.get("models", []):
-                    if health_check_info := model_info.get("service", {}).get("health_check"):
-                        if _info is None:
-                            _info = ModelHealthCheck(path=health_check_info["path"])
-                        override_kwargs: dict[str, float | int | str] = {}
-                        if health_check_info.get("path") is not None:
-                            override_kwargs["path"] = health_check_info["path"]
-                        if health_check_info.get("interval") is not None:
-                            override_kwargs["interval"] = health_check_info["interval"]
-                        if health_check_info.get("max_retries") is not None:
-                            override_kwargs["max_retries"] = health_check_info["max_retries"]
-                        if health_check_info.get("max_wait_time") is not None:
-                            override_kwargs["max_wait_time"] = health_check_info["max_wait_time"]
-                        if health_check_info.get("expected_status_code") is not None:
-                            override_kwargs["expected_status_code"] = health_check_info[
-                                "expected_status_code"
-                            ]
-                        if health_check_info.get("initial_delay") is not None:
-                            override_kwargs["initial_delay"] = health_check_info["initial_delay"]
-                        if override_kwargs:
-                            _info = _info.model_copy(update=override_kwargs)
-                        break
-            except Exception as e:
-                log.debug(
-                    "Failed to read health check override from model definition for endpoint {}, "
-                    "using default health check settings if any. Error: {}",
-                    endpoint.id,
-                    str(e),
-                    exc_info=True,
-                )
-        return _info
+        ``endpoint.model_definition`` is the already-merged result persisted at
+        revision creation time (variant baseline → preset → yaml → request).
+        The runtime path returns exactly what was stored — no dynamic
+        fallback — so AppProxy never sees a config that drifts from the
+        revision snapshot.
+        """
+        if endpoint.model_definition is None:
+            return None
+        return endpoint.model_definition.health_check_config()
 
     async def create_appproxy_endpoint(
         self,
@@ -2483,9 +1926,20 @@ class AgentRegistry:
 
         if endpoint.model is None:
             raise InvalidAPIParameters("Model not set for endpoint")
-        model = await VFolderRow.get(db_sess, endpoint.model)
 
-        health_check_config = await self.get_health_check_info(endpoint, model)
+        health_check_config = self._resolve_health_check(endpoint)
+
+        # ``EndpointData`` carries ``runtime_variant_id`` only. AppProxy's
+        # wire API keys on the variant name string, so resolve the id into
+        # a name at this single wire boundary rather than plumbing the
+        # string through internal data types.
+        variant_name = (
+            await db_sess.execute(
+                sa.select(RuntimeVariantRow.name).where(
+                    RuntimeVariantRow.id == endpoint.runtime_variant_id
+                )
+            )
+        ).scalar_one()
 
         request_body = CreateEndpointRequestBody(
             version="v2",
@@ -2493,16 +1947,15 @@ class AgentRegistry:
             tags=TagsModel(
                 session=SessionTagsModel(
                     user_uuid=str(endpoint.session_owner_id),
-                    group_id=str(endpoint.project),
+                    project_id=str(endpoint.project),
                     domain_name=endpoint.domain,
                 ),
                 endpoint=EndpointTagsModel(
                     id=str(endpoint.id),
-                    runtime_variant=endpoint.runtime_variant.value,
+                    runtime_variant=variant_name,
                     existing_url=str(endpoint.url) if endpoint.url else None,
                 ),
             ),
-            apps={},
             open_to_public=endpoint.open_to_public,
             health_check=health_check_config,
         )
@@ -2526,32 +1979,6 @@ class AgentRegistry:
         wsproxy_client = self._load_app_proxy_client(wsproxy_addr, wsproxy_api_token)
         await wsproxy_client.delete_endpoint(endpoint.id)
 
-    async def notify_endpoint_route_update_to_appproxy(self, endpoint_id: uuid.UUID) -> None:
-        async with self.db.begin_readonly_session() as db_sess:
-            endpoint = await EndpointRow.get(
-                db_sess,
-                endpoint_id,
-                load_created_user=True,
-                load_session_owner=True,
-                load_revisions=True,
-                load_routes=True,
-            )
-            connection_info = await endpoint.generate_route_info(db_sess)
-            current_rev = endpoint._find_current_revision()
-            if current_rev is None or current_rev.model is None:
-                raise InvalidAPIParameters("Model not set for endpoint")
-            model = await VFolderRow.get(db_sess, current_rev.model)
-            endpoint_data = endpoint.to_data()
-
-        health_check_config = await self.get_health_check_info(endpoint_data, model)
-        await self.valkey_live.update_appproxy_redis_info(
-            endpoint.id,
-            connection_info,
-            health_check_config,
-        )
-
-        await self.event_producer.anycast_event(EndpointRouteListUpdatedEvent(endpoint.id))
-
 
 async def check_scaling_group(
     conn: SAConnection,
@@ -2559,7 +1986,7 @@ async def check_scaling_group(
     session_type: SessionTypes,
     access_key: AccessKey,
     domain_name: str,
-    group_id: uuid.UUID | str,
+    group_id: ProjectID | str,
     public_sgroup_only: bool = False,
 ) -> str:
     # Check scaling group availability if scaling_group parameter is given.

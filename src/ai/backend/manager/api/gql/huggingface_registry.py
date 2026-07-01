@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Iterable, Sequence
 from typing import Self, cast
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -70,13 +70,13 @@ class HuggingFaceRegistry(PydanticNodeMixin[HuggingFaceRegistryNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.huggingface_registry_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
     @classmethod
     async def load_by_id(
-        cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
+        cls, ctx: StrawberryGQLContext, registry_ids: Sequence[UUID]
     ) -> list[HuggingFaceRegistry]:
         nodes = await ctx.adapters.huggingface_registry.get_many(list(registry_ids))
         return [HuggingFaceRegistry.from_pydantic(node) for node in nodes]
@@ -103,7 +103,7 @@ class HuggingFaceRegistryConnection(Connection[HuggingFaceRegistry]):
 async def huggingface_registry(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> HuggingFaceRegistry | None:
-    node = await info.context.adapters.huggingface_registry.get(uuid.UUID(id))
+    node = await info.context.adapters.huggingface_registry.get(UUID(id))
     return HuggingFaceRegistry.from_pydantic(node)
 
 
@@ -197,36 +197,35 @@ class UpdateHuggingFaceRegistryPayload(PydanticOutputMixin[UpdateHuggingFaceRegi
         description="Payload for deleting a HuggingFace registry.",
     ),
     model=DeleteHuggingFaceRegistryPayloadDTO,
-    fields=["id"],
 )
 class DeleteHuggingFaceRegistryPayload(PydanticOutputMixin[DeleteHuggingFaceRegistryPayloadDTO]):
-    id: ID
+    id: UUID = gql_field(description="ID of the deleted HuggingFace registry")
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create huggingface registry."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create huggingface registry."))
 async def create_huggingface_registry(
     input: CreateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
-) -> CreateHuggingFaceRegistryPayload:
+) -> CreateHuggingFaceRegistryPayload | None:
     result = await info.context.adapters.huggingface_registry.create(input.to_pydantic())
     return CreateHuggingFaceRegistryPayload(
         huggingface_registry=HuggingFaceRegistry.from_pydantic(result.huggingface_registry)
     )
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update huggingface registry."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update huggingface registry."))
 async def update_huggingface_registry(
     input: UpdateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
-) -> UpdateHuggingFaceRegistryPayload:
+) -> UpdateHuggingFaceRegistryPayload | None:
     result = await info.context.adapters.huggingface_registry.update(input.to_pydantic())
     return UpdateHuggingFaceRegistryPayload(
         huggingface_registry=HuggingFaceRegistry.from_pydantic(result.huggingface_registry)
     )
 
 
-@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete huggingface registry."))  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete huggingface registry."))
 async def delete_huggingface_registry(
     input: DeleteHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
-) -> DeleteHuggingFaceRegistryPayload:
+) -> DeleteHuggingFaceRegistryPayload | None:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.huggingface_registry.delete(pydantic_input)
-    return DeleteHuggingFaceRegistryPayload(id=ID(str(result.id)))
+    return DeleteHuggingFaceRegistryPayload(id=result.id)

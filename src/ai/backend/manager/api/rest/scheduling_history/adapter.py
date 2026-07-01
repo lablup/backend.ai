@@ -26,13 +26,14 @@ from ai.backend.common.dto.manager.scheduling_history import (
     SessionHistoryOrderField,
     SubStepResultDTO,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
     SessionSchedulingHistoryData,
     SubStepResult,
 )
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
     RouteHistoryConditions,
@@ -43,12 +44,7 @@ from ai.backend.manager.models.scheduling_history.orders import (
     RouteHistoryOrders,
     SessionSchedulingHistoryOrders,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 
 __all__ = ("SchedulingHistoryAdapter",)
 
@@ -86,6 +82,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=SessionSchedulingHistoryConditions.by_phase_equals,
                 starts_with_factory=SessionSchedulingHistoryConditions.by_phase_starts_with,
                 ends_with_factory=SessionSchedulingHistoryConditions.by_phase_ends_with,
+                in_factory=SessionSchedulingHistoryConditions.by_phase_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -112,6 +109,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=SessionSchedulingHistoryConditions.by_error_code_equals,
                 starts_with_factory=SessionSchedulingHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=SessionSchedulingHistoryConditions.by_error_code_ends_with,
+                in_factory=SessionSchedulingHistoryConditions.by_error_code_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -123,6 +121,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=SessionSchedulingHistoryConditions.by_message_equals,
                 starts_with_factory=SessionSchedulingHistoryConditions.by_message_starts_with,
                 ends_with_factory=SessionSchedulingHistoryConditions.by_message_ends_with,
+                in_factory=SessionSchedulingHistoryConditions.by_message_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -192,6 +191,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=DeploymentHistoryConditions.by_phase_equals,
                 starts_with_factory=DeploymentHistoryConditions.by_phase_starts_with,
                 ends_with_factory=DeploymentHistoryConditions.by_phase_ends_with,
+                in_factory=DeploymentHistoryConditions.by_phase_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -216,6 +216,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=DeploymentHistoryConditions.by_error_code_equals,
                 starts_with_factory=DeploymentHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=DeploymentHistoryConditions.by_error_code_ends_with,
+                in_factory=DeploymentHistoryConditions.by_error_code_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -227,6 +228,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=DeploymentHistoryConditions.by_message_equals,
                 starts_with_factory=DeploymentHistoryConditions.by_message_starts_with,
                 ends_with_factory=DeploymentHistoryConditions.by_message_ends_with,
+                in_factory=DeploymentHistoryConditions.by_message_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -303,6 +305,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=RouteHistoryConditions.by_phase_equals,
                 starts_with_factory=RouteHistoryConditions.by_phase_starts_with,
                 ends_with_factory=RouteHistoryConditions.by_phase_ends_with,
+                in_factory=RouteHistoryConditions.by_phase_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -327,6 +330,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=RouteHistoryConditions.by_error_code_equals,
                 starts_with_factory=RouteHistoryConditions.by_error_code_starts_with,
                 ends_with_factory=RouteHistoryConditions.by_error_code_ends_with,
+                in_factory=RouteHistoryConditions.by_error_code_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -338,6 +342,7 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
                 equals_factory=RouteHistoryConditions.by_message_equals,
                 starts_with_factory=RouteHistoryConditions.by_message_starts_with,
                 ends_with_factory=RouteHistoryConditions.by_message_ends_with,
+                in_factory=RouteHistoryConditions.by_message_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -366,6 +371,8 @@ class SchedulingHistoryAdapter(BaseFilterAdapter):
             phase=data.phase,
             from_status=data.from_status,
             to_status=data.to_status,
+            from_sub_status=data.from_sub_status,
+            to_sub_status=data.to_sub_status,
             result=data.result.value,
             error_code=data.error_code,
             message=data.message,

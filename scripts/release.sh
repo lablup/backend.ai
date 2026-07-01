@@ -20,19 +20,33 @@ else
     git commit -m "chore: update webui to $WEBUI_VERSION"
 fi
 
-# Check dependencies
-pants tailor --check update-build-files --check '::'
-pants check ::
+# Update external tool binaries (bssh, all-smi, etc.)
+echo "Updating external tool binaries..."
+./scripts/download-external-tools.sh
+# Only commit if there are staged changes (download-external-tools.sh may be a no-op)
+if ! git diff --cached --quiet; then
+    git commit -m "chore: update external tool binaries"
+else
+    echo "No external tool binary updates to commit."
+fi
 
 # Update VERSION file
 echo $TARGET_VERSION > VERSION
 
-# Freeze NEXT_RELEASE_VERSION to the actual version
-echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
-sed -i'' -e "s/^NEXT_RELEASE_VERSION = .*/NEXT_RELEASE_VERSION = \"${TARGET_VERSION}\"/" src/ai/backend/common/meta/meta.py
+# Freeze NEXT_RELEASE_VERSION references to the actual version string.
+# Skip for pre-release versions (PEP 440: rc, a, b, dev, post) so the
+# placeholder survives until the eventual stable release is cut.
+if [[ "$TARGET_VERSION" =~ (rc|a|b|dev|post)[0-9]+ ]]; then
+    echo "Skipping NEXT_RELEASE_VERSION freeze for pre-release version ${TARGET_VERSION}"
+else
+    echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
+    python3 scripts/freeze_release_version.py "${TARGET_VERSION}"
+    pants fix ::
+    pants fmt ::
+fi
 
-# Update the changelog
-LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier
+# Update the changelog (--yes consumes news fragments without an interactive prompt)
+LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier --yes
 
 # Update sample config files (unmask secrets to show actual default values)
 ./backend.ai mgr config generate-sample --overwrite --unmask-secrets
@@ -43,5 +57,19 @@ LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]'
 ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
 ./scripts/generate-graphql-schema.sh
 
+# Check dependencies
+pants tailor --check update-build-files --check '::'
+pants check ::
+
 git add -A
 git commit -m "release: $TARGET_VERSION"
+
+# Advance NEXT_RELEASE_VERSION to the next sprint development cycle.
+# Only for sprint releases (patch == 0); the regex also excludes patch
+# releases and PEP 440 pre-releases (rc/a/b/dev/post). Override the computed
+# sprint+1 default with NEXT_DEV_VERSION (e.g. for year rollover: 27.1.0).
+if [[ "$TARGET_VERSION" =~ ^[0-9]+\.[0-9]+\.0$ ]]; then
+    next_dev=$(python3 scripts/bump_next_release_version.py ${NEXT_DEV_VERSION:+"$NEXT_DEV_VERSION"})
+    git add src/ai/backend/common/meta/meta.py
+    git commit -m "chore: bump NEXT_RELEASE_VERSION to $next_dev"
+fi

@@ -142,6 +142,7 @@ class WebSocketProxy:
     __slots__ = (
         "down_conn",
         "downstream_cb",
+        "downstream_task",
         "ping_cb",
         "up_conn",
         "upstream_buffer",
@@ -154,6 +155,7 @@ class WebSocketProxy:
     # FIXME: use __future__.annotations in Python 3.7+
     upstream_buffer: asyncio.Queue[tuple[bytes | str, web.WSMsgType]]
     upstream_buffer_task: asyncio.Future[None] | None
+    downstream_task: asyncio.Task[None] | None
     downstream_cb: AsyncCallback[str | bytes, None] | None
     upstream_cb: AsyncCallback[str | bytes, None] | None
     ping_cb: AsyncCallback[str | bytes, None] | None
@@ -171,12 +173,14 @@ class WebSocketProxy:
         self.down_conn = down_conn
         self.upstream_buffer = asyncio.Queue()
         self.upstream_buffer_task = None
+        self.downstream_task = None
         self.downstream_cb = downstream_callback
         self.upstream_cb = upstream_callback
         self.ping_cb = ping_callback
+        self.downstream_task = None
 
     async def proxy(self) -> None:
-        asyncio.create_task(self.downstream())
+        self.downstream_task = asyncio.create_task(self.downstream())
         await self.upstream()
 
     async def upstream(self) -> None:

@@ -25,6 +25,9 @@ class LoginHistoryResultFilter(BaseRequestModel):
     in_: list[LoginAttemptResult] | None = Field(
         default=None, alias="in", description="Result is in list"
     )
+    not_equals: LoginAttemptResult | None = Field(
+        default=None, description="Excludes exact result match"
+    )
     not_in: list[LoginAttemptResult] | None = Field(
         default=None, description="Result is not in list"
     )

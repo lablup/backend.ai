@@ -175,7 +175,8 @@ class ValkeyBgtaskClient:
             batch.hset(subtask_key, subkey_info.to_valkey_hash_fields())
             batch.expire(subtask_key, TASK_METADATA_TTL)
         batch = await self._build_claim_task(batch, task_info.task_id, task_set_key)
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_bgtask_resilience.apply()
     async def claim_task(self, task_id: TaskID, task_set_key: TaskSetKey) -> None:
@@ -184,7 +185,8 @@ class ValkeyBgtaskClient:
         """
         batch = self._create_batch()
         batch = await self._build_claim_task(batch, task_id, task_set_key)
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     async def _build_claim_task(
         self, batch: Batch, task_id: TaskID, task_set_key: TaskSetKey
@@ -233,7 +235,8 @@ class ValkeyBgtaskClient:
         batch = self._create_batch()
         for key in keys:
             batch.expire(key, TASK_METADATA_TTL)
-        await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_bgtask_resilience.apply()
     async def finish_subtask(
@@ -269,7 +272,8 @@ class ValkeyBgtaskClient:
         # Decrement ongoing_count last to get its final value
         batch.hincrby(task_key, b"ongoing_count", -1)
 
-        results = await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            results = await conn.exec(batch, raise_on_error=True)
         if results is None:
             raise RuntimeError("Failed to execute finish_subtask batch")
 
@@ -286,32 +290,33 @@ class ValkeyBgtaskClient:
         """
         # First, get subtask keys before modifying anything
         task_subkey_set_key = self._get_task_subkey_set_key(task_id)
-        subkeys_result = await self._client.client.smembers(task_subkey_set_key)
+        async with self._client.client() as conn:
+            subkeys_result = await conn.smembers(task_subkey_set_key)
 
-        batch = self._create_batch()
+            batch = self._create_batch()
 
-        # Set short TTL on task metadata
-        task_key = self._get_task_key(task_id)
-        batch.expire(task_key, TASK_FINISHED_TTL)
+            # Set short TTL on task metadata
+            task_key = self._get_task_key(task_id)
+            batch.expire(task_key, TASK_FINISHED_TTL)
 
-        # Set short TTL on subkey set
-        batch.expire(task_subkey_set_key, TASK_FINISHED_TTL)
+            # Set short TTL on subkey set
+            batch.expire(task_subkey_set_key, TASK_FINISHED_TTL)
 
-        # Set short TTL on all subtasks
-        if subkeys_result:
-            for subkey in subkeys_result:
-                subtask_key = self._get_subtask_key(task_id, subkey.decode())
-                batch.expire(subtask_key, TASK_FINISHED_TTL)
+            # Set short TTL on all subtasks
+            if subkeys_result:
+                for subkey in subkeys_result:
+                    subtask_key = self._get_subtask_key(task_id, subkey.decode())
+                    batch.expire(subtask_key, TASK_FINISHED_TTL)
 
-        # Remove from index references immediately
-        for tag in task_set_key.tags:
-            tag_key = self._get_tag_key(tag)
-            batch.srem(tag_key, [task_id.hex])
+            # Remove from index references immediately
+            for tag in task_set_key.tags:
+                tag_key = self._get_tag_key(tag)
+                batch.srem(tag_key, [task_id.hex])
 
-        server_key = self._get_server_key(task_set_key.server_id)
-        batch.srem(server_key, [task_id.hex])
+            server_key = self._get_server_key(task_set_key.server_id)
+            batch.srem(server_key, [task_id.hex])
 
-        await self._client.client.exec(batch, raise_on_error=True)
+            await conn.exec(batch, raise_on_error=True)
 
     @valkey_bgtask_resilience.apply()
     async def fetch_unmanaged_tasks(self, task_set_key: TaskSetKey) -> list[TaskTotalInfo]:
@@ -331,7 +336,8 @@ class ValkeyBgtaskClient:
         batch = self._create_batch()
         for key in keys:
             batch.smembers(key)
-        raw_results = await self._client.client.exec(batch, raise_on_error=True)
+        async with self._client.client() as conn:
+            raw_results = await conn.exec(batch, raise_on_error=True)
         if raw_results is None:
             raise RuntimeError("Failed to retrieve members from keys")
         results = cast(list[set[bytes]], raw_results)
@@ -366,14 +372,15 @@ class ValkeyBgtaskClient:
         """
         task_key = self._get_task_key(task_id)
         script = self._conditional_ttl_refresh_script()
-        raw_result = await self._client.client.invoke_script(
-            script,
-            keys=[task_key],
-            args=[
-                str(TASK_TTL_THRESHOLD),
-                str(TASK_METADATA_TTL),
-            ],
-        )
+        async with self._client.client() as conn:
+            raw_result = await conn.invoke_script(
+                script,
+                keys=[task_key],
+                args=[
+                    str(TASK_TTL_THRESHOLD),
+                    str(TASK_METADATA_TTL),
+                ],
+            )
 
         result = cast(bytes, raw_result)
         result_type = _ScriptResult.from_bytes(result)
@@ -400,39 +407,40 @@ class ValkeyBgtaskClient:
         """
         # Fetch task metadata
         task_key = self._get_task_key(task_id)
-        raw_task_metadata_dict = await self._client.client.hgetall(task_key)
-        if not raw_task_metadata_dict:
-            log.warning("Task metadata not found (id: {})", task_id)
-            return None
-        task_info = TaskInfo.from_valkey_hash_fields(raw_task_metadata_dict)
-        # Fetch subkeys
-        task_subkey_set_key = self._get_task_subkey_set_key(task_id)
-        subkeys_result = await self._client.client.smembers(task_subkey_set_key)
-        subkeys = {subkey.decode() for subkey in subkeys_result} if subkeys_result else set()
-
-        # Fetch all subtask metadata
-        task_key_set = []
-        if subkeys:
-            batch = self._create_batch()
-            for subkey in subkeys:
-                subtask_key = self._get_subtask_key(task_id, subkey)
-                batch.hgetall(subtask_key)
-
-            subtask_results = await self._client.client.exec(batch, raise_on_error=True)
-            if subtask_results is None:
-                log.warning("Failed to fetch subtask metadata (id: {})", task_id)
+        async with self._client.client() as conn:
+            raw_task_metadata_dict = await conn.hgetall(task_key)
+            if not raw_task_metadata_dict:
+                log.warning("Task metadata not found (id: {})", task_id)
                 return None
+            task_info = TaskInfo.from_valkey_hash_fields(raw_task_metadata_dict)
+            # Fetch subkeys
+            task_subkey_set_key = self._get_task_subkey_set_key(task_id)
+            subkeys_result = await conn.smembers(task_subkey_set_key)
+            subkeys = {subkey.decode() for subkey in subkeys_result} if subkeys_result else set()
 
-            raw_subtask_results = cast(list[dict[bytes, bytes]], subtask_results)
+            # Fetch all subtask metadata
+            task_key_set = []
+            if subkeys:
+                batch = self._create_batch()
+                for subkey in subkeys:
+                    subtask_key = self._get_subtask_key(task_id, subkey)
+                    batch.hgetall(subtask_key)
 
-            # Parse subtask metadata
-            for raw_subtask_dict in raw_subtask_results:
-                try:
-                    subtask_info = TaskSubKeyInfo.from_valkey_hash_fields(raw_subtask_dict)
-                    task_key_set.append(subtask_info)
-                except InvalidTaskMetadataError:
-                    log.warning("Invalid subtask metadata (id: {})", task_id)
+                subtask_results = await conn.exec(batch, raise_on_error=True)
+                if subtask_results is None:
+                    log.warning("Failed to fetch subtask metadata (id: {})", task_id)
                     return None
+
+                raw_subtask_results = cast(list[dict[bytes, bytes]], subtask_results)
+
+                # Parse subtask metadata
+                for raw_subtask_dict in raw_subtask_results:
+                    try:
+                        subtask_info = TaskSubKeyInfo.from_valkey_hash_fields(raw_subtask_dict)
+                        task_key_set.append(subtask_info)
+                    except InvalidTaskMetadataError:
+                        log.warning("Invalid subtask metadata (id: {})", task_id)
+                        return None
         log.info(
             "Fetched task total info (id: {}, task_info: {}, subtasks: {})",
             task_id,

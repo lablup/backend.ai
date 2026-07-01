@@ -8,8 +8,7 @@ from ai.backend.common.dto.manager.v2.login_session.request import (
     LoginSessionFilter,
     LoginSessionStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter
+from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -23,7 +22,7 @@ from .node import LoginSessionStatusGQL
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for login session status field.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="LoginSessionStatusFilter",
 )
@@ -32,17 +31,21 @@ class LoginSessionStatusFilterGQL(PydanticInputMixin[LoginSessionStatusFilter]):
     in_: list[LoginSessionStatusGQL] | None = gql_field(
         description="The in field.", name="in", default=None
     )
+    not_equals: LoginSessionStatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
+    )
     not_in: list[LoginSessionStatusGQL] | None = None
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter criteria for querying login sessions.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="LoginSessionFilter",
 )
 class LoginSessionFilterGQL(PydanticInputMixin[LoginSessionFilter]):
+    user_id: UUIDFilter | None = None
     status: LoginSessionStatusFilterGQL | None = None
     access_key: StringFilter | None = None
     created_at: DateTimeFilter | None = None

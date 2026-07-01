@@ -14,15 +14,20 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
     VFolderFilter,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
-from ai.backend.manager.api.adapters.vfolder import VFolderAdapter
+from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
     VFolderMountPermission,
     VFolderOperationStatus,
     VFolderOwnershipType,
+    VFolderUsageData,
 )
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.services.vfolder.actions.get_usage import (
+    GetVFolderUsageActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectActionResult,
 )
@@ -48,7 +53,7 @@ class TestVFolderAdapterMySearch:
     @pytest.fixture
     def vfolder_data(self) -> VFolderData:
         return VFolderData(
-            id=uuid4(),
+            id=VFolderUUID(uuid4()),
             name="test-vfolder",
             host="local:volume1",
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
@@ -59,6 +64,7 @@ class TestVFolderAdapterMySearch:
             num_files=0,
             cur_size=0,
             creator="test@example.com",
+            creator_id=uuid4(),
             unmanaged_path=None,
             ownership_type=VFolderOwnershipType.USER,
             user=uuid4(),
@@ -67,6 +73,7 @@ class TestVFolderAdapterMySearch:
             status=VFolderOperationStatus.READY,
             created_at=datetime.now(tz=UTC),
             last_used=None,
+            updated_at=datetime.now(tz=UTC),
             domain_name="default",
         )
 
@@ -99,7 +106,7 @@ class TestVFolderAdapterMySearch:
         input_dto = SearchVFoldersInput(limit=10, offset=0)
 
         with patch(
-            "ai.backend.manager.api.adapters.vfolder.current_user",
+            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
             return_value=user_data,
         ):
             await adapter.my_search(input_dto)
@@ -118,7 +125,7 @@ class TestVFolderAdapterMySearch:
         input_dto = SearchVFoldersInput(limit=10, offset=0)
 
         with patch(
-            "ai.backend.manager.api.adapters.vfolder.current_user",
+            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
             return_value=user_data,
         ):
             result = await adapter.my_search(input_dto)
@@ -140,7 +147,7 @@ class TestVFolderAdapterProjectSearch:
     def vfolder_data(self) -> VFolderData:
         group_id = uuid4()
         return VFolderData(
-            id=uuid4(),
+            id=VFolderUUID(uuid4()),
             name="project-vfolder",
             host="local:volume1",
             quota_scope_id=QuotaScopeID.parse(f"user:{uuid4()}"),
@@ -151,6 +158,7 @@ class TestVFolderAdapterProjectSearch:
             num_files=0,
             cur_size=0,
             creator="test@example.com",
+            creator_id=uuid4(),
             unmanaged_path=None,
             ownership_type=VFolderOwnershipType.GROUP,
             user=uuid4(),
@@ -159,6 +167,7 @@ class TestVFolderAdapterProjectSearch:
             status=VFolderOperationStatus.READY,
             created_at=datetime.now(tz=UTC),
             last_used=None,
+            updated_at=datetime.now(tz=UTC),
             domain_name="default",
         )
 
@@ -248,3 +257,58 @@ class TestVFolderAdapterConvertFilter:
         conditions = adapter._convert_vfolder_filter(f)
         sql = str(conditions[0]().compile(compile_kwargs={"literal_binds": True}))
         assert "vfolders.cloneable" in sql
+
+
+class TestVFolderAdapterGetFolderUsage:
+    """Tests for VFolderAdapter.get_folder_usage()."""
+
+    @pytest.fixture
+    def mock_processors(self) -> MagicMock:
+        return MagicMock()
+
+    @pytest.fixture
+    def adapter(self, mock_processors: MagicMock) -> VFolderAdapter:
+        return VFolderAdapter(mock_processors)
+
+    async def test_maps_usage_data_to_dto(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+    ) -> None:
+        """Live measurements are mapped into the DTO with BinarySizeInfo
+        conversion for byte values."""
+        vfolder_uuid = uuid4()
+        action_result = GetVFolderUsageActionResult(
+            vfolder_uuid=vfolder_uuid,
+            usage=VFolderUsageData(
+                num_files=2,
+                used_bytes=524308,
+            ),
+        )
+        mock_processors.vfolder.get_folder_usage.wait_for_complete = AsyncMock(
+            return_value=action_result,
+        )
+
+        dto = await adapter.get_folder_usage(vfolder_uuid)
+
+        assert dto is not None
+        assert dto.num_files == 2
+        assert dto.used_bytes.value == 524308
+
+    async def test_unmanaged_vfolder_returns_none(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+    ) -> None:
+        """A None usage in the action result (unmanaged vfolder) yields None."""
+        action_result = GetVFolderUsageActionResult(
+            vfolder_uuid=uuid4(),
+            usage=None,
+        )
+        mock_processors.vfolder.get_folder_usage.wait_for_complete = AsyncMock(
+            return_value=action_result,
+        )
+
+        dto = await adapter.get_folder_usage(uuid4())
+
+        assert dto is None

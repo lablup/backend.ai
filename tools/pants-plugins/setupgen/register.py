@@ -6,8 +6,9 @@ from pathlib import Path
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.package_dists import SetupKwargs, SetupKwargsRequest
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs
+from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 
@@ -36,13 +37,14 @@ async def setup_kwargs_plugin(
     kwargs = request.explicit_kwargs.copy()
 
     # Single-source the version from VERSION.
-    _digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            ["VERSION"],
-            description_of_origin="setupgen plugin",
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        ),
+    _digest_contents = await get_digest_contents(
+        await path_globs_to_digest(
+            PathGlobs(
+                ["VERSION"],
+                description_of_origin="setupgen plugin",
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            )
+        )
     )
     VERSION = _digest_contents[0].content.decode()
 
@@ -106,13 +108,14 @@ async def setup_kwargs_plugin(
     else:
         readme_path = spec_path / "README"
         long_description_content_type = "text/plain"
-    _digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            [str(readme_path)],
-            description_of_origin="setupgen plugin",
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        ),
+    _digest_contents = await get_digest_contents(
+        await path_globs_to_digest(
+            PathGlobs(
+                [str(readme_path)],
+                description_of_origin="setupgen plugin",
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            )
+        )
     )
     long_description = _digest_contents[0].content.decode()
 

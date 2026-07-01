@@ -33,6 +33,7 @@ from ai.backend.common.dto.manager.config import (
     UpdateGroupDotfileRequest,
     UpdateUserDotfileRequest,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import DomainDotfileFactory, GroupDotfileFactory, UserDotfileFactory
 
@@ -458,13 +459,13 @@ class TestDomainDotfileCreate:
     async def test_regular_user_cannot_create_domain_dotfile(
         self,
         user_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         unique = secrets.token_hex(4)
         with pytest.raises(PermissionDeniedError):
             await user_registry.config.create_domain_dotfile(
                 CreateDomainDotfileRequest(
-                    domain=domain_fixture,
+                    domain=domain_fixture.domain_name,
                     path=f".denied-{unique}",
                     data="denied",
                     permission="644",
@@ -476,14 +477,14 @@ class TestDomainDotfileGet:
     async def test_admin_gets_domain_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         domain_dotfile_factory: DomainDotfileFactory,
     ) -> None:
         unique = secrets.token_hex(4)
         path = f".domain-get-{unique}"
         await domain_dotfile_factory(path=path, data="domain-get-data", permission="600")
         result = await admin_registry.config.get_domain_dotfile(
-            GetDomainDotfileRequest(domain=domain_fixture, path=path)
+            GetDomainDotfileRequest(domain=domain_fixture.domain_name, path=path)
         )
         assert isinstance(result, GetDotfileResponse)
         assert result.path == path
@@ -493,7 +494,7 @@ class TestDomainDotfileGet:
     async def test_admin_lists_domain_dotfiles(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         domain_dotfile_factory: DomainDotfileFactory,
     ) -> None:
         unique1 = secrets.token_hex(4)
@@ -501,7 +502,7 @@ class TestDomainDotfileGet:
         await domain_dotfile_factory(path=f".dlist-a-{unique1}", data="a", permission="644")
         await domain_dotfile_factory(path=f".dlist-b-{unique2}", data="b", permission="644")
         result = await admin_registry.config.list_domain_dotfiles(
-            GetDomainDotfileRequest(domain=domain_fixture)
+            GetDomainDotfileRequest(domain=domain_fixture.domain_name)
         )
         assert isinstance(result, ListDotfilesResponse)
         # List response is a plain array (via BaseRootResponseModel)
@@ -512,7 +513,7 @@ class TestDomainDotfileGet:
     async def test_list_domain_dotfiles_returns_plain_array_json(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         domain_dotfile_factory: DomainDotfileFactory,
     ) -> None:
         """Verify the API returns a plain JSON array with 'permission' field.
@@ -526,7 +527,7 @@ class TestDomainDotfileGet:
         await domain_dotfile_factory(path=path, data="test-data", permission="755")
         try:
             result = await admin_registry.config.list_domain_dotfiles(
-                GetDomainDotfileRequest(domain=domain_fixture)
+                GetDomainDotfileRequest(domain=domain_fixture.domain_name)
             )
             # The response should be a plain array
             assert isinstance(result.root, list)
@@ -547,7 +548,7 @@ class TestDomainDotfileGet:
         finally:
             # Cleanup
             await admin_registry.config.delete_domain_dotfile(
-                DeleteDomainDotfileRequest(domain=domain_fixture, path=path)
+                DeleteDomainDotfileRequest(domain=domain_fixture.domain_name, path=path)
             )
 
 
@@ -555,7 +556,7 @@ class TestDomainDotfileUpdate:
     async def test_admin_updates_domain_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         domain_dotfile_factory: DomainDotfileFactory,
     ) -> None:
         unique = secrets.token_hex(4)
@@ -563,7 +564,7 @@ class TestDomainDotfileUpdate:
         await domain_dotfile_factory(path=path, data="original-domain", permission="644")
         update_result = await admin_registry.config.update_domain_dotfile(
             UpdateDomainDotfileRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 path=path,
                 data="updated-domain-data",
                 permission="755",
@@ -571,7 +572,7 @@ class TestDomainDotfileUpdate:
         )
         assert isinstance(update_result, UpdateDotfileResponse)
         get_result = await admin_registry.config.get_domain_dotfile(
-            GetDomainDotfileRequest(domain=domain_fixture, path=path)
+            GetDomainDotfileRequest(domain=domain_fixture.domain_name, path=path)
         )
         assert get_result.data == "updated-domain-data"
         assert get_result.perm == "755"
@@ -581,18 +582,18 @@ class TestDomainDotfileDelete:
     async def test_admin_deletes_domain_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         domain_dotfile_factory: DomainDotfileFactory,
     ) -> None:
         unique = secrets.token_hex(4)
         path = f".domain-del-{unique}"
         await domain_dotfile_factory(path=path, data="to-delete", permission="644")
         delete_result = await admin_registry.config.delete_domain_dotfile(
-            DeleteDomainDotfileRequest(domain=domain_fixture, path=path)
+            DeleteDomainDotfileRequest(domain=domain_fixture.domain_name, path=path)
         )
         assert isinstance(delete_result, DeleteDotfileResponse)
         assert delete_result.success is True
         with pytest.raises(NotFoundError):
             await admin_registry.config.get_domain_dotfile(
-                GetDomainDotfileRequest(domain=domain_fixture, path=path)
+                GetDomainDotfileRequest(domain=domain_fixture.domain_name, path=path)
             )

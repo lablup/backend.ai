@@ -19,16 +19,12 @@ from ai.backend.common.dto.manager.image.response import (
     ImageTagEntryDTO,
 )
 from ai.backend.common.dto.manager.image.types import ImageOrderField, OrderDirection
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.image.types import ImageData, ImageDataWithDetails
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.image.conditions import ImageConditions
 from ai.backend.manager.models.image.orders import ImageOrders
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 
 
 class ImageAdapter(BaseFilterAdapter):
@@ -116,6 +112,7 @@ class ImageAdapter(BaseFilterAdapter):
                 equals_factory=ImageConditions.by_name_equals,
                 starts_with_factory=ImageConditions.by_name_starts_with,
                 ends_with_factory=ImageConditions.by_name_ends_with,
+                in_factory=ImageConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -127,6 +124,7 @@ class ImageAdapter(BaseFilterAdapter):
                 equals_factory=ImageConditions.by_architecture_equals,
                 starts_with_factory=ImageConditions.by_architecture_starts_with,
                 ends_with_factory=ImageConditions.by_architecture_ends_with,
+                in_factory=ImageConditions.by_architecture_in,
             )
             if condition is not None:
                 conditions.append(condition)

@@ -1,26 +1,35 @@
-import strawberry
-from strawberry import ID, Info
+from __future__ import annotations
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from collections.abc import Iterable
+
+from strawberry import ID, Info, relay
+
+from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_federation_type
 
 
 @gql_federation_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Federation stub for legacy DomainNode.",
     ),
     name="DomainNode",
     keys=["id"],
     extend=True,
 )
-class Domain:
-    id: ID = strawberry.federation.field(external=True)
+class Domain(relay.Node):
+    id: relay.NodeID[str]
 
     @classmethod
-    def resolve_reference(cls, id: ID, info: Info) -> "Domain":
-        return cls(id=id)
+    def resolve_nodes(
+        cls,
+        *,
+        info: Info,
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> list[Domain]:
+        return [cls(id=node_id) for node_id in node_ids]
 
-
-mock_domain_id = ID("UHJvamVjdE5vZGU6ZjM4ZGVhMjMtNTBmYS00MmEwLWI1YWUtMzM4ZjVmNDY5M2Y0")
-mock_domain = Domain(id=mock_domain_id)
+    @classmethod
+    def resolve_reference(cls, id: ID, info: Info) -> Domain:
+        return cls(id=resolve_global_id(str(id))[1])

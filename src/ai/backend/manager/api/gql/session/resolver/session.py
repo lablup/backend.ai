@@ -8,9 +8,9 @@ from strawberry import ID, Info
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
-    TerminateSessionsInProjectInput,
+    TerminateSessionsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -35,6 +35,20 @@ from ai.backend.manager.errors.user import UserNotFound
 
 @gql_root_field(
     BackendAIGQLMeta(
+        added_version="26.4.3",
+        description="Query a single session by ID. Returns an error if not found.",
+    )
+)  # type: ignore[misc]
+async def session_v2(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> SessionV2GQL | None:
+    payload = await info.context.adapters.session.get(SessionId(id))
+    return SessionV2GQL.from_pydantic(payload)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
         added_version="26.3.0",
         description="Query sessions with pagination and filtering. (admin only)",
     )
@@ -49,7 +63,7 @@ async def admin_sessions_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> SessionV2ConnectionGQL:
+) -> SessionV2ConnectionGQL | None:
     check_admin_only()
     payload = await info.context.adapters.session.admin_search(
         AdminSearchSessionsInput(
@@ -79,7 +93,7 @@ async def admin_sessions_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List sessions within a specific project. Requires project membership or higher privileges.",
     )
 )  # type: ignore[misc]
@@ -94,7 +108,7 @@ async def project_sessions_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> SessionV2ConnectionGQL:
+) -> SessionV2ConnectionGQL | None:
     from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 
     payload = await info.context.adapters.session.gql_search_by_project(
@@ -126,14 +140,14 @@ async def project_sessions_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Enqueue a new compute session.",
     ),
-)  # type: ignore[misc]
+)
 async def enqueue_session(
     input: EnqueueSessionInputGQL,
     info: Info[StrawberryGQLContext],
-) -> EnqueueSessionPayloadGQL:
+) -> EnqueueSessionPayloadGQL | None:
     """Enqueue a new compute session (interactive or batch)."""
     user_data = current_user()
     if user_data is None:
@@ -154,20 +168,21 @@ async def enqueue_session(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Terminate sessions within a project scope.",
+        added_version="26.4.4",
+        description=(
+            "Terminate one or more sessions by ID. Per-session RBAC permission is enforced "
+            "by the bulk validator; any denial fails the whole request."
+        ),
     ),
-)  # type: ignore[misc]
-async def terminate_project_sessions_v2(
+)
+async def terminate_sessions_v2(
     info: Info[StrawberryGQLContext],
-    scope: ProjectSessionScopeGQL,
     session_ids: list[ID],
     forced: bool = False,
-) -> TerminateSessionsPayloadGQL:
-    """Terminate one or more sessions scoped to a project."""
-    payload = await info.context.adapters.session.terminate_in_project(
-        TerminateSessionsInProjectInput(
-            project_id=scope.project_id,
+) -> TerminateSessionsPayloadGQL | None:
+    """Terminate one or more sessions identified by ID."""
+    payload = await info.context.adapters.session.terminate(
+        TerminateSessionsInput(
             session_ids=[UUID(str(sid)) for sid in session_ids],
             forced=forced,
         )

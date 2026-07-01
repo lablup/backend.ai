@@ -44,5 +44,11 @@ def register_v2_login_session_routes(
         handler.my_revoke,
         middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        "/unblock-user",
+        handler.admin_unblock_user,
+        middlewares=[superadmin_required],
+    )
 
     return registry

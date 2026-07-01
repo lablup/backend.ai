@@ -30,8 +30,8 @@ from ai.backend.common.dto.manager.resource.request import (
 )
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.common.types import SlotQuantity
-from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
+from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.models.user import UserRole
 

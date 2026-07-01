@@ -11,7 +11,7 @@ from ai.backend.common.dto.manager.v2.audit_log.request import AdminSearchAuditL
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.audit_log import AuditLogAdapter
+    from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -40,7 +40,6 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.agent.types import AgentStatus
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.kernel.types import (
@@ -167,7 +166,7 @@ class AgentStatsGQL:
     name="AgentStatusInfo",
 )
 class AgentStatusInfoGQL:
-    status: AgentStatus = gql_field(
+    status: AgentStatusEnum = gql_field(
         description="Current operational status of the agent. Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable), TERMINATED (intentionally stopped), or RESTARTING (in recovery process)."
     )
     status_changed: datetime | None = gql_field(
@@ -290,7 +289,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     async def container_count(
         self,
         info: Info[StrawberryGQLContext],
-    ) -> int:
+    ) -> int | None:
         """
         Get the container count for a specific agent.
         """
@@ -321,9 +320,10 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        KernelV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
-    ]:
+    ) -> (
+        Annotated[KernelV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")]
+        | None
+    ):
         """Fetch kernels associated with this agent."""
         from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
         from ai.backend.manager.api.gql.base import encode_cursor
@@ -382,9 +382,12 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        SessionV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
-    ]:
+    ) -> (
+        Annotated[
+            SessionV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
+        ]
+        | None
+    ):
         """Fetch sessions associated with this agent."""
         from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
         from ai.backend.manager.api.gql.base import encode_cursor
@@ -447,10 +450,13 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         before: str | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        AgentResourceConnectionGQL,
-        strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
-    ]:
+    ) -> (
+        Annotated[
+            AgentResourceConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+        ]
+        | None
+    ):
         """Fetch per-slot resource capacity and usage for this agent."""
         from decimal import Decimal
 

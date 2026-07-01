@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import 
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     CreateDeploymentRevisionPresetInputGQL,
@@ -31,11 +30,12 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     UpdateDeploymentRevisionPresetPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Search deployment revision presets.",
     )
 )  # type: ignore[misc]
@@ -92,7 +92,7 @@ async def deployment_revision_presets(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single deployment revision preset by ID.",
     )
 )  # type: ignore[misc]
@@ -106,14 +106,15 @@ async def deployment_revision_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Create a deployment revision preset.",
+        added_version="26.4.2",
+        description="Create a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
-async def create_deployment_revision_preset(
+)
+async def admin_create_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     input: CreateDeploymentRevisionPresetInputGQL,
-) -> CreateDeploymentRevisionPresetPayloadGQL:
+) -> CreateDeploymentRevisionPresetPayloadGQL | None:
+    check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.deployment_revision_preset.create(dto)
     return CreateDeploymentRevisionPresetPayloadGQL.from_pydantic(payload)
@@ -121,14 +122,15 @@ async def create_deployment_revision_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Update a deployment revision preset.",
+        added_version="26.4.2",
+        description="Update a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
-async def update_deployment_revision_preset(
+)
+async def admin_update_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     input: UpdateDeploymentRevisionPresetInputGQL,
-) -> UpdateDeploymentRevisionPresetPayloadGQL:
+) -> UpdateDeploymentRevisionPresetPayloadGQL | None:
+    check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.deployment_revision_preset.update(dto)
     return UpdateDeploymentRevisionPresetPayloadGQL.from_pydantic(payload)
@@ -136,13 +138,14 @@ async def update_deployment_revision_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Delete a deployment revision preset.",
+        added_version="26.4.2",
+        description="Delete a deployment revision preset (admin only).",
     )
-)  # type: ignore[misc]
-async def delete_deployment_revision_preset(
+)
+async def admin_delete_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteDeploymentRevisionPresetPayloadGQL:
+) -> DeleteDeploymentRevisionPresetPayloadGQL | None:
+    check_admin_only()
     payload = await info.context.adapters.deployment_revision_preset.delete(id)
     return DeleteDeploymentRevisionPresetPayloadGQL.from_pydantic(payload)

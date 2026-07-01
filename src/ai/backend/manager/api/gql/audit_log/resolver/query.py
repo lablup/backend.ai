@@ -3,10 +3,14 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.dto.manager.v2.audit_log.request import AdminSearchAuditLogsInput
+from ai.backend.common.dto.manager.v2.audit_log.request import (
+    AdminSearchAuditLogsInput,
+    ScopedSearchAuditLogsInput,
+)
 from ai.backend.manager.api.gql.audit_log.types import (
     AuditLogFilterGQL,
     AuditLogOrderByGQL,
+    AuditLogScopeGQL,
     AuditLogV2ConnectionGQL,
     AuditLogV2EdgeGQL,
     AuditLogV2GQL,
@@ -36,10 +40,58 @@ async def admin_audit_logs_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> AuditLogV2ConnectionGQL:
+) -> AuditLogV2ConnectionGQL | None:
     check_admin_only()
     result = await info.context.adapters.audit_log.admin_search(
         AdminSearchAuditLogsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [AuditLogV2GQL.from_pydantic(item) for item in result.items]
+    edges = [AuditLogV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    return AuditLogV2ConnectionGQL(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description=(
+            "Query audit logs within a scope (non-admin accessible, subject to RBAC). "
+            "All scope items are OR'd; raises an error if every field is empty."
+        ),
+    )
+)  # type: ignore[misc]
+async def scoped_audit_logs_v2(
+    info: Info[StrawberryGQLContext],
+    scope: AuditLogScopeGQL,
+    filter: AuditLogFilterGQL | None = None,
+    order_by: list[AuditLogOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> AuditLogV2ConnectionGQL | None:
+    result = await info.context.adapters.audit_log.scoped_search(
+        ScopedSearchAuditLogsInput(
+            scope=scope.to_pydantic(),
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,

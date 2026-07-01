@@ -20,18 +20,13 @@ from ai.backend.common.dto.manager.rbac import (
     SearchRolesRequest,
     UpdateRoleRequest,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac_models.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    Purger,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
@@ -127,6 +122,7 @@ class RoleAdapter(BaseFilterAdapter):
                 equals_factory=RoleConditions.by_name_equals,
                 starts_with_factory=RoleConditions.by_name_starts_with,
                 ends_with_factory=RoleConditions.by_name_ends_with,
+                in_factory=RoleConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

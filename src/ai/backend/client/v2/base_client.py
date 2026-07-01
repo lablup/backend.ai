@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any, TypeVar, cast
+from types import TracebackType
+from typing import Any, Self, TypeVar, cast
 
 import aiohttp
 from multidict import CIMultiDict
+from yarl import URL
 
-from ai.backend.client.exceptions import BackendAPIError
+from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.common.api_handlers import (
     BaseRequestModel,
     BaseResponseModel,
@@ -17,7 +20,12 @@ from ai.backend.common.api_handlers import (
 
 from .auth import AuthStrategy
 from .config import ClientConfig
-from .exceptions import SSEError, WebSocketError, map_status_to_exception
+from .exceptions import (
+    DeploymentAuthError,
+    SSEError,
+    WebSocketError,
+    map_status_to_exception,
+)
 from .streaming_types import SSEConnection, WebSocketSession
 
 ResponseT = TypeVar("ResponseT", bound=BaseResponseModel | BaseRootResponseModel[Any])
@@ -124,15 +132,17 @@ class BackendAIAuthClient:
         path: str,
         *,
         json: Any | None = None,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
         extra_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any] | list[Any] | str | None:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
         if params:
-            qs = "&".join(f"{k}={v}" for k, v in params.items())
-            rel_url = f"{rel_url}?{qs}"
+            # Build the signed query string with yarl so it matches what aiohttp
+            # actually sends on the wire (URL-encoding plus repeated keys for list
+            # values); the manager verifies the signature against request.raw_path.
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = {**self._sign(method, rel_url, content_type)}
         if extra_headers:
             headers.update(extra_headers)
@@ -204,11 +214,13 @@ class BackendAIAuthClient:
         path: str,
         data: aiohttp.FormData,
         *,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
     ) -> dict[str, Any] | None:
         """Send a multipart file upload and return the parsed JSON response."""
         session = self._session
         rel_url = "/" + path.lstrip("/")
+        if params:
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = dict(self._sign("POST", rel_url, "multipart/form-data"))
         # Let aiohttp set the actual Content-Type with the multipart boundary.
         del headers["Content-Type"]
@@ -237,12 +249,16 @@ class BackendAIAuthClient:
         *,
         method: str = "POST",
         json: Any | None = None,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
     ) -> bytes:
         """Send a request and return the raw binary response."""
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
+        if params:
+            # Sign the encoded query string that aiohttp will send on the wire so
+            # the HMAC signature matches the manager's view of request.raw_path.
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = dict(self._sign(method, rel_url, content_type))
         url = self._build_url(path)
         async with session.request(
@@ -265,7 +281,7 @@ class BackendAIAuthClient:
         self,
         path: str,
         *,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
         heartbeat: float | None = 30.0,
         protocols: Iterable[str] = (),
     ) -> AsyncIterator[WebSocketSession]:
@@ -279,6 +295,8 @@ class BackendAIAuthClient:
                     print(msg.data)
         """
         rel_url = "/" + path.lstrip("/")
+        if params:
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = self._sign("GET", rel_url, "application/octet-stream")
         url = self._build_url(path)
         ws: aiohttp.ClientWebSocketResponse | None = None
@@ -306,7 +324,7 @@ class BackendAIAuthClient:
         self,
         path: str,
         *,
-        params: dict[str, str] | None = None,
+        params: Mapping[str, str | list[str]] | None = None,
     ) -> AsyncIterator[SSEConnection]:
         """Open an SSE connection with proper auth headers.
 
@@ -317,6 +335,8 @@ class BackendAIAuthClient:
                     print(event.event, event.data)
         """
         rel_url = "/" + path.lstrip("/")
+        if params:
+            rel_url = URL(rel_url).with_query(params).raw_path_qs
         headers = dict(self._sign("GET", rel_url, "text/event-stream"))
         headers["Accept"] = "text/event-stream"
         url = self._build_url(path)
@@ -453,3 +473,104 @@ class BackendAIAnonymousClient:
                 },
             )
         return cast(ResponseT, response_model.model_validate(data))
+
+
+class BackendAIAppProxyClient:
+    """HTTP client base for direct-to-deployment endpoints fronted by Backend.AI's app-proxy.
+
+    Unlike :class:`BackendAIAuthClient` (which signs requests with HMAC against
+    the Backend.AI manager API), this client targets the runtime's own HTTP
+    surface (vLLM / SGLang / NIM / TGI / custom) and uses an optional
+    ``Authorization: Bearer <token>`` header. The deployment endpoint URL is
+    supplied per-request, not via :attr:`ClientConfig.endpoint`.
+
+    Subclasses add the contract-specific request methods (e.g. chat-completions,
+    /generate, etc.).
+    """
+
+    _config: ClientConfig
+    _session: aiohttp.ClientSession
+
+    def __init__(self, config: ClientConfig) -> None:
+        self._config = config
+        self._session = _create_aiohttp_session(config)
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(
+        self,
+        _exc_type: type[BaseException] | None,
+        _exc: BaseException | None,
+        _tb: TracebackType | None,
+    ) -> None:
+        await self.close()
+
+    async def close(self) -> None:
+        if not self._session.closed:
+            await self._session.close()
+
+    async def _request(
+        self,
+        method: str,
+        endpoint_url: str,
+        path: str,
+        token: str | None,
+        *,
+        body: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        target = self._build_url(endpoint_url, path)
+        headers: dict[str, str] = {}
+        if body is not None:
+            headers["Content-Type"] = "application/json"
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        try:
+            async with self._session.request(method, target, headers=headers, json=body) as resp:
+                payload = await self._parse_response(resp)
+                self._raise_for_status(resp, payload)
+                return payload
+        except aiohttp.ClientConnectionError as e:
+            raise BackendClientError(f"failed to reach deployment endpoint: {e!r}") from e
+
+    @staticmethod
+    async def _parse_response(resp: aiohttp.ClientResponse) -> dict[str, Any]:
+        # Backend.AI's app-proxy fronts every deployment endpoint, and on
+        # 5xx it can emit HTML / plain-text bodies (e.g. cloud LB error
+        # pages) instead of JSON. Read text up front so the raw body is
+        # available either as the JSON-parse input or as context in the
+        # raised error.
+        raw = await resp.text()
+        try:
+            payload = json.loads(raw) if raw else None
+        except json.JSONDecodeError as e:
+            if resp.status >= 400:
+                raise BackendAPIError(
+                    resp.status, resp.reason or "HTTP error", {"detail": raw}
+                ) from e
+            raise BackendClientError(
+                f"deployment endpoint returned non-JSON response (status={resp.status}): {raw!r}"
+            ) from e
+        if not isinstance(payload, dict):
+            raise BackendClientError(
+                f"deployment endpoint returned non-object payload "
+                f"(type={type(payload).__name__}, status={resp.status}): {payload!r}"
+            )
+        return payload
+
+    @staticmethod
+    def _build_url(endpoint_url: str, path: str) -> str:
+        base = URL(endpoint_url)
+        target_path = path if path.startswith("/") else "/" + path
+        base_path = base.path.rstrip("/")
+        if base_path.endswith(target_path):
+            return str(base.with_path(base_path))
+        return str(base.with_path(f"{base_path}{target_path}"))
+
+    @staticmethod
+    def _raise_for_status(resp: aiohttp.ClientResponse, payload: dict[str, Any]) -> None:
+        if resp.status < 400:
+            return
+        if resp.status in (401, 403):
+            raise DeploymentAuthError(resp.status, resp.reason or "Unauthorized", payload)
+        raise BackendAPIError(resp.status, resp.reason or "HTTP error", payload)

@@ -122,6 +122,111 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
     ]
 
 
+class NodeMetricConfig(BaseConfigSchema):
+    enable: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description="Whether to collect per-node and per-device utilization metrics.",
+            added_version="26.4.4",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    interval: Annotated[
+        float,
+        Field(default=30.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Time interval in seconds between per-node utilization metric collection cycles."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+
+
+class ContainerMetricConfig(BaseConfigSchema):
+    enable: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description="Whether to collect per-container utilization metrics.",
+            added_version="26.4.4",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    interval: Annotated[
+        float,
+        Field(default=30.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Time interval in seconds between per-container utilization metric collection "
+                "cycles."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+
+
+class ProcessMetricConfig(BaseConfigSchema):
+    enable: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to collect per-process utilization metrics for each container. "
+                "When disabled, the agent skips listing container processes and reporting "
+                "per-process statistics, while per-node and per-container metrics are "
+                "still collected."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    interval: Annotated[
+        float,
+        Field(default=30.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Time interval in seconds between per-process utilization metric collection cycles."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+
+
+class UtilizationMetricConfig(BaseConfigSchema):
+    node: Annotated[
+        NodeMetricConfig,
+        Field(default_factory=NodeMetricConfig),
+        BackendAIConfigMeta(
+            description="Per-node and per-device utilization metric collection settings.",
+            added_version="26.4.4",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    container: Annotated[
+        ContainerMetricConfig,
+        Field(default_factory=ContainerMetricConfig),
+        BackendAIConfigMeta(
+            description="Per-container utilization metric collection settings.",
+            added_version="26.4.4",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    process: Annotated[
+        ProcessMetricConfig,
+        Field(default_factory=ProcessMetricConfig),
+        BackendAIConfigMeta(
+            description="Per-process utilization metric collection settings.",
+            added_version="26.4.4",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+
 class CoreDumpConfig(BaseConfigSchema):
     enabled: Annotated[
         bool,
@@ -1192,6 +1297,22 @@ class OverridableAgentConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+    utilization_metric: Annotated[
+        UtilizationMetricConfig,
+        Field(
+            default_factory=UtilizationMetricConfig,
+            validation_alias=AliasChoices("utilization-metric", "utilization_metric"),
+            serialization_alias="utilization-metric",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Configuration for utilization metric collection. Holds per-node, per-container, "
+                "and per-process settings, each with its own enable flag and collection interval."
+            ),
+            added_version="26.4.4",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     model_config = ConfigDict(
         extra="allow",
@@ -1330,6 +1451,27 @@ class OverridableContainerConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="[30000, 31000]", prod="[30000, 32000]"),
+        ),
+    ]
+    port_reuse_cooldown_sec: Annotated[
+        int,
+        Field(
+            default=60,
+            ge=0,
+            validation_alias=AliasChoices("port-reuse-cooldown-sec", "port_reuse_cooldown_sec"),
+            serialization_alias="port-reuse-cooldown-sec",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Minimum seconds between releasing a host port and reallocating it to a new "
+                "container. Mitigates TCP TIME_WAIT and stale firewall/monitoring state by "
+                "ensuring recently freed ports are not immediately reused. "
+                "Set to 0 to disable cooldown (any released port may be reused immediately). "
+                "Note: this cooldown only applies to container-driven allocations; the "
+                "RPC assign_port path bypasses cooldown for emergency/dynamic allocation."
+            ),
+            added_version="26.5.0",
+            example=ConfigExample(local="60", prod="60"),
         ),
     ]
     stats_type: Annotated[

@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
 from ai.backend.manager.exceptions import InvalidArgument
 from ai.backend.manager.models.session_template import TemplateType
@@ -104,7 +105,7 @@ class TestCreateTaskTemplateAction:
     def base_action_kwargs(self) -> dict[str, Any]:
         return {
             "domain_name": "default",
-            "requesting_group": "default",
+            "requesting_project": ProjectID(uuid.uuid4()),
             "requester_uuid": uuid.uuid4(),
             "requester_access_key": "AKIAIOSFODNN7EXAMPLE",
             "requester_role": UserRole.USER,
@@ -384,7 +385,7 @@ class TestUpdateTaskTemplateAction:
         return {
             "template_id": "tmpl-existing",
             "domain_name": "default",
-            "requesting_group": "default",
+            "requesting_project": ProjectID(uuid.uuid4()),
             "requester_uuid": uuid.uuid4(),
             "requester_access_key": "AKIAIOSFODNN7EXAMPLE",
             "requester_role": UserRole.USER,
@@ -523,7 +524,7 @@ class TestCreateClusterTemplateAction:
     def base_action_kwargs(self) -> dict[str, Any]:
         return {
             "domain_name": "default",
-            "requesting_group": "default",
+            "requesting_project": ProjectID(uuid.uuid4()),
             "requester_uuid": uuid.uuid4(),
             "requester_access_key": "AKIAIOSFODNN7EXAMPLE",
             "requester_role": UserRole.USER,

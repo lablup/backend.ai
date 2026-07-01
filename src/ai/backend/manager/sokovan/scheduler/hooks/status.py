@@ -9,29 +9,22 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    EndpointRouteListUpdatedEvent,
-)
 from ai.backend.common.types import (
     AgentId,
-    KernelId,
-    ResourceSlot,
+    ClusterMode,
     SessionId,
     SessionTypes,
-    SlotQuantity,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
-from ai.backend.manager.sokovan.data import SessionRunningData, SessionWithKernels
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.sokovan import SessionWithKernels
+from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.errors.resource import AgentNotAllocated
+from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
-
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -57,19 +50,21 @@ class StatusTransitionHook(ABC):
 class RunningHookDependencies:
     """Dependencies for RunningTransitionHook."""
 
-    scheduler_repository: SchedulerRepository
     agent_client_pool: AgentClientPool
-    deployment_repository: DeploymentRepository
-    event_producer: EventProducer
 
 
 class RunningTransitionHook(StatusTransitionHook):
     """Hook executed when sessions transition to RUNNING status.
 
     Handles:
-    - Common: Update agent occupied_slots
     - BATCH: Trigger batch execution
-    - INFERENCE: Update route info and notify app proxy
+    - INFERENCE: no-op — the route coordinator pushes to AppProxy
+      synchronously from the health-check handler when a route first
+      transitions to HEALTHY, and the long-cycle ``AppProxySyncRouteHandler``
+      keeps state convergent as a fallback.
+
+    Note: Resource allocation (occupied_slots) is handled per-kernel at
+    kernel RUNNING transition time, not here at session level.
     """
 
     _deps: RunningHookDependencies
@@ -78,55 +73,22 @@ class RunningTransitionHook(StatusTransitionHook):
         self._deps = deps
 
     async def execute(self, session: SessionWithKernels) -> None:
-        """Execute RUNNING transition hook."""
-        # 1. Common: Update occupied_slots for all session types
-        await self._update_occupied_slots(session)
+        """Execute RUNNING transition hook.
 
-        # 2. Session-type specific logic
+        Note: Resource allocation is now handled per-kernel at kernel RUNNING
+        transition time (in update_kernel_status_running), not here at
+        session RUNNING transition time.
+        """
+        # Session-type specific logic
         session_type = session.session_info.metadata.session_type
         match session_type:
             case SessionTypes.BATCH:
                 await self._execute_batch(session)
-            case SessionTypes.INFERENCE:
-                await self._execute_inference_running(session)
             case _:
                 log.debug(
                     "No specific RUNNING hook for session type {}",
                     session_type,
                 )
-
-    async def _update_occupied_slots(self, session: SessionWithKernels) -> None:
-        """Calculate and update occupied_slots for a session transitioning to RUNNING."""
-        total_occupied_slots = ResourceSlot()
-        for kernel_info in session.kernel_infos:
-            if kernel_info.resource.occupied_slots:
-                total_occupied_slots += kernel_info.resource.occupied_slots
-
-        running_data = [
-            SessionRunningData(
-                session_id=session.session_info.identity.id,
-                occupying_slots=total_occupied_slots,
-            )
-        ]
-
-        # Record allocations in normalized resource_allocations / agent_resources tables.
-        allocations: list[tuple[KernelId, str, list[SlotQuantity]]] = []
-        for kernel_info in session.kernel_infos:
-            agent_id = kernel_info.resource.agent
-            if agent_id and kernel_info.resource.occupied_slots:
-                quantities = resource_slot_to_quantities(kernel_info.resource.occupied_slots)
-                if quantities:
-                    allocations.append((kernel_info.id, agent_id, quantities))
-
-        # Single transaction: session update + resource allocation are atomic.
-        await self._deps.scheduler_repository.update_running_and_allocate_resources(
-            running_data, allocations
-        )
-
-        log.debug(
-            "Updated occupied_slots for session {} transitioning to RUNNING",
-            session.session_info.identity.id,
-        )
 
     async def _execute_batch(self, session: SessionWithKernels) -> None:
         """Trigger batch execution for BATCH sessions."""
@@ -162,70 +124,24 @@ class RunningTransitionHook(StatusTransitionHook):
             agent_id,
         )
 
-    async def _execute_inference_running(self, session: SessionWithKernels) -> None:
-        """Create model service route for INFERENCE sessions."""
-        session_id = session.session_info.identity.id
-        log.info(
-            "Creating model service route for inference session {}",
-            session_id,
-        )
-
-        # Get endpoint ID from session
-        endpoint_id = await self._deps.deployment_repository.get_endpoint_id_by_session(session_id)
-        if not endpoint_id:
-            log.warning(
-                "No endpoint ID found for inference session {}, skipping route update",
-                session_id,
-            )
-            return
-
-        pool = RecorderContext[SessionId].current_pool()
-        recorder = pool.recorder(session_id)
-        with recorder.phase(
-            "finalize_start",
-            success_detail="Session startup finalized",
-        ):
-            with recorder.step(
-                "setup_route",
-                success_detail=f"Set up route for endpoint {endpoint_id}",
-            ):
-                try:
-                    # Update route info
-                    await self._deps.deployment_repository.update_endpoint_route_info(endpoint_id)
-
-                    # Send event to app proxy
-                    await self._deps.event_producer.anycast_event(
-                        EndpointRouteListUpdatedEvent(endpoint_id)
-                    )
-
-                    log.info(
-                        "Successfully updated route info and notified app proxy for endpoint {} (session {})",
-                        endpoint_id,
-                        session_id,
-                    )
-                except Exception as e:
-                    log.exception(
-                        "Unexpected error updating route info for endpoint {} (session {}): {}",
-                        endpoint_id,
-                        session_id,
-                        e,
-                    )
-                    raise
-
 
 @dataclass
 class TerminatedHookDependencies:
     """Dependencies for TerminatedTransitionHook."""
 
-    deployment_repository: DeploymentRepository
-    event_producer: EventProducer
+    agent_client_pool: AgentClientPool
+    network_plugin_ctx: NetworkPluginContext
+    config_provider: ManagerConfigProvider
 
 
 class TerminatedTransitionHook(StatusTransitionHook):
     """Hook executed when sessions transition to TERMINATED status.
 
-    Handles:
-    - INFERENCE: Update route info (removal) and notify app proxy
+    Destroys the session's volatile inter-container network so that
+    overlay (MULTI_NODE) and agent-local (SINGLE_NODE) networks do not
+    leak after the session terminates. The hook is blocking: on failure
+    it propagates so the coordinator keeps the session in TERMINATING and
+    the self-healing loop retries the cleanup on the next tick.
     """
 
     _deps: TerminatedHookDependencies
@@ -235,62 +151,68 @@ class TerminatedTransitionHook(StatusTransitionHook):
 
     async def execute(self, session: SessionWithKernels) -> None:
         """Execute TERMINATED transition hook."""
-        session_type = session.session_info.metadata.session_type
-        match session_type:
-            case SessionTypes.INFERENCE:
-                await self._execute_inference_terminated(session)
-            case _:
-                log.debug(
-                    "No specific TERMINATED hook for session type {}",
-                    session_type,
-                )
+        await self._destroy_network(session)
 
-    async def _execute_inference_terminated(self, session: SessionWithKernels) -> None:
-        """Delete model service route for INFERENCE sessions."""
-        session_id = session.session_info.identity.id
-        log.info(
-            "Deleting model service route for inference session {}",
-            session_id,
-        )
-
-        # Get endpoint ID from session
-        endpoint_id = await self._deps.deployment_repository.get_endpoint_id_by_session(session_id)
-        if not endpoint_id:
-            log.warning(
-                "No endpoint ID found for inference session {}, skipping route update",
-                session_id,
-            )
+    async def _destroy_network(self, session: SessionWithKernels) -> None:
+        network = session.session_info.network
+        if network.network_type != NetworkType.VOLATILE or network.network_id is None:
             return
+        network_id = network.network_id
+        session_id = session.session_info.identity.id
+        cluster_mode = ClusterMode(session.session_info.resource.cluster_mode)
 
         pool = RecorderContext[SessionId].current_pool()
         recorder = pool.recorder(session_id)
         with recorder.phase(
-            "finalize_termination",
-            success_detail="Session termination finalized",
+            "terminate_cleanup",
+            success_detail="Volatile inter-container network destroyed",
         ):
             with recorder.step(
-                "cleanup_route",
-                success_detail=f"Cleaned up route for endpoint {endpoint_id}",
+                "destroy_network",
+                success_detail=f"Destroyed {cluster_mode.value} network {network_id}",
             ):
-                try:
-                    # Update route info (removal)
-                    await self._deps.deployment_repository.update_endpoint_route_info(endpoint_id)
+                if cluster_mode == ClusterMode.SINGLE_NODE:
+                    await self._destroy_local_network(session, network_id)
+                elif cluster_mode == ClusterMode.MULTI_NODE:
+                    await self._destroy_overlay_network(session_id, network_id)
 
-                    # Send event to app proxy
-                    await self._deps.event_producer.anycast_event(
-                        EndpointRouteListUpdatedEvent(endpoint_id)
-                    )
+    async def _destroy_local_network(self, session: SessionWithKernels, network_id: str) -> None:
+        session_id = session.session_info.identity.id
+        agent_id = session.main_kernel.resource.agent
+        if agent_id is None:
+            raise AgentNotAllocated(f"Main kernel has no agent assigned for session {session_id}")
+        async with self._deps.agent_client_pool.acquire(AgentId(agent_id)) as client:
+            try:
+                await client.destroy_local_network(network_id)
+            except Exception:
+                log.exception(
+                    "Failed to destroy local network on agent for session. "
+                    "Session ID: {}, Network ID: {}, Agent ID: {}",
+                    session_id,
+                    network_id,
+                    agent_id,
+                )
+                raise
 
-                    log.info(
-                        "Successfully updated route info and notified app proxy of route removal for endpoint {} (session {})",
-                        endpoint_id,
-                        session_id,
-                    )
-                except Exception as e:
-                    log.exception(
-                        "Unexpected error updating route info for endpoint {} (session {}): {}",
-                        endpoint_id,
-                        session_id,
-                        e,
-                    )
-                    raise
+    async def _destroy_overlay_network(self, session_id: SessionId, network_id: str) -> None:
+        default_driver = self._deps.config_provider.config.network.inter_container.default_driver
+        if default_driver is None:
+            raise ServerMisconfiguredError("No inter-container network driver is configured.")
+        if default_driver not in self._deps.network_plugin_ctx.plugins:
+            available = list(self._deps.network_plugin_ctx.plugins.keys())
+            raise ServerMisconfiguredError(
+                f"Network plugin '{default_driver}' not found. Available plugins: {available}. "
+                f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
+            )
+        network_plugin = self._deps.network_plugin_ctx.plugins[default_driver]
+        try:
+            await network_plugin.destroy_network(network_id=network_id)
+        except Exception:
+            log.exception(
+                "Failed to destroy overlay network for session. "
+                "Session ID: {}, Network ID: {}, Driver: {}",
+                session_id,
+                network_id,
+                default_driver,
+            )
+            raise

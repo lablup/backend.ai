@@ -4,27 +4,32 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.config import ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
+from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -53,18 +58,35 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
 )
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-    RevisionGeneratorRegistryArgs,
-)
+from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
 from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 # Type aliases for fixture factories
-ImageFactoryFunc = Callable[[], Coroutine[Any, Any, uuid.UUID]]
-VFolderFactoryFunc = Callable[[], Coroutine[Any, Any, uuid.UUID]]
+ImageFactoryFunc = Callable[[], Coroutine[Any, Any, ImageID]]
+VFolderFactoryFunc = Callable[[], Coroutine[Any, Any, VFolderUUID]]
+
+
+@pytest.fixture(autouse=True)
+async def _seed_resource_slot_types(db_engine: SAEngine) -> None:
+    """Ensure resource_slot_types has seed data for FK constraints."""
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.text(
+                "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                " VALUES ('cpu', 'count', 40), ('mem', 'bytes', 50)"
+                " ON CONFLICT DO NOTHING"
+            )
+        )
+
+
+@pytest.fixture()
+def mock_appproxy_client_pool() -> MagicMock:
+    """Stub AppProxyClientPool for tests that do not exercise app-proxy IO."""
+    return MagicMock(spec=AppProxyClientPool)
 
 
 @pytest.fixture()
@@ -76,6 +98,7 @@ def deployment_processors(
     event_producer: EventProducer,
     network_plugin_ctx: NetworkPluginContext,
     hook_plugin_ctx: HookPluginContext,
+    mock_appproxy_client_pool: MagicMock,
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors with real DeploymentService and DeploymentRepository."""
     repo = DeploymentRepository(
@@ -101,9 +124,7 @@ def deployment_processors(
             hook_plugin_ctx=hook_plugin_ctx,
         )
     )
-    revision_generator_registry = RevisionGeneratorRegistry(
-        RevisionGeneratorRegistryArgs(deployment_repository=repo)
-    )
+    revision_draft_reader = RevisionDraftReader(deployment_repository=repo)
     deployment_controller = DeploymentController(
         DeploymentControllerArgs(
             scheduling_controller=scheduling_controller,
@@ -112,16 +133,14 @@ def deployment_processors(
             storage_manager=storage_manager,
             event_producer=event_producer,
             valkey_schedule=valkey_clients.schedule,
-            revision_generator_registry=revision_generator_registry,
+            revision_draft_reader=revision_draft_reader,
+            deployment_revision_preset_repository=None,
         )
     )
-    model_definition_generator_registry = AsyncMock()
-    model_definition_generator_registry.generate_model_definition.return_value = ModelDefinition()
     service = DeploymentService(
         deployment_controller,
         repo,
-        revision_generator_registry,
-        model_definition_generator_registry,
+        appproxy_client_pool=mock_appproxy_client_pool,
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
@@ -129,22 +148,65 @@ def deployment_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo),
-                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
+                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
+                single_entity=SingleEntityActionRBACValidator(
+                    permission_controller_repo, MagicMock()
+                ),
+                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
         ),
     )
 
 
 @pytest.fixture()
+async def runtime_variant_fixture(
+    db_engine: SAEngine,
+) -> AsyncIterator[uuid.UUID]:
+    """Seed a runtime_variant row so deployment creates can resolve its FK."""
+    variant_id = uuid.uuid4()
+    default_definition = (
+        '{"models": [{"name": "test-model", "model_path": "/models/test",'
+        ' "service": {"start_command": ["python", "serve.py"], "port": 8000}}]}'
+    )
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.text(
+                "INSERT INTO runtime_variants (id, name, description, default_model_definition)"
+                " VALUES (:id, :name, :desc, CAST(:default_model_definition AS jsonb))"
+            ).bindparams(
+                id=variant_id,
+                name=f"test-variant-{variant_id.hex[:8]}",
+                desc="Test runtime variant for deployment tests",
+                default_model_definition=default_definition,
+            )
+        )
+    yield variant_id
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.text("DELETE FROM runtime_variants WHERE id = :id").bindparams(id=variant_id)
+        )
+
+
+@pytest.fixture()
 def server_module_registries(
     route_deps: RouteDeps,
     deployment_processors: DeploymentProcessors,
+    runtime_variant_fixture: uuid.UUID,
 ) -> list[RouteRegistry]:
     """Load only the modules required for deployment-domain tests."""
+    resolved_variant_id = RuntimeVariantID(runtime_variant_fixture)
+    runtime_variant_adapter = MagicMock(spec=RuntimeVariantAdapter)
+    runtime_variant_adapter.resolve_by_name = AsyncMock(return_value=resolved_variant_id)
+    _variant_node_mock = MagicMock()
+    _variant_node_mock.name = "custom"
+    runtime_variant_adapter.get = AsyncMock(return_value=_variant_node_mock)
     return [
         register_deployment_routes(
-            DeploymentAPIHandler(deployment=deployment_processors), route_deps
+            DeploymentAPIHandler(
+                deployment=deployment_processors,
+                runtime_variant_adapter=runtime_variant_adapter,
+            ),
+            route_deps,
         ),
     ]
 
@@ -179,10 +241,10 @@ async def image_factory(
     container_registry_fixture: uuid.UUID,
 ) -> AsyncIterator[ImageFactoryFunc]:
     """Factory that creates ImageRow entries for deployment tests."""
-    created_ids: list[uuid.UUID] = []
+    created_ids: list[ImageID] = []
 
-    async def _create() -> uuid.UUID:
-        image_id = uuid.uuid4()
+    async def _create() -> ImageID:
+        image_id = ImageID(uuid.uuid4())
         unique = secrets.token_hex(4)
         image_name = f"deployment-image-{unique}"
         canonical = f"registry.deployment.test.local/testproject/{image_name}:latest"
@@ -226,14 +288,14 @@ async def image_factory(
 @pytest.fixture()
 async def vfolder_factory(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     admin_user_fixture: Any,
 ) -> AsyncIterator[VFolderFactoryFunc]:
     """Factory that creates VFolder entries for deployment model mounts."""
-    created_ids: list[uuid.UUID] = []
+    created_ids: list[VFolderUUID] = []
 
-    async def _create() -> uuid.UUID:
-        vfolder_id = uuid.uuid4()
+    async def _create() -> VFolderUUID:
+        vfolder_id = VFolderUUID(uuid.uuid4())
         unique = secrets.token_hex(4)
         user_uuid = admin_user_fixture.user_uuid
         quota_scope_id = QuotaScopeID(
@@ -246,7 +308,7 @@ async def vfolder_factory(
                     id=vfolder_id,
                     name=f"deployment-model-{unique}",
                     host="local",
-                    domain_name=domain_fixture,
+                    domain_name=domain_fixture.domain_name,
                     quota_scope_id=str(quota_scope_id),
                     usage_mode=VFolderUsageMode.MODEL,
                     permission=VFolderMountPermission.READ_ONLY,
@@ -271,10 +333,10 @@ async def vfolder_factory(
 @pytest.fixture()
 async def deployment_seed_data(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     image_factory: ImageFactoryFunc,
     vfolder_factory: VFolderFactoryFunc,
-) -> AsyncIterator[tuple[uuid.UUID, uuid.UUID]]:
+) -> AsyncIterator[tuple[ImageID, VFolderUUID]]:
     """Create seed data and clean up endpoints created during the test.
 
     Endpoints reference domains/groups/scaling_groups with RESTRICT FK,
@@ -288,7 +350,7 @@ async def deployment_seed_data(
     # Clean up endpoints and soft-FK children created during the test
     async with db_engine.begin() as conn:
         endpoint_ids_q = sa.select(EndpointRow.__table__.c.id).where(
-            EndpointRow.__table__.c.domain == domain_fixture
+            EndpointRow.__table__.c.domain == domain_fixture.domain_name
         )
         await conn.execute(
             DeploymentRevisionRow.__table__.delete().where(
@@ -301,5 +363,7 @@ async def deployment_seed_data(
             )
         )
         await conn.execute(
-            EndpointRow.__table__.delete().where(EndpointRow.__table__.c.domain == domain_fixture)
+            EndpointRow.__table__.delete().where(
+                EndpointRow.__table__.c.domain == domain_fixture.domain_name
+            )
         )

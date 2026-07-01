@@ -28,6 +28,16 @@ def tabulate_items(
     is_first = True
     output_count = 0
     buffered_items: list[_Item] = []
+    # Column widths pinned from the first chunk's data + headers.
+    # Subsequent chunks pad cells to (at least) these widths so that
+    # `tabulate()` — called once per chunk for streaming/pager support —
+    # produces identical column widths across chunks. Without pinning,
+    # each chunk would compute widths from only its own data, causing
+    # visible misalignment partway through long listings (BA-2959 / #6632).
+    # We do not shrink widths once established; later chunks may grow a
+    # column only if a wider value appears, which is rare and a much
+    # smaller visual artifact than the per-chunk recomputation default.
+    pinned_widths: list[int] = []
 
     # check table header/footer sizes
     header_height = 0
@@ -37,15 +47,47 @@ def tabulate_items(
         raise ValueError("Header height must be non-negative")
 
     def _tabulate_buffer() -> Iterator[str]:
+        # Pre-format every cell to a string so we can pad to pinned widths
+        # before handing rows to tabulate().
+        formatted_rows: list[list[str]] = [
+            [f.formatter.format_console(v, f) for f, v in zip(fields, item.values(), strict=True)]
+            for item in buffered_items
+        ]
+        headers: list[str] = (
+            [] if tablefmt == "plain" else [field.humanized_name for field in fields]
+        )
+
+        if is_first:
+            # Establish pinned widths from this chunk's headers and rows.
+            num_cols = len(fields)
+            widths = [0] * num_cols
+            if headers:
+                for i, h in enumerate(headers):
+                    if len(h) > widths[i]:
+                        widths[i] = len(h)
+            for row in formatted_rows:
+                for i, cell in enumerate(row):
+                    if len(cell) > widths[i]:
+                        widths[i] = len(cell)
+            pinned_widths.extend(widths)
+        else:
+            # Allow widening only if a later cell exceeds the pinned width.
+            # We cannot rewrite already-emitted output, so this just keeps
+            # subsequent chunks self-consistent in that rare case.
+            for row in formatted_rows:
+                for i, cell in enumerate(row):
+                    if len(cell) > pinned_widths[i]:
+                        pinned_widths[i] = len(cell)
+
+        # Pad each cell to the pinned width so tabulate() computes the
+        # same column widths it produced for the first chunk.
+        padded_rows: list[list[str]] = [
+            [cell.ljust(pinned_widths[i]) for i, cell in enumerate(row)] for row in formatted_rows
+        ]
+
         table = tabulate(
-            [
-                [
-                    f.formatter.format_console(v, f)
-                    for f, v in zip(fields, item.values(), strict=True)
-                ]
-                for item in buffered_items
-            ],
-            headers=([] if tablefmt == "plain" else [field.humanized_name for field in fields]),
+            padded_rows,
+            headers=headers,
             tablefmt=tablefmt,
         )
         table_rows = table.splitlines()

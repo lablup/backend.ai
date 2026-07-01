@@ -19,6 +19,7 @@ from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import AsyncSession, Session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.dto.manager.session.types import MountOption
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 from .extensions import pass_ctx_obj
@@ -276,8 +277,11 @@ def info(ctx: CLIContext, service_name_or_id: str) -> None:
 @click.option(
     "--runtime-variant",
     metavar="RUNTIME_VARIANT",
-    type=click.Choice([*RuntimeVariant], case_sensitive=False),
-    default=RuntimeVariant.CUSTOM,
+    type=click.Choice(
+        ["custom", "vllm", "nim", "huggingface-tgi", "sglang", "modular-max", "cmd"],
+        case_sensitive=False,
+    ),
+    default="custom",
     help=(
         "Runtime variant of the service. "
         "Control which runtime environment is used for the service. Default is `custom`."
@@ -321,13 +325,16 @@ def create(
     mount, mount_map, mount_options = prepare_mount_arg(mount, escape=True)
     parsed_resources = prepare_resource_arg(resources)
     parsed_resource_opts = prepare_resource_arg(resource_opts)
+    extra_mount_options = {
+        key: MountOption.model_validate(opts) for key, opts in mount_options.items()
+    }
     body = {
         "service_name": name,
         "model_version": model_version,
         "envs": envs,
         "extra_mounts": mount,
         "extra_mount_map": mount_map,
-        "extra_mount_options": mount_options,
+        "extra_mount_options": extra_mount_options,
         "startup_command": startup_command,
         "resources": parsed_resources,
         "resource_opts": parsed_resource_opts,

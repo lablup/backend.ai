@@ -10,9 +10,9 @@ from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
+from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.sokovan.data import SessionWithKernels
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
@@ -103,15 +103,13 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
 
         Returns:
         - successes: Sessions that were scheduled
+        - failures: Sessions whose scheduling attempt failed in the Provisioner
         - skipped: Sessions that were not attempted (priority-based, resource constraints)
         """
         result = SessionExecutionResult()
 
         if not sessions:
             return result
-
-        # Build session map for lookup
-        session_map = {s.session_info.identity.id: s for s in sessions}
 
         # Fetch scheduling data required by Provisioner
         scheduling_data = await self._repository.get_scheduling_data(scaling_group)
@@ -121,16 +119,9 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
                 scaling_group,
             )
             # All sessions are skipped when no scheduling data available
-            for session in sessions:
-                result.skipped.append(
-                    SessionTransitionInfo(
-                        session_id=session.session_info.identity.id,
-                        from_status=session.session_info.lifecycle.status,
-                        reason="no-scheduling-data",
-                        creation_id=session.session_info.identity.creation_id,
-                        access_key=AccessKey(session.session_info.metadata.access_key),
-                    )
-                )
+            result.skipped.extend(
+                self._to_transition_info(session, "no-scheduling-data") for session in sessions
+            )
             return result
 
         # Delegate to Provisioner with pre-fetched data
@@ -138,41 +129,35 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         schedule_result = await self._provisioner.schedule_scaling_group(
             scaling_group, scheduling_data, provision_time
         )
+        scheduled_ids = set(schedule_result.scheduled_session_ids)
+        failure_map = {
+            failure.session_id: failure for failure in schedule_result.scheduling_failures
+        }
 
-        # Track scheduled session IDs
-        scheduled_session_ids = set()
-
-        # Mark scheduled sessions as success for status transition
-        for event_data in schedule_result.scheduled_sessions:
-            scheduled_session_ids.add(event_data.session_id)
-            original_session = session_map.get(event_data.session_id)
-            from_status = (
-                original_session.session_info.lifecycle.status
-                if original_session
-                else SessionStatus.PENDING  # fallback to expected status
-            )
-            result.successes.append(
-                SessionTransitionInfo(
-                    session_id=event_data.session_id,
-                    from_status=from_status,
-                    reason=event_data.reason,
-                    creation_id=event_data.creation_id,
-                    access_key=event_data.access_key,
-                )
-            )
-
-        # Mark non-scheduled sessions as skipped (not attempted due to priority/resources)
+        # Allocated sessions transition to SCHEDULED; failed attempts are reported
+        # as failures so the coordinator can classify them (need_retry/expired/
+        # give_up); the rest were not attempted this cycle (priority/resource
+        # constraints) and are skipped. The coordinator owns the actual session
+        # status transition based on these reports.
         for session in sessions:
             session_id = session.session_info.identity.id
-            if session_id not in scheduled_session_ids:
-                result.skipped.append(
-                    SessionTransitionInfo(
-                        session_id=session_id,
-                        from_status=session.session_info.lifecycle.status,
-                        reason="not-scheduled-this-cycle",
-                        creation_id=session.session_info.identity.creation_id,
-                        access_key=AccessKey(session.session_info.metadata.access_key),
-                    )
-                )
+            if session_id in scheduled_ids:
+                result.successes.append(self._to_transition_info(session, "triggered-by-scheduler"))
+            elif session_id in failure_map:
+                reason = failure_map[session_id].msg or "scheduling-failed"
+                result.failures.append(self._to_transition_info(session, reason))
+            else:
+                result.skipped.append(self._to_transition_info(session, "not-scheduled-this-cycle"))
 
         return result
+
+    @staticmethod
+    def _to_transition_info(session: SessionWithKernels, reason: str) -> SessionTransitionInfo:
+        info = session.session_info
+        return SessionTransitionInfo(
+            session_id=info.identity.id,
+            from_status=info.lifecycle.status,
+            reason=reason,
+            creation_id=info.identity.creation_id,
+            access_key=AccessKey(info.metadata.access_key),
+        )

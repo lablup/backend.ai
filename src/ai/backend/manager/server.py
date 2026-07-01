@@ -44,7 +44,7 @@ from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_prometheus_metrics_handler
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -55,7 +55,6 @@ from ai.backend.logging.otel import (
 )
 
 from . import __version__
-from .api import ManagerStatus
 from .api.rest.app import _mount_registry_tree
 from .api.rest.internal.tree import build_internal_api_routes
 from .api.rest.middleware import (
@@ -65,6 +64,7 @@ from .api.rest.middleware import (
 from .api.rest.routing import RouteRegistry
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
+from .data.manager_status.types import ManagerStatus
 from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
 from .plugin.webapp import WebappPluginContext
 

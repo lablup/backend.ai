@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.model_serving.response import (
     TokenResponseModel,
     TryStartResponseModel,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import RuntimeVariant
 
 
@@ -85,7 +86,7 @@ class TestRouteInfoModel:
 class TestServeInfoModel:
     def test_field_completeness(self) -> None:
         eid = uuid.uuid4()
-        mid = uuid.uuid4()
+        mid = VFolderUUID(uuid.uuid4())
         rid = uuid.uuid4()
         model = ServeInfoModel(
             endpoint_id=eid,
@@ -100,7 +101,7 @@ class TestServeInfoModel:
             ],
             service_endpoint=HttpUrl("https://serve.example.com"),
             is_public=False,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
         )
         assert model.endpoint_id == eid
         assert model.model_id == mid
@@ -109,12 +110,12 @@ class TestServeInfoModel:
         assert model.replicas == 2
         assert model.model_definition_path == "model-definition.yaml"
         assert len(model.active_routes) == 1
-        assert model.runtime_variant == RuntimeVariant.CUSTOM
+        assert model.runtime_variant == RuntimeVariant("custom")
 
     def test_nullable_fields(self) -> None:
         model = ServeInfoModel(
             endpoint_id=uuid.uuid4(),
-            model_id=uuid.uuid4(),
+            model_id=VFolderUUID(uuid.uuid4()),
             extra_mounts=[],
             name="svc",
             replicas=0,
@@ -122,7 +123,7 @@ class TestServeInfoModel:
             model_definition_path=None,
             active_routes=[],
             is_public=True,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
         )
         assert model.service_endpoint is None
         assert model.model_definition_path is None
@@ -130,7 +131,7 @@ class TestServeInfoModel:
     def test_serialization_roundtrip(self) -> None:
         model = ServeInfoModel(
             endpoint_id=uuid.uuid4(),
-            model_id=uuid.uuid4(),
+            model_id=VFolderUUID(uuid.uuid4()),
             extra_mounts=[],
             name="svc",
             replicas=1,
@@ -138,7 +139,7 @@ class TestServeInfoModel:
             model_definition_path=None,
             active_routes=[],
             is_public=False,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant=RuntimeVariant("custom"),
         )
         data = model.model_dump()
         assert data["name"] == "svc"

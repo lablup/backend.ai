@@ -31,7 +31,6 @@ import trafaret as t
 from aiotools import TaskGroupError
 from dateutil.relativedelta import relativedelta
 from pydantic import (
-    BaseModel,
     Field,
     GetCoreSchemaHandler,
 )
@@ -60,6 +59,7 @@ from ai.backend.common.events.event_types.session.anycast import (
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.types import (
     AccessKey,
+    BackendAISchema,
     BinarySize,
     ResourceSlot,
     SessionExecutionStatus,
@@ -288,6 +288,7 @@ class IdleCheckerHost:
                     kernels.c.session_id,
                     kernels.c.session_type,
                     kernels.c.created_at,
+                    kernels.c.starts_at,
                     kernels.c.occupied_slots,
                     kernels.c.requested_slots,
                     kernels.c.cluster_size,
@@ -511,7 +512,8 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         )
 
         log.info(
-            f"NewUserGracePeriodChecker: default period = {_grace_period} seconds",
+            "NewUserGracePeriodChecker: default period = {} seconds",
+            _grace_period,
         )
 
     async def get_extra_info(
@@ -694,7 +696,7 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
             await self._update_timeout(session_id)
 
     async def _disable_timeout(self, session_id: SessionId) -> None:
-        log.debug(f"NetworkTimeoutIdleChecker._disable_timeout({session_id})")
+        log.debug("NetworkTimeoutIdleChecker._disable_timeout({})", session_id)
         await self._redis_live.store_live_data(
             f"session.{session_id}.last_access",
             "0",
@@ -702,7 +704,7 @@ class NetworkTimeoutEventDispatcherIdleChecker(AbstractEventDispatcherIdleChecke
         )
 
     async def _update_timeout(self, session_id: SessionId) -> None:
-        log.debug(f"NetworkTimeoutIdleChecker._update_timeout({session_id})")
+        log.debug("NetworkTimeoutIdleChecker._update_timeout({})", session_id)
         timestamp = await self._redis_live.get_server_time()
         await self._redis_live.store_live_data(
             f"session.{session_id}.last_access",
@@ -840,13 +842,13 @@ class SessionLifetimeChecker(BaseIdleChecker):
 
         session_id = kernel.session_id
         if (max_session_lifetime := policy.max_session_lifetime) > 0:
-            # TODO: once per-status time tracking is implemented, let's change created_at
-            #       to the timestamp when the session entered PREPARING status.
             idle_timeout = timedelta(seconds=max_session_lifetime)
             now: datetime = await get_db_now(dbconn)
-            kernel_created_at: datetime = kernel.created_at
+            # starts_at is set at the RUNNING transition; fall back to created_at
+            # for abnormal/legacy rows where it was never populated.
+            kernel_starts_at: datetime = kernel.starts_at or kernel.created_at
             remaining = calculate_remaining_time(
-                now, kernel_created_at, idle_timeout, grace_period_end
+                now, kernel_starts_at, idle_timeout, grace_period_end
             )
             await self.set_remaining_time_report(
                 session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE
@@ -874,7 +876,7 @@ def _get_resource_name_from_metric_key(name: str) -> str:
     return name
 
 
-class ResourceThresholdValue(BaseModel):
+class ResourceThresholdValue(BackendAISchema):
     average: Annotated[
         int | float | Decimal | None,
         Field(
@@ -987,9 +989,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
             f"{k}({threshold.average})," for k, threshold in self.resource_thresholds.items()
         ])
         log.info(
-            f"UtilizationIdleChecker(%): {thresholds_log} "
-            f'thresholds-check-operator("{self.thresholds_check_operator}"), '
-            f"time-window({self.time_window.total_seconds()}s)"
+            'UtilizationIdleChecker(%): {} thresholds-check-operator("{}"), time-window({}s)',
+            thresholds_log,
+            self.thresholds_check_operator,
+            self.time_window.total_seconds(),
         )
 
     @classmethod
@@ -1232,7 +1235,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 raw_live_stat = await self._valkey_stat_client.get_kernel_statistics(str(kernel_id))
                 if raw_live_stat is None:
                     log.warning(
-                        f"Utilization data not found or failed to fetch utilization data. Skip idle check (k:{kernel_id})"
+                        "Utilization data not found or failed to fetch utilization data. Skip idle check (k:{})",
+                        kernel_id,
                     )
                     continue
                 live_stat = raw_live_stat

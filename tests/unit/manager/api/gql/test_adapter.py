@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.manager.api.adapters.pagination import DEFAULT_PAGINATION_LIMIT
+from ai.backend.manager.api.adapter_options.pagination.pagination import DEFAULT_PAGINATION_LIMIT
 from ai.backend.manager.api.gql.adapter import (
     BaseGQLAdapter,
     PaginationOptions,

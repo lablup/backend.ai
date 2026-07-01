@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import enum
 from collections.abc import Callable, Sequence
-from typing import Any, TypeVar, dataclass_transform, overload
+from typing import Any, TypeVar, cast, dataclass_transform, overload
 
 import strawberry
 import strawberry.experimental.pydantic
@@ -167,7 +167,6 @@ def gql_pydantic_interface[PydanticModel: BaseModel](
     meta: BackendAIGQLMeta,
     *,
     model: type[PydanticModel],
-    fields: list[str] | None = None,
     name: str | None = None,
     directives: Sequence[object] = (),
     use_pydantic_alias: bool = True,
@@ -181,7 +180,6 @@ def gql_pydantic_interface[PydanticModel: BaseModel](
     """
     return strawberry.experimental.pydantic.interface(
         model=model,
-        fields=fields,
         name=name,
         description=_build_description(meta),
         directives=directives,
@@ -198,7 +196,6 @@ def gql_pydantic_type[PydanticModel: BaseModel](
     meta: BackendAIGQLMeta,
     *,
     model: type[PydanticModel],
-    fields: list[str] | None = None,
     name: str | None = None,
     all_fields: bool = False,
     directives: Sequence[object] = (),
@@ -212,7 +209,6 @@ def gql_pydantic_type[PydanticModel: BaseModel](
     """
     return strawberry.experimental.pydantic.type(
         model=model,
-        fields=fields,
         name=name,
         description=_build_description(meta),
         directives=directives,
@@ -265,15 +261,18 @@ def gql_root_field(
     *,
     name: str | None = None,
     deprecation_reason: str | None = None,
+    directives: Sequence[object] = (),
 ) -> Any:
     """Root query/subscription field on the Query type (always has its own version).
 
     Use for top-level fields on the Query type that are independently versioned.
+    ``directives`` forwards schema directives (e.g. federation ``@override``) onto the field.
     """
     return strawberry.field(
         description=_build_description(meta),
         name=name,
         deprecation_reason=deprecation_reason,
+        directives=directives,
     )
 
 
@@ -322,17 +321,29 @@ def gql_enum(
     return strawberry.enum(description=description)
 
 
+_ResolverFn = TypeVar("_ResolverFn", bound=Callable[..., Any])
+
+
 def gql_mutation(
     meta: BackendAIGQLMeta,
     *,
     name: str | None = None,
     deprecation_reason: str | None = None,
-) -> Any:
-    """Mutation resolver with version metadata."""
-    return strawberry.mutation(
-        description=_build_description(meta),
-        name=name,
-        deprecation_reason=deprecation_reason,
+) -> Callable[[_ResolverFn], _ResolverFn]:
+    """Mutation resolver with version metadata.
+
+    Returned signature preserves the decorated function's type so mypy
+    does not flag the wrapped resolver as untyped. At runtime Strawberry
+    rewrites the attribute into a :class:`StrawberryField`, but the
+    type-checker only sees the pass-through contract.
+    """
+    return cast(
+        Callable[[_ResolverFn], _ResolverFn],
+        strawberry.mutation(
+            description=_build_description(meta),
+            name=name,
+            deprecation_reason=deprecation_reason,
+        ),
     )
 
 
@@ -341,12 +352,15 @@ def gql_subscription(
     *,
     name: str | None = None,
     deprecation_reason: str | None = None,
-) -> Any:
+) -> Callable[[_ResolverFn], _ResolverFn]:
     """Subscription resolver with version metadata."""
-    return strawberry.subscription(
-        description=_build_description(meta),
-        name=name,
-        deprecation_reason=deprecation_reason,
+    return cast(
+        Callable[[_ResolverFn], _ResolverFn],
+        strawberry.subscription(
+            description=_build_description(meta),
+            name=name,
+            deprecation_reason=deprecation_reason,
+        ),
     )
 
 

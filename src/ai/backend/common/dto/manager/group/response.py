@@ -9,10 +9,11 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     # DTOs
@@ -35,7 +36,7 @@ __all__ = (
 )
 
 
-class GroupDTO(BaseModel):
+class GroupDTO(BackendAISchema):
     """DTO for group/project data."""
 
     id: UUID = Field(description="Group ID")
@@ -58,7 +59,7 @@ class GroupDTO(BaseModel):
     )
 
 
-class GroupMemberDTO(BaseModel):
+class GroupMemberDTO(BackendAISchema):
     """DTO for group membership data."""
 
     user_id: UUID = Field(description="User ID")

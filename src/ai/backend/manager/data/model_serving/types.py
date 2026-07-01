@@ -1,26 +1,32 @@
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import yarl
 from pydantic import HttpUrl
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.config import ModelDefinition
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.session.types import MountOption as MountOptionDTO
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
+    MountInfoEntry,
     MountPermission,
     MountTypes,
     QuotaScopeID,
     ResourceSlot,
-    RuntimeVariant,
     VFolderMount,
 )
 from ai.backend.manager.data.image.types import ImageData
@@ -31,11 +37,11 @@ if TYPE_CHECKING:
 __all__ = [
     "EndpointAccessValidationData",
     "EndpointAutoScalingRuleData",
-    "EndpointAutoScalingRuleListResult",
     "EndpointData",
     "EndpointLifecycle",
     "EndpointTokenData",
     "RoutingData",
+    "ScalingState",
     "ServiceSearchItem",
     "ServiceSearchResult",
 ]
@@ -52,6 +58,14 @@ class EndpointAccessValidationData:
 
 @dataclass
 class EndpointData:
+    """Legacy model-serving endpoint projection — DO NOT USE in new code.
+
+    Backs the legacy ``/services`` (model-serving) responses, which flatten
+    the active revision's fields (image, model, resources, mounts, …) onto
+    the endpoint and carry no separate revision object. New deployment code
+    uses ``ModelDeploymentData`` (v2) / ``LegacyDeploymentData`` (REST v1).
+    """
+
     id: uuid.UUID
     name: str
     image: ImageData | None
@@ -81,9 +95,20 @@ class EndpointData:
     destroyed_at: datetime | None
     retries: int
     lifecycle_stage: EndpointLifecycle
-    runtime_variant: RuntimeVariant
-    extra_mounts: Sequence[VFolderMount]
-    routings: Sequence[RoutingData] | None = None
+    # Projected from whichever revision is currently active —
+    # ``current_revision`` preferred, falling back to
+    # ``deploying_revision``. ``None`` when the endpoint has neither
+    # (e.g. a freshly-created PENDING endpoint before any revision is
+    # attached); legacy response surfaces render this as the historical
+    # "custom" fallback.
+    runtime_variant_id: RuntimeVariantID | None
+    # Snapshotted from the current revision's ``extra_mounts`` column.
+    # ``VFolderMount`` resolution happens later in the session-creation
+    # path; ``EndpointData`` carries the unresolved request entries.
+    extra_mounts: Sequence[MountInfoEntry]
+    scaling_state: ScalingState = ScalingState.STABLE
+    model_definition: ModelDefinition | None = None
+    routings: Sequence[RoutingData] = field(default_factory=list)
 
 
 @dataclass
@@ -121,18 +146,8 @@ class EndpointAutoScalingRuleData:
     min_replicas: int
     max_replicas: int
     created_at: datetime
-    last_triggered_at: datetime
+    last_triggered_at: datetime | None
     endpoint: uuid.UUID
-
-
-@dataclass
-class EndpointAutoScalingRuleListResult:
-    """Search result with total count for endpoint auto scaling rules."""
-
-    items: list[EndpointAutoScalingRuleData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
 
 
 @dataclass
@@ -151,7 +166,7 @@ class ScalingGroupData:
 class ModelServiceValidationContext:
     """Data resolved from DB during model service validation."""
 
-    model_id: uuid.UUID
+    model_vfolder_id: VFolderUUID
     model_folder_host: str
     model_folder_quota_scope_id: QuotaScopeID | None
     model_folder_usage_mode: str
@@ -163,11 +178,12 @@ class ModelServiceValidationContext:
     resource_policy: dict[str, Any]
     scaling_group: str
     extra_mounts: Sequence[VFolderMount]
+    variant_reads_vfolder_config_files: bool
 
 
 @dataclass
 class ModelServicePrepareCtx:
-    model_id: uuid.UUID
+    model_vfolder_id: VFolderUUID
     model_definition_path: str | None
     requester_access_key: AccessKey
     owner_access_key: AccessKey
@@ -181,16 +197,28 @@ class ModelServicePrepareCtx:
 
 @dataclass
 class MountOption:
+    """Per-vfolder extra mount option."""
+
     mount_destination: str | None
     type: MountTypes
     permission: MountPermission | None
+    subpath: str | None = None
+
+    @classmethod
+    def from_dto(cls, dto: MountOptionDTO) -> MountOption:
+        """Convert the wire-level :class:`MountOption` DTO into a data-layer dataclass."""
+        return cls(
+            mount_destination=dto.mount_destination,
+            type=dto.type,
+            permission=dto.permission,
+            subpath=dto.subpath,
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "mount_destination": self.mount_destination,
-            "type": self.type.value,
-            "permission": self.permission.value if self.permission else None,
-        }
+        # ``MountTypes`` / ``MountPermission`` are ``StrEnum``s, so the enum
+        # instances ``dataclasses.asdict`` returns serialise as their string
+        # value under ``json.dumps`` — no manual ``.value`` extraction needed.
+        return dataclasses.asdict(self)
 
 
 @dataclass
@@ -200,9 +228,18 @@ class RouteInfo:
     traffic_ratio: float
 
 
-@dataclass
-class RouteConnectionInfo:
-    app: str
+@dataclass(frozen=True)
+class AppProxyRouteEntry:
+    """One (session, kernel host:port) entry pushed to AppProxy.
+
+    Manager builds these from RoutingRow + KernelRow joins so the
+    AppProxy coordinator can install them on ``circuit.route_info``
+    without needing a manager-side Redis hand-off or a back-channel
+    DB read.
+    """
+
+    session_id: uuid.UUID
+    route_id: uuid.UUID
     kernel_host: str
     kernel_port: int
 
@@ -216,14 +253,16 @@ class ServiceConfig:
     extra_mounts: dict[uuid.UUID, MountOption]
     environ: dict[str, str] | None
     scaling_group: str
-    resources: dict[str, str | int] | None
+    resources: dict[str, str | int | float] | None
     resource_opts: dict[str, str | int | bool] | None
+    vfolder_subpath: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "model": self.model,
             "model_definition_path": self.model_definition_path,
             "model_mount_destination": self.model_mount_destination,
+            "vfolder_subpath": self.vfolder_subpath,
             "extra_mounts": {key: value.to_dict() for key, value in self.extra_mounts.items()},
             "environ": self.environ if self.environ is not None else {},
             "scaling_group": self.scaling_group,
@@ -234,9 +273,9 @@ class ServiceConfig:
 
 @dataclass
 class ServiceInfo:
-    endpoint_id: uuid.UUID
-    model_id: uuid.UUID
-    extra_mounts: Sequence[uuid.UUID]
+    deployment_id: DeploymentID
+    model_vfolder_id: VFolderUUID
+    extra_mounts: Sequence[VFolderUUID]
     name: str
     model_definition_path: str | None
     replicas: int
@@ -244,7 +283,7 @@ class ServiceInfo:
     active_routes: list[RouteInfo]
     service_endpoint: HttpUrl | None
     is_public: bool
-    runtime_variant: RuntimeVariant
+    runtime_variant_id: RuntimeVariantID
 
 
 @dataclass
@@ -268,7 +307,7 @@ class ServiceSearchItem:
     open_to_public: bool
     resource_slots: ResourceSlot
     resource_group: str
-    routings: Sequence[RoutingData] | None
+    routings: Sequence[RoutingData]
 
 
 @dataclass
@@ -277,16 +316,6 @@ class ServiceSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-
-
-@dataclass
-class RequesterCtx:
-    """Deprecated: Use UserData from ai.backend.common.data.user.types instead."""
-
-    is_authorized: bool | None
-    user_id: uuid.UUID
-    user_role: UserRole
-    domain_name: str
 
 
 @dataclass

@@ -26,7 +26,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.types import SlotQuantity
-from ai.backend.manager.api.adapters.resource_group import (
+from ai.backend.manager.api.adapters.resource_group.adapter import (
     _normalize_quantity,
     _slot_quantities_to_resource_slot_info,
 )

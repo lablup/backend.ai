@@ -206,7 +206,6 @@ from ai.backend.common.data.storage.types import ArtifactStorageImportStep, Name
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.meta import (
-    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -522,8 +521,31 @@ class AuthConfig(BaseConfigSchema):
                 "Default is 604800 (7 days). "
                 "Sessions older than this are considered expired."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             example=ConfigExample(local="604800", prod="604800"),
+        ),
+    ]
+
+
+class RBACConfig(BaseConfigSchema):
+    enforcement_enabled: Annotated[
+        bool,
+        Field(
+            default=True,
+            validation_alias=AliasChoices("enforcement-enabled", "enforcement_enabled", "enabled"),
+            serialization_alias="enforcement-enabled",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to enable RBAC enforcement on the manager's read/validation path. "
+                "When true (default), all RBAC validators run normally. "
+                "When false, RBAC validators short-circuit so that only the legacy "
+                "permission path (user.role / is_admin / domain and project membership) applies. "
+                "RBAC write paths continue to populate association and role-mapping rows "
+                "regardless of this flag, so re-enabling does not require data backfill."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="true", prod="true"),
         ),
     ]
 
@@ -801,7 +823,7 @@ class ManagerConfig(BaseConfigSchema):
                 "Only proxies in this list are trusted to set forwarding headers. "
                 "If empty (default), the manager falls back to manual X-Forwarded-For parsing."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.2",
             example=ConfigExample(local="", prod='["10.0.0.0/8", "172.16.0.0/12"]'),
         ),
     ]
@@ -1230,6 +1252,19 @@ class ManagerConfig(BaseConfigSchema):
             ),
             added_version="25.8.0",
             example=ConfigExample(local="", prod="9090"),
+        ),
+    ]
+    rbac: Annotated[
+        RBACConfig,
+        Field(default_factory=RBACConfig),
+        BackendAIConfigMeta(
+            description=(
+                "RBAC (Role-Based Access Control) configuration. "
+                "Controls runtime RBAC enforcement behavior including "
+                "the ability to toggle enforcement on or off without a restart."
+            ),
+            added_version="26.4.4",
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -3227,28 +3262,13 @@ class ArtifactRegistryConfig(BaseConfigSchema):
 
 
 class DeploymentConfig(BaseConfigSchema):
-    enable_model_definition_override: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "enable-model-definition-override", "enable_model_definition_override"
-            ),
-            serialization_alias="enable-model-definition-override",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Enable custom model definition override from storage for non-CUSTOM runtime variants. "
-                "When enabled, after generating the standard model definition programmatically, the "
-                "system attempts to fetch a custom definition from storage if model_definition_path "
-                "is specified in the model revision. The custom definition overrides the generated "
-                "one if found; otherwise, the generated definition is used as fallback. This allows "
-                "customizing model serving configurations while maintaining automatic defaults."
-            ),
-            added_version="25.8.0",
-            example=ConfigExample(local="false", prod="true"),
-        ),
-    ]
+    """Deployment-wide configuration.
+
+    The schema is intentionally empty: all per-variant model-definition
+    handling now lives on the runtime variant rows (via
+    ``reads_vfolder_config_files`` and ``default_model_definition``) rather
+    than a global override toggle.
+    """
 
 
 class ExportConfig(BaseConfigSchema):

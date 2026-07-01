@@ -7,6 +7,7 @@ from typing import Final
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminCreateKeypairInput,
+    AdminRegisterSSHKeypairInput,
     AdminSearchKeypairsInput,
     AdminUpdateKeypairInput,
     RevokeMyKeypairInput,
@@ -17,6 +18,9 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
 from ai.backend.common.dto.manager.v2.keypair.response import (
     AdminCreateKeypairPayload,
     AdminDeleteKeypairPayload,
+    AdminDeleteSSHKeypairPayload,
+    AdminGetSSHKeypairPayload,
+    AdminRegisterSSHKeypairPayload,
     AdminSearchKeypairsPayload,
     AdminUpdateKeypairPayload,
     IssueMyKeypairPayload,
@@ -132,4 +136,34 @@ class V2KeypairClient(BaseDomainClient):
             "DELETE",
             f"{_ADMIN_PATH}/{access_key}",
             response_model=AdminDeleteKeypairPayload,
+        )
+
+    # ------------------------------------------------------------------ admin SSH keypair
+
+    async def admin_register_ssh_keypair(
+        self,
+        request: AdminRegisterSSHKeypairInput,
+    ) -> AdminRegisterSSHKeypairPayload:
+        """Register (overwrite) a user's SSH keypair (admin only)."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_ADMIN_PATH}/ssh",
+            request=request,
+            response_model=AdminRegisterSSHKeypairPayload,
+        )
+
+    async def admin_get_ssh_keypair(self, access_key: str) -> AdminGetSSHKeypairPayload:
+        """Get a user's SSH public key (admin only)."""
+        return await self._client.typed_request(
+            "GET",
+            f"{_ADMIN_PATH}/{access_key}/ssh",
+            response_model=AdminGetSSHKeypairPayload,
+        )
+
+    async def admin_delete_ssh_keypair(self, access_key: str) -> AdminDeleteSSHKeypairPayload:
+        """Clear a user's SSH keypair (admin only)."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_ADMIN_PATH}/{access_key}/ssh",
+            response_model=AdminDeleteSSHKeypairPayload,
         )

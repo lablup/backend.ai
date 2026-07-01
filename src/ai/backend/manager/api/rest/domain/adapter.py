@@ -16,17 +16,13 @@ from ai.backend.common.dto.manager.domain import (
     UpdateDomainRequest,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.updaters import DomainUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
@@ -48,7 +44,7 @@ class DomainAdapter(BaseFilterAdapter):
             total_resource_slots=dict(data.total_resource_slots),
             allowed_vfolder_hosts=dict(data.allowed_vfolder_hosts),
             allowed_docker_registries=data.allowed_docker_registries,
-            integration_id=data.integration_id,
+            integration_id=data.integration_name,  # data type uses integration_name, v1 DTO uses integration_id
         )
 
     def build_updater(self, request: UpdateDomainRequest, domain_name: str) -> Updater[DomainRow]:
@@ -59,7 +55,7 @@ class DomainAdapter(BaseFilterAdapter):
         total_resource_slots: TriState[ResourceSlot] = TriState.nop()
         allowed_vfolder_hosts: OptionalState[dict[str, list[str]]] = OptionalState.nop()
         allowed_docker_registries: OptionalState[list[str]] = OptionalState.nop()
-        integration_id = TriState[str].nop()
+        integration_name = TriState[str].nop()
 
         if request.name is not None:
             name = OptionalState.update(request.name)
@@ -74,7 +70,7 @@ class DomainAdapter(BaseFilterAdapter):
         if request.allowed_docker_registries is not None:
             allowed_docker_registries = OptionalState.update(request.allowed_docker_registries)
         if request.integration_id is not None:
-            integration_id = TriState.update(request.integration_id)
+            integration_name = TriState.update(request.integration_id)
 
         updater_spec = DomainUpdaterSpec(
             name=name,
@@ -83,7 +79,7 @@ class DomainAdapter(BaseFilterAdapter):
             total_resource_slots=total_resource_slots,
             allowed_vfolder_hosts=allowed_vfolder_hosts,
             allowed_docker_registries=allowed_docker_registries,
-            integration_id=integration_id,
+            integration_name=integration_name,
         )
         return Updater(spec=updater_spec, pk_value=domain_name)
 
@@ -106,6 +102,7 @@ class DomainAdapter(BaseFilterAdapter):
                 equals_factory=DomainConditions.by_name_equals,
                 starts_with_factory=DomainConditions.by_name_starts_with,
                 ends_with_factory=DomainConditions.by_name_ends_with,
+                in_factory=DomainConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

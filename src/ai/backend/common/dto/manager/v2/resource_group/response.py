@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotInfo,
     ResourceWeightEntryInfo,
@@ -21,6 +22,8 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionOrderDTO,
     SchedulerTypeDTO,
 )
+from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
@@ -31,6 +34,8 @@ __all__ = (
     "DeleteResourceGroupPayload",
     "FairShareScalingGroupSpecInfo",
     "PreemptionConfigInfo",
+    "ReplaceResourceGroupDefaultDeploymentOptionsPayload",
+    "ReplaceResourceGroupDefaultSessionOptionsPayload",
     "ResourceGroupDetailNode",
     "ResourceGroupMetadataInfo",
     "ResourceGroupNetworkConfigInfo",
@@ -63,7 +68,7 @@ class ResourceGroupNode(BaseResponseModel):
     allowed_vfolder_hosts: dict[str, Any] = Field(
         description="Allowed vfolder host permissions for the resource group.",
     )
-    integration_id: str | None = Field(
+    integration_name: str | None = Field(
         default=None,
         description="External integration ID associated with this resource group.",
     )
@@ -82,19 +87,19 @@ class ResourceGroupNode(BaseResponseModel):
 class CreateResourceGroupPayload(BaseResponseModel):
     """Payload for resource group creation mutation result."""
 
-    resource_group: ResourceGroupNode = Field(description="Created resource group.")
+    resource_group: ResourceGroupDetailNode = Field(description="Created resource group.")
 
 
 class UpdateResourceGroupPayload(BaseResponseModel):
     """Payload for resource group update mutation result."""
 
-    resource_group: ResourceGroupNode = Field(description="Updated resource group.")
+    resource_group: ResourceGroupDetailNode = Field(description="Updated resource group.")
 
 
 class DeleteResourceGroupPayload(BaseResponseModel):
     """Payload for resource group deletion mutation result."""
 
-    id: UUID = Field(description="UUID of the deleted resource group.")
+    id: str = Field(description="Name of the deleted resource group.")
 
 
 class AdminSearchResourceGroupsPayload(BaseResponseModel):
@@ -184,6 +189,19 @@ class ResourceGroupDetailNode(BaseResponseModel):
     scheduler: ResourceGroupSchedulerConfigInfo = Field(
         description="Scheduler configuration for the resource group."
     )
+    default_deployment_options: DeploymentOptionsInfo = Field(
+        description=(
+            "Default deployment options (timeouts, etc.) snapshot-copied"
+            " onto each new deployment created in this resource group."
+        ),
+    )
+    default_session_options: DefaultSessionOptionsInfo = Field(
+        description=(
+            "Default session options used as the fallback layer for the"
+            " scheduling controller's options resolver at session"
+            " enqueue time."
+        ),
+    )
 
 
 class UpdateResourceGroupFairShareSpecPayloadNode(BaseResponseModel):
@@ -199,6 +217,39 @@ class UpdateResourceGroupConfigPayloadNode(BaseResponseModel):
 
     resource_group: ResourceGroupDetailNode = Field(
         description="The updated resource group with new configuration."
+    )
+
+
+class ReplaceResourceGroupDefaultDeploymentOptionsPayload(BaseResponseModel):
+    """Payload returned after replacing a resource group's default deployment options.
+
+    The server path uses ``UPDATE ... RETURNING`` so only the refreshed
+    ``default_deployment_options`` payload is round-tripped; clients that
+    need the surrounding resource group node should re-fetch it.
+    """
+
+    resource_group_name: ResourceGroupName = Field(
+        description="Name of the resource group whose default options were replaced.",
+    )
+    default_deployment_options: DeploymentOptionsInfo = Field(
+        description="The newly persisted ``default_deployment_options`` surface.",
+    )
+
+
+class ReplaceResourceGroupDefaultSessionOptionsPayload(BaseResponseModel):
+    """Payload returned after replacing a resource group's default session options.
+
+    Mirrors :class:`ReplaceResourceGroupDefaultDeploymentOptionsPayload`.
+    The server path uses ``UPDATE ... RETURNING`` so only the refreshed
+    ``default_session_options`` payload is round-tripped; clients that
+    need the surrounding resource group node should re-fetch it.
+    """
+
+    resource_group_name: ResourceGroupName = Field(
+        description="Name of the resource group whose default options were replaced.",
+    )
+    default_session_options: DefaultSessionOptionsInfo = Field(
+        description="The newly persisted ``default_session_options`` surface.",
     )
 
 

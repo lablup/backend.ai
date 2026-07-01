@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self, cast
+from typing import TYPE_CHECKING, Annotated, Self, cast
 from uuid import UUID
 
+import strawberry
 from strawberry import ID, Info
 from strawberry.relay import NodeID
 
@@ -51,6 +52,7 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_node_type,
@@ -63,6 +65,11 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
+    from ai.backend.manager.api.gql.deployment.types.route import Route
+    from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
 __all__ = (
     # Enums
@@ -180,6 +187,28 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     created_at: datetime
     updated_at: datetime
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The session this history record belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def session(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            SessionV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.session.types"),
+        ]
+        | None
+    ):
+        from ai.backend.common.types import SessionId
+
+        return await info.context.data_loaders.session_loader.load(
+            SessionId(UUID(str(self.session_id)))
+        )
+
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
@@ -209,6 +238,34 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     attempts: int
     created_at: datetime
     updated_at: datetime
+    category: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description=(
+                "Handler category that produced this row. ``lifecycle``"
+                " for monotonic lifecycle transitions; ``scaling`` for"
+                " replica-reconcile transitions; ``health`` is reserved."
+            ),
+        )
+    )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The deployment this history record belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def deployment(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ModelDeployment,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.deployment"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -241,6 +298,42 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     attempts: int
     created_at: datetime
     updated_at: datetime
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The route this history record belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def route(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            Route,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.route"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.route_loader.load(UUID(str(self.route_id)))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The deployment this history record belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def deployment(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ModelDeployment,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.deployment"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

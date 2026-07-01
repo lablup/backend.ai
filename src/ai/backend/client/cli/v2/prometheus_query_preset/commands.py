@@ -1,10 +1,17 @@
-"""CLI commands for prometheus query definition management."""
+"""User-facing CLI commands for prometheus query presets.
+
+Read operations (search, get, execute) are available to any authenticated
+user since prometheus query presets are a shared catalog of metric query
+templates. Write operations (create, update, delete) live under
+``admin/prometheus_query_preset.py``.
+"""
 
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
-from typing import TYPE_CHECKING
+import json
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 import click
@@ -20,6 +27,51 @@ from ai.backend.client.cli.v2.helpers import (
     parse_order_options,
     print_result,
 )
+
+_DATETIME_FORMATS = (
+    "%Y-%m-%dT%H:%M:%S%z",
+    "%Y-%m-%d %H:%M:%S%z",
+)
+
+
+class PrometheusTimestampParamType(click.ParamType):
+    """Parse timezone-aware ISO8601 values or Unix timestamps for Prometheus."""
+
+    name = "prometheus-timestamp"
+
+    def __init__(self) -> None:
+        self._datetime_parser = click.DateTime(formats=_DATETIME_FORMATS)
+
+    def convert(
+        self,
+        value: object,
+        param: click.Parameter | None,
+        ctx: click.Context | None,
+    ) -> datetime:
+        if isinstance(value, datetime):
+            return value
+
+        if isinstance(value, str):
+            try:
+                return datetime.fromtimestamp(float(value), tz=UTC)
+            except ValueError:
+                pass
+
+        try:
+            parsed = self._datetime_parser.convert(value, param, ctx)
+        except click.BadParameter:
+            self.fail(
+                "must be a timezone-aware ISO8601 datetime "
+                "(for example: 2026-04-16T23:00:00+09:00 or 2026-04-16T14:00:00Z) "
+                "or a Unix timestamp (for example: 1713372000)",
+                param,
+                ctx,
+            )
+
+        return cast("datetime", parsed)
+
+
+prometheus_timestamp = PrometheusTimestampParamType()
 
 
 @click.group(name="prometheus-query-definition")
@@ -57,7 +109,6 @@ def search(
         QueryDefinitionOrderField,
     )
 
-    # Build filter only if any filter option is provided
     filter_dto: QueryDefinitionFilter | None = None
     if name_contains is not None:
         from ai.backend.common.dto.manager.query import StringFilter
@@ -66,7 +117,6 @@ def search(
             name=StringFilter(contains=name_contains),
         )
 
-    # Build order only if --order-by is provided
     orders = (
         parse_order_options(order_by, QueryDefinitionOrderField, QueryDefinitionOrder)
         if order_by
@@ -107,79 +157,6 @@ def get(preset_id: UUID) -> None:
     asyncio.run(_run())
 
 
-@prometheus_query_preset.command()
-@click.option("--name", required=True, help="Human-readable name.")
-@click.option("--metric-name", required=True, help="Prometheus metric name.")
-@click.option("--query-template", required=True, help="PromQL template with placeholders.")
-@click.option("--time-window", default=None, help="Default time window (e.g. '5m', '1h').")
-def create(
-    name: str,
-    metric_name: str,
-    query_template: str,
-    time_window: str | None,
-) -> None:
-    """Create a new prometheus query definition."""
-    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
-        CreateQueryDefinitionInput,
-        CreateQueryDefinitionOptionsInput,
-    )
-
-    async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
-        try:
-            result = await registry.prometheus_query_preset.create(
-                CreateQueryDefinitionInput(
-                    name=name,
-                    metric_name=metric_name,
-                    query_template=query_template,
-                    time_window=time_window,
-                    options=CreateQueryDefinitionOptionsInput(
-                        filter_labels=[],
-                        group_labels=[],
-                    ),
-                ),
-            )
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@prometheus_query_preset.command()
-@click.argument("preset_id", type=click.UUID)
-@click.argument("body", type=str)
-def update(preset_id: UUID, body: str) -> None:
-    """Update a prometheus query definition.
-
-    BODY is a JSON string with fields to update.
-    """
-    import json
-    import sys
-
-    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
-        ModifyQueryDefinitionInput,
-    )
-
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError as e:
-        click.echo(f"Invalid JSON: {e}", err=True)
-        sys.exit(1)
-
-    async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
-        try:
-            result = await registry.prometheus_query_preset.update(
-                preset_id, ModifyQueryDefinitionInput(**data)
-            )
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
 def _parse_label_filters(labels: tuple[str, ...]) -> list[MetricLabelEntry]:
     """Parse ``--label key=value`` options into MetricLabelEntry list."""
     import sys
@@ -206,8 +183,18 @@ def _parse_label_filters(labels: tuple[str, ...]) -> list[MetricLabelEntry]:
 
 @prometheus_query_preset.command()
 @click.argument("preset_id", type=click.UUID)
-@click.option("--start", type=click.DateTime(), default=None, help="Start time (ISO8601).")
-@click.option("--end", type=click.DateTime(), default=None, help="End time (ISO8601).")
+@click.option(
+    "--start",
+    type=prometheus_timestamp,
+    default=None,
+    help="Start time (timezone-aware ISO8601 or Unix timestamp).",
+)
+@click.option(
+    "--end",
+    type=prometheus_timestamp,
+    default=None,
+    help="End time (timezone-aware ISO8601 or Unix timestamp).",
+)
 @click.option("--step", type=str, default=None, help="Step duration (e.g. 60s).")
 @click.option(
     "--label",
@@ -233,8 +220,6 @@ def execute(
     time_window: str | None,
 ) -> None:
     """Execute a prometheus query definition."""
-    import json
-
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         ExecuteQueryDefinitionInput,
         ExecuteQueryDefinitionOptionsInput,
@@ -272,27 +257,6 @@ def execute(
         try:
             result = await registry.prometheus_query_preset.execute(preset_id, request)
             print(json.dumps(result.model_dump(mode="json"), indent=2, default=str))
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@prometheus_query_preset.command()
-@click.argument("preset_id", type=click.UUID)
-def delete(preset_id: UUID) -> None:
-    """Delete a query definition by ID."""
-    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
-        DeleteQueryDefinitionInput,
-    )
-
-    async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
-        try:
-            result = await registry.prometheus_query_preset.delete(
-                DeleteQueryDefinitionInput(id=preset_id),
-            )
-            print_result(result)
         finally:
             await registry.close()
 

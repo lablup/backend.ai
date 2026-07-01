@@ -41,6 +41,10 @@ from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
     PurgeGroupActionResult,
 )
+from ai.backend.manager.services.group.actions.resolve_project_id_by_name import (
+    ResolveProjectIdByNameAction,
+    ResolveProjectIdByNameActionResult,
+)
 from ai.backend.manager.services.group.actions.search_projects import (
     GetProjectAction,
     GetProjectActionResult,
@@ -226,7 +230,7 @@ class GroupService:
     ) -> ScopedSearchProjectsActionResult:
         """Search projects a user is member of.
 
-        Filters by association_groups_users table.
+        Filters by association_scopes_entities (PROJECT scope, USER entity).
 
         Args:
             action: SearchProjectsByUserAction with scope and querier.
@@ -248,7 +252,7 @@ class GroupService:
         self, action: AssignUsersToProjectAction
     ) -> AssignUsersToProjectActionResult:
         assigned_users = await self._group_repository.assign_users_to_project(
-            action.project_id, action.user_ids
+            action.project_id, action.user_ids, action.role_id
         )
         return AssignUsersToProjectActionResult(
             project_id=action.project_id, assigned_users=assigned_users
@@ -268,3 +272,21 @@ class GroupService:
         """
         data = await self._group_repository.get_project(action.project_id)
         return GetProjectActionResult(data=data)
+
+    async def resolve_project_id_by_name(
+        self, action: ResolveProjectIdByNameAction
+    ) -> ResolveProjectIdByNameActionResult:
+        """Resolve an active project's UUID by its `(domain_name, project_name)` pair.
+
+        LEGACY: Exists solely to keep legacy API handlers working that accept a
+        project name as input. Performs no authorization or validation beyond the
+        existence/active-state check in the underlying query. New API handlers
+        MUST NOT use this — they should accept a project UUID directly.
+
+        Returns a result whose ``project_id`` is ``None`` when no matching
+        active project exists — the caller decides how to handle the miss.
+        """
+        project_id = await self._group_repository.project_id_by_name_in_domain(
+            action.domain_name, action.project_name
+        )
+        return ResolveProjectIdByNameActionResult(project_id=project_id)

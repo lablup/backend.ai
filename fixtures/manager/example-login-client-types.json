@@ -1,0 +1,14 @@
+{
+  "login_client_types": [
+    {
+      "id": "00000000-0000-0000-0000-00000000c02e",
+      "name": "core",
+      "description": "Backend.AI CLI / core SDK clients."
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000eb",
+      "name": "webui",
+      "description": "Backend.AI web console."
+    }
+  ]
+}

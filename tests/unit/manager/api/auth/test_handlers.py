@@ -242,6 +242,7 @@ class TestAuthorize:
         request_ctx: RequestCtx,
         mock_processors: MagicMock,
         authorize_result: AuthorizeActionResult,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """Verify processor is called and authorization result is returned."""
         body: BodyParam[AuthorizeRequest] = BodyParam(AuthorizeRequest)
@@ -250,6 +251,7 @@ class TestAuthorize:
             "domain": "default",
             "username": "test@example.com",
             "password": "password123",
+            "client_type_id": str(sample_client_type_id),
         })
         mock_processors.auth.authorize.wait_for_complete = AsyncMock(return_value=authorize_result)
 
@@ -271,6 +273,7 @@ class TestAuthorize:
         request_ctx: RequestCtx,
         mock_processors: MagicMock,
         authorize_result: AuthorizeActionResult,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """Verify domain, username, password are passed to Action."""
         domain = "test-domain"
@@ -284,6 +287,7 @@ class TestAuthorize:
             "username": email,
             "password": password,
             "stoken": stoken,
+            "client_type_id": str(sample_client_type_id),
         })
         mock_processors.auth.authorize.wait_for_complete = AsyncMock(return_value=authorize_result)
 
@@ -301,6 +305,7 @@ class TestAuthorize:
         handler: AuthHandler,
         request_ctx: RequestCtx,
         mock_processors: MagicMock,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """Verify StreamResponse from hook is passed through."""
         stream_resp = MagicMock(spec=web.StreamResponse)
@@ -314,6 +319,7 @@ class TestAuthorize:
             "domain": "default",
             "username": "test@example.com",
             "password": "pass",
+            "client_type_id": str(sample_client_type_id),
         })
         mock_processors.auth.authorize.wait_for_complete = AsyncMock(return_value=result)
 

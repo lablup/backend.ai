@@ -72,11 +72,14 @@ def _make_handler(mock_db: MagicMock) -> tuple[SessionEventHandler, MagicMock]:
     mock_registry.webhook_ptask_group = MagicMock()
     mock_event_dispatcher_plugin_ctx = MagicMock()
     mock_idle_checker_host = MagicMock()
+    mock_scheduling_controller = MagicMock()
+    mock_scheduling_controller.mark_sessions_for_termination = AsyncMock()
     handler = SessionEventHandler(
         registry=mock_registry,
         db=mock_db,
         event_dispatcher_plugin_ctx=mock_event_dispatcher_plugin_ctx,
         idle_checker_host=mock_idle_checker_host,
+        scheduling_controller=mock_scheduling_controller,
     )
     return handler, mock_registry
 

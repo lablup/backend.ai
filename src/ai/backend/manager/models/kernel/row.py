@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
-from contextlib import asynccontextmanager as actxmgr
+from collections.abc import Iterable, Sequence
 from datetime import datetime, tzinfo
 from typing import (
     TYPE_CHECKING,
@@ -22,7 +20,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     foreign,
-    load_only,
     mapped_column,
     noload,
     relationship,
@@ -30,6 +27,7 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -65,48 +63,38 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.models.user import UserRow
 
-from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import (
-    KernelCreationFailed,
-    KernelDestructionFailed,
-    KernelExecutionFailed,
     KernelNotFound,
-    KernelRestartFailed,
     SessionNotFound,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
-from ai.backend.manager.exceptions import AgentError
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    EnumType,
     KernelIDColumnType,
     ResourceSlotColumn,
     SessionIDColumnType,
     StrEnumType,
     StructuredJSONObjectListColumn,
+    URLColumn,
 )
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
-    JSONCoalesceExpr,
     execute_with_retry,
     execute_with_txn_retry,
-    sql_json_merge,
 )
 
 __all__ = (
     "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "DEAD_KERNEL_STATUSES",
-    "KERNEL_STATUS_TRANSITION_MAP",
     "LIVE_STATUS",
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "KernelRow",
     "get_user_email",
-    "handle_kernel_exception",
     "kernels",
     "recalc_concurrency_used",
 )
@@ -151,23 +139,6 @@ DEAD_KERNEL_STATUSES = (
 LIVE_STATUS = (KernelStatus.RUNNING,)
 
 
-OP_EXC = {
-    "create_session": KernelCreationFailed,
-    "restart_session": KernelRestartFailed,
-    "destroy_session": KernelDestructionFailed,
-    "execute": KernelExecutionFailed,
-    "shutdown_service": KernelExecutionFailed,
-    "upload_file": KernelExecutionFailed,
-    "download_file": KernelExecutionFailed,
-    "download_single": KernelExecutionFailed,
-    "list_files": KernelExecutionFailed,
-    "get_logs_from_agent": KernelExecutionFailed,
-    "refresh_session": KernelExecutionFailed,
-    "commit_session": KernelExecutionFailed,
-    "commit_session_to_file": KernelExecutionFailed,
-}
-
-
 async def get_user_email(
     db_session: SASession,
     kernel: KernelRow,
@@ -183,184 +154,11 @@ def default_hostname(context: Any) -> str:
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
 
-KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
-    KernelStatus.PENDING: {
-        KernelStatus.SCHEDULED,
-        KernelStatus.CANCELLED,
-        KernelStatus.ERROR,
-    },
-    KernelStatus.SCHEDULED: {
-        KernelStatus.PREPARING,
-        KernelStatus.PULLING,
-        KernelStatus.PREPARED,
-        KernelStatus.CANCELLED,
-        KernelStatus.ERROR,
-    },
-    KernelStatus.PREPARING: {
-        KernelStatus.PULLING,
-        KernelStatus.PREPARED,
-        KernelStatus.CANCELLED,
-        KernelStatus.ERROR,
-    },
-    KernelStatus.PULLING: {
-        KernelStatus.PREPARED,
-        KernelStatus.CANCELLED,
-        KernelStatus.ERROR,
-    },
-    KernelStatus.PREPARED: {
-        KernelStatus.CREATING,
-        KernelStatus.CANCELLED,
-        KernelStatus.ERROR,
-    },
-    KernelStatus.CREATING: {
-        KernelStatus.RUNNING,
-        KernelStatus.TERMINATING,
-        KernelStatus.TERMINATED,
-        KernelStatus.CANCELLED,
-        KernelStatus.ERROR,
-    },
-    KernelStatus.BUILDING: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.BUILDING,
-            KernelStatus.PENDING,
-            KernelStatus.SCHEDULED,
-            KernelStatus.TERMINATED,
-        )
-    },
-    KernelStatus.RUNNING: {
-        KernelStatus.RESTARTING,
-        KernelStatus.RESIZING,
-        KernelStatus.TERMINATING,
-        KernelStatus.TERMINATED,
-        KernelStatus.ERROR,
-    },
-    KernelStatus.RESTARTING: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.RESTARTING,
-            KernelStatus.PENDING,
-            KernelStatus.SCHEDULED,
-            KernelStatus.TERMINATED,
-        )
-    },
-    KernelStatus.RESIZING: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.RESIZING,
-            KernelStatus.PENDING,
-            KernelStatus.SCHEDULED,
-            KernelStatus.TERMINATED,
-        )
-    },
-    KernelStatus.SUSPENDED: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.SUSPENDED,
-            KernelStatus.PENDING,
-            KernelStatus.SCHEDULED,
-            KernelStatus.TERMINATED,
-        )
-    },
-    KernelStatus.TERMINATING: {KernelStatus.TERMINATED, KernelStatus.ERROR},
-    KernelStatus.TERMINATED: set(),
-    KernelStatus.ERROR: {KernelStatus.TERMINATING, KernelStatus.TERMINATED},
-    KernelStatus.CANCELLED: set(),
-}
-
-
-@actxmgr
-async def handle_kernel_exception(
-    db: ExtendedAsyncSAEngine,
-    op: str,
-    kernel_id: KernelId,
-    error_callback: Callable[[], Any] | None = None,
-    cancellation_callback: Callable[[], Any] | None = None,
-    set_error: bool = False,
-) -> AsyncIterator[None]:
-    exc_class = OP_EXC[op]
-    # NOTE: Error logging is done outside of this actxmanager.
-    try:
-        yield
-    except TimeoutError:
-        if set_error:
-            await KernelRow.set_kernel_status(
-                db,
-                kernel_id,
-                KernelStatus.ERROR,
-                reason=f"operation-timeout ({op})",
-            )
-        if error_callback:
-            await error_callback()
-        raise exc_class("TIMEOUT") from None
-    except asyncio.CancelledError:
-        if cancellation_callback:
-            await cancellation_callback()
-        raise
-    except AgentError as e:
-        if set_error:
-            await KernelRow.set_kernel_status(
-                db,
-                kernel_id,
-                KernelStatus.ERROR,
-                reason=f"agent-error ({e!r})",
-                status_data={
-                    "error": {
-                        "src": "agent",
-                        "agent_id": e.agent_id,
-                        "name": e.exc_name,
-                        "repr": e.exc_repr,
-                    },
-                },
-            )
-        if error_callback:
-            await error_callback()
-        raise exc_class("FAILURE", e) from None
-    except BackendAIError:
-        # silently re-raise to make them handled by gateway http handlers
-        raise
-    except Exception as e:
-        if set_error:
-            await KernelRow.set_kernel_status(
-                db,
-                kernel_id,
-                KernelStatus.ERROR,
-                reason=f"other-error ({e!r})",
-                status_data={
-                    "error": {
-                        "src": "other",
-                        "name": e.__class__.__name__,
-                        "repr": repr(e),
-                    },
-                },
-            )
-        if error_callback:
-            await error_callback()
-        raise
-
-
 # Defined for avoiding circular import
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     from ai.backend.manager.models.user import UserRow
 
     return UserRow.uuid == foreign(KernelRow.user_uuid)
-
-
-def _get_image_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.image import ImageRow
-
-    return sa.and_(
-        KernelRow.image == ImageRow.name,
-        KernelRow.architecture == ImageRow.architecture,
-    )
 
 
 class KernelRow(Base):  # type: ignore[misc]
@@ -386,7 +184,7 @@ class KernelRow(Base):  # type: ignore[misc]
         "session_creation_id", sa.String(length=32), unique=False, index=False, nullable=True
     )
     session_name: Mapped[str | None] = mapped_column(
-        "session_name", sa.String(length=64), unique=False, index=True, nullable=True
+        "session_name", sa.String(length=128), unique=False, index=True, nullable=True
     )  # previously sess_id
     session_type: Mapped[SessionTypes] = mapped_column(
         "session_type",
@@ -443,8 +241,15 @@ class KernelRow(Base):  # type: ignore[misc]
         "access_key", sa.String(length=20), nullable=True
     )
     # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
+    # Kept as historical audit data; active reference is `image_id`.
     image: Mapped[str | None] = mapped_column("image", sa.String(length=512), nullable=True)
-    # ForeignKeyIDColumn("image_id", "images.id")
+    image_id: Mapped[ImageID | None] = mapped_column(
+        "image_id",
+        GUID(ImageID),
+        sa.ForeignKey("images.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     architecture: Mapped[str | None] = mapped_column(
         "architecture", sa.String(length=32), default="x86_64", nullable=True
     )
@@ -553,7 +358,7 @@ class KernelRow(Base):  # type: ignore[misc]
     #         // an ISO 8601 formatted timestamp of the last attempt
     #     "failed_predicates": [
     #       { "name": "concurrency", "msg": "You cannot run more than 30 concurrent sessions." },
-    #           // see the manager.scheduler.predicates module for possible messages
+    #           // see the sokovan scheduler validator modules for possible messages
     #       ...
     #     ],
     #     "passed_predicates": [ {"name": "reserved_time"}, ... ],  // names only
@@ -580,12 +385,12 @@ class KernelRow(Base):  # type: ignore[misc]
         "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
     )
     callback_url: Mapped[yarl.URL | None] = mapped_column(
-        "callback_url", sa.UnicodeText, nullable=True, default=sa.null()
+        "callback_url", URLColumn, nullable=True, default=sa.null()
     )
     startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
     result: Mapped[SessionResult] = mapped_column(
         "result",
-        EnumType(SessionResult),
+        StrEnumType(SessionResult, use_name=True),
         default=SessionResult.UNDEFINED,
         server_default=SessionResult.UNDEFINED.name,
         nullable=False,
@@ -646,8 +451,7 @@ class KernelRow(Base):  # type: ignore[misc]
     session: Mapped[SessionRow] = relationship("SessionRow", back_populates="kernels")
     image_row: Mapped[ImageRow | None] = relationship(
         "ImageRow",
-        foreign_keys="KernelRow.image",
-        primaryjoin=_get_image_row_join_condition,
+        foreign_keys="KernelRow.image_id",
     )
     agent_row: Mapped[AgentRow | None] = relationship("AgentRow", back_populates="kernels")
     group_row: Mapped[GroupRow] = relationship("GroupRow", back_populates="kernels")
@@ -775,153 +579,9 @@ class KernelRow(Base):  # type: ignore[misc]
         _stmt = sa.select(KernelRow).where(KernelRow.id.in_(kernel_ids))
         return (await db_session.scalars(_stmt)).all()
 
-    def transit_status(
-        self,
-        status: KernelStatus,
-        status_info: str | None = None,
-        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
-        status_changed_at: datetime | None = None,
-    ) -> bool:
-        """
-        Check whether the transition from a current status to the given status is valid or not.
-        Set the status if it is valid and return True.
-        Else, return False.
-        """
-        if status not in KERNEL_STATUS_TRANSITION_MAP[self.status]:
-            return False
-        self.set_status(status, status_info, status_data, status_changed_at)
-        return True
-
-    def set_status(
-        self,
-        status: KernelStatus,
-        status_info: str | None = None,
-        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
-        status_changed_at: datetime | None = None,
-    ) -> None:
-        """
-        Set the status of the kernel.
-        """
-        now = status_changed_at or datetime.now(tzutc())
-        if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
-            self.terminated_at = now
-        self.status_changed = now
-        self.status = status
-        self.status_history = {
-            **(self.status_history or {}),
-            status.name: now.isoformat(),
-        }
-        if status_info is not None:
-            self.status_info = status_info
-        if status_data is not None:
-            if not isinstance(status_data, Mapping):
-                # It's a JSONCoalesceExpr, cannot assign directly to ORM attribute
-                pass
-            else:
-                self.status_data = dict(status_data)
-
     def delegate_ownership(self, user_uuid: uuid.UUID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
-
-    @classmethod
-    async def set_kernel_status(
-        cls,
-        db: ExtendedAsyncSAEngine,
-        kernel_id: KernelId,
-        status: KernelStatus,
-        *,
-        status_data: Mapping[str, Any] | None = None,
-        reason: str | None = None,
-        status_changed_at: datetime | None = None,
-    ) -> None:
-        from ai.backend.manager.errors.kernel import InvalidKernelStatus
-
-        if status == KernelStatus.TERMINATED:
-            raise InvalidKernelStatus(
-                "TERMINATED status update must be handled in mark_kernel_terminated()"
-            )
-        if status_changed_at is None:
-            now = datetime.now(tzutc())
-        else:
-            now = status_changed_at
-        data: dict[str, Any] = {
-            "status": status,
-            "status_changed": now,
-            "status_history": sql_json_merge(
-                kernels.c.status_history,
-                (),
-                {
-                    status.name: now.isoformat(),  # ["PULLING", "CREATING"]
-                },
-            ),
-        }
-        if status_data is not None:
-            data["status_data"] = status_data
-        if reason is not None:
-            data["status_info"] = reason
-        if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
-            data["terminated_at"] = now
-
-        await cls.update_kernel(db, kernel_id, status, update_data=data)
-
-    @classmethod
-    async def update_kernel(
-        cls,
-        db: ExtendedAsyncSAEngine,
-        kernel_id: KernelId,
-        new_status: KernelStatus,
-        update_data: Mapping[str, Any] | None = None,
-    ) -> bool:
-        """
-        Update kernel by given id and data.
-        Return True if the kernel is updated, else return False.
-        """
-
-        now = datetime.now(tzutc())
-
-        async def _update() -> bool:
-            async with db.begin_session() as db_session:
-                kernel_query = (
-                    sa.select(KernelRow)
-                    .where(KernelRow.id == kernel_id)
-                    .with_for_update()
-                    .options(
-                        noload("*"),
-                        load_only(KernelRow.status, KernelRow.session_id),
-                    )
-                )
-                kernel_row = (await db_session.scalars(kernel_query)).first()
-                if kernel_row is None:
-                    return False
-
-                if new_status not in KERNEL_STATUS_TRANSITION_MAP[kernel_row.status]:
-                    # TODO: log or raise error
-                    return False
-                if update_data is None:
-                    update_values: dict[str, Any] = {
-                        "status": new_status,
-                        "status_history": sql_json_merge(
-                            kernels.c.status_history,
-                            (),
-                            {
-                                new_status.name: now.isoformat(),
-                            },
-                        ),
-                    }
-                else:
-                    update_values = {
-                        **update_data,
-                        "status": new_status,
-                    }
-
-                update_query = (
-                    sa.update(KernelRow).where(KernelRow.id == kernel_id).values(**update_values)
-                )
-                await db_session.execute(update_query)
-            return True
-
-        return await execute_with_retry(_update)
 
     @classmethod
     def from_kernel_info(cls, info: KernelInfo) -> Self:
@@ -948,6 +608,7 @@ class KernelRow(Base):  # type: ignore[misc]
             user_uuid=info.user_permission.user_uuid,
             access_key=info.user_permission.access_key,
             image=info.image.identifier.canonical if info.image.identifier else None,
+            image_id=info.image.image_id,
             architecture=info.image.identifier.architecture if info.image.identifier else None,
             registry=info.image.registry,
             tag=info.image.tag,
@@ -1011,6 +672,7 @@ class KernelRow(Base):  # type: ignore[misc]
                 gids=self.gids,
             ),
             image=ImageInfo(
+                image_id=self.image_id,
                 identifier=ImageIdentifier(
                     canonical=self.image,
                     architecture=self.architecture or "",

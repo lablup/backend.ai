@@ -1,7 +1,7 @@
 import pytest
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,
@@ -79,5 +79,8 @@ class TestReservedBatchSessionValidator:
 
         workload = batch_session_future_start_time
 
-        with pytest.raises(SchedulingValidationError, match="Before start time"):
+        with pytest.raises(
+            SchedulingValidationError,
+            match="Batch session is scheduled to start at",
+        ):
             validator.validate(snapshot, workload)

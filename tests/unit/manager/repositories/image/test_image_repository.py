@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import BinarySize, KernelId, ResourceSlot, SessionId
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -87,7 +88,7 @@ class TestImageRepositorySearch:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: UUID,
-    ) -> AsyncGenerator[list[UUID], None]:
+    ) -> AsyncGenerator[list[ImageID], None]:
         """Create sample images for testing"""
         images_data = [
             ("python:3.9", "x86_64", ImageType.COMPUTE),
@@ -128,7 +129,7 @@ class TestImageRepositorySearch:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: UUID,
-    ) -> AsyncGenerator[list[UUID], None]:
+    ) -> AsyncGenerator[list[ImageID], None]:
         """Create 25 images for pagination testing"""
         image_rows: list[ImageRow] = []
 
@@ -181,7 +182,7 @@ class TestImageRepositorySearch:
     async def test_search_images_first_page(
         self,
         image_repository: ImageRepository,
-        sample_images_for_pagination: list[UUID],
+        sample_images_for_pagination: list[ImageID],
     ) -> None:
         """Test first page of search results"""
         querier = BatchQuerier(
@@ -198,7 +199,7 @@ class TestImageRepositorySearch:
     async def test_search_images_second_page(
         self,
         image_repository: ImageRepository,
-        sample_images_for_pagination: list[UUID],
+        sample_images_for_pagination: list[ImageID],
     ) -> None:
         """Test second page of search results"""
         querier = BatchQuerier(
@@ -215,7 +216,7 @@ class TestImageRepositorySearch:
     async def test_search_images_last_page(
         self,
         image_repository: ImageRepository,
-        sample_images_for_pagination: list[UUID],
+        sample_images_for_pagination: list[ImageID],
     ) -> None:
         """Test last page with partial results"""
         querier = BatchQuerier(
@@ -236,7 +237,7 @@ class TestImageRepositorySearch:
     async def test_search_images_filter_by_architecture(
         self,
         image_repository: ImageRepository,
-        sample_images: list[UUID],
+        sample_images: list[ImageID],
     ) -> None:
         """Test filtering images by architecture"""
         querier = BatchQuerier(
@@ -256,7 +257,7 @@ class TestImageRepositorySearch:
     async def test_search_images_filter_by_type(
         self,
         image_repository: ImageRepository,
-        sample_images: list[UUID],
+        sample_images: list[ImageID],
     ) -> None:
         """Test filtering images by type"""
         querier = BatchQuerier(
@@ -281,7 +282,7 @@ class TestImageRepositorySearch:
     async def test_search_images_order_by_name_ascending(
         self,
         image_repository: ImageRepository,
-        sample_images: list[UUID],
+        sample_images: list[ImageID],
     ) -> None:
         """Test ordering images by name ascending"""
         querier = BatchQuerier(
@@ -298,7 +299,7 @@ class TestImageRepositorySearch:
     async def test_search_images_order_by_name_descending(
         self,
         image_repository: ImageRepository,
-        sample_images: list[UUID],
+        sample_images: list[ImageID],
     ) -> None:
         """Test ordering images by name descending"""
         querier = BatchQuerier(
@@ -319,7 +320,7 @@ class TestImageRepositorySearch:
     async def test_search_images_no_results(
         self,
         image_repository: ImageRepository,
-        sample_images: list[UUID],
+        sample_images: list[ImageID],
     ) -> None:
         """Test search with no matching results"""
         querier = BatchQuerier(
@@ -345,7 +346,7 @@ class TestImageRepositorySearch:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_registry_id: UUID,
-    ) -> AsyncGenerator[list[UUID], None]:
+    ) -> AsyncGenerator[list[ImageID], None]:
         """Create images with aliases for alias filter testing."""
         images_data = [
             ("python:3.9", "x86_64", ImageType.COMPUTE, ["py39"]),
@@ -392,7 +393,7 @@ class TestImageRepositorySearch:
     async def test_filter_by_single_alias_condition(
         self,
         image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
+        images_with_aliases: list[ImageID],
     ) -> None:
         """Test filtering images with a single alias condition."""
         querier = BatchQuerier(
@@ -411,7 +412,7 @@ class TestImageRepositorySearch:
     async def test_filter_by_combined_alias_conditions(
         self,
         image_repository: ImageRepository,
-        images_with_aliases: list[UUID],
+        images_with_aliases: list[ImageID],
     ) -> None:
         """Test filtering images with two alias conditions combined."""
         querier = BatchQuerier(

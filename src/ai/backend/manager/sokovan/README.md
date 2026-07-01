@@ -427,7 +427,7 @@ sokovan/
 │   └── allocators/            # Resource allocation
 │
 ├── deployment/                # Deployment management
-│   ├── definition_generator/  # Session definition generation per deployment type
+│   ├── revision_draft/        # Revision draft reader + merge helpers
 │   └── route/                 # Routing management
 │
 └── scheduling_controller/     # Session validation and preparation

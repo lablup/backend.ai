@@ -20,19 +20,14 @@ from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
 )
 from ai.backend.common.types import SessionId
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import SessionOrders
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    NoPagination,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination, OffsetPagination
 
 
 class ComputeSessionsAdapter(BaseFilterAdapter):
@@ -116,6 +111,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
                 equals_factory=SessionConditions.by_name_equals,
                 starts_with_factory=SessionConditions.by_name_starts_with,
                 ends_with_factory=SessionConditions.by_name_ends_with,
+                in_factory=SessionConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -127,6 +123,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
                 equals_factory=SessionConditions.by_access_key_equals,
                 starts_with_factory=SessionConditions.by_access_key_starts_with,
                 ends_with_factory=SessionConditions.by_access_key_ends_with,
+                in_factory=SessionConditions.by_access_key_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -138,6 +135,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
                 equals_factory=SessionConditions.by_domain_name_equals,
                 starts_with_factory=SessionConditions.by_domain_name_starts_with,
                 ends_with_factory=SessionConditions.by_domain_name_ends_with,
+                in_factory=SessionConditions.by_domain_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -149,6 +147,7 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
                 equals_factory=SessionConditions.by_scaling_group_equals,
                 starts_with_factory=SessionConditions.by_scaling_group_starts_with,
                 ends_with_factory=SessionConditions.by_scaling_group_ends_with,
+                in_factory=SessionConditions.by_scaling_group_in,
             )
             if condition is not None:
                 conditions.append(condition)

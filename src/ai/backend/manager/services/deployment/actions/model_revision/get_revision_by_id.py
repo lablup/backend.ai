@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import (
@@ -14,7 +14,7 @@ from ai.backend.manager.services.deployment.actions.model_revision.base import (
 
 @dataclass
 class GetRevisionByIdAction(ModelRevisionBaseAction):
-    revision_id: UUID
+    revision_id: DeploymentRevisionID
 
     @override
     def entity_id(self) -> str | None:

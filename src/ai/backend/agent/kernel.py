@@ -60,14 +60,12 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .errors import (
+    InvalidArgumentError,
+    InvalidSocket,
     KernelRunnerNotInitializedError,
     OutputQueueMismatchError,
     OutputQueueNotInitializedError,
     RunIdNotSetError,
-)
-from .exception import (
-    InvalidArgumentError,
-    InvalidSocket,
     UnsupportedBaseDistroError,
 )
 from .resources import KernelResourceSpec
@@ -632,7 +630,9 @@ class SocketPair:
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
                 log.warning(
-                    f"Socket invalid, recreating socket (addr: {self.input_sock.addr}, err: {e!r})"
+                    "Socket invalid, recreating socket (addr: {}, err: {!r})",
+                    self.input_sock.addr,
+                    e,
                 )
                 self.input_sock.recreate_socket()
                 self.output_sock.recreate_socket()
@@ -645,7 +645,7 @@ class SocketPair:
             return await self.output_sock.socket.recv_multipart()
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
-                log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {e!r})")
+                log.exception("Socket invalid (addr: {}, err: {!r})", self.output_sock.addr, e)
                 raise InvalidSocket from e
 
             raise
@@ -928,7 +928,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             b"start-model-service",
             _dump_json_bytes(model_info),
         ])
-        if health_check_info := model_info.get("service", {}).get("health_check"):
+        health_check_info = model_info.get("service", {}).get("health_check")
+        if health_check_info and health_check_info.get("enable"):
             timeout_seconds = (
                 health_check_info["max_retries"] * health_check_info["max_wait_time"] + 10
             )
@@ -1134,7 +1135,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "exitCode": None,
                 "options": None,
             }
-            log.warning(f"Execution timeout detected on kernel {self.kernel_id}")
+            log.warning("Execution timeout detected on kernel {}", self.kernel_id)
             type(self).aggregate_console(result, records, api_ver)
             self.next_output_queue()
             return result
@@ -1228,7 +1229,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             try:
                 data = await sock.recv_multipart()
                 if len(data) != 2:
-                    log.warning(f"Invalid data from output socket, skip. (data: {data})")
+                    log.warning("Invalid data from output socket, skip. (data: {})", data)
                     continue
                 msg_type, msg_data = data
                 try:

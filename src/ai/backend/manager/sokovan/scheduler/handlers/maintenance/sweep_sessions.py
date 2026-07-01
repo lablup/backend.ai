@@ -8,9 +8,9 @@ from collections.abc import Sequence
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
+from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.sokovan.data import SessionWithKernels
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
@@ -57,7 +57,12 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
         - success: None (sweep operation doesn't have success transition)
         - need_retry: None
         - expired: Session/kernel → TERMINATING (pending timeout exceeded)
-        - give_up: None
+        - give_up: None (intentional — sweep is a best-effort
+          maintenance pass over PENDING sessions; if a particular
+          session repeatedly fails to be swept the next sweep run
+          will pick it up again. Forcing a give_up transition would
+          mutate session state on a transient maintenance error,
+          which we'd rather avoid.)
         """
         return StatusTransitions(
             success=None,

@@ -1,7 +1,7 @@
 """Validator for user resource limits."""
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
+from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
 from .exceptions import UserResourceQuotaExceeded
 from .validator import ValidatorRule
@@ -35,7 +35,4 @@ class UserResourceLimitValidator(ValidatorRule):
         # Check if adding this workload would exceed the limit
         total_after = user_occupied + workload.requested_slots
         if not (total_after <= policy.total_resource_slots):
-            exceeded_msg = " ".join(f"{k}={v}" for k, v in policy.total_resource_slots.items() if v)
-            raise UserResourceQuotaExceeded(
-                f"Your main-keypair resource quota is exceeded. ({exceeded_msg})"
-            )
+            raise UserResourceQuotaExceeded(quota_slots=policy.total_resource_slots)

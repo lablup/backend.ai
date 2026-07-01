@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar
 from uuid import UUID
@@ -10,9 +11,10 @@ import sqlalchemy as sa
 
 from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 from .pagination import PageInfoResult, QueryPagination
-from .types import ExistenceCheck, QueryCondition, QueryOrder, SearchScope
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -90,6 +92,24 @@ async def execute_querier[TRow: Base](
 
 
 # =============================================================================
+# Existence Querier (by conditions)
+# =============================================================================
+
+
+@dataclass
+class ExistsQuerier[TRow: Base]:
+    """Existence check over a table by a set of conditions (combined with AND).
+
+    Attributes:
+        row_class: ORM class for table access.
+        conditions: Query conditions; an empty list checks whether the table has any row.
+    """
+
+    row_class: type[TRow]
+    conditions: list[QueryCondition] = field(default_factory=list)
+
+
+# =============================================================================
 # Batch Querier (with pagination)
 # =============================================================================
 
@@ -111,6 +131,12 @@ class BatchQuerierResult[TRow: Base]:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+@dataclass
+class _QueryPair:
+    query: sa.sql.Select[Any]
+    count_query: sa.sql.Select[Any]
 
 
 async def _validate_scope(
@@ -144,24 +170,35 @@ async def _validate_scope(
 def _apply_batch_querier(
     query: sa.sql.Select[Any],
     querier: BatchQuerier,
-) -> sa.sql.Select[Any]:
+    or_conditions: Sequence[QueryCondition],
+) -> _QueryPair:
     """Apply query conditions, orders, and pagination to a SQLAlchemy select statement.
 
     Args:
         query: The base SELECT statement
         querier: BatchQuerier containing conditions, orders, and pagination to apply
+        or_conditions: Conditions forming a single OR group, AND-merged with
+            `querier.conditions`. Pass an empty sequence to skip the OR group.
 
     Returns:
-        The modified SELECT statement with conditions, orders, and pagination applied
+        _QueryPair with the data query (filtered + paginated + ordered) and the
+        count query (filtered only, no pagination/ordering).
 
     Note:
+        Final WHERE applied to both data and count queries:
+            (cond_1 AND ... AND cond_N) AND (or_1 OR ... OR or_M)
         For cursor-based pagination, the pagination.apply() method applies
         cursor_order first. User-specified orders are applied after,
         serving as secondary sort criteria.
     """
-    # Apply all conditions
+    count_query = sa.select(sa.func.count()).select_from(query.froms[0])
+
     for condition in querier.conditions:
         query = query.where(condition())
+        count_query = count_query.where(condition())
+    if or_conditions:
+        query = query.where(sa.or_(*(c() for c in or_conditions)))
+        count_query = count_query.where(sa.or_(*(c() for c in or_conditions)))
 
     # Apply pagination (includes cursor condition and cursor_order for cursor pagination)
     query = querier.pagination.apply(query)
@@ -170,14 +207,14 @@ def _apply_batch_querier(
     for order in querier.orders:
         query = query.order_by(order)
 
-    return query
+    return _QueryPair(query=query, count_query=count_query)
 
 
 async def execute_batch_querier(
     db_sess: SASession,
     query: sa.sql.Select[Any],
     querier: BatchQuerier,
-    scope: SearchScope | None = None,
+    scopes: Sequence[SearchScope] = (),
 ) -> BatchQuerierResult[Row[Any]]:
     """Execute query with batch querier and return rows with total_count and pagination info.
 
@@ -188,7 +225,10 @@ async def execute_batch_querier(
         db_sess: Database session
         query: Base SELECT query (without count window function)
         querier: BatchQuerier for filtering, ordering, and pagination
-        scope: Optional SearchScope that provides required query conditions
+        scopes: Optional sequence of SearchScope. Each scope contributes its own
+            existence checks (aggregated and validated in a single query) and its
+            own to_condition() result. The to_condition() results form a single
+            OR group that is AND-merged with querier.conditions.
 
     Returns:
         BatchQuerierResult containing rows, total_count, and pagination info
@@ -203,24 +243,21 @@ async def execute_batch_querier(
         print(result.rows)  # List of matching rows
         print(result.total_count)  # Total count
     """
-    # Validate and add scope condition to querier if provided
-    if scope is not None:
-        await _validate_scope(db_sess, list(scope.existence_checks))
-        querier = BatchQuerier(
-            pagination=querier.pagination,
-            conditions=[*querier.conditions, scope.to_condition()],
-            orders=querier.orders,
-        )
+    or_conditions: list[QueryCondition] = []
+    if scopes:
+        aggregated_checks: list[ExistenceCheck[Any]] = []
+        for scope in scopes:
+            aggregated_checks.extend(scope.existence_checks)
+            or_conditions.append(scope.to_condition())
+        await _validate_scope(db_sess, aggregated_checks)
 
-    initial_query = query
+    query_pair = _apply_batch_querier(query, querier, or_conditions)
+    data_query = query_pair.query
+    count_query = query_pair.count_query
 
-    # Add window function for offset pagination
     if querier.pagination.uses_window_function:
-        query = query.add_columns(sa.func.count().over().label("total_count"))
-
-    # Apply conditions and pagination to get data rows
-    query = _apply_batch_querier(query, querier)
-    result = await db_sess.execute(query)
+        data_query = data_query.add_columns(sa.func.count().over().label("total_count"))
+    result = await db_sess.execute(data_query)
     rows = list(result.all())
 
     total_count: int
@@ -228,12 +265,7 @@ async def execute_batch_querier(
         # Offset pagination with results: use window function from rows
         total_count = rows[0].total_count
     else:
-        # Cursor pagination or offset fallback (rows empty):
-        # Execute pure count query with filter conditions only
-        count_query = sa.select(sa.func.count()).select_from(initial_query.froms[0])
-        for condition in querier.conditions:
-            count_query = count_query.where(condition())
-
+        # Cursor pagination or offset fallback (rows empty): separate count query
         count_result = await db_sess.execute(count_query)
         total_count = count_result.scalar() or 0
 

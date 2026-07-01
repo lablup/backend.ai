@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import asyncio
 import itertools
 import logging
 from collections import defaultdict
-from collections.abc import Callable, Sequence
-from contextlib import AbstractAsyncContextManager
-from dataclasses import dataclass
+from collections.abc import AsyncIterator, Callable, Sequence
+from contextlib import AbstractAsyncContextManager, AsyncExitStack
+from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass, field
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     Protocol,
@@ -15,7 +19,7 @@ from uuid import UUID
 
 import aiohttp_cors
 import attrs
-from pydantic import AliasChoices, BaseModel, Field, TypeAdapter
+from pydantic import AliasChoices, Field, TypeAdapter
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError, ServiceUnavailable
 from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
@@ -26,7 +30,6 @@ from ai.backend.appproxy.common.events import (
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
-from ai.backend.appproxy.coordinator.health_checker import HealthCheckEngine
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -39,13 +42,17 @@ from ai.backend.common.metrics.metric import (
     SystemMetricObserver,
 )
 from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
-from ai.backend.common.types import AgentId, RedisConnectionInfo
+from ai.backend.common.types import AgentId, BackendAISchema, RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
 
 from .config import ServerConfig
 from .defs import LockID
 from .models import Circuit
 from .models.utils import ExtendedAsyncSAEngine
+from .models.worker import Worker
+
+if TYPE_CHECKING:
+    from .services.endpoint import EndpointService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -78,11 +85,40 @@ class DistributedLockFactory(Protocol):
 
 
 @dataclass
+class CircuitRouteUpdateItem:
+    """One circuit's route-table change pending propagation to workers.
+
+    ``old_routes`` is kept alongside ``circuit`` so the legacy and
+    Traefik propagation paths share a single entry shape: legacy
+    propagation does not consult ``old_routes``, but Traefik's per-
+    session cleanup historically did, and pre-bundling them keeps the
+    bulk method's caller from re-reading state per circuit.
+    """
+
+    circuit: Circuit
+    old_routes: list[RouteInfo]
+
+
+@dataclass
 class CircuitManager:
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
     traefik_etcd: TraefikEtcd | None
     local_config: ServerConfig
+    _circuit_locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
+
+    def _get_lock(self, circuit_id: UUID) -> asyncio.Lock:
+        if circuit_id not in self._circuit_locks:
+            self._circuit_locks[circuit_id] = asyncio.Lock()
+        return self._circuit_locks[circuit_id]
+
+    def _release_circuit_lock(self, circuit_id: UUID) -> None:
+        self._circuit_locks.pop(circuit_id, None)
+
+    @actxmgr
+    async def circuit_lock(self, circuit_id: UUID) -> AsyncIterator[None]:
+        async with self._get_lock(circuit_id):
+            yield
 
     async def initialize_circuits(self, circuits: Sequence[Circuit]) -> None:
         if self.local_config.proxy_coordinator.enable_traefik:
@@ -96,30 +132,25 @@ class CircuitManager:
         if not self.traefik_etcd:
             raise ServerMisconfiguredError("proxy-coordinator.traefik")
 
+        # Publish each circuit's router / service / middleware subtrees via the same
+        # atomic per-subtree replace used by the route-update path, keeping both etcd
+        # write paths consistent. Each top-level traefik object (one router, one
+        # service, each middleware) maps to its own ``.../{kind}/{name}`` subtree so a
+        # re-publish only rewrites that object and never disturbs sibling circuits.
         for circuit_chunk in itertools.batched(circuits, 5):
-            total_map: defaultdict[str, Any] = defaultdict(
-                lambda: defaultdict(lambda: {"services": {}, "routers": {}, "middlewares": {}})
-            )
+            replacements: dict[str, Any] = {}
             for circuit in circuit_chunk:
                 worker_authority = circuit.worker_row.authority
+                etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
+                for name, body in circuit.traefik_routers.items():
+                    replacements[f"{etcd_prefix}/routers/{name}"] = convert_to_etcd_dict(body)
+                for name, body in circuit.traefik_services.items():
+                    replacements[f"{etcd_prefix}/services/{name}"] = convert_to_etcd_dict(body)
+                for name, body in circuit.get_traefik_middlewares(self.local_config).items():
+                    replacements[f"{etcd_prefix}/middlewares/{name}"] = convert_to_etcd_dict(body)
 
-                routers = circuit.traefik_routers
-                middlewares = circuit.get_traefik_middlewares(self.local_config)
-                services = circuit.traefik_services
-
-                total_map[f"worker_{worker_authority}"][circuit.protocol.value.lower()][
-                    "services"
-                ].update(services)
-                total_map[f"worker_{worker_authority}"][circuit.protocol.value.lower()][
-                    "routers"
-                ].update(routers)
-                if middlewares:
-                    total_map[f"worker_{worker_authority}"][circuit.protocol.value.lower()][
-                        "middlewares"
-                    ].update(middlewares)
-
-            log.debug("traefik_etcd put_prefix {}", convert_to_etcd_dict(total_map))
-            await self.traefik_etcd.put_prefix("", convert_to_etcd_dict(total_map))
+            log.debug("traefik_etcd atomic_replace_prefixes {}", replacements)
+            await self.traefik_etcd.atomic_replace_prefixes(replacements)
             log.debug("initialize_traefik_circuits(): end")
 
     async def initialize_legacy_circuit(self, circuit: Circuit) -> None:
@@ -155,75 +186,85 @@ class CircuitManager:
         self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
     async def update_circuit_routes(self, circuit: Circuit, old_routes: list[RouteInfo]) -> None:
-        if self.local_config.proxy_coordinator.enable_traefik:
-            await self.update_traefik_circuit_routes(circuit, old_routes)
-        else:
-            await self.update_legacy_circuit_routes(circuit, old_routes)
+        # Single-circuit entry point still exists for callers that don't
+        # batch (delete cleanups etc.). It just degenerates to the bulk
+        # path with one item so propagation logic lives in one place.
+        await self.update_circuit_routes_bulk([
+            CircuitRouteUpdateItem(circuit=circuit, old_routes=old_routes)
+        ])
 
-    async def update_traefik_circuit_routes(
-        self, circuit: Circuit, old_routes: list[RouteInfo]
+    async def update_circuit_routes_bulk(self, items: Sequence[CircuitRouteUpdateItem]) -> None:
+        """Apply many circuits' route-table changes under their per-circuit locks.
+
+        Locks are acquired in deterministic id order to avoid a deadlock
+        if two callers happen to bulk-update overlapping circuit sets.
+        Worker propagation is then issued in one batched call (Traefik:
+        one combined ``put_prefix``; legacy: one broadcast event per
+        worker authority) so the AppProxy side does not pay per-circuit
+        DB connection / etcd round-trip cost.
+        """
+        if not items:
+            return
+        ordered = sorted(items, key=lambda it: it.circuit.id)
+        async with AsyncExitStack() as stack:
+            for item in ordered:
+                await stack.enter_async_context(self.circuit_lock(item.circuit.id))
+            if self.local_config.proxy_coordinator.enable_traefik:
+                await self._update_traefik_circuit_routes_bulk(ordered)
+            else:
+                await self._update_legacy_circuit_routes_bulk(ordered)
+
+    async def _update_traefik_circuit_routes_bulk(
+        self, items: Sequence[CircuitRouteUpdateItem]
     ) -> None:
-        log.debug("update_traefik_circuit_routes(): start")
         if not self.traefik_etcd:
             raise ServerMisconfiguredError("proxy-coordinator.traefik")
 
-        worker_authority = circuit.worker_row.authority
-        etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
+        # Replace each circuit's ``bai_service_{id}`` subtree in a single etcd
+        # transaction so Traefik never observes a revision where the service was
+        # deleted but the new one not yet published (which would briefly leave the
+        # router pointing at a missing backend and drop requests). A circuit whose
+        # service shrinks (fewer routes) has its stale ``servers/N`` keys removed
+        # by the diff; a circuit with no routes yields an empty subtree that is
+        # fully removed, matching the previous delete-then-empty-put behaviour.
+        replacements: dict[str, Any] = {}
+        for item in items:
+            worker_authority = item.circuit.worker_row.authority
+            etcd_prefix = f"worker_{worker_authority}/{item.circuit.protocol.value.lower()}"
+            service_prefix = f"{etcd_prefix}/services/bai_service_{item.circuit.id}"
+            service_body = item.circuit.traefik_services.get(f"bai_service_{item.circuit.id}", {})
+            replacements[service_prefix] = convert_to_etcd_dict(service_body)
+        await self.traefik_etcd.atomic_replace_prefixes(replacements)
 
-        # Use health-aware services configuration
-        new_route_keys = {
-            f"bai_session_{r.session_id}_{circuit.id}" for r in circuit.healthy_routes
-        }
-        new_services = circuit.traefik_services
-        new_services = {
-            f"bai_service_{circuit.id}": new_services[f"bai_service_{circuit.id}"],
-            **{k: v for k, v in new_services.items() if k in new_route_keys},
-        }
-
-        # clear old routes
-        for route in old_routes:
-            log.debug(
-                "traefik_etcd.delete_prefix {}",
-                f"{etcd_prefix}/services/bai_session_{route.session_id}_{circuit.id}",
-            )
-            await self.traefik_etcd.delete_prefix(
-                f"{etcd_prefix}/services/bai_session_{route.session_id}_{circuit.id}"
-            )
-        log.debug(
-            "traefik_etcd.delete_prefix {}", f"{etcd_prefix}/services/bai_service_{circuit.id}"
-        )
-        await self.traefik_etcd.delete_prefix(f"{etcd_prefix}/services/bai_service_{circuit.id}")
-
-        log.debug(
-            "traefik_etcd.put_prefix {} {}",
-            f"{etcd_prefix}/services",
-            convert_to_etcd_dict(new_services),
-        )
-        await self.traefik_etcd.put_prefix(
-            f"{etcd_prefix}/services",
-            convert_to_etcd_dict(new_services),
-        )
-        log.debug("update_traefik_circuit_routes(): end")
-
-    async def update_legacy_circuit_routes(
-        self, circuit: Circuit, old_routes: list[RouteInfo]
+    async def _update_legacy_circuit_routes_bulk(
+        self, items: Sequence[CircuitRouteUpdateItem]
     ) -> None:
-        # Get healthy routes for the circuit
-        healthy_routes = circuit.healthy_routes
-
-        event = AppProxyCircuitRouteUpdatedEvent(
-            target_worker_authority=circuit.worker_row.authority,
-            circuit=SerializableCircuit(**circuit.dump_model()),
-            routes=healthy_routes,
-        )
-        await self.event_producer.broadcast_event(event)
+        # Legacy mode broadcasts one event per circuit because each
+        # event carries a single SerializableCircuit payload that the
+        # worker's RoutePool consumes. Batching them into a multi-
+        # circuit event would require a new wire shape on the worker
+        # side, which is out of scope for this change. Healthy-route
+        # filtering remains worker-side.
+        for item in items:
+            event = AppProxyCircuitRouteUpdatedEvent(
+                target_worker_authority=item.circuit.worker_row.authority,
+                circuit=SerializableCircuit(**item.circuit.dump_model()),
+                routes=item.circuit.route_info,
+            )
+            await self.event_producer.broadcast_event(event)
 
     async def unload_circuits(self, circuits: Sequence[Circuit]) -> None:
-        if self.local_config.proxy_coordinator.enable_traefik:
-            for circuit in circuits:
-                await self.unload_traefik_circuit(circuit)
-        else:
-            await self.unload_legacy_circuits(circuits)
+        for circuit in circuits:
+            try:
+                async with self.circuit_lock(circuit.id):
+                    if self.local_config.proxy_coordinator.enable_traefik:
+                        await self.unload_traefik_circuit(circuit)
+                    else:
+                        await self.unload_legacy_circuit(circuit)
+            except Exception:
+                log.exception("Failed to unload circuit {}", circuit.id)
+            finally:
+                self._release_circuit_lock(circuit.id)
 
     async def unload_traefik_circuit(self, circuit: Circuit) -> None:
         log.debug("unload_traefik_circuit(): start")
@@ -233,12 +274,12 @@ class CircuitManager:
         worker_authority = circuit.worker_row.authority
         etcd_prefix = f"worker_{worker_authority}/{circuit.protocol.value.lower()}"
 
+        # Circuit.traefik_services now emits a single bai_service_{circuit.id}
+        # prefix per circuit (no per-session sub-keys), so cleanup only needs
+        # to drop router / service / middleware prefixes scoped to the circuit id.
         prefixes_to_remove = [
             f"{etcd_prefix}/routers/bai_router_{circuit.id}",
             f"{etcd_prefix}/services/bai_service_{circuit.id}",
-        ] + [
-            f"{etcd_prefix}/services/bai_session_{r.session_id}_{circuit.id}"
-            for r in circuit.route_info
         ]
         if circuit.protocol == ProxyProtocol.HTTP:
             prefixes_to_remove.append(
@@ -247,23 +288,109 @@ class CircuitManager:
             prefixes_to_remove.append(
                 f"{etcd_prefix}/middlewares/appproxy/plugin/bai_appproxy_plugin_{circuit.id}",
             )
+            # Removed even when the circuit had no allowlist.
+            prefixes_to_remove.append(
+                f"{etcd_prefix}/middlewares/bai_ipallowlist_{circuit.id}",
+            )
 
         for prefix in prefixes_to_remove:
             log.debug("traefik_etcd.delete_prefix {}", prefix)
             await self.traefik_etcd.delete_prefix(prefix)
         log.debug("unload_traefik_circuit(): end")
 
-    async def unload_legacy_circuits(self, circuits: Sequence[Circuit]) -> None:
-        circuits_by_worker: defaultdict[str, list[Circuit]] = defaultdict(list)
-        for circuit in circuits:
-            circuits_by_worker[circuit.worker_row.authority].append(circuit)
+    async def reconcile_traefik_etcd_state(
+        self,
+        live_circuits: Sequence[Circuit],
+        workers: Sequence[Worker],
+    ) -> None:
+        """Drop stale circuit keys left behind in etcd by missed unloads.
 
-        for authority, circuits in circuits_by_worker.items():
-            event = AppProxyCircuitRemovedEvent(
-                target_worker_authority=authority,
-                circuits=[SerializableCircuit(**c.dump_model()) for c in circuits],
-            )
-            await self.event_producer.broadcast_event(event)
+        For each (worker, protocol) scope, compare the set of circuit ids
+        currently in the coordinator DB against the set of ``bai_service_{id}``
+        keys present under ``worker_{authority}/{protocol}/services``. Any
+        circuit id present in etcd but missing from the DB is an orphan
+        (lost unload event, coordinator crash between DB delete and etcd
+        cleanup, etc.) and gets the same prefix set removed as
+        ``unload_traefik_circuit`` would have.
+
+        The per-circuit put reconcile still runs before this helper, so this
+        method is a pure cleanup pass — it never adds keys, only removes them.
+        """
+        if not self.traefik_etcd:
+            raise ServerMisconfiguredError("proxy-coordinator.traefik")
+
+        live_by_scope: dict[tuple[str, str], set[UUID]] = defaultdict(set)
+        for circuit in live_circuits:
+            scope = (circuit.worker_row.authority, circuit.protocol.value.lower())
+            live_by_scope[scope].add(circuit.id)
+
+        dropped = 0
+        for worker in workers:
+            for protocol in ("http", "tcp"):
+                etcd_prefix = f"worker_{worker.authority}/{protocol}"
+                services_prefix = f"{etcd_prefix}/services"
+                try:
+                    existing = await self.traefik_etcd.get_prefix(services_prefix)
+                except Exception:
+                    log.exception(
+                        "reconcile_traefik_etcd_state: failed to list etcd services at {}",
+                        services_prefix,
+                    )
+                    continue
+
+                existing_ids: set[UUID] = set()
+                for top_key in existing.keys():
+                    if not top_key.startswith("bai_service_"):
+                        continue
+                    try:
+                        existing_ids.add(UUID(top_key.removeprefix("bai_service_")))
+                    except ValueError:
+                        continue
+
+                live_ids = live_by_scope.get((worker.authority, protocol), set())
+                stale_ids = existing_ids - live_ids
+
+                for stale_id in stale_ids:
+                    prefixes_to_remove = [
+                        f"{etcd_prefix}/routers/bai_router_{stale_id}",
+                        f"{etcd_prefix}/services/bai_service_{stale_id}",
+                    ]
+                    if protocol == "http":
+                        prefixes_to_remove.append(
+                            f"{etcd_prefix}/middlewares/bai_appproxy_plugin_{stale_id}"
+                        )
+                        prefixes_to_remove.append(
+                            f"{etcd_prefix}/middlewares/appproxy/plugin/bai_appproxy_plugin_{stale_id}"
+                        )
+                        # Removed even when the stale circuit had no allowlist.
+                        prefixes_to_remove.append(
+                            f"{etcd_prefix}/middlewares/bai_ipallowlist_{stale_id}"
+                        )
+                    for prefix in prefixes_to_remove:
+                        try:
+                            await self.traefik_etcd.delete_prefix(prefix)
+                        except Exception:
+                            log.exception(
+                                "reconcile_traefik_etcd_state: delete_prefix {} failed",
+                                prefix,
+                            )
+                    log.info(
+                        "reconcile_traefik_etcd_state: dropped stale circuit {} from worker={} protocol={}",
+                        stale_id,
+                        worker.authority,
+                        protocol,
+                    )
+                    dropped += 1
+
+        if dropped:
+            log.info("reconcile_traefik_etcd_state: dropped {} stale circuit(s)", dropped)
+
+    async def unload_legacy_circuit(self, circuit: Circuit) -> None:
+        event = AppProxyCircuitRemovedEvent(
+            target_worker_authority=circuit.worker_row.authority,
+            circuits=[SerializableCircuit(**circuit.dump_model())],
+        )
+        await self.event_producer.broadcast_event(event)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
@@ -285,7 +412,7 @@ class RootContext:
     traefik_etcd: TraefikEtcd | None
 
     circuit_manager: CircuitManager
-    health_engine: HealthCheckEngine
+    endpoint_service: EndpointService
 
     metrics: CoordinatorMetricRegistry
     health_probe: HealthProbe
@@ -295,7 +422,7 @@ class RootContext:
 type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
 
 
-class InferenceAppConfig(BaseModel):
+class InferenceAppConfig(BackendAISchema):
     session_id: Annotated[
         UUID,
         Field(

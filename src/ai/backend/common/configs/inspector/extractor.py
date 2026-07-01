@@ -3,7 +3,6 @@ from __future__ import annotations
 import types
 from typing import TYPE_CHECKING, Any, cast
 
-from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
@@ -15,6 +14,7 @@ from ai.backend.common.meta import (
     ConfigExample,
     get_field_meta,
 )
+from ai.backend.common.types import BackendAISchema
 
 from .types import FieldDocumentation, FieldSchema, FieldTypeInfo
 
@@ -53,7 +53,7 @@ class ConfigInspector:
         """The current environment for example extraction."""
         return self._env
 
-    def extract(self, model: type[BaseModel]) -> Mapping[str, FieldSchema]:
+    def extract(self, model: type[BackendAISchema]) -> Mapping[str, FieldSchema]:
         """Extract complete schema from a Pydantic model.
 
         Args:
@@ -73,7 +73,7 @@ class ConfigInspector:
 
     def _extract_field(
         self,
-        model: type[BaseModel],
+        model: type[BackendAISchema],
         field_name: str,
         field_info: FieldInfo,
     ) -> FieldSchema | None:
@@ -298,8 +298,8 @@ class ConfigInspector:
         if target_type is None:
             return None
 
-        # Extract children from the target BaseModel
-        if isinstance(target_type, type) and issubclass(target_type, BaseModel):
+        # Extract children from the target BackendAISchema
+        if isinstance(target_type, type) and issubclass(target_type, BackendAISchema):
             return self.extract(target_type)
 
         return None

@@ -41,7 +41,6 @@ from ai.backend.agent.stats import (
     StatContext,
 )
 from ai.backend.agent.types import Container, MountInfo
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     BinarySize,
@@ -52,6 +51,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 PREFIX = "tt-n300"
 VALID_CARD_TYPE = "n300"
@@ -207,19 +207,19 @@ class TTn300Plugin(AbstractComputePlugin):
                 for device in (await self.list_devices())
             }
 
-            for cid in container_ids:
-                power_stats[cid] = Decimal("0")
-                number_of_devices_per_container[cid] = 0
-                async with Docker() as docker:
+            async with Docker() as docker:
+                for cid in container_ids:
+                    power_stats[cid] = Decimal("0")
+                    number_of_devices_per_container[cid] = 0
                     container_info = await docker.containers.get(cid)
-                for device in container_info["HostConfig"]["Devices"]:
-                    if device["PathOnHost"] in device_stats_by_device_filename:
-                        left_stat, right_stat = device_stats_by_device_filename[
-                            device["PathOnHost"]
-                        ]
-                        power_stats[cid] += Decimal(left_stat["power"].strip())
-                        power_stats[cid] += Decimal(right_stat["power"].strip())
-                        number_of_devices_per_container[cid] += 1
+                    for device in container_info["HostConfig"]["Devices"]:
+                        if device["PathOnHost"] in device_stats_by_device_filename:
+                            left_stat, right_stat = device_stats_by_device_filename[
+                                device["PathOnHost"]
+                            ]
+                            power_stats[cid] += Decimal(left_stat["power"].strip())
+                            power_stats[cid] += Decimal(right_stat["power"].strip())
+                            number_of_devices_per_container[cid] += 1
         return [
             ContainerMeasurement(
                 MetricKey(f"{stat_prefix}_power"),

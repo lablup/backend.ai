@@ -10,7 +10,6 @@ from ai.backend.common.data.permission.scope_entity_combinations import (
 )
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY, build_operation_description
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -19,6 +18,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.rbac.types import (
+    BulkAddRolePermissionsInputGQL,
+    BulkAddRolePermissionsPayloadGQL,
+    BulkRemoveRolePermissionsInputGQL,
+    BulkRemoveRolePermissionsPayloadGQL,
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
@@ -30,6 +33,8 @@ from ai.backend.manager.api.gql.rbac.types import (
     PermissionGQL,
     PermissionOrderBy,
     RBACElementTypeGQL,
+    ReplaceRolePermissionsInputGQL,
+    ReplaceRolePermissionsPayloadGQL,
     ScopeEntityCombinationGQL,
     ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
@@ -57,7 +62,7 @@ async def admin_permissions(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> PermissionConnection:
+) -> PermissionConnection | None:
     check_admin_only()
     result = await info.context.adapters.rbac.admin_search_permissions_gql(
         AdminSearchPermissionsGQLInput(
@@ -97,7 +102,7 @@ async def admin_permissions(
 )  # type: ignore[misc]
 async def rbac_scope_entity_combinations(
     info: Info[StrawberryGQLContext],
-) -> list[ScopeEntityCombinationGQL]:
+) -> list[ScopeEntityCombinationGQL] | None:
     return [
         ScopeEntityCombinationGQL(
             scope_type=RBACElementTypeGQL(scope.value),
@@ -112,13 +117,13 @@ async def rbac_scope_entity_combinations(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List valid RBAC entity-operation combinations.",
     )
 )  # type: ignore[misc]
 async def rbac_entity_operation_combinations(
     info: Info[StrawberryGQLContext],
-) -> list[EntityOperationCombinationGQL]:
+) -> list[EntityOperationCombinationGQL] | None:
     entity_ops: dict[RBACElementType, list[OperationInfoGQL]] = {}
     for action_cls in RBAC_ACTION_REGISTRY:
         perm = action_cls.required_permission()
@@ -142,13 +147,13 @@ async def rbac_entity_operation_combinations(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List complete RBAC scope-entity-operation combinations (permission matrix).",
     )
 )  # type: ignore[misc]
 async def rbac_permission_matrix(
     info: Info[StrawberryGQLContext],
-) -> list[ScopeEntityOperationCombinationGQL]:
+) -> list[ScopeEntityOperationCombinationGQL] | None:
     dto_items = await info.context.adapters.rbac.get_permission_matrix()
     return [ScopeEntityOperationCombinationGQL.from_pydantic(item) for item in dto_items]
 
@@ -158,11 +163,11 @@ async def rbac_permission_matrix(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Create a scoped permission (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_create_permission(
     info: Info[StrawberryGQLContext],
     input: CreatePermissionInput,
-) -> PermissionGQL:
+) -> PermissionGQL | None:
     check_admin_only()
     result = await info.context.adapters.rbac.create_permission(input.to_pydantic())
     return PermissionGQL.from_pydantic(result)
@@ -170,11 +175,11 @@ async def admin_create_permission(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Update a scoped permission (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_update_permission(
     info: Info[StrawberryGQLContext],
     input: UpdatePermissionInput,
-) -> PermissionGQL:
+) -> PermissionGQL | None:
     check_admin_only()
     result = await info.context.adapters.rbac.update_permission(input.to_pydantic())
     return PermissionGQL.from_pydantic(result)
@@ -182,11 +187,56 @@ async def admin_update_permission(
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="26.3.0", description="Delete a scoped permission (admin only).")
-)  # type: ignore[misc]
+)
 async def admin_delete_permission(
     info: Info[StrawberryGQLContext],
     input: DeletePermissionInput,
-) -> DeletePermissionPayload:
+) -> DeletePermissionPayload | None:
     check_admin_only()
     result = await info.context.adapters.rbac.delete_permission(input.id)
     return DeletePermissionPayload.from_pydantic(result)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description="Bulk-insert scoped permission rows across one or more roles (admin only).",
+    )
+)
+async def admin_bulk_add_role_permissions(
+    info: Info[StrawberryGQLContext],
+    input: BulkAddRolePermissionsInputGQL,
+) -> BulkAddRolePermissionsPayloadGQL | None:
+    check_admin_only()
+    result = await info.context.adapters.rbac.bulk_add_role_permissions(input.to_pydantic())
+    return BulkAddRolePermissionsPayloadGQL.from_pydantic(result)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description="Bulk-delete permission rows by primary key (admin only).",
+    )
+)
+async def admin_bulk_remove_role_permissions(
+    info: Info[StrawberryGQLContext],
+    input: BulkRemoveRolePermissionsInputGQL,
+) -> BulkRemoveRolePermissionsPayloadGQL | None:
+    check_admin_only()
+    result = await info.context.adapters.rbac.bulk_remove_role_permissions(input.to_pydantic())
+    return BulkRemoveRolePermissionsPayloadGQL.from_pydantic(result)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description="Replace one role's entire scoped-permission set (admin only).",
+    )
+)
+async def admin_replace_role_permissions(
+    info: Info[StrawberryGQLContext],
+    input: ReplaceRolePermissionsInputGQL,
+) -> ReplaceRolePermissionsPayloadGQL | None:
+    check_admin_only()
+    result = await info.context.adapters.rbac.replace_role_permissions(input.to_pydantic())
+    return ReplaceRolePermissionsPayloadGQL.from_pydantic(result)

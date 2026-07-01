@@ -21,7 +21,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import PresetIdPathParam
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.resource_preset import ResourcePresetAdapter
+    from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

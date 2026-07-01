@@ -69,7 +69,7 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
 
 
 class TestAuthClient:
-    async def test_authorize(self) -> None:
+    async def test_authorize(self, sample_client_type_id: UUID) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
         mock_resp.json = AsyncMock(
@@ -95,6 +95,7 @@ class TestAuthClient:
             domain="default",
             username="user@example.com",
             password="secret",
+            client_type_id=sample_client_type_id,
         )
         result = await auth_client.authorize(request)
 

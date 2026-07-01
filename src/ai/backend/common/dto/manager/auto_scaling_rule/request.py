@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.query import DateTimeFilter, NullableDateTimeFilter
 from ai.backend.common.types import AutoScalingMetricSource
 
 from .types import (
@@ -42,6 +43,10 @@ class CreateAutoScalingRuleRequest(BaseRequestModel):
     time_window: int = Field(description="Time window in seconds for scaling evaluation")
     min_replicas: int | None = Field(default=None, description="Minimum number of replicas")
     max_replicas: int | None = Field(default=None, description="Maximum number of replicas")
+    prometheus_query_preset_id: UUID | None = Field(
+        default=None,
+        description="ID of Prometheus query preset (required when metric_source is PROMETHEUS)",
+    )
 
 
 class UpdateAutoScalingRuleRequest(BaseRequestModel):
@@ -57,12 +62,19 @@ class UpdateAutoScalingRuleRequest(BaseRequestModel):
     time_window: int | None = Field(default=None, description="Updated time window in seconds")
     min_replicas: int | None = Field(default=None, description="Updated minimum replicas")
     max_replicas: int | None = Field(default=None, description="Updated maximum replicas")
+    prometheus_query_preset_id: UUID | None = Field(
+        default=None, description="Updated Prometheus query preset ID"
+    )
 
 
 class AutoScalingRuleFilter(BaseRequestModel):
     """Filter for auto-scaling rules."""
 
     model_deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+    created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
+    last_triggered_at: NullableDateTimeFilter | None = Field(
+        default=None, description="Last triggered datetime filter"
+    )
 
 
 class AutoScalingRuleOrder(BaseRequestModel):

@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from ai.backend.common.data.permission.types import RelationType
+from ai.backend.common.data.permission.types import Permission, RelationType
 
 from .id import ObjectId, ScopeId
 
@@ -15,4 +15,5 @@ class AssociationScopesEntitiesData:
     scope_id: ScopeId
     object_id: ObjectId
     relation_type: RelationType
+    permission_cap: Permission | None
     registered_at: datetime

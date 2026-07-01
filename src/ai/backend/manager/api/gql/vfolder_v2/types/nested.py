@@ -18,12 +18,19 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderOwnershipInfo as VFolderOwnershipInfoDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.dto.manager.v2.vfolder.types import (
+    VFolderQuotaInfo as VFolderQuotaInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder.types import (
+    VFolderUsageInfo as VFolderUsageInfoDTO,
+)
+from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
     VFolderMountPermissionGQL,
     VFolderOwnershipTypeGQL,
@@ -32,13 +39,12 @@ from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-    from ai.backend.manager.api.gql.types import StrawberryGQLContext
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Descriptive metadata for a virtual folder. "
             "Includes the folder name, usage mode, quota scope, "
@@ -69,7 +75,7 @@ class VFolderMetadataInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Access control information for a virtual folder. "
             "Includes the mount permission level (read-only, read-write, read-write-delete) "
@@ -92,7 +98,51 @@ class VFolderAccessControlInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
+        description="Quota limits configured for a virtual folder.",
+    ),
+    model=VFolderQuotaInfoDTO,
+    name="VFolderQuotaInfo",
+)
+class VFolderQuotaInfoGQL:
+    """Quota limits configured for a virtual folder."""
+
+    max_size: BinarySizeInfoGQL | None = gql_field(
+        description="Capacity quota limit in bytes with human-readable display. Null if unlimited."
+    )
+    max_files: int = gql_field(description="File-count quota for the folder.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description=(
+            "Usage statistics for a virtual folder, measured live through the storage proxy."
+        ),
+    ),
+    model=VFolderUsageInfoDTO,
+    name="VFolderUsageInfo",
+)
+class VFolderUsageInfoGQL:
+    """Usage statistics for a virtual folder, measured live through the storage proxy."""
+
+    num_files: int = gql_field(
+        description=(
+            "Number of files currently stored in the folder, "
+            "measured live through the storage proxy."
+        )
+    )
+    used_bytes: BinarySizeInfoGQL = gql_field(
+        description=(
+            "Current used capacity in bytes with human-readable display, "
+            "measured live through the storage proxy."
+        )
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.4.2",
         description=(
             "Ownership context for a virtual folder. "
             "Provides both scalar IDs (userId, projectId, creatorEmail) for lightweight access "
@@ -111,6 +161,9 @@ class VFolderOwnershipInfoGQL:
     project_id: UUID | None = gql_field(
         description="UUID of the project that owns this virtual folder. Null for user-owned folders.",
     )
+    creator_id: UUID | None = gql_field(
+        description="UUID of the user who originally created this virtual folder.",
+    )
     creator_email: str | None = gql_field(
         description="Email of the user who originally created this virtual folder.",
     )
@@ -126,8 +179,9 @@ class VFolderOwnershipInfoGQL:
         ]
         | None
     ):
-        # Defer to data loader when wired; stub returns None for now.
-        return None
+        if self.user_id is None:
+            return None
+        return await info.context.data_loaders.user_loader.load(self.user_id)
 
     @gql_field(
         description="The project that owns this virtual folder. Null for user-owned folders."
@@ -142,8 +196,9 @@ class VFolderOwnershipInfoGQL:
         ]
         | None
     ):
-        # Defer to data loader when wired; stub returns None for now.
-        return None
+        if self.project_id is None:
+            return None
+        return await info.context.data_loaders.project_loader.load(self.project_id)
 
     @gql_field(description="The user who originally created this virtual folder.")  # type: ignore[misc]
     async def creator(
@@ -156,5 +211,6 @@ class VFolderOwnershipInfoGQL:
         ]
         | None
     ):
-        # Defer to data loader when wired; stub returns None for now.
-        return None
+        if self.creator_id is None:
+            return None
+        return await info.context.data_loaders.user_loader.load(self.creator_id)

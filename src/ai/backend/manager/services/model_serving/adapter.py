@@ -6,9 +6,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
-from ai.backend.manager.repositories.base import QueryCondition
 
 if TYPE_CHECKING:
     from ai.backend.common.dto.manager.model_serving.request import ServiceFilterModel
@@ -28,6 +28,7 @@ class ServiceSearchAdapter(BaseFilterAdapter):
                 equals_factory=DeploymentConditions.by_name_equals,
                 starts_with_factory=DeploymentConditions.by_name_starts_with,
                 ends_with_factory=DeploymentConditions.by_name_ends_with,
+                in_factory=DeploymentConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

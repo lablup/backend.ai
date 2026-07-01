@@ -2,15 +2,27 @@
 
 from .resolver import (
     admin_create_prometheus_query_preset,
+    admin_create_prometheus_query_preset_category,
     admin_delete_prometheus_query_preset,
+    admin_delete_prometheus_query_preset_category,
     admin_modify_prometheus_query_preset,
-    admin_prometheus_query_preset,
-    admin_prometheus_query_preset_result,
-    admin_prometheus_query_presets,
+    admin_preview_prometheus_query_preset,
+    prometheus_query_preset,
+    prometheus_query_preset_categories,
+    prometheus_query_preset_category,
+    prometheus_query_preset_result,
+    prometheus_query_presets,
 )
 from .types import (
+    CategoryFilterGQL,
+    CategoryGQL,
+    CategoryOrderByGQL,
+    CategoryOrderFieldGQL,
+    CreateCategoryInputGQL,
+    CreateCategoryPayloadGQL,
     CreateQueryDefinitionInput,
     CreateQueryDefinitionPayload,
+    DeleteCategoryPayloadGQL,
     DeleteQueryDefinitionPayload,
     ExecuteQueryDefinitionOptionsInput,
     MetricLabelEntryGQL,
@@ -32,13 +44,20 @@ from .types import (
 
 __all__ = [
     # Queries
-    "admin_prometheus_query_preset",
-    "admin_prometheus_query_presets",
-    "admin_prometheus_query_preset_result",
+    "prometheus_query_preset",
+    "prometheus_query_presets",
+    "prometheus_query_preset_result",
+    "admin_preview_prometheus_query_preset",
+    # Category Queries
+    "prometheus_query_preset_category",
+    "prometheus_query_preset_categories",
     # Mutations
     "admin_create_prometheus_query_preset",
     "admin_modify_prometheus_query_preset",
     "admin_delete_prometheus_query_preset",
+    # Category Mutations
+    "admin_create_prometheus_query_preset_category",
+    "admin_delete_prometheus_query_preset_category",
     # Types
     "QueryDefinitionGQL",
     "QueryDefinitionEdge",
@@ -59,4 +78,12 @@ __all__ = [
     "CreateQueryDefinitionPayload",
     "ModifyQueryDefinitionPayload",
     "DeleteQueryDefinitionPayload",
+    # Category Types
+    "CategoryGQL",
+    "CategoryFilterGQL",
+    "CategoryOrderByGQL",
+    "CategoryOrderFieldGQL",
+    "CreateCategoryInputGQL",
+    "CreateCategoryPayloadGQL",
+    "DeleteCategoryPayloadGQL",
 ]

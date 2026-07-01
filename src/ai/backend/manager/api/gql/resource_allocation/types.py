@@ -43,7 +43,6 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
 from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     ScopeResourceUsageNode as ScopeResourceUsageNodeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     ResourceLimitEntryGQL,
@@ -80,7 +79,7 @@ __all__ = (
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Resource usage for a single scope (keypair, project, domain).",
     ),
     model=ScopeResourceUsageNodeDTO,
@@ -100,7 +99,7 @@ class ScopeResourceUsageGQL(PydanticOutputMixin[ScopeResourceUsageNodeDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Resource usage for a resource group (agent-level physical resources).",
     ),
     model=ResourceGroupUsageNodeDTO,
@@ -123,7 +122,7 @@ class ResourceGroupUsageGQL(PydanticOutputMixin[ResourceGroupUsageNodeDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Breakdown of resource allocation by scope.",
     ),
     model=EffectiveBreakdownNodeDTO,
@@ -146,7 +145,7 @@ class EffectiveBreakdownGQL(PydanticOutputMixin[EffectiveBreakdownNodeDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Effective assignable resources considering all scope constraints.",
     ),
     model=EffectiveResourceAllocationPayloadDTO,
@@ -165,7 +164,7 @@ class EffectiveResourceAllocationPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="A resource preset with its availability status.",
     ),
     model=PresetAvailabilityNodeDTO,
@@ -190,7 +189,7 @@ class PresetAvailabilityNodeGQL(PydanticOutputMixin[PresetAvailabilityNodeDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload containing preset availability check results.",
     ),
     model=CheckPresetAvailabilityPayloadDTO,
@@ -204,7 +203,7 @@ class CheckPresetAvailabilityPayloadGQL(PydanticOutputMixin[CheckPresetAvailabil
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for keypair resource allocation query.",
     ),
     model=KeypairResourceAllocationPayloadDTO,
@@ -220,7 +219,7 @@ class KeypairResourceAllocationPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for project resource allocation query.",
     ),
     model=ProjectResourceAllocationPayloadDTO,
@@ -236,7 +235,7 @@ class ProjectResourceAllocationPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for domain resource allocation query.",
     ),
     model=DomainResourceAllocationPayloadDTO,
@@ -252,7 +251,7 @@ class DomainResourceAllocationPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for resource group resource allocation query.",
     ),
     model=ResourceGroupResourceAllocationPayloadDTO,
@@ -272,7 +271,7 @@ class ResourceGroupResourceAllocationPayloadGQL(
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for querying effective assignable resources.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="EffectiveResourceAllocationV2Input",
 )
@@ -288,7 +287,7 @@ class EffectiveResourceAllocationInputGQL(
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for admin querying effective assignable resources for a specific user.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="AdminEffectiveResourceAllocationV2Input",
 )
@@ -305,7 +304,7 @@ class AdminEffectiveResourceAllocationInputGQL(
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for checking which resource presets are available.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="CheckPresetAvailabilityV2Input",
 )

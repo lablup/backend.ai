@@ -7,7 +7,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
 from ai.backend.common.bgtask.types import TaskID
@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
-from ai.backend.common.types import ResultSet, VFolderUsageMode
+from ai.backend.common.types import BackendAISchema, ResultSet, VFolderUsageMode
 
 __all__ = (
     # DTOs (data transfer objects)
@@ -68,7 +68,7 @@ __all__ = (
 # ============================================================
 
 
-class VFolderCreatedDTO(BaseModel):
+class VFolderCreatedDTO(BackendAISchema):
     """DTO for a newly created vfolder."""
 
     id: str = Field(description="VFolder ID (hex UUID)")
@@ -87,7 +87,7 @@ class VFolderCreatedDTO(BaseModel):
     unmanaged_path: str | None = Field(default=None, description="Unmanaged path if any")
 
 
-class VFolderInfoDTO(BaseModel):
+class VFolderInfoDTO(BackendAISchema):
     """DTO for detailed vfolder information."""
 
     name: str = Field(description="VFolder name")
@@ -108,18 +108,18 @@ class VFolderInfoDTO(BaseModel):
     cloneable: bool = Field(description="Whether the vfolder is cloneable")
 
 
-class CompactVFolderInfoDTO(BaseModel):
+class CompactVFolderInfoDTO(BackendAISchema):
     """DTO for compact vfolder information (ID + name only)."""
 
     id: uuid.UUID = Field(description="VFolder ID")
     name: str = Field(description="VFolder name")
 
 
-class VFolderInvitationDTO(BaseModel):
+class VFolderInvitationDTO(BackendAISchema):
     """DTO for vfolder invitation data."""
 
     id: str = Field(description="Invitation ID")
-    inviter: str = Field(description="Inviter email")
+    inviter: str = Field(description="Inviter email, or username if email is empty")
     invitee: str = Field(description="Invitee email")
     perm: VFolderPermissionField = Field(description="Permission level")
     state: str = Field(description="Invitation state")
@@ -129,7 +129,7 @@ class VFolderInvitationDTO(BaseModel):
     vfolder_name: str = Field(description="VFolder name")
 
 
-class VFolderSharedInfoDTO(BaseModel):
+class VFolderSharedInfoDTO(BackendAISchema):
     """DTO for shared vfolder information."""
 
     vfolder_id: str = Field(description="VFolder ID")
@@ -141,7 +141,7 @@ class VFolderSharedInfoDTO(BaseModel):
     perm: VFolderPermissionField = Field(description="Permission level")
 
 
-class VFolderCloneInfoDTO(BaseModel):
+class VFolderCloneInfoDTO(BackendAISchema):
     """DTO for cloned vfolder information."""
 
     id: str = Field(description="Cloned VFolder ID (hex UUID)")
@@ -157,7 +157,7 @@ class VFolderCloneInfoDTO(BaseModel):
     bgtask_id: str = Field(description="Background task ID for the clone operation")
 
 
-class VolumeInfoDTO(BaseModel):
+class VolumeInfoDTO(BackendAISchema):
     """DTO for volume host information."""
 
     backend: str = Field(description="Storage backend type")
@@ -166,7 +166,7 @@ class VolumeInfoDTO(BaseModel):
     sftp_scaling_groups: list[str] | None = Field(default=None, description="SFTP scaling groups")
 
 
-class MountResultDTO(BaseModel):
+class MountResultDTO(BackendAISchema):
     """DTO for mount/umount operation result per node."""
 
     success: bool = Field(description="Whether the operation succeeded")
@@ -195,10 +195,8 @@ class VFolderGetIDResponse(BaseRootResponseModel[CompactVFolderInfoDTO]):
     """Response for getting vfolder ID by name."""
 
 
-class VFolderCloneResponse(BaseResponseModel):
+class VFolderCloneResponse(BaseRootResponseModel[VFolderCloneInfoDTO]):
     """Response for cloning a vfolder."""
-
-    item: VFolderCloneInfoDTO = Field(description="Cloned vfolder info")
 
 
 # ============================================================

@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.clients.prometheus.client import PrometheusClient
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -29,7 +28,12 @@ from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators, RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
+from ai.backend.manager.actions.validators.rbac.legacy import (
+    LegacyScopeActionRBACValidator,
+    LegacySingleEntityActionRBACValidator,
+)
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -37,11 +41,13 @@ from ai.backend.manager.actions.validators.rbac.single_entity import (
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
 from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import StreamCleanupEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.notification import NotificationCenter
 from ai.backend.manager.registry import AgentRegistry
@@ -56,10 +62,9 @@ from ai.backend.manager.service.container_registry.harbor import (
 from ai.backend.manager.services.processors import Processors, ServiceArgs
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
+from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory, SMTPTriggerPolicy
@@ -94,6 +99,7 @@ class ProcessingInput:
     scheduling_controller: SchedulingController
     deployment_coordinator: DeploymentCoordinator
     route_coordinator: RouteCoordinator
+    reconciler_coordinator: ReconcilerCoordinator
     scheduler_repository: SchedulerRepository
     event_hub: EventHub
     agent_registry: AgentRegistry
@@ -115,7 +121,7 @@ class ProcessingInput:
     error_monitor: ErrorPluginContext
     hook_plugin_ctx: HookPluginContext
     deployment_controller: DeploymentController
-    revision_generator_registry: RevisionGeneratorRegistry
+    route_controller: RouteController
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
@@ -220,6 +226,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         prometheus_monitor = PrometheusMonitor()
         audit_log_monitor = AuditLogMonitor(setup_input.repositories.audit_log.repository)
 
+        ssh_key_validator = SSHKeyValidator()
+
         service_args = ServiceArgs(
             db=setup_input.db,
             repositories=setup_input.repositories,
@@ -240,19 +248,28 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             hook_plugin_ctx=setup_input.hook_plugin_ctx,
             scheduling_controller=setup_input.scheduling_controller,
             deployment_controller=setup_input.deployment_controller,
-            revision_generator_registry=setup_input.revision_generator_registry,
+            route_controller=setup_input.route_controller,
             event_producer=setup_input.event_producer,
             agent_cache=setup_input.agent_cache,
             notification_center=setup_input.notification_center,
             appproxy_client_pool=setup_input.appproxy_client_pool,
             prometheus_client=setup_input.prometheus_client,
+            ssh_key_validator=ssh_key_validator,
             registry_quota_service=setup_input.registry_quota_service,
         )
 
         permission_controller_repository = setup_input.repositories.permission_controller.repository
+        config_provider = setup_input.config_provider
         rbac_validators = RBACValidators(
-            scope=ScopeActionRBACValidator(permission_controller_repository),
-            single_entity=SingleEntityActionRBACValidator(permission_controller_repository),
+            scope=ScopeActionRBACValidator(permission_controller_repository, config_provider),
+            single_entity=SingleEntityActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
+            bulk=BulkActionRBACValidator(permission_controller_repository, config_provider),
+        )
+        legacy_rbac_validators = LegacyRBACValidators(
+            scope=LegacyScopeActionRBACValidator(permission_controller_repository),
+            single_entity=LegacySingleEntityActionRBACValidator(permission_controller_repository),
         )
 
         processors = await stack.enter_dependency(
@@ -262,7 +279,10 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 action_monitors=[reporter_monitor, prometheus_monitor, audit_log_monitor],
                 event_hub=setup_input.event_hub,
                 event_fetcher=setup_input.event_fetcher,
-                validators=ActionValidators(rbac=rbac_validators),
+                validators=ActionValidators(
+                    rbac=rbac_validators,
+                    legacy_rbac=legacy_rbac_validators,
+                ),
             ),
         )
 
@@ -276,6 +296,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 scheduling_controller=setup_input.scheduling_controller,
                 deployment_coordinator=setup_input.deployment_coordinator,
                 route_coordinator=setup_input.route_coordinator,
+                reconciler_coordinator=setup_input.reconciler_coordinator,
                 scheduler_repository=setup_input.scheduler_repository,
                 event_hub=setup_input.event_hub,
                 agent_registry=setup_input.agent_registry,

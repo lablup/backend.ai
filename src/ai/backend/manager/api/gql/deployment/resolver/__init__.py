@@ -6,6 +6,7 @@ for the deployment module.
 
 from .access_token import (
     create_access_token,
+    delete_access_token,
 )
 from .auto_scaling import (
     create_auto_scaling_rule,
@@ -13,11 +14,15 @@ from .auto_scaling import (
     update_auto_scaling_rule,
 )
 from .deployment import (
+    admin_deployments,
+    admin_refresh_deployment_revisions,
     create_model_deployment,
     delete_model_deployment,
     deployment,
     deployment_status_changed,
-    deployments,
+    my_deployments,
+    project_deployments,
+    replace_deployment_options,
     sync_replicas,
     update_model_deployment,
 )
@@ -38,11 +43,11 @@ from .revision import (
     revisions,
 )
 from .revision_preset import (
-    create_deployment_revision_preset,
-    delete_deployment_revision_preset,
+    admin_create_deployment_revision_preset,
+    admin_delete_deployment_revision_preset,
+    admin_update_deployment_revision_preset,
     deployment_revision_preset,
     deployment_revision_presets,
-    update_deployment_revision_preset,
 )
 from .route import (
     route,
@@ -53,16 +58,21 @@ from .route import (
 __all__ = [
     # Access Token
     "create_access_token",
+    "delete_access_token",
     # Auto Scaling
     "create_auto_scaling_rule",
     "update_auto_scaling_rule",
     "delete_auto_scaling_rule",
     # Deployment
-    "deployments",
+    "admin_deployments",
+    "admin_refresh_deployment_revisions",
+    "my_deployments",
+    "project_deployments",
     "deployment",
     "create_model_deployment",
     "update_model_deployment",
     "delete_model_deployment",
+    "replace_deployment_options",
     "sync_replicas",
     "deployment_status_changed",
     # Policy
@@ -83,9 +93,9 @@ __all__ = [
     "route",
     "update_route_traffic_status",
     # Revision Preset
-    "create_deployment_revision_preset",
-    "delete_deployment_revision_preset",
+    "admin_create_deployment_revision_preset",
+    "admin_delete_deployment_revision_preset",
+    "admin_update_deployment_revision_preset",
     "deployment_revision_preset",
     "deployment_revision_presets",
-    "update_deployment_revision_preset",
 ]

@@ -7,12 +7,17 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
-from ai.backend.manager.repositories.base.types import QueryCondition, QueryOrder
 
 if TYPE_CHECKING:
-    from ai.backend.common.data.filter_specs import StringMatchSpec
+    from ai.backend.common.data.filter_specs import (
+        StringMatchSpec,
+        UUIDEqualMatchSpec,
+        UUIDInMatchSpec,
+    )
 
 
 class LoginSessionConditions:
@@ -22,6 +27,28 @@ class LoginSessionConditions:
     def by_ids(session_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return LoginSessionRow.id.in_(session_ids)
+
+        return inner
+
+    # --- user_id UUID filters ---
+
+    @staticmethod
+    def by_user_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = LoginSessionRow.user_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_user_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = LoginSessionRow.user_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -101,6 +128,8 @@ class LoginSessionConditions:
             return condition
 
         return inner
+
+    by_access_key_in = staticmethod(make_string_in_factory(LoginSessionRow.access_key))
 
     # --- created_at datetime filters ---
 
@@ -283,6 +312,8 @@ class LoginHistoryConditions:
             return condition
 
         return inner
+
+    by_domain_name_in = staticmethod(make_string_in_factory(LoginHistoryRow.domain_name))
 
     # --- created_at datetime filters ---
 

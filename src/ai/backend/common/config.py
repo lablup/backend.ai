@@ -4,30 +4,28 @@ import os
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import humps
 import tomli
 import trafaret as t
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
+    model_validator,
 )
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
-from .exception import ConfigurationError
-from .types import RedisHelperConfig
-from .utils import deep_merge
+from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
+from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
 __all__ = (
     "ConfigurationError",
     "check",
     "etcd_config_iv",
     "merge",
-    "model_definition_iv",
     "override_key",
     "override_with_env",
     "read_from_etcd",
@@ -39,7 +37,7 @@ __all__ = (
 )
 
 
-class BaseConfigSchema(BaseModel):
+class BaseConfigSchema(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -52,7 +50,7 @@ class BaseConfigSchema(BaseModel):
     )
 
 
-class BaseConfigModel(BaseModel):
+class BaseConfigModel(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -144,56 +142,24 @@ agent_selector_globalconfig_iv = t.Dict({}).allow_extra("*")
 agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
 
 
-model_definition_iv = t.Dict({
-    t.Key("models"): t.List(
-        t.Dict({
-            t.Key("name"): t.String,
-            t.Key("model_path"): t.String,
-            t.Key("service", default=None): t.Null
-            | t.Dict({
-                # ai.backend.kernel.service.ServiceParser.start_service()
-                # ai.backend.kernel.service_actions
-                t.Key("pre_start_actions", default=[]): t.Null
-                | t.List(
-                    t.Dict({
-                        t.Key("action"): t.String,
-                        t.Key("args"): t.Dict().allow_extra("*"),
-                    })
-                ),
-                t.Key("start_command"): t.String | t.List(t.String),
-                t.Key("shell", default="/bin/bash"): t.String,  # used if start_command is a string
-                t.Key("port"): t.ToInt[1:],
-                t.Key("health_check", default=None): t.Null
-                | t.Dict({
-                    t.Key("interval", default=10): t.Null | t.ToFloat[0:],
-                    t.Key("path"): t.String,
-                    t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
-                    t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
-                    t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
-                    t.Key("initial_delay", default=60): t.Null | t.ToFloat[0:],
-                }),
-            }),
-            t.Key("metadata", default=None): t.Null
-            | t.Dict({
-                t.Key("author", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("title", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("version", default=None): t.Null | t.Int | t.String,
-                tx.AliasedKey(["created", "created_at"], default=None): t.Null
-                | t.String(allow_blank=True),
-                tx.AliasedKey(["last_modified", "modified_at"], default=None): t.Null
-                | t.String(allow_blank=True),
-                t.Key("description", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("task", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("category", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("architecture", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("framework", default=None): t.Null | t.List(t.String),
-                t.Key("label", default=None): t.Null | t.List(t.String),
-                t.Key("license", default=None): t.Null | t.String(allow_blank=True),
-                t.Key("min_resource", default=None): t.Null | t.Dict().allow_extra("*"),
-            }).allow_extra("*"),
-        })
-    )
-})
+DEFAULT_SHELL = "/bin/bash"
+
+
+def _wrap_str_start_command_into_argv(service: Any) -> Any:
+    if not isinstance(service, dict):
+        return service
+    # FIXME: temporary bridge — fold the single-string `command` into the str `start_command`
+    # so the ModelServiceConfigDraft validator wraps it.
+    command = service.get("command")
+    service = {k: v for k, v in service.items() if k != "command"}
+    # Override `start_command` with `command` if both are present as start_command is deprecated.
+    sc = command if command is not None else service.get("start_command")
+    if not isinstance(sc, str):
+        return service
+    shell = service.get("shell")
+    if shell:
+        return {**service, "start_command": [shell, "-c", sc]}
+    return {**service, "start_command": [sc]}
 
 
 class PreStartAction(BaseConfigModel):
@@ -209,12 +175,21 @@ class PreStartAction(BaseConfigModel):
 
 
 class ModelHealthCheck(BaseConfigModel):
+    enable: bool = Field(
+        default=False,
+        description=(
+            "Whether the route should be health-checked. When false the route "
+            "becomes active immediately and the remaining fields are ignored."
+        ),
+        examples=[False],
+    )
     interval: float = Field(
         default=10.0,
         description="Interval in seconds between health checks.",
         examples=[10.0],
     )
     path: str = Field(
+        default="/health",
         description="Path to check for health status.",
         examples=["/health"],
     )
@@ -236,10 +211,42 @@ class ModelHealthCheck(BaseConfigModel):
     )
     initial_delay: float = Field(
         default=60.0,
-        description="Initial delay in seconds before the first health check.",
+        description=(
+            "Grace period in seconds for a warming-up route to pass its first "
+            "health check. Probing starts immediately; the route stays "
+            "WARMING_UP until a probe passes (then it activates) or this period "
+            "elapses without a passing probe (then it is terminated). This does "
+            "not delay the first probe."
+        ),
         examples=[60.0],
         ge=0,
     )
+
+    def is_retry_exhausted(self, consecutive_failures: int) -> bool:
+        """Whether consecutive failed probes have reached ``max_retries``.
+
+        The health observer accumulates ``consecutive_failures`` (reset to 0
+        on a passing probe); the consuming handler calls this to decide when
+        a route should transition to UNHEALTHY.
+        """
+        return consecutive_failures >= self.max_retries
+
+    def is_probe_due(self, last_check: int, now: int) -> bool:
+        """Whether ``interval`` has elapsed since the last probe.
+
+        ``last_check`` / ``now`` are Unix-second timestamps. Used by the
+        observer to throttle per-route probing to the configured interval.
+        """
+        return now - last_check >= self.interval
+
+    def health_status_ttl_sec(self) -> int:
+        """Per-route TTL for the cached health status in Valkey.
+
+        Key expiry signals DEGRADED (no recent check), so the TTL must stay
+        comfortably above the probe ``interval`` — normal probing refreshes
+        it every ``interval`` with margin for scheduling jitter.
+        """
+        return max(120, int(self.interval * 3))
 
 
 class ModelServiceConfig(BaseConfigModel):
@@ -247,14 +254,19 @@ class ModelServiceConfig(BaseConfigModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: str | list[str] = Field(
-        description="Command to start the model service.",
-        examples=["python service.py", ["python", "service.py"]],
+    start_command: list[str] | None = Field(
+        default=None,
+        description=(
+            "Argv list to start the model service. ``{model_path}`` in any "
+            "token is replaced per-token with the resolved ``model_path`` "
+            "before launch. ``None`` falls back to the image's default CMD."
+        ),
+        examples=[["python", "service.py"], ["vllm", "serve", "{model_path}"]],
     )
     shell: str = Field(
-        default="/bin/bash",
-        description="Shell to use if start_command is a string.",
-        examples=["/bin/bash"],
+        default=DEFAULT_SHELL,
+        description="Shell configured for the model service.",
+        examples=[DEFAULT_SHELL],
     )
     port: int = Field(
         description="Port number for the model service. Must be greater than 1.",
@@ -265,6 +277,11 @@ class ModelServiceConfig(BaseConfigModel):
         default=None,
         description="Health check configuration for the model service.",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_str_start_command(cls, data: Any) -> Any:
+        return _wrap_str_start_command_into_argv(data)
 
 
 class ModelMetadata(BaseConfigModel):
@@ -334,25 +351,405 @@ class ModelConfig(BaseConfigModel):
     )
 
 
+def _pick(base_val: Any, override_val: Any, override_set: bool) -> Any:
+    """Return the override value if explicitly set, otherwise the base.
+
+    Distinguishes between unset (not in model_fields_set → keep base)
+    and explicitly set to None (in model_fields_set → replace with None).
+    """
+    if not override_set:
+        return base_val
+    return override_val
+
+
+def _pick_non_null_override(base_val: Any, override_val: Any, override_set: bool) -> Any:
+    """Return a non-null draft override, otherwise keep the base value.
+
+    Draft model definitions are patch layers from several sources. In that
+    patch context ``None`` means the field was not supplied with a concrete
+    value, even when an input adapter materializes optional fields as null.
+    """
+    if not override_set or override_val is None:
+        return base_val
+    return override_val
+
+
+def _merge_metadata(base: ModelMetadata, override: ModelMetadata) -> ModelMetadata:
+    """Merge two ModelMetadata instances. All fields are atomic."""
+    s = override.model_fields_set
+    return ModelMetadata.model_construct(
+        author=_pick(base.author, override.author, "author" in s),
+        title=_pick(base.title, override.title, "title" in s),
+        version=_pick(base.version, override.version, "version" in s),
+        created=_pick(base.created, override.created, "created" in s),
+        last_modified=_pick(base.last_modified, override.last_modified, "last_modified" in s),
+        description=_pick(base.description, override.description, "description" in s),
+        task=_pick(base.task, override.task, "task" in s),
+        category=_pick(base.category, override.category, "category" in s),
+        architecture=_pick(base.architecture, override.architecture, "architecture" in s),
+        framework=_pick(base.framework, override.framework, "framework" in s),
+        label=_pick(base.label, override.label, "label" in s),
+        license=_pick(base.license, override.license, "license" in s),
+        min_resource=_pick(base.min_resource, override.min_resource, "min_resource" in s),
+    )
+
+
+def _merge_service_config(
+    base: ModelServiceConfig,
+    override: ModelServiceConfig,
+) -> ModelServiceConfig:
+    """Merge two ModelServiceConfig instances.
+
+    ``health_check`` is merged field-by-field; all other fields
+    (``start_command``, ``pre_start_actions``, etc.) are replaced atomically.
+    """
+    s = override.model_fields_set
+    health_check: ModelHealthCheck | None
+    if "health_check" in s and base.health_check is not None and override.health_check is not None:
+        hb, ho = base.health_check, override.health_check
+        hs = ho.model_fields_set
+        health_check = ModelHealthCheck.model_construct(
+            enable=_pick(hb.enable, ho.enable, "enable" in hs),
+            interval=_pick(hb.interval, ho.interval, "interval" in hs),
+            path=_pick(hb.path, ho.path, "path" in hs),
+            max_retries=_pick(hb.max_retries, ho.max_retries, "max_retries" in hs),
+            max_wait_time=_pick(hb.max_wait_time, ho.max_wait_time, "max_wait_time" in hs),
+            expected_status_code=_pick(
+                hb.expected_status_code, ho.expected_status_code, "expected_status_code" in hs
+            ),
+            initial_delay=_pick(hb.initial_delay, ho.initial_delay, "initial_delay" in hs),
+        )
+    else:
+        health_check = _pick(base.health_check, override.health_check, "health_check" in s)
+    return ModelServiceConfig.model_construct(
+        pre_start_actions=_pick(
+            base.pre_start_actions, override.pre_start_actions, "pre_start_actions" in s
+        ),
+        start_command=_pick(base.start_command, override.start_command, "start_command" in s),
+        shell=_pick(base.shell, override.shell, "shell" in s),
+        port=_pick(base.port, override.port, "port" in s),
+        health_check=health_check,
+    )
+
+
+def _merge_config(base: ModelConfig, override: ModelConfig) -> ModelConfig:
+    """Merge two ModelConfig instances.
+
+    ``service`` and ``metadata`` sub-models are merged recursively;
+    all other fields are replaced atomically.
+    """
+    s = override.model_fields_set
+    service: ModelServiceConfig | None
+    if "service" in s and base.service is not None and override.service is not None:
+        service = _merge_service_config(base.service, override.service)
+    else:
+        service = _pick(base.service, override.service, "service" in s)
+    metadata: ModelMetadata | None
+    if "metadata" in s and base.metadata is not None and override.metadata is not None:
+        metadata = _merge_metadata(base.metadata, override.metadata)
+    else:
+        metadata = _pick(base.metadata, override.metadata, "metadata" in s)
+    return ModelConfig.model_construct(
+        name=_pick(base.name, override.name, "name" in s),
+        model_path=_pick(base.model_path, override.model_path, "model_path" in s),
+        service=service,
+        metadata=metadata,
+    )
+
+
+def _merge_definition(base: ModelDefinition, override: ModelDefinition) -> ModelDefinition:
+    """Merge two ModelDefinition instances.
+
+    The ``models`` list is merged by index — each element pair is merged
+    via :func:`_merge_config`.  All other fields are replaced atomically.
+    """
+    models: list[ModelConfig]
+    if "models" not in override.model_fields_set:
+        models = base.models
+    elif not base.models or not override.models:
+        models = override.models
+    else:
+        models = []
+        for i in range(max(len(base.models), len(override.models))):
+            if i >= len(base.models):
+                models.append(override.models[i])
+            elif i >= len(override.models):
+                models.append(base.models[i])
+            else:
+                models.append(_merge_config(base.models[i], override.models[i]))
+    return ModelDefinition.model_construct(models=models)
+
+
 class ModelDefinition(BaseConfigModel):
     models: list[ModelConfig] = Field(
         default_factory=list,
         description="List of models in the model definition.",
     )
 
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return ModelDefinitionValidationError(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
     def merge(self, override: ModelDefinition) -> ModelDefinition:
-        """Deep merge the given override into this definition, returning a new instance."""
-        base_dict = self.model_dump(exclude_none=True, by_alias=True)
-        override_dict = override.model_dump(exclude_none=True, by_alias=True)
-        merged_dict = deep_merge(base_dict, override_dict)
-        return ModelDefinition.model_validate(merged_dict)
+        """Merge the given override into this definition, returning a new instance."""
+        return _merge_definition(self, override)
 
     def health_check_config(self) -> ModelHealthCheck | None:
         for model in self.models:
-            if model.service and model.service.health_check:
-                if model.service.health_check is not None:
-                    return model.service.health_check
+            if model.service and model.service.health_check and model.service.health_check.enable:
+                return model.service.health_check
         return None
+
+    def health_check_setting(self) -> ModelHealthCheck | None:
+        """The configured health check, preserved even when disabled.
+
+        Unlike :meth:`health_check_config`, this does not gate on ``enable``,
+        so a caller that persists the setting keeps the ``enable`` flag intact
+        and consumers decide based on it rather than on presence alone.
+        """
+        for model in self.models:
+            if model.service and model.service.health_check:
+                return model.service.health_check
+        return None
+
+    def with_args_appended(self, args: list[str]) -> ModelDefinition:
+        """Return a copy with ``args`` appended to each model's
+        ``service.start_command`` as separate argv tokens.
+
+        Models with ``service is None`` are passed through unchanged;
+        a model whose ``start_command`` is ``None`` receives ``args``
+        as its initial ``start_command`` (the agent's image-CMD fallback
+        is responsible for prepending a launcher when this happens).
+        """
+        if not args:
+            return self
+        new_models: list[ModelConfig] = []
+        for model in self.models:
+            if model.service is None:
+                new_models.append(model)
+                continue
+            existing = model.service.start_command or []
+            new_service = model.service.model_copy(
+                update={"start_command": existing + args},
+            )
+            new_models.append(model.model_copy(update={"service": new_service}))
+        return self.model_copy(update={"models": new_models})
+
+
+# ============================================================================
+# ModelDefinition draft types — partial-input variants used by source layers
+# (preset storage, vfolder yaml, request DTO). Every field defaults to
+# ``None`` so any subset can flow through ``merge`` without strict
+# validation. ``to_resolved`` converts the draft back to the strict
+# :class:`ModelDefinition` at the persistence boundary; required-field
+# validation is delegated to Pydantic via the strict type's constructor.
+# ============================================================================
+
+
+class ModelHealthCheckDraft(BaseConfigModel):
+    enable: bool | None = None
+    interval: float | None = None
+    path: str | None = None
+    max_retries: int | None = None
+    max_wait_time: float | None = None
+    expected_status_code: int | None = None
+    initial_delay: float | None = None
+
+    def to_resolved(self) -> ModelHealthCheck:
+        # Drop unset (None) fields so the strict type's ``Field(default=...)``
+        # declarations remain the single source of truth for default values.
+        return ModelHealthCheck.model_validate(self.model_dump(exclude_none=True))
+
+
+class ModelServiceConfigDraft(BaseConfigModel):
+    pre_start_actions: list[PreStartAction] | None = None
+    start_command: list[str] | None = None
+    shell: str | None = None
+    port: int | None = None
+    health_check: ModelHealthCheckDraft | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_str_start_command(cls, data: Any) -> Any:
+        return _wrap_str_start_command_into_argv(data)
+
+    def to_resolved(self) -> ModelServiceConfig:
+        # Drop unset (None) scalars so the strict type's ``Field(default=...)``
+        # declarations remain the single source of truth for default values;
+        # resolve the nested ``health_check`` draft explicitly. Missing
+        # required fields (e.g. ``port``) surface as
+        # ``BackendAISchemaValidationFailed``.
+        payload = self.model_dump(exclude_none=True, exclude={"health_check"})
+        payload["health_check"] = self.health_check.to_resolved() if self.health_check else None
+        return ModelServiceConfig.model_validate(payload)
+
+
+class ModelConfigDraft(BaseConfigModel):
+    name: str | None = None
+    model_path: str | None = None
+    service: ModelServiceConfigDraft | None = None
+    metadata: ModelMetadata | None = None  # ModelMetadata is already all-Optional.
+
+    def to_resolved(self) -> ModelConfig:
+        service = self.service.to_resolved() if self.service else None
+        if service is not None and service.start_command and self.model_path is not None:
+            # ``{model_path}`` placeholders in the variant baseline's
+            # ``start_command`` are resolved here, at the same moment the
+            # draft becomes a strict ``ModelConfig`` and ``model_path`` is
+            # finalized. Placeholders therefore never propagate downstream.
+            service.start_command = [
+                token.replace("{model_path}", self.model_path) for token in service.start_command
+            ]
+        payload = self.model_dump(exclude_none=True, exclude={"service"})
+        payload["service"] = service
+        return ModelConfig.model_validate(payload)
+
+
+def _merge_health_check_draft(
+    base: ModelHealthCheckDraft,
+    override: ModelHealthCheckDraft,
+) -> ModelHealthCheckDraft:
+    s = override.model_fields_set
+    return ModelHealthCheckDraft.model_construct(
+        enable=_pick_non_null_override(base.enable, override.enable, "enable" in s),
+        interval=_pick_non_null_override(base.interval, override.interval, "interval" in s),
+        path=_pick_non_null_override(base.path, override.path, "path" in s),
+        max_retries=_pick_non_null_override(
+            base.max_retries, override.max_retries, "max_retries" in s
+        ),
+        max_wait_time=_pick_non_null_override(
+            base.max_wait_time, override.max_wait_time, "max_wait_time" in s
+        ),
+        expected_status_code=_pick_non_null_override(
+            base.expected_status_code, override.expected_status_code, "expected_status_code" in s
+        ),
+        initial_delay=_pick_non_null_override(
+            base.initial_delay, override.initial_delay, "initial_delay" in s
+        ),
+    )
+
+
+def _merge_service_config_draft(
+    base: ModelServiceConfigDraft,
+    override: ModelServiceConfigDraft,
+) -> ModelServiceConfigDraft:
+    s = override.model_fields_set
+    health_check: ModelHealthCheckDraft | None
+    if "health_check" in s and base.health_check is not None and override.health_check is not None:
+        health_check = _merge_health_check_draft(base.health_check, override.health_check)
+    else:
+        health_check = _pick_non_null_override(
+            base.health_check, override.health_check, "health_check" in s
+        )
+    return ModelServiceConfigDraft.model_construct(
+        pre_start_actions=_pick_non_null_override(
+            base.pre_start_actions, override.pre_start_actions, "pre_start_actions" in s
+        ),
+        start_command=_pick_non_null_override(
+            base.start_command, override.start_command, "start_command" in s
+        ),
+        shell=_pick_non_null_override(base.shell, override.shell, "shell" in s),
+        port=_pick_non_null_override(base.port, override.port, "port" in s),
+        health_check=health_check,
+    )
+
+
+def _merge_config_draft(
+    base: ModelConfigDraft,
+    override: ModelConfigDraft,
+) -> ModelConfigDraft:
+    s = override.model_fields_set
+    service: ModelServiceConfigDraft | None
+    if "service" in s and base.service is not None and override.service is not None:
+        service = _merge_service_config_draft(base.service, override.service)
+    else:
+        service = _pick_non_null_override(base.service, override.service, "service" in s)
+    metadata: ModelMetadata | None
+    if "metadata" in s and base.metadata is not None and override.metadata is not None:
+        metadata = _merge_metadata(base.metadata, override.metadata)
+    else:
+        metadata = _pick_non_null_override(base.metadata, override.metadata, "metadata" in s)
+    return ModelConfigDraft.model_construct(
+        name=_pick_non_null_override(base.name, override.name, "name" in s),
+        model_path=override.model_path if override.model_path is not None else base.model_path,
+        service=service,
+        metadata=metadata,
+    )
+
+
+class ModelDefinitionDraft(BaseConfigModel):
+    """Partial ModelDefinition; every field is optional.
+
+    Drafts are produced by source layers (preset storage, vfolder yaml,
+    request DTO) and merged together. Convert to a strict
+    :class:`ModelDefinition` via :meth:`to_resolved` at the persistence
+    boundary; required-field validation is delegated to Pydantic via the
+    strict type's constructor.
+    """
+
+    models: list[ModelConfigDraft] | None = None
+
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return ModelDefinitionValidationError(
+            extra_msg=info.summary,
+            extra_data={"errors": info.errors},
+        )
+
+    def merge(self, override: ModelDefinitionDraft) -> ModelDefinitionDraft:
+        """Merge ``override`` over ``self`` and return a new draft.
+
+        ``models`` is merged element-wise by index. Within each element,
+        nested sub-models are merged recursively when both sides provide
+        them; otherwise the override's value (when explicitly set) wins.
+        """
+        if "models" not in override.model_fields_set or override.models is None:
+            return ModelDefinitionDraft.model_construct(models=self.models)
+        if self.models is None or not self.models:
+            return ModelDefinitionDraft.model_construct(models=override.models)
+        if not override.models:
+            return ModelDefinitionDraft.model_construct(models=self.models)
+        merged: list[ModelConfigDraft] = []
+        for i in range(max(len(self.models), len(override.models))):
+            if i >= len(self.models):
+                merged.append(override.models[i])
+            elif i >= len(override.models):
+                merged.append(self.models[i])
+            else:
+                merged.append(_merge_config_draft(self.models[i], override.models[i]))
+        return ModelDefinitionDraft.model_construct(models=merged)
+
+    def to_resolved(self) -> ModelDefinition:
+        return ModelDefinition.model_validate({
+            "models": [m.to_resolved() for m in (self.models or [])],
+        })
+
+    @classmethod
+    def from_file_payload(cls, payload: Mapping[str, Any]) -> ModelDefinitionDraft:
+        """Parse a model-definition file into a draft, normalizing the ``health_check`` block."""
+        # Dump by field name so the keys below match regardless of snake/kebab input.
+        data = cls.model_validate(dict(payload)).model_dump(exclude_unset=True, by_alias=False)
+        for model in data.get("models") or []:
+            service = model.get("service")
+            if service is None:
+                continue
+            if "health_check" not in service:
+                continue
+            health_check = service["health_check"]
+            # An empty health_check (null or {}) is an explicit opt-out; disable it so it
+            # overrides any enabled baseline instead of inheriting one.
+            if not health_check:
+                service["health_check"] = {"enable": False}
+                continue
+            # A non-empty block opts in; default enable to True when unset.
+            if health_check.get("enable") is None:
+                health_check["enable"] = True
+        return cls.model_validate(data)
 
 
 def find_config_file(daemon_name: str) -> Path:

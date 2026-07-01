@@ -26,7 +26,7 @@ def make_domain_node(name: str = "test-domain") -> DomainNode:
         basic_info=DomainBasicInfo(
             name=name,
             description="Test domain",
-            integration_id=None,
+            integration_name=None,
         ),
         registry=DomainRegistryInfo(
             allowed_docker_registries=["registry.example.com"],
@@ -46,24 +46,24 @@ class TestDomainBasicInfo:
         info = DomainBasicInfo(name="test")
         assert info.name == "test"
         assert info.description is None
-        assert info.integration_id is None
+        assert info.integration_name is None
 
     def test_creation_with_all_fields(self) -> None:
         info = DomainBasicInfo(
             name="production",
             description="Production domain",
-            integration_id="ext-123",
+            integration_name="ext-123",
         )
         assert info.description == "Production domain"
-        assert info.integration_id == "ext-123"
+        assert info.integration_name == "ext-123"
 
     def test_round_trip(self) -> None:
-        info = DomainBasicInfo(name="domain", description="Desc", integration_id="id-1")
+        info = DomainBasicInfo(name="domain", description="Desc", integration_name="id-1")
         json_data = info.model_dump_json()
         restored = DomainBasicInfo.model_validate_json(json_data)
         assert restored.name == "domain"
         assert restored.description == "Desc"
-        assert restored.integration_id == "id-1"
+        assert restored.integration_name == "id-1"
 
 
 class TestDomainRegistryInfo:
@@ -128,7 +128,7 @@ class TestDomainNode:
         node = make_domain_node("prod")
         assert node.basic_info.name == "prod"
         assert node.basic_info.description == "Test domain"
-        assert node.basic_info.integration_id is None
+        assert node.basic_info.integration_name is None
 
     def test_nested_registry_info(self) -> None:
         node = make_domain_node()

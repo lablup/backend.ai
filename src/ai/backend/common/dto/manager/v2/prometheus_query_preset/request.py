@@ -12,9 +12,10 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.clients.prometheus.defs import PROMETHEUS_DURATION_PATTERN
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 
 from .types import OrderDirection, QueryDefinitionOrderField
+from .validators import validate_query_template
 
 __all__ = (
     # Options inputs
@@ -32,6 +33,8 @@ __all__ = (
     # Execute supporting
     "MetricLabelEntry",
     "ExecuteQueryDefinitionInput",
+    # Preview
+    "PreviewQueryDefinitionInput",
     # Query time range
     "QueryTimeRangeInputDTO",
 )
@@ -58,6 +61,9 @@ class CreateQueryDefinitionInput(BaseRequestModel):
     """Input for creating a prometheus query definition."""
 
     name: str = Field(min_length=1, max_length=256, description="Human-readable name")
+    description: str | None = Field(default=None, description="Human-readable description")
+    rank: int = Field(default=0, ge=0, description="Sort rank (lower = higher priority)")
+    category_id: UUID | None = Field(default=None, description="Category ID")
     metric_name: str = Field(description="Prometheus metric name")
     query_template: str = Field(description="PromQL template with placeholders")
     time_window: str | None = Field(
@@ -75,6 +81,12 @@ class CreateQueryDefinitionInput(BaseRequestModel):
             raise ValueError("name must not be blank or whitespace-only")
         return stripped
 
+    @field_validator("query_template")
+    @classmethod
+    def _validate_query_template(cls, v: str) -> str:
+        validate_query_template(v)
+        return v
+
 
 class ModifyQueryDefinitionOptionsInput(BaseRequestModel):
     """Options for modifying a prometheus query definition.
@@ -89,11 +101,25 @@ class ModifyQueryDefinitionOptionsInput(BaseRequestModel):
 class ModifyQueryDefinitionInput(BaseRequestModel):
     """Input for modifying a prometheus query definition.
 
-    Only ``time_window`` uses ``Sentinel`` because it is the only nullable DB column;
-    all other fields are non-nullable, so ``None`` simply means "do not update".
+    Nullable DB columns (``time_window``, ``description``, ``category_id``) use the
+    ``Sentinel`` pattern so callers can distinguish "leave unchanged" from "clear to null".
+    Non-nullable fields use ``None`` to mean "do not update".
     """
 
     name: str | None = Field(default=None, description="Updated human-readable name")
+    description: str | Sentinel | None = Field(
+        default=SENTINEL,
+        description=(
+            "Updated description. Pass SENTINEL (default) to leave unchanged; pass None to clear."
+        ),
+    )
+    rank: int | None = Field(default=None, ge=0, description="Updated sort rank")
+    category_id: UUID | Sentinel | None = Field(
+        default=SENTINEL,
+        description=(
+            "Updated category ID. Pass SENTINEL (default) to leave unchanged; pass None to clear."
+        ),
+    )
     metric_name: str | None = Field(default=None, description="Updated Prometheus metric name")
     query_template: str | None = Field(
         default=None, description="Updated PromQL template with placeholders"
@@ -126,6 +152,13 @@ class ModifyQueryDefinitionInput(BaseRequestModel):
             raise ValueError(f"Invalid Prometheus duration format: {v!r}")
         return v
 
+    @field_validator("query_template")
+    @classmethod
+    def _validate_query_template(cls, v: str | None) -> str | None:
+        if v is not None:
+            validate_query_template(v)
+        return v
+
 
 class DeleteQueryDefinitionInput(BaseRequestModel):
     """Input for deleting a prometheus query definition."""
@@ -137,6 +170,19 @@ class QueryDefinitionFilter(BaseRequestModel):
     """Filter for prometheus query definition search."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name")
+    category_id: UUIDFilter | None = Field(default=None, description="Filter by category ID")
+    AND: list[QueryDefinitionFilter] | None = Field(
+        default=None, description="AND logical combinator."
+    )
+    OR: list[QueryDefinitionFilter] | None = Field(
+        default=None, description="OR logical combinator."
+    )
+    NOT: list[QueryDefinitionFilter] | None = Field(
+        default=None, description="NOT logical combinator."
+    )
+
+
+QueryDefinitionFilter.model_rebuild()
 
 
 class QueryDefinitionOrder(BaseRequestModel):
@@ -147,16 +193,25 @@ class QueryDefinitionOrder(BaseRequestModel):
 
 
 class SearchQueryDefinitionsInput(BaseRequestModel):
-    """Input for searching prometheus query definitions with filters, orders, and pagination."""
+    """Input for searching prometheus query definitions with filters, orders, and pagination.
+
+    Supports two pagination modes (mutually exclusive):
+    - Cursor-based: first/after (forward) or last/before (backward)
+    - Offset-based: limit/offset
+    """
 
     filter: QueryDefinitionFilter | None = Field(default=None, description="Filter conditions")
     order: list[QueryDefinitionOrder] | None = Field(
         default=None, description="Order specifications"
     )
-    limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+    # Cursor-based pagination (Relay)
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
+    # Offset-based pagination
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Maximum items to return")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip")
 
 
 class MetricLabelEntry(BaseRequestModel):
@@ -177,6 +232,18 @@ class ExecuteQueryDefinitionOptionsInput(BaseRequestModel):
         default_factory=list,
         description="Group-by labels",
     )
+
+
+class PreviewQueryDefinitionInput(BaseRequestModel):
+    """Input for previewing a prometheus query template before saving (admin only)."""
+
+    query_template: str = Field(description="PromQL template to validate")
+
+    @field_validator("query_template")
+    @classmethod
+    def _validate_query_template(cls, v: str) -> str:
+        validate_query_template(v)
+        return v
 
 
 class ExecuteQueryDefinitionInput(BaseRequestModel):

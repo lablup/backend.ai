@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.model_serving.request import (
     ServiceConfigInput,
     UpdateServiceInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.types import RuntimeVariant
 
 
@@ -80,12 +81,21 @@ class TestServiceConfigInput:
         assert config.resources is not None
         assert config.resources["cpu"] == "2"
 
+    def test_with_fractional_resource_values(self) -> None:
+        config = _make_service_config(resources={"cpu": 4, "mem": "32g", "cuda.shares": 2.5})
+        assert config.resources is not None
+        assert config.resources["cuda.shares"] == 2.5
+
+    def test_negative_float_resource_rejected(self) -> None:
+        with pytest.raises(ValidationError, match=r"greater than or equal to 0"):
+            _make_service_config(resources={"cuda.shares": -0.5})
+
     def test_missing_model_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ServiceConfigInput.model_validate({"scaling_group": "default"})
 
     def test_missing_scaling_group_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ServiceConfigInput.model_validate({"model": "my-model"})
 
 
@@ -99,15 +109,15 @@ class TestCreateServiceInput:
 
     def test_service_name_with_whitespace_fails_pattern(self) -> None:
         # pattern constraint runs before field_validator, so whitespace-padded names fail
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(service_name="  my-service  ")
 
     def test_service_name_min_length_4(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(service_name="abc")
 
     def test_service_name_max_length_64(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(service_name="a" * 65)
 
     def test_service_name_at_min_length_is_valid(self) -> None:
@@ -123,15 +133,15 @@ class TestCreateServiceInput:
         assert inp.service_name == "my-service-01"
 
     def test_service_name_pattern_invalid_starts_with_hyphen(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(service_name="-invalid")
 
     def test_service_name_pattern_invalid_ends_with_hyphen(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(service_name="invalid-")
 
     def test_replicas_must_be_at_least_one(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             _make_create_input(replicas=0)
 
     def test_default_group_name(self) -> None:
@@ -144,7 +154,7 @@ class TestCreateServiceInput:
 
     def test_default_runtime_variant_is_custom(self) -> None:
         inp = _make_create_input()
-        assert inp.runtime_variant == RuntimeVariant.CUSTOM
+        assert inp.runtime_variant == RuntimeVariant("custom")
 
     def test_default_cluster_size_is_one(self) -> None:
         inp = _make_create_input()
@@ -167,8 +177,8 @@ class TestCreateServiceInput:
         assert inp.architecture is None
 
     def test_with_vllm_runtime(self) -> None:
-        inp = _make_create_input(runtime_variant=RuntimeVariant.VLLM)
-        assert inp.runtime_variant == RuntimeVariant.VLLM
+        inp = _make_create_input(runtime_variant=RuntimeVariant("vllm"))
+        assert inp.runtime_variant == RuntimeVariant("vllm")
 
     def test_nested_config_accessible(self) -> None:
         config = _make_service_config(model="bert-model")
@@ -176,7 +186,7 @@ class TestCreateServiceInput:
         assert inp.config.model == "bert-model"
 
     def test_missing_service_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateServiceInput.model_validate({"replicas": 2, "config": {}})
 
     def test_round_trip(self) -> None:
@@ -209,7 +219,7 @@ class TestUpdateServiceInput:
         assert inp.replicas == 0
 
     def test_negative_replicas_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateServiceInput(replicas=-1)
 
     def test_default_all_none(self) -> None:
@@ -239,11 +249,11 @@ class TestDeleteServiceInput:
         assert inp.id == service_id
 
     def test_invalid_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteServiceInput.model_validate({"id": "not-a-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteServiceInput.model_validate({})
 
     def test_id_is_uuid_instance(self) -> None:
@@ -270,11 +280,11 @@ class TestScaleServiceInput:
         assert inp.to == 0
 
     def test_negative_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScaleServiceInput(to=-1)
 
     def test_missing_to_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             ScaleServiceInput.model_validate({})
 
     def test_round_trip(self) -> None:

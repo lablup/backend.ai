@@ -1,4 +1,4 @@
-.TH ALL-SMI 1 "March 2026" "all-smi 0.17.3" "User Commands"
+.TH ALL-SMI 1 "May 2026" "all-smi 0.22.0" "User Commands"
 .SH NAME
 all-smi \- Command-line utility for monitoring GPU hardware
 .SH SYNOPSIS
@@ -17,7 +17,7 @@ all-smi \- Command-line utility for monitoring GPU hardware
 .B all-smi
 is a comprehensive hardware monitoring tool that provides real-time information about GPU/NPU utilization,
 memory usage, temperature, power consumption, chassis-level metrics, and other system information. It supports various hardware platforms
-including NVIDIA GPUs, AMD GPUs, Apple Silicon, NVIDIA Jetson, Google Cloud TPUs, Tenstorrent NPUs, Rebellions NPUs, and Furiosa NPUs.
+including NVIDIA GPUs, AMD GPUs, Apple Silicon, NVIDIA Jetson, Intel Arc/Iris Xe client GPUs, Google Cloud TPUs, Tenstorrent NPUs, Rebellions NPUs, and Furiosa NPUs.
 Chassis monitoring provides node-level power consumption tracking (CPU+GPU+ANE), thermal pressure monitoring (Apple Silicon),
 and BMC sensor integration for inlet/outlet temperatures and fan speeds on server systems.
 
@@ -44,6 +44,23 @@ Does not require sudo permissions.
 .B api
 Run in API mode, exposing metrics in Prometheus format via HTTP endpoint.
 No sudo required on macOS (uses native APIs).
+.TP
+.B config \fISUBCOMMAND\fR
+Manage the optional TOML configuration file. Subcommands:
+.RS
+.IP \(bu 3
+.B init
+\(em write a commented example config to the platform-canonical path.
+.IP \(bu 3
+.B print
+\(em print the merged effective configuration (TOML or JSON).
+.IP \(bu 3
+.B validate
+\(em parse a config file and report errors (exit 0 valid, 2 invalid).
+.IP \(bu 3
+.B path
+\(em print the active config-file path and the candidate search order. Read-only; supports \fB--json\fR for scripts.
+.RE
 .TP
 .B help
 Display help information about all-smi or a specific command.
@@ -144,9 +161,6 @@ Sort by PID
 .B u
 Sort by utilization
 .TP
-.B c
-Toggle per-core CPU display
-.TP
 .B h / 1
 Toggle help screen
 .TP
@@ -159,6 +173,18 @@ Full support via nvidia-smi, including CUDA information, PCIe status, and perfor
 .TP
 .B AMD GPUs
 Support for Radeon and Instinct GPUs via ROCm/libamdgpu_top, including VRAM/GTT memory tracking and fdinfo-based process monitoring
+.TP
+.B Intel Arc / Iris Xe / Xe client GPUs
+Support for Arc A/B-series discrete GPUs and Iris Xe/Xe-LPG integrated GPUs via i915/xe sysfs (Linux) and WMI (Windows), including architecture classification, SYCL/oneAPI capability detection, engine-busy utilization computed from sysfs per-engine monotonic counters (Linux; max of render and compute engines reported as primary utilization), and per-process GPU memory tracking via /proc fdinfo (Linux; dedupes shared DRM file descriptors by drm-client-id).
+Optional Intel Level Zero (oneAPI) augmentation is available when the binary is built with
+.B \-\-features level_zero
+(default: off). When enabled and
+.I libze_loader.so.1
+(Linux) or
+.I ze_loader.dll
+(Windows) is present at runtime, additional per-engine activity metrics (including the XMX
+.B COMPUTE_SINGLE
+class not reachable via sysfs), energy-counter-derived power, temperature, dedicated/local memory state, frequency, and fan readings are surfaced when the corresponding Sysman domains are available and fresh. Seeded power and engine samples do not overwrite sysfs/WMI fallbacks. Missing loaders, missing optional symbols, unsupported domains, and permission failures degrade silently to the sysfs/WMI baseline, and per-field detail entries identify mixed metric sources.
 .TP
 .B Apple Silicon
 Native support for M1/M2/M3/M4 series with Metal API integration, ANE power monitoring, and thermal pressure tracking
@@ -236,6 +262,99 @@ http://node002:9090
 https://node003:9443
 .fi
 .RE
+.TP
+.I config.toml
+Optional TOML configuration file. Per-platform canonical paths:
+.RS
+.IP \(bu 3
+Linux: \fI$XDG_CONFIG_HOME/all-smi/config.toml\fR (fallback \fI~/.config/all-smi/config.toml\fR)
+.IP \(bu 3
+macOS: \fI~/Library/Application Support/all-smi/config.toml\fR (also accepts \fI~/.config/all-smi/config.toml\fR)
+.IP \(bu 3
+Windows: \fI%APPDATA%\\all-smi\\config.toml\fR
+.RE
+.RS
+The active path for the current user is printed by
+.B all-smi --help
+(under "Configuration file") and by
+.B all-smi config path
+(read-only; supports
+.B --json
+for scripts). Override the discovery with
+.B --config \fIPATH\fR\fR.
+A missing or malformed
+.B --config
+target is a hard error (exit 2); implicit discovery silently falls back
+to compiled defaults plus env vars when no candidate file exists.
+.RE
+.TP
+.I energy-wal.bin
+Disk-backed write-ahead log persisting the cumulative joules counter
+across restarts. Default: under the platform cache directory as
+\fI<cache>/all-smi/energy-wal.bin\fR — Linux
+\fI$XDG_CACHE_HOME/all-smi/energy-wal.bin\fR (or
+\fI~/.cache/all-smi/energy-wal.bin\fR when
+.B $XDG_CACHE_HOME
+is unset), macOS \fI~/Library/Caches/all-smi/energy-wal.bin\fR, Windows
+\fI%LOCALAPPDATA%\\all-smi\\energy-wal.bin\fR. The record output
+(\fIall-smi record\fR) and the users-tab CSV export share the same
+\fI<cache>/all-smi/\fR root for consistency.
+See
+.B ENERGY ACCOUNTING
+below for the \fBALL_SMI_ENERGY_WAL_PATH\fR / \fBALL_SMI_ENERGY_NO_WAL\fR
+overrides.
+.SH ENERGY ACCOUNTING
+The Energy Session panel integrates instantaneous power draw over time
+to report cumulative energy consumption (kWh) and an optional cost
+estimate ($/kWh) for the current run. The session counter starts when
+the process launches and can be reset with the
+.B R
+key in the TUI; the underlying Prometheus
+.B all_smi_energy_joules_total
+counter is monotonic and is never reset.
+.PP
+Display behaviour is controlled via the
+.B [energy]
+section of the TOML config file (run
+.B all-smi config path
+to print the active location, or see
+.B FILES
+above) or the following environment variables, which take precedence
+over the file:
+.TP
+.B ALL_SMI_ENERGY_PRICE
+Electricity price per kWh as a decimal number (e.g.
+.IR 0.12 ).
+A non-positive or non-finite value silently hides the cost column instead
+of surfacing
+.IR $NaN .
+Default: 0.12.
+.TP
+.B ALL_SMI_ENERGY_CURRENCY
+Display-only currency code (e.g.
+.IR USD ", " KRW ", " EUR ).
+Default: USD.
+.TP
+.B ALL_SMI_ENERGY_NO_COST
+When set to any value, suppresses the monetary cost column. The kWh
+total and average power are still rendered.
+.TP
+.B ALL_SMI_ENERGY_WAL_PATH
+Path to the disk-backed write-ahead log used to persist the cumulative
+joules counter across restarts. Default: the platform cache directory's
+\fIall-smi/energy-wal.bin\fR — see
+.B FILES
+above for the per-platform path.
+.TP
+.B ALL_SMI_ENERGY_NO_WAL
+When set to any value, disables the disk-backed WAL — counters are
+in-memory only. Useful for ephemeral hosts.
+.TP
+.B ALL_SMI_ENERGY_GAP_SECONDS
+Sample-gap threshold in seconds (range
+.IR [1,\ 3600] )
+above which the integrator switches from trapezoidal to hold-last
+integration. Default: 10.
 .SH ENVIRONMENT
 .TP
 .B RUST_LOG

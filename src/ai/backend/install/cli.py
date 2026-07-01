@@ -94,6 +94,115 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     default=False,
     help="Use wildcard domain binding for app-proxy worker.",
 )
+@click.option(
+    "--otel-endpoint",
+    type=str,
+    default=None,
+    help="OpenTelemetry collector endpoint (e.g., http://10.122.10.56:4317).",
+)
+@click.option(
+    "--metric-access-cidr",
+    type=str,
+    default="0.0.0.0/0",
+    help="CIDR for metric access allowed hosts (default: 0.0.0.0/0).",
+)
+@click.option(
+    "--with-harbor",
+    is_flag=True,
+    default=False,
+    help="Also install a local Harbor container registry (dev mode only).",
+)
+@click.option(
+    "--harbor-hostname",
+    type=str,
+    default=None,
+    help=(
+        "Hostname for the local Harbor instance "
+        "(must be a non-loopback address; defaults to host.docker.internal "
+        "when --public-facing-address is a loopback)."
+    ),
+)
+@click.option(
+    "--harbor-http-port",
+    type=int,
+    default=8084,
+    show_default=True,
+    help="HTTP port for the local Harbor instance.",
+)
+@click.option(
+    "--harbor-admin-password",
+    type=str,
+    default="Harbor12345",
+    show_default=False,
+    help=(
+        "Initial admin password for the local Harbor instance. WARNING: "
+        "if omitted, a well-known default value is used — override it for "
+        "anything beyond a throwaway dev box."
+    ),
+)
+@click.option(
+    "--harbor-download-uri",
+    type=str,
+    default=(
+        "https://github.com/goharbor/harbor/releases/download/"
+        "v2.11.0/harbor-offline-installer-v2.11.0.tgz"
+    ),
+    show_default=False,
+    help="Harbor offline installer archive URL to download.",
+)
+@click.option(
+    "--harbor-download-sha256",
+    type=str,
+    default=None,
+    help=(
+        "Expected SHA-256 of the downloaded Harbor archive. When set, the "
+        "installer verifies the downloaded file against this digest and "
+        "aborts on mismatch. When unset, no integrity check is performed."
+    ),
+)
+@click.option(
+    "--with-sftp-agent",
+    is_flag=True,
+    default=False,
+    help=(
+        "Also configure a dedicated SFTP agent (multi-agent per node). "
+        "Creates agent-sftp.toml with distinct ports and the 'upload' "
+        "scaling group; start it with './dev start sftp-agent'."
+    ),
+)
+@click.option(
+    "--enable-observability",
+    is_flag=True,
+    default=False,
+    help=(
+        "Bring up the halfstack 'observability' Compose profile (Prometheus,"
+        " Grafana, OTel collector, Loki, Tempo, Pyroscope, exporters) and enable"
+        " Pyroscope / OTel in component configs."
+    ),
+)
+@click.option(
+    "--enable-storage",
+    is_flag=True,
+    default=False,
+    help="Bring up the halfstack 'storage' Compose profile (MinIO).",
+)
+@click.option(
+    "--enable-telemetry",
+    "enable_telemetry",
+    flag_value="on",
+    default=None,
+    help=(
+        "Bring up the halfstack 'telemetry' Compose profile (OTel collector"
+        " + Loki) and enable [otel] in component configs. Default ON in"
+        " DEVELOP install mode, OFF in PACKAGE install mode."
+    ),
+)
+@click.option(
+    "--disable-telemetry",
+    "enable_telemetry",
+    flag_value="off",
+    help="Force the 'telemetry' profile OFF (overrides DEVELOP mode default).",
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def main(
@@ -110,6 +219,18 @@ def main(
     endpoint_protocol: str | None,
     frontend_mode: str,
     use_wildcard_binding: bool,
+    otel_endpoint: str | None,
+    metric_access_cidr: str,
+    with_harbor: bool,
+    harbor_hostname: str | None,
+    harbor_http_port: int,
+    harbor_admin_password: str,
+    harbor_download_uri: str,
+    harbor_download_sha256: str | None,
+    with_sftp_agent: bool,
+    enable_observability: bool,
+    enable_storage: bool,
+    enable_telemetry: str | None,
     accelerator: str,
 ) -> None:
     """The installer"""
@@ -139,6 +260,18 @@ def main(
         endpoint_protocol=EndpointProtocol(endpoint_protocol) if endpoint_protocol else None,
         frontend_mode=FrontendMode(frontend_mode),
         use_wildcard_binding=use_wildcard_binding,
+        otel_endpoint=otel_endpoint,
+        metric_access_cidr=metric_access_cidr,
+        with_harbor=with_harbor,
+        harbor_hostname=harbor_hostname,
+        harbor_http_port=harbor_http_port,
+        harbor_admin_password=harbor_admin_password,
+        harbor_download_uri=harbor_download_uri,
+        harbor_download_sha256=harbor_download_sha256,
+        with_sftp_agent=with_sftp_agent,
+        enable_observability=enable_observability,
+        enable_storage=enable_storage,
+        enable_telemetry=(None if enable_telemetry is None else (enable_telemetry == "on")),
     )
     app = InstallerApp(args)
     app.run(headless=headless)

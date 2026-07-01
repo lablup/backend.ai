@@ -26,6 +26,8 @@ class TestRepositoriesDependency:
         valkey_image = MagicMock()
 
         dependency = RepositoriesDependency()
+        prometheus_client = MagicMock()
+
         repos_input = RepositoriesInput(
             db=db,
             storage_manager=storage_manager,
@@ -34,6 +36,7 @@ class TestRepositoriesDependency:
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
             valkey_image=valkey_image,
+            prometheus_client=prometheus_client,
         )
 
         async with dependency.provide(repos_input) as repos:

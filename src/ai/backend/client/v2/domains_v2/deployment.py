@@ -6,18 +6,22 @@ from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
+    BulkDeleteAutoScalingRulesInput,
     CreateAutoScalingRuleInput,
     DeleteAutoScalingRuleInput,
     UpdateAutoScalingRuleInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
-    AddRevisionGQLInputDTO,
+    AddRevisionInput,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
+    BulkDeleteAccessTokensInput,
     CreateAccessTokenInput,
     CreateDeploymentInput,
+    DeleteAccessTokenInput,
     DeleteDeploymentInput,
+    ReplaceDeploymentOptionsInput,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
@@ -31,16 +35,22 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ActivateRevisionPayload,
     AddRevisionPayload,
+    AdminRefreshDeploymentRevisionsPayload,
     AdminSearchDeploymentsPayload,
     AdminSearchRevisionsPayload,
+    BulkDeleteAccessTokensPayload,
+    BulkDeleteAutoScalingRulesPayload,
     CreateAccessTokenPayload,
     CreateAutoScalingRulePayload,
     CreateDeploymentPayload,
+    DeleteAccessTokenPayload,
     DeleteAutoScalingRulePayload,
     DeleteDeploymentPayload,
     DeploymentNode,
+    GetAccessTokenPayload,
     GetAutoScalingRulePayload,
     GetDeploymentPolicyPayload,
+    ReplaceDeploymentOptionsPayload,
     ReplicaNode,
     RevisionNode,
     SearchAccessTokensPayload,
@@ -54,6 +64,8 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateRouteTrafficStatusPayload,
     UpsertDeploymentPolicyPayload,
 )
+from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
+from ai.backend.common.identifier.deployment import DeploymentID
 
 _PATH = "/v2/deployments"
 
@@ -85,6 +97,31 @@ class V2DeploymentClient(BaseDomainClient):
         return await self._client.typed_request(
             "POST",
             _PATH + "/search",
+            request=body,
+            response_model=AdminSearchDeploymentsPayload,
+        )
+
+    async def my_search(
+        self,
+        body: AdminSearchDeploymentsInput,
+    ) -> AdminSearchDeploymentsPayload:
+        """Search deployments owned by the current user."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/my/search",
+            request=body,
+            response_model=AdminSearchDeploymentsPayload,
+        )
+
+    async def project_search(
+        self,
+        project_id: UUID,
+        body: AdminSearchDeploymentsInput,
+    ) -> AdminSearchDeploymentsPayload:
+        """Search deployments within a specific project."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/projects/{project_id}/search",
             request=body,
             response_model=AdminSearchDeploymentsPayload,
         )
@@ -132,7 +169,7 @@ class V2DeploymentClient(BaseDomainClient):
     async def add_revision(
         self,
         deployment_id: UUID,
-        body: AddRevisionGQLInputDTO,
+        body: AddRevisionInput,
     ) -> AddRevisionPayload:
         """Add a new model revision to a deployment."""
         return await self._client.typed_request(
@@ -253,6 +290,16 @@ class V2DeploymentClient(BaseDomainClient):
             response_model=SyncReplicaPayload,
         )
 
+    async def admin_refresh_deployment_revisions(
+        self,
+    ) -> AdminRefreshDeploymentRevisionsPayload:
+        """Rebuild and activate a fresh revision for every active deployment (superadmin)."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH + "/admin/refresh-revisions",
+            response_model=AdminRefreshDeploymentRevisionsPayload,
+        )
+
     # ------------------------------------------------------------------
     # Route operations
     # ------------------------------------------------------------------
@@ -310,6 +357,41 @@ class V2DeploymentClient(BaseDomainClient):
             _PATH + f"/{deployment_id}/access-tokens/search",
             request=body,
             response_model=SearchAccessTokensPayload,
+        )
+
+    async def get_access_token(
+        self,
+        token_id: UUID,
+    ) -> GetAccessTokenPayload:
+        """Retrieve a single access token by ID."""
+        return await self._client.typed_request(
+            "GET",
+            _PATH + f"/access-tokens/{token_id}",
+            response_model=GetAccessTokenPayload,
+        )
+
+    async def delete_access_token(
+        self,
+        body: DeleteAccessTokenInput,
+    ) -> DeleteAccessTokenPayload:
+        """Delete an access token."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH + "/access-tokens/delete",
+            request=body,
+            response_model=DeleteAccessTokenPayload,
+        )
+
+    async def bulk_delete_access_tokens(
+        self,
+        body: BulkDeleteAccessTokensInput,
+    ) -> BulkDeleteAccessTokensPayload:
+        """Bulk delete access tokens."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH + "/access-tokens/bulk-delete",
+            request=body,
+            response_model=BulkDeleteAccessTokensPayload,
         )
 
     # ------------------------------------------------------------------
@@ -377,6 +459,18 @@ class V2DeploymentClient(BaseDomainClient):
             response_model=DeleteAutoScalingRulePayload,
         )
 
+    async def bulk_delete_auto_scaling_rules(
+        self,
+        body: BulkDeleteAutoScalingRulesInput,
+    ) -> BulkDeleteAutoScalingRulesPayload:
+        """Bulk delete auto-scaling rules."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH + "/auto-scaling-rules/bulk-delete",
+            request=body,
+            response_model=BulkDeleteAutoScalingRulesPayload,
+        )
+
     # ------------------------------------------------------------------
     # Deployment policy operations
     # ------------------------------------------------------------------
@@ -414,4 +508,29 @@ class V2DeploymentClient(BaseDomainClient):
             _PATH + "/policies/upsert",
             request=body,
             response_model=UpsertDeploymentPolicyPayload,
+        )
+
+    # ------------------------------------------------------------------
+    # Deployment options
+    # ------------------------------------------------------------------
+
+    async def get_options(self, deployment_id: DeploymentID) -> DeploymentOptionsInfo:
+        """Read the current ``options`` surface of a deployment.
+
+        Reads the full deployment node and returns its ``options`` field.
+        """
+        node = await self.get(deployment_id)
+        return node.options
+
+    async def replace_options(
+        self,
+        deployment_id: DeploymentID,
+        body: ReplaceDeploymentOptionsInput,
+    ) -> ReplaceDeploymentOptionsPayload:
+        """Fully replace a deployment's ``options`` surface."""
+        return await self._client.typed_request(
+            "PUT",
+            f"{_PATH}/{deployment_id}/options",
+            request=body,
+            response_model=ReplaceDeploymentOptionsPayload,
         )

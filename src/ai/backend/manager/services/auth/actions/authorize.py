@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 from aiohttp import web
 
@@ -19,6 +20,7 @@ class AuthorizeAction(AuthAction):
     password: str
     stoken: str | None
     otp: str | None
+    client_type_id: UUID | None
     force: bool = False
 
     @override
@@ -32,15 +34,14 @@ class AuthorizeAction(AuthAction):
 
     @property
     def hook_params(self) -> dict[str, str]:
-        otp_value = self.otp or self.stoken or ""
         return {
             "type": self.type.value,
             "domain": self.domain_name,
             "username": self.email,
             "password": self.password,
-            "stoken": otp_value,
-            "sToken": otp_value,
-            "otp": otp_value,
+            "stoken": self.stoken or "",
+            "sToken": self.stoken or "",
+            "otp": self.otp or "",
         }
 
 

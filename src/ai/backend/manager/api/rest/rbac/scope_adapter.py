@@ -13,8 +13,9 @@ from ai.backend.common.dto.manager.rbac.request import (
 )
 from ai.backend.common.dto.manager.rbac.response import ScopeDTO
 from ai.backend.common.dto.manager.rbac.types import OrderDirection, ScopeOrderField
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.types import ScopeData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac_models.conditions import (
     DomainScopeConditions,
     ProjectScopeConditions,
@@ -25,12 +26,7 @@ from ai.backend.manager.models.rbac_models.orders import (
     ProjectScopeOrders,
     UserScopeOrders,
 )
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 
 __all__ = ("ScopeAdapter",)
 
@@ -87,6 +83,7 @@ class ScopeAdapter(BaseFilterAdapter):
                 equals_factory=DomainScopeConditions.by_name_equals,
                 starts_with_factory=DomainScopeConditions.by_name_starts_with,
                 ends_with_factory=DomainScopeConditions.by_name_ends_with,
+                in_factory=DomainScopeConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -104,6 +101,7 @@ class ScopeAdapter(BaseFilterAdapter):
                 equals_factory=ProjectScopeConditions.by_name_equals,
                 starts_with_factory=ProjectScopeConditions.by_name_starts_with,
                 ends_with_factory=ProjectScopeConditions.by_name_ends_with,
+                in_factory=ProjectScopeConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -121,6 +119,7 @@ class ScopeAdapter(BaseFilterAdapter):
                 equals_factory=UserScopeConditions.by_name_equals,
                 starts_with_factory=UserScopeConditions.by_name_starts_with,
                 ends_with_factory=UserScopeConditions.by_name_ends_with,
+                in_factory=UserScopeConditions.by_name_in,
             )
             if condition is not None:
                 conditions.append(condition)

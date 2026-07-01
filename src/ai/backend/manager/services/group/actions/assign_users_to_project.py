@@ -18,6 +18,7 @@ from ai.backend.manager.services.group.actions.base import (
 class AssignUsersToProjectAction(GroupSingleEntityAction):
     project_id: UUID
     user_ids: list[UUID]
+    role_id: UUID
 
     @override
     @classmethod

@@ -153,6 +153,36 @@ class TestUserUpdaterSpecBuildValues:
 
         assert result["container_gids"] == [1000, 1001, 1002]
 
+    def test_build_values_with_integration_name_update(self) -> None:
+        """Test integration_name TriState field with update state."""
+        spec = UserUpdaterSpec(
+            integration_name=TriState.update("ext-abc"),
+        )
+
+        result = spec.build_values()
+
+        assert result["integration_id"] == "ext-abc"
+
+    def test_build_values_with_integration_name_nullify(self) -> None:
+        """Test integration_name TriState field with nullify state."""
+        spec = UserUpdaterSpec(
+            integration_name=TriState.nullify(),
+        )
+
+        result = spec.build_values()
+
+        assert result["integration_id"] is None
+
+    def test_build_values_with_integration_name_nop(self) -> None:
+        """Test integration_name TriState field with nop state is not included."""
+        spec = UserUpdaterSpec(
+            integration_name=TriState.nop(),
+        )
+
+        result = spec.build_values()
+
+        assert "integration_id" not in result
+
 
 class TestUserUpdaterSpecGroupIds:
     """Tests for UserUpdaterSpec.group_ids_value property."""

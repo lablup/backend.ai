@@ -4,10 +4,17 @@ Request DTOs for resource policy DTO v2.
 
 from __future__ import annotations
 
+from typing import Self
+
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import DateTimeFilter, IntFilter, StringFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    IntFilter,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     OrderDirection,
@@ -157,6 +164,15 @@ class CreateUserResourcePolicyInput(BaseRequestModel):
     max_vfolder_count: int = Field(
         description="Maximum number of vfolders a user can create.",
     )
+    max_concurrent_logins: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "Maximum number of concurrent authenticated login sessions per user."
+            " Null means unlimited. Must be >= 1 when set."
+            " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
+        ),
+    )
     max_quota_scope_size: BinarySizeInput = Field(
         description="Maximum quota scope size (e.g., '1g', '536870912').",
     )
@@ -183,6 +199,15 @@ class UpdateUserResourcePolicyInput(BaseRequestModel):
     max_vfolder_count: int | Sentinel | None = Field(
         default=SENTINEL,
         description="Updated max vfolder count. Use SENTINEL to clear, null to keep existing.",
+    )
+    max_concurrent_logins: int | Sentinel | None = Field(
+        default=SENTINEL,
+        ge=1,
+        description=(
+            "Updated maximum number of concurrent authenticated login sessions per user."
+            " Set to null to clear (unlimited). Must be >= 1 when set."
+            " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
+        ),
     )
     max_quota_scope_size: BinarySizeInput | Sentinel | None = Field(
         default=SENTINEL,
@@ -258,11 +283,30 @@ class DeleteProjectResourcePolicyInput(BaseRequestModel):
 # ── Filter & Order DTOs ──
 
 
+class KeypairResourcePolicyKeypairNestedFilter(BaseRequestModel):
+    """Nested filter for keypairs attached to a keypair resource policy.
+
+    Filters policies that have at least one keypair matching all specified
+    conditions.
+    """
+
+    user_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the UUID of the keypair owner."
+    )
+
+
 class KeypairResourcePolicyFilter(BaseRequestModel):
     """Filter for keypair resource policy search."""
 
     name: StringFilter | None = Field(default=None, description="Filter by policy name.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
+    keypair: KeypairResourcePolicyKeypairNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Nested filter on keypairs assigned to this policy. "
+            "Matches policies linked to at least one keypair satisfying the conditions."
+        ),
+    )
     max_session_lifetime: IntFilter | None = Field(
         default=None, description="Filter by max session lifetime."
     )
@@ -279,6 +323,9 @@ class KeypairResourcePolicyFilter(BaseRequestModel):
     max_pending_session_count: IntFilter | None = Field(
         default=None, description="Filter by max pending session count."
     )
+    AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
+    OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
+    NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
 
 
 class UserResourcePolicyFilter(BaseRequestModel):
@@ -289,6 +336,9 @@ class UserResourcePolicyFilter(BaseRequestModel):
     max_vfolder_count: IntFilter | None = Field(
         default=None, description="Filter by max vfolder count."
     )
+    max_concurrent_logins: IntFilter | None = Field(
+        default=None, description="Filter by max concurrent logins."
+    )
     max_quota_scope_size: IntFilter | None = Field(
         default=None, description="Filter by max quota scope size."
     )
@@ -298,6 +348,9 @@ class UserResourcePolicyFilter(BaseRequestModel):
     max_customized_image_count: IntFilter | None = Field(
         default=None, description="Filter by max customized image count."
     )
+    AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
+    OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
+    NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
 
 
 class ProjectResourcePolicyFilter(BaseRequestModel):
@@ -314,6 +367,14 @@ class ProjectResourcePolicyFilter(BaseRequestModel):
     max_network_count: IntFilter | None = Field(
         default=None, description="Filter by max network count."
     )
+    AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
+    OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
+    NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
+
+
+KeypairResourcePolicyFilter.model_rebuild()
+UserResourcePolicyFilter.model_rebuild()
+ProjectResourcePolicyFilter.model_rebuild()
 
 
 class KeypairResourcePolicyOrder(BaseRequestModel):

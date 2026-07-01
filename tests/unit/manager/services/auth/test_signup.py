@@ -12,6 +12,9 @@ from ai.backend.manager.errors.auth import EmailAlreadyExistsError, UserCreation
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.actions.signup import SignupAction
 from ai.backend.manager.services.auth.service import AuthService
 
@@ -32,12 +35,18 @@ def auth_service(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
     mock_config_provider: AsyncMock,
+    mock_user_repository: AsyncMock,
+    mock_group_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
         valkey_session_client=AsyncMock(),
+        user_resource_policy_repository=AsyncMock(spec=UserResourcePolicyRepository),
+        user_repository=mock_user_repository,
+        group_repository=mock_group_repository,
+        ssh_key_validator=AsyncMock(),
     )
 
 
@@ -166,6 +175,7 @@ async def test_signup_fails_when_email_already_exists(
 async def test_signup_with_hook_override(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
+    mock_group_repository: AsyncMock,
     mocker: Any,
     auth_service: AuthService,
 ) -> None:
@@ -210,7 +220,7 @@ async def test_signup_with_hook_override(
     )
     result = await auth_service.signup(action)
 
-    # Verify the repository was called with modified data
+    # Verify the repository was called with modified user/keypair data
     call_args = mock_auth_repository.create_user_with_keypair.call_args
     user_data = call_args.kwargs["user_data"]
     keypair_data = call_args.kwargs["keypair_data"]
@@ -220,7 +230,11 @@ async def test_signup_with_hook_override(
     assert user_data["status"] == UserStatus.BEFORE_VERIFICATION
     assert user_data["role"] == UserRole.ADMIN
     assert keypair_data["resource_policy"] == "premium"
-    assert call_args.kwargs["group_name"] == "special"
+
+    # Verify the hook-overridden ``group`` is forwarded to the project lookup.
+    mock_group_repository.project_id_by_name_in_domain.assert_called_once_with(
+        action.domain_name, "special"
+    )
 
     assert result.user_id == mock_user.uuid
     assert result.access_key == ak

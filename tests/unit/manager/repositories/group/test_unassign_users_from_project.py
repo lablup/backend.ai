@@ -8,14 +8,15 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.group.row import AssocGroupUserRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -24,6 +25,7 @@ from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -71,14 +73,15 @@ class TestUnassignUsersFromProject:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
-                AssocGroupUserRow,
                 AssociationScopesEntitiesRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -196,7 +199,13 @@ class TestUnassignUsersFromProject:
     ) -> None:
         async with db.begin_session() as session:
             session.add(
-                AssocGroupUserRow(user_id=user_id, group_id=project_id),
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(project_id),
+                    entity_type=EntityType.USER,
+                    entity_id=str(user_id),
+                    relation_type=RelationType.AUTO,
+                ),
             )
             await session.commit()
 
@@ -247,11 +256,15 @@ class TestUnassignUsersFromProject:
         assert result_uuids == set(assigned_users)
         assert result.failures == []
 
-        # Verify association rows removed
+        # Verify project-scope membership rows removed
         async with db_with_cleanup.begin_readonly_session() as session:
             remaining = (
                 await session.execute(
-                    sa.select(AssocGroupUserRow).where(AssocGroupUserRow.group_id == test_project)
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(test_project),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    )
                 )
             ).all()
             assert len(remaining) == 0
@@ -282,7 +295,11 @@ class TestUnassignUsersFromProject:
         async with db_with_cleanup.begin_readonly_session() as session:
             remaining = (
                 await session.execute(
-                    sa.select(AssocGroupUserRow).where(AssocGroupUserRow.group_id == test_project)
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(test_project),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    )
                 )
             ).all()
             assert len(remaining) == 3

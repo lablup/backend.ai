@@ -11,9 +11,14 @@ from .creator import (
     Creator,
     CreatorResult,
     CreatorSpec,
+    DependentCreatorSpec,
+    NextValuePolicy,
     execute_bulk_creator,
     execute_bulk_creator_partial,
+    execute_bulk_dependent_creator,
     execute_creator,
+    execute_dependent_creator,
+    execute_next_value_creator,
 )
 from .export import (
     ExportDataStream,
@@ -53,6 +58,7 @@ from .purger import (
 from .querier import (
     BatchQuerier,
     BatchQuerierResult,
+    ExistsQuerier,
     Querier,
     QuerierResult,
     execute_batch_querier,
@@ -60,21 +66,19 @@ from .querier import (
 )
 from .types import (
     CursorConditionFactory,
-    ExistenceCheck,
     IntegrityErrorCheck,
-    QueryCondition,
-    QueryOrder,
-    SearchScope,
 )
 from .updater import (
     BatchUpdater,
     BatchUpdaterResult,
     BatchUpdaterSpec,
     BulkUpdaterError,
+    BulkUpdaterResult,
     Updater,
     UpdaterResult,
     UpdaterSpec,
     execute_batch_updater,
+    execute_bulk_updater_partial,
     execute_updater,
 )
 from .upserter import (
@@ -87,18 +91,15 @@ from .upserter import (
     execute_upserter,
 )
 from .utils import (
+    combine_conditions_and,
     combine_conditions_or,
     negate_conditions,
 )
 
 __all__ = [
     # Types
-    "QueryCondition",
-    "QueryOrder",
     "CursorConditionFactory",
-    "ExistenceCheck",
     "IntegrityErrorCheck",
-    "SearchScope",
     # Integrity
     "parse_integrity_error",
     "match_integrity_error",
@@ -123,6 +124,7 @@ __all__ = [
     "Querier",
     "QuerierResult",
     "execute_querier",
+    "ExistsQuerier",
     # BatchQuerier
     "BatchQuerier",
     "BatchQuerierResult",
@@ -132,6 +134,13 @@ __all__ = [
     "Creator",
     "CreatorResult",
     "execute_creator",
+    # DependentCreator
+    "DependentCreatorSpec",
+    "execute_dependent_creator",
+    "execute_bulk_dependent_creator",
+    # NextValue
+    "NextValuePolicy",
+    "execute_next_value_creator",
     # BulkCreator
     "BulkCreator",
     "BulkCreatorError",
@@ -151,6 +160,8 @@ __all__ = [
     "execute_batch_updater",
     # BulkUpdater
     "BulkUpdaterError",
+    "BulkUpdaterResult",
+    "execute_bulk_updater_partial",
     # Upserter
     "UpserterSpec",
     "Upserter",
@@ -174,6 +185,7 @@ __all__ = [
     "BatchPurgerResult",
     "execute_batch_purger",
     # Utils
+    "combine_conditions_and",
     "combine_conditions_or",
     "negate_conditions",
 ]

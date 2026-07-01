@@ -10,12 +10,19 @@ from .entity import (
 )
 from .entity_node import EntityNode
 from .permission import (
+    BulkAddRolePermissionFailureInfoGQL,
+    BulkAddRolePermissionsInputGQL,
+    BulkAddRolePermissionsPayloadGQL,
+    BulkRemoveRolePermissionFailureInfoGQL,
+    BulkRemoveRolePermissionsInputGQL,
+    BulkRemoveRolePermissionsPayloadGQL,
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
     EntityActionInfoGQL,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
+    OperationTypeFilterGQL,
     OperationTypeGQL,
     PermissionConnection,
     PermissionEdge,
@@ -24,7 +31,9 @@ from .permission import (
     PermissionNestedFilterGQL,
     PermissionOrderBy,
     PermissionOrderField,
-    RBACElementTypeGQL,
+    ReplaceRolePermissionFailureInfoGQL,
+    ReplaceRolePermissionsInputGQL,
+    ReplaceRolePermissionsPayloadGQL,
     ScopeEntityCombinationGQL,
     ScopeEntityOperationCombinationGQL,
     UpdatePermissionInput,
@@ -60,13 +69,34 @@ from .role import (
     RoleSourceGQL,
     RoleStatusFilterGQL,
     RoleStatusGQL,
+    RoleUserNestedFilterGQL,
     UpdateRoleInput,
 )
+from .role_invitation import (
+    AcceptRoleInvitationInputGQL,
+    CancelRoleInvitationInputGQL,
+    CreateRoleInvitationInputGQL,
+    CreateRoleInvitationPayload,
+    RejectRoleInvitationInputGQL,
+    RoleInvitationConnection,
+    RoleInvitationEdge,
+    RoleInvitationFilterGQL,
+    RoleInvitationGQL,
+    RoleInvitationOrderByGQL,
+    RoleInvitationOrderFieldGQL,
+    RoleInvitationRoleNestedFilterGQL,
+    RoleInvitationStateFilterGQL,
+    RoleInvitationStateGQL,
+    RoleInvitationUserNestedFilterGQL,
+)
+from .scope import RBACElementTypeFilterGQL, RBACElementTypeGQL, ScopeInputGQL
 
 __all__ = [
     # Permission enums
     "RBACElementTypeGQL",
+    "RBACElementTypeFilterGQL",
     "OperationTypeGQL",
+    "OperationTypeFilterGQL",
     "PermissionOrderField",
     # Role enums
     "RoleSourceGQL",
@@ -88,6 +118,7 @@ __all__ = [
     "RoleFilter",
     "RoleAssignmentFilter",
     "RoleAssignmentRoleNestedFilterGQL",
+    "RoleUserNestedFilterGQL",
     "PermissionNestedFilterGQL",
     "EntityFilter",
     # OrderBy
@@ -107,6 +138,9 @@ __all__ = [
     "RevokeRoleInput",
     "BulkAssignRoleInputGQL",
     "BulkRevokeRoleInputGQL",
+    "BulkAddRolePermissionsInputGQL",
+    "BulkRemoveRolePermissionsInputGQL",
+    "ReplaceRolePermissionsInputGQL",
     # Payloads
     "DeletePermissionPayload",
     "DeleteRolePayload",
@@ -115,6 +149,12 @@ __all__ = [
     "BulkAssignRolePayloadGQL",
     "BulkRevokeRoleErrorGQL",
     "BulkRevokeRolePayloadGQL",
+    "BulkAddRolePermissionFailureInfoGQL",
+    "BulkAddRolePermissionsPayloadGQL",
+    "BulkRemoveRolePermissionFailureInfoGQL",
+    "BulkRemoveRolePermissionsPayloadGQL",
+    "ReplaceRolePermissionFailureInfoGQL",
+    "ReplaceRolePermissionsPayloadGQL",
     # Connections
     "PermissionConnection",
     "PermissionEdge",
@@ -126,6 +166,24 @@ __all__ = [
     "EntityNode",
     "EntityEdge",
     "EntityConnection",
+    # Role invitation types
+    "RoleInvitationStateGQL",
+    "RoleInvitationGQL",
+    "RoleInvitationConnection",
+    "RoleInvitationEdge",
+    "RoleInvitationOrderFieldGQL",
+    "RoleInvitationOrderByGQL",
+    "RoleInvitationFilterGQL",
+    "RoleInvitationStateFilterGQL",
+    "RoleInvitationRoleNestedFilterGQL",
+    "RoleInvitationUserNestedFilterGQL",
+    "CreateRoleInvitationInputGQL",
+    "AcceptRoleInvitationInputGQL",
+    "RejectRoleInvitationInputGQL",
+    "CancelRoleInvitationInputGQL",
+    "CreateRoleInvitationPayload",
+    # Scope types
+    "ScopeInputGQL",
     # Scope-entity combination
     "ScopeEntityCombinationGQL",
     # Entity-operation combination

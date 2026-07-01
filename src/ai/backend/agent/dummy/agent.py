@@ -15,7 +15,7 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig
-from ai.backend.agent.exception import UnsupportedResource
+from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.resources import (
@@ -283,7 +283,7 @@ class DummyAgent(
         return []
 
     @override
-    async def sync_container_lifecycles(self, interval: float) -> None:
+    async def sync_container_lifecycles(self) -> None:
         return
 
     @override
@@ -308,10 +308,10 @@ class DummyAgent(
         return ""
 
     @override
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> list[str] | None:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
         await asyncio.sleep(delay)
-        return "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+        return ["cr.backend.ai/stable/python:3.9-ubuntu20.04"]
 
     @override
     async def scan_images(self) -> ScanImagesResult:

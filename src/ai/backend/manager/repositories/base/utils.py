@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from .types import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 
 
 def combine_conditions_or(conditions: list[QueryCondition]) -> QueryCondition:
@@ -20,6 +20,23 @@ def combine_conditions_or(conditions: list[QueryCondition]) -> QueryCondition:
     def inner() -> sa.sql.expression.ColumnElement[bool]:
         clauses = [cond() for cond in conditions]
         return sa.or_(*clauses)
+
+    return inner
+
+
+def combine_conditions_and(conditions: list[QueryCondition]) -> QueryCondition:
+    """Combine multiple QueryConditions with AND logic.
+
+    Args:
+        conditions: List of QueryCondition callables to combine
+
+    Returns:
+        A single QueryCondition that applies all conditions with AND logic
+    """
+
+    def inner() -> sa.sql.expression.ColumnElement[bool]:
+        clauses = [cond() for cond in conditions]
+        return sa.and_(*clauses)
 
     return inner
 

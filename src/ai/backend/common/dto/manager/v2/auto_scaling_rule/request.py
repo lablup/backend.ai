@@ -37,6 +37,10 @@ class CreateAutoScalingRuleInput(BaseRequestModel):
     time_window: int = Field(ge=1, description="Time window in seconds for scaling evaluation")
     min_replicas: int | None = Field(default=None, ge=0, description="Minimum number of replicas")
     max_replicas: int | None = Field(default=None, ge=1, description="Maximum number of replicas")
+    prometheus_query_preset_id: UUID | None = Field(
+        default=None,
+        description="ID of Prometheus query preset (required when metric_source is PROMETHEUS)",
+    )
 
 
 class UpdateAutoScalingRuleInput(BaseRequestModel):
@@ -75,12 +79,22 @@ class UpdateAutoScalingRuleInput(BaseRequestModel):
         default=SENTINEL,
         description="Updated maximum replicas. SENTINEL = no change, None = clear.",
     )
+    prometheus_query_preset_id: UUID | Sentinel | None = Field(
+        default=SENTINEL,
+        description="Updated Prometheus query preset ID. SENTINEL = no change, None = clear.",
+    )
 
 
 class DeleteAutoScalingRuleInput(BaseRequestModel):
     """Input for deleting an auto-scaling rule."""
 
     id: UUID = Field(description="ID of the auto-scaling rule to delete")
+
+
+class BulkDeleteAutoScalingRulesInput(BaseRequestModel):
+    """Input for bulk deleting auto-scaling rules."""
+
+    ids: list[UUID] = Field(description="List of auto-scaling rule UUIDs to delete.")
 
 
 class AutoScalingRuleFilter(BaseRequestModel):

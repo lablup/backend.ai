@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -43,6 +43,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
@@ -56,6 +57,7 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -76,10 +78,10 @@ from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
 from ai.backend.manager.agent_cache import AgentRPCCache
-from ai.backend.manager.api import ManagerStatus
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
 from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -104,6 +106,7 @@ from ai.backend.manager.config.unified import (
     ManagerUnifiedConfig,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts
@@ -113,6 +116,10 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -133,6 +140,11 @@ from ai.backend.manager.notification.notification_center import NotificationCent
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -140,6 +152,7 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     postgres_container,
     redis_container,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger("tests.component.conftest")
@@ -532,20 +545,23 @@ async def database_engine(
 @pytest.fixture()
 async def domain_fixture(
     db_engine: SAEngine,
-) -> AsyncIterator[str]:
-    """Insert a test domain and yield its name."""
+) -> AsyncIterator[DomainFixtureData]:
+    """Insert a test domain and yield its identifiers."""
     domain_name = f"domain-{secrets.token_hex(6)}"
     async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(domains).values(
+        result = await conn.execute(
+            sa.insert(domains)
+            .values(
                 name=domain_name,
                 description=f"Test domain {domain_name}",
                 is_active=True,
                 total_resource_slots=ResourceSlot(),
                 allowed_vfolder_hosts=VFolderHostPermissionMap(),
             )
+            .returning(domains.c.id, domains.c.name)
         )
-    yield domain_name
+        row = result.one()
+    yield DomainFixtureData(domain_name=row.name, domain_id=row.id)
     async with db_engine.begin() as conn:
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
 
@@ -659,10 +675,10 @@ async def resource_policy_fixture(
 @pytest.fixture()
 async def scaling_group_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
-) -> AsyncIterator[str]:
+    domain_fixture: DomainFixtureData,
+) -> AsyncIterator[ResourceGroupName]:
     """Insert a scaling group and its domain association; yield the name."""
-    sgroup_name = f"sgroup-{secrets.token_hex(6)}"
+    sgroup_name = ResourceGroupName(f"sgroup-{secrets.token_hex(6)}")
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(scaling_groups).values(
@@ -678,7 +694,7 @@ async def scaling_group_fixture(
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
                 scaling_group=sgroup_name,
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
             )
         )
     yield sgroup_name
@@ -692,7 +708,7 @@ async def scaling_group_fixture(
 @pytest.fixture()
 async def group_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a test group (project) and yield its UUID."""
@@ -705,7 +721,7 @@ async def group_fixture(
                 name=group_name,
                 description=f"Test group {group_name}",
                 is_active=True,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
             )
         )
@@ -718,7 +734,7 @@ async def group_fixture(
 async def admin_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert admin user, keypair, and group membership; yield identifiers."""
@@ -749,7 +765,7 @@ async def admin_user_fixture(
                 description=f"Test admin account {unique_id}",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.SUPERADMIN,
             )
@@ -768,9 +784,22 @@ async def admin_user_fixture(
             )
         )
         await conn.execute(
+            users.update()
+            .where(users.c.uuid == str(data.user_uuid))
+            .values(main_access_key=data.keypair.access_key)
+        )
+        await conn.execute(
             sa.insert(association_groups_users).values(
                 group_id=str(group_fixture),
                 user_id=str(data.user_uuid),
+            )
+        )
+        await conn.execute(
+            sa.insert(AssociationScopesEntitiesRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(group_fixture),
+                entity_type=EntityType.USER,
+                entity_id=str(data.user_uuid),
             )
         )
     yield data
@@ -789,6 +818,14 @@ async def admin_user_fixture(
             )
         )
         await conn.execute(
+            AssociationScopesEntitiesRow.__table__.delete().where(
+                AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
+            )
+        )
+        await conn.execute(
+            users.update().where(users.c.uuid == str(data.user_uuid)).values(main_access_key=None)
+        )
+        await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
         )
         await conn.execute(users.delete().where(users.c.uuid == str(data.user_uuid)))
@@ -798,7 +835,7 @@ async def admin_user_fixture(
 async def regular_user_fixture(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[UserFixtureData]:
     """Insert regular user, keypair, and group membership; yield identifiers."""
@@ -829,7 +866,7 @@ async def regular_user_fixture(
                 description=f"Test user account {unique_id}",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
             )
@@ -848,9 +885,22 @@ async def regular_user_fixture(
             )
         )
         await conn.execute(
+            users.update()
+            .where(users.c.uuid == str(data.user_uuid))
+            .values(main_access_key=data.keypair.access_key)
+        )
+        await conn.execute(
             sa.insert(association_groups_users).values(
                 group_id=str(group_fixture),
                 user_id=str(data.user_uuid),
+            )
+        )
+        await conn.execute(
+            sa.insert(AssociationScopesEntitiesRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(group_fixture),
+                entity_type=EntityType.USER,
+                entity_id=str(data.user_uuid),
             )
         )
     yield data
@@ -864,6 +914,14 @@ async def regular_user_fixture(
             association_groups_users.delete().where(
                 association_groups_users.c.user_id == str(data.user_uuid)
             )
+        )
+        await conn.execute(
+            AssociationScopesEntitiesRow.__table__.delete().where(
+                AssociationScopesEntitiesRow.__table__.c.entity_id == str(data.user_uuid)
+            )
+        )
+        await conn.execute(
+            users.update().where(users.c.uuid == str(data.user_uuid)).values(main_access_key=None)
         )
         await conn.execute(
             keypairs.delete().where(keypairs.c.access_key == data.keypair.access_key)
@@ -1073,10 +1131,13 @@ async def background_task_manager(
 ) -> AsyncIterator[BackgroundTaskManager]:
     """Real BackgroundTaskManager backed by Valkey."""
     mgr = BackgroundTaskManager(
-        event_producer,
-        valkey_client=valkey_clients.bgtask,
-        server_id=f"test-server-{uuid4()}",
+        BackgroundTaskManagerArgs(
+            event_producer=event_producer,
+            valkey_client=valkey_clients.bgtask,
+            server_id=f"test-server-{uuid4()}",
+        )
     )
+    await mgr.init()
     yield mgr
     await mgr.shutdown()
 
@@ -1194,14 +1255,27 @@ def auth_processors(
     config_provider: ManagerConfigProvider,
     hook_plugin_ctx: HookPluginContext,
     valkey_clients: ValkeyClients,
+    storage_manager: StorageSessionManager,
 ) -> AuthProcessors:
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
     repo = AuthRepository(database_engine)
+    user_resource_policy_repository = UserResourcePolicyRepository(database_engine)
+    user_repository = UserRepository(database_engine)
+    group_repository = GroupRepository(
+        database_engine,
+        config_provider,
+        valkey_clients.stat,
+        storage_manager,
+    )
     service = AuthService(
         hook_plugin_ctx=hook_plugin_ctx,
         auth_repository=repo,
         config_provider=config_provider,
         valkey_session_client=valkey_clients.session,
+        user_resource_policy_repository=user_resource_policy_repository,
+        user_repository=user_repository,
+        group_repository=group_repository,
+        ssh_key_validator=SSHKeyValidator(),
     )
     return AuthProcessors(
         service=service,
@@ -1210,6 +1284,7 @@ def auth_processors(
             rbac=RBACValidators(
                 scope=MagicMock(spec=ScopeActionRBACValidator),
                 single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                bulk=MagicMock(spec=BulkActionRBACValidator),
             ),
         ),
     )

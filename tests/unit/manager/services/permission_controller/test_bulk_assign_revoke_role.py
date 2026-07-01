@@ -47,7 +47,11 @@ class TestBulkAssignRole:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_bulk_assign_all_succeed(
         self,
@@ -157,7 +161,11 @@ class TestBulkRevokeRole:
     def service(
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
+        return PermissionControllerService(
+            repository=mock_repository,
+            group_repository=MagicMock(),
+            rbac_action_registry=[],
+        )
 
     async def test_bulk_revoke_all_succeed(
         self,

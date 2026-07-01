@@ -11,7 +11,9 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.types import EndpointId, ResourceSlot
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentSummarySearchResult
 from ai.backend.manager.data.image.types import ImageType
@@ -22,6 +24,7 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
 )
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -30,6 +33,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -37,6 +41,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -83,10 +88,13 @@ class TestEndpointSearchInProject:
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -211,14 +219,14 @@ class TestEndpointSearchInProject:
                 labels={},
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1g"}},
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
             await db_sess.flush()
 
             # Endpoints: 2 in project A, 1 in project B (all CREATED lifecycle)
             endpoint_ids_in_a: list[uuid.UUID] = []
             for i in range(2):
-                eid = EndpointId(uuid.uuid4())
+                eid = DeploymentID(uuid.uuid4())
                 db_sess.add(
                     EndpointRow(
                         id=eid,
@@ -229,14 +237,13 @@ class TestEndpointSearchInProject:
                         project=project_a_id,
                         resource_group=sgroup_name,
                         lifecycle_stage=EndpointLifecycle.CREATED,
-                        current_revision=uuid.uuid4(),
                         replicas=1,
                     )
                 )
                 endpoint_ids_in_a.append(eid)
 
             endpoint_ids_in_b: list[uuid.UUID] = []
-            eid = EndpointId(uuid.uuid4())
+            eid = DeploymentID(uuid.uuid4())
             db_sess.add(
                 EndpointRow(
                     id=eid,
@@ -247,7 +254,6 @@ class TestEndpointSearchInProject:
                     project=project_b_id,
                     resource_group=sgroup_name,
                     lifecycle_stage=EndpointLifecycle.CREATED,
-                    current_revision=uuid.uuid4(),
                     replicas=1,
                 )
             )

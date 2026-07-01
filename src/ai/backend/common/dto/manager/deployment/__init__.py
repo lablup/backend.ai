@@ -5,6 +5,7 @@ Common DTOs for deployment system used by both Client SDK and Manager.
 from __future__ import annotations
 
 from .request import (
+    AddRevisionOptions,
     AddRevisionRequest,
     BlueGreenConfigInput,
     ClusterConfigInput,
@@ -112,6 +113,7 @@ __all__ = (
     # Request DTOs - Create/Update requests
     "CreateDeploymentRequest",
     "UpsertDeploymentPolicyRequest",
+    "AddRevisionOptions",
     "AddRevisionRequest",
     "UpdateDeploymentRequest",
     "UpdateRouteTrafficStatusRequest",

@@ -7,10 +7,12 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 
+from .types import PresetTarget, PresetValueType, UIOption
+
 
 class PresetTargetSpec(BaseResponseModel):
-    preset_target: str = Field(description="Target: env or args.")
-    value_type: str = Field(description="Value type: str, int, float, bool.")
+    preset_target: PresetTarget = Field(description="Target: env or args.")
+    value_type: PresetValueType = Field(description="Value type: str, int, float, bool, flag.")
     default_value: str | None = Field(default=None, description="Default value.")
     key: str = Field(description="Env key or args flag.")
 
@@ -22,6 +24,15 @@ class RuntimeVariantPresetNode(BaseResponseModel):
     description: str | None = Field(default=None, description="Description.")
     rank: int = Field(description="Display order rank.")
     target_spec: PresetTargetSpec = Field(description="Preset target specification.")
+    required: bool = Field(
+        description="Whether this preset param must be supplied on a deployment revision.",
+    )
+    category: str | None = Field(default=None, description="UI category group.")
+    ui_type: str | None = Field(
+        default=None, description="UI type for rendering (slider, number, choice, text)."
+    )
+    display_name: str | None = Field(default=None, description="UI display name.")
+    ui_option: UIOption | None = Field(default=None, description="UI rendering config.")
     created_at: datetime = Field(description="Creation timestamp.")
     updated_at: datetime | None = Field(default=None, description="Last update timestamp.")
 

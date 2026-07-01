@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.resource_usage.types import (
     DomainUsageBucketGQL,
     DomainUsageBucketOrderBy,
 )
-from ai.backend.manager.api.gql.types import ResourceGroupDomainScope, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 # Admin APIs
@@ -64,31 +64,6 @@ async def admin_domain_usage_buckets(
         ),
         count=payload.total_count,
     )
-
-
-# Resource Group Scoped APIs
-
-
-@gql_root_field(
-    BackendAIGQLMeta(
-        added_version="26.2.0",
-        description="List domain usage buckets within resource group scope. This API is not yet implemented.",
-    )
-)  # type: ignore[misc]
-async def rg_domain_usage_buckets(
-    info: Info[StrawberryGQLContext],
-    scope: ResourceGroupDomainScope,
-    filter: DomainUsageBucketFilter | None = None,
-    order_by: list[DomainUsageBucketOrderBy] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> DomainUsageBucketConnection | None:
-    """Search domain usage buckets within resource group scope."""
-    raise NotImplementedError("rg_domain_usage_buckets is not yet implemented")
 
 
 # Legacy APIs (deprecated)

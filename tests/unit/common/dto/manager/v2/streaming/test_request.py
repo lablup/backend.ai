@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.streaming.request import (
     StreamProxyInput,
 )
 from ai.backend.common.dto.manager.v2.streaming.types import ExecuteMode, PtyInputMessageType
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestPtyStdinInput:
@@ -128,12 +129,12 @@ class TestPtyClientInputDiscriminatedUnion:
 
     def test_invalid_type_raises_error(self) -> None:
         adapter: TypeAdapter[PtyClientInput] = TypeAdapter(PtyClientInput)
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             adapter.validate_python({"type": "unknown"})
 
     def test_stdin_missing_chars_raises_error(self) -> None:
         adapter: TypeAdapter[PtyClientInput] = TypeAdapter(PtyClientInput)
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             adapter.validate_python({"type": "stdin"})
 
 
@@ -204,15 +205,15 @@ class TestStreamProxyInput:
         assert req.port == 65535
 
     def test_port_below_1024_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StreamProxyInput(app="jupyter", port=999)
 
     def test_port_above_65535_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StreamProxyInput(app="jupyter", port=65536)
 
     def test_port_zero_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             StreamProxyInput(app="jupyter", port=0)
 
     def test_creation_with_envs_and_arguments(self) -> None:

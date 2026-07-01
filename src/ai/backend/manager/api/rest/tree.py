@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
         ValkeyRateLimitClient,
     )
+    from ai.backend.common.health_checker.probe import HealthProbe
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -41,6 +42,7 @@ def build_api_routes(
     valkey_rate_limit: ValkeyRateLimitClient | None,
     root_app: web.Application,
     stream_cleanup_handler: StreamCleanupEventHandler,
+    health_probe: HealthProbe,
     pidx: int = 0,
 ) -> list[RouteRegistry]:
     """Build the full API module tree and return all root-level registries.
@@ -49,6 +51,7 @@ def build_api_routes(
     passed to pure routing registrar functions.
     """
     # Lazy imports to avoid circular dependencies at module level
+    from ai.backend.manager.api.gql.schema import public_schema as public_strawberry_schema
     from ai.backend.manager.api.gql.schema import schema as strawberry_schema
     from ai.backend.manager.api.gql_legacy.schema import graphene_schema
 
@@ -164,7 +167,10 @@ def build_api_routes(
     container_registry_handler = ContainerRegistryHandler(
         container_registry=processors.container_registry
     )
-    deployment_handler = DeploymentAPIHandler(deployment=processors.deployment)
+    deployment_handler = DeploymentAPIHandler(
+        deployment=processors.deployment,
+        runtime_variant_adapter=adapters.runtime_variant,
+    )
     domainconfig_handler = DomainConfigHandler(dotfile=processors.dotfile)
     error_log_handler = ErrorLogHandler(error_log=processors.error_log)
     etcd_handler = EtcdHandler(
@@ -204,6 +210,7 @@ def build_api_routes(
         deployment=processors.deployment,
         model_serving=processors.model_serving,
         model_serving_auto_scaling=processors.model_serving_auto_scaling,
+        runtime_variant=processors.runtime_variant,
     )
     session_handler = SessionHandler(
         auth=processors.auth,
@@ -242,20 +249,33 @@ def build_api_routes(
 
     if gql_context_deps is None:
         raise RuntimeError("GQLContextDeps required for admin routes")
+
+    from ai.backend.manager.api.gql.graphql_ws import GraphQLTransportWSHandler
+
+    gql_ws_handler = GraphQLTransportWSHandler(
+        schema=strawberry_schema,
+        gql_deps=gql_context_deps,
+        max_msg_size=gql_context_deps.config_provider.config.manager.max_wsmsg_size,
+    )
     admin_handler = AdminHandler(
         gql_schema=graphene_schema,
         gql_deps=gql_context_deps,
         strawberry_schema=strawberry_schema,
+        public_strawberry_schema=public_strawberry_schema,
     )
 
     # Template sub-registries
-    cluster_template_handler = ClusterTemplateHandler(template=processors.template)
-    session_template_handler = SessionTemplateHandler(template=processors.template)
+    cluster_template_handler = ClusterTemplateHandler(
+        template=processors.template, group=processors.group
+    )
+    session_template_handler = SessionTemplateHandler(
+        template=processors.template, group=processors.group
+    )
     cluster_template_reg = register_cluster_template_routes(cluster_template_handler, route_deps)
     session_template_reg = register_session_template_routes(session_template_handler, route_deps)
 
     # Health handler
-    health_handler = HealthHandler()
+    health_handler = HealthHandler(health_probe=health_probe)
 
     # Spec handler
     spec_handler = SpecHandler(config_provider=config_provider, root_app=root_app)
@@ -278,6 +298,7 @@ def build_api_routes(
     stream_handler = StreamHandler(
         private_ctx=stream_ctx,
         stream_processors=stream_processors,
+        session_processors=processors.session,
         config_provider=config_provider,
         error_monitor=error_monitor,
     )
@@ -309,6 +330,7 @@ def build_api_routes(
                 quota_scope_reg,
                 auto_scaling_rule_reg,
             ],
+            gql_ws_handler=gql_ws_handler,
         ),
         register_template_routes(
             route_deps,

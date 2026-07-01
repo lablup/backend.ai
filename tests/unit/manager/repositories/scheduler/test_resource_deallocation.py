@@ -34,8 +34,10 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import (
@@ -85,6 +87,8 @@ class TestForceTerminateResourceDeallocation:
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,
@@ -391,6 +395,7 @@ class TestForceTerminateResourceDeallocation:
                     slot_name="cpu",
                     requested=cpu_used,
                     used=cpu_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             db_sess.add(
@@ -399,6 +404,7 @@ class TestForceTerminateResourceDeallocation:
                     slot_name="mem",
                     requested=mem_used,
                     used=mem_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             await db_sess.flush()
@@ -552,6 +558,59 @@ class TestForceTerminateResourceDeallocation:
                     f"free_at should be set even with NULL agent for slot {alloc.slot_name}"
                 )
 
+    async def test_force_terminate_from_terminating_session_frees_resources(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        resource_slot_types: None,
+    ) -> None:
+        """Forced termination must also apply to sessions already in TERMINATING."""
+        db_source = ScheduleDBSource(db_with_cleanup)
+
+        session_id, kernel_id = await self._create_session_with_kernel_and_resources(
+            db_with_cleanup,
+            session_status=SessionStatus.TERMINATING,
+            kernel_status=KernelStatus.TERMINATING,
+            domain_name=test_domain_name,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            agent_id=test_agent_id,
+            cpu_used=Decimal("2"),
+            mem_used=Decimal("4096"),
+        )
+
+        result = await db_source.mark_sessions_terminating([session_id], forced=True)
+        assert session_id in result.force_terminated_sessions
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            session_row = await db_sess.get(SessionRow, session_id)
+            kernel_row = await db_sess.get(KernelRow, kernel_id)
+            assert session_row is not None
+            assert kernel_row is not None
+            assert session_row.status == SessionStatus.TERMINATED
+            assert kernel_row.status == KernelStatus.TERMINATED
+
+            allocs = (
+                (
+                    await db_sess.execute(
+                        sa.select(ResourceAllocationRow).where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for alloc in allocs:
+                assert alloc.free_at is not None
+
 
 class TestBulkTerminateResourceDeallocation:
     """Test that update_kernels_to_terminated frees resources."""
@@ -577,6 +636,8 @@ class TestBulkTerminateResourceDeallocation:
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,
@@ -880,6 +941,7 @@ class TestBulkTerminateResourceDeallocation:
                     slot_name="cpu",
                     requested=cpu_used,
                     used=cpu_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             db_sess.add(
@@ -888,6 +950,7 @@ class TestBulkTerminateResourceDeallocation:
                     slot_name="mem",
                     requested=mem_used,
                     used=mem_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             await db_sess.flush()
@@ -1007,6 +1070,8 @@ class TestNegativeValueGuard:
                 AssociationScopesEntitiesRow,
                 EntityFieldRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 SessionRow,
                 KernelRow,
                 ResourceSlotTypeRow,
@@ -1310,6 +1375,7 @@ class TestNegativeValueGuard:
                     slot_name="cpu",
                     requested=cpu_used,
                     used=cpu_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             db_sess.add(
@@ -1318,6 +1384,7 @@ class TestNegativeValueGuard:
                     slot_name="mem",
                     requested=mem_used,
                     used=mem_used,
+                    used_at=datetime.now(tzutc()),
                 )
             )
             await db_sess.flush()

@@ -21,7 +21,7 @@ python_distribution(
     entry_points={
         "backendai_accelerator_v21": {
             "warboy": "ai.backend.accelerator.furiosa.warboy.plugin:WarboyPlugin",
-            "rngd": "ai.backend.accelerator.furiosa.rngd.plugin:RNGDPlugin",
+            "rngd": "ai.backend.accelerator.furiosa.rngd.plugin:RngdPlugin",
         }
     },
     generate_setup=True,

@@ -3,32 +3,38 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.keypair.response import KeypairNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_field,
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Keypair entity representing an API access key. "
             "The access_key field serves as the unique identifier. "
             "Secret key and private SSH key are excluded for security reasons."
         ),
     ),
-    name="KeyPairGQL",
+    name="KeyPairV2",
 )
 class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     """Keypair entity accessible via Relay Node interface."""
@@ -54,13 +60,31 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     )
     user_id: UUID = gql_field(description="UUID of the user who owns this keypair.")
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The user who owns this keypair.",
+        )
+    )  # type: ignore[misc]
+    async def user(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.user_loader.load(self.user_id)
+
 
 KeyPairEdge = Edge[KeyPairGQL]
 
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Paginated connection for keypair records. "
             "Provides relay-style cursor-based pagination. "

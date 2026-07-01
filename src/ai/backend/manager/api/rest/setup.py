@@ -24,7 +24,6 @@ def setup_api(
     """
     from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
-    from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 
     from .tree import build_api_routes
     from .types import GQLContextDeps
@@ -33,6 +32,8 @@ def setup_api(
     adapters = Adapters.create(
         r.processing.processors,
         r.bootstrap.config_provider.config.auth,
+        deployment_coordinator=r.orchestration.sokovan_orchestrator.deployment_coordinator,
+        schedule_coordinator=r.orchestration.sokovan_orchestrator.coordinator,
         config_provider=r.bootstrap.config_provider,
     )
     gql_context_deps = GQLContextDeps(
@@ -55,7 +56,6 @@ def setup_api(
         user_repository=r.domain.repositories.user.repository,
         agent_repository=r.domain.repositories.agent.repository,
         strawberry_gql_adapter=BaseGQLAdapter(),
-        strawberry_data_loaders=DataLoaders(adapters),
         adapters=adapters,
     )
 
@@ -70,6 +70,7 @@ def setup_api(
         valkey_rate_limit=r.infrastructure.valkey.rate_limit,
         root_app=root_app,
         stream_cleanup_handler=r.processing.stream_cleanup_handler,
+        health_probe=r.system.health_probe,
         pidx=pidx,
     ):
         root_registry.add_subregistry(sub)

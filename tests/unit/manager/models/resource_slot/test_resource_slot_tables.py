@@ -13,7 +13,9 @@ from decimal import Decimal
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
 
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
     NumberFormat,
@@ -473,3 +475,73 @@ class TestResourceAllocationRow:
             assert row is not None
             assert row.requested == one_tib
             assert row.used == one_tib
+
+
+class TestActualOccupiedSlotsOrdering:
+    """Tests that actual_occupied_slots() returns slots sorted by resource_slot_types.rank."""
+
+    @pytest.mark.parametrize(
+        ("slot_type_ranks", "expected_order"),
+        [
+            pytest.param(
+                {"cpu": 10, "mem": 20, "cuda.shares": 30},
+                ["cpu", "mem", "cuda.shares"],
+                id="ascending-rank",
+            ),
+            pytest.param(
+                {"mem": 1, "cpu": 2, "cuda.shares": 3},
+                ["mem", "cpu", "cuda.shares"],
+                id="rank-differs-from-alphabetical",
+            ),
+        ],
+    )
+    async def test_occupied_slots_sorted_by_rank(
+        self,
+        database_with_resource_slot_tables: ExtendedAsyncSAEngine,
+        agent_id: str,
+        slot_type_ranks: dict[str, int],
+        expected_order: list[str],
+    ) -> None:
+        """Slots are ordered by rank regardless of insertion order."""
+        slot_type_defs: dict[str, str] = {
+            "cpu": "count",
+            "mem": "bytes",
+            "cuda.shares": "count",
+        }
+        async with database_with_resource_slot_tables.begin_session() as db_sess:
+            for slot_name, rank in slot_type_ranks.items():
+                db_sess.add(
+                    ResourceSlotTypeRow(
+                        slot_name=slot_name,
+                        slot_type=slot_type_defs[slot_name],
+                        rank=rank,
+                    )
+                )
+            await db_sess.flush()
+
+        async with database_with_resource_slot_tables.begin_session() as db_sess:
+            for slot_name in slot_type_ranks:
+                db_sess.add(
+                    AgentResourceRow(
+                        agent_id=agent_id,
+                        slot_name=slot_name,
+                        capacity=Decimal("1"),
+                        used=Decimal("0"),
+                    )
+                )
+            await db_sess.flush()
+
+        async with database_with_resource_slot_tables.begin_readonly_session() as db_sess:
+            agent_row = await db_sess.scalar(
+                sa.select(AgentRow)
+                .where(AgentRow.id == agent_id)
+                .options(
+                    selectinload(AgentRow.agent_resource_rows).joinedload(
+                        AgentResourceRow.slot_type_row
+                    )
+                )
+            )
+            assert agent_row is not None
+            occupied = agent_row.actual_occupied_slots()
+
+        assert list(occupied.keys()) == expected_order

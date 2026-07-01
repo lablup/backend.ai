@@ -20,7 +20,7 @@ from typing import (
 import aiodocker
 import trafaret as t
 
-from ai.backend.agent.exception import InitializationError
+from ai.backend.agent.errors import InitializationError
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
@@ -155,14 +155,14 @@ class MockPlugin(AbstractComputePlugin):
         # Set the allocation mode.
         mode = self.plugin_config.get("allocation_mode")
         if mode is None:
-            log.warning(f'{self.key} allocation mode is not set. Using "discrete" mode.')
+            log.warning('{} allocation mode is not set. Using "discrete" mode.', self.key)
             self._mode = AllocationModes.DISCRETE
         else:
             try:
                 self._mode = AllocationModes(mode)
             except ValueError:
                 log.error("Invalid fractional mode value.")
-                log.info(f"{self.key} acceleration is disabled.")
+                log.info("{} acceleration is disabled.", self.key)
                 self.enabled = False
                 return
 
@@ -249,9 +249,9 @@ class MockPlugin(AbstractComputePlugin):
         try:
             detected_devices = await self.list_devices()
             log.info("detected devices (mocked):\n" + pformat(detected_devices))
-            log.info(f"{self.key} acceleration is enabled.")
+            log.info("{} acceleration is enabled.", self.key)
         except ImportError:
-            log.warning(f"{self.key} acceleration is disabled.")
+            log.warning("{} acceleration is disabled.", self.key)
             self.enabled = False
             return
 

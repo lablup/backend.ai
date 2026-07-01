@@ -49,10 +49,12 @@ class TestSokovanOrchestratorDependency:
         sokovan_input = SokovanOrchestratorInput(
             scheduler_repository=MagicMock(),
             deployment_repository=MagicMock(),
+            replica_group_repository=MagicMock(),
             fair_share_repository=MagicMock(),
             resource_usage_repository=MagicMock(),
             config_provider=MagicMock(),
             agent_client_pool=MagicMock(),
+            appproxy_client_pool=MagicMock(),
             network_plugin_ctx=MagicMock(),
             event_producer=MagicMock(),
             valkey_schedule=MagicMock(),
@@ -62,6 +64,9 @@ class TestSokovanOrchestratorDependency:
             route_controller=MagicMock(),
             distributed_lock_factory=MagicMock(),
             service_discovery=MagicMock(),
+            prometheus_client=MagicMock(),
+            prometheus_query_preset_repository=MagicMock(),
+            runtime_variant_repository=MagicMock(),
         )
 
         async with dependency.provide(sokovan_input) as orchestrator:
@@ -103,34 +108,38 @@ class TestSokovanOrchestratorDependency:
         network_plugin_ctx = MagicMock()
         event_producer = MagicMock()
         valkey_schedule = MagicMock()
+        route_controller = MagicMock()
 
         dependency = SokovanOrchestratorDependency()
         sokovan_input = SokovanOrchestratorInput(
             scheduler_repository=scheduler_repo,
             deployment_repository=deployment_repo,
+            replica_group_repository=MagicMock(),
             fair_share_repository=fair_share_repo,
             resource_usage_repository=MagicMock(),
             config_provider=config_provider,
             agent_client_pool=agent_client_pool,
+            appproxy_client_pool=MagicMock(),
             network_plugin_ctx=network_plugin_ctx,
             event_producer=event_producer,
             valkey_schedule=valkey_schedule,
             valkey_stat=MagicMock(),
             scheduling_controller=MagicMock(),
             deployment_controller=MagicMock(),
-            route_controller=MagicMock(),
+            route_controller=route_controller,
             distributed_lock_factory=MagicMock(),
             service_discovery=MagicMock(),
+            prometheus_client=MagicMock(),
+            prometheus_query_preset_repository=MagicMock(),
+            runtime_variant_repository=MagicMock(),
         )
 
         async with dependency.provide(sokovan_input):
             mock_create_components.assert_called_once_with(
                 scheduler_repo,
-                deployment_repo,
                 fair_share_repo,
                 config_provider,
                 agent_client_pool,
                 network_plugin_ctx,
-                event_producer,
                 valkey_schedule,
             )

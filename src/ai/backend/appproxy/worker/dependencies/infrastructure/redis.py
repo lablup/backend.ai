@@ -56,16 +56,8 @@ class RedisProvider(DependencyProvider[ServerConfig, WorkerValkeyClients]):
             await valkey_live.close()
             await valkey_stat.close()
 
-    def gen_health_checkers(self, resource: WorkerValkeyClients) -> ServiceHealthChecker:
-        """
-        Return health checkers for worker Valkey clients.
-
-        Args:
-            resource: The initialized Valkey clients
-
-        Returns:
-            Health checker for Valkey clients
-        """
+    def gen_liveness_checker(self, resource: WorkerValkeyClients) -> ServiceHealthChecker:
+        """Liveness — Valkey connection-stuck observed; restart recovers."""
         return ValkeyHealthChecker(
             clients={
                 CID_REDIS_LIVE: resource.valkey_live,

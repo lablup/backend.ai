@@ -29,7 +29,8 @@ class TestDeploymentControllerDependency:
             storage_manager=MagicMock(),
             event_producer=MagicMock(),
             valkey_schedule=MagicMock(),
-            revision_generator_registry=MagicMock(),
+            revision_draft_reader=MagicMock(),
+            deployment_revision_preset_repository=None,
         )
 
         dependency = DeploymentControllerDependency()

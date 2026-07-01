@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import enum
+import functools
+from collections.abc import Mapping
 
 
 class PermissionStatus(enum.StrEnum):
@@ -31,6 +33,13 @@ class RoleSource(enum.StrEnum):
 
 
 class OperationType(enum.StrEnum):
+    """
+    .. deprecated::
+        Superseded by :class:`Permission`, an :class:`enum.IntFlag` bitmask.
+        Retained because permission resolution and the ``permissions.operation``
+        column still consume these string values; do not build new features on it.
+    """
+
     CREATE = "create"
     READ = "read"
     UPDATE = "update"
@@ -70,6 +79,11 @@ class OperationType(enum.StrEnum):
 
 
 class EntityType(enum.StrEnum):
+    """
+    Deprecated for RBAC: use ``RBACElementType`` instead
+    or use ai.backend.common.entity.types.EntityType for non-RBAC-specific contexts.
+    """
+
     # === RBAC scope/resource types (original 12) ===
     USER = "user"
     PROJECT = "project"
@@ -88,6 +102,9 @@ class EntityType(enum.StrEnum):
 
     # === Standalone entity types ===
     AGENT = "agent"
+    APP_CONFIG_DEFINITION = "app_config_definition"
+    APP_CONFIG_ALLOW_LIST = "app_config_allow_list"
+    APP_CONFIG_FRAGMENT = "app_config_fragment"
     AUTH = "auth"
     PROJECT_ADMIN_PAGE = "project_admin_page"
     DOMAIN_ADMIN_PAGE = "domain_admin_page"
@@ -95,6 +112,7 @@ class EntityType(enum.StrEnum):
     AUDIT_LOG = "audit_log"
     CONTAINER_METRIC = "container_metric"
     CONTAINER_METRIC_METADATA = "container_metric_metadata"
+    CONTAINER_LIVE_STAT = "container_live_stat"
     CONTAINER_REGISTRY = "container_registry"
     DEPLOYMENT = "deployment"
     ERROR_LOG = "error_log"
@@ -102,6 +120,7 @@ class EntityType(enum.StrEnum):
     GROUP = "group"
     KERNEL = "kernel"
     KEYPAIR = "keypair"
+    LOGIN_CLIENT_TYPE = "login_client_type"
     LOGIN_SESSION = "login_session"
     MODEL_SERVICE = "model_service"
     NETWORK = "network"
@@ -115,6 +134,7 @@ class EntityType(enum.StrEnum):
     RESOURCE_OVERVIEW = "resource_overview"
     RESOURCE_GROUP = "resource_group"
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
+    PROMETHEUS_QUERY_PRESET_CATEGORY = "prometheus_query_preset_category"
     RESOURCE_PRESET = "resource_preset"
     MODEL_CARD = "model_card"
     ROLE = "role"
@@ -142,7 +162,6 @@ class EntityType(enum.StrEnum):
     APP_CONFIG_DOMAIN = "app_config:domain"
     APP_CONFIG_USER = "app_config:user"
     # Session sub
-    SESSION_KERNEL = "session:kernel"
     SESSION_FILE = "session:file"
     SESSION_DIRECTORY = "session:directory"
     SESSION_APP_SERVICE = "session:app_service"
@@ -186,6 +205,7 @@ class EntityType(enum.StrEnum):
     VFOLDER_FILE = "vfolder:file"
     VFOLDER_DIRECTORY = "vfolder:directory"
     VFOLDER_INVITATION = "vfolder:invitation"
+    VFOLDER_DATA = "vfolder:data"
     # Resource group sub
     RESOURCE_GROUP_DOMAIN = "resource_group:domain"
     RESOURCE_GROUP_KEYPAIR = "resource_group:keypair"
@@ -220,6 +240,7 @@ class EntityType(enum.StrEnum):
     GROUP_USAGE = "group:usage"
     # User sub
     USER_STATS = "user:stats"
+    USER_EMAIL = "user:email"
     # Agent sub
     AGENT_WATCHER = "agent:watcher"
     AGENT_REGISTRY = "agent:registry"
@@ -252,6 +273,7 @@ class EntityType(enum.StrEnum):
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
             cls.MODEL_DEPLOYMENT,
+            cls.MODEL_CARD,
         }
 
     @classmethod
@@ -311,11 +333,13 @@ class FieldType(enum.StrEnum):
 
 
 class ScopeType(enum.StrEnum):
+    """Deprecated for RBAC: use ``RBACElementType`` instead."""
+
     # === Organization/permission scopes (original) ===
     DOMAIN = "domain"
     PROJECT = "project"
     USER = "user"
-    GLOBAL = "global"
+    GLOBAL = "global"  # Deprecated: no longer used in RBAC scope hierarchy
 
     RESOURCE_GROUP = "resource_group"
     CONTAINER_REGISTRY = "container_registry"
@@ -332,7 +356,10 @@ class ScopeType(enum.StrEnum):
     ARTIFACT_REVISION = "artifact_revision"
     AGENT = "agent"
     ROLE = "role"
+    ROLE_ASSIGNMENT = "role:assignment"
     NOTIFICATION_CHANNEL = "notification_channel"
+    KEYPAIR = "keypair"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
 
     def to_element(self) -> RBACElementType:
         from ai.backend.common.exception import RBACTypeConversionError
@@ -343,7 +370,7 @@ class ScopeType(enum.StrEnum):
             raise RBACTypeConversionError(f"{self!r} has no corresponding RBACElementType") from e
 
 
-GLOBAL_SCOPE_ID = "global"
+GLOBAL_SCOPE_ID = "global"  # Deprecated: no longer used in RBAC scope hierarchy
 
 
 class RBACElementType(enum.StrEnum):
@@ -380,6 +407,10 @@ class RBACElementType(enum.StrEnum):
     ARTIFACT_REGISTRY = "artifact_registry"
     SESSION_TEMPLATE = "session_template"
     APP_CONFIG = "app_config"
+    APP_CONFIG_DEFINITION = "app_config_definition"
+    APP_CONFIG_ALLOW_LIST = "app_config_allow_list"
+    APP_CONFIG_FRAGMENT = "app_config_fragment"
+    MODEL_CARD = "model_card"
 
     # === Root-query-enabled entities (superadmin-only) ===
     RESOURCE_PRESET = "resource_preset"
@@ -402,6 +433,15 @@ class RBACElementType(enum.StrEnum):
     DEPLOYMENT_POLICY = "deployment:policy"
     DEPLOYMENT_REVISION = "deployment:revision"
     IMAGE_ALIAS = "image:alias"
+    ROLE_ASSIGNMENT = "role:assignment"
+
+    # === Sub-entity permissions split from parent metadata access ===
+    # These split permission control of a parent entity into sub-aspects so that
+    # access to listings/detail (parent) and access to internal data or
+    # sub-operations (child) can be granted independently.
+    VFOLDER_DATA = "vfolder:data"
+    SESSION_APP_SERVICE = "session:app_service"
+    USER_EMAIL = "user:email"
 
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"
@@ -440,3 +480,122 @@ class RelationType(enum.StrEnum):
 
     AUTO = "auto"
     REF = "ref"
+
+
+# ---------------------------------------------------------------------------
+# Per-entity allowed-operation tables
+#
+# These tables define which operations are valid for a given role-kind on a
+# given entity. Entity types not listed in an override map fall back to the
+# corresponding default set. The helper functions are cached because the
+# answer is purely a function of the inputs.
+# ---------------------------------------------------------------------------
+
+_STANDARD_OPS: frozenset[OperationType] = frozenset({
+    OperationType.CREATE,
+    OperationType.READ,
+    OperationType.UPDATE,
+    OperationType.SOFT_DELETE,
+    OperationType.HARD_DELETE,
+})
+_READ_ONLY_OPS: frozenset[OperationType] = frozenset({OperationType.READ})
+
+_DEFAULT_ADMIN_OPS: frozenset[OperationType] = _STANDARD_OPS
+_DEFAULT_OWNER_OPS: frozenset[OperationType] = _STANDARD_OPS
+_DEFAULT_MEMBER_OPS: frozenset[OperationType] = _READ_ONLY_OPS
+
+# vfolder:data CRUD on internal files/directories — soft-delete is intentionally
+# omitted because there is no two-stage delete for vfolder data.
+_VFOLDER_DATA_OWNER_OPS: frozenset[OperationType] = frozenset({
+    OperationType.CREATE,
+    OperationType.READ,
+    OperationType.UPDATE,
+    OperationType.HARD_DELETE,
+})
+
+_ADMIN_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    # vfolder:data and session:app_service are owner-only — admins of the parent scope
+    # have access to listings/metadata but not to internal data or app endpoints.
+    RBACElementType.VFOLDER_DATA: frozenset(),
+    RBACElementType.SESSION_APP_SERVICE: frozenset(),
+}
+_OWNER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    RBACElementType.VFOLDER_DATA: _VFOLDER_DATA_OWNER_OPS,
+    RBACElementType.SESSION_APP_SERVICE: _READ_ONLY_OPS,
+}
+_MEMBER_OPS_OVERRIDES: Mapping[RBACElementType, frozenset[OperationType]] = {
+    # Members of a project may create their own sessions, vfolders,
+    # and model deployments (a.k.a. model services).
+    RBACElementType.SESSION: frozenset({OperationType.READ, OperationType.CREATE}),
+    RBACElementType.VFOLDER: frozenset({OperationType.READ, OperationType.CREATE}),
+    RBACElementType.MODEL_DEPLOYMENT: frozenset({
+        OperationType.READ,
+        OperationType.CREATE,
+    }),
+    # Owner-only sub-entities — members of the parent scope have no access.
+    RBACElementType.VFOLDER_DATA: frozenset(),
+    RBACElementType.SESSION_APP_SERVICE: frozenset(),
+}
+
+
+@functools.cache
+def admin_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
+    """Operations granted to an *admin* role on the given entity type."""
+    return _ADMIN_OPS_OVERRIDES.get(entity_type, _DEFAULT_ADMIN_OPS)
+
+
+@functools.cache
+def owner_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
+    """Operations granted to an *owner* role on the given entity type."""
+    return _OWNER_OPS_OVERRIDES.get(entity_type, _DEFAULT_OWNER_OPS)
+
+
+@functools.cache
+def member_operations(entity_type: RBACElementType) -> frozenset[OperationType]:
+    """Operations granted to a *member* role on the given entity type."""
+    return _MEMBER_OPS_OVERRIDES.get(entity_type, _DEFAULT_MEMBER_OPS)
+
+
+class Permission(enum.IntFlag):
+    """A bitmask of operations, each a distinct power-of-two bit.
+
+    Bit magnitude carries no semantics; checks are purely bitwise:
+
+    * does the mask include an operation?  ``bool(mask & Permission.X)``
+    * is one mask a subset of another?     ``(a & ~b) == Permission.NONE``
+    * intersect / union two masks          ``a & b`` / ``a | b``
+    """
+
+    NONE = 0
+    READ = 1 << 0
+    UPDATE = 1 << 1
+    CREATE = 1 << 2
+    SOFT_DELETE = 1 << 3
+    HARD_DELETE = 1 << 4
+
+    @classmethod
+    def full(cls) -> Permission:
+        """The full permission cap — every operation allowed."""
+        return cls.READ | cls.UPDATE | cls.CREATE | cls.SOFT_DELETE | cls.HARD_DELETE
+
+    @classmethod
+    def from_operation(cls, operation: OperationType) -> Permission:
+        """Map a single :class:`OperationType` to its corresponding bit.
+
+        Grant operations (``GRANT_*``) have no dedicated bit and map to
+        :attr:`NONE`; grant authority is still carried by the legacy
+        ``permissions.operation`` column during the transition.
+        """
+        match operation:
+            case OperationType.READ:
+                return cls.READ
+            case OperationType.UPDATE:
+                return cls.UPDATE
+            case OperationType.CREATE:
+                return cls.CREATE
+            case OperationType.SOFT_DELETE:
+                return cls.SOFT_DELETE
+            case OperationType.HARD_DELETE:
+                return cls.HARD_DELETE
+            case _:
+                return cls.NONE

@@ -40,6 +40,7 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.kernel.types import (
     Metrics as KernelMetrics,
 )
+from ai.backend.manager.data.session.options import SessionHandlerOptions
 from ai.backend.manager.data.session.types import (
     ImageSpec,
     MountSpec,
@@ -53,13 +54,7 @@ from ai.backend.manager.data.session.types import (
     SessionNetwork,
     SessionStatus,
 )
-from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
-from ai.backend.manager.repositories.scheduler.types.session import (
-    TerminatingKernelData,
-    TerminatingSessionData,
-)
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ImageConfigData,
     KernelBindingData,
     SessionDataForPull,
@@ -67,6 +62,11 @@ from ai.backend.manager.sokovan.data import (
     SessionsForPullWithImages,
     SessionsForStartWithImages,
     SessionWithKernels,
+)
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.repositories.scheduler.types.session import (
+    TerminatingKernelData,
+    TerminatingSessionData,
 )
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
@@ -145,6 +145,7 @@ def _create_session(
         ),
         metrics=SessionMetrics(num_queries=0, last_stat=None),
         network=SessionNetwork(network_type=None, network_id=None),
+        handler_options=SessionHandlerOptions(),
     )
 
     kernel_infos = []
@@ -169,6 +170,7 @@ def _create_session(
                 gids=None,
             ),
             image=ImageInfo(
+                image_id=None,
                 identifier=None,
                 registry="docker.io",
                 tag="latest",
@@ -270,6 +272,7 @@ def _create_kernel(
             gids=None,
         ),
         image=ImageInfo(
+            image_id=None,
             identifier=None,
             registry="docker.io",
             tag="latest",
@@ -340,7 +343,7 @@ def mock_provisioner() -> AsyncMock:
     """Mock SessionProvisioner for ScheduleSessionsLifecycleHandler tests."""
     provisioner = AsyncMock()
     provisioner.schedule_scaling_group = AsyncMock(
-        return_value=ScheduleResult(scheduled_sessions=[])
+        return_value=ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
     )
     return provisioner
 
@@ -541,16 +544,10 @@ def schedule_result_success_factory() -> Callable[..., ScheduleResult]:
     """Factory for creating successful ScheduleResult from sessions."""
 
     def _create(sessions: list[SessionWithKernels]) -> ScheduleResult:
-        scheduled_sessions = [
-            ScheduledSessionData(
-                session_id=s.session_info.identity.id,
-                creation_id=s.session_info.identity.creation_id,
-                access_key=AccessKey(s.session_info.metadata.access_key),
-                reason="scheduled-successfully",
-            )
-            for s in sessions
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_sessions)
+        return ScheduleResult(
+            scheduled_session_ids=[s.session_info.identity.id for s in sessions],
+            scheduling_failures=[],
+        )
 
     return _create
 
@@ -572,6 +569,7 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
                         agent_addr=k.resource.agent_addr,
                         scaling_group=s.session_info.resource.scaling_group_name or "default",
                         image="test-image:latest",
+                        image_id=None,
                         architecture=k.image.architecture or "x86_64",
                     )
                     for k in s.kernel_infos
@@ -579,10 +577,12 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
             )
             for s in sessions
         ]
+        _image_id = uuid4()
         return SessionsForPullWithImages(
             sessions=sessions_for_pull,
             image_configs={
-                "test-image:latest": ImageConfigData(
+                _image_id: ImageConfigData(
+                    id=_image_id,
                     canonical="test-image:latest",
                     architecture="x86_64",
                     project=None,
@@ -620,6 +620,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                         agent_addr=k.resource.agent_addr,
                         scaling_group=s.session_info.resource.scaling_group_name or "default",
                         image="test-image:latest",
+                        image_id=None,
                         architecture=k.image.architecture or "x86_64",
                     )
                     for k in s.kernel_infos
@@ -631,10 +632,12 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
             )
             for s in sessions
         ]
+        _image_id = uuid4()
         return SessionsForStartWithImages(
             sessions=sessions_for_start,
             image_configs={
-                "test-image:latest": ImageConfigData(
+                _image_id: ImageConfigData(
+                    id=_image_id,
                     canonical="test-image:latest",
                     architecture="x86_64",
                     project=None,

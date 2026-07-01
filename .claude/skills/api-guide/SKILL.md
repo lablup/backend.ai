@@ -28,7 +28,7 @@ APIs implement 6 standard operations:
 5. **delete** - Delete entity (soft)
 6. **purge** - Permanently remove entity (hard)
 
-**Batch operations:** `batch_update`, `batch_delete`, `batch_purge`
+**Multi-target:** `batch_*` (atomic, one statement) vs `bulk_*` (per-row, partial failures). See `/repository-guide`.
 
 ## Scope Prefix Rules
 
@@ -400,7 +400,7 @@ CLI → SDK → REST API → Processor → Service → Repository
 
 ## Testing
 
-**See:** `/tdd-guide` skill and `tests/CLAUDE.md` for complete testing strategies.
+**See:** `/test-guide` skill and `tests/CLAUDE.md` for complete testing strategies.
 
 **Test hierarchy:**
 ```
@@ -451,7 +451,7 @@ CLI Tests → Mock HTTP
 
 - **Service Layer**: `/service-guide` - Actions, Processors
 - **Repository Layer**: `/repository-guide` - Data access
-- **Testing**: `/tdd-guide` - TDD workflow
+- **Testing**: `/test-guide` - Scenario-first testing
 - **API README**: `src/ai/backend/manager/api/README.md`
 
 ## Examples
@@ -492,4 +492,4 @@ CLI Tests → Mock HTTP
 2. Implement service (`/service-guide`)
 3. Implement API handlers
 4. Add SDK + CLI
-5. Write tests (`/tdd-guide`)
+5. Write tests (`/test-guide`)

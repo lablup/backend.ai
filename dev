@@ -7,6 +7,7 @@ _service_cmd() {
   case $1 in
     mgr)              echo "./backend.ai mgr start-server --debug" ;;
     agent)            echo "./backend.ai ag start-server --debug" ;;
+    sftp-agent)       echo "./backend.ai ag start-server -f agent-sftp.toml --debug" ;;
     storage)          echo "./backend.ai storage start-server --debug" ;;
     web)              echo "./backend.ai web start-server --debug" ;;
     proxy-coordinator) echo "./backend.ai app-proxy-coordinator start-server --debug" ;;
@@ -19,6 +20,7 @@ _service_process() {
   case $1 in
     mgr)              echo "backend.ai: manager" ;;
     agent)            echo "backend.ai: agent" ;;
+    sftp-agent)       echo "agent-sftp.toml" ;;
     storage)          echo "backend.ai: storage-proxy" ;;
     web)              echo "backend.ai: webserver" ;;
     proxy-coordinator) echo "backend.ai: proxy-coordinator" ;;
@@ -35,7 +37,11 @@ _tmux_window_name() {
   esac
 }
 
+# Services started by `./dev start all` and included in `./dev status`.
+# Intentionally excludes sftp-agent since it is an optional dev addon that
+# must be started explicitly via `./dev start sftp-agent`.
 ALL_SERVICES="mgr agent storage web proxy-coordinator proxy-worker"
+OPTIONAL_SERVICES="sftp-agent"
 
 _color() {
   local color=$1; shift
@@ -48,23 +54,88 @@ _color() {
   esac
 }
 
+# Path to the pid-file managed by the agent process itself.
+# Since setproctitle overwrites the argv of agent workers to just
+# "backend.ai: agent", there is no way to distinguish the primary compute
+# agent from the optional SFTP agent using `pgrep -f` alone. Both agents
+# write their own pid-file (configured in agent.toml / agent-sftp.toml),
+# and we use those files as the source of truth for process tracking.
+_service_pidfile() {
+  case $1 in
+    agent)      echo "./agent.pid" ;;
+    sftp-agent) echo "./agent-sftp.pid" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Check whether the pid recorded in $1 is still a live process.
+_pid_alive() {
+  local pid=$1
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
 _is_running() {
-  pgrep -f "$(_service_process "$1")" > /dev/null 2>&1
+  local svc=$1
+  case "$svc" in
+    agent|sftp-agent)
+      local pidfile
+      pidfile=$(_service_pidfile "$svc")
+      if [ -f "$pidfile" ]; then
+        local pid
+        pid=$(cat "$pidfile" 2>/dev/null || true)
+        _pid_alive "$pid"
+        return $?
+      fi
+      return 1
+      ;;
+    *)
+      pgrep -f "$(_service_process "$svc")" > /dev/null 2>&1
+      ;;
+  esac
 }
 
 _stop_service() {
   local svc=$1
+  _kill_by_pidfile() {
+    local signal=$1
+    local pidfile
+    pidfile=$(_service_pidfile "$svc")
+    if [ -f "$pidfile" ]; then
+      local pid
+      pid=$(cat "$pidfile" 2>/dev/null || true)
+      if [ -n "$pid" ]; then
+        kill "-${signal}" "$pid" 2>/dev/null || true
+      fi
+    fi
+  }
+  _kill_matching() {
+    local signal=$1
+    case "$svc" in
+      agent|sftp-agent)
+        _kill_by_pidfile "$signal"
+        ;;
+      *)
+        pkill "-${signal}" -f "$(_service_process "$svc")" 2>/dev/null || true
+        ;;
+    esac
+  }
   if _is_running "$svc"; then
     echo "  Stopping $svc..."
-    pkill -f "$(_service_process "$svc")" 2>/dev/null || true
+    _kill_matching TERM
     for _ in $(seq 1 10); do
       _is_running "$svc" || break
       sleep 0.5
     done
     if _is_running "$svc"; then
-      pkill -9 -f "$(_service_process "$svc")" 2>/dev/null || true
+      _kill_matching KILL
       sleep 1
     fi
+    # Remove stale pid file on stop so the next status check is accurate.
+    case "$svc" in
+      agent|sftp-agent)
+        rm -f "$(_service_pidfile "$svc")"
+        ;;
+    esac
   fi
 }
 
@@ -75,7 +146,11 @@ _start_service() {
     return
   fi
   local cmd
-  cmd=$(_service_cmd "$svc")
+  # Raise the soft open-files limit before exec'ing the service. The long-lived
+  # tmux server inherits launchd's low default (256 on macOS), so services
+  # started here would otherwise hit "Too many open files". Best-effort: a
+  # failure on hosts with a low hard limit must not block startup.
+  cmd="ulimit -n 65536 2>/dev/null; $(_service_cmd "$svc")"
   if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
     local winname
     winname=$(_tmux_window_name "$svc")
@@ -88,19 +163,35 @@ _start_service() {
   echo "  Started $svc"
 }
 
-cmd_status() {
-  echo ""
-  printf "  %-20s %s\n" "SERVICE" "STATUS"
-  printf "  %-20s %s\n" "-------" "------"
-  for svc in $ALL_SERVICES; do
+_status_services() {
+  local services="$*"
+  for svc in $services; do
     if _is_running "$svc"; then
       local pid
-      pid=$(pgrep -f "$(_service_process "$svc")" | head -1)
+      case "$svc" in
+        agent|sftp-agent)
+          pid=$(cat "$(_service_pidfile "$svc")" 2>/dev/null || true)
+          ;;
+        *)
+          pid=$(pgrep -f "$(_service_process "$svc")" | head -1)
+          ;;
+      esac
       printf "  %-20s %s (pid: %s)\n" "$svc" "$(_color green running)" "$pid"
     else
       printf "  %-20s %s\n" "$svc" "$(_color red stopped)"
     fi
   done
+}
+
+cmd_status() {
+  echo ""
+  printf "  %-20s %s\n" "SERVICE" "STATUS"
+  printf "  %-20s %s\n" "-------" "------"
+  _status_services $ALL_SERVICES
+  # Only show optional services that are actually installed (config exists).
+  if [ -f "./agent-sftp.toml" ]; then
+    _status_services sftp-agent
+  fi
   echo ""
 }
 
@@ -149,15 +240,70 @@ cmd_restart() {
 
 cmd_log() {
   local svc=$1
+  local follow=${2:-}
   local winname
   winname=$(_tmux_window_name "$svc")
   local win
   win=$(tmux list-windows -t "$TMUX_SESSION" -F "#{window_name}" 2>/dev/null | grep "^${winname}$" | head -1) || true
-  if [ -n "$win" ]; then
-    tmux capture-pane -t "$TMUX_SESSION:$win" -p -S -50
-  else
+  if [ -z "$win" ]; then
     echo "$(_color red "No tmux window found for $svc")"
+    return 1
   fi
+  if [ "$follow" = "-f" ]; then
+    local last_hash=""
+    trap 'exit 0' INT
+    while true; do
+      local output
+      output=$(tmux capture-pane -t "$TMUX_SESSION:$win" -p -S -50 2>/dev/null)
+      local cur_hash
+      cur_hash=$(echo "$output" | md5sum | cut -d' ' -f1)
+      if [ "$cur_hash" != "$last_hash" ]; then
+        clear
+        echo "$output"
+        last_hash=$cur_hash
+      fi
+      sleep 1
+    done
+  else
+    tmux capture-pane -t "$TMUX_SESSION:$win" -p -S -50
+  fi
+}
+
+cmd_harbor() {
+  local action=${1:-}
+  local harbor_dir="./harbor"
+  if [ ! -d "$harbor_dir" ] || [ ! -f "$harbor_dir/docker-compose.yml" ]; then
+    echo "$(_color red "Harbor is not installed.")"
+    echo "Install it by running: ./backendai-install install --with-harbor"
+    exit 1
+  fi
+  case "$action" in
+    start)
+      echo "$(_color bold "Starting Harbor...")"
+      (cd "$harbor_dir" && docker compose up -d)
+      echo "$(_color green "Harbor started.")"
+      ;;
+    stop)
+      echo "$(_color bold "Stopping Harbor...")"
+      (cd "$harbor_dir" && docker compose down)
+      echo "$(_color green "Harbor stopped.")"
+      ;;
+    restart)
+      echo "$(_color bold "Restarting Harbor...")"
+      (cd "$harbor_dir" && docker compose down && docker compose up -d)
+      echo "$(_color green "Harbor restarted.")"
+      ;;
+    status)
+      (cd "$harbor_dir" && docker compose ps)
+      ;;
+    logs)
+      (cd "$harbor_dir" && docker compose logs -f --tail=200)
+      ;;
+    *)
+      echo "$(_color red "Usage: ./dev harbor <start|stop|restart|status|logs>")"
+      exit 1
+      ;;
+  esac
 }
 
 usage() {
@@ -170,16 +316,23 @@ Commands:
   start   <service|all>     Start a service
   stop    <service|all>     Stop a service
   restart <service|all>     Restart a service
-  log     <service>         Show recent log output
+  log     <service> [-f]    Show recent log output (-f to follow)
+  harbor  <start|stop|restart|status|logs>
+                            Manage the optional Harbor registry
 
 Services:
   mgr, agent, storage, web, proxy-coordinator, proxy-worker, all
+
+Optional services (must be started explicitly, not included in 'all'):
+  sftp-agent                Dedicated SFTP upload agent (needs agent-sftp.toml)
 
 Examples:
   ./dev status
   ./dev restart mgr
   ./dev restart all
   ./dev log mgr
+  ./dev harbor start
+  ./dev start sftp-agent
 
 EOF
 }
@@ -189,9 +342,14 @@ _validate_service() {
   [ "$svc" = "all" ] && return 0
   _service_cmd "$svc" > /dev/null 2>&1 || {
     echo "$(_color red "Unknown service: $svc")"
-    echo "Valid services: $ALL_SERVICES all"
+    echo "Valid services: $ALL_SERVICES $OPTIONAL_SERVICES all"
     exit 1
   }
+  # Fail fast if sftp-agent config is missing
+  if [ "$svc" = "sftp-agent" ] && [ ! -f "./agent-sftp.toml" ]; then
+    echo "$(_color red "agent-sftp.toml not found. Run the installer with --with-sftp-agent first.")"
+    exit 1
+  fi
 }
 
 if [ $# -lt 1 ]; then
@@ -207,9 +365,12 @@ case "$1" in
     "cmd_$1" "$2"
     ;;
   log)
-    [ $# -lt 2 ] && { echo "$(_color red "Usage: ./dev log <service>")"; exit 1; }
+    [ $# -lt 2 ] && { echo "$(_color red "Usage: ./dev log <service> [-f]")"; exit 1; }
     _validate_service "$2"
-    cmd_log "$2"
+    cmd_log "$2" "${3:-}"
+    ;;
+  harbor)
+    cmd_harbor "${2:-}"
     ;;
   *) echo "$(_color red "Unknown command: $1")"; usage; exit 1 ;;
 esac

@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from ai.backend.common.types import BackendAISchema
 
 
-class BgTaskProgressData(BaseModel):
+class BgTaskProgressData(BackendAISchema):
     current: int = Field(
         default=0,
         description="Current progress of the scan operation, expressed as a percentage.",

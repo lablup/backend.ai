@@ -2,10 +2,11 @@ import enum
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.exception import ArtifactDefaultRevisionResolveError
+from ai.backend.common.types import BackendAISchema
 
 
 class ModelSortKey(enum.StrEnum):
@@ -17,7 +18,7 @@ class ModelSortKey(enum.StrEnum):
 
 
 # TODO: Separate of the ModelTarget type used in the storage proxy and the one used in the manager
-class ModelTarget(BaseModel):
+class ModelTarget(BackendAISchema):
     model_id: str = Field(
         description="""
         HuggingFace model ID to import.
@@ -47,7 +48,7 @@ class ModelTarget(BaseModel):
                 )
 
 
-class FileObjectData(BaseModel):
+class FileObjectData(BackendAISchema):
     """
     Model file information.
     """
@@ -82,7 +83,7 @@ class FileObjectData(BaseModel):
     )
 
 
-class ModelData(BaseModel):
+class ModelData(BackendAISchema):
     """
     Model Artifact information.
     """

@@ -9,9 +9,9 @@ from typing import Any, override
 
 import yarl
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     ClusterMode,
-    RuntimeVariant,
     VFolderMount,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
@@ -41,7 +41,6 @@ class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
     callback_url: yarl.URL | None = None
     environ: dict[str, str] | None = None
     open_to_public: bool = False
-    runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
     model_mount_destination: str = "/models"
     url: str | None = None
     resource_opts: dict[str, Any] | None = None
@@ -67,7 +66,6 @@ class EndpointCreatorSpec(CreatorSpec[EndpointRow]):
             cluster_mode=self.cluster_mode,
             cluster_size=self.cluster_size,
             extra_mounts=self.extra_mounts,
-            runtime_variant=self.runtime_variant,
             model_mount_destination=self.model_mount_destination,
             tag=self.tag,
             startup_command=self.startup_command,
@@ -85,7 +83,7 @@ class EndpointTokenCreatorSpec(CreatorSpec[EndpointTokenRow]):
 
     id: uuid.UUID
     token: str
-    endpoint: uuid.UUID
+    endpoint: DeploymentID
     domain: str
     project: uuid.UUID
     session_owner: uuid.UUID

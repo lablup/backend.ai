@@ -11,13 +11,16 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.keypair.types import KeypairOrderField
 
 __all__ = (
     "AdminCreateKeypairInput",
     "AdminDeleteKeypairInput",
+    "AdminDeleteSSHKeypairInput",
+    "AdminGetSSHKeypairInput",
+    "AdminRegisterSSHKeypairInput",
     "AdminSearchKeypairsInput",
     "AdminUpdateKeypairInput",
     "KeypairFilter",
@@ -36,6 +39,10 @@ class KeypairFilter(BaseRequestModel):
     is_admin: bool | None = None
     access_key: StringFilter | None = None
     resource_policy: StringFilter | None = None
+    user_id: UUIDFilter | None = Field(
+        default=None,
+        description="Filter by the UUID of the keypair owner.",
+    )
     created_at: DateTimeFilter | None = None
     last_used: DateTimeFilter | None = None
 
@@ -56,6 +63,31 @@ class KeypairOrderBy(BaseRequestModel):
 
 class SearchMyKeypairsRequest(BaseRequestModel):
     """Search input for current user's keypairs. Shared by GQL and REST."""
+
+    filter: KeypairFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[KeypairOrderBy] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor-based: return first N items.")
+    after: str | None = Field(default=None, description="Cursor-based: return items after cursor.")
+    last: int | None = Field(default=None, description="Cursor-based: return last N items.")
+    before: str | None = Field(
+        default=None, description="Cursor-based: return items before cursor."
+    )
+    limit: int | None = Field(
+        default=None,
+        ge=1,
+        le=MAX_PAGE_LIMIT,
+        description="Offset-based: maximum items to return.",
+    )
+    offset: int | None = Field(
+        default=None, ge=0, description="Offset-based: number of items to skip."
+    )
+
+
+class SearchKeypairsRequest(BaseRequestModel):
+    """Generic keypair search input (filter/order/pagination), scope-agnostic.
+
+    Shared by GQL and REST; the search scope is supplied separately by the caller.
+    """
 
     filter: KeypairFilter | None = Field(default=None, description="Filter conditions.")
     order: list[KeypairOrderBy] | None = Field(default=None, description="Order specifications.")
@@ -119,6 +151,26 @@ class AdminDeleteKeypairInput(BaseRequestModel):
     """Admin request to delete a keypair."""
 
     access_key: str = Field(description="Access key of the keypair to delete.")
+
+
+class AdminRegisterSSHKeypairInput(BaseRequestModel):
+    """Admin request to register (overwrite) a user's SSH keypair."""
+
+    access_key: str = Field(description="Access key whose SSH keypair will be replaced.")
+    ssh_public_key: str = Field(description="PEM-encoded SSH public key.")
+    ssh_private_key: str = Field(description="PEM-encoded SSH private key.")
+
+
+class AdminDeleteSSHKeypairInput(BaseRequestModel):
+    """Admin request to clear a user's SSH keypair."""
+
+    access_key: str = Field(description="Access key whose SSH keypair will be cleared.")
+
+
+class AdminGetSSHKeypairInput(BaseRequestModel):
+    """Admin request to look up a user's SSH keypair (public key only)."""
+
+    access_key: str = Field(description="Access key whose SSH public key will be returned.")
 
 
 class AdminSearchKeypairsInput(BaseRequestModel):

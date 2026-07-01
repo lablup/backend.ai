@@ -19,7 +19,7 @@ def _make_domain_node(
     *,
     name: str = "test-domain",
     description: str | None = "Test domain description",
-    integration_id: str | None = "integration-123",
+    integration_name: str | None = "integration-123",
     allowed_docker_registries: list[str] | None = None,
     is_active: bool = True,
     created_at: datetime | None = None,
@@ -31,7 +31,7 @@ def _make_domain_node(
         basic_info=DomainBasicInfo(
             name=name,
             description=description,
-            integration_id=integration_id,
+            integration_name=integration_name,
         ),
         registry=DomainRegistryInfo(
             allowed_docker_registries=allowed_docker_registries or [],
@@ -54,7 +54,7 @@ class TestDomainV2GQL:
         dto = _make_domain_node(
             name="test-domain",
             description="Test domain description",
-            integration_id="integration-123",
+            integration_name="integration-123",
             allowed_docker_registries=["docker.io", "ghcr.io"],
             is_active=True,
             created_at=created,
@@ -66,7 +66,7 @@ class TestDomainV2GQL:
         # Verify basic info
         assert domain_gql.basic_info.name == "test-domain"
         assert domain_gql.basic_info.description == "Test domain description"
-        assert domain_gql.basic_info.integration_id == "integration-123"
+        assert domain_gql.basic_info.integration_name == "integration-123"
 
         # Verify registry
         assert domain_gql.registry.allowed_docker_registries == ["docker.io", "ghcr.io"]
@@ -97,7 +97,7 @@ class TestDomainV2GQL:
         dto = _make_domain_node(
             name="minimal-domain",
             description=None,
-            integration_id=None,
+            integration_name=None,
             is_active=False,
         )
 
@@ -105,5 +105,5 @@ class TestDomainV2GQL:
 
         # Verify None values are preserved
         assert domain_gql.basic_info.description is None
-        assert domain_gql.basic_info.integration_id is None
+        assert domain_gql.basic_info.integration_name is None
         assert domain_gql.lifecycle.is_active is False

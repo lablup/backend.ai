@@ -20,9 +20,9 @@ Setting Up Additional Agents (multi-node)
 Updating manager configuration for multi-nodes
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Since ``scripts/install-dev.sh`` assumes a single-node all-in-one setup, it configures the etcd and Redis addresses to be ``127.0.0.1``.
+Since ``scripts/install-dev.sh`` assumes a single-node all-in-one setup, it configures the etcd and Valkey addresses to be ``127.0.0.1``.
 
-You need to update the etcd configuration of the Redis address so that additional agent nodes can connect to the Redis server using the address advertised via etcd:
+You need to update the etcd configuration of the Valkey address so that additional agent nodes can connect to the Valkey server using the address advertised via etcd:
 
 .. code-block:: console
 

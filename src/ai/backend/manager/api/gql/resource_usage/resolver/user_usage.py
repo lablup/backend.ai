@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.resource_usage.types import (
     UserUsageBucketGQL,
     UserUsageBucketOrderBy,
 )
-from ai.backend.manager.api.gql.types import ResourceGroupUserScope, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 # Admin APIs
@@ -67,28 +67,6 @@ async def admin_user_usage_buckets(
 
 
 # Resource Group Scoped APIs
-
-
-@gql_root_field(
-    BackendAIGQLMeta(
-        added_version="26.2.0",
-        description="List user usage buckets within resource group scope. This API is not yet implemented.",
-    )
-)  # type: ignore[misc]
-async def rg_user_usage_buckets(
-    info: Info[StrawberryGQLContext],
-    scope: ResourceGroupUserScope,
-    filter: UserUsageBucketFilter | None = None,
-    order_by: list[UserUsageBucketOrderBy] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> UserUsageBucketConnection | None:
-    """Search user usage buckets within resource group scope."""
-    raise NotImplementedError("rg_user_usage_buckets is not yet implemented")
 
 
 # Legacy APIs (deprecated)

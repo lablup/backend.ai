@@ -281,17 +281,15 @@ class TestVFolderCRUD:
 
     async def test_clone(self) -> None:
         response_data = {
-            "item": {
-                "id": "clone-id",
-                "name": "cloned-folder",
-                "host": "local:vol",
-                "usage_mode": "general",
-                "permission": "rw",
-                "creator": "user@test.com",
-                "ownership_type": "user",
-                "cloneable": False,
-                "bgtask_id": "task-123",
-            }
+            "id": "clone-id",
+            "name": "cloned-folder",
+            "host": "local:vol",
+            "usage_mode": "general",
+            "permission": "rw",
+            "creator": "user@test.com",
+            "ownership_type": "user",
+            "cloneable": False,
+            "bgtask_id": "task-123",
         }
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
@@ -299,7 +297,7 @@ class TestVFolderCRUD:
         result = await vfolder.clone("original", CloneVFolderReq(target_name="cloned-folder"))
 
         assert isinstance(result, VFolderCloneResponse)
-        assert result.item.name == "cloned-folder"
+        assert result.root.name == "cloned-folder"
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"

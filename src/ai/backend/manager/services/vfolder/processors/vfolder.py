@@ -32,6 +32,38 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.batch_load_by_ids import (
+    BatchLoadVFoldersByIdsAction,
+    BatchLoadVFoldersByIdsActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.create_v2 import (
+    CreateVFolderV2Action,
+    CreateVFolderV2ActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.file_v2 import (
+    CloneVFolderV2Action,
+    CloneVFolderV2ActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.get_my_storage_host_permissions import (
+    GetMyStorageHostPermissionsAction,
+    GetMyStorageHostPermissionsActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.get_row import (
+    GetVFolderLegacyRowAction,
+    GetVFolderLegacyRowActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.get_usage import (
+    GetVFolderUsageAction,
+    GetVFolderUsageActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.get_v2 import (
+    GetVFolderV2Action,
+    GetVFolderV2ActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.resolve_ids_by_names import (
+    ResolveIdsByNamesAction,
+    ResolveIdsByNamesActionResult,
+)
 from ai.backend.manager.services.vfolder.actions.search_in_project import (
     SearchVFoldersInProjectAction,
     SearchVFoldersInProjectActionResult,
@@ -47,8 +79,8 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     GetFstabContentsActionResult,
     GetQuotaAction,
     GetQuotaActionResult,
-    GetVFolderUsageAction,
-    GetVFolderUsageActionResult,
+    GetVFolderUsageLegacyAction,
+    GetVFolderUsageLegacyActionResult,
     GetVFolderUsedBytesAction,
     GetVFolderUsedBytesActionResult,
     GetVolumePerfMetricAction,
@@ -67,6 +99,20 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     UmountHostActionResult,
     UpdateQuotaAction,
     UpdateQuotaActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.upload_session_v2 import (
+    CreateUploadSessionV2Action,
+    CreateUploadSessionV2ActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
+    CreateVFolderInProjectAction,
+    CreateVFolderInProjectActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.vfolder_v2 import (
+    DeleteVFolderV2Action,
+    DeleteVFolderV2ActionResult,
+    PurgeVFolderV2Action,
+    PurgeVFolderV2ActionResult,
 )
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
@@ -104,9 +150,14 @@ class VFolderProcessors(AbstractProcessorPackage):
     get_volume_perf_metric: ActionProcessor[
         GetVolumePerfMetricAction, GetVolumePerfMetricActionResult
     ]
-    get_usage: ActionProcessor[GetVFolderUsageAction, GetVFolderUsageActionResult]
+    get_usage_legacy: ActionProcessor[
+        GetVFolderUsageLegacyAction, GetVFolderUsageLegacyActionResult
+    ]
     get_used_bytes: ActionProcessor[GetVFolderUsedBytesAction, GetVFolderUsedBytesActionResult]
     list_hosts: ActionProcessor[ListHostsAction, ListHostsActionResult]
+    get_my_storage_host_permissions: ActionProcessor[
+        GetMyStorageHostPermissionsAction, GetMyStorageHostPermissionsActionResult
+    ]
     get_quota: ActionProcessor[GetQuotaAction, GetQuotaActionResult]
     update_quota: ActionProcessor[UpdateQuotaAction, UpdateQuotaActionResult]
     change_vfolder_ownership: ActionProcessor[
@@ -119,6 +170,28 @@ class VFolderProcessors(AbstractProcessorPackage):
     get_accessible_vfolder: ActionProcessor[
         GetAccessibleVFolderAction, GetAccessibleVFolderActionResult
     ]
+    get_vfolder_row: ActionProcessor[GetVFolderLegacyRowAction, GetVFolderLegacyRowActionResult]
+    batch_load_vfolders_by_ids: ActionProcessor[
+        BatchLoadVFoldersByIdsAction, BatchLoadVFoldersByIdsActionResult
+    ]
+    resolve_vfolder_ids_by_names: ActionProcessor[
+        ResolveIdsByNamesAction,
+        ResolveIdsByNamesActionResult,
+    ]
+    get_v2: SingleEntityActionProcessor[GetVFolderV2Action, GetVFolderV2ActionResult]
+    get_folder_usage: SingleEntityActionProcessor[
+        GetVFolderUsageAction, GetVFolderUsageActionResult
+    ]
+    create_vfolder_v2: ActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
+    create_upload_session_v2: ActionProcessor[
+        CreateUploadSessionV2Action, CreateUploadSessionV2ActionResult
+    ]
+    delete_v2: SingleEntityActionProcessor[DeleteVFolderV2Action, DeleteVFolderV2ActionResult]
+    purge_v2: SingleEntityActionProcessor[PurgeVFolderV2Action, PurgeVFolderV2ActionResult]
+    clone_v2: ActionProcessor[CloneVFolderV2Action, CloneVFolderV2ActionResult]
+    create_vfolder_in_project: ScopeActionProcessor[
+        CreateVFolderInProjectAction, CreateVFolderInProjectActionResult
+    ]
 
     def __init__(
         self,
@@ -130,9 +203,11 @@ class VFolderProcessors(AbstractProcessorPackage):
         single_entity_rbac_validators = [validators.rbac.single_entity]
 
         # Scope actions with RBAC validation
-        self.create_vfolder = ScopeActionProcessor(
-            service.create, action_monitors, validators=scope_rbac_validators
-        )
+        # NOTE: RBAC validation is temporarily disabled for create_vfolder
+        # because the project member role does not yet grant vfolder:create.
+        # The service layer still enforces the legacy admin-only check for
+        # group-owned folders.
+        self.create_vfolder = ScopeActionProcessor(service.create, action_monitors)
         self.list_vfolder = ScopeActionProcessor(
             service.list, action_monitors, validators=scope_rbac_validators
         )
@@ -176,9 +251,12 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.get_volume_perf_metric = ActionProcessor(
             service.get_volume_perf_metric, action_monitors
         )
-        self.get_usage = ActionProcessor(service.get_usage, action_monitors)
+        self.get_usage_legacy = ActionProcessor(service.get_usage_legacy, action_monitors)
         self.get_used_bytes = ActionProcessor(service.get_used_bytes, action_monitors)
         self.list_hosts = ActionProcessor(service.list_hosts, action_monitors)
+        self.get_my_storage_host_permissions = ActionProcessor(
+            service.get_my_storage_host_permissions, action_monitors
+        )
         self.get_quota = ActionProcessor(service.get_quota, action_monitors)
         self.update_quota = ActionProcessor(service.update_quota, action_monitors)
         self.change_vfolder_ownership = ActionProcessor(
@@ -190,6 +268,39 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.get_fstab_contents = ActionProcessor(service.get_fstab_contents, action_monitors)
         self.get_accessible_vfolder = ActionProcessor(
             service.get_accessible_vfolder, action_monitors
+        )
+        self.get_vfolder_row = ActionProcessor(service.get_vfolder_row, action_monitors)
+
+        # Cross-entity loaders (no RBAC validation; caller has parent access)
+        self.batch_load_vfolders_by_ids = ActionProcessor(
+            service.batch_load_by_ids, action_monitors
+        )
+        self.resolve_vfolder_ids_by_names = ActionProcessor(
+            service.resolve_vfolder_ids_by_names, action_monitors
+        )
+
+        # V2 actions
+        self.get_v2 = SingleEntityActionProcessor(
+            service.get_v2, action_monitors, validators=single_entity_rbac_validators
+        )
+        self.get_folder_usage = SingleEntityActionProcessor(
+            service.get_folder_usage, action_monitors, validators=single_entity_rbac_validators
+        )
+        self.create_vfolder_v2 = ActionProcessor(service.create_v2, action_monitors)
+        self.create_upload_session_v2 = ActionProcessor(
+            service.create_upload_session_v2, action_monitors
+        )
+        self.delete_v2 = SingleEntityActionProcessor(
+            service.delete_v2, action_monitors, validators=single_entity_rbac_validators
+        )
+        self.purge_v2 = SingleEntityActionProcessor(
+            service.purge_v2, action_monitors, validators=single_entity_rbac_validators
+        )
+        self.clone_v2 = ActionProcessor(service.clone_v2, action_monitors)
+        self.create_vfolder_in_project = ScopeActionProcessor(
+            service.create_in_project,
+            action_monitors,
+            validators=scope_rbac_validators,
         )
 
     @override
@@ -211,9 +322,10 @@ class VFolderProcessors(AbstractProcessorPackage):
             ListAllowedTypesAction.spec(),
             ListAllHostsAction.spec(),
             GetVolumePerfMetricAction.spec(),
-            GetVFolderUsageAction.spec(),
+            GetVFolderUsageLegacyAction.spec(),
             GetVFolderUsedBytesAction.spec(),
             ListHostsAction.spec(),
+            GetMyStorageHostPermissionsAction.spec(),
             GetQuotaAction.spec(),
             UpdateQuotaAction.spec(),
             ChangeVFolderOwnershipAction.spec(),
@@ -222,4 +334,15 @@ class VFolderProcessors(AbstractProcessorPackage):
             UmountHostAction.spec(),
             GetFstabContentsAction.spec(),
             GetAccessibleVFolderAction.spec(),
+            GetVFolderLegacyRowAction.spec(),
+            BatchLoadVFoldersByIdsAction.spec(),
+            ResolveIdsByNamesAction.spec(),
+            CreateVFolderV2Action.spec(),
+            CreateUploadSessionV2Action.spec(),
+            GetVFolderV2Action.spec(),
+            GetVFolderUsageAction.spec(),
+            DeleteVFolderV2Action.spec(),
+            PurgeVFolderV2Action.spec(),
+            CloneVFolderV2Action.spec(),
+            CreateVFolderInProjectAction.spec(),
         ]

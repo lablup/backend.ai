@@ -176,6 +176,75 @@ DomainStatusGQL = gql_enum(
 )
 ```
 
+### Nullable Return Types
+
+Any field that runs through a **resolver** MUST be declared nullable (`T | None`). This
+covers root `Query` / `Mutation` fields and any computed nested field on a Node /
+Connection / Payload type — anything decorated with `@gql_root_field`, `@gql_mutation`,
+`@gql_field`, or `@gql_added_field`. This follows GraphQL's nullable-by-default best
+practice.
+
+**Why**
+
+- **Partial failure isolation.** When a resolver raises, GraphQL propagates `null` up to
+  the nearest nullable ancestor. A non-null computed field turns a single nested
+  resolver failure into a whole-parent failure, wiping sibling fields the client could
+  otherwise have used.
+- **Permission / scope denial.** Fields that are visible only to some users naturally
+  express "denied" as `null` instead of an error that aborts the query.
+- **Forward compatibility.** `nullable → non-null` is a breaking change; `non-null →
+  nullable` is not. Starting nullable is the safe default.
+
+**The rule (in Python resolvers)**
+
+```python
+# Root Query — single object
+@gql_root_field(BackendAIGQLMeta(...))
+async def admin_search_domains(...) -> AdminSearchDomainsPayloadGQL | None: ...
+
+# Root Mutation — payload
+@gql_mutation(BackendAIGQLMeta(...))
+async def admin_create_domain(...) -> CreateDomainPayloadGQL | None: ...
+
+# Root Connection
+@gql_root_field(BackendAIGQLMeta(...))
+async def admin_audit_logs_v2(...) -> AuditLogV2ConnectionGQL | None: ...
+
+# Computed nested field — cross-entity DataLoader resolver
+class DomainV2GQL(PydanticNodeMixin[DomainNode]):
+    @gql_field(description="Projects belonging to this domain.")
+    async def projects(self, info: Info[StrawberryGQLContext]) -> ProjectV2ConnectionGQL | None: ...
+
+# Trivially derived scalar — exempt, see Exceptions below
+class FooConnection(Connection[Foo]):
+    @gql_field(description="Total count.")
+    def count(self) -> int: ...
+
+# List — only the outer list is nullable; element non-null is fine
+@gql_root_field(BackendAIGQLMeta(...))
+async def scheduling_handlers(...) -> list[SchedulingHandlerNodeGQL] | None: ...
+```
+
+This emits the return type without `!` in the SDL — e.g. `AdminSearchDomainsPayload`,
+`AuditLogV2Connection`, `[SchedulingHandlerNode!]`, `ProjectV2Connection`.
+
+**Resolver implementation note**
+
+Returning `None` is allowed and recommended for "not found" / "denied" cases. Do NOT
+catch domain exceptions inside fetchers just to swallow them as `None` — let
+`BackendAIError` propagate so the failure surfaces in the GraphQL `errors` array.
+
+**Exceptions**
+
+- **Statically projected DTO fields** — class-level attributes that map directly from
+  the backing Pydantic DTO (e.g. `name: str`) may stay non-null.
+- **Trivially derived scalars** — resolver-decorated fields whose value is computed
+  synchronously from non-null parent state with no I/O, permission check, or external
+  call. Example: a Connection `count` returning `len(self.edges)` stays non-null.
+- **Apollo Federation entry points** — `_service` and `_entities` are mandated by the
+  spec and remain non-null.
+- **Subscriptions** — streaming-event return types are governed separately.
+
 ## Fetcher Pattern
 
 ```python
@@ -213,8 +282,8 @@ async def admin_search_domains(
     order_by: list[DomainV2OrderByGQL] | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> AdminSearchDomainsPayloadGQL:
-    check_admin_only(info)
+) -> AdminSearchDomainsPayloadGQL | None:
+    check_admin_only()
     return await fetch_admin_search_domains(
         info=info, filter=filter, order_by=order_by, limit=limit, offset=offset
     )
@@ -227,7 +296,7 @@ async def admin_search_domains(
 async def admin_create_domain(
     input: CreateDomainInputGQL,
     info: Info[StrawberryGQLContext],
-) -> CreateDomainPayloadGQL:
+) -> CreateDomainPayloadGQL | None:
     check_admin_only(info)
     payload_dto = await info.context.adapters.domain.create(input.to_pydantic())
     return CreateDomainPayloadGQL.from_pydantic(payload_dto)
@@ -262,6 +331,6 @@ async def projects(
 ## Related Documentation
 
 - [Manager API Overview](../README.md)
-- [REST v2 API](../rest/v2/CLAUDE.md)
+- [REST v2 API](../rest/v2/AGENTS.md)
 - [Repositories Layer](../../repositories/README.md)
 - [Legacy GraphQL (Graphene)](../gql_legacy/README.md) — DEPRECATED

@@ -5,13 +5,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.adapters.pagination import (
+from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
     PaginationSpec,
     build_pagination,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.base import BatchQuerier, QueryCondition, QueryOrder
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import BatchQuerier
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors

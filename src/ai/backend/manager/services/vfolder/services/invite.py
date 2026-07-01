@@ -10,6 +10,7 @@ from ai.backend.manager.errors.storage import (
     VFolderInvitationNotFound,
     VFolderNotFound,
 )
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
     VFolderInvitationState,
@@ -64,8 +65,6 @@ class VFolderInviteService:
     async def invite(self, action: InviteVFolderAction) -> InviteVFolderActionResult:
         # Get VFolder data
         user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        if not user.domain_name:
-            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, action.user_uuid, user.domain_name
         )
@@ -77,8 +76,8 @@ class VFolderInviteService:
 
         # Get inviter email
         inviter_email = await self._vfolder_repository.get_user_email_by_id(action.user_uuid)
-        if not inviter_email:
-            raise VFolderNotFound()
+        if inviter_email is None:
+            raise UserNotFound()
 
         # Resolve invitee emails to user info
         invitee_users = await self._vfolder_repository.get_users_by_emails(action.invitee_emails)
@@ -174,8 +173,8 @@ class VFolderInviteService:
             requester_email = await self._vfolder_repository.get_user_email_by_id(
                 action.requester_user_uuid
             )
-            if not requester_email:
-                raise VFolderNotFound
+            if requester_email is None:
+                raise UserNotFound
 
             # Determine new state based on who is rejecting
             if requester_email == invitation_data.inviter:
@@ -203,8 +202,8 @@ class VFolderInviteService:
         requester_email = await self._vfolder_repository.get_user_email_by_id(
             action.requester_user_uuid
         )
-        if not requester_email:
-            raise VFolderNotFound()
+        if requester_email is None:
+            raise UserNotFound()
 
         # Update invitation permission (only by inviter)
         await self._vfolder_repository.update_invitation_permission(
@@ -218,8 +217,8 @@ class VFolderInviteService:
         requester_email = await self._vfolder_repository.get_user_email_by_id(
             action.requester_user_uuid
         )
-        if not requester_email:
-            raise VFolderNotFound()
+        if requester_email is None:
+            raise UserNotFound()
 
         # Get pending invitations with vfolder info
         invitation_vfolder_pairs = await self._vfolder_repository.get_pending_invitations_for_user(
@@ -234,6 +233,7 @@ class VFolderInviteService:
                 vfolder_name=vfolder_data.name,
                 invitee_user_email=invitation_data.invitee,
                 inviter_user_email=invitation_data.inviter,
+                inviter_username=invitation_data.inviter_username,
                 mount_permission=invitation_data.permission,
                 created_at=invitation_data.created_at,
                 modified_at=invitation_data.modified_at,
@@ -250,8 +250,6 @@ class VFolderInviteService:
     ) -> LeaveInvitedVFolderActionResult:
         # Get vfolder info
         user = await self._user_repository.get_user_by_uuid(action.requester_user_uuid)
-        if not user.domain_name:
-            raise VFolderInvalidParameter("User has no domain assigned")
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
@@ -306,8 +304,8 @@ class VFolderInviteService:
         requester_email = await self._vfolder_repository.get_user_email_by_id(
             action.requester_user_uuid
         )
-        if not requester_email:
-            raise VFolderNotFound()
+        if requester_email is None:
+            raise UserNotFound()
 
         invitation_pairs = await self._vfolder_repository.get_sent_invitations_for_user(
             requester_email
@@ -320,6 +318,7 @@ class VFolderInviteService:
                 vfolder_name=vfolder_data.name,
                 invitee_user_email=invitation_data.invitee,
                 inviter_user_email=invitation_data.inviter,
+                inviter_username=invitation_data.inviter_username,
                 mount_permission=invitation_data.permission,
                 created_at=invitation_data.created_at,
                 modified_at=invitation_data.modified_at,

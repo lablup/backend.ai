@@ -21,6 +21,11 @@ def keypair() -> None:
     """My keypair commands."""
 
 
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.role:role")
+def role() -> None:
+    """My role commands."""
+
+
 @my.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.my.login_history:login_history",
@@ -47,6 +52,11 @@ def session() -> None:
     """My session commands."""
 
 
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.deployment:deployment")
+def deployment() -> None:
+    """My deployment commands."""
+
+
 @my.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.my.resource_allocation:resource_allocation",
@@ -63,3 +73,12 @@ def resource_allocation() -> None:
 )
 def resource_policy() -> None:
     """My resource policy commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.storage_host:storage_host",
+    name="storage-host",
+)
+def storage_host() -> None:
+    """My storage host commands."""

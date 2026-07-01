@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import (
@@ -12,11 +11,13 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -44,6 +45,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 
@@ -122,6 +124,7 @@ async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> d
     return {}
 
 
+@graphene_federation.key("id")
 class AgentNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
@@ -156,6 +159,11 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         AgentPermissionField,
         description=f"Added in 24.12.0. One of {[val.value for val in AgentPermission]}.",
     )
+
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> AgentNode | None:
+        return await AgentNode.get_node(info, self.id)
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
@@ -211,7 +219,19 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         if self.status != AgentStatus.ALIVE.name:
             return None
         graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.gather_agent_hwinfo(self.id)
+        devices = await graph_ctx.registry.gather_agent_hwinfo(AgentId(self.id))
+        # Adapt v3 ``list[DeviceHardwareInfo]`` back into the legacy
+        # ``{device_name: HardwareMetadata}`` JSON shape that existing
+        # GraphQL clients query. The registry-layer call now uses v3
+        # types natively; this layer owns the legacy schema contract.
+        return {
+            device.device_name: {
+                "status": device.status.value,
+                "status_info": device.status_info,
+                "metadata": device.metadata,
+            }
+            for device in devices
+        }
 
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         return {
@@ -252,6 +272,8 @@ class AgentNode(graphene.ObjectType):  # type: ignore[misc]
         last: int | None = None,
     ) -> ConnectionResolverResult[AgentNode]:
         graph_ctx: GraphQueryContext = info.context
+        if graph_ctx.user["role"] != UserRole.SUPERADMIN:
+            return ConnectionResolverResult([], None, None, None, 0)
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
             if filter_expr is not None
@@ -434,7 +456,19 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
         if self.status != AgentStatus.ALIVE.name:
             return None
         graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.gather_agent_hwinfo(self.id)
+        devices = await graph_ctx.registry.gather_agent_hwinfo(self.id)
+        # Adapt v3 ``list[DeviceHardwareInfo]`` back into the legacy
+        # ``{device_name: HardwareMetadata}`` JSON shape that existing
+        # GraphQL clients query. The registry-layer call now uses v3
+        # types natively; this layer owns the legacy schema contract.
+        return {
+            device.device_name: {
+                "status": device.status.value,
+                "status_info": device.status_info,
+                "metadata": dict(device.metadata),
+            }
+            for device in devices
+        }
 
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         return {
@@ -630,7 +664,7 @@ async def _query_domain_groups_by_ak(
     db_conn: SAConnection,
     access_key: str,
     domain_name: str | None,
-) -> tuple[str, list[uuid.UUID]]:
+) -> tuple[str, list[ProjectID]]:
     kp_user_join = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
     group_join: sa.FromClause
     if domain_name is None:
@@ -655,7 +689,7 @@ async def _query_domain_groups_by_ak(
         group_cond = keypairs.c.access_key == access_key
     query = sa.select(AssocGroupUserRow.group_id).select_from(group_join).where(group_cond)
     rows = (await db_conn.execute(query)).fetchall()
-    group_ids = [row.group_id for row in rows]
+    group_ids = [ProjectID(row.group_id) for row in rows]
     return user_domain, group_ids
 
 
@@ -743,7 +777,11 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
         query = (
             sa.select(AgentRow)
             .where(AgentRow.id.in_(agent_ids))
-            .options(sa.orm.selectinload(AgentRow.agent_resource_rows))
+            .options(
+                sa.orm.selectinload(AgentRow.agent_resource_rows).joinedload(
+                    AgentResourceRow.slot_type_row
+                )
+            )
             .order_by(
                 AgentRow.id,
             )

@@ -10,6 +10,8 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -23,19 +25,24 @@ from .types import (
 
 __all__ = (
     "AcceptInvitationInput",
+    "BulkDeleteVFoldersInput",
+    "BulkPurgeVFoldersInput",
     "SearchVFoldersInput",
     "CloneVFolderInput",
     "CreateDownloadSessionInput",
     "CreateUploadSessionInput",
+    "CreateVFolderInScopeInput",
     "CreateVFolderInput",
     "DeleteFilesInput",
     "DeleteInvitationInput",
     "DeleteVFolderInput",
+    "DeployVFolderInput",
     "InviteVFolderInput",
     "ListFilesInput",
     "MkdirInput",
     "MoveFileInput",
     "PurgeVFolderInput",
+    "PurgeVFolderOptions",
     "RenameFileInput",
     "RestoreVFolderInput",
     "ShareVFolderInput",
@@ -63,9 +70,43 @@ class CreateVFolderInput(BaseRequestModel):
         default=VFolderPermissionField.READ_WRITE,
         description="Default permission of the vfolder",
     )
-    group_id: UUID | None = Field(default=None, description="Group ID for group-owned vfolder")
+    project_id: UUID | None = Field(
+        default=None, description="Project ID for project-owned vfolder"
+    )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
     unmanaged_path: str | None = Field(default=None, description="Path for unmanaged vfolders")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def strip_and_validate_name(cls, v: object) -> object:
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                raise ValueError("name must not be blank or whitespace-only")
+            return stripped
+        return v
+
+
+class CreateVFolderInScopeInput(BaseRequestModel):
+    """Scope-agnostic body for vfolder creation under a specific scope.
+
+    The owning scope (project, user, domain, …) is supplied externally by
+    the transport layer (REST path segment, GraphQL mutation argument)
+    and is NOT part of this body. This keeps the body reusable across
+    scope-specific endpoints without forcing clients to duplicate the
+    scope identifier.
+    """
+
+    name: VFolderName = Field(description="VFolder name")
+    host: str | None = Field(default=None, description="Storage host for the vfolder")
+    usage_mode: VFolderUsageMode = Field(
+        default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
+    )
+    permission: VFolderPermissionField = Field(
+        default=VFolderPermissionField.READ_WRITE,
+        description="Default permission of the vfolder",
+    )
+    cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
 
     @field_validator("name", mode="before")
     @classmethod
@@ -107,10 +148,50 @@ class DeleteVFolderInput(BaseRequestModel):
     id: UUID = Field(description="VFolder ID to delete")
 
 
-class PurgeVFolderInput(BaseRequestModel):
-    """Input for purging a virtual folder."""
+class PurgeVFolderOptions(BaseRequestModel):
+    """Optional behavior flags for vfolder purge operations.
 
-    id: UUID = Field(description="VFolder ID to purge")
+    Wrapped as a nested object so future flags can be added without
+    flattening the input shape further.
+    """
+
+    cascade_model_card: bool = Field(
+        default=False,
+        description=(
+            "If true, also delete model card record(s) referencing the vfolder. "
+            "If false, the request is rejected when any model card still references it."
+        ),
+    )
+
+
+class PurgeVFolderInput(BaseRequestModel):
+    """Input for purging a virtual folder.
+
+    The target vfolder is identified exclusively by the URL path
+    parameter; the body carries only behavior flags so there is no
+    chance of a path/body id mismatch.
+    """
+
+    options: PurgeVFolderOptions = Field(
+        default_factory=PurgeVFolderOptions,
+        description="Optional behavior flags for the purge.",
+    )
+
+
+class BulkDeleteVFoldersInput(BaseRequestModel):
+    """Input for soft-deleting multiple virtual folders."""
+
+    ids: list[UUID] = Field(description="List of VFolder UUIDs to soft-delete.")
+
+
+class BulkPurgeVFoldersInput(BaseRequestModel):
+    """Input for permanently purging multiple virtual folders."""
+
+    ids: list[UUID] = Field(description="List of VFolder UUIDs to purge.")
+    options: PurgeVFolderOptions = Field(
+        default_factory=PurgeVFolderOptions,
+        description="Optional behavior flags applied to every vfolder in the batch.",
+    )
 
 
 class RestoreVFolderInput(BaseRequestModel):
@@ -120,13 +201,17 @@ class RestoreVFolderInput(BaseRequestModel):
 
 
 class CloneVFolderInput(BaseRequestModel):
-    """Input for cloning a virtual folder."""
+    """Input for cloning a virtual folder.
 
-    source_id: UUID = Field(description="Source vfolder ID to clone")
-    target_name: str = Field(
-        min_length=1, max_length=256, description="Name for the cloned vfolder"
+    The source vfolder is identified by the path parameter {vfolder_id}.
+    """
+
+    name: str = Field(min_length=1, max_length=256, description="Name for the cloned vfolder")
+    project_id: UUID | None = Field(
+        default=None,
+        description="Project ID for the cloned vfolder. If omitted, cloned as user-owned.",
     )
-    target_host: str | None = Field(default=None, description="Target host for the clone")
+    host: str | None = Field(default=None, description="Target storage host for the clone")
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the cloned vfolder"
     )
@@ -136,12 +221,12 @@ class CloneVFolderInput(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
 
-    @field_validator("target_name")
+    @field_validator("name")
     @classmethod
-    def strip_and_validate_target_name(cls, v: str) -> str:
+    def strip_and_validate_name(cls, v: str) -> str:
         stripped = v.strip()
         if not stripped:
-            raise ValueError("target_name must not be blank or whitespace-only")
+            raise ValueError("name must not be blank or whitespace-only")
         return stripped
 
 
@@ -196,7 +281,7 @@ class DeleteFilesInput(BaseRequestModel):
 class ListFilesInput(BaseRequestModel):
     """Input for listing files in a virtual folder."""
 
-    path: str = Field(default="", description="Directory path to list files from")
+    path: str = Field(description="Directory path to list files from")
 
 
 # ============================================================
@@ -286,3 +371,60 @@ class SearchVFoldersInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+# ============================================================
+# Deploy
+# ============================================================
+
+
+class DeployVFolderInput(BaseRequestModel):
+    """Input for creating a deployment directly from a model VFolder.
+
+    The target VFolder must have ``usage_mode == MODEL``. Non-model
+    vfolders are rejected with ``NotAModelVFolder`` at the service
+    layer. The revision preset supplies image, runtime variant,
+    resource slots, environ, startup command, and (optionally)
+    deployment-level defaults; explicit overrides below take
+    precedence.
+    """
+
+    project_id: UUID = Field(
+        description="Target project UUID where the deployment will be created. "
+        "Must be a general project, not MODEL_STORE.",
+    )
+    revision_preset_id: DeploymentPresetID = Field(
+        description="Deployment revision preset UUID that provides image, "
+        "runtime variant, resource slots, environ, and startup command.",
+    )
+    resource_group: str = Field(
+        description="Resource group (scaling group) name for scheduling.",
+    )
+    desired_replica_count: int = Field(
+        default=1,
+        ge=1,
+        description="Number of replicas to deploy.",
+    )
+    open_to_public: bool | None = Field(
+        default=None,
+        description="Override for the deployment's open_to_public setting. "
+        "If omitted, the preset default is used; otherwise falls back to False.",
+    )
+    replica_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Override for the deployment's replica_count. "
+        "If omitted, the preset default is used; otherwise falls back to "
+        "desired_replica_count or 1.",
+    )
+    revision_history_limit: int | None = Field(
+        default=None,
+        ge=0,
+        description="Override for the deployment's revision_history_limit. "
+        "If omitted, the preset default is used; otherwise falls back to 10.",
+    )
+    deployment_strategy: DeploymentStrategyInput | None = Field(
+        default=None,
+        description="Override for the deployment strategy (rolling or blue-green). "
+        "If omitted, the preset default is used; otherwise no policy is attached.",
+    )

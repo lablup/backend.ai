@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     RuntimeVariantPresetOrderField,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.runtime_variant_preset.types import (
     CreateRuntimeVariantPresetInputGQL,
@@ -34,7 +33,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Search runtime variant presets.",
     )
 )  # type: ignore[misc]
@@ -93,7 +92,7 @@ async def runtime_variant_presets(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single runtime variant preset by ID.",
     )
 )  # type: ignore[misc]
@@ -107,14 +106,14 @@ async def runtime_variant_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a runtime variant preset (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_runtime_variant_preset(
     info: Info[StrawberryGQLContext],
     input: CreateRuntimeVariantPresetInputGQL,
-) -> CreateRuntimeVariantPresetPayloadGQL:
+) -> CreateRuntimeVariantPresetPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.runtime_variant_preset.create(dto)
@@ -123,14 +122,14 @@ async def admin_create_runtime_variant_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update a runtime variant preset (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_runtime_variant_preset(
     info: Info[StrawberryGQLContext],
     input: UpdateRuntimeVariantPresetInputGQL,
-) -> UpdateRuntimeVariantPresetPayloadGQL:
+) -> UpdateRuntimeVariantPresetPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.runtime_variant_preset.update(dto)
@@ -139,14 +138,14 @@ async def admin_update_runtime_variant_preset(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete a runtime variant preset (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_runtime_variant_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteRuntimeVariantPresetPayloadGQL:
+) -> DeleteRuntimeVariantPresetPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.runtime_variant_preset.delete(id)
     return DeleteRuntimeVariantPresetPayloadGQL.from_pydantic(payload)

@@ -8,12 +8,13 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.group.types import ProjectType
 from ai.backend.common.dto.manager.v2.user.response import UserNode
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "AdminSearchGroupsPayload",
@@ -33,7 +34,7 @@ __all__ = (
 )
 
 
-class ProjectBasicInfo(BaseModel):
+class ProjectBasicInfo(BackendAISchema):
     """Basic project information."""
 
     name: str = Field(
@@ -46,13 +47,13 @@ class ProjectBasicInfo(BaseModel):
     type: ProjectType = Field(
         description="Project type determining its purpose. See ProjectType enum.",
     )
-    integration_id: str | None = Field(
+    integration_name: str | None = Field(
         default=None,
         description="External system integration identifier.",
     )
 
 
-class ProjectOrganizationInfo(BaseModel):
+class ProjectOrganizationInfo(BackendAISchema):
     """Project's organizational context."""
 
     domain_name: str = Field(
@@ -63,7 +64,7 @@ class ProjectOrganizationInfo(BaseModel):
     )
 
 
-class VFolderHostPermissionEntry(BaseModel):
+class VFolderHostPermissionEntry(BackendAISchema):
     """Storage host permission entry."""
 
     host: str = Field(
@@ -77,7 +78,7 @@ class VFolderHostPermissionEntry(BaseModel):
     )
 
 
-class ProjectStorageInfo(BaseModel):
+class ProjectStorageInfo(BackendAISchema):
     """Project storage configuration."""
 
     allowed_vfolder_hosts: list[VFolderHostPermissionEntry] = Field(
@@ -89,7 +90,7 @@ class ProjectStorageInfo(BaseModel):
     )
 
 
-class ProjectLifecycleInfo(BaseModel):
+class ProjectLifecycleInfo(BackendAISchema):
     """Project lifecycle information."""
 
     is_active: bool | None = Field(

@@ -7,12 +7,15 @@ import uuid
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
+    DeploymentRevisionResourceSlotRow,
+    PresetResourceSlotRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class ResourceSlotTypeConditions:
@@ -69,6 +72,9 @@ class ResourceSlotTypeConditions:
             return condition
 
         return inner
+
+    by_slot_name_in = staticmethod(make_string_in_factory(ResourceSlotTypeRow.slot_name))
+    by_slot_type_in = staticmethod(make_string_in_factory(ResourceSlotTypeRow.slot_type))
 
     @staticmethod
     def by_slot_type_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -173,6 +179,8 @@ class ResourceSlotTypeConditions:
             return condition
 
         return inner
+
+    by_display_name_in = staticmethod(make_string_in_factory(ResourceSlotTypeRow.display_name))
 
     @staticmethod
     def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
@@ -307,6 +315,9 @@ class AgentResourceConditions:
 
         return inner
 
+    by_agent_id_in = staticmethod(make_string_in_factory(AgentResourceRow.agent_id))
+    by_slot_name_in = staticmethod(make_string_in_factory(AgentResourceRow.slot_name))
+
     @staticmethod
     def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -384,6 +395,8 @@ class ResourceAllocationConditions:
 
         return inner
 
+    by_slot_name_in = staticmethod(make_string_in_factory(ResourceAllocationRow.slot_name))
+
     @staticmethod
     def by_cursor_forward(cursor_slot_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -413,5 +426,167 @@ class ResourceAllocationConditions:
             if spec.negated:
                 return ResourceAllocationRow.kernel_id.not_in(spec.values)
             return ResourceAllocationRow.kernel_id.in_(spec.values)
+
+        return inner
+
+
+class RevisionResourceSlotConditions:
+    """Query condition factories for deployment revision resource slot rows."""
+
+    @staticmethod
+    def by_revision_id(revision_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DeploymentRevisionResourceSlotRow.revision_id == revision_id
+
+        return inner
+
+    @staticmethod
+    def by_slot_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DeploymentRevisionResourceSlotRow.slot_name.ilike(f"%{spec.value}%")
+            else:
+                condition = DeploymentRevisionResourceSlotRow.slot_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_slot_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = (
+                    sa.func.lower(DeploymentRevisionResourceSlotRow.slot_name) == spec.value.lower()
+                )
+            else:
+                condition = DeploymentRevisionResourceSlotRow.slot_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_slot_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DeploymentRevisionResourceSlotRow.slot_name.ilike(f"{spec.value}%")
+            else:
+                condition = DeploymentRevisionResourceSlotRow.slot_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_slot_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DeploymentRevisionResourceSlotRow.slot_name.ilike(f"%{spec.value}")
+            else:
+                condition = DeploymentRevisionResourceSlotRow.slot_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_slot_name_in = staticmethod(
+        make_string_in_factory(DeploymentRevisionResourceSlotRow.slot_name)
+    )
+
+    @staticmethod
+    def by_cursor_forward(cursor_rank: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceSlotTypeRow.rank > int(cursor_rank)
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_rank: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceSlotTypeRow.rank < int(cursor_rank)
+
+        return inner
+
+
+class PresetResourceSlotConditions:
+    """Query condition factories for preset resource slot rows."""
+
+    @staticmethod
+    def by_preset_id(preset_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PresetResourceSlotRow.preset_id == preset_id
+
+        return inner
+
+    @staticmethod
+    def by_slot_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = PresetResourceSlotRow.slot_name.ilike(f"%{spec.value}%")
+            else:
+                condition = PresetResourceSlotRow.slot_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_slot_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(PresetResourceSlotRow.slot_name) == spec.value.lower()
+            else:
+                condition = PresetResourceSlotRow.slot_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_slot_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = PresetResourceSlotRow.slot_name.ilike(f"{spec.value}%")
+            else:
+                condition = PresetResourceSlotRow.slot_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_slot_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = PresetResourceSlotRow.slot_name.ilike(f"%{spec.value}")
+            else:
+                condition = PresetResourceSlotRow.slot_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_slot_name_in = staticmethod(make_string_in_factory(PresetResourceSlotRow.slot_name))
+
+    @staticmethod
+    def by_cursor_forward(cursor_rank: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceSlotTypeRow.rank > int(cursor_rank)
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_rank: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ResourceSlotTypeRow.rank < int(cursor_rank)
 
         return inner

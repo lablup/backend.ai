@@ -5,12 +5,14 @@ from uuid import UUID
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
+    DeleteRuntimeVariantsInput,
     SearchRuntimeVariantsInput,
     UpdateRuntimeVariantInput,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     CreateRuntimeVariantPayload,
     DeleteRuntimeVariantPayload,
+    DeleteRuntimeVariantsPayload,
     RuntimeVariantNode,
     SearchRuntimeVariantsPayload,
     UpdateRuntimeVariantPayload,
@@ -58,4 +60,14 @@ class V2RuntimeVariantClient(BaseDomainClient):
             "DELETE",
             f"{_PATH}/{variant_id}",
             response_model=DeleteRuntimeVariantPayload,
+        )
+
+    async def bulk_delete(
+        self, request: DeleteRuntimeVariantsInput
+    ) -> DeleteRuntimeVariantsPayload:
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/delete",
+            request=request,
+            response_model=DeleteRuntimeVariantsPayload,
         )

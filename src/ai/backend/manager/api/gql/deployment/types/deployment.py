@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
 )
@@ -45,10 +46,16 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelDeploymentNetworkAccessInput as ModelDeploymentNetworkAccessInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplaceDeploymentOptionsGQLInput as ReplaceDeploymentOptionsGQLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     SyncReplicaInput as SyncReplicaInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     UpdateDeploymentInput as UpdateDeploymentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    AdminRefreshDeploymentRevisionsPayload as AdminRefreshDeploymentRevisionsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     CreateDeploymentPayload as CreateDeploymentPayloadDTO,
@@ -63,6 +70,12 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     DeploymentStatusChangedPayload as DeploymentStatusChangedPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
+    ReplaceDeploymentOptionsPayload as ReplaceDeploymentOptionsPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    RevisionRefreshResultInfo as RevisionRefreshResultInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
     SyncReplicaPayload as SyncReplicaPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
@@ -71,14 +84,20 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentMetadataInfoDTO,
     DeploymentNetworkAccessInfoDTO,
+    DeploymentOrderField,
     DeploymentStrategyInfoDTO,
     ReplicaStateInfo,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    ProjectDeploymentScope as ProjectDeploymentScopeDTO,
+)
 from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
+    UUIDFilter,
     encode_cursor,
-    to_global_id,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -105,6 +124,10 @@ from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
     AutoScalingRuleFilter,
     AutoScalingRuleOrderBy,
 )
+from ai.backend.manager.api.gql.deployment.types.deployment_options import (
+    DeploymentOptionsInfoGQL,
+    DeploymentOptionsInputGQL,
+)
 from ai.backend.manager.api.gql.deployment.types.policy import (
     BlueGreenConfigInputGQL,
     DeploymentPolicyGQL,
@@ -128,19 +151,20 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
 )
 from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.user_federation import User
-from ai.backend.manager.api.gql_legacy.domain import DomainNode
-from ai.backend.manager.api.gql_legacy.group import GroupNode
-from ai.backend.manager.api.gql_legacy.user import UserNode
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchScope,
     AutoScalingRuleSearchScope,
-    DeploymentOrderField,
     ReplicaSearchScope,
     RevisionSearchScope,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
     BackendAIGQLMeta(
@@ -152,12 +176,28 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
 )
 
 
+ScalingStateGQL: type[ScalingState] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description=(
+            "Replica scaling axis for a deployment, orthogonal to the"
+            " lifecycle status. ``SCALING`` while the replica reconciler"
+            " is adjusting replica count against desired_replica_count;"
+            " ``STABLE`` once holding at the desired count."
+        ),
+    ),
+    ScalingState,
+    name="ScalingState",
+)
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Represents the deployment strategy configuration that determines how updates are rolled out to replicas (e.g., rolling update, blue-green).",
     ),
     model=DeploymentStrategyInfoDTO,
+    name="DeploymentStrategy",
 )
 class DeploymentStrategyGQL:
     type: DeploymentStrategyTypeGQL
@@ -189,20 +229,81 @@ class ModelDeploymentMetadata:
     tags: list[str]
     created_at: datetime
     updated_at: datetime
-
-    @gql_field(description="The project of this entity.")  # type: ignore[misc]
-    async def project(self, info: Info[StrawberryGQLContext]) -> Project:
-        project_global_id = to_global_id(
-            GroupNode, UUID(str(self.project_id)), is_target_graphene_object=True
+    resource_group_name: str = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="Name of the resource group (scaling group) this deployment runs in.",
         )
-        return Project(id=ID(project_global_id))
+    )
 
-    @gql_field(description="The domain of this entity.")  # type: ignore[misc]
-    async def domain(self, info: Info[StrawberryGQLContext]) -> Domain:
-        domain_global_id = to_global_id(
-            DomainNode, self.domain_name, is_target_graphene_object=True
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="The resource group this deployment runs in, resolved via DataLoader.",
         )
-        return Domain(id=ID(domain_global_id))
+    )  # type: ignore[misc]
+    async def resource_group(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ResourceGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
+
+    @gql_field(
+        description="The project of this entity.",
+        deprecation_reason="Use project_v2 instead.",
+    )  # type: ignore[misc]
+    async def project(self, info: Info[StrawberryGQLContext]) -> Project | None:
+        # Federated GroupNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return Project(id=ID(str(UUID(str(self.project_id)))))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The project this deployment belongs to, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def project_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ProjectV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.project_loader.load(UUID(str(self.project_id)))
+
+    @gql_field(
+        description="The domain of this entity.",
+        deprecation_reason="Use domain_v2 instead.",
+    )  # type: ignore[misc]
+    async def domain(self, info: Info[StrawberryGQLContext]) -> Domain | None:
+        # Federated DomainNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return Domain(id=ID(str(self.domain_name)))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The domain this deployment belongs to, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def domain_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            DomainV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.domain_loader.load(self.domain_name)
 
 
 @gql_pydantic_type(
@@ -230,16 +331,66 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
     current_revision_id: ID | None = None
+    deploying_revision_id: ID | None = None
     default_deployment_strategy: DeploymentStrategyGQL
     replica_state: ReplicaState
     created_user_id: ID
-
-    @gql_field(description="The created user of this entity.")  # type: ignore[misc]
-    async def created_user(self, info: Info[StrawberryGQLContext]) -> User:
-        user_global_id = to_global_id(
-            UserNode, UUID(str(self.created_user_id)), is_target_graphene_object=True
+    options: DeploymentOptionsInfoGQL
+    scaling_state: ScalingStateGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            deprecated_version="26.4.4",
+            deprecation_hint="per-replica-group scaling status",
+            description=(
+                "Endpoint-level replica scaling axis. Scaling is now reconciled per replica"
+                " group, so this stays ``STABLE``; inspect each replica group's scaling status"
+                " instead."
+            ),
         )
-        return User(id=strawberry.ID(user_global_id))
+    )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The current active revision of this deployment, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def current_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
+        if self.current_revision_id is None:
+            return None
+        return await info.context.data_loaders.revision_loader.load(
+            UUID(str(self.current_revision_id))
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The revision currently being deployed (in progress, not yet active), resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def deploying_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
+        if self.deploying_revision_id is None:
+            return None
+        return await info.context.data_loaders.revision_loader.load(
+            UUID(str(self.deploying_revision_id))
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The user who created this deployment, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def creator(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.user_loader.load(UUID(str(self.created_user_id)))
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="25.19.0", description="Deployment policy configuration.")
@@ -267,7 +418,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ModelRevisionConnection:
+    ) -> ModelRevisionConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_revisions(
@@ -308,7 +459,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ModelReplicaConnection:
+    ) -> ModelReplicaConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_replicas(
@@ -349,7 +500,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> AutoScalingRuleConnection:
+    ) -> AutoScalingRuleConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_rules(
@@ -392,7 +543,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> AccessTokenConnection:
+    ) -> AccessTokenConnection | None:
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
         payload = await info.context.adapters.deployment.search_access_tokens(
@@ -444,6 +595,23 @@ class DeploymentStatusFilter(PydanticInputMixin[DeploymentStatusFilterDTO]):
         description="The in  field.", name="in", default=None
     )
     equals: DeploymentStatusGQL | None = None
+    not_in: list[DeploymentStatusGQL] | None = gql_field(
+        description="Excludes statuses in the list.", name="notIn", default=None
+    )
+    not_equals: DeploymentStatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for project-level deployment operations.",
+        added_version="25.19.0",
+    ),
+    name="ProjectDeploymentScope",
+)
+class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
+    project_id: UUID = gql_field(description="Project UUID to scope the deployment operation.")
 
 
 @gql_pydantic_input(
@@ -456,6 +624,39 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
     open_to_public: bool | None = None
     tags: StringFilter | None = None
     endpoint_url: StringFilter | None = None
+    domain_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by domain name."),
+        default=None,
+    )
+    project_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by project ID."),
+        default=None,
+    )
+    resource_group: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.4.3", description="Filter by resource group name."),
+        default=None,
+    )
+    created_user_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="Filter by the user who created the deployment.",
+        ),
+        default=None,
+    )
+    created_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="Filter by deployment creation datetime.",
+        ),
+        default=None,
+    )
+    destroyed_at: NullableDateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.",
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -518,6 +719,7 @@ class DeploymentStatusChangedPayload:
 class ModelDeploymentMetadataInput(PydanticInputMixin[ModelDeploymentMetadataInputDTO]):
     project_id: ID
     domain_name: str
+    resource_group_name: str
     name: str | None = None
     tags: list[str] | None = None
 
@@ -557,7 +759,7 @@ class CreateDeploymentInput(PydanticInputMixin[CreateDeploymentInputDTO]):
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
     default_deployment_strategy: DeploymentStrategyInputGQL
-    desired_replica_count: int
+    replica_count: int
     initial_revision: CreateRevisionInput | None = None
 
 
@@ -569,8 +771,7 @@ class UpdateDeploymentInput(PydanticInputMixin[UpdateDeploymentInputDTO]):
     open_to_public: bool | None = UNSET
     tags: list[str] | None = UNSET
     default_deployment_strategy: DeploymentStrategyInputGQL | None = UNSET
-    active_revision_id: ID | None = UNSET
-    desired_replica_count: int | None = UNSET
+    replica_count: int | None = UNSET
     name: str | None = UNSET
     preferred_domain_name: str | None = UNSET
 
@@ -615,3 +816,65 @@ class SyncReplicaPayload:
     """Payload for replica sync mutation result."""
 
     success: strawberry.auto
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.4.3",
+        description="Per-deployment result of an admin bulk revision refresh.",
+    ),
+    model=RevisionRefreshResultInfoDTO,
+)
+class RevisionRefreshResult:
+    """Per-deployment result of an admin bulk revision refresh."""
+
+    deployment_id: strawberry.auto
+    new_revision_id: strawberry.auto
+    success: strawberry.auto
+    failure_reason: strawberry.auto
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.4.3",
+        description="Payload for admin bulk revision refresh mutation result.",
+    ),
+    model=AdminRefreshDeploymentRevisionsPayloadDTO,
+)
+class AdminRefreshDeploymentRevisionsPayload:
+    """Payload for admin bulk revision refresh mutation result."""
+
+    results: strawberry.auto
+
+
+# Replace deployment options types
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description=(
+            "Input for the replaceDeploymentOptions mutation. Full-replace"
+            " semantics — the supplied payload is the complete new value."
+        ),
+    ),
+    name="ReplaceDeploymentOptionsInput",
+)
+class ReplaceDeploymentOptionsInputGQL(PydanticInputMixin[ReplaceDeploymentOptionsGQLInputDTO]):
+    deployment_id: UUID
+    options: DeploymentOptionsInputGQL
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description=(
+            "Payload returned after replacing a deployment's options. Only"
+            " the refreshed options surface is returned; the server path uses"
+            " ``UPDATE ... RETURNING`` and does not re-read the surrounding"
+            " deployment node."
+        ),
+    ),
+    model=ReplaceDeploymentOptionsPayloadDTO,
+)
+class ReplaceDeploymentOptionsPayload(PydanticOutputMixin[ReplaceDeploymentOptionsPayloadDTO]):
+    deployment_id: ID
+    options: DeploymentOptionsInfoGQL

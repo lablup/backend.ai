@@ -15,6 +15,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from .handler import AdminHandler
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.graphql_ws import GraphQLTransportWSHandler
     from ai.backend.manager.api.rest.types import RouteDeps
 
 
@@ -22,6 +23,8 @@ def register_admin_routes(
     handler: AdminHandler,
     route_deps: RouteDeps,
     sub_registries: Sequence[RouteRegistry],
+    *,
+    gql_ws_handler: GraphQLTransportWSHandler,
 ) -> RouteRegistry:
     """Build the admin tree: admin's own routes + pre-built sub-registries."""
     reg = RouteRegistry.create("admin", route_deps.cors_options)
@@ -42,6 +45,22 @@ def register_admin_routes(
         "POST",
         "/gql/strawberry",
         handler.handle_gql_strawberry,
+        middlewares=[auth_required],
+    )
+    # Anonymous public endpoint: no auth_required, so unauthenticated callers reach the handler.
+    # It serves a separate PublicQueries schema that contains only public fields, so private
+    # fields are physically absent and cannot be queried.
+    # TODO(BA-6592): re-enable once a real public field exists (PublicQueries currently only has
+    # the public_ping placeholder, nothing safe to expose anonymously).
+    # reg.add(
+    #     "POST",
+    #     "/gql/strawberry/public",
+    #     handler.handle_gql_strawberry_public,
+    # )
+    reg.add(
+        "GET",
+        "/gql/strawberry",
+        gql_ws_handler.handle,
         middlewares=[auth_required],
     )
 

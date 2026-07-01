@@ -38,8 +38,11 @@ class AutoScalingRuleNode(BaseResponseModel):
     time_window: int = Field(description="Time window in seconds for scaling evaluation")
     min_replicas: int | None = Field(default=None, description="Minimum number of replicas")
     max_replicas: int | None = Field(default=None, description="Maximum number of replicas")
+    prometheus_query_preset_id: UUID | None = Field(
+        default=None, description="Prometheus query preset ID"
+    )
     created_at: datetime = Field(description="Creation timestamp")
-    last_triggered_at: datetime = Field(description="Last triggered timestamp")
+    last_triggered_at: datetime | None = Field(default=None, description="Last triggered timestamp")
 
 
 class CreateAutoScalingRulePayload(BaseResponseModel):
@@ -71,3 +74,9 @@ class DeleteAutoScalingRulePayload(BaseResponseModel):
     """Payload for auto-scaling rule deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted auto-scaling rule")
+
+
+class BulkDeleteAutoScalingRulesPayload(BaseResponseModel):
+    """Payload for bulk auto-scaling rule deletion mutation result."""
+
+    ids: list[UUID] = Field(description="IDs of the deleted auto-scaling rules")

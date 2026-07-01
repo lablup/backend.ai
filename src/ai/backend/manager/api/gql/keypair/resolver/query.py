@@ -9,7 +9,6 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminSearchKeypairsInput,
     SearchMyKeypairsRequest,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -17,13 +16,14 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.keypair.types.filters import KeypairFilterGQL, KeypairOrderByGQL
 from ai.backend.manager.api.gql.keypair.types.node import KeyPairConnection, KeyPairEdge, KeyPairGQL
+from ai.backend.manager.api.gql.keypair.types.payloads import AdminGetSSHKeypairPayloadGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.",
     )
 )  # type: ignore[misc]
@@ -37,7 +37,7 @@ async def my_keypairs(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> KeyPairConnection:
+) -> KeyPairConnection | None:
     result = await info.context.adapters.user.search_my_keypairs(
         SearchMyKeypairsRequest(
             filter=filter.to_pydantic() if filter is not None else None,
@@ -66,7 +66,7 @@ async def my_keypairs(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List all keypairs with filtering and pagination (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
@@ -80,7 +80,7 @@ async def admin_keypairs_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> KeyPairConnection:
+) -> KeyPairConnection | None:
     check_admin_only()
     result = await info.context.adapters.user.gql_admin_search_keypairs(
         AdminSearchKeypairsInput(
@@ -110,7 +110,7 @@ async def admin_keypairs_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single keypair by access key (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
@@ -121,3 +121,18 @@ async def admin_keypair_v2(
     check_admin_only()
     node = await info.context.adapters.user.admin_get_keypair(access_key)
     return KeyPairGQL.from_pydantic(node)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.4.2",
+        description="Get a user's SSH public key (admin only). The private key is never returned.",
+    )
+)  # type: ignore[misc]
+async def admin_ssh_keypair_v2(
+    info: Info[StrawberryGQLContext],
+    access_key: str,
+) -> AdminGetSSHKeypairPayloadGQL | None:
+    check_admin_only()
+    payload = await info.context.adapters.user.admin_get_ssh_keypair(access_key)
+    return AdminGetSSHKeypairPayloadGQL.from_pydantic(payload)

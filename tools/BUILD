@@ -35,4 +35,7 @@ python_requirements(
     name="reqs-setuptools",
     source="setuptools-requirements.txt",
     resolve="setuptools",
+    module_mapping={
+        "Cython": ["Cython"],
+    },
 )

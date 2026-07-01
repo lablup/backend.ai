@@ -4,10 +4,10 @@ import socket
 import sys
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated
+from typing import Annotated, Self
 
 import click
-from pydantic import Field, FilePath, ValidationError
+from pydantic import Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
 
 from ai.backend.appproxy.common.config import (
     BaseSchema,
@@ -166,6 +166,51 @@ class DBConfig(BaseSchema):
     ]
 
 
+class ClientIPStrategyConfig(BaseSchema):
+    """How Traefik determines the client IP for the generated ipAllowList
+    middleware when this AppProxy is deployed behind a load balancer / reverse
+    proxy. Maps onto Traefik's ``ipAllowList.ipStrategy``. Leave unset when
+    Traefik is directly exposed to clients (the default strategy then matches the
+    direct connection address)."""
+
+    depth: Annotated[
+        int | None,
+        Field(default=None, ge=1),
+        BackendAIConfigMeta(
+            description=(
+                "Number of trusted proxy hops in front of Traefik. Traefik selects the IP at this "
+                "depth (counted from the rightmost, i.e. nearest-proxy, entry) of 'X-Forwarded-For' "
+                "as the client IP. Mutually exclusive with 'excluded_ips'. Use this when a fixed "
+                "number of proxies always front Traefik."
+            ),
+            added_version="26.4.5",
+            example=ConfigExample(local="", prod="1"),
+        ),
+    ]
+    excluded_ips: Annotated[
+        list[IPvAnyNetwork],
+        Field(default_factory=list),
+        BackendAIConfigMeta(
+            description=(
+                "CIDR blocks (or bare IPs) of trusted proxies in front of Traefik. Traefik scans "
+                "'X-Forwarded-For' right-to-left, skipping these networks, and uses the first "
+                "remaining address as the client IP. Mutually exclusive with 'depth'. Prefer this "
+                "for environments where the proxy chain length varies."
+            ),
+            added_version="26.4.5",
+            example=ConfigExample(local="[]", prod='["10.0.0.0/8"]'),
+        ),
+    ]
+
+    @model_validator(mode="after")
+    def validate_strategy(self) -> Self:
+        if self.depth is not None and self.excluded_ips:
+            raise ConfigValidationError(
+                "client_ip_strategy: 'depth' and 'excluded_ips' are mutually exclusive"
+            )
+        return self
+
+
 class TraefikConfig(BaseSchema):
     etcd: Annotated[
         EtcdConfig,
@@ -177,6 +222,19 @@ class TraefikConfig(BaseSchema):
                 "The namespace should be set to 'traefik' to isolate Traefik's configuration keys."
             ),
             added_version="25.9.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    client_ip_strategy: Annotated[
+        ClientIPStrategyConfig | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "Strategy for resolving the real client IP behind a load balancer / reverse proxy "
+                "when enforcing per-circuit client-IP allowlists via Traefik's ipAllowList "
+                "middleware. Leave unset when Traefik is directly exposed to clients."
+            ),
+            added_version="26.4.5",
             composite=CompositeType.FIELD,
         ),
     ]

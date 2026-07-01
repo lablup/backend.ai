@@ -16,6 +16,7 @@ __all__ = (
     "LoginSessionNode",
     "MySearchLoginSessionsPayload",
     "RevokeLoginSessionPayload",
+    "UnblockUserPayload",
 )
 
 
@@ -57,3 +58,9 @@ class RevokeLoginSessionPayload(BaseResponseModel):
     """Payload for login session revocation result."""
 
     success: bool = Field(description="Whether the revocation was successful")
+
+
+class UnblockUserPayload(BaseResponseModel):
+    """Payload returned after clearing a user's failed-login block."""
+
+    success: bool = Field(description="Whether the unblock was successful")

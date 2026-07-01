@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput,
     DeleteUserInput,
@@ -27,6 +28,7 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus,
     UserStatusFilter,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateUserInput:
@@ -68,6 +70,7 @@ class TestCreateUserInput:
         assert req.container_uid is None
         assert req.container_main_gid is None
         assert req.container_gids is None
+        assert req.integration_name is None
 
     def test_valid_creation_with_all_fields(self) -> None:
         group_id = uuid.uuid4()
@@ -89,6 +92,7 @@ class TestCreateUserInput:
             container_uid=1000,
             container_main_gid=1000,
             container_gids=[100, 200],
+            integration_name="ext-abc",
         )
         assert req.full_name == "Admin User"
         assert req.description == "An admin account"
@@ -97,9 +101,10 @@ class TestCreateUserInput:
         assert req.container_uid == 1000
         assert req.container_main_gid == 1000
         assert req.container_gids == [100, 200]
+        assert req.integration_name == "ext-abc"
 
     def test_missing_required_email_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateUserInput.model_validate({
                 "username": "user",
                 "password": "secret",
@@ -109,7 +114,7 @@ class TestCreateUserInput:
             })
 
     def test_missing_required_username_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateUserInput.model_validate({
                 "email": "user@example.com",
                 "password": "secret",
@@ -172,6 +177,7 @@ class TestUpdateUserInput:
         assert req.container_uid is SENTINEL
         assert req.container_main_gid is SENTINEL
         assert req.container_gids is SENTINEL
+        assert req.integration_name is SENTINEL
 
     def test_non_sentinel_fields_default_to_none(self) -> None:
         req = UpdateUserInput()
@@ -229,6 +235,26 @@ class TestUpdateUserInput:
         req = UpdateUserInput(container_uid=1000)
         assert req.container_uid == 1000
 
+    def test_integration_name_sentinel_default(self) -> None:
+        req = UpdateUserInput()
+        assert req.integration_name is SENTINEL
+
+    def test_integration_name_none_clears(self) -> None:
+        req = UpdateUserInput(integration_name=None)
+        assert req.integration_name is None
+
+    def test_integration_name_with_value(self) -> None:
+        req = UpdateUserInput(integration_name="ext-system")
+        assert req.integration_name == "ext-system"
+
+    def test_integration_name_max_length_rejects_over_512(self) -> None:
+        with pytest.raises(ValidationError, match="integration_name"):
+            UpdateUserInput(integration_name="x" * 513)
+
+    def test_integration_name_max_length_accepts_exactly_512(self) -> None:
+        req = UpdateUserInput(integration_name="x" * 512)
+        assert req.integration_name == "x" * 512
+
     def test_round_trip_with_none_fields(self) -> None:
         req = UpdateUserInput(
             username="newname",
@@ -258,11 +284,11 @@ class TestDeleteUserInput:
         assert req.user_id == user_id
 
     def test_invalid_uuid_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteUserInput.model_validate({"user_id": "not-a-uuid"})
 
     def test_missing_user_id_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteUserInput.model_validate({})
 
     def test_round_trip(self) -> None:
@@ -381,11 +407,11 @@ class TestPurgeUserV2Input:
         assert req.options is None
 
     def test_missing_user_id_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeUserV2Input.model_validate({})
 
     def test_invalid_user_id_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeUserV2Input.model_validate({"user_id": "not-a-uuid"})
 
     def test_round_trip_without_options(self) -> None:
@@ -437,8 +463,20 @@ class TestUserFilter:
         assert f.email is None
         assert f.username is None
         assert f.domain_name is None
+        assert f.integration_name is None
         assert f.status is None
         assert f.role is None
+
+    def test_integration_name_filter(self) -> None:
+        f = UserFilter(
+            integration_name=StringFilter(equals="k8s-user"),
+        )
+        assert f.integration_name is not None
+        assert f.integration_name.equals == "k8s-user"
+
+    def test_integration_name_filter_defaults_to_none(self) -> None:
+        f = UserFilter(email=StringFilter(contains="test"))
+        assert f.integration_name is None
 
     def test_status_filter(self) -> None:
         f = UserFilter(status=UserStatusFilter(in_=[UserStatus.ACTIVE, UserStatus.INACTIVE]))
@@ -449,6 +487,49 @@ class TestUserFilter:
         f = UserFilter(role=UserRoleFilter(in_=[UserRole.ADMIN, UserRole.SUPERADMIN]))
         assert f.role is not None
         assert f.role.in_ == [UserRole.ADMIN, UserRole.SUPERADMIN]
+
+    def test_container_filters_default_to_none(self) -> None:
+        f = UserFilter()
+        assert f.container_uid is None
+        assert f.container_main_gid is None
+        assert f.container_gids is None
+
+    def test_container_uid_filter(self) -> None:
+        f = UserFilter.model_validate({"container_uid": {"equals": 1000}})
+        assert f.container_uid is not None
+        assert f.container_uid.equals == 1000
+
+    def test_container_main_gid_filter(self) -> None:
+        f = UserFilter.model_validate({"container_main_gid": {"greater_than": 500}})
+        assert f.container_main_gid is not None
+        assert f.container_main_gid.greater_than == 500
+
+    def test_container_gids_contains_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"contains": 42}})
+        assert f.container_gids is not None
+        assert f.container_gids.contains == 42
+        assert f.container_gids.contains_any is None
+        assert f.container_gids.contains_all is None
+
+    def test_container_gids_contains_all_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"contains_all": [10, 20]}})
+        assert f.container_gids is not None
+        assert f.container_gids.contains_all == [10, 20]
+        assert f.container_gids.contains_any is None
+
+    def test_container_gids_contains_any_filter(self) -> None:
+        f = UserFilter.model_validate({"container_gids": {"contains_any": [30]}})
+        assert f.container_gids is not None
+        assert f.container_gids.contains_any == [30]
+        assert f.container_gids.contains_all is None
+
+    def test_container_gids_empty_contains_all_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UserFilter.model_validate({"container_gids": {"contains_all": []}})
+
+    def test_container_gids_empty_contains_any_rejected(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            UserFilter.model_validate({"container_gids": {"contains_any": []}})
 
 
 class TestUserOrder:
@@ -485,11 +566,11 @@ class TestSearchUsersRequest:
         assert req.limit >= 1
 
     def test_limit_too_small_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchUsersRequest(limit=0)
 
     def test_offset_negative_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchUsersRequest(offset=-1)
 
     def test_with_filter_and_order(self) -> None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ai.backend.manager.repositories.base import QueryOrder
+from ai.backend.manager.models.clauses import QueryOrder
 
 from .row import KeyPairResourcePolicyRow, ProjectResourcePolicyRow, UserResourcePolicyRow
 
@@ -79,6 +79,12 @@ class UserResourcePolicyOrders:
         if ascending:
             return UserResourcePolicyRow.max_vfolder_count.asc()
         return UserResourcePolicyRow.max_vfolder_count.desc()
+
+    @staticmethod
+    def max_concurrent_logins(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return UserResourcePolicyRow.max_concurrent_logins.asc()
+        return UserResourcePolicyRow.max_concurrent_logins.desc()
 
     @staticmethod
     def max_quota_scope_size(ascending: bool = True) -> QueryOrder:

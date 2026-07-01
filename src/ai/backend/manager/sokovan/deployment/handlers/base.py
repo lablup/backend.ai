@@ -4,8 +4,9 @@ from abc import abstractmethod
 from collections.abc import Sequence
 
 from ai.backend.manager.data.deployment.types import (
-    DeploymentLifecycleStatus,
+    DeploymentHandlerCategory,
     DeploymentStatusTransitions,
+    DeploymentTargetStatuses,
 )
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.types import (
@@ -32,6 +33,19 @@ class DeploymentHandler:
         """Get the name of the handler."""
         raise NotImplementedError("Subclasses must implement name()")
 
+    @classmethod
+    @abstractmethod
+    def category(cls) -> DeploymentHandlerCategory:
+        """Classify the work this handler performs.
+
+        Used by the coordinator to stamp deployment-history rows so
+        scaling / lifecycle (and future health) operations can be
+        filtered apart when querying the history. LIFECYCLE handlers
+        progress the endpoint's monotonic lifecycle; SCALING handlers
+        operate on the orthogonal ``scaling_state`` axis.
+        """
+        raise NotImplementedError("Subclasses must implement category()")
+
     @property
     @abstractmethod
     def lock_id(self) -> LockID | None:
@@ -44,15 +58,13 @@ class DeploymentHandler:
 
     @classmethod
     @abstractmethod
-    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
-        """Get the target deployment statuses for this handler.
+    def target_statuses(cls) -> DeploymentTargetStatuses:
+        """Declare which deployments this handler consumes each tick.
 
-        Each entry pairs an ``EndpointLifecycle`` with an optional
-        ``DeploymentLifecycleSubStep`` (sub-step).  The coordinator uses these
-        to filter deployments from the DB and to build registry keys.
-
-        Returns:
-            List of lifecycle + sub-step pairs that this handler targets
+        Returns a :class:`DeploymentTargetStatuses` carrying per-axis
+        lists (``lifecycle_stages``, ``scaling_states``, ``sub_steps``)
+        that the coordinator AND-composes into the fetch query. An
+        empty list on an axis means "do not restrict by that axis".
         """
         raise NotImplementedError("Subclasses must implement target_statuses()")
 

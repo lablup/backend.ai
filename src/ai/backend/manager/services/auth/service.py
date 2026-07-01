@@ -16,19 +16,20 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionTokenData,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import InvalidAPIParameters, UserResourcePolicyNotFound
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import AccessKey
+from ai.backend.common.types import AccessKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.defs import DEFAULT_PROJECT_NAME
 from ai.backend.manager.errors.auth import (
-    ActiveLoginSessionExistsError,
     AuthorizationFailed,
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
     PasswordExpired,
+    TooManyConcurrentLoginSessions,
     UserCreationError,
 )
 from ai.backend.manager.errors.common import (
@@ -42,8 +43,8 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import (
     generate_keypair,
     generate_ssh_keypair,
-    validate_ssh_keypair,
 )
+from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import (
     INACTIVE_USER_STATUSES,
@@ -53,6 +54,11 @@ from ai.backend.manager.models.user import (
 )
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
     AuthorizeActionResult,
@@ -70,6 +76,10 @@ from ai.backend.manager.services.auth.actions.logout import LogoutAction, Logout
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
     ResolveAccessKeyScopeResult,
+)
+from ai.backend.manager.services.auth.actions.resolve_user_id_by_access_key import (
+    ResolveUserIDByAccessKeyAction,
+    ResolveUserIDByAccessKeyResult,
 )
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     ResolveUserScopeAction,
@@ -92,6 +102,10 @@ from ai.backend.manager.services.auth.actions.search_login_sessions import (
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
+from ai.backend.manager.services.auth.actions.unblock_user import (
+    AdminUnblockUserAction,
+    AdminUnblockUserActionResult,
+)
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
     UpdateFullNameActionResult,
@@ -116,7 +130,7 @@ _FAILURE_MAP: dict[type[Exception], LoginAttemptResult] = {
     AuthorizationFailed: LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
     PasswordExpired: LoginAttemptResult.FAILED_PASSWORD_EXPIRED,
     RejectedByHook: LoginAttemptResult.FAILED_REJECTED_BY_HOOK,
-    ActiveLoginSessionExistsError: LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
+    TooManyConcurrentLoginSessions: LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
 }
 
 
@@ -129,6 +143,10 @@ class AuthService:
     _auth_repository: AuthRepository
     _config_provider: ManagerConfigProvider
     _valkey_session_client: ValkeySessionClient
+    _user_resource_policy_repository: UserResourcePolicyRepository
+    _user_repository: UserRepository
+    _group_repository: GroupRepository
+    _ssh_key_validator: SSHKeyValidator
 
     def __init__(
         self,
@@ -136,11 +154,19 @@ class AuthService:
         auth_repository: AuthRepository,
         config_provider: ManagerConfigProvider,
         valkey_session_client: ValkeySessionClient,
+        user_resource_policy_repository: UserResourcePolicyRepository,
+        user_repository: UserRepository,
+        group_repository: GroupRepository,
+        ssh_key_validator: SSHKeyValidator,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
         self._config_provider = config_provider
         self._valkey_session_client = valkey_session_client
+        self._user_resource_policy_repository = user_resource_policy_repository
+        self._user_repository = user_repository
+        self._group_repository = group_repository
+        self._ssh_key_validator = ssh_key_validator
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
@@ -171,7 +197,8 @@ class AuthService:
         if action.type != AuthTokenType.KEYPAIR:
             raise InvalidAPIParameters("Unsupported authorization type")
         auth_config = self._config_provider.config.auth
-        user, active_sessions = await self._verify_user(action, auth_config)
+        login_client_type_id = action.client_type_id
+        user, active_sessions = await self._verify_user(action, auth_config, login_client_type_id)
 
         try:
             post_result = await self._post_check(action, user, active_sessions, auth_config)
@@ -180,13 +207,13 @@ class AuthService:
             keypair_row, live_sessions = post_result
 
             return await self._create_login_session(
-                action, user, keypair_row, live_sessions, auth_config
+                action, user, keypair_row, live_sessions, auth_config, login_client_type_id
             )
         except (
             AuthorizationFailed,
             PasswordExpired,
             RejectedByHook,
-            ActiveLoginSessionExistsError,
+            TooManyConcurrentLoginSessions,
         ) as e:
             await self._record_login_failure(
                 user.uuid,
@@ -199,6 +226,7 @@ class AuthService:
         self,
         action: AuthorizeAction,
         auth_config: AuthConfig,
+        login_client_type_id: uuid.UUID | None,
     ) -> tuple[RowMapping, list[ActiveSessionInfo]]:
         """Step 1: Verify user identity via hook or password."""
         params = action.hook_params
@@ -211,7 +239,9 @@ class AuthService:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result:
             user = hook_result.result
-            active_sessions = await self._auth_repository.get_active_session_tokens(user.uuid)
+            active_sessions = await self._auth_repository.get_active_session_tokens(
+                user.uuid, login_client_type_id=login_client_type_id
+            )
             return user, active_sessions
 
         target_password_info = PasswordInfo(
@@ -224,6 +254,7 @@ class AuthService:
             action.domain_name,
             action.email,
             target_password_info=target_password_info,
+            login_client_type_id=login_client_type_id,
         )
         return cred_result.user, cred_result.active_sessions
 
@@ -265,11 +296,47 @@ class AuthService:
             if await self._valkey_session_client.get_login_session(session_info.session_token):
                 live_sessions.append(session_info)
             else:
-                await self._auth_repository.invalidate_login_session_by_token(
-                    session_info.session_token
+                await self._auth_repository.delete_login_session_by_token(
+                    session_info.session_token, LoginAttemptResult.EXPIRED
                 )
 
         return main_keypair_row, live_sessions
+
+    def _enforce_max_concurrent_logins(
+        self,
+        max_concurrent_logins: int | None,
+        live_sessions: list[ActiveSessionInfo],
+        force: bool,
+    ) -> list[str] | None:
+        """Apply the per-user ``max_concurrent_logins`` cap and return tokens to evict.
+
+        Behavior:
+        - ``max_concurrent_logins is None`` (unlimited or no policy): no cap, returns ``None``.
+        - Below the cap: no eviction, returns ``None``.
+        - At or over the cap with ``force=True``: returns the oldest session tokens
+          (``count - max_concurrent_logins + 1`` of them) so the caller can invalidate
+          them before creating the new login session.
+        - At or over the cap with ``force=False``: raises ``TooManyConcurrentLoginSessions``.
+
+        ``live_sessions`` must already be the authoritative active set (cross-checked
+        against Valkey by the caller) and ordered oldest-first.
+        """
+        if max_concurrent_logins is None:
+            return None
+        if max_concurrent_logins <= 0:
+            # Cap of 0 (or negative) means no logins allowed at all; force cannot help
+            # since even evicting every existing session still leaves the new login over cap.
+            raise TooManyConcurrentLoginSessions()
+        count = len(live_sessions)
+        if count < max_concurrent_logins:
+            return None
+        if not force:
+            raise TooManyConcurrentLoginSessions()
+        # Normally evicts just the oldest session (result is 1). Can be >1 when an admin
+        # lowered max_concurrent_logins after the user already exceeded the new cap — in
+        # that case this brings the user back down to (max_concurrent_logins - 1) in one shot.
+        sessions_to_invalidate = count - max_concurrent_logins + 1
+        return [s.session_token for s in live_sessions[:sessions_to_invalidate]]
 
     async def _create_login_session(
         self,
@@ -278,25 +345,47 @@ class AuthService:
         keypair_row: Any,
         live_sessions: list[ActiveSessionInfo],
         auth_config: AuthConfig,
+        login_client_type_id: uuid.UUID | None,
     ) -> AuthorizeActionResult:
-        """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed."""
-        max_concurrent_sessions = 1
-        tokens_to_invalidate: list[str] | None = None
-        if action.force and len(live_sessions) >= max_concurrent_sessions:
-            sessions_to_remove = len(live_sessions) - max_concurrent_sessions + 1
-            tokens_to_invalidate = [s.session_token for s in live_sessions[:sessions_to_remove]]
+        """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed.
 
+        Enforcement uses ``user_resource_policy.max_concurrent_logins``:
+        - None (unlimited): always proceed.
+        - Set: if ``len(live_sessions) >= limit`` and ``action.force`` is True, evict the
+          oldest sessions to make room; otherwise raise ``TooManyConcurrentLoginSessions``.
+
+        ``live_sessions`` is already the authoritative active set (cross-checked against
+        Valkey by the caller), so no additional repository count query is needed.
+        """
+        try:
+            user_resource_policy = await self._user_resource_policy_repository.get_by_name(
+                user.resource_policy
+            )
+            max_concurrent_logins: int | None = user_resource_policy.max_concurrent_logins
+        except UserResourcePolicyNotFound:
+            # If no matching resource policy is found, skip login-session limit enforcement.
+            max_concurrent_logins = None
+
+        tokens_to_invalidate = self._enforce_max_concurrent_logins(
+            max_concurrent_logins=max_concurrent_logins,
+            live_sessions=live_sessions,
+            force=action.force,
+        )
+
+        # Create-before-destroy: evict old sessions only after the new one is persisted.
         session_result = await self._auth_repository.create_login_session(
             user_id=user.uuid,
             access_key=keypair_row.access_key,
             domain_name=action.domain_name,
-            max_concurrent_sessions=max_concurrent_sessions,
-            tokens_to_invalidate=tokens_to_invalidate,
+            login_client_type_id=login_client_type_id,
         )
 
         if tokens_to_invalidate:
             for token in tokens_to_invalidate:
                 await self._valkey_session_client.delete_login_session(token)
+            await self._auth_repository.delete_login_sessions_by_tokens(
+                tokens_to_invalidate, LoginAttemptResult.EVICTED
+            )
 
         session_data = LoginSessionData(
             created=int(time.time()),
@@ -421,18 +510,21 @@ class AuthService:
             "num_queries": 0,
         }
 
-        # Add user to the default group.
-        group_name = user_data_overriden.get("group", "default")
-
         try:
             user = await self._auth_repository.create_user_with_keypair(
                 user_data=data,
                 keypair_data=kp_data,
-                group_name=group_name,
-                domain_name=action.domain_name,
             )
         except UserCreationError as e:
             raise InternalServerError("Error creating user account") from e
+
+        # Assign the new user to the default project
+        group_name = user_data_overriden.get("group", DEFAULT_PROJECT_NAME)
+        project_id = await self._group_repository.project_id_by_name_in_domain(
+            action.domain_name, group_name
+        )
+        if project_id is not None:
+            await self._user_repository.assign_project_membership(user.uuid, project_id)
 
         # [Hooking point for POST_SIGNUP as one-way notification]
         # The hook handlers should accept a tuple of the user email,
@@ -451,14 +543,18 @@ class AuthService:
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
-        await self._auth_repository.invalidate_login_session_by_token(action.session_token)
+        await self._auth_repository.delete_login_session_by_token(
+            action.session_token, LoginAttemptResult.LOGOUT
+        )
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
 
     async def admin_revoke_login_session(
         self, action: AdminRevokeLoginSessionAction
     ) -> RevokeLoginSessionActionResult:
-        session_token = await self._auth_repository.revoke_login_session(action.session_id)
+        session_token = await self._auth_repository.delete_login_session_by_id(
+            action.session_id, LoginAttemptResult.REVOKED_BY_ADMIN
+        )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
 
@@ -468,9 +564,17 @@ class AuthService:
         session_data = await self._auth_repository.get_login_session_by_id(action.session_id)
         if session_data.user_id != action.user_id:
             raise GenericForbidden("You can only revoke your own login sessions.")
-        session_token = await self._auth_repository.revoke_login_session(action.session_id)
+        session_token = await self._auth_repository.delete_login_session_by_id(
+            action.session_id, LoginAttemptResult.REVOKED_BY_USER
+        )
         await self._valkey_session_client.delete_login_session(session_token)
         return RevokeLoginSessionActionResult(success=True)
+
+    async def admin_unblock_user(
+        self, action: AdminUnblockUserAction
+    ) -> AdminUnblockUserActionResult:
+        await self._valkey_session_client.clear_login_block(action.username)
+        return AdminUnblockUserActionResult(success=True)
 
     async def signout(self, action: SignoutAction) -> SignoutActionResult:
         if action.email != action.requester_email:
@@ -481,11 +585,11 @@ class AuthService:
             email,
             action.password,
         )
-        # Get active session tokens before invalidating, for Valkey cleanup
-        active_sessions = await self._auth_repository.get_active_session_tokens(action.user_id)
-        await self._auth_repository.invalidate_user_login_sessions(action.user_id)
-        for session_info in active_sessions:
-            await self._valkey_session_client.delete_login_session(session_info.session_token)
+        deleted_tokens = await self._auth_repository.delete_user_login_sessions(
+            action.user_id, action.domain_name, LoginAttemptResult.LOGOUT
+        )
+        for token in deleted_tokens:
+            await self._valkey_session_client.delete_login_session(token)
         await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)
@@ -611,9 +715,7 @@ class AuthService:
     ) -> UploadSSHKeypairActionResult:
         privkey = action.private_key
         pubkey = action.public_key
-        is_valid, err_msg = validate_ssh_keypair(privkey, pubkey)
-        if not is_valid:
-            raise InvalidAPIParameters(err_msg)
+        self._ssh_key_validator.validate(SSHPrivateKey(privkey), SSHPublicKey(pubkey))
 
         await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
 
@@ -660,6 +762,12 @@ class AuthService:
             requester_access_key=requester_ak,
             owner_access_key=owner_ak,
         )
+
+    async def resolve_user_id_by_access_key(
+        self, action: ResolveUserIDByAccessKeyAction
+    ) -> ResolveUserIDByAccessKeyResult:
+        user_id = await self._auth_repository.get_user_id_by_access_key(action.access_key)
+        return ResolveUserIDByAccessKeyResult(user_id=user_id)
 
     async def resolve_user_scope(self, action: ResolveUserScopeAction) -> ResolveUserScopeResult:
         if action.owner_user_email is None:

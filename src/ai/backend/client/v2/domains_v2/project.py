@@ -6,15 +6,17 @@ from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.group.request import (
-    AdminSearchGroupsInput,
-    CreateGroupInput,
-    DeleteGroupInput,
-    PurgeGroupInput,
+    AdminSearchProjectsInput,
+    AssignUsersToProjectInput,
+    CreateProjectInput,
+    DeleteProjectInput,
+    PurgeProjectInput,
     UnassignUsersFromProjectInput,
-    UpdateGroupInput,
+    UpdateProjectInput,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
+    AssignUsersToProjectPayload,
     DeleteProjectPayload,
     ProjectNode,
     ProjectPayload,
@@ -30,7 +32,7 @@ class V2ProjectClient(BaseDomainClient):
 
     async def admin_search(
         self,
-        request: AdminSearchGroupsInput,
+        request: AdminSearchProjectsInput,
     ) -> AdminSearchGroupsPayload:
         """Search projects with filters, orders, and pagination (superadmin only)."""
         return await self._client.typed_request(
@@ -48,7 +50,7 @@ class V2ProjectClient(BaseDomainClient):
             response_model=ProjectNode,
         )
 
-    async def admin_create(self, request: CreateGroupInput) -> ProjectPayload:
+    async def admin_create(self, request: CreateProjectInput) -> ProjectPayload:
         """Create a new project (superadmin only)."""
         return await self._client.typed_request(
             "POST",
@@ -57,7 +59,7 @@ class V2ProjectClient(BaseDomainClient):
             response_model=ProjectPayload,
         )
 
-    async def admin_update(self, project_id: UUID, request: UpdateGroupInput) -> ProjectPayload:
+    async def admin_update(self, project_id: UUID, request: UpdateProjectInput) -> ProjectPayload:
         """Update a project (superadmin only)."""
         return await self._client.typed_request(
             "PATCH",
@@ -66,7 +68,7 @@ class V2ProjectClient(BaseDomainClient):
             response_model=ProjectPayload,
         )
 
-    async def admin_delete(self, request: DeleteGroupInput) -> DeleteProjectPayload:
+    async def admin_delete(self, request: DeleteProjectInput) -> DeleteProjectPayload:
         """Soft-delete a project (superadmin only)."""
         return await self._client.typed_request(
             "POST",
@@ -75,13 +77,26 @@ class V2ProjectClient(BaseDomainClient):
             response_model=DeleteProjectPayload,
         )
 
-    async def admin_purge(self, request: PurgeGroupInput) -> PurgeProjectPayload:
+    async def admin_purge(self, request: PurgeProjectInput) -> PurgeProjectPayload:
         """Permanently purge a project (superadmin only)."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/purge",
             request=request,
             response_model=PurgeProjectPayload,
+        )
+
+    async def assign_users(
+        self,
+        project_id: UUID,
+        request: AssignUsersToProjectInput,
+    ) -> AssignUsersToProjectPayload:
+        """Assign users to a project with a specific project role."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{project_id}/users/assign",
+            request=request,
+            response_model=AssignUsersToProjectPayload,
         )
 
     async def unassign_users(

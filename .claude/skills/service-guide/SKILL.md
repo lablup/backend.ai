@@ -4,7 +4,7 @@ description: Guide for implementing Backend.AI service layer (create, get, searc
 version: 1.0.0
 dependencies:
   - repository-guide
-  - tdd-guide
+  - test-guide
 tags:
   - service-layer
   - actions
@@ -27,7 +27,7 @@ Services implement 6 standard operations:
 5. **delete** - Delete entity
 6. **purge** - Permanently remove entity
 
-**Batch operations:** `batch_update`, `batch_delete`, `batch_purge`
+**Multi-target:** `batch_*` (atomic, one statement) vs `bulk_*` (per-row, partial failures). See `/repository-guide`.
 
 **Method naming (no prefix):**
 ```python
@@ -179,7 +179,7 @@ Protocol with all standard operations
 
 ### Step 7: Write Tests
 
-**See:** `/tdd-guide` for complete testing workflow
+**See:** `/test-guide` for complete testing workflow
 
 **Critical:** Service tests MUST mock repositories (no real DB)
 
@@ -225,13 +225,13 @@ Protocol with all standard operations
 - Test business logic
 - Verify repository calls
 
-**See:** `/tdd-guide` skill
+**See:** `/test-guide` skill
 
 ## Related Documentation
 
 - **Repository Layer**: `/repository-guide` - Data access
 - **API Integration**: `/api-guide` - REST/GraphQL
-- **Testing**: `/tdd-guide` - TDD workflow
+- **Testing**: `/test-guide` - Scenario-first testing
 - **Service README**: `src/ai/backend/manager/services/README.md`
 
 ## Examples
@@ -259,5 +259,5 @@ Protocol with all standard operations
 2. Define actions and operations
 3. Implement service methods
 4. Create processors
-5. Write tests (`/tdd-guide`)
+5. Write tests (`/test-guide`)
 6. Integrate with API (`/api-guide`)

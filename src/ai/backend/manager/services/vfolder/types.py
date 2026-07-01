@@ -51,6 +51,7 @@ class VFolderInvitationInfo:
     vfolder_name: str
     invitee_user_email: str
     inviter_user_email: str
+    inviter_username: str | None
     mount_permission: VFolderMountPermission
     created_at: datetime
     modified_at: datetime | None
@@ -63,6 +64,7 @@ class VFolderInvitationInfo:
             "vfolder_name": self.vfolder_name,
             "invitee_user_email": self.invitee_user_email,
             "inviter_user_email": self.inviter_user_email,
+            "inviter_username": self.inviter_username,
             "mount_permission": self.mount_permission.value,
             "created_at": self.created_at.isoformat(),
             "modified_at": self.modified_at.isoformat() if self.modified_at is not None else None,

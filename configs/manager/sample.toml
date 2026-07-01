@@ -188,6 +188,13 @@
   # for security.
   # Added in 25.8.0
   ## ssl-privkey = "/etc/backend.ai/ssl/manager.key"
+  # List of trusted reverse proxy IP addresses or CIDR ranges. When configured,
+  # the manager uses aiohttp_remotes.XForwardedStrict middleware to securely
+  # resolve client IPs from X-Forwarded-For headers. Only proxies in this list
+  # are trusted to set forwarding headers. If empty (default), the manager falls
+  # back to manual X-Forwarded-For parsing.
+  # Added in 26.4.2
+  trusted-proxies = ["10.0.0.0/8", "172.16.0.0/12"]
   # Event loop implementation to use for async operations. 'asyncio' is the
   # Python standard library implementation (default). 'uvloop' is a faster
   # alternative based on libuv but may have compatibility issues. Use uvloop for
@@ -298,6 +305,20 @@
   # metrics exposure.
   # Added in 25.8.0
   ## public-metrics-port = 9090
+
+  # RBAC (Role-Based Access Control) configuration. Controls runtime RBAC
+  # enforcement behavior including the ability to toggle enforcement on or off
+  # without a restart.
+  # Added in 26.4.4
+  [manager.rbac]
+    # Whether to enable RBAC enforcement on the manager's read/validation path.
+    # When true (default), all RBAC validators run normally. When false, RBAC
+    # validators short-circuit so that only the legacy permission path
+    # (user.role / is_admin / domain and project membership) applies. RBAC write
+    # paths continue to populate association and role-mapping rows regardless of
+    # this flag, so re-enabling does not require data backfill.
+    # Added in 26.4.4
+    enforcement-enabled = true
 
 # Deprecated Docker registry configuration. This legacy configuration controls
 # basic Docker registry connection settings. For new deployments, use the
@@ -559,10 +580,15 @@
   # availability. Identifies which service to monitor for failover.
   # Added in 25.13.0
   ## service-name = "backend-ai"
-  # Password for authenticating with Redis. Set to None if Redis doesn't require
-  # authentication. Should be kept secret in production environments.
+  # Password for authenticating with Redis master. Set to None if Redis doesn't
+  # require authentication. Should be kept secret in production environments.
   # Added in 25.13.0
   ## password = "REDIS_PASSWORD"
+  # Password for authenticating with Redis Sentinel nodes. If None, falls back
+  # to the master password. Set explicitly when Sentinel nodes use a different
+  # password than the master.
+  # Added in 26.4.2
+  ## sentinel-password = "REDIS_SENTINEL_PASSWORD"
   # Timeout in milliseconds for Redis requests. Controls how long operations
   # wait before timing out. If None, uses the default timeout configured in the
   # Redis client.
@@ -797,6 +823,10 @@
   # manages its own salt internally, so this setting doesn't apply to bcrypt.
   # Added in 25.8.0
   password-hash-salt-size = 32
+  # Maximum login session age in seconds. Default is 604800 (7 days). Sessions
+  # older than this are considered expired.
+  # Added in 26.4.2
+  login-session-max-age = 604800
 
 # JWT (JSON Web Token) authentication configuration. Controls JWT token signing
 # and verification settings used for stateless authentication between
@@ -1052,15 +1082,6 @@
 # model definition handling.
 # Added in 25.8.0
 [deployment]
-  # Enable custom model definition override from storage for non-CUSTOM runtime
-  # variants. When enabled, after generating the standard model definition
-  # programmatically, the system attempts to fetch a custom definition from
-  # storage if model_definition_path is specified in the model revision. The
-  # custom definition overrides the generated one if found; otherwise, the
-  # generated definition is used as fallback. This allows customizing model
-  # serving configurations while maintaining automatic defaults.
-  # Added in 25.8.0
-  enable-model-definition-override = true
 
 # Export API configuration. Controls CSV export functionality including row
 # limits, timeouts, and concurrency limits. These settings prevent resource

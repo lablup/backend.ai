@@ -1,0 +1,12 @@
+{
+  "prometheus_query_preset_categories": [
+    {
+      "name": "container",
+      "description": "Container-level utilization metrics collected by Backend.AI agents"
+    },
+    {
+      "name": "vllm-inference",
+      "description": "vLLM inference runtime metrics scraped from model serving endpoints"
+    }
+  ]
+}

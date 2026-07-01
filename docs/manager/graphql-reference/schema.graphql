@@ -806,7 +806,7 @@ type AgentEdge {
 }
 
 """Added in 24.12.0."""
-type AgentNode implements Node {
+type AgentNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   row_id: String
@@ -1836,6 +1836,9 @@ type Routing implements Item {
   endpoint: String
   session: UUID
   status: String
+
+  """Added in 26.4.2."""
+  health_status: String
   traffic_ratio: Float
   created_at: DateTime
   error_data: JSONString
@@ -1916,7 +1919,7 @@ type ContainerRegistryConfig {
 }
 
 """Added in 24.09.0."""
-type ContainerRegistryNode implements Node {
+type ContainerRegistryNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -1981,7 +1984,7 @@ type ContainerRegistryEdge {
   cursor: String!
 }
 
-type ModelCard implements Node {
+type ModelCard implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   name: String
@@ -2044,7 +2047,7 @@ type ModelCardEdge {
 }
 
 """Added in 24.12.0."""
-type NetworkNode implements Node {
+type NetworkNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   row_id: UUID
@@ -2101,6 +2104,7 @@ type EndpointAutoScalingRuleNode implements Node @key(fields: "id") {
 enum AutoScalingMetricSource {
   KERNEL
   INFERENCE_FRAMEWORK
+  PROMETHEUS
 }
 
 """
@@ -2260,7 +2264,7 @@ type ServiceConfigEdge {
   cursor: String!
 }
 
-union _Entity = ImageNode | DomainNode | ScalingGroupNode | GroupNode | UserNode | VirtualFolderNode | ComputeSessionNode | EndpointToken | EndpointAutoScalingRuleNode
+union _Entity = ImageNode | DomainNode | ScalingGroupNode | AgentNode | GroupNode | UserNode | VirtualFolderNode | ComputeSessionNode | EndpointToken | ContainerRegistryNode | ModelCard | NetworkNode | EndpointAutoScalingRuleNode
 
 scalar _Any
 
@@ -3683,7 +3687,7 @@ input ExtraMountInput {
   mount_destination: String
 
   """
-  Added in 24.03.4. Set bind type of this mount. Shoud be one of (volume,bind,tmpfs,k8s-generic,k8s-hostpath). Default is 'bind'.
+  Added in 24.03.4. Set bind type of this mount. Shoud be one of (volume,bind,tmpfs,overlay,k8s-generic,k8s-hostpath). Default is 'bind'.
   """
   type: String
 

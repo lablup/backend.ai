@@ -13,7 +13,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import BinarySizeInput, ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
@@ -48,7 +48,6 @@ __all__ = (
     "ShutdownSessionServiceInput",
     "StartServiceInput",
     "StartSessionServiceInput",
-    "TerminateSessionsInProjectInput",
     "TerminateSessionsInput",
     "UpdateSessionInput",
     "UploadFilesInput",
@@ -86,7 +85,7 @@ class SessionFilter(BaseRequestModel):
     domain_name: StringFilter | None = None
     project_id: UUIDFilter | None = None
     user_uuid: UUIDFilter | None = None
-    created_at: DateTimeRangeFilter | None = None
+    created_at: DateTimeFilter | None = None
     AND: list[SessionFilter] | None = None
     OR: list[SessionFilter] | None = None
     NOT: list[SessionFilter] | None = None
@@ -132,15 +131,12 @@ class AdminSearchSessionsInput(BaseRequestModel):
 class RestartSessionInput(BaseRequestModel):
     """Input for restarting a session."""
 
-    owner_access_key: str | None = None
-
 
 class DestroySessionInput(BaseRequestModel):
     """Input for destroying a session."""
 
     forced: bool = False
     recursive: bool = False
-    owner_access_key: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +234,6 @@ class ListFilesInput(BaseRequestModel):
 class GetContainerLogsInput(BaseRequestModel):
     """Input for retrieving container logs from a session."""
 
-    owner_access_key: str | None = None
     kernel_id: UUID | None = None
 
 
@@ -264,6 +259,14 @@ class MountItemInput(BaseRequestModel):
     )
     permission: str | None = Field(
         default=None, description="Mount permission override ('rw' or 'ro')."
+    )
+    subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the vfolder to mount. Omit (null) to mount the vfolder root."
+            " Empty string is rejected."
+        ),
     )
 
 
@@ -352,6 +355,16 @@ class EnqueueSessionInput(BaseRequestModel):
     # Project scope
     project_id: UUID = Field(description="Project (group) UUID.")
 
+    # Delegation
+    owner_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Delegated owner user UUID. When set, the session is created on behalf of "
+            "the specified user instead of the caller. Caller must have permission to "
+            "act on behalf of the target user."
+        ),
+    )
+
 
 # ---------------------------------------------------------------------------
 # Terminate (batch)
@@ -361,14 +374,6 @@ class EnqueueSessionInput(BaseRequestModel):
 class TerminateSessionsInput(BaseRequestModel):
     """Input for terminating one or more sessions."""
 
-    session_ids: list[UUID] = Field(description="Session UUIDs to terminate.")
-    forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
-
-
-class TerminateSessionsInProjectInput(BaseRequestModel):
-    """Input for terminating sessions within a project scope."""
-
-    project_id: UUID = Field(description="Project UUID to scope the termination.")
     session_ids: list[UUID] = Field(description="Session UUIDs to terminate.")
     forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
 

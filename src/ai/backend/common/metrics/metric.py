@@ -1,13 +1,19 @@
 import asyncio
 import enum
 import os
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Self
 
 import psutil
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import BackendAIError, ErrorCode
-from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
+from ai.backend.common.metrics.multiprocess import (
+    generate_latest_multiprocess,
+    generate_latest_singleprocess,
+)
 from ai.backend.common.metrics.safe import (
     SafeCounter as Counter,
 )
@@ -17,6 +23,7 @@ from ai.backend.common.metrics.safe import (
 from ai.backend.common.metrics.safe import (
     SafeHistogram as Histogram,
 )
+from ai.backend.common.metrics.types import SUCCESS_LABEL_FALSE, SUCCESS_LABEL_TRUE
 
 
 class APIMetricObserver:
@@ -414,6 +421,9 @@ class DomainType(enum.StrEnum):
 class LayerType(enum.StrEnum):
     # Repository layers with _REPOSITORY suffix
     AGENT_REPOSITORY = "agent_repository"
+    APP_CONFIG_ALLOW_LIST_REPOSITORY = "app_config_allow_list_repository"
+    APP_CONFIG_DEFINITION_REPOSITORY = "app_config_definition_repository"
+    APP_CONFIG_FRAGMENT_REPOSITORY = "app_config_fragment_repository"
     AUTH_REPOSITORY = "auth_repository"
     ARTIFACT_REPOSITORY = "artifact_repository"
     ARTIFACT_REGISTRY_REPOSITORY = "artifact_registry_repository"
@@ -453,8 +463,12 @@ class LayerType(enum.StrEnum):
     FAIR_SHARE_REPOSITORY = "fair_share_repository"
     RESOURCE_USAGE_HISTORY_REPOSITORY = "resource_usage_history_repository"
     RESOURCE_SLOT_REPOSITORY = "resource_slot_repository"
+    REPLICA_GROUP_REPOSITORY = "replica_group_repository"
 
     # DB Source layers
+    APP_CONFIG_ALLOW_LIST_DB_SOURCE = "app_config_allow_list_db_source"
+    APP_CONFIG_DEFINITION_DB_SOURCE = "app_config_definition_db_source"
+    APP_CONFIG_FRAGMENT_DB_SOURCE = "app_config_fragment_db_source"
     AUDIT_LOG_DB_SOURCE = "audit_log_db_source"
     AUTH_DB_SOURCE = "auth_db_source"
     AGENT_DB_SOURCE = "agent_db_source"
@@ -489,6 +503,7 @@ class LayerType(enum.StrEnum):
     VALKEY_STREAM = "valkey_stream"
     VALKEY_BGTASK = "valkey_bgtask"
     VALKEY_VOLUME_STATS = "valkey_volume_stats"
+    VALKEY_TUS = "valkey_tus"
 
     # Client layers
     AGENT_CLIENT = "agent_client"
@@ -654,37 +669,6 @@ class SystemMetricObserver:
         self._memory_used_vms.set(proc.memory_info().vms)
 
 
-class SweeperMetricObserver:
-    _instance: Self | None = None
-
-    _session_sweep_count: Counter
-    _kernel_sweep_count: Counter
-
-    def __init__(self) -> None:
-        self._session_sweep_count = Counter(
-            name="backendai_sweep_session_count",
-            documentation="Total number of session sweeps",
-            labelnames=["status", "success"],
-        )
-        self._kernel_sweep_count = Counter(
-            name="backendai_sweep_kernel_count",
-            documentation="Total number of kernel sweeps",
-            labelnames=["success"],
-        )
-
-    @classmethod
-    def instance(cls) -> Self:
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
-
-    def observe_session_sweep(self, *, status: str, success: bool) -> None:
-        self._session_sweep_count.labels(status=status, success=success).inc()
-
-    def observe_kernel_sweep(self, *, success: bool) -> None:
-        self._kernel_sweep_count.labels(success=success).inc()
-
-
 class EventPropagatorMetricObserver:
     _instance: Self | None = None
 
@@ -741,7 +725,6 @@ class CommonMetricRegistry:
     event: EventMetricObserver
     bgtask: BgTaskMetricObserver
     system: SystemMetricObserver
-    sweeper: SweeperMetricObserver
     event_propagator_observer: EventPropagatorMetricObserver
 
     def __init__(self) -> None:
@@ -750,7 +733,6 @@ class CommonMetricRegistry:
         self.event = EventMetricObserver.instance()
         self.bgtask = BgTaskMetricObserver.instance()
         self.system = SystemMetricObserver.instance()
-        self.sweeper = SweeperMetricObserver.instance()
         self.event_propagator_observer = EventPropagatorMetricObserver.instance()
 
     @classmethod
@@ -763,17 +745,50 @@ class CommonMetricRegistry:
         self.system.observe()
         return generate_latest_multiprocess().decode("utf-8")
 
+    def to_prometheus_singleprocess(self) -> str:
+        """
+        For single-worker components that do not set up the prometheus
+        multiprocess dir (e.g., the agent, which needs per-series removal
+        that multiprocess mmap storage cannot provide).
+        """
+        self.system.observe()
+        return generate_latest_singleprocess().decode("utf-8")
+
+
+class CollectionStage(enum.StrEnum):
+    """Named timed segments of a stat collection cycle (measured via measure_stage)."""
+
+    DOCKER_TOP = "docker_top"
+    GATHER_MEASURES = "gather_measures"
+    SERIALIZE = "serialize"
+    REDIS_WRITE = "redis_write"
+
+
+class CollectionLayer(enum.StrEnum):
+    """The collection task a stage belongs to (the ``upper_layer`` label)."""
+
+    NODE = "collect_node_stat"
+    CONTAINER = "collect_container_stat"
+    PROCESS = "collect_per_container_process_stat"
+
 
 class StageObserver:
     _instance: Self | None = None
 
     _stage_count: Counter
+    _stage_duration_sec: Histogram
 
     def __init__(self) -> None:
         self._stage_count = Counter(
             name="backendai_stage_count",
             documentation="Count stage occurrences",
+            labelnames=["stage", "upper_layer", "success"],
+        )
+        self._stage_duration_sec = Histogram(
+            name="backendai_stage_duration_sec",
+            documentation="Elapsed wall-clock time spent in each stage in seconds",
             labelnames=["stage", "upper_layer"],
+            buckets=[0.001, 0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
         )
 
     @classmethod
@@ -782,5 +797,36 @@ class StageObserver:
             cls._instance = cls()
         return cls._instance
 
-    def observe_stage(self, *, stage: str, upper_layer: str) -> None:
-        self._stage_count.labels(stage=stage, upper_layer=upper_layer).inc()
+    @contextmanager
+    def measure_stage(
+        self, *, stage: CollectionStage, upper_layer: CollectionLayer
+    ) -> Iterator[None]:
+        """
+        Measure the wrapped block: record its wall-clock duration into the
+        stage-duration histogram and count its occurrence (with a ``success``
+        label) into the stage counter. Usable around ``await`` expressions:
+
+            with observer.measure_stage(
+                stage=CollectionStage.DOCKER_TOP, upper_layer=CollectionLayer.PROCESS
+            ):
+                await do_docker_call()
+
+        A block that raises (including ``CancelledError``) is counted as
+        ``success="False"`` and the exception is re-raised.
+        """
+        start_time = time.perf_counter()
+        success = SUCCESS_LABEL_TRUE
+        try:
+            yield
+        except BaseException:
+            success = SUCCESS_LABEL_FALSE
+            raise
+        finally:
+            self._stage_duration_sec.labels(
+                stage=stage.value, upper_layer=upper_layer.value
+            ).observe(time.perf_counter() - start_time)
+            self._stage_count.labels(
+                stage=stage.value,
+                upper_layer=upper_layer.value,
+                success=success,
+            ).inc()

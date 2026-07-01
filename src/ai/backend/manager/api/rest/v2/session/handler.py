@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.request import (
     SessionIdPathParam as SessionIdPathParamDTO,
 )
+from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import (
@@ -30,7 +31,7 @@ from ai.backend.manager.api.rest.v2.path_params import (
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.session import SessionAdapter
+    from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -111,7 +112,7 @@ class V2SessionHandler:
         path: PathParam[SessionIdPathParamDTO],
     ) -> APIResponse:
         """Get a single session by ID."""
-        result = await self._adapter.get(path.parsed.session_id)
+        result = await self._adapter.get(SessionId(path.parsed.session_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def my_search(
@@ -141,14 +142,11 @@ class V2SessionHandler:
 
     async def start_service(
         self,
-        user_ctx: UserContext,
         path: PathParam[SessionIdPathParamDTO],
         body: BodyParam[StartSessionServiceInput],
     ) -> APIResponse:
         """Start a service in a session."""
-        result = await self._adapter.start_service(
-            path.parsed.session_id, body.parsed, access_key=user_ctx.access_key
-        )
+        result = await self._adapter.start_service(SessionID(path.parsed.session_id), body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def shutdown_service(

@@ -87,6 +87,18 @@ from ai.backend.manager.services.scaling_group.actions.purge_scaling_group impor
     PurgeScalingGroupAction,
     PurgeScalingGroupActionResult,
 )
+from ai.backend.manager.services.scaling_group.actions.replace_default_deployment_options import (
+    ReplaceDefaultDeploymentOptionsAction,
+    ReplaceDefaultDeploymentOptionsActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.replace_default_session_options import (
+    ReplaceDefaultSessionOptionsAction,
+    ReplaceDefaultSessionOptionsActionResult,
+)
+from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
+    ResolveResourceGroupIDByNameAction,
+    ResolveResourceGroupIDByNameActionResult,
+)
 from ai.backend.manager.services.scaling_group.actions.update_allowed_domains_for_rg import (
     UpdateAllowedDomainsForResourceGroupAction,
     UpdateAllowedDomainsForResourceGroupActionResult,
@@ -165,6 +177,12 @@ class ScalingGroupService:
         status = await client.fetch_status()
         return GetWsproxyVersionActionResult(wsproxy_version=status.api_version)
 
+    async def resolve_resource_group_id_by_name(
+        self, action: ResolveResourceGroupIDByNameAction
+    ) -> ResolveResourceGroupIDByNameActionResult:
+        resource_group_id = await self._repository.get_resource_group_id_by_name(action.name)
+        return ResolveResourceGroupIDByNameActionResult(resource_group_id=resource_group_id)
+
     async def search_scaling_groups(
         self, action: SearchScalingGroupsAction
     ) -> SearchScalingGroupsActionResult:
@@ -200,6 +218,42 @@ class ScalingGroupService:
         """Modifies a scaling group."""
         scaling_group_data = await self._repository.update_scaling_group(action.updater)
         return ModifyScalingGroupActionResult(scaling_group=scaling_group_data)
+
+    async def replace_default_deployment_options(
+        self, action: ReplaceDefaultDeploymentOptionsAction
+    ) -> ReplaceDefaultDeploymentOptionsActionResult:
+        """Fully replace a resource group's ``default_deployment_options``.
+
+        Admin-only. The new default applies to deployments created after
+        this call; existing deployments snapshot-copy the old default.
+        The repository returns the persisted :class:`DeploymentOptions`
+        via ``UPDATE ... RETURNING`` so this path does a single round-trip
+        and does not re-materialise the surrounding scaling group node.
+        """
+        options = await self._repository.replace_default_deployment_options(
+            action.resource_group, action.options
+        )
+        return ReplaceDefaultDeploymentOptionsActionResult(
+            resource_group=action.resource_group,
+            options=options,
+        )
+
+    async def replace_default_session_options(
+        self, action: ReplaceDefaultSessionOptionsAction
+    ) -> ReplaceDefaultSessionOptionsActionResult:
+        """Fully replace a resource group's ``default_session_options``.
+
+        Admin-only. The new default is consulted at session enqueue
+        time by the scheduling controller's options resolver; already-
+        enqueued sessions keep the values frozen onto them earlier.
+        """
+        options = await self._repository.replace_default_session_options(
+            action.resource_group, action.options
+        )
+        return ReplaceDefaultSessionOptionsActionResult(
+            resource_group=action.resource_group,
+            options=options,
+        )
 
     async def associate_scaling_group_with_domains(
         self, action: AssociateScalingGroupWithDomainsAction

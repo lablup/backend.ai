@@ -10,15 +10,16 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     DeleteQueryDefinitionInput,
     ExecuteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
+    PreviewQueryDefinitionInput,
     SearchQueryDefinitionsInput,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
-    AdminSearchQueryDefinitionsPayload,
     CreateQueryDefinitionPayload,
     DeleteQueryDefinitionPayload,
     ExecuteQueryDefinitionPayload,
     GetQueryDefinitionPayload,
     ModifyQueryDefinitionPayload,
+    SearchQueryDefinitionsPayload,
 )
 
 _PATH = "/v2/prometheus-query-presets"
@@ -36,15 +37,13 @@ class V2PrometheusQueryPresetClient(BaseDomainClient):
             response_model=CreateQueryDefinitionPayload,
         )
 
-    async def search(
-        self, request: SearchQueryDefinitionsInput
-    ) -> AdminSearchQueryDefinitionsPayload:
+    async def search(self, request: SearchQueryDefinitionsInput) -> SearchQueryDefinitionsPayload:
         """Search query definitions with admin scope."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/search",
             request=request,
-            response_model=AdminSearchQueryDefinitionsPayload,
+            response_model=SearchQueryDefinitionsPayload,
         )
 
     async def get(self, preset_id: UUID) -> GetQueryDefinitionPayload:
@@ -82,6 +81,17 @@ class V2PrometheusQueryPresetClient(BaseDomainClient):
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/{preset_id}/execute",
+            request=request,
+            response_model=ExecuteQueryDefinitionPayload,
+        )
+
+    async def admin_preview(
+        self, request: PreviewQueryDefinitionInput
+    ) -> ExecuteQueryDefinitionPayload:
+        """Preview a prometheus query template (superadmin only)."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/preview",
             request=request,
             response_model=ExecuteQueryDefinitionPayload,
         )

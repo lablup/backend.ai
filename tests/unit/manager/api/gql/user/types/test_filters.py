@@ -20,6 +20,7 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
 )
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
@@ -27,6 +28,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -34,6 +36,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -56,10 +59,13 @@ _MAPPER_ROWS = [
     EndpointRow,
     DeploymentPolicyRow,
     DeploymentAutoScalingPolicyRow,
+    RuntimeVariantRow,
+    DeploymentRevisionPresetRow,
     DeploymentRevisionRow,
     SessionRow,
     AgentRow,
     KernelRow,
+    ReplicaGroupRow,
     RoutingRow,
     ResourcePresetRow,
 ]
@@ -222,6 +228,52 @@ class TestUserFilterGQLWithNestedFilters:
         assert dto.project is not None
         assert dto.project.name is None
         assert dto.project.is_active is None
+
+
+class TestUserFilterGQLAdditionalFields:
+    """Tests for UserFilterGQL.to_pydantic() with the additional filterable fields."""
+
+    def test_string_fields_propagate_to_pydantic(self) -> None:
+        f = UserFilterGQL(
+            full_name=StringFilter(contains="alice"),
+            description=StringFilter(i_contains="research"),
+            status_info=StringFilter(equals="active"),
+            resource_policy=StringFilter(equals="default"),
+        )
+        dto = f.to_pydantic()
+        assert isinstance(dto, UserFilterDTO)
+        assert dto.full_name is not None
+        assert dto.full_name.contains == "alice"
+        assert dto.description is not None
+        assert dto.description.i_contains == "research"
+        assert dto.status_info is not None
+        assert dto.status_info.equals == "active"
+        assert dto.resource_policy is not None
+        assert dto.resource_policy.equals == "default"
+
+    def test_boolean_fields_propagate_to_pydantic(self) -> None:
+        f = UserFilterGQL(
+            need_password_change=True,
+            totp_activated=False,
+            sudo_session_enabled=True,
+        )
+        dto = f.to_pydantic()
+        assert isinstance(dto, UserFilterDTO)
+        assert dto.need_password_change is True
+        assert dto.totp_activated is False
+        assert dto.sudo_session_enabled is True
+
+    def test_additional_fields_default_to_none(self) -> None:
+        f = UserFilterGQL(username=StringFilter(contains="admin"))
+        dto = f.to_pydantic()
+        assert isinstance(dto, UserFilterDTO)
+        assert dto.full_name is None
+        assert dto.description is None
+        assert dto.status_info is None
+        assert dto.resource_policy is None
+        assert dto.need_password_change is None
+        assert dto.totp_activated is None
+        assert dto.sudo_session_enabled is None
 
 
 class TestUserOrderByGQLNewFields:

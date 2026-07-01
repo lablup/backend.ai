@@ -13,6 +13,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -23,6 +24,7 @@ from ai.backend.manager.api.rest.auto_scaling_rule.handler import AutoScalingRul
 from ai.backend.manager.api.rest.auto_scaling_rule.registry import register_auto_scaling_rule_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -35,6 +37,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @dataclass
@@ -51,10 +54,17 @@ class UserFixtureData:
 
 
 @pytest.fixture()
+def mock_appproxy_client_pool() -> MagicMock:
+    """Stub AppProxyClientPool for tests that do not exercise app-proxy IO."""
+    return MagicMock(spec=AppProxyClientPool)
+
+
+@pytest.fixture()
 def deployment_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: AsyncMock,
     valkey_clients: ValkeyClients,
+    mock_appproxy_client_pool: MagicMock,
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors for auto-scaling-rule tests."""
     repo = DeploymentRepository(
@@ -65,13 +75,10 @@ def deployment_processors(
         valkey_clients.schedule,
     )
     deployment_controller = AsyncMock()
-    revision_generator_registry = MagicMock()
-    model_definition_generator_registry = MagicMock()
     service = DeploymentService(
         deployment_controller,
         repo,
-        revision_generator_registry,
-        model_definition_generator_registry,
+        appproxy_client_pool=mock_appproxy_client_pool,
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
@@ -79,8 +86,11 @@ def deployment_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo),
-                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
+                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
+                single_entity=SingleEntityActionRBACValidator(
+                    permission_controller_repo, MagicMock()
+                ),
+                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
         ),
     )
@@ -98,10 +108,14 @@ def server_module_registries(
     return [
         register_admin_routes(
             AdminHandler(
-                gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()
+                gql_schema=MagicMock(),
+                gql_deps=MagicMock(),
+                strawberry_schema=MagicMock(),
+                public_strawberry_schema=MagicMock(),
             ),
             route_deps,
             sub_registries=[auto_scaling_rule_registry],
+            gql_ws_handler=MagicMock(),
         ),
     ]
 
@@ -109,7 +123,7 @@ def server_module_registries(
 @pytest.fixture()
 async def model_deployment_fixture(
     db_engine: SAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     scaling_group_fixture: str,
     admin_user_fixture: UserFixtureData,
@@ -160,7 +174,7 @@ async def model_deployment_fixture(
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
                 created_user=str(admin_user_fixture.user_uuid),
                 session_owner=str(admin_user_fixture.user_uuid),
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 project=str(group_fixture),
                 resource_group=scaling_group_fixture,
                 lifecycle_stage=EndpointLifecycle.CREATED,

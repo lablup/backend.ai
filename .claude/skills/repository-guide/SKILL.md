@@ -4,6 +4,11 @@ description: Guide for implementing Backend.AI repository patterns (create, get,
 invoke_method: automatic
 auto_execute: false
 enabled: true
+tags:
+  - repository
+  - data-access
+  - querier
+  - search-scope
 ---
 
 # Repository Development Guide
@@ -21,10 +26,10 @@ Repositories implement 6 standard operations:
 5. **delete** - Soft delete (status change)
 6. **purge** - Hard delete (permanent removal)
 
-**Batch operations:**
-- `batch_update` - Update multiple entities
-- `batch_delete` - Soft delete multiple entities
-- `batch_purge` - Hard delete multiple entities
+**Target semantics:**
+- **Single** (`create`/`get`/`update`/`delete`/`purge`) — one row by PK.
+- **Batch** (`batch_*`) — many rows in one SQL statement, **atomic** (all-or-nothing); returns only the affected-row count.
+- **Bulk** (`bulk_*`) — rows processed individually, **partial failures allowed** (returns successes + errors).
 
 **Method naming (no prefix):**
 ```python
@@ -34,9 +39,11 @@ await repository.search(scope, filters, pagination)
 await repository.update(id, data)
 await repository.delete(id)
 await repository.purge(id)
-await repository.batch_update(ids, data)
+await repository.batch_update(ids, data)   # atomic
 await repository.batch_delete(ids)
 await repository.batch_purge(ids)
+await repository.bulk_create(specs)         # partial failures allowed
+await repository.bulk_upsert(specs)
 ```
 
 ## Base Utilities
@@ -64,11 +71,76 @@ Multi-tenant access control for queries.
 - `BatchQuerier[TRow]` - Search with filters and pagination
 - `Updater[TRow]` - Update with OptionalState pattern
 - `Purger[TRow]` - Hard delete operations
-- `BatchUpdater[TRow]`, `BatchPurger[TRow]` - Batch operations
+- `BatchUpdater[TRow]`, `BatchPurger[TRow]` - atomic multi-row (single statement)
+- `BulkCreator[TRow]`, `BulkUpserter[TRow]` - per-row with partial failures (`execute_bulk_*_partial`)
 
 **See implementations:**
 - `repositories/base/` - Base utility source code
 - `repositories/fair_share/repository.py` - Usage examples
+
+## DB Ops Wrapper (`ops/`) — Preferred for new code
+
+`ops/provider.py` wraps `ExtendedAsyncSAEngine` and exposes a spec-only operations
+surface. **Migration direction:** db_sources are moving to this wrapper. New or modified
+db_sources SHOULD use `DBOpsProvider` rather than holding the engine and calling
+`session.execute` directly. Existing db_sources are migrated gradually when touched.
+
+### Entry points
+
+```python
+class FooDBSource:
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+        self._ops = DBOpsProvider(db)
+
+    async def foo(self, foo_id: FooID) -> FooData:
+        async with self._ops.read_ops() as r:
+            result = await r.query(Querier(row_class=FooRow, pk_value=foo_id))
+            if result is None:
+                raise FooNotFound()
+            return result.row.to_data()
+
+    async def create(self, spec: FooCreatorSpec) -> FooData:
+        async with self._ops.write_ops() as w:
+            result = await w.create(Creator(spec=spec))
+            return result.row.to_data()
+```
+
+- `read_ops()` / `write_ops()` both open a READ COMMITTED session; the raw engine/
+  session is never exposed.
+- ops methods accept only spec types — never raw `Select/Insert/Update/Delete`.
+
+### Reads with scope (RBAC)
+
+```python
+async with self._ops.read_ops() as r:
+    # default — scoped query:
+    result = await r.batch_query_with_scopes(sa.select(FooRow), querier, scopes)
+    # superadmin / internal only — bypasses scope filtering:
+    result = await r.batch_query_in_global(sa.select(FooRow), querier)
+```
+
+Use `batch_query_in_global` only for superadmin-only endpoints or internal system
+operations; it bypasses RBAC scope filtering. Empty `scopes` for the scoped variant
+raises `EmptySearchScopeError` (400).
+
+### Single-table specs + multi-table coordination
+
+Each spec owns exactly one table — never build child-table rows inside a creator/
+updater spec. For a parent + dependent children, the repository coordinates the
+sequence procedurally (no tree object):
+
+```python
+async with self._ops.write_ops() as w:
+    parent = (await w.create(Creator(spec=parent_spec))).row
+    dep = ChildDependency(parent_id=parent.id)          # build dependency from the result
+    children = (await w.bulk_create_dependent(child_specs, dep)).rows
+```
+
+- `DependentCreatorSpec[TDependency, TRow].build_row(dependency)` builds one row from a
+  dependency resolved at execution time (e.g. the parent's generated id).
+- `create_dependent` (single) / `bulk_create_dependent` (multiple) execute them.
+- An update that must replace child rows = update parent + purge old children +
+  `bulk_create_dependent` new children, all inside one `write_ops()` block.
 
 ## Implementation Pattern
 
@@ -156,7 +228,7 @@ Define SearchScope dataclass with `to_conditions()` method.
 - Test scope filtering
 - Test error cases
 
-**See:** `/tdd-guide` skill for testing workflow
+**See:** `/test-guide` skill for testing workflow
 
 ## Transaction Management
 
@@ -217,7 +289,7 @@ Define SearchScope dataclass with `to_conditions()` method.
 
 - **Service Layer**: `/service-guide` - Service methods using repositories
 - **API Layer**: `/api-guide` - API handlers calling services
-- **Testing**: `/tdd-guide` - TDD workflow with repositories
+- **Testing**: `/test-guide` - Scenario-first testing with repositories
 - **Base README**: `repositories/README.md` - Architecture overview
 
 ## Troubleshooting
@@ -264,5 +336,5 @@ Define SearchScope dataclass with `to_conditions()` method.
 1. Study example repositories
 2. Define types and scope
 3. Implement standard operations
-4. Write tests with `/tdd-guide`
+4. Write tests with `/test-guide`
 5. Integrate with service layer (`/service-guide`)

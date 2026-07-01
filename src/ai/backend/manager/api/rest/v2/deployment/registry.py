@@ -36,6 +36,18 @@ def register_v2_deployment_routes(
         middlewares=[superadmin_required],
     )
     registry.add(
+        "POST",
+        "/projects/{project_id}/search",
+        handler.project_search,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/my/search",
+        handler.my_search,
+        middlewares=[auth_required],
+    )
+    registry.add(
         "GET",
         "/{deployment_id}",
         handler.get,
@@ -51,6 +63,12 @@ def register_v2_deployment_routes(
         "POST",
         "/delete",
         handler.delete,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "PUT",
+        "/{deployment_id}/options",
+        handler.replace_options,
         middlewares=[auth_required],
     )
 
@@ -92,6 +110,18 @@ def register_v2_deployment_routes(
         "/{deployment_id}/revisions/activate",
         handler.activate_revision,
         middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/revisions/{revision_id}/resource-slots/search",
+        handler.search_revision_resource_slots,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/admin/refresh-revisions",
+        handler.admin_refresh_deployment_revisions,
+        middlewares=[superadmin_required],
     )
 
     # ------------------------------------------------------------------
@@ -153,6 +183,24 @@ def register_v2_deployment_routes(
         handler.search_access_tokens,
         middlewares=[auth_required],
     )
+    registry.add(
+        "GET",
+        "/access-tokens/{token_id}",
+        handler.get_access_token,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/access-tokens/delete",
+        handler.delete_access_token,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/access-tokens/bulk-delete",
+        handler.bulk_delete_access_tokens,
+        middlewares=[auth_required],
+    )
 
     # ------------------------------------------------------------------
     # Auto-scaling rule operations
@@ -185,6 +233,12 @@ def register_v2_deployment_routes(
         "POST",
         "/auto-scaling-rules/delete",
         handler.delete_auto_scaling_rule,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/auto-scaling-rules/bulk-delete",
+        handler.bulk_delete_auto_scaling_rules,
         middlewares=[auth_required],
     )
 

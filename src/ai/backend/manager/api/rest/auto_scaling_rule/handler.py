@@ -79,6 +79,7 @@ class AutoScalingRuleHandler:
             time_window=body.parsed.time_window,
             min_replicas=body.parsed.min_replicas,
             max_replicas=body.parsed.max_replicas,
+            prometheus_query_preset_id=body.parsed.prometheus_query_preset_id,
         )
 
         action_result = await self._deployment.create_auto_scaling_rule.wait_for_complete(

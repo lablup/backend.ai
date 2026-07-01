@@ -10,7 +10,7 @@ from pprint import pformat
 from typing import Annotated, Self
 
 import click
-from pydantic import AnyUrl, Field, FilePath, ValidationError, model_validator
+from pydantic import AnyUrl, Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
 
 from ai.backend.appproxy.common.config import (
     BaseSchema,
@@ -38,6 +38,7 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import AutoDirectoryPath
 from ai.backend.common.types import ServiceDiscoveryType
@@ -757,20 +758,6 @@ class ProxyWorkerConfig(BaseSchema):
         ),
     ]
 
-    inference_metric_collection_interval: Annotated[
-        float,
-        Field(default=5.0),
-        BackendAIConfigMeta(
-            description=(
-                "The interval in seconds between collecting metrics from inference model endpoints. "
-                "Metrics include request counts, latencies, and throughput. Lower values provide "
-                "more granular data but increase overhead on model services."
-            ),
-            added_version="25.9.0",
-            example=ConfigExample(local="5.0", prod="5.0"),
-        ),
-    ]
-
     client_pool_cleanup_interval: Annotated[
         float,
         Field(default=60.0),
@@ -796,6 +783,23 @@ class ProxyWorkerConfig(BaseSchema):
             ),
             added_version="25.9.0",
             example=ConfigExample(local="", prod="worker.example.com:10201"),
+        ),
+    ]
+
+    trusted_proxies: Annotated[
+        list[IPvAnyNetwork],
+        Field(default_factory=list),
+        BackendAIConfigMeta(
+            description=(
+                "CIDR blocks (or bare IP addresses) of load balancers / reverse proxies that sit "
+                "in front of this worker and may be trusted to set the 'X-Forwarded-For' header. "
+                "Client-IP allowlist checks honor 'X-Forwarded-For' only when the immediate peer "
+                "matches one of these networks; otherwise the direct connection address is used, so "
+                "a directly-exposed worker cannot be spoofed by a forged header. Leave empty when "
+                "clients connect directly to the worker."
+            ),
+            added_version="26.4.5",
+            example=ConfigExample(local="[]", prod='["10.0.0.0/8"]'),
         ),
     ]
 
@@ -1002,12 +1006,14 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
                 raise ConfigValidationError("Pyroscope enabled but config is not populated")
             if server_config.profiling.pyroscope_config.application_name is None:
                 server_config.profiling.pyroscope_config.application_name = f"proxy-worker-{server_config.proxy_worker.authority}-{server_config.proxy_worker.api_bind_addr.port}"
-    except (ValidationError, ConfigValidationError) as e:
+    except (BackendAISchemaValidationFailed, ValidationError, ConfigValidationError) as e:
+        # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+        # skip the ``BackendAISchema`` auto-conversion override.
         print(
             "ConfigurationError: Could not read or validate the manager local config:",
             file=sys.stderr,
         )
-        if isinstance(e, ValidationError):
+        if isinstance(e, (BackendAISchemaValidationFailed, ValidationError)):
             detail = str(e)
         else:
             detail = pformat(e)

@@ -16,6 +16,7 @@ import pytest
 from ai.backend.common.dto.manager.model_serving.request import (
     NewServiceRequestModel,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.models.user import UserRole
@@ -101,7 +102,9 @@ class TestRunValidationUsesKeypairResourcePolicy:
         async def _capture(action: ValidateModelServiceAction) -> ValidateModelServiceActionResult:
             captured_validate_action.append(action)
             return ValidateModelServiceActionResult(
-                model_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                model_vfolder_id=VFolderUUID(
+                    uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                ),
                 model_definition_path=None,
                 requester_access_key=action.requester_access_key,
                 owner_access_key=action.owner_access_key,
@@ -125,6 +128,7 @@ class TestRunValidationUsesKeypairResourcePolicy:
             deployment=MagicMock(),
             model_serving=mock_model_serving,
             model_serving_auto_scaling=MagicMock(),
+            runtime_variant=MagicMock(),
         )
 
     async def test_keypair_resource_policy_is_used(

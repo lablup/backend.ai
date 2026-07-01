@@ -15,9 +15,9 @@ from ai.backend.common.exception import (
 )
 
 
-class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/not-implemented"
-    error_title = "This API is not implemented."
+class UnsupportedOperation(BackendAIError):
+    error_type = "https://api.backend.ai/probs/unsupported-operation"
+    error_title = "This operation is not supported."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
@@ -27,15 +27,15 @@ class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class DeprecatedAPI(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/deprecated"
-    error_title = "This API is deprecated."
+class NotImplementedAPI(BackendAIError, web.HTTPNotImplemented):
+    error_type = "https://api.backend.ai/probs/not-implemented"
+    error_title = "This API is not implemented."
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.DEPRECATED,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
         )
 
 

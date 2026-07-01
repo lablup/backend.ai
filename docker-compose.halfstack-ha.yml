@@ -17,6 +17,7 @@ services:
 
   backendai-half-db-exporter:
     image: prometheuscommunity/postgres-exporter:v0.17.1
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -29,6 +30,7 @@ services:
 
   backendai-half-redis-exporter-node01:
     image: oliver006/redis_exporter:v1.73.0
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -44,6 +46,7 @@ services:
 
   backendai-half-redis-exporter-node02:
     image: oliver006/redis_exporter:v1.73.0
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -59,6 +62,7 @@ services:
 
   backendai-half-redis-exporter-node03:
     image: oliver006/redis_exporter:v1.73.0
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -72,16 +76,35 @@ services:
     depends_on:
       - backendai-half-redis-node03
 
+  backendai-half-node-exporter:
+    image: prom/node-exporter:v1.9.1
+    profiles: ["observability"]
+    restart: unless-stopped
+    networks:
+      - half
+    pid: host
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/host/root'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+    ports:
+      - "9100:9100"
+
   # Initial master is redis-node01.
   backendai-half-redis-node01:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: node01
     networks:
     - half
     ports:
     - 0.0.0.0:${REDIS_MASTER_PORT}:${REDIS_MASTER_PORT}
     command: >
-      redis-server
+      valkey-server
       --port ${REDIS_MASTER_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
@@ -94,14 +117,14 @@ services:
     # network partitioning.
 
   backendai-half-redis-node02:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: node02
     networks:
     - half
     ports:
     - 0.0.0.0:${REDIS_SLAVE1_PORT}:${REDIS_SLAVE1_PORT}
     command: >
-      redis-server
+      valkey-server
       --port ${REDIS_SLAVE1_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
@@ -112,14 +135,14 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-node03:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: node03
     ports:
     - 0.0.0.0:${REDIS_SLAVE2_PORT}:${REDIS_SLAVE2_PORT}
     networks:
     - half
     command: >
-      redis-server
+      valkey-server
       --port ${REDIS_SLAVE2_PORT}
       --requirepass ${REDIS_PASSWORD:-develove}
       --masterauth ${REDIS_PASSWORD:-develove}
@@ -130,7 +153,7 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-sentinel01:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: sentinel01
     networks:
     - half
@@ -145,12 +168,12 @@ services:
     - backendai-half-redis-node02
     - backendai-half-redis-node03
     command: >
-      redis-sentinel /config/sentinel01.conf
+      valkey-sentinel /config/sentinel01.conf
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel02:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: sentinel02
     networks:
     - half
@@ -165,12 +188,12 @@ services:
     - backendai-half-redis-node02
     - backendai-half-redis-node03
     command: >
-      redis-sentinel /config/sentinel02.conf
+      valkey-sentinel /config/sentinel02.conf
     environment:
     - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel03:
-    image: redis:7.2.11-alpine
+    image: valkey/valkey:9.1.0-alpine
     hostname: sentinel03
     networks:
     - half
@@ -185,7 +208,7 @@ services:
     - backendai-half-redis-node02
     - backendai-half-redis-node03
     command: >
-      redis-sentinel /config/sentinel03.conf
+      valkey-sentinel /config/sentinel03.conf
     environment:
     - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
@@ -281,6 +304,7 @@ services:
 
   backendai-half-grafana:
     image: grafana/grafana-enterprise:11.4.0
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -297,6 +321,7 @@ services:
 
   backendai-half-pyroscope:
     image: grafana/pyroscope:1.9.2
+    profiles: ["observability"]
     restart: unless-stopped
     networks:
       - half
@@ -321,6 +346,7 @@ services:
 
   backendai-half-otel-collector:
     image: otel/opentelemetry-collector-contrib:0.126.0
+    profiles: ["telemetry", "observability"]
     networks:
       - half
     command: ["--config=/etc/otel-collector-config.yaml"]
@@ -332,6 +358,7 @@ services:
 
   backendai-half-loki:
     image: grafana/loki:3.5.0
+    profiles: ["telemetry", "observability"]
     networks:
       - half
     command: -config.file=/etc/loki/local-config.yaml
@@ -342,6 +369,7 @@ services:
 
   backendai-half-tempo:
     image: grafana/tempo:2.7.2
+    profiles: ["observability"]
     networks:
       - half
     command: [ "-config.file=/etc/tempo.yaml" ]
@@ -371,6 +399,7 @@ services:
 
   backendai-half-minio:
     image: minio/minio:latest
+    profiles: ["storage"]
     restart: unless-stopped
     networks:
       - half

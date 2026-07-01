@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "AgentResourceOrderField",
+    "AllocatedResourceSlotOrderField",
     "NumberFormatInfo",
     "OrderDirection",
     "ResourceAllocationOrderField",
@@ -41,6 +42,14 @@ class AgentResourceOrderField(StrEnum):
     SLOT_NAME = "slot_name"
     CAPACITY = "capacity"
     USED = "used"
+
+
+class AllocatedResourceSlotOrderField(StrEnum):
+    """Fields available for ordering allocated resource slots (revision/preset)."""
+
+    SLOT_NAME = "slot_name"
+    QUANTITY = "quantity"
+    RANK = "rank"
 
 
 class ResourceAllocationOrderField(StrEnum):

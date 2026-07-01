@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, OrderDirecti
 from ai.backend.common.types import VFolderUsageMode
 
 __all__ = (
+    "FileEntryType",
     "OrderDirection",
     "VFolderInvitationState",
     "VFolderMetadataInfo",
@@ -27,11 +28,20 @@ __all__ = (
     "VFolderOwnershipTypeField",
     "VFolderPermissionField",
     "VFolderAccessControlInfo",
+    "VFolderQuotaInfo",
     "VFolderStatusFilter",
     "VFolderUsageInfo",
     "VFolderUsageMode",
     "VFolderUsageModeFilter",
 )
+
+
+class FileEntryType(StrEnum):
+    """Type of a file entry in a virtual folder."""
+
+    FILE = "FILE"
+    DIRECTORY = "DIRECTORY"
+    SYMLINK = "SYMLINK"
 
 
 class VFolderOrderField(StrEnum):
@@ -56,14 +66,18 @@ class VFolderInvitationState(StrEnum):
 class VFolderStatusFilter(BaseRequestModel):
     """Filter for vfolder operation status values."""
 
+    equals: VFolderOperationStatusField | None = None
     in_: list[VFolderOperationStatusField] | None = None
+    not_equals: VFolderOperationStatusField | None = None
     not_in: list[VFolderOperationStatusField] | None = None
 
 
 class VFolderUsageModeFilter(BaseRequestModel):
     """Filter for vfolder usage mode values."""
 
+    equals: VFolderUsageMode | None = None
     in_: list[VFolderUsageMode] | None = None
+    not_equals: VFolderUsageMode | None = None
     not_in: list[VFolderUsageMode] | None = None
 
 
@@ -90,13 +104,19 @@ class VFolderOwnershipInfo(BaseResponseModel):
 
     user_id: UUID | None
     project_id: UUID | None
+    creator_id: UUID | None
     creator_email: str | None
 
 
+class VFolderQuotaInfo(BaseResponseModel):
+    """Quota limits configured for a virtual folder."""
+
+    max_size: BinarySizeInfo | None
+    max_files: int
+
+
 class VFolderUsageInfo(BaseResponseModel):
-    """Usage statistics fields for a virtual folder."""
+    """Usage statistics for a virtual folder, measured live through the storage proxy."""
 
     num_files: int
     used_bytes: BinarySizeInfo
-    max_size: BinarySizeInfo | None
-    max_files: int

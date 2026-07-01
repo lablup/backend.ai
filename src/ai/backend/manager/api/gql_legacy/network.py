@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, overload
 
 import graphene
+import graphene_federation
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -57,6 +58,7 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+@graphene_federation.key("id")
 class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
     """Added in 24.12.0."""
 
@@ -120,6 +122,9 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
             created_at=row.created_at,
             updated_at=row.updated_at,
         )
+
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> NetworkNode:
+        return await NetworkNode.get_node(info, self.id)
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> NetworkNode:
@@ -236,7 +241,7 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
     ) -> CreateNetwork:
         graph_ctx: GraphQueryContext = info.context
         network_config = graph_ctx.config_provider.config.network.inter_container
-        if network_config.enabled:
+        if not network_config.enabled:
             return CreateNetwork(
                 ok=False, msg="Inter-container networking disabled on this cluster", network=None
             )
@@ -274,7 +279,7 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
             network_info = await network_plugin.create_network()
             network_name = network_info.network_id
         except Exception:
-            log.exception(f"Failed to create the inter-container network (plugin: {_driver})")
+            log.exception("Failed to create the inter-container network (plugin: {})", _driver)
             raise
 
         async def _do_mutate() -> CreateNetwork:

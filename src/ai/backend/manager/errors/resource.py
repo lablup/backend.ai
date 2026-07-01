@@ -264,6 +264,30 @@ class ModelCardConflict(BackendAIError, web.HTTPConflict):
         )
 
 
+class InvalidProjectTypeForModelCard(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-project-type-for-model-card"
+    error_title = "Project is not a MODEL_STORE type."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_CARD,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class NotAModelVFolder(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/not-a-model-vfolder"
+    error_title = "VFolder usage_mode is not MODEL."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_CARD,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class DeploymentRevisionPresetNotFound(ObjectNotFound):
     object_name = "deployment revision preset"
 

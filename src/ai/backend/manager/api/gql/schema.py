@@ -1,3 +1,5 @@
+import re
+
 import strawberry
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.federation import Schema
@@ -15,17 +17,17 @@ from .agent import (
     agent_stats,
     agents_v2,
 )
-from .app_config import (
-    admin_delete_domain_app_config,
-    admin_domain_app_config,
-    admin_upsert_domain_app_config,
-    delete_domain_app_config,
-    delete_user_app_config,
-    domain_app_config,
-    merged_app_config,
-    upsert_domain_app_config,
-    upsert_user_app_config,
-    user_app_config,
+from .app_config_allow_list import (
+    admin_app_config_allow_list,
+    admin_app_config_allow_lists,
+    admin_create_app_config_allow_list,
+    admin_purge_app_config_allow_list,
+)
+from .app_config_definition import (
+    admin_app_config_definition,
+    admin_app_config_definitions,
+    admin_create_app_config_definition,
+    admin_purge_app_config_definition,
 )
 from .artifact import (
     approve_artifact_revision,
@@ -48,7 +50,7 @@ from .artifact import (
     update_artifact,
 )
 from .artifact_registry import default_artifact_registry
-from .audit_log import admin_audit_logs_v2
+from .audit_log import admin_audit_logs_v2, scoped_audit_logs_v2
 from .background_task import background_task_events
 from .container_registry import (
     admin_container_registries_v2,
@@ -60,24 +62,29 @@ from .deployment import (
     # Revision
     activate_deployment_revision,
     add_model_revision,
+    # Revision Preset
+    admin_create_deployment_revision_preset,
+    admin_delete_deployment_revision_preset,
+    admin_deployments,
+    admin_refresh_deployment_revisions,
+    admin_update_deployment_revision_preset,
     # Access Token
     create_access_token,
     # Auto Scaling
     create_auto_scaling_rule,
-    # Revision Preset
-    create_deployment_revision_preset,
     # Deployment
     create_model_deployment,
+    delete_access_token,
     delete_auto_scaling_rule,
-    delete_deployment_revision_preset,
     delete_model_deployment,
     deployment,
     deployment_revision_preset,
     deployment_revision_presets,
     deployment_status_changed,
-    deployments,
     inference_runtime_config,
     inference_runtime_configs,
+    my_deployments,
+    project_deployments,
     # Replica
     replica,
     replica_status_changed,
@@ -90,10 +97,10 @@ from .deployment import (
     sync_replicas,
     update_auto_scaling_rule,
     update_deployment_policy,
-    update_deployment_revision_preset,
     update_model_deployment,
     update_route_traffic_status,
 )
+from .domain import Domain as _DomainStub
 from .domain_v2 import (
     admin_create_domain_v2,
     admin_delete_domain_v2,
@@ -150,12 +157,16 @@ from .image import (
     image_scoped_aliases,
     image_v2,
 )
+from .image_federation import Image as _ImageStub
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .keypair import (
     admin_create_keypair_v2,
     admin_delete_keypair_v2,
+    admin_delete_ssh_keypair_v2,
     admin_keypair_v2,
     admin_keypairs_v2,
+    admin_register_ssh_keypair_v2,
+    admin_ssh_keypair_v2,
     admin_update_keypair_v2,
     issue_my_keypair,
     my_keypairs,
@@ -163,20 +174,46 @@ from .keypair import (
     switch_my_main_access_key,
     update_my_keypair,
 )
+from .legacy_node_stubs import (
+    AgentNodeStub as _AgentNodeStub,
+)
+from .legacy_node_stubs import (
+    ContainerRegistryNodeStub as _ContainerRegistryNodeStub,
+)
+from .legacy_node_stubs import (
+    ModelCardStub as _ModelCardStub,
+)
+from .legacy_node_stubs import (
+    NetworkNodeStub as _NetworkNodeStub,
+)
+from .login_client_type import (
+    admin_create_login_client_type,
+    admin_delete_login_client_type,
+    admin_update_login_client_type,
+    login_client_type,
+    login_client_types,
+)
 from .login_history import admin_login_history_v2, my_login_history_v2
 from .login_session import (
     admin_login_sessions_v2,
     admin_revoke_login_session,
+    admin_unblock_user,
     my_login_sessions_v2,
     my_revoke_login_session,
 )
 from .model_card import (
+    admin_bulk_delete_model_cards_v2,
     admin_create_model_card_v2,
     admin_delete_model_card_v2,
+    admin_model_cards_v2,
     admin_update_model_card_v2,
+    deploy_model_card_v2,
+    model_card_available_presets,
     model_card_v2,
-    model_cards_v2,
+    project_model_cards_v2,
+    scan_project_model_cards_v2,
 )
+from .node_field import node
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -197,6 +234,7 @@ from .notification import (
     notification_channel,
     notification_channels,
     notification_rule,
+    notification_rule_type_schema,
     notification_rule_types,
     notification_rules,
     update_notification_channel,
@@ -213,6 +251,7 @@ from .object_storage import (
     object_storages,
     update_object_storage,
 )
+from .project import Project as _ProjectStub
 from .project_v2 import (
     admin_create_project_v2,
     admin_delete_project_v2,
@@ -226,16 +265,25 @@ from .project_v2 import (
 )
 from .prometheus_query_preset import (
     admin_create_prometheus_query_preset,
+    admin_create_prometheus_query_preset_category,
     admin_delete_prometheus_query_preset,
+    admin_delete_prometheus_query_preset_category,
     admin_modify_prometheus_query_preset,
-    admin_prometheus_query_preset,
-    admin_prometheus_query_preset_result,
-    admin_prometheus_query_presets,
+    admin_preview_prometheus_query_preset,
+    prometheus_query_preset,
+    prometheus_query_preset_categories,
+    prometheus_query_preset_category,
+    prometheus_query_preset_result,
+    prometheus_query_presets,
 )
 from .rbac import (
+    accept_role_invitation,
     admin_assign_role,
+    admin_bulk_add_role_permissions,
     admin_bulk_assign_role,
+    admin_bulk_remove_role_permissions,
     admin_bulk_revoke_role,
+    admin_cancel_role_invitation,
     admin_create_permission,
     admin_create_role,
     admin_delete_permission,
@@ -243,16 +291,24 @@ from .rbac import (
     admin_entities,
     admin_permissions,
     admin_purge_role,
+    admin_replace_role_permissions,
     admin_revoke_role,
     admin_role,
     admin_role_assignments,
+    admin_role_invitations,
     admin_roles,
     admin_update_permission,
     admin_update_role,
+    create_role_invitation,
+    my_role_invitations,
     my_roles,
+    my_sent_role_invitations,
+    project_roles,
     rbac_entity_operation_combinations,
     rbac_permission_matrix,
     rbac_scope_entity_combinations,
+    reject_role_invitation,
+    role_scoped_role_invitations,
 )
 from .reservoir_registry import (
     create_reservoir_registry,
@@ -285,9 +341,12 @@ from .resource_group import (
     admin_update_allowed_resource_groups_for_project_v2,
     admin_update_resource_group,
     admin_update_resource_group_fair_share_spec,
+    replace_resource_group_default_deployment_options,
+    replace_resource_group_default_session_options,
     resource_groups,
     update_resource_group_fair_share_spec,
 )
+from .resource_group.federation import ResourceGroup as _ResourceGroupStub
 from .resource_policy_v2 import (
     admin_create_keypair_resource_policy_v2,
     admin_create_project_resource_policy_v2,
@@ -321,14 +380,23 @@ from .resource_usage import (
     admin_user_usage_buckets,
     domain_usage_buckets,
     project_usage_buckets,
-    rg_domain_usage_buckets,
-    rg_project_usage_buckets,
-    rg_user_usage_buckets,
     user_usage_buckets,
+)
+from .role_preset import (
+    admin_bulk_add_role_preset_permissions,
+    admin_bulk_remove_role_preset_permissions,
+    admin_create_role_preset,
+    admin_delete_role_presets,
+    admin_purge_role_presets,
+    admin_restore_role_presets,
+    admin_role_preset,
+    admin_role_presets,
+    admin_update_role_preset,
 )
 from .runtime_variant import (
     admin_create_runtime_variant,
     admin_delete_runtime_variant,
+    admin_delete_runtime_variants,
     admin_update_runtime_variant,
     runtime_variant,
     runtime_variants,
@@ -343,6 +411,7 @@ from .runtime_variant_preset import (
 from .scheduler import (
     scheduling_events_by_session,
 )
+from .scheduling_handler import scheduling_handlers
 from .scheduling_history import (
     admin_deployment_histories,
     admin_route_histories,
@@ -357,9 +426,13 @@ from .scheduling_history import (
 from .service_catalog import admin_service_catalogs
 from .session.resolver import (
     admin_sessions_v2,
+    enqueue_session,
     project_sessions_v2,
-    terminate_project_sessions_v2,
+    session_v2,
+    terminate_sessions_v2,
 )
+from .session_federation import Session as _SessionStub
+from .storage_host import my_storage_host_permissions
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -367,6 +440,7 @@ from .storage_namespace import (
 from .user import (
     # Mutations
     admin_bulk_create_users_v2,
+    admin_bulk_create_users_with_keypair_v2,
     admin_bulk_purge_users_v2,
     admin_bulk_update_users_v2,
     admin_create_user_v2,
@@ -384,7 +458,29 @@ from .user import (
     update_my_allowed_client_ip,
     update_user_v2,
 )
-from .vfolder_v2 import my_vfolders, project_vfolders
+from .user_federation import User as _UserStub
+from .vfolder import VFolder as _VFolderStub
+from .vfolder_v2 import (
+    admin_vfolders_v2,
+    bulk_delete_vfolders_v2,
+    bulk_purge_vfolders_v2,
+    clone_vfolder_v2,
+    create_vfolder_in_project,
+    create_vfolder_v2,
+    delete_vfolder_v2,
+    deploy_vfolder_v2,
+    my_vfolders,
+    project_vfolders,
+    purge_vfolder_v2,
+    restore_vfolder_v2,
+    vfolder_create_download_session_v2,
+    vfolder_create_upload_session_v2,
+    vfolder_delete_files_v2,
+    vfolder_list_files_v2,
+    vfolder_mkdir_v2,
+    vfolder_move_file_v2,
+    vfolder_v2,
+)
 from .vfs_storage import (
     create_vfs_storage,
     delete_vfs_storage,
@@ -396,21 +492,23 @@ from .vfs_storage import (
 
 @strawberry.type
 class Query:
+    # Relay Global Object Identification entry point (resolves any Node by global ID)
+    node = node
     agent_stats = agent_stats
     agents_v2 = agents_v2
+    admin_app_config_allow_list = admin_app_config_allow_list
+    admin_app_config_allow_lists = admin_app_config_allow_lists
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
     artifact_revisions = artifact_revisions
-    user_app_config = user_app_config
-    merged_app_config = merged_app_config
-    deployments = deployments
     deployment = deployment
     revisions = revisions
     revision = revision
     replicas = replicas
     replica = replica
     notification_rule_types = notification_rule_types
+    notification_rule_type_schema = notification_rule_type_schema
     object_storage = object_storage
     object_storages = object_storages
     vfs_storage = vfs_storage
@@ -425,19 +523,20 @@ class Query:
     # Admin APIs
     admin_resource_groups = admin_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
+    scheduling_handlers = scheduling_handlers
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
     admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
     admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2
     admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
     admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
+    admin_deployments = admin_deployments
     admin_deployment_histories = admin_deployment_histories
     admin_route_histories = admin_route_histories
     admin_notification_channel = admin_notification_channel
     admin_notification_channels = admin_notification_channels
     admin_notification_rule = admin_notification_rule
     admin_notification_rules = admin_notification_rules
-    admin_domain_app_config = admin_domain_app_config
     admin_domain_fair_share = admin_domain_fair_share
     admin_domain_fair_shares = admin_domain_fair_shares
     admin_project_fair_share = admin_project_fair_share
@@ -450,18 +549,29 @@ class Query:
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
+    scoped_audit_logs_v2 = scoped_audit_logs_v2
     admin_container_registries_v2 = admin_container_registries_v2
     admin_login_sessions_v2 = admin_login_sessions_v2
     admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
     project_sessions_v2 = project_sessions_v2
+    session_v2 = session_v2
+    project_deployments = project_deployments
+    my_deployments = my_deployments
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases
-    # Prometheus Query Preset Admin APIs
-    admin_prometheus_query_preset = admin_prometheus_query_preset
-    admin_prometheus_query_presets = admin_prometheus_query_presets
-    admin_prometheus_query_preset_result = admin_prometheus_query_preset_result
+    # Prometheus Query Preset APIs (read available to any authenticated user)
+    prometheus_query_preset = prometheus_query_preset
+    prometheus_query_presets = prometheus_query_presets
+    prometheus_query_preset_result = prometheus_query_preset_result
+    admin_preview_prometheus_query_preset = admin_preview_prometheus_query_preset
+    # Prometheus Query Preset Category APIs (read available to any authenticated user)
+    prometheus_query_preset_category = prometheus_query_preset_category
+    prometheus_query_preset_categories = prometheus_query_preset_categories
+    # Role Preset Admin APIs
+    admin_role_preset = admin_role_preset
+    admin_role_presets = admin_role_presets
     # RBAC Admin APIs
     admin_role = admin_role
     admin_roles = admin_roles
@@ -473,11 +583,19 @@ class Query:
     # Keypair admin queries
     admin_keypair_v2 = admin_keypair_v2
     admin_keypairs_v2 = admin_keypairs_v2
+    admin_ssh_keypair_v2 = admin_ssh_keypair_v2
     # Login session/history self-service queries
     my_login_sessions_v2 = my_login_sessions_v2
     my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
+    my_role_invitations = my_role_invitations
+    my_sent_role_invitations = my_sent_role_invitations
+    # RBAC Admin Invitation APIs
+    admin_role_invitations = admin_role_invitations
+    # RBAC Scoped APIs
+    project_roles = project_roles
+    role_scoped_role_invitations = role_scoped_role_invitations
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
     rbac_entity_operation_combinations = rbac_entity_operation_combinations
     rbac_permission_matrix = rbac_permission_matrix
@@ -490,9 +608,6 @@ class Query:
     rg_project_fair_shares = rg_project_fair_shares
     rg_user_fair_share = rg_user_fair_share
     rg_user_fair_shares = rg_user_fair_shares
-    rg_domain_usage_buckets = rg_domain_usage_buckets
-    rg_project_usage_buckets = rg_project_usage_buckets
-    rg_user_usage_buckets = rg_user_usage_buckets
     # Container Registry Scoped APIs
     container_registry_images_v2 = container_registry_images_v2
     # Image Scoped APIs
@@ -503,7 +618,6 @@ class Query:
     route_scoped_scheduling_histories = route_scoped_scheduling_histories
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
-    domain_app_config = domain_app_config
     domain_fair_share = domain_fair_share
     domain_fair_shares = domain_fair_shares
     project_fair_share = project_fair_share
@@ -550,9 +664,16 @@ class Query:
     admin_project_resource_policies_v2 = admin_project_resource_policies_v2
     my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
     my_user_resource_policy_v2 = my_user_resource_policy_v2
+    # Storage Host APIs
+    my_storage_host_permissions = my_storage_host_permissions
     # Resource Preset V2 APIs
     admin_resource_presets_v2 = admin_resource_presets_v2
     admin_resource_preset_v2 = admin_resource_preset_v2
+    login_client_type = login_client_type
+    login_client_types = login_client_types
+    # App Config Definition APIs
+    admin_app_config_definition = admin_app_config_definition
+    admin_app_config_definitions = admin_app_config_definitions
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant
@@ -563,8 +684,10 @@ class Query:
     deployment_revision_presets = deployment_revision_presets
     deployment_revision_preset = deployment_revision_preset
     # Model Card APIs
-    model_cards_v2 = model_cards_v2
+    admin_model_cards_v2 = admin_model_cards_v2
+    project_model_cards_v2 = project_model_cards_v2
     model_card_v2 = model_card_v2
+    model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
     project_resource_allocation_v2 = project_resource_allocation_v2
@@ -574,17 +697,19 @@ class Query:
     admin_effective_resource_allocation_v2 = admin_effective_resource_allocation_v2
     check_preset_availability_v2 = check_preset_availability_v2
     # VFolder APIs
+    admin_vfolders_v2 = admin_vfolders_v2
+    vfolder_v2 = vfolder_v2
     project_vfolders = project_vfolders
     my_vfolders = my_vfolders
 
 
 @strawberry.type
 class Mutation:
+    admin_create_app_config_allow_list = admin_create_app_config_allow_list
+    admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
-    upsert_user_app_config = upsert_user_app_config
-    delete_user_app_config = delete_user_app_config
     delegate_scan_artifacts = delegate_scan_artifacts
     delegate_import_artifacts = delegate_import_artifacts
     update_artifact = update_artifact
@@ -601,6 +726,7 @@ class Mutation:
     delete_model_deployment = delete_model_deployment
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
+    admin_refresh_deployment_revisions = admin_refresh_deployment_revisions
     update_deployment_policy = update_deployment_policy
     # Notification - Admin APIs
     admin_create_notification_channel = admin_create_notification_channel
@@ -611,9 +737,6 @@ class Mutation:
     admin_update_notification_rule = admin_update_notification_rule
     admin_delete_notification_rule = admin_delete_notification_rule
     admin_validate_notification_rule = admin_validate_notification_rule
-    # App Config - Admin APIs
-    admin_upsert_domain_app_config = admin_upsert_domain_app_config
-    admin_delete_domain_app_config = admin_delete_domain_app_config
     # Notification - Legacy (deprecated)
     create_notification_channel = create_notification_channel
     update_notification_channel = update_notification_channel
@@ -623,9 +746,6 @@ class Mutation:
     update_notification_rule = update_notification_rule
     delete_notification_rule = delete_notification_rule
     validate_notification_rule = validate_notification_rule
-    # App Config - Legacy (deprecated)
-    upsert_domain_app_config = upsert_domain_app_config
-    delete_domain_app_config = delete_domain_app_config
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     create_auto_scaling_rule = create_auto_scaling_rule
@@ -648,6 +768,7 @@ class Mutation:
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
     create_access_token = create_access_token
+    delete_access_token = delete_access_token
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
     # Fair Share - Admin APIs
@@ -681,6 +802,10 @@ class Mutation:
     admin_update_allowed_projects_for_resource_group_v2 = (
         admin_update_allowed_projects_for_resource_group_v2
     )
+    replace_resource_group_default_deployment_options = (
+        replace_resource_group_default_deployment_options
+    )
+    replace_resource_group_default_session_options = replace_resource_group_default_session_options
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
     # Domain V2 APIs
@@ -697,6 +822,7 @@ class Mutation:
     # User V2 APIs
     admin_create_user_v2 = admin_create_user_v2
     admin_bulk_create_users_v2 = admin_bulk_create_users_v2
+    admin_bulk_create_users_with_keypair_v2 = admin_bulk_create_users_with_keypair_v2
     admin_bulk_update_users_v2 = admin_bulk_update_users_v2
     admin_update_user_v2 = admin_update_user_v2
     update_user_v2 = update_user_v2
@@ -713,15 +839,29 @@ class Mutation:
     admin_create_keypair_v2 = admin_create_keypair_v2
     admin_update_keypair_v2 = admin_update_keypair_v2
     admin_delete_keypair_v2 = admin_delete_keypair_v2
+    admin_register_ssh_keypair_v2 = admin_register_ssh_keypair_v2
+    admin_delete_ssh_keypair_v2 = admin_delete_ssh_keypair_v2
     # Login session mutations
     admin_revoke_login_session = admin_revoke_login_session
     my_revoke_login_session = my_revoke_login_session
+    admin_unblock_user = admin_unblock_user
     # IP allowlist self-service mutation
     update_my_allowed_client_ip = update_my_allowed_client_ip
     # Prometheus Query Preset - Admin APIs
     admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
     admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
     admin_delete_prometheus_query_preset = admin_delete_prometheus_query_preset
+    # Prometheus Query Preset Category - Admin APIs
+    admin_create_prometheus_query_preset_category = admin_create_prometheus_query_preset_category
+    admin_delete_prometheus_query_preset_category = admin_delete_prometheus_query_preset_category
+    # Role Preset - Admin APIs
+    admin_create_role_preset = admin_create_role_preset
+    admin_update_role_preset = admin_update_role_preset
+    admin_delete_role_presets = admin_delete_role_presets
+    admin_restore_role_presets = admin_restore_role_presets
+    admin_purge_role_presets = admin_purge_role_presets
+    admin_bulk_add_role_preset_permissions = admin_bulk_add_role_preset_permissions
+    admin_bulk_remove_role_preset_permissions = admin_bulk_remove_role_preset_permissions
     # RBAC Admin APIs
     admin_create_role = admin_create_role
     admin_update_role = admin_update_role
@@ -734,6 +874,14 @@ class Mutation:
     admin_revoke_role = admin_revoke_role
     admin_bulk_assign_role = admin_bulk_assign_role
     admin_bulk_revoke_role = admin_bulk_revoke_role
+    admin_bulk_add_role_permissions = admin_bulk_add_role_permissions
+    admin_bulk_remove_role_permissions = admin_bulk_remove_role_permissions
+    admin_replace_role_permissions = admin_replace_role_permissions
+    # RBAC Invitation Mutations
+    create_role_invitation = create_role_invitation
+    accept_role_invitation = accept_role_invitation
+    reject_role_invitation = reject_role_invitation
+    admin_cancel_role_invitation = admin_cancel_role_invitation
     # Resource Policy V2 APIs
     admin_create_keypair_resource_policy_v2 = admin_create_keypair_resource_policy_v2
     admin_update_keypair_resource_policy_v2 = admin_update_keypair_resource_policy_v2
@@ -748,24 +896,52 @@ class Mutation:
     admin_create_resource_preset_v2 = admin_create_resource_preset_v2
     admin_update_resource_preset_v2 = admin_update_resource_preset_v2
     admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
+    # Login Client Type mutations
+    admin_create_login_client_type = admin_create_login_client_type
+    admin_update_login_client_type = admin_update_login_client_type
+    admin_delete_login_client_type = admin_delete_login_client_type
+    # App Config Definition mutations
+    admin_create_app_config_definition = admin_create_app_config_definition
+    admin_purge_app_config_definition = admin_purge_app_config_definition
     # Runtime Variant mutations
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
+    admin_delete_runtime_variants = admin_delete_runtime_variants
     # Runtime Variant Preset mutations
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
     admin_delete_runtime_variant_preset = admin_delete_runtime_variant_preset
     # Deployment Revision Preset mutations
-    create_deployment_revision_preset = create_deployment_revision_preset
-    update_deployment_revision_preset = update_deployment_revision_preset
-    delete_deployment_revision_preset = delete_deployment_revision_preset
+    admin_create_deployment_revision_preset = admin_create_deployment_revision_preset
+    admin_update_deployment_revision_preset = admin_update_deployment_revision_preset
+    admin_delete_deployment_revision_preset = admin_delete_deployment_revision_preset
     # Model Card mutations
     admin_create_model_card_v2 = admin_create_model_card_v2
     admin_update_model_card_v2 = admin_update_model_card_v2
     admin_delete_model_card_v2 = admin_delete_model_card_v2
+    admin_bulk_delete_model_cards_v2 = admin_bulk_delete_model_cards_v2
+    scan_project_model_cards_v2 = scan_project_model_cards_v2
+    deploy_model_card_v2 = deploy_model_card_v2
+    # VFolder V2 mutations
+    create_vfolder_v2 = create_vfolder_v2
+    create_vfolder_in_project = create_vfolder_in_project
+    delete_vfolder_v2 = delete_vfolder_v2
+    purge_vfolder_v2 = purge_vfolder_v2
+    restore_vfolder_v2 = restore_vfolder_v2
+    deploy_vfolder_v2 = deploy_vfolder_v2
+    bulk_delete_vfolders_v2 = bulk_delete_vfolders_v2
+    bulk_purge_vfolders_v2 = bulk_purge_vfolders_v2
+    clone_vfolder_v2 = clone_vfolder_v2
+    vfolder_list_files_v2 = vfolder_list_files_v2
+    vfolder_mkdir_v2 = vfolder_mkdir_v2
+    vfolder_move_file_v2 = vfolder_move_file_v2
+    vfolder_delete_files_v2 = vfolder_delete_files_v2
+    vfolder_create_upload_session_v2 = vfolder_create_upload_session_v2
+    vfolder_create_download_session_v2 = vfolder_create_download_session_v2
     # Session V2 mutations
-    terminate_project_sessions_v2 = terminate_project_sessions_v2
+    enqueue_session = enqueue_session
+    terminate_sessions_v2 = terminate_sessions_v2
 
 
 @strawberry.type
@@ -790,8 +966,16 @@ class CustomizedSchema(Schema):
                 if isinstance(getattr(field, "default_value", None), BackendSentinel):
                     field.default_value = GraphQLUndefined
         sdl = super().as_str()
-        sdl = sdl.replace("type PageInfo", "type PageInfo @shareable").replace(
-            'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
+        sdl = sdl.replace("type PageInfo", "type PageInfo @shareable")
+        # PageInfo is force-marked @shareable above, so the directive must be imported from the
+        # federation spec @link. Strawberry only auto-imports the directives it actually emits, and
+        # that set varies (e.g. @external drops out once no field uses it), so inject @shareable
+        # into whatever import list is present rather than matching a fixed literal.
+        sdl = re.sub(
+            r'(@link\(url: "[^"]*/federation/[^"]*", import: \[)(?![^\]]*"@shareable")([^\]]*)\]',
+            r'\1\2, "@shareable"]',
+            sdl,
+            count=1,
         )
         # Convert escaped newlines to actual newlines for better description formatting
         return sdl.replace("\\n", "\n")
@@ -802,7 +986,61 @@ schema = CustomizedSchema(
     mutation=Mutation,
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),
-    enable_federation_2=True,
+    federation_version="2.7",
+    # Federation stubs bridging legacy graphene Node types into the Strawberry-owned
+    # node(id:) resolver. Listed explicitly so they are part of the schema (and the Node
+    # interface's possible types) even when no V2 field references them.
+    types=[
+        _SessionStub,
+        _DomainStub,
+        _ProjectStub,
+        _ImageStub,
+        _VFolderStub,
+        _UserStub,
+        _ResourceGroupStub,
+        _AgentNodeStub,
+        _NetworkNodeStub,
+        _ModelCardStub,
+        _ContainerRegistryNodeStub,
+    ],
+    extensions=[
+        GQLLoggingExtension,
+        GQLMetricExtension,
+        GQLValidationExtension,
+        GQLExceptionHandlerExtension,
+    ],
+)
+
+
+async def _public_ping() -> str:
+    return "pong"
+
+
+@strawberry.type
+class PublicQueries:
+    """Query root served at the unauthenticated public endpoint (POST /admin/gql/strawberry/public).
+
+    Contains ONLY fields that are safe to expose without authentication; private fields are
+    physically absent, so they cannot be queried (no runtime gate needed). Real public fields
+    should be registered both here and on ``Query`` so authenticated clients can reach them via the
+    main endpoint too.
+
+    ``public_ping`` is a temporary placeholder so this type is non-empty (GraphQL requires >=1
+    field). It is intentionally registered only here (not on ``Query``) and will be replaced by
+    real public fields (e.g. ``publicAppConfigs``).
+    """
+
+    public_ping: str = strawberry.field(
+        resolver=_public_ping,
+        description="Placeholder public field; returns 'pong'.",
+    )
+
+
+# Plain (non-federation) schema: the public endpoint is hit directly, not through the Apollo
+# Router supergraph, so it needs no federation machinery.
+public_schema = strawberry.Schema(
+    query=PublicQueries,
+    config=StrawberryConfig(auto_camel_case=True),
     extensions=[
         GQLLoggingExtension,
         GQLMetricExtension,

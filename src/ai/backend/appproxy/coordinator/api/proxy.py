@@ -8,7 +8,7 @@ from uuid import UUID
 
 import jwt
 from aiohttp import web
-from pydantic import AnyUrl, BaseModel, Field
+from pydantic import AnyUrl, Field
 
 from ai.backend.appproxy.common.errors import (
     InvalidCredentials,
@@ -29,6 +29,7 @@ from ai.backend.appproxy.coordinator.errors import CircuitCreationError
 from ai.backend.appproxy.coordinator.models import Circuit, Token, Worker, add_circuit
 from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.types import RootContext
+from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class AddRequestModel(BaseModel):
+class AddRequestModel(BackendAISchema):
     app: str
     protocol: ProxyProtocol
     envs: Annotated[dict[str, str | int | None], Field(default={})]
@@ -56,12 +57,12 @@ class ProxyRequestModel(AddRequestModel):
     session_id: UUID
 
 
-class AddResponseModel(BaseModel):
+class AddResponseModel(BackendAISchema):
     code: int
     url: AnyUrl
 
 
-class ProxyResponseModel(BaseModel):
+class ProxyResponseModel(BackendAISchema):
     redirect_url: AnyUrl
     reuse: bool
 
@@ -151,9 +152,6 @@ async def proxy(
                 protocol=params.protocol,
                 traffic_ratio=1.0,
                 route_id=None,
-                health_status=None,
-                last_health_check=None,
-                consecutive_failures=0,
             )
         ]
 
@@ -172,7 +170,7 @@ async def proxy(
                 SessionConfig(
                     id=token.session_id,
                     user_uuid=token.user_uuid,
-                    group_id=token.group_id,
+                    project_id=token.group_id,
                     access_key=token.access_key,
                     domain_name=token.domain_name,
                 ),

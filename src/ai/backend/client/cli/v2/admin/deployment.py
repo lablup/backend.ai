@@ -121,6 +121,26 @@ def revision() -> None:
     """Admin deployment revision commands."""
 
 
+@revision.command(name="refresh")
+def revision_refresh() -> None:
+    """Rebuild and activate a fresh revision for every active deployment.
+
+    Useful to repair deployments whose current revision has stale or missing
+    model_definition after backing store migrations. Each deployment is
+    processed independently; partial success is reported per deployment.
+    """
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.deployment.admin_refresh_deployment_revisions()
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @revision.command(name="search")
 @click.option(
     "--deployment-id",
@@ -133,20 +153,23 @@ def revision() -> None:
 @click.option(
     "--order-by",
     multiple=True,
-    help="Order by field:direction (e.g., name:asc, created_at:desc).",
+    help="Order by field:direction (e.g., revision_number:asc, created_at:desc).",
 )
 @click.option(
-    "--name-contains", type=str, default=None, help="Filter revisions by name (contains)."
+    "--revision-number",
+    type=int,
+    default=None,
+    help="Filter revisions by revision number (exact match).",
 )
 def revision_search(
     deployment_id: str | None,
     limit: int | None,
     offset: int | None,
     order_by: tuple[str, ...],
-    name_contains: str | None,
+    revision_number: int | None,
 ) -> None:
     """Search deployment revisions (admin)."""
-    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.query import IntFilter
     from ai.backend.common.dto.manager.v2.deployment.request import (
         AdminSearchRevisionsInput,
         RevisionFilter,
@@ -156,9 +179,11 @@ def revision_search(
 
     # Build filter only if any filter option is provided
     filter_dto: RevisionFilter | None = None
-    if name_contains is not None or deployment_id is not None:
+    if revision_number is not None or deployment_id is not None:
         filter_dto = RevisionFilter(
-            name=StringFilter(contains=name_contains) if name_contains is not None else None,
+            revision_number=IntFilter(equals=revision_number)
+            if revision_number is not None
+            else None,
             deployment_id=UUID(deployment_id) if deployment_id is not None else None,
         )
 

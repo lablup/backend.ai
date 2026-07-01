@@ -7,9 +7,22 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.deployment.types import ModelDefinitionInfoDTO
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 
 
 class EnvironEntryInfo(BaseResponseModel):
+    """A single environment variable entry with key and value.
+
+    .. deprecated::
+        Equivalent to
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariableEntryInfo`.
+        New code should prefer the common type; this class is retained only for
+        the deployment revision preset response schema.
+    """
+
     key: str = Field(description="Environment variable key.")
     value: str = Field(description="Environment variable value.")
 
@@ -20,6 +33,15 @@ class ResourceSlotEntryInfo(BaseResponseModel):
 
 
 class ResourceOptsEntryInfo(BaseResponseModel):
+    """A single resource option entry with name and value.
+
+    .. deprecated::
+        Equivalent to
+        :class:`ai.backend.common.dto.manager.v2.resource_slot.types.ResourceOptsEntryInfoDTO`.
+        New code should prefer the common type; this class is retained only for
+        the deployment revision preset response schema.
+    """
+
     name: str = Field(description="Resource option name (e.g. shmem).")
     value: str = Field(description="Resource option value (e.g. 1g).")
 
@@ -30,16 +52,13 @@ class PresetValueInfo(BaseResponseModel):
 
 
 class PresetResourceAllocation(BaseResponseModel):
-    resource_slots: list[ResourceSlotEntryInfo] = Field(
-        default_factory=list, description="Resource slot allocations."
-    )
     resource_opts: list[ResourceOptsEntryInfo] = Field(
         default_factory=list, description="Additional resource options."
     )
 
 
 class PresetExecutionSpec(BaseResponseModel):
-    image: str | None = Field(default=None, description="Container image reference.")
+    image_id: ImageID | None = Field(default=None, description="Container image UUID.")
     startup_command: str | None = Field(default=None, description="Startup command.")
     bootstrap_script: str | None = Field(default=None, description="Bootstrap script.")
     environ: list[EnvironEntryInfo] = Field(
@@ -52,16 +71,47 @@ class PresetClusterSpec(BaseResponseModel):
     cluster_size: int = Field(description="Cluster size.")
 
 
+class PresetDeploymentDefaults(BaseResponseModel):
+    """Deployment-level default values provided by the preset.
+
+    Any field that is ``None`` means the preset does not specify a default;
+    callers should fall back to user input or the system default.
+    """
+
+    open_to_public: bool | None = Field(
+        default=None, description="Default open_to_public for deployments from this preset."
+    )
+    replica_count: int | None = Field(
+        default=None, description="Default replica count for deployments from this preset."
+    )
+    revision_history_limit: int | None = Field(
+        default=None,
+        description="Default revision history limit for deployments from this preset.",
+    )
+    deployment_strategy: DeploymentStrategy | None = Field(
+        default=None,
+        description="Default deployment strategy type (ROLLING or BLUE_GREEN).",
+    )
+    deployment_strategy_spec: dict[str, Any] | None = Field(
+        default=None,
+        description="Strategy-specific configuration (rolling or blue-green).",
+    )
+
+
 class DeploymentRevisionPresetNode(BaseResponseModel):
     id: UUID = Field(description="Preset ID.")
-    runtime_variant_id: UUID = Field(description="Runtime variant ID.")
+    runtime_variant_id: RuntimeVariantID = Field(description="Runtime variant ID.")
     name: str = Field(description="Preset name.")
     description: str | None = Field(default=None, description="Description.")
     rank: int = Field(description="Display order rank.")
     cluster: PresetClusterSpec = Field(description="Cluster configuration.")
     resource: PresetResourceAllocation = Field(description="Resource allocation.")
     execution: PresetExecutionSpec = Field(description="Execution configuration.")
-    model_definition: dict[str, Any] | None = Field(
+    deployment_defaults: PresetDeploymentDefaults = Field(
+        default_factory=PresetDeploymentDefaults,
+        description="Deployment-level default values provided by this preset.",
+    )
+    model_definition: ModelDefinitionInfoDTO | None = Field(
         default=None, description="Model definition configuration."
     )
     preset_values: list[PresetValueInfo] = Field(default_factory=list, description="Preset values.")

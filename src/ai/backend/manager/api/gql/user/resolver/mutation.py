@@ -12,6 +12,7 @@ from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -20,6 +21,7 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
     BulkCreateUsersV2PayloadGQL,
+    BulkCreateUsersWithKeypairV2PayloadGQL,
     BulkCreateUserV2InputGQL,
     BulkPurgeUsersV2InputGQL,
     BulkPurgeUsersV2PayloadGQL,
@@ -39,6 +41,7 @@ from ai.backend.manager.api.gql.user.types import (
     UpdateUserV2InputGQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -67,11 +70,11 @@ from ai.backend.manager.types import OptionalState, TriState
         added_version="26.2.0",
         description="Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_user_v2(
     info: Info[StrawberryGQLContext],
     input: CreateUserInputGQL,
-) -> CreateUserPayloadGQL:
+) -> CreateUserPayloadGQL | None:
     """Create a new user.
 
     Args:
@@ -81,8 +84,7 @@ async def admin_create_user_v2(
     Returns:
         CreateUserPayloadGQL with the created user.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     check_admin_only()
     ctx = info.context
@@ -90,30 +92,11 @@ async def admin_create_user_v2(
     return CreateUserPayloadGQL.from_pydantic(payload)
 
 
-@gql_mutation(
-    BackendAIGQLMeta(
-        added_version="26.2.0",
-        description="Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications",
-    )
-)  # type: ignore[misc]
-async def admin_bulk_create_users_v2(
-    info: Info[StrawberryGQLContext],
+def _build_bulk_create_user_action(
     input: BulkCreateUserV2InputGQL,
-) -> BulkCreateUsersV2PayloadGQL:
-    """Create multiple users in bulk with individual specifications.
-
-    Args:
-        info: Strawberry GraphQL context.
-        input: Bulk user creation input with individual specs.
-
-    Returns:
-        BulkCreateUsersV2PayloadGQL with created users.
-    """
-    check_admin_only()
-    ctx = info.context
-    auth_config = ctx.config_provider.config.auth
-
-    # Build list of UserCreateSpec from input
+    auth_config: AuthConfig,
+) -> BulkCreateUserAction:
+    """Build a BulkCreateUserAction from a bulk-create GraphQL input."""
     items: list[UserCreateSpec] = []
     for user_input in input.users:
         dto = user_input.to_pydantic()
@@ -146,10 +129,68 @@ async def admin_bulk_create_users_v2(
         group_ids = [str(gid) for gid in dto.group_ids] if dto.group_ids else None
         items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=group_ids))
 
-    action = BulkCreateUserAction(items=items)
-    payload = await ctx.adapters.user.bulk_create_users(action)
+    return BulkCreateUserAction(items=items)
 
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.",
+        deprecated_version="26.4.4",
+    ),
+    deprecation_reason=(
+        "Use adminBulkCreateUsersWithKeypairV2 instead, which also returns each "
+        "created user's generated keypair and secret key."
+    ),
+)
+async def admin_bulk_create_users_v2(
+    info: Info[StrawberryGQLContext],
+    input: BulkCreateUserV2InputGQL,
+) -> BulkCreateUsersV2PayloadGQL | None:
+    """Create multiple users in bulk with individual specifications.
+
+    Args:
+        info: Strawberry GraphQL context.
+        input: Bulk user creation input with individual specs.
+
+    Returns:
+        BulkCreateUsersV2PayloadGQL with created users.
+    """
+    check_admin_only()
+    ctx = info.context
+    action = _build_bulk_create_user_action(input, ctx.config_provider.config.auth)
+    payload = await ctx.adapters.user.bulk_create_users(action)
     return BulkCreateUsersV2PayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description=(
+            "Create multiple users in bulk (admin only). Requires superadmin privileges. "
+            "Returns each created user together with its automatically generated keypair "
+            "and secret key (the secret key is only returned at creation time)."
+        ),
+    )
+)
+async def admin_bulk_create_users_with_keypair_v2(
+    info: Info[StrawberryGQLContext],
+    input: BulkCreateUserV2InputGQL,
+) -> BulkCreateUsersWithKeypairV2PayloadGQL | None:
+    """Create multiple users in bulk, returning each user's generated keypair.
+
+    Args:
+        info: Strawberry GraphQL context.
+        input: Bulk user creation input with individual specs.
+
+    Returns:
+        BulkCreateUsersWithKeypairV2PayloadGQL with created users and their keypairs.
+    """
+    check_admin_only()
+    ctx = info.context
+    action = _build_bulk_create_user_action(input, ctx.config_provider.config.auth)
+    payload = await ctx.adapters.user.bulk_create_users_with_keypair(action)
+    return BulkCreateUsersWithKeypairV2PayloadGQL.from_pydantic(payload)
 
 
 # Update Mutations
@@ -160,12 +201,12 @@ async def admin_bulk_create_users_v2(
         added_version="26.3.0",
         description="Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
     input: UpdateUserV2InputGQL,
-) -> UpdateUserPayloadGQL:
+) -> UpdateUserPayloadGQL | None:
     """Update a user's information.
 
     Args:
@@ -176,8 +217,7 @@ async def admin_update_user_v2(
     Returns:
         UpdateUserPayloadGQL with the updated user.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     check_admin_only()
     ctx = info.context
@@ -190,11 +230,11 @@ async def admin_update_user_v2(
         added_version="26.3.0",
         description="Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications",
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_update_users_v2(
     info: Info[StrawberryGQLContext],
     input: BulkUpdateUserV2InputGQL,
-) -> BulkUpdateUsersV2PayloadGQL:
+) -> BulkUpdateUsersV2PayloadGQL | None:
     """Update multiple users in bulk with individual specifications.
 
     Args:
@@ -306,7 +346,7 @@ async def admin_bulk_update_users_v2(
             ),
         )
 
-        items.append(UserUpdateSpec(user_id=user_item.user_id, updater_spec=updater_spec))
+        items.append(UserUpdateSpec(user_id=UserID(user_item.user_id), updater_spec=updater_spec))
 
     action = BulkModifyUserAction(items=items)
     payload = await ctx.adapters.user.bulk_modify_users(action)
@@ -319,11 +359,11 @@ async def admin_bulk_update_users_v2(
         added_version="26.2.0",
         description="Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role",
     )
-)  # type: ignore[misc]
+)
 async def update_user_v2(
     info: Info[StrawberryGQLContext],
     input: UpdateUserV2InputGQL,
-) -> UpdateUserPayloadGQL:
+) -> UpdateUserPayloadGQL | None:
     """Update the current user's own information.
 
     Args:
@@ -333,8 +373,7 @@ async def update_user_v2(
     Returns:
         UpdateUserPayloadGQL with the updated user.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     ctx = info.context
     me = current_user()
@@ -352,11 +391,11 @@ async def update_user_v2(
         added_version="26.2.0",
         description="Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-) -> DeleteUserPayloadGQL:
+) -> DeleteUserPayloadGQL | None:
     """Soft-delete a single user.
 
     Args:
@@ -366,8 +405,7 @@ async def admin_delete_user_v2(
     Returns:
         DeleteUserPayloadGQL indicating success.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     check_admin_only()
     ctx = info.context
@@ -380,11 +418,11 @@ async def admin_delete_user_v2(
         added_version="26.2.0",
         description="Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_users_v2(
     info: Info[StrawberryGQLContext],
     input: DeleteUsersInputGQL,
-) -> DeleteUsersPayloadGQL:
+) -> DeleteUsersPayloadGQL | None:
     """Soft-delete multiple users.
 
     Args:
@@ -394,8 +432,7 @@ async def admin_delete_users_v2(
     Returns:
         DeleteUsersPayloadGQL with count of deleted users.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     check_admin_only()
     ctx = info.context
@@ -413,11 +450,11 @@ async def admin_delete_users_v2(
         added_version="26.2.0",
         description="Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted",
     )
-)  # type: ignore[misc]
+)
 async def admin_purge_user_v2(
     info: Info[StrawberryGQLContext],
     input: PurgeUserInputGQL,
-) -> PurgeUserPayloadGQL:
+) -> PurgeUserPayloadGQL | None:
     """Permanently delete a single user.
 
     Args:
@@ -427,8 +464,7 @@ async def admin_purge_user_v2(
     Returns:
         PurgeUserPayloadGQL indicating success.
 
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+
     """
     check_admin_only()
     ctx = info.context
@@ -453,11 +489,11 @@ async def admin_purge_user_v2(
         added_version="26.3.0",
         description="Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted",
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_purge_users_v2(
     info: Info[StrawberryGQLContext],
     input: BulkPurgeUsersV2InputGQL,
-) -> BulkPurgeUsersV2PayloadGQL:
+) -> BulkPurgeUsersV2PayloadGQL | None:
     """Permanently delete multiple users in bulk.
 
     Args:
@@ -513,11 +549,11 @@ async def admin_bulk_purge_users_v2(
         added_version="26.4.0",
         description="Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention)",
     )
-)  # type: ignore[misc]
+)
 async def update_my_allowed_client_ip(
     info: Info[StrawberryGQLContext],
     input: UpdateMyAllowedClientIPInputGQL,
-) -> UpdateMyAllowedClientIPPayloadGQL:
+) -> UpdateMyAllowedClientIPPayloadGQL | None:
     """Update the current user's allowed client IP addresses."""
     me = current_user()
     if me is None:

@@ -16,9 +16,11 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
@@ -35,6 +37,7 @@ from ai.backend.manager.repositories.domain.purgers import (
     DomainKernelBatchPurgerSpec,
 )
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -61,28 +64,21 @@ class TestDomainPurgersIntegration:
                 GroupRow,
                 SessionRow,
                 AgentRow,
+                ContainerRegistryRow,
+                ImageRow,
                 KernelRow,
             ],
         ):
             yield database_connection
 
     @pytest.fixture
-    async def sample_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
+    async def sample_domain(
+        self,
+        domain_factory: DomainFactory,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DomainFixtureData:
         """Create a test domain."""
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-        async with db_with_cleanup.begin_session() as session:
-            domain = DomainRow(
-                name=domain_name,
-                description=f"Test domain {domain_name}",
-                is_active=True,
-                total_resource_slots=ResourceSlot({}),
-                allowed_vfolder_hosts=VFolderHostPermissionMap({}),
-                allowed_docker_registries=[],
-                dotfiles=b"",
-                integration_id=None,
-            )
-            session.add(domain)
-        return domain_name
+        return await domain_factory(db_with_cleanup)
 
     @pytest.fixture
     async def project_resource_policy(self, db_with_cleanup: ExtendedAsyncSAEngine) -> str:
@@ -117,7 +113,7 @@ class TestDomainPurgersIntegration:
     async def sample_user(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         user_resource_policy: str,
     ) -> UserRow:
         """Create a test user."""
@@ -139,7 +135,7 @@ class TestDomainPurgersIntegration:
                 description="Test user for integration tests",
                 status=UserStatus.ACTIVE,
                 status_info="",
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 role=UserRole.USER,
                 resource_policy=user_resource_policy,
             )
@@ -152,7 +148,7 @@ class TestDomainPurgersIntegration:
     async def sample_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         project_resource_policy: str,
     ) -> GroupRow:
         """Create a test group."""
@@ -163,7 +159,7 @@ class TestDomainPurgersIntegration:
                 name=f"test-group-{uuid.uuid4().hex[:8]}",
                 description="Test group for integration tests",
                 is_active=True,
-                domain_name=sample_domain,
+                domain_name=sample_domain.domain_name,
                 total_resource_slots=ResourceSlot({}),
                 allowed_vfolder_hosts=VFolderHostPermissionMap({}),
                 dotfiles=b"\x90",
@@ -180,7 +176,7 @@ class TestDomainPurgersIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_group: GroupRow,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         sample_user: UserRow,
     ) -> list[SessionRow]:
         """Create test sessions belonging to the domain."""
@@ -192,7 +188,7 @@ class TestDomainPurgersIntegration:
                     session_type=SessionTypes.INTERACTIVE,
                     cluster_mode="single-node",
                     cluster_size=1,
-                    domain_name=sample_domain,
+                    domain_name=sample_domain.domain_name,
                     group_id=sample_group.id,
                     user_uuid=sample_user.uuid,
                     occupying_slots=ResourceSlot({}),
@@ -215,7 +211,7 @@ class TestDomainPurgersIntegration:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_sessions: list[SessionRow],
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         sample_group: GroupRow,
         sample_user: UserRow,
     ) -> list[KernelRow]:
@@ -225,7 +221,7 @@ class TestDomainPurgersIntegration:
             for sess in sample_sessions:
                 kernel = KernelRow(
                     session_id=sess.id,
-                    domain_name=sample_domain,
+                    domain_name=sample_domain.domain_name,
                     group_id=sample_group.id,
                     user_uuid=sample_user.uuid,
                     occupied_slots=ResourceSlot({}),
@@ -248,11 +244,11 @@ class TestDomainPurgersIntegration:
     async def test_purge_domain_kernels(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
         sample_kernels: list[KernelRow],
     ) -> None:
         """Test purging kernels belonging to a domain."""
-        domain_name = sample_domain
+        domain_name = sample_domain.domain_name
 
         # Purge kernels
         async with db_with_cleanup.begin_session() as session:
@@ -272,10 +268,10 @@ class TestDomainPurgersIntegration:
     async def test_purge_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        sample_domain: str,
+        sample_domain: DomainFixtureData,
     ) -> None:
         """Test purging the domain itself."""
-        domain_name = sample_domain
+        domain_name = sample_domain.domain_name
 
         # Purge domain
         async with db_with_cleanup.begin_session() as session:

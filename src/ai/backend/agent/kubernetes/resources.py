@@ -6,7 +6,7 @@ from typing import Any
 
 import aiofiles
 
-from ai.backend.agent.exception import InitializationError
+from ai.backend.agent.errors import InitializationError
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputePluginContext,
@@ -52,9 +52,8 @@ async def load_resources(
             if sname not in {"cpu", "mem"}
         ):
             raise InitializationError(
-                "Slot types defined by an accelerator plugin must be prefixed by the plugin's key.",
-                invalid_name,
-                plugin_instance.key,
+                "Slot types defined by an accelerator plugin must be prefixed by the plugin's key. "
+                f"(invalid slot: {invalid_name!r}, plugin key: {plugin_instance.key!r})"
             )
         if plugin_instance.key in compute_device_types:
             raise InitializationError(

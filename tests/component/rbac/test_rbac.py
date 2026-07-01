@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.rbac.types import (
     RoleSource,
     RoleStatus,
 )
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 RoleFactory = Callable[..., Coroutine[Any, Any, CreateRoleResponse]]
 
@@ -589,13 +590,13 @@ class TestEntityManagement:
     async def test_search_entities_in_domain(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Search entities within a domain scope."""
         # Search for users in the test domain
         result = await admin_registry.rbac.search_entities(
             scope_type="domain",
-            scope_id=domain_fixture,
+            scope_id=domain_fixture.domain_name,
             entity_type="user",
             request=SearchEntitiesRequest(),
         )
@@ -608,12 +609,12 @@ class TestEntityManagement:
     async def test_search_entities_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Search entities with pagination returns correct page."""
         result = await admin_registry.rbac.search_entities(
             scope_type="domain",
-            scope_id=domain_fixture,
+            scope_id=domain_fixture.domain_name,
             entity_type="user",
             request=SearchEntitiesRequest(limit=1, offset=0),
         )
@@ -632,14 +633,14 @@ class TestEntityManagement:
     async def test_regular_user_cannot_search_entities(
         self,
         user_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
     ) -> None:
         """Regular user cannot search entities."""
         # Entity search should be admin-only
         with pytest.raises(PermissionDeniedError):
             await user_registry.rbac.search_entities(
                 scope_type="domain",
-                scope_id=domain_fixture,
+                scope_id=domain_fixture.domain_name,
                 entity_type="user",
                 request=SearchEntitiesRequest(),
             )

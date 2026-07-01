@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
+import sqlalchemy as sa
 import yarl
 
 from ai.backend.client.v2.auth import HMACAuth
@@ -16,7 +17,7 @@ from ai.backend.client.v2.v2_registry import V2ClientRegistry
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
 
-from ai.backend.manager.api.adapters.deployment_revision_preset import (
+from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -31,6 +32,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentRevisionPresetRepository,
 )
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.services.deployment_revision_preset.processors import (
     DeploymentRevisionPresetProcessors,
 )
@@ -39,12 +41,28 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 from ai.backend.manager.services.processors import Processors
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
+
+
+@pytest.fixture(autouse=True)
+async def _seed_resource_slot_types(db_engine: SAEngine) -> None:
+    """Ensure resource_slot_types has seed data for FK constraints."""
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.text(
+                "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                " VALUES ('cpu', 'count', 40), ('mem', 'bytes', 50)"
+                " ON CONFLICT DO NOTHING"
+            )
+        )
+
 
 @pytest.fixture()
 def deployment_revision_preset_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> DeploymentRevisionPresetProcessors:
-    repo = DeploymentRevisionPresetRepository(database_engine)
+    repo = DeploymentRevisionPresetRepository(DBOpsProvider(database_engine))
     service = DeploymentRevisionPresetService(repo)
     return DeploymentRevisionPresetProcessors(
         service=service,

@@ -2,19 +2,25 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any, override
 
 from ai.backend.common.config import ModelDefinition
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
+    MountInfoEntry,
+    MountPermission,
     ResourceSlot,
-    RuntimeVariant,
-    VFolderMount,
 )
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
+from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 from ai.backend.manager.repositories.base import CreatorSpec
 
 
@@ -27,23 +33,30 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     left as None — the repository will assign it atomically.
     """
 
-    endpoint_id: uuid.UUID
-    image_id: uuid.UUID
+    deployment_id: DeploymentID
+    image_id: ImageID
     resource_group: str
     resource_slots: ResourceSlot
     resource_opts: Mapping[str, Any]
     cluster_mode: str
     cluster_size: int
-    model_id: uuid.UUID | None
+    model_vfolder_id: VFolderUUID
     model_mount_destination: str
+    model_mount_perm: MountPermission
+    vfolder_subpath: str | None
     model_definition_path: str | None
     model_definition: ModelDefinition | None
     startup_command: str | None
     bootstrap_script: str | None
     environ: Mapping[str, Any]
     callback_url: str | None
-    runtime_variant: RuntimeVariant
-    extra_mounts: Sequence[VFolderMount]
+    runtime_variant_id: RuntimeVariantID
+    extra_mounts: Sequence[MountInfoEntry]
+    termination_grace_period: float = 30.0
+    runtime_variant_preset_values: Sequence[RuntimeVariantPresetValueEntry] = field(
+        default_factory=list
+    )
+    revision_preset_id: DeploymentPresetID | None = None
     revision_number: int | None = None
 
     def with_revision_number(self, revision_number: int) -> DeploymentRevisionCreatorSpec:
@@ -54,18 +67,17 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
     def build_row(self) -> DeploymentRevisionRow:
         if self.revision_number is None:
             raise InternalServerError("revision_number must be set before building a row")
-        return DeploymentRevisionRow(
-            endpoint=self.endpoint_id,
+        row = DeploymentRevisionRow(
+            endpoint=self.deployment_id,
             revision_number=self.revision_number,
             image=self.image_id,
-            model=self.model_id,
+            model=self.model_vfolder_id,
             model_mount_destination=self.model_mount_destination,
+            model_mount_perm=self.model_mount_perm,
+            vfolder_subpath=self.vfolder_subpath,
             model_definition_path=self.model_definition_path,
-            model_definition=self.model_definition.model_dump(exclude_none=True, by_alias=True)
-            if self.model_definition
-            else None,
+            model_definition=self.model_definition,
             resource_group=self.resource_group,
-            resource_slots=self.resource_slots,
             resource_opts=self.resource_opts,
             cluster_mode=self.cluster_mode,
             cluster_size=self.cluster_size,
@@ -73,6 +85,17 @@ class DeploymentRevisionCreatorSpec(CreatorSpec[DeploymentRevisionRow]):
             bootstrap_script=self.bootstrap_script,
             environ=self.environ,
             callback_url=self.callback_url,
-            runtime_variant=self.runtime_variant,
+            runtime_variant_id=self.runtime_variant_id,
             extra_mounts=list(self.extra_mounts),
+            termination_grace_period=self.termination_grace_period,
+            preset_values=list(self.runtime_variant_preset_values),
+            revision_preset_id=self.revision_preset_id,
         )
+        row.resource_slot_rows = [
+            DeploymentRevisionResourceSlotRow(
+                slot_name=str(slot_name),
+                quantity=quantity,
+            )
+            for slot_name, quantity in self.resource_slots.items()
+        ]
+        return row

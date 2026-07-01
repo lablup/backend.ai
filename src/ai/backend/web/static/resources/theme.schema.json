@@ -62,6 +62,61 @@
             "type": "number",
             "description": "The height of the collapsed logo image."
           }
+        },
+        "loginLogoSrc": {
+          "type": "string",
+          "description": "The source of the login form logo image for light mode. Falls back to srcDark, then the default hardcoded path."
+        },
+        "loginLogoSrcDark": {
+          "type": "string",
+          "description": "The source of the login form logo image for dark mode. Falls back to src, then the default hardcoded path."
+        },
+        "loginLogoSize": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number",
+              "description": "The width of the login form logo image."
+            },
+            "height": {
+              "type": "number",
+              "description": "The height of the login form logo image."
+            }
+          }
+        },
+        "aboutLogoSrc": {
+          "type": "string",
+          "description": "The source of the about modal logo image for light mode. Falls back to srcDark, then the default hardcoded path."
+        },
+        "aboutLogoSrcDark": {
+          "type": "string",
+          "description": "The source of the about modal logo image for dark mode. Falls back to src, then the default hardcoded path."
+        },
+        "aboutLogoSize": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number",
+              "description": "The width of the about modal logo image."
+            },
+            "height": {
+              "type": "number",
+              "description": "The height of the about modal logo image."
+            }
+          }
+        },
+        "aboutModalSize": {
+          "type": "object",
+          "deprecated": true,
+          "description": "Deprecated. Use aboutLogoSize instead.",
+          "properties": {
+            "width": {
+              "type": "number"
+            },
+            "height": {
+              "type": "number"
+            }
+          }
         }
       }
     },

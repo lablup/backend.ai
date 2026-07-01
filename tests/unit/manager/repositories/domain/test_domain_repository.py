@@ -12,6 +12,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -26,10 +27,13 @@ from ai.backend.manager.errors.resource import (
     DomainHasGroups,
     DomainHasUsers,
 )
+from ai.backend.manager.errors.resource import DomainNotFound as ResourceDomainNotFound
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow, ProjectType, groups
@@ -38,6 +42,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -45,6 +50,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -80,15 +86,19 @@ class TestDomainRepository:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
                 DeploymentPolicyRow,
                 DeploymentAutoScalingPolicyRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
             ],
@@ -160,7 +170,7 @@ class TestDomainRepository:
             total_resource_slots=ResourceSlot.from_user_input({"cpu": "10", "mem": "20g"}, None),
             allowed_vfolder_hosts={"local": ["modify-vfolder", "upload-file", "download-file"]},
             allowed_docker_registries=["registry.example.com"],
-            integration_id="test-integration",
+            integration_name="test-integration",
             dotfiles=b"test dotfiles",
         )
 
@@ -429,7 +439,7 @@ class TestDomainRepository:
         assert created_domain.description == sample_domain_creator.description
         assert created_domain.is_active == sample_domain_creator.is_active
         assert created_domain.total_resource_slots == sample_domain_creator.total_resource_slots
-        assert created_domain.integration_id == sample_domain_creator.integration_id
+        assert created_domain.integration_name == sample_domain_creator.integration_name
 
         # Verify domain exists in database
         async with db_with_default_resource_policies.begin() as conn:
@@ -486,7 +496,7 @@ class TestDomainRepository:
                 ),
                 allowed_vfolder_hosts={"local": ["modify-vfolder"]},
                 allowed_docker_registries=["registry.example.com"],
-                integration_id="test-integration",
+                integration_name="test-integration",
                 dotfiles=b"test dotfiles",
             )
         )
@@ -547,7 +557,7 @@ class TestDomainRepository:
                 ),
                 allowed_vfolder_hosts={"local": ["modify-vfolder"]},
                 allowed_docker_registries=["registry.example.com"],
-                integration_id="test-integration",
+                integration_name="test-integration",
                 dotfiles=b"test dotfiles",
             )
         )
@@ -631,7 +641,7 @@ class TestDomainRepository:
                     "registry.example.com",
                     "private.registry",
                 ],
-                integration_id="comprehensive-integration",
+                integration_name="comprehensive-integration",
                 dotfiles=b"comprehensive dotfiles configuration",
             )
         )
@@ -644,7 +654,7 @@ class TestDomainRepository:
         assert created_domain.total_resource_slots == ResourceSlot.from_user_input(
             {"cpu": "100", "mem": "500g", "cuda.device": "8"}, None
         )
-        assert created_domain.integration_id == "comprehensive-integration"
+        assert created_domain.integration_name == "comprehensive-integration"
         assert len(created_domain.allowed_docker_registries) == 3
         assert created_domain.dotfiles == b"comprehensive dotfiles configuration"
 
@@ -677,3 +687,18 @@ class TestDomainRepository:
         # Try to purge domain (should fail due to active kernels)
         with pytest.raises(DomainHasActiveKernels):
             await domain_repository.purge_domain(domain_with_active_kernel)
+
+    async def test_get_domain_id_by_name_success(
+        self,
+        domain_repository: DomainRepository,
+        sample_domain: DomainData,
+    ) -> None:
+        domain_id = await domain_repository.get_domain_id_by_name(DomainName(sample_domain.name))
+        assert domain_id == sample_domain.id
+
+    async def test_get_domain_id_by_name_not_found(
+        self,
+        domain_repository: DomainRepository,
+    ) -> None:
+        with pytest.raises(ResourceDomainNotFound):
+            await domain_repository.get_domain_id_by_name(DomainName("nonexistent-domain"))

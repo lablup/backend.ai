@@ -37,6 +37,13 @@ class LoginSessionRow(Base):  # type: ignore[misc]
         index=True,
     )
     access_key: Mapped[str] = mapped_column("access_key", sa.String(20), nullable=False)
+    login_client_type_id: Mapped[uuid.UUID | None] = mapped_column(
+        "login_client_type_id",
+        GUID,
+        sa.ForeignKey("login_client_types.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     status: Mapped[LoginSessionStatus] = mapped_column(
         "status",
         StrEnumType(LoginSessionStatus),

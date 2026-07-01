@@ -8,7 +8,12 @@ from typing import TypeVar
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringInMatchSpec,
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 
 _QC = TypeVar("_QC")
 
@@ -73,11 +78,61 @@ class IntFilter(BaseRequestModel):
         return None
 
 
+class ArrayFilter[T](BaseRequestModel):
+    """Filter for array (list) columns of element type ``T``.
+
+    Supports three membership operations against the stored array column:
+
+    * ``contains`` — the column array must contain this single value.
+    * ``contains_any`` — the column array must contain ANY of the given values.
+    * ``contains_all`` — the column array must contain ALL of the given values.
+    """
+
+    contains: T | None = Field(
+        default=None,
+        description="Column array contains this value.",
+    )
+    contains_any: list[T] | None = Field(
+        default=None,
+        min_length=1,
+        description="Column array contains ANY of these values.",
+    )
+    contains_all: list[T] | None = Field(
+        default=None,
+        min_length=1,
+        description="Column array contains ALL of these values.",
+    )
+
+    def build_query_condition(
+        self,
+        contains_factory: Callable[[T], _QC],
+        contains_any_factory: Callable[[list[T]], _QC],
+        contains_all_factory: Callable[[list[T]], _QC],
+    ) -> _QC | None:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            contains_factory: Factory for "contains this single value" operations.
+            contains_any_factory: Factory for "contains ANY of these values" operations.
+            contains_all_factory: Factory for "contains ALL of these values" operations.
+
+        Returns:
+            A query condition if any filter field is set, None otherwise.
+        """
+        if self.contains is not None:
+            return contains_factory(self.contains)
+        if self.contains_any is not None:
+            return contains_any_factory(self.contains_any)
+        if self.contains_all is not None:
+            return contains_all_factory(self.contains_all)
+        return None
+
+
 class DateTimeFilter(BaseRequestModel):
     """Filter for datetime fields supporting range and equality operations."""
 
-    before: datetime | None = Field(default=None, description="Before this datetime (inclusive)")
-    after: datetime | None = Field(default=None, description="After this datetime (inclusive)")
+    before: datetime | None = Field(default=None, description="Before this datetime (exclusive)")
+    after: datetime | None = Field(default=None, description="After this datetime (exclusive)")
     equals: datetime | None = Field(default=None, description="Exact datetime match")
     not_equals: datetime | None = Field(default=None, description="Not equal to this datetime")
 
@@ -90,8 +145,8 @@ class DateTimeFilter(BaseRequestModel):
         """Build a query condition from this filter using the provided factory callables.
 
         Args:
-            before_factory: Factory function that takes datetime and returns a condition for <= comparison
-            after_factory: Factory function that takes datetime and returns a condition for >= comparison
+            before_factory: Factory function that takes datetime and returns a condition for < comparison
+            after_factory: Factory function that takes datetime and returns a condition for > comparison
             equals_factory: Factory function for = comparison
 
         Returns:
@@ -104,6 +159,34 @@ class DateTimeFilter(BaseRequestModel):
         if self.after is not None:
             return after_factory(self.after)
         return None
+
+
+class NullableDateTimeFilter(DateTimeFilter):
+    """Filter for nullable datetime fields.
+
+    Extends DateTimeFilter with is_null support for columns that allow NULL values
+    (e.g., last_triggered_at). Use DateTimeFilter for NOT NULL columns.
+    """
+
+    is_null: bool | None = Field(
+        default=None,
+        description="Filter by null status: true = IS NULL, false = IS NOT NULL",
+    )
+
+    def build_query_condition(
+        self,
+        before_factory: Callable[[datetime], _QC],
+        after_factory: Callable[[datetime], _QC],
+        equals_factory: Callable[[datetime], _QC],
+        is_null_factory: Callable[[], _QC] | None = None,
+        is_not_null_factory: Callable[[], _QC] | None = None,
+    ) -> _QC | None:
+        if self.is_null is not None:
+            if self.is_null and is_null_factory is not None:
+                return is_null_factory()
+            if not self.is_null and is_not_null_factory is not None:
+                return is_not_null_factory()
+        return super().build_query_condition(before_factory, after_factory, equals_factory)
 
 
 class DateTimeRangeFilter(BaseRequestModel):
@@ -199,12 +282,27 @@ class StringFilter(BaseRequestModel):
         default=None, description="Not ends with (case-insensitive)"
     )
 
+    # IN operations
+    in_: list[str] | None = Field(
+        default=None, alias="in", description="Value is in the provided list (case-sensitive)"
+    )
+    not_in: list[str] | None = Field(
+        default=None, description="Value is not in the provided list (case-sensitive)"
+    )
+    i_in: list[str] | None = Field(
+        default=None, description="Value is in the provided list (case-insensitive)"
+    )
+    i_not_in: list[str] | None = Field(
+        default=None, description="Value is not in the provided list (case-insensitive)"
+    )
+
     def build_query_condition(
         self,
         contains_factory: Callable[[StringMatchSpec], _QC],
         equals_factory: Callable[[StringMatchSpec], _QC],
         starts_with_factory: Callable[[StringMatchSpec], _QC],
         ends_with_factory: Callable[[StringMatchSpec], _QC],
+        in_factory: Callable[[StringInMatchSpec], _QC],
     ) -> _QC | None:
         """Build a query condition from this filter using the provided factory callables.
 
@@ -213,6 +311,7 @@ class StringFilter(BaseRequestModel):
             equals_factory: Factory for exact match (=) operations
             starts_with_factory: Factory for LIKE 'value%' operations
             ends_with_factory: Factory for LIKE '%value' operations
+            in_factory: Factory for IN (list membership) operations
 
         Returns:
             _QC if any filter field is set, None otherwise
@@ -287,6 +386,24 @@ class StringFilter(BaseRequestModel):
         if self.i_not_ends_with is not None:
             return ends_with_factory(
                 StringMatchSpec(self.i_not_ends_with, case_insensitive=True, negated=True)
+            )
+
+        # IN operations
+        if self.in_ is not None:
+            return in_factory(
+                StringInMatchSpec(values=self.in_, case_insensitive=False, negated=False)
+            )
+        if self.not_in is not None:
+            return in_factory(
+                StringInMatchSpec(values=self.not_in, case_insensitive=False, negated=True)
+            )
+        if self.i_in is not None:
+            return in_factory(
+                StringInMatchSpec(values=self.i_in, case_insensitive=True, negated=False)
+            )
+        if self.i_not_in is not None:
+            return in_factory(
+                StringInMatchSpec(values=self.i_not_in, case_insensitive=True, negated=True)
             )
 
         return None

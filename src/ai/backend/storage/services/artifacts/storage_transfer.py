@@ -295,7 +295,7 @@ class StorageTransferManager:
         try:
             return await storage.list_objects_with_prefix(prefix)
         except Exception as e:
-            log.warning(f"Failed to list objects with prefix '{prefix}': {e!s}")
+            log.warning("Failed to list objects with prefix '{}': {!s}", prefix, e)
             return []
 
     async def verify_transfer(

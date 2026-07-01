@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2RBACHandler
@@ -57,6 +57,12 @@ def register_v2_rbac_routes(
         handler.purge_role,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "POST",
+        "/roles/projects/{project_id}/search",
+        handler.project_search_roles,
+        middlewares=[auth_required],
+    )
 
     # Permissions
     registry.add(
@@ -83,6 +89,24 @@ def register_v2_rbac_routes(
         handler.delete_permission,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "POST",
+        "/permissions/bulk-add",
+        handler.bulk_add_role_permissions,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/permissions/bulk-remove",
+        handler.bulk_remove_role_permissions,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/permissions/replace",
+        handler.replace_role_permissions,
+        middlewares=[superadmin_required],
+    )
 
     # Assignments
     registry.add(
@@ -102,6 +126,12 @@ def register_v2_rbac_routes(
         "/assignments/search",
         handler.search_assignments,
         middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/assignments/my/search",
+        handler.my_search_assignments,
+        middlewares=[auth_required],
     )
     registry.add(
         "POST",

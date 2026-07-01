@@ -13,6 +13,8 @@ from aiohttp.typedefs import Handler
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ai.backend.account_manager.exceptions import AuthorizationFailed, InvalidAPIParameters
+from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
 
 
@@ -69,7 +71,7 @@ def mask_sensitive_keys(data: Mapping[str, Any]) -> Mapping[str, Any]:
 TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 
-class RequestData(BaseModel):
+class RequestData(BackendAISchema):
     model_config = ConfigDict(
         extra="allow",
     )
@@ -173,8 +175,13 @@ def pydantic_api_handler[TParamModel: BaseModel, TQueryModel: BaseModel](
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as e:
                 raise InvalidAPIParameters("Malformed body") from e
-            except ValidationError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.errors()) from e
+            except (BackendAISchemaValidationFailed, ValidationError) as e:
+                # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+                # skip the ``BackendAISchema`` auto-conversion override.
+                raise InvalidAPIParameters(
+                    "Input validation error",
+                    extra_data={"errors": e.errors()},
+                ) from e
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 

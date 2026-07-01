@@ -33,6 +33,18 @@ from ai.backend.manager.services.vfolder.actions.file import (
     RenameFileAction,
     RenameFileActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.file_v2 import (
+    CreateDownloadSessionV2Action,
+    CreateDownloadSessionV2ActionResult,
+    DeleteFilesV2Action,
+    DeleteFilesV2ActionResult,
+    ListFilesV2Action,
+    ListFilesV2ActionResult,
+    MkdirV2Action,
+    MkdirV2ActionResult,
+    MoveFileV2Action,
+    MoveFileV2ActionResult,
+)
 from ai.backend.manager.services.vfolder.types import FileInfo
 
 
@@ -406,3 +418,166 @@ class VFolderFileService:
             action.dst,
         )
         return MoveFileActionResult(vfolder_uuid=action.vfolder_uuid)
+
+    async def list_files_v2(self, action: ListFilesV2Action) -> ListFilesV2ActionResult:
+        """List files in a vfolder (v2). Resolves policy internally from user_id."""
+        user = await self._user_repository.get_user_by_uuid(action.user_id)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_id, user.id, user.domain_name
+        )
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+        vfolder_id = VFolderID(
+            quota_scope_id=vfolder_data.quota_scope_id,
+            folder_id=vfolder_data.id,
+        )
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        result = await manager_client.list_files(
+            volume_name,
+            str(vfolder_id),
+            action.path,
+        )
+        return ListFilesV2ActionResult(
+            files=[
+                FileInfo(
+                    name=item["name"],
+                    type=item["type"],
+                    size=item["stat"]["size"],
+                    mode=item["stat"]["mode"],
+                    created=item["stat"]["created"],
+                    modified=item["stat"]["modified"],
+                )
+                for item in result["items"]
+            ],
+        )
+
+    async def mkdir_v2(self, action: MkdirV2Action) -> MkdirV2ActionResult:
+        """Create directories in a vfolder (v2). Resolves policy internally from user_id."""
+        if isinstance(action.path, list) and len(action.path) > 50:
+            raise VFolderInvalidParameter("Too many directories specified.")
+
+        user = await self._user_repository.get_user_by_uuid(action.user_id)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_id, user.id, user.domain_name
+        )
+        if not vfolder_data:
+            raise VFolderInvalidParameter("VFolder not found")
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+        vfolder_id = VFolderID(
+            quota_scope_id=vfolder_data.quota_scope_id,
+            folder_id=vfolder_data.id,
+        )
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.mkdir(
+            volume=volume_name,
+            vfid=str(vfolder_id),
+            relpath=action.path,
+            exist_ok=action.exist_ok,
+            parents=action.parents,
+        )
+        return MkdirV2ActionResult()
+
+    async def move_file_v2(self, action: MoveFileV2Action) -> MoveFileV2ActionResult:
+        """Move a file within a vfolder (v2). Resolves policy internally from user_id."""
+        user = await self._user_repository.get_user_by_uuid(action.user_id)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_id, user.id, user.domain_name
+        )
+        if not vfolder_data:
+            raise VFolderInvalidParameter("VFolder not found")
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+        vfolder_id = VFolderID(
+            quota_scope_id=vfolder_data.quota_scope_id,
+            folder_id=vfolder_data.id,
+        )
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        await manager_client.move_file(
+            volume_name,
+            str(vfolder_id),
+            action.src,
+            action.dst,
+        )
+        return MoveFileV2ActionResult()
+
+    async def delete_files_v2(self, action: DeleteFilesV2Action) -> DeleteFilesV2ActionResult:
+        """Delete files in a vfolder (v2). Resolves policy internally from user_id."""
+        user = await self._user_repository.get_user_by_uuid(action.user_id)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_id, user.id, user.domain_name
+        )
+        if not vfolder_data:
+            raise VFolderInvalidParameter("The specified vfolder is not accessible.")
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+        vfolder_id = VFolderID(
+            quota_scope_id=vfolder_data.quota_scope_id,
+            folder_id=vfolder_data.id,
+        )
+        request = FileDeleteAsyncRequest(
+            volume=volume_name,
+            vfid=vfolder_id,
+            relpaths=[PurePosixPath(f) for f in action.files],
+            recursive=action.recursive,
+        )
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        response = await manager_client.delete_files_async(request)
+        return DeleteFilesV2ActionResult(bgtask_id=str(response.bgtask_id))
+
+    async def download_file_v2(
+        self, action: CreateDownloadSessionV2Action
+    ) -> CreateDownloadSessionV2ActionResult:
+        """Create a download session (v2). Resolves policy internally from user_id."""
+        user = await self._user_repository.get_user_by_uuid(action.user_id)
+        if not user.domain_name:
+            raise VFolderInvalidParameter("User has no domain assigned")
+        vfolder_data = await self._vfolder_repository.get_by_id_validated(
+            action.vfolder_id, user.id, user.domain_name
+        )
+        if not vfolder_data:
+            raise VFolderInvalidParameter("VFolder not found")
+
+        # Host permission check — resolved from user_id
+        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+            vfolder_data.host,
+            permission=VFolderHostPermission.DOWNLOAD_FILE,
+            user_uuid=action.user_id,
+        )
+
+        proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+        vfolder_id = VFolderID(
+            quota_scope_id=vfolder_data.quota_scope_id,
+            folder_id=vfolder_data.id,
+        )
+        manager_client = self._storage_manager.get_manager_facing_client(proxy_name)
+        storage_reply = await manager_client.download_file(
+            volume=volume_name,
+            vfid=str(vfolder_id),
+            relpath=action.path,
+            archive=action.archive,
+            unmanaged_path=vfolder_data.unmanaged_path,
+        )
+        client_api_url = self._storage_manager.get_client_api_url(proxy_name)
+        return CreateDownloadSessionV2ActionResult(
+            token=storage_reply["token"],
+            url=str(client_api_url / "download"),
+        )

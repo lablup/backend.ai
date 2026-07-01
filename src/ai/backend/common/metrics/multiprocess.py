@@ -1,95 +1,23 @@
 """
-Prometheus multiprocess mode support.
+Prometheus multiprocess mode metric generation.
 
-In multiprocess environments (e.g., manager with multiple workers via aiotools),
-each worker process has its own prometheus_client registry. Without multiprocess mode,
-Prometheus scraping via a shared port (reuse_port=True) only sees one random worker's
-metrics per scrape, leading to incorrect counter values.
-
-This module provides:
-- setup_prometheus_multiprocess_dir(): Must be called BEFORE any prometheus_client import
-- generate_latest_multiprocess(): Always aggregates metrics across all workers
-- generate_latest_singleprocess(): For single-process components using default registry
-- cleanup_prometheus_multiprocess_dir(): Called on full server shutdown
+For directory setup, see ``multiprocess_setup.py`` — that module is kept
+free of prometheus_client imports so the env var can be set before the
+library determines its ValueClass.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-import shutil
-from pathlib import Path
 
 from prometheus_client import CollectorRegistry, generate_latest
 from prometheus_client.multiprocess import MultiProcessCollector
 from prometheus_client.multiprocess import mark_process_dead as _mark_dead
 
+from ai.backend.common.metrics.multiprocess_setup import get_multiprocess_dir
+
 log = logging.getLogger(__spec__.name)
-
-_multiprocess_dir: Path | None = None
-
-_DEFAULT_BASE_DIR = Path("./run/prometheus")
-
-
-def setup_prometheus_multiprocess_dir(
-    component: str = "manager",
-    base_dir: Path | None = None,
-) -> Path:
-    """
-    Set up the prometheus multiprocess directory and environment variable.
-
-    MUST be called before any prometheus_client import.
-
-    Creates a directory for prometheus multiprocess files and sets
-    the PROMETHEUS_MULTIPROC_DIR environment variable.
-
-    The base directory is resolved in the following priority order:
-    1. ``base_dir`` argument (if provided)
-    2. ``BACKENDAI_PROMETHEUS_DIR`` environment variable (if set)
-    3. Default: ``./run/prometheus/``
-
-    Args:
-        component: Component name for directory naming (e.g., 'manager', 'agent')
-        base_dir: Optional override for the base directory. Takes precedence over
-            the ``BACKENDAI_PROMETHEUS_DIR`` environment variable.
-
-    Returns:
-        Path to the created multiprocess directory
-    """
-    global _multiprocess_dir
-
-    if _multiprocess_dir is not None:
-        return _multiprocess_dir
-
-    if base_dir is not None:
-        resolved_base = base_dir
-    elif env_base := os.environ.get("BACKENDAI_PROMETHEUS_DIR"):
-        resolved_base = Path(env_base)
-    else:
-        resolved_base = _DEFAULT_BASE_DIR
-
-    multiprocess_dir = resolved_base / component
-    try:
-        multiprocess_dir.mkdir(parents=True, exist_ok=True)
-    except PermissionError:
-        log.error(
-            "Cannot create prometheus multiprocess dir %s — permission denied. "
-            "Ensure the directory is writable by the current user.",
-            multiprocess_dir,
-        )
-        raise
-
-    # Clean stale .db files from previous runs
-    for db_file in multiprocess_dir.glob("*.db"):
-        try:
-            db_file.unlink()
-        except OSError:
-            pass
-
-    os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(multiprocess_dir)
-    _multiprocess_dir = multiprocess_dir
-    log.info("Prometheus multiprocess dir: %s", multiprocess_dir)
-    return multiprocess_dir
 
 
 def generate_latest_multiprocess() -> bytes:
@@ -101,6 +29,7 @@ def generate_latest_multiprocess() -> bytes:
 
     This should be used by multi-worker components (manager, agent, storage, etc.).
     """
+    multiprocess_dir = get_multiprocess_dir()
     try:
         registry = CollectorRegistry()
         MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
@@ -108,21 +37,21 @@ def generate_latest_multiprocess() -> bytes:
     except ValueError:
         # Directory may have been deleted (e.g., by systemd-tmpfiles-clean).
         # Attempt to recreate it and retry once.
-        if _multiprocess_dir is not None:
+        if multiprocess_dir is not None:
             try:
-                _multiprocess_dir.mkdir(parents=True, exist_ok=True)
-                os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(_multiprocess_dir)
+                multiprocess_dir.mkdir(parents=True, exist_ok=True)
+                os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(multiprocess_dir)
                 registry = CollectorRegistry()
                 MultiProcessCollector(registry)  # type: ignore[no-untyped-call]
                 log.warning(
                     "Prometheus multiprocess dir was missing and has been recreated: %s",
-                    _multiprocess_dir,
+                    multiprocess_dir,
                 )
                 return generate_latest(registry)
             except Exception:
                 log.error(
                     "Failed to recover prometheus multiprocess dir: %s",
-                    _multiprocess_dir,
+                    multiprocess_dir,
                     exc_info=True,
                 )
         return b""
@@ -136,23 +65,6 @@ def generate_latest_singleprocess() -> bytes:
     multiprocess aggregation.
     """
     return generate_latest()
-
-
-def cleanup_prometheus_multiprocess_dir() -> None:
-    """
-    Clean up the prometheus multiprocess directory.
-
-    Should be called on full server shutdown (not per-worker).
-    """
-    global _multiprocess_dir
-
-    if _multiprocess_dir is not None and _multiprocess_dir.exists():
-        shutil.rmtree(_multiprocess_dir, ignore_errors=True)
-        log.info("Cleaned up prometheus multiprocess dir: %s", _multiprocess_dir)
-        _multiprocess_dir = None
-
-    if "PROMETHEUS_MULTIPROC_DIR" in os.environ:
-        del os.environ["PROMETHEUS_MULTIPROC_DIR"]
 
 
 def mark_process_dead(pid: int) -> None:

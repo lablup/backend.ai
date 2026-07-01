@@ -6,8 +6,18 @@ from ai.backend.manager.repositories.resource_allocation.repository import (
 )
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
-from ai.backend.manager.services.app_config.processors import AppConfigProcessors
-from ai.backend.manager.services.app_config.service import AppConfigService
+from ai.backend.manager.services.app_config_allow_list.processors import (
+    AppConfigAllowListProcessors,
+)
+from ai.backend.manager.services.app_config_allow_list.service import (
+    AppConfigAllowListService,
+)
+from ai.backend.manager.services.app_config_definition.processors import (
+    AppConfigDefinitionProcessors,
+)
+from ai.backend.manager.services.app_config_definition.service import (
+    AppConfigDefinitionService,
+)
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
@@ -50,12 +60,18 @@ from ai.backend.manager.services.keypair_resource_policy.processors import (
     KeypairResourcePolicyProcessors,
 )
 from ai.backend.manager.services.keypair_resource_policy.service import KeypairResourcePolicyService
+from ai.backend.manager.services.login_client_type.admin_service import (
+    LoginClientTypeAdminService,
+)
+from ai.backend.manager.services.login_client_type.processors import (
+    LoginClientTypeAdminProcessors,
+    LoginClientTypeProcessors,
+)
+from ai.backend.manager.services.login_client_type.service import LoginClientTypeService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
-from ai.backend.manager.services.metric.processors.utilization_metric import (
-    UtilizationMetricProcessors,
-)
-from ai.backend.manager.services.metric.root_service import UtilizationMetricService
+from ai.backend.manager.services.metric.processors import MetricProcessors
+from ai.backend.manager.services.metric.service import MetricService
 from ai.backend.manager.services.model_card.processors import ModelCardProcessors
 from ai.backend.manager.services.model_card.service import ModelCardService
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
@@ -87,6 +103,12 @@ from ai.backend.manager.services.prometheus_query_preset.processors import (
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )
+from ai.backend.manager.services.prometheus_query_preset_category.processors import (
+    PrometheusQueryPresetCategoryProcessors,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.service import (
+    PrometheusQueryPresetCategoryService,
+)
 from ai.backend.manager.services.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
@@ -97,6 +119,8 @@ from ai.backend.manager.services.resource_slot.processors import ResourceSlotPro
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.manager.services.resource_usage.processors import ResourceUsageProcessors
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
+from ai.backend.manager.services.role_preset.processors import RolePresetProcessors
+from ai.backend.manager.services.role_preset.service import RolePresetService
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.services.runtime_variant.service import RuntimeVariantService
 from ai.backend.manager.services.runtime_variant_preset.processors import (
@@ -135,12 +159,6 @@ from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-)
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    RegistryArgs as ModelDefinitionRegistryArgs,
-)
 
 
 def create_services(args: ServiceArgs) -> Services:
@@ -156,8 +174,8 @@ def create_services(args: ServiceArgs) -> Services:
             args.event_producer,
             args.agent_cache,
         ),
-        app_config=AppConfigService(
-            app_config_repository=repositories.app_config.repository,
+        app_config_allow_list=AppConfigAllowListService(
+            repository=repositories.app_config_allow_list.repository,
         ),
         domain=DomainService(repositories.domain.repository),
         dotfile=DotfileService(
@@ -189,6 +207,7 @@ def create_services(args: ServiceArgs) -> Services:
             args.valkey_stat_client,
             args.agent_registry,
             repositories.user.repository,
+            args.scheduling_controller,
         ),
         image=ImageService(
             args.agent_registry, repositories.image.repository, args.config_provider
@@ -235,8 +254,10 @@ def create_services(args: ServiceArgs) -> Services:
                 error_monitor=args.error_monitor,
                 idle_checker_host=args.idle_checker_host,
                 session_repository=repositories.session.repository,
+                scheduler_repository=repositories.scheduler.repository,
                 scheduling_controller=args.scheduling_controller,
                 appproxy_client_pool=args.appproxy_client_pool,
+                user_repository=repositories.user.repository,
             )
         ),
         keypair_resource_policy=KeypairResourcePolicyService(
@@ -260,10 +281,14 @@ def create_services(args: ServiceArgs) -> Services:
             prometheus_client=args.prometheus_client,
             default_timewindow=args.config_provider.config.metric.timewindow,
         ),
+        prometheus_query_preset_category=PrometheusQueryPresetCategoryService(
+            repository=repositories.prometheus_query_preset_category.repository,
+        ),
         resource_preset=ResourcePresetService(
             repositories.resource_preset.repository,
         ),
         resource_slot=ResourceSlotService(repositories.resource_slot.repository),
+        role_preset=RolePresetService(repositories.role_preset.repository),
         runtime_variant=RuntimeVariantService(
             repositories.runtime_variant.repository,
         ),
@@ -275,6 +300,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         model_card=ModelCardService(
             repositories.model_card.repository,
+            args.storage_manager,
         ),
         resource_usage=ResourceUsageService(
             repository=repositories.resource_usage_history.repository,
@@ -283,10 +309,8 @@ def create_services(args: ServiceArgs) -> Services:
             repositories.scaling_group.repository,
             appproxy_client_pool=args.appproxy_client_pool,
         ),
-        utilization_metric=UtilizationMetricService(
-            args.prometheus_client,
-            args.config_provider.config.metric.timewindow,
-            repositories.metric.repository,
+        metric=MetricService(
+            metric_repository=repositories.metric.repository,
         ),
         model_serving=ModelServingService(
             agent_registry=args.agent_registry,
@@ -297,10 +321,12 @@ def create_services(args: ServiceArgs) -> Services:
             config_provider=args.config_provider,
             valkey_live=args.valkey_live,
             repository=repositories.model_serving.repository,
-            deployment_repository=args.deployment_controller._deployment_repository,
+            deployment_repository=repositories.deployment.repository,
+            runtime_variant_repository=repositories.runtime_variant.repository,
+            scheduler_repository=repositories.scheduler.repository,
             deployment_controller=args.deployment_controller,
             scheduling_controller=args.scheduling_controller,
-            revision_generator_registry=args.revision_generator_registry,
+            route_controller=args.route_controller,
         ),
         model_serving_auto_scaling=AutoScalingService(
             repository=repositories.model_serving.repository,
@@ -310,6 +336,19 @@ def create_services(args: ServiceArgs) -> Services:
             auth_repository=repositories.auth.repository,
             config_provider=args.config_provider,
             valkey_session_client=args.valkey_session_client,
+            user_resource_policy_repository=repositories.user_resource_policy.repository,
+            user_repository=repositories.user.repository,
+            group_repository=repositories.group.repository,
+            ssh_key_validator=args.ssh_key_validator,
+        ),
+        app_config_definition=AppConfigDefinitionService(
+            repository=repositories.app_config_definition.repository,
+        ),
+        login_client_type=LoginClientTypeService(
+            repository=repositories.auth.login_client_type,
+        ),
+        login_client_type_admin=LoginClientTypeAdminService(
+            admin_repository=repositories.auth.login_client_type_admin,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,
@@ -324,6 +363,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
+            group_repository=repositories.group.repository,
             rbac_action_registry=RBAC_ACTION_REGISTRY,
         ),
         vfs_storage=VFSStorageService(
@@ -361,15 +401,10 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         deployment=DeploymentService(
             args.deployment_controller,
-            args.deployment_controller._deployment_repository,
-            args.revision_generator_registry,
-            ModelDefinitionGeneratorRegistry(
-                ModelDefinitionRegistryArgs(
-                    deployment_repository=args.deployment_controller._deployment_repository,
-                    enable_model_definition_override=args.config_provider.config.deployment.enable_model_definition_override,
-                )
-            ),
+            repositories.deployment.repository,
             deployment_revision_preset_repository=repositories.deployment_revision_preset.repository,
+            runtime_variant_preset_repository=repositories.runtime_variant_preset.repository,
+            appproxy_client_pool=args.appproxy_client_pool,
         ),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),
@@ -407,7 +442,9 @@ def create_processors(
     services = create_services(args.service_args)
     return Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
-        app_config=AppConfigProcessors(services.app_config, action_monitors, validators),
+        app_config_allow_list=AppConfigAllowListProcessors(
+            services.app_config_allow_list, action_monitors
+        ),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
         error_log=ErrorLogProcessors(services.error_log, action_monitors, validators),
@@ -443,10 +480,14 @@ def create_processors(
         prometheus_query_preset=PrometheusQueryPresetProcessors(
             services.prometheus_query_preset, action_monitors, validators
         ),
+        prometheus_query_preset_category=PrometheusQueryPresetCategoryProcessors(
+            services.prometheus_query_preset_category, action_monitors, validators
+        ),
         resource_preset=ResourcePresetProcessors(
             services.resource_preset, action_monitors, validators
         ),
         resource_slot=ResourceSlotProcessors(services.resource_slot, action_monitors, validators),
+        role_preset=RolePresetProcessors(services.role_preset, action_monitors, validators),
         runtime_variant=RuntimeVariantProcessors(
             services.runtime_variant, action_monitors, validators
         ),
@@ -461,14 +502,19 @@ def create_processors(
             services.resource_usage, action_monitors, validators
         ),
         scaling_group=ScalingGroupProcessors(services.scaling_group, action_monitors, validators),
-        utilization_metric=UtilizationMetricProcessors(
-            services.utilization_metric, action_monitors, validators
-        ),
+        metric=MetricProcessors(services.metric, action_monitors, validators),
         model_serving=ModelServingProcessors(services.model_serving, action_monitors, validators),
         model_serving_auto_scaling=ModelServingAutoScalingProcessors(
             services.model_serving_auto_scaling, action_monitors, validators
         ),
         auth=AuthProcessors(services.auth, action_monitors, validators),
+        app_config_definition=AppConfigDefinitionProcessors(
+            services.app_config_definition, action_monitors
+        ),
+        login_client_type=LoginClientTypeProcessors(services.login_client_type, action_monitors),
+        login_client_type_admin=LoginClientTypeAdminProcessors(
+            services.login_client_type_admin, action_monitors
+        ),
         notification=NotificationProcessors(services.notification, action_monitors, validators),
         object_storage=ObjectStorageProcessors(
             services.object_storage, action_monitors, validators

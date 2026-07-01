@@ -29,7 +29,7 @@ jobs:
             TAG="${{ github.event.inputs.tag }}"
           else
             # Get latest release tag
-            TAG=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/inureyes/all-smi/releases/latest | jq -r .tag_name)
+            TAG=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/lablup/all-smi/releases/latest | jq -r .tag_name)
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Using tag: $TAG"
@@ -38,7 +38,7 @@ jobs:
         run: |
           TAG="${{ steps.get-tag.outputs.tag }}"
           for ARCH in aarch64 x86_64; do
-            URL="https://github.com/inureyes/all-smi/releases/download/${TAG}/all-smi-linux-${ARCH}-musl.tar.gz"
+            URL="https://github.com/lablup/all-smi/releases/download/${TAG}/all-smi-linux-${ARCH}-musl.tar.gz"
             echo "Downloading from: $URL"
             curl -fL -o all-smi.tar.gz "$URL"
             tar -xzf all-smi.tar.gz
@@ -80,7 +80,7 @@ jobs:
           body: |
             This PR updates the all-smi binaries (musl variant) for both aarch64 and x86_64 architectures to version ${{ steps.get-tag.outputs.tag }}.
 
-            Source: https://github.com/inureyes/all-smi/releases/tag/${{ steps.get-tag.outputs.tag }}
+            Source: https://github.com/lablup/all-smi/releases/tag/${{ steps.get-tag.outputs.tag }}
 
             This update was triggered by:
             - Event: ${{ github.event_name }}
@@ -96,7 +96,7 @@ jobs:
         run: |
           echo "To enable automated triggers when all-smi releases occur:"
           echo ""
-          echo "1. Go to https://github.com/inureyes/all-smi/settings/hooks"
+          echo "1. Go to https://github.com/lablup/all-smi/settings/hooks"
           echo "2. Add a new webhook with:"
           echo "   - Payload URL: https://api.github.com/repos/${{ github.repository }}/dispatches"
           echo "   - Content type: application/json"

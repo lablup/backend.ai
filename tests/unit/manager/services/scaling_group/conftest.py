@@ -46,6 +46,7 @@ from ai.backend.manager.repositories.scaling_group.repository import ScalingGrou
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
 from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 
 @dataclass
@@ -193,29 +194,19 @@ async def resource_policy_fixture(
 
 @pytest.fixture
 async def domain_fixture(
+    domain_factory: DomainFactory,
     database_engine: ExtendedAsyncSAEngine,
     database_fixture: None,
-) -> AsyncIterator[str]:
-    """Insert a test domain and yield its name."""
-    domain_name = f"domain-{secrets.token_hex(6)}"
-    async with database_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(DomainRow.__table__).values(
-                name=domain_name,
-                description=f"Test domain {domain_name}",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts=VFolderHostPermissionMap(),
-            )
-        )
-    yield domain_name
+) -> DomainFixtureData:
+    """Insert a test domain and yield its identifiers."""
+    return await domain_factory(database_engine, name=f"domain-{secrets.token_hex(6)}")
     # Cleanup handled by database_fixture TRUNCATE CASCADE
 
 
 @pytest.fixture
 async def admin_user_fixture(
     database_engine: ExtendedAsyncSAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[Any]:
     """Insert an admin user and keypair; yield UserFixtureData."""
@@ -233,7 +224,7 @@ async def admin_user_fixture(
                 email=email,
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.SUPERADMIN,
             )
@@ -262,7 +253,7 @@ async def admin_user_fixture(
 @pytest.fixture
 async def regular_user_fixture(
     database_engine: ExtendedAsyncSAEngine,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[Any]:
     """Insert a regular user and keypair; yield UserFixtureData."""
@@ -280,7 +271,7 @@ async def regular_user_fixture(
                 email=email,
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
             )

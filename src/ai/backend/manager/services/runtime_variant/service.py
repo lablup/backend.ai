@@ -1,5 +1,6 @@
 import logging
 
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.runtime_variant.actions.create import (
@@ -9,6 +10,10 @@ from ai.backend.manager.services.runtime_variant.actions.create import (
 from ai.backend.manager.services.runtime_variant.actions.delete import (
     DeleteRuntimeVariantAction,
     DeleteRuntimeVariantActionResult,
+)
+from ai.backend.manager.services.runtime_variant.actions.resolve_by_name import (
+    ResolveRuntimeVariantByNameAction,
+    ResolveRuntimeVariantByNameActionResult,
 )
 from ai.backend.manager.services.runtime_variant.actions.search import (
     SearchRuntimeVariantsAction,
@@ -52,4 +57,18 @@ class RuntimeVariantService:
             total_count=total_count,
             has_next_page=has_next_page,
             has_previous_page=has_previous_page,
+        )
+
+    async def resolve_by_name(
+        self, action: ResolveRuntimeVariantByNameAction
+    ) -> ResolveRuntimeVariantByNameActionResult:
+        """Resolve a runtime variant name into its ``RuntimeVariantID``.
+
+        Legacy API handlers call this before invoking id-typed internal
+        adapters so that the adapter / service / sokovan chain never has
+        to touch a name string.
+        """
+        data = await self._repository.get_by_name(action.name)
+        return ResolveRuntimeVariantByNameActionResult(
+            runtime_variant_id=RuntimeVariantID(data.id),
         )

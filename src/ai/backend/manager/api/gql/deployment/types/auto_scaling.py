@@ -6,9 +6,10 @@ from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
+import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -39,10 +40,14 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateAutoScalingRulePayload as UpdateAutoScalingRulePayloadDTO,
 )
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    AutoScalingRuleOrderField,
+)
+from ai.backend.manager.api.gql.base import DateTimeFilter, NullableDateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -52,9 +57,9 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.deployment.types import (
-    AutoScalingRuleOrderField,
-)
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.prometheus_query_preset.types.node import QueryDefinitionGQL
 
 
 @gql_enum(
@@ -63,6 +68,7 @@ from ai.backend.manager.data.deployment.types import (
 class AutoScalingMetricSource(StrEnum):
     KERNEL = "KERNEL"
     INFERENCE_FRAMEWORK = "INFERENCE_FRAMEWORK"
+    PROMETHEUS = "PROMETHEUS"
 
 
 @gql_pydantic_input(
@@ -73,7 +79,7 @@ class AutoScalingRuleFilter(PydanticInputMixin[AutoScalingRuleFilterDTO]):
     """Filter for auto-scaling rules."""
 
     created_at: DateTimeFilter | None = None
-    last_triggered_at: DateTimeFilter | None = None
+    last_triggered_at: NullableDateTimeFilter | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -114,8 +120,37 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     min_replicas: int | None = gql_field(description="The minimum number of replicas (e.g. 1).")
     max_replicas: int | None = gql_field(description="The maximum number of replicas (e.g. 10).")
 
+    prometheus_query_preset_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.2",
+            description="The Prometheus query preset ID for PROMETHEUS metric source.",
+        ),
+    )
+
     created_at: datetime
-    last_triggered_at: datetime
+    last_triggered_at: datetime | None
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The Prometheus query preset used for metric-based auto-scaling.",
+        )
+    )  # type: ignore[misc]
+    async def query_preset(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            QueryDefinitionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.prometheus_query_preset.types.node"),
+        ]
+        | None
+    ):
+        if self.prometheus_query_preset_id is None:
+            return None
+        return await info.context.data_loaders.query_definition_loader.load(
+            UUID(str(self.prometheus_query_preset_id))
+        )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -161,6 +196,7 @@ class CreateAutoScalingRuleInput(PydanticInputMixin[CreateAutoScalingRuleInputDT
     time_window: int
     min_replicas: int | None
     max_replicas: int | None
+    prometheus_query_preset_id: ID | None = None
 
 
 @gql_pydantic_input(
@@ -180,6 +216,7 @@ class UpdateAutoScalingRuleInput(PydanticInputMixin[UpdateAutoScalingRuleInputDT
     time_window: int | None = UNSET
     min_replicas: int | None = UNSET
     max_replicas: int | None = UNSET
+    prometheus_query_preset_id: ID | None = UNSET
 
 
 @gql_pydantic_input(

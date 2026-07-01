@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import secrets
+import uuid
 
 import pytest
 import sqlalchemy as sa
@@ -28,6 +29,7 @@ class TestSignupAndAuthorizeFlow:
         admin_registry: BackendAIClientRegistry,
         domain_fixture: str,
         db_engine: SAEngine,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """Signup a new user -> activate via DB -> authorize -> verify credentials work."""
         unique = secrets.token_hex(4)
@@ -64,6 +66,7 @@ class TestSignupAndAuthorizeFlow:
                     domain=domain_fixture,
                     username=email,
                     password=password,
+                    client_type_id=sample_client_type_id,
                 ),
             )
             assert auth_result.data.access_key != ""

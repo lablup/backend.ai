@@ -8,6 +8,8 @@ from .access_token import (
     AccessTokenOrderBy,
     CreateAccessTokenInput,
     CreateAccessTokenPayload,
+    DeleteAccessTokenInput,
+    DeleteAccessTokenPayload,
 )
 from .auto_scaling import (
     AutoScalingMetricSource,
@@ -24,6 +26,7 @@ from .auto_scaling import (
     UpdateAutoScalingRulePayload,
 )
 from .deployment import (
+    AdminRefreshDeploymentRevisionsPayload,
     CreateDeploymentInput,
     CreateDeploymentPayload,
     DeleteDeploymentInput,
@@ -42,11 +45,25 @@ from .deployment import (
     ModelDeploymentMetadataInput,
     ModelDeploymentNetworkAccess,
     ModelDeploymentNetworkAccessInput,
+    ProjectDeploymentScopeGQL,
+    ReplaceDeploymentOptionsInputGQL,
+    ReplaceDeploymentOptionsPayload,
     ReplicaState,
+    RevisionRefreshResult,
     SyncReplicaInput,
     SyncReplicaPayload,
     UpdateDeploymentInput,
     UpdateDeploymentPayload,
+)
+from .deployment_options import (
+    DeploymentHandlerOptionsInfoGQL,
+    DeploymentHandlerOptionsInputGQL,
+    DeploymentOptionsInfoGQL,
+    DeploymentOptionsInputGQL,
+    HandlerOptionsEntryInfoGQL,
+    HandlerOptionsEntryInputGQL,
+    HandlerOptionsInfoGQL,
+    HandlerOptionsInputGQL,
 )
 from .policy import (
     BlueGreenConfigInputGQL,
@@ -74,6 +91,12 @@ from .replica import (
     TrafficStatus,
     TrafficStatusFilter,
 )
+from .resource_slot import (
+    AllocatedResourceSlotFilterGQL,
+    AllocatedResourceSlotGQL,
+    AllocatedResourceSlotOrderByGQL,
+    AllocatedResourceSlotOrderFieldGQL,
+)
 from .revision import (
     ActivateRevisionInputGQL,
     ActivateRevisionPayloadGQL,
@@ -96,7 +119,6 @@ from .revision import (
     MountPermission,
     ResourceConfig,
     ResourceConfigInput,
-    ResourceGroupInput,
 )
 from .revision_preset import (
     CreateDeploymentRevisionPresetInputGQL,
@@ -108,6 +130,8 @@ from .revision_preset import (
     DeploymentRevisionPresetGQL,
     DeploymentRevisionPresetOrderByGQL,
     DeploymentRevisionPresetOrderFieldGQL,
+    PresetDeploymentDefaultsGQL,
+    PresetDeploymentStrategyInputGQL,
     UpdateDeploymentRevisionPresetInputGQL,
     UpdateDeploymentRevisionPresetPayloadGQL,
 )
@@ -134,6 +158,8 @@ __all__ = [
     "AccessTokenOrderBy",
     "CreateAccessTokenInput",
     "CreateAccessTokenPayload",
+    "DeleteAccessTokenInput",
+    "DeleteAccessTokenPayload",
     # Auto Scaling
     "AutoScalingMetricSource",
     "AutoScalingRule",
@@ -148,6 +174,7 @@ __all__ = [
     "UpdateAutoScalingRuleInput",
     "UpdateAutoScalingRulePayload",
     # Deployment
+    "AdminRefreshDeploymentRevisionsPayload",
     "CreateDeploymentInput",
     "CreateDeploymentPayload",
     "DeleteDeploymentInput",
@@ -164,13 +191,26 @@ __all__ = [
     "ModelDeploymentEdge",
     "ModelDeploymentMetadata",
     "ModelDeploymentMetadataInput",
+    "ProjectDeploymentScopeGQL",
     "ModelDeploymentNetworkAccess",
     "ModelDeploymentNetworkAccessInput",
+    "ReplaceDeploymentOptionsInputGQL",
+    "ReplaceDeploymentOptionsPayload",
     "ReplicaState",
+    "RevisionRefreshResult",
     "SyncReplicaInput",
     "SyncReplicaPayload",
     "UpdateDeploymentInput",
     "UpdateDeploymentPayload",
+    # Deployment Options
+    "DeploymentHandlerOptionsInfoGQL",
+    "DeploymentHandlerOptionsInputGQL",
+    "DeploymentOptionsInfoGQL",
+    "DeploymentOptionsInputGQL",
+    "HandlerOptionsEntryInfoGQL",
+    "HandlerOptionsEntryInputGQL",
+    "HandlerOptionsInfoGQL",
+    "HandlerOptionsInputGQL",
     # Policy
     "BlueGreenConfigInputGQL",
     "BlueGreenStrategySpecGQL",
@@ -217,7 +257,11 @@ __all__ = [
     "MountPermission",
     "ResourceConfig",
     "ResourceConfigInput",
-    "ResourceGroupInput",
+    # Allocated Resource Slot
+    "AllocatedResourceSlotFilterGQL",
+    "AllocatedResourceSlotGQL",
+    "AllocatedResourceSlotOrderByGQL",
+    "AllocatedResourceSlotOrderFieldGQL",
     # Route
     "Route",
     "RouteConnection",
@@ -240,6 +284,8 @@ __all__ = [
     "DeploymentRevisionPresetGQL",
     "DeploymentRevisionPresetOrderByGQL",
     "DeploymentRevisionPresetOrderFieldGQL",
+    "PresetDeploymentDefaultsGQL",
+    "PresetDeploymentStrategyInputGQL",
     "UpdateDeploymentRevisionPresetInputGQL",
     "UpdateDeploymentRevisionPresetPayloadGQL",
 ]

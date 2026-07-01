@@ -4,7 +4,9 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
@@ -157,12 +159,25 @@ class ImageProcessors(AbstractProcessorPackage):
         self.get_all_images = ActionProcessor(service.get_all_images, action_monitors)
         self.search_images = ActionProcessor(service.search_images, action_monitors)
 
-        # Single entity actions with RBAC validation
+        # Single entity actions — also invoked from gql_legacy, so use the
+        # non-enforcing legacy RBAC validator to avoid breaking legacy callers.
+        # Mocked test fixtures do not provide a legacy_rbac, so isinstance
+        # guards against MagicMock attribute access returning a truthy mock.
+        legacy_rbac = validators.legacy_rbac
+        legacy_single_entity_validator: SingleEntityActionValidator = (
+            legacy_rbac.single_entity
+            if isinstance(legacy_rbac, LegacyRBACValidators)
+            else validators.rbac.single_entity
+        )
         self.forget_image_by_id = SingleEntityActionProcessor(
-            service.forget_image_by_id, action_monitors, validators=[validators.rbac.single_entity]
+            service.forget_image_by_id,
+            action_monitors,
+            validators=[legacy_single_entity_validator],
         )
         self.purge_image_by_id = SingleEntityActionProcessor(
-            service.purge_image_by_id, action_monitors, validators=[validators.rbac.single_entity]
+            service.purge_image_by_id,
+            action_monitors,
+            validators=[legacy_single_entity_validator],
         )
         # Superadmin-only mutations — access is enforced by check_admin_only at the API layer,
         # so per-entity RBAC validation is not required here.

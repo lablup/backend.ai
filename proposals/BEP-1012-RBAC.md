@@ -138,58 +138,42 @@ Permission delegation is achieved through Role and Role Assignment management.
 
 ### Permission Types
 
-The RBAC system provides two types of permissions:
+The RBAC system uses Scoped Permissions to define access control:
 
-#### 1. Scoped Permission (Scope-Level Permission)
+#### Scoped Permission (Scope-Level Permission)
 
 Defines permissions for operations on an **entity type** within a specific scope.
 
-- Specifies: entity type (e.g., `vfolder`) + operation (e.g., `read`)
+- Specifies: scope + entity type (e.g., `vfolder`) + operation (e.g., `read`)
 - Applies to all entities of that type accessible within the scope
-- Example: `vfolder:read` permission allows reading all VFolders within the scope
+- Example: A role bound to Project-A with `vfolder:read` permission allows reading all VFolders within Project-A
 
-#### 2. Object Permission (Instance-Level Permission)
-
-Defines permissions for operations on a **specific entity instance**.
-
-- Specifies: entity type + entity ID + operation
-- Applies only to that specific entity
-- Example: `vfolder:{id}:read` permission allows reading only that specific VFolder
-- Can reference entities from different scopes, enabling cross-scope sharing
-- Attached directly to a Role, independent of the Role's scope binding
-
-**Cross-Scope Object Permissions**:
-When a Role bound to Project-A scope includes Object Permissions for entities in Project-B scope, the Project-B scope is automatically added to the Role. This enables scenarios like:
-- Sharing a personal VFolder with project team members
-- Granting access to a specific session across projects
-- Collaborative workflows spanning multiple scopes
+**Multi-Scope Permissions**:
+A single role can have different permissions per scope. For example, a "Cross-Project-Coordinator" role bound to both Project-A and Project-B can have `vfolder:read` in Project-A and `session:create` in Project-B.
 
 ### Role Structure
 
 Each Role in the RBAC system has the following structure:
 
 **Attributes**:
-- **Name**: Human-readable role name (e.g., "Project-A-Admin", "VFolder-X-Reader")
+- **Name**: Human-readable role name (e.g., "Project-A-Admin", "Cross-Project-Coordinator")
 - **Description**: Optional description of the role's purpose
-- **Scope Binding**: Every Role is bound to exactly one scope (Global, Domain, Project, or User)
+- **Scope Bindings**: A Role is bound to one or more scopes (Domain, Project, or User) via `association_scopes_entities`. Scope bindings determine:
+  1. Where the role is visible and manageable (e.g., which scope admin can see and assign the role)
+  2. Which scopes users assigned this role become members of
 - **Source**: Indicates whether the role is system-generated or custom-created
 
 **Permission Components**:
-- **Scoped Permissions**: A collection of scope-level permissions (entity type + operation) that apply within the Role's bound scope
-  - Example: `vfolder:read`, `compute_session:create`
-- **Object Permissions**: A collection of instance-level permissions (entity type + entity ID + operation)
-  - Can reference entities from any scope, enabling cross-scope sharing
-  - Example: `vfolder:abc-123:read`
+- **Scoped Permissions**: A collection of scope-level permissions (scope + entity type + operation)
+  - Example: A role bound to Project-A can have `vfolder:read`, `compute_session:create` for Project-A
 
 ```mermaid
 graph LR
     User -->|has| RoleAssignment
     RoleAssignment -->|references| Role
-    Role -->|bound to| Scope
+    Role -->|bound to| Scopes[Scope Bindings]
     Role -->|contains| ScopedPermission[Scoped Permissions]
-    Role -->|contains| ObjectPermission[Object Permissions]
     ScopedPermission -->|applies within| Scope
-    ObjectPermission -->|applies to| EntityInstance[Entity Instance]
 ```
 
 ### Role Source
@@ -207,14 +191,15 @@ Roles in the RBAC system have a source attribute indicating how they were create
 
 **Automatically Created System Sourced Roles**:
 - **Domain Admin**: Administrator role for domain scope
+- **Domain Member**: Default member role for domain scope (basic read access)
 - **Project Admin**: Administrator role for project scope
-- **User Owner**: Default role for user scope (for owned resources and shared resource access)
+- **Project Member**: Default member role for project scope (basic read access)
+- **User Owner**: Default role for user scope (for owned resources)
 
 **Characteristics**:
 - Cannot be individually deleted as they form the fundamental infrastructure of the scope
 - Automatically deleted when the scope is deleted
 - Multiple users can be assigned to the same system sourced role (via Role Assignments)
-- **Multi-scope binding support**: Especially for User Owner Role, when other users share resources, their scopes are automatically added to the role
 
 #### Custom Sourced Roles
 
@@ -227,54 +212,70 @@ Roles in the RBAC system have a source attribute indicating how they were create
 
 **Characteristics**:
 - Freely created, modified, and deleted by administrators as needed
+- Can be bound to one or more scopes, with different permissions per scope
 - Can define permission sets optimized for specific scopes or organizational structures
-- Enable fine-grained resource access control using Object Permissions
 
 ### Role Assignment Entity
 
-Role Assignment is a separate entity that maps users to roles within specific scopes. This design provides several benefits:
+Role Assignment is a separate entity that maps users to roles. This design provides several benefits:
 
 **Key Characteristics**:
 - **Separation of Concerns**: Role definition is independent of Role Assignment
 - **Flexible Management**: Create and manage Role Assignments without modifying the Role itself
 - **Audit Trail**: Each assignment tracks who granted it and when
 - **Consistent Operations**: Uses standard create/read/update operations instead of special-purpose operations
+- **Membership Determination**: A user's scope membership is automatically synced to `association_scopes_entities` when roles are assigned or unassigned
 
 **Role Assignment Attributes**:
 - `user_id`: The user receiving the role
 - `role_id`: The role being assigned
-- `scope_type` and `scope_id`: Where the role applies
 - `granted_by`: Who created this assignment
 - `granted_at`: When the assignment was created
-- `state`: Active or inactive
+
+**Scope Membership via Role Assignment**:
+When a user is assigned a role, the system automatically syncs user-scope membership entries in `association_scopes_entities` (with `entity_type='user'`). This replaces the previous `association_groups_users` table and unifies scope membership queries across all scope types.
+
+- **On role assign**: Insert user-scope entries for the role's bound scopes (`ON CONFLICT DO NOTHING` to handle overlap with other roles).
+- **On role unassign**: Delete user-scope entries only for scopes not covered by the user's remaining roles.
+
+**Querying Users in a Scope**:
+
+All scope types use a single-table lookup:
+
+```sql
+SELECT entity_id AS user_id
+FROM association_scopes_entities
+WHERE scope_type = :scope_type   -- 'domain', 'project', 'user'
+  AND scope_id = :scope_id
+  AND entity_type = 'user'
+```
+
+Previously, each scope type required a different query path (e.g., `association_groups_users` for projects, `users.domain_name` for domains). The new approach unifies all scope membership queries into a single-table pattern with no JOINs.
 
 **Example**:
-- Role: "Project-A-User" (defines permissions for Project A)
-- Role Assignment: User Alice → "Project-A-User" role
-- Result: Alice has the permissions defined in "Project-A-User" role within Project A scope
+- Role: "Project-A-Member" (bound to Project-A scope, with basic read permissions)
+- Role Assignment: User Alice → "Project-A-Member" role
+- Result: System inserts `(scope_type='project', scope_id='proj-A', entity_type='user', entity_id=alice_id)` into `association_scopes_entities`. Alice becomes a member of Project-A and has the permissions defined in the role.
 
 **Management**: Scope administrators (Domain Admin, Project Admin) typically have all Role Assignment management permissions for their scope, allowing them to assign roles, revoke assignments, and view all assignments within their scope.
 
 ### Scope Hierarchy
 
-Backend.AI uses a four-level scope hierarchy:
+Backend.AI uses a three-level scope hierarchy:
 
 ```mermaid
 graph TD
-    A[Global Scope] --> B[Domain Scope]
-    B --> C[Project Scope]
+    B[Domain Scope] --> C[Project Scope]
     C --> D[User Scope]
 ```
 
 **Scope Characteristics**:
-- **Global Scope**: System-wide resources and permissions
 - **Domain Scope**: Organizational units within the system
 - **Project Scope**: Collaborative workspaces within domains
 - **User Scope**: Individual user's private resources
 
 **Management Principle**:
 Each scope is managed independently by its respective administrators:
-- **Global Admin**: Manages global scope resources
 - **Domain Admin**: Manages their domain scope resources
 - **Project Admin**: Manages their project scope resources
 - **User Owner**: Manages their user scope resources
@@ -299,29 +300,25 @@ System sourced roles cannot be individually deleted:
 
 ### Resource Ownership
 
-In the RBAC system, resource ownership is managed through automatic Role Assignment creation, not as a separate ownership concept.
+In the RBAC system, resource ownership is managed through the creator's "User Owner" System Sourced Role, which is bound to the user's own scope.
 
 **Ownership Model**:
 
-When a user creates a resource (VFolder, Compute Session, Model Service, etc.), the system automatically adds Object Permissions to the creator's "User Owner" System Sourced Role.
+When a user creates a resource (VFolder, Compute Session, Model Service, etc.), the resource is associated with the creator's user scope via `association_scopes_entities`. The creator's "User Owner" role, bound to their user scope, provides full control over owned resources through Scoped Permissions.
 
 **Example - VFolder Creation**:
 ```
 1. User A creates VFolder-X in Project-A
-2. System automatically adds Object Permissions to User A's "User Owner" System Sourced Role:
-   - vfolder:X:read
-   - vfolder:X:update
-   - vfolder:X:soft-delete
-   - vfolder:X:hard-delete
-   - vfolder:assignment:X:create (permission to share with other users)
-   - vfolder:assignment:X:delete (permission to revoke shares)
-3. User A now has full control and sharing permissions over VFolder-X
+2. VFolder-X is associated with User A's user scope via association_scopes_entities
+3. User A's "User Owner" role (bound to user scope) grants full control:
+   - vfolder:read, vfolder:update, vfolder:soft-delete, vfolder:hard-delete
+4. User A can share VFolder-X with others via vfolder:assignment
 ```
 
 **Implications**:
-- Ownership is represented as Object Permissions in the "User Owner" System Sourced Role
-- Owned resources and shared resources are managed within the same Role
-- Resource creators delegate permissions by adding Object Permissions to other users' System Sourced Roles
+- Ownership is determined by the resource's scope association with the user scope
+- The "User Owner" role provides Scoped Permissions for all owned resources
+- Resource sharing is managed via assignment entities and role-scope bindings
 
 **Scope-Level Resources**:
 
@@ -391,45 +388,46 @@ When User A shares their VFolder with User B:
 
 **Sharing Process**:
 1. User A creates a `vfolder:assignment` entity
-2. System automatically adds Object Permissions to User B's "User Owner" System Sourced Role:
-   - `vfolder:{folder_id}:read`
-   - `vfolder:{folder_id}:update` (if write permission included)
-3. User B can immediately access the VFolder
+2. System adds a `ref` edge in `association_scopes_entities` linking User B's scope to VFolder-X
+3. System adds Scoped Permissions for VFolder-X's scope to User B's "User Owner" role:
+   - `vfolder:read` (and `vfolder:update` if write permission included)
+4. User B can immediately access the VFolder
 
 ```mermaid
 sequenceDiagram
     participant UserA as User A
     participant System
-    participant Assignment as vfolder:assignment
+    participant ASE as association_scopes_entities
     participant RoleB as User B's User Owner Role
     participant UserB as User B
 
     UserA->>System: Create vfolder:assignment
-    Note over System,Assignment: Target: User B, VFolder: X
-    System->>Assignment: Create assignment entity
-    System->>RoleB: Add Object Permissions<br/>(vfolder:X:read, update)
+    Note over System: Target: User B, VFolder: X
+    System->>ASE: Add ref edge<br/>(User B scope → VFolder X)
+    System->>RoleB: Add scope binding + permissions
     System->>UserB: Grant access
     UserB->>System: Access VFolder X ✓
 ```
 
 **Revoking Share**:
 - User A deletes the `vfolder:assignment` entity
-- System automatically removes the VFolder's Object Permissions from User B's System Sourced Role
+- System removes the `ref` edge and associated permissions from User B's role
 
 **Backward Compatibility**: Existing share/invite API continues to work, internally using this RBAC mechanism.
 
 #### 2. Session Access Control
 
-Project Admins can grant access to specific compute sessions by:
-- Adding Object Permissions to team members' System Sourced Roles
-- Or creating a Custom Role in project scope with Role Assignment
+Project Admins can grant access to compute sessions by:
+- Assigning a role with `session:read` permission bound to the project scope
+- Creating a Custom Role in project scope with appropriate Scoped Permissions
 
 #### 3. Custom Role Creation
 
 Project Admins can create custom roles tailored to their needs:
-- Define a Custom Role with necessary Scoped Permissions and Object Permissions
-- Assign the role to team members via Role Assignments
-- Permission updates automatically apply to all users with that role
+1. Create a Custom Role and declare its scope bindings (e.g., Project-A)
+2. Add Scoped Permissions within the declared scopes
+3. Assign the role to team members via Role Assignments
+4. Permission updates automatically apply to all users with that role
 
 ### Migration Strategy
 
@@ -437,9 +435,9 @@ Existing permissions will be migrated to the RBAC system:
 
 **Migration Targets**:
 - User roles (superadmin, user) → RBAC Roles and Role Assignments
-- Project memberships → Role Assignments in project scopes
-- Resource ownership → Object Permissions in System Sourced Roles
-- VFolder invitations → Object Permissions and `vfolder:assignment` entities
+- Project memberships (`association_groups_users`) → Role Assignments with project-scoped roles (sunset `association_groups_users`)
+- Resource ownership → Scope associations in `association_scopes_entities` with User Owner role
+- VFolder invitations → `ref` edges in `association_scopes_entities` and `vfolder:assignment` entities
 
 **Approach**: Gradual migration by entity type with backward compatibility maintained throughout the transition.
 

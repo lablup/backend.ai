@@ -23,6 +23,15 @@ from .my import my
 @click.group()
 def v2() -> None:
     """V2 REST API commands."""
+    # The real entry point for `./bai v2 ...` is the `LazyGroup` wrapper in
+    # `client/cli/__init__.py`, because `LazyGroup` does not delegate
+    # `MultiCommand.invoke` to the underlying group. This callback only runs
+    # when the inner group is invoked directly (e.g. tests, REPL), so we
+    # mirror the wrapper's `.env` auto-load here as a safety net.
+    # `load_dotenv` is idempotent — running on both paths is harmless.
+    from dotenv import find_dotenv, load_dotenv
+
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
 
 
 # Infrastructure commands
@@ -125,6 +134,39 @@ def service_catalog() -> None:
     """Service catalog commands."""
 
 
+# ------------------------------------------------------------------ Runtime Variants
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.runtime_variant:runtime_variant",
+    name="runtime-variant",
+)
+def runtime_variant() -> None:
+    """Runtime variant commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.runtime_variant_preset:runtime_variant_preset",
+    name="runtime-variant-preset",
+)
+def runtime_variant_preset() -> None:
+    """Runtime variant preset commands."""
+
+
+# ------------------------------------------------------------------ Model Store
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.model_card:model_card",
+    name="model-card",
+)
+def model_card() -> None:
+    """Model card commands."""
+
+
 # ------------------------------------------------------------------ Storage
 
 
@@ -152,6 +194,15 @@ def object_storage() -> None:
 
 
 # ------------------------------------------------------------------ RBAC & resources
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.login_client_type.commands:login_client_type",
+    name="login-client-type",
+)
+def login_client_type() -> None:
+    """Read-only commands for inspecting registered login client types."""
 
 
 @v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.rbac:rbac")
@@ -209,11 +260,6 @@ def notification() -> None:
     """Notification commands."""
 
 
-@v2.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.app_config:app_config")
-def app_config() -> None:
-    """App config commands."""
-
-
 @v2.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.prometheus_query_preset:prometheus_query_preset",
@@ -221,3 +267,12 @@ def app_config() -> None:
 )
 def prometheus_query_preset() -> None:
     """Prometheus query definition commands."""
+
+
+@v2.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.prometheus_query_preset_category:prometheus_query_preset_category",
+    name="prometheus-query-definition-category",
+)
+def prometheus_query_preset_category() -> None:
+    """Prometheus query definition category commands."""

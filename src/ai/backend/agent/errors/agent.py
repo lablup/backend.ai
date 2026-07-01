@@ -4,6 +4,8 @@ Agent operation-related exceptions.
 
 from __future__ import annotations
 
+from typing import Any
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -169,20 +171,6 @@ class ModelDefinitionInvalidYAMLError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class ModelDefinitionValidationError(BackendAIError, web.HTTPBadRequest):
-    """Raised when model definition validation fails."""
-
-    error_type = "https://api.backend.ai/probs/agent/model-definition-validation-failed"
-    error_title = "Model definition validation failed."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
 class ModelFolderNotSpecifiedError(BackendAIError, web.HTTPBadRequest):
     """Raised when no model virtual folder is specified."""
 
@@ -306,4 +294,133 @@ class KernelNotFoundError(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class InitializationError(BackendAIError, web.HTTPInternalServerError):
+    """Raised during agent initialization and compute plugin setup."""
+
+    error_type = "https://api.backend.ai/probs/agent/initialization-error"
+    error_title = "Agent initialization error."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class InvalidArgumentError(BackendAIError, web.HTTPBadRequest):
+    """Raised when an invalid argument is given to an agent operation."""
+
+    error_type = "https://api.backend.ai/probs/agent/invalid-argument"
+    error_title = "Invalid argument."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class UnsupportedBaseDistroError(BackendAIError, web.HTTPBadRequest):
+    """Raised when the base distribution of an image cannot be determined or supported."""
+
+    error_type = "https://api.backend.ai/probs/agent/unsupported-base-distro"
+    error_title = "Unsupported base distribution."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
+class ContainerCreationError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the underlying container runtime fails to create a container."""
+
+    error_type = "https://api.backend.ai/probs/agent/container-creation-error"
+    error_title = "Container creation error."
+
+    def __init__(
+        self, container_id: str, message: str | None = None, *args: Any, **kwargs: Any
+    ) -> None:
+        self.container_id = container_id
+        self.message = message
+        super().__init__(extra_msg=message)
+
+    def __reduce__(self) -> tuple[type[BackendAIError], tuple[Any, ...], dict[str, Any]]:
+        return (self.__class__, (self.container_id, self.message), self.__dict__)
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class K8sError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a Kubernetes operation fails."""
+
+    error_type = "https://api.backend.ai/probs/agent/k8s-error"
+    error_title = "Kubernetes error."
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(extra_msg=message)
+
+    def __reduce__(self) -> tuple[type[BackendAIError], tuple[Any, ...], dict[str, Any]]:
+        return (self.__class__, (self.message,), self.__dict__)
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class NetworkPluginNotFound(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a configured network plugin cannot be found."""
+
+    error_type = "https://api.backend.ai/probs/agent/network-plugin-not-found"
+    error_title = "Network plugin not found."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ServicePortAlreadyUsedError(BackendAIError, web.HTTPConflict):
+    """Raised when a port is already used by another service."""
+
+    error_type = "https://api.backend.ai/probs/agent/service-port-already-used"
+    error_title = "Service port already used."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class InvalidSocket(BackendAIError, web.HTTPInternalServerError):
+    """Raised when an invalid socket is encountered."""
+
+    error_type = "https://api.backend.ai/probs/agent/invalid-socket"
+    error_title = "Invalid socket."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

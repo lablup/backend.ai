@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.v2.fair_share.request import (
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
+    from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

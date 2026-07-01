@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections import defaultdict
 from collections.abc import (
     Iterable,
     Sequence,
 )
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -19,10 +17,7 @@ from typing import (
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
-import trafaret as t
 import yarl
-from ruamel.yaml import YAML
-from ruamel.yaml.error import YAMLError
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import (
@@ -34,18 +29,20 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from ai.backend.common.config import model_definition_iv
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
-    EndpointId,
     ResourceSlot,
-    RuntimeVariant,
-    SessionTypes,
     VFolderID,
     VFolderMount,
+    VFolderMountOptions,
+    VFolderMountRequest,
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -64,33 +61,32 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleSubStep,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
+    DeploymentOptions,
+    DeploymentPolicyData,
     DeploymentState,
     DeploymentSummaryData,
     ModelDeploymentAutoScalingRuleData,
-    ModelRevisionSpec,
-    ReplicaSpec,
+    ModelRevisionData,
+    ReplicaData,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
     EndpointLifecycle,
     EndpointTokenData,
+    ScalingState,
 )
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import ObjectNotFound, ServiceUnavailable
-from ai.backend.manager.errors.resource import DataTransformationFailed
+from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     DecimalType,
-    EndpointIDColumnType,
-    EnumValueType,
+    PydanticColumn,
     StrEnumType,
 )
 from ai.backend.manager.models.routing import RouteStatus
-from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 from ai.backend.manager.types import MountOptionModel, UserScope
@@ -102,6 +98,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
     from ai.backend.manager.models.routing import RoutingRow
     from ai.backend.manager.models.user import UserRow
 
@@ -113,8 +110,6 @@ __all__ = (
     "ModelServiceHelper",
 )
 
-
-type ModelServiceSerializableConnectionInfo = dict[str, list[dict[str, Any]]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -129,6 +124,31 @@ def _get_endpoint_revisions_join_condition() -> Any:
     from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
     return EndpointRow.id == foreign(DeploymentRevisionRow.endpoint)
+
+
+def _get_primary_replica_group_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+
+    return foreign(EndpointRow.primary_replica_group_id) == ReplicaGroupRow.id
+
+
+def _get_target_replica_group_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+
+    return foreign(EndpointRow.target_replica_group_id) == ReplicaGroupRow.id
+
+
+def _get_current_revision_secondaryjoin() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+
+    return foreign(ReplicaGroupRow.current_revision_id) == DeploymentRevisionRow.id
+
+
+def _get_deploying_revision_join_condition() -> sa.ColumnElement[bool]:
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+
+    return foreign(EndpointRow.deploying_revision_id) == DeploymentRevisionRow.id
 
 
 def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
@@ -166,22 +186,14 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     __table_args__ = (
         sa.Index(
-            "ix_endpoints_unique_name_when_not_destroyed",
-            "name",
-            "domain",
-            "project",
-            unique=True,
-            postgresql_where=(sa.column("lifecycle_stage") != EndpointLifecycle.DESTROYED.value),
-        ),
-        sa.Index(
             "ix_endpoints_lifecycle_sub_step",
             "lifecycle_stage",
             "sub_step",
         ),
     )
 
-    id: Mapped[EndpointId] = mapped_column(
-        "id", EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    id: Mapped[DeploymentID] = mapped_column(
+        "id", GUID(DeploymentID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=512), nullable=False)
     created_user: Mapped[UUID] = mapped_column("created_user", GUID, nullable=False)
@@ -214,9 +226,16 @@ class EndpointRow(Base):  # type: ignore[misc]
     )
     lifecycle_stage: Mapped[EndpointLifecycle] = mapped_column(
         "lifecycle_stage",
-        EnumValueType(EndpointLifecycle),
+        StrEnumType(EndpointLifecycle),
         nullable=False,
         default=EndpointLifecycle.PENDING,
+    )
+    scaling_state: Mapped[ScalingState] = mapped_column(
+        "scaling_state",
+        StrEnumType(ScalingState),
+        nullable=False,
+        default=ScalingState.STABLE,
+        server_default=ScalingState.STABLE.value,
     )
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
     open_to_public: Mapped[bool | None] = mapped_column("open_to_public", sa.Boolean, default=False)
@@ -225,11 +244,11 @@ class EndpointRow(Base):  # type: ignore[misc]
     retries: Mapped[int] = mapped_column(
         "retries", sa.Integer, nullable=False, default=0, server_default="0"
     )
-    created_at: Mapped[datetime | None] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.text("now()"),
-        nullable=True,
+        nullable=False,
     )
     destroyed_at: Mapped[datetime | None] = mapped_column(
         "destroyed_at",
@@ -237,10 +256,24 @@ class EndpointRow(Base):  # type: ignore[misc]
         nullable=True,
     )
 
-    # Revision management columns
-    current_revision: Mapped[UUID | None] = mapped_column("current_revision", GUID, nullable=True)
-    deploying_revision: Mapped[UUID | None] = mapped_column(
-        "deploying_revision", GUID, nullable=True
+    # Revision pointers live on the replica groups (see
+    # ``primary_replica_group_id`` / ``target_replica_group_id`` below): the
+    # current revision is the primary group's ``current_revision_id`` and the
+    # deploying revision is the target group's ``target_revision_id``.
+
+    # Replica group references (no FK; mirrors ``RoutingRow.revision`` and
+    # avoids a circular FK with ``replica_groups.deployment_id``).
+    # ``primary_replica_group_id`` is the group serving traffic;
+    # ``target_replica_group_id`` is the group being rolled out (``NULL``
+    # in the steady state).
+    primary_replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
+        "primary_replica_group_id", GUID(ReplicaGroupID), nullable=True
+    )
+    target_replica_group_id: Mapped[ReplicaGroupID | None] = mapped_column(
+        "target_replica_group_id", GUID(ReplicaGroupID), nullable=True
+    )
+    deploying_revision_id: Mapped[DeploymentRevisionID | None] = mapped_column(
+        "deploying_revision_id", GUID(DeploymentRevisionID), nullable=True
     )
     sub_step: Mapped[DeploymentLifecycleSubStep | None] = mapped_column(
         "sub_step",
@@ -253,6 +286,14 @@ class EndpointRow(Base):  # type: ignore[misc]
         sa.Integer,
         nullable=False,
         server_default=sa.text("10"),
+    )
+    # Per-deployment operational options (snapshot from the scaling
+    # group's ``default_deployment_options`` at create time).
+    options: Mapped[DeploymentOptions] = mapped_column(
+        "options",
+        PydanticColumn(DeploymentOptions),
+        nullable=False,
+        default=DeploymentOptions,
     )
 
     routings: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="endpoint_row")
@@ -281,6 +322,38 @@ class EndpointRow(Base):  # type: ignore[misc]
         "DeploymentRevisionRow",
         back_populates="endpoint_row",
         primaryjoin=_get_endpoint_revisions_join_condition,
+        order_by="DeploymentRevisionRow.revision_number.desc()",
+    )
+    primary_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
+        "ReplicaGroupRow",
+        primaryjoin=_get_primary_replica_group_join_condition,
+        viewonly=True,
+        uselist=False,
+    )
+    target_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
+        "ReplicaGroupRow",
+        primaryjoin=_get_target_replica_group_join_condition,
+        viewonly=True,
+        uselist=False,
+    )
+    # Sourced from the replica groups: the current revision is the primary
+    # group's ``current_revision_id`` and the deploying revision is the
+    # target group's ``target_revision_id`` (``None`` when no rollout is in
+    # progress). Joined through ``replica_groups`` so existing consumers
+    # (``to_deployment_info`` and the ``selectinload`` paths) are unchanged.
+    current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        secondary="replica_groups",
+        primaryjoin=_get_primary_replica_group_join_condition,
+        secondaryjoin=_get_current_revision_secondaryjoin,
+        viewonly=True,
+        uselist=False,
+    )
+    deploying_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
+        "DeploymentRevisionRow",
+        primaryjoin=_get_deploying_revision_join_condition,
+        viewonly=True,
+        uselist=False,
     )
 
     auto_scaling_policy: Mapped[DeploymentAutoScalingPolicyRow | None] = relationship(
@@ -327,7 +400,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -372,7 +454,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -387,7 +478,7 @@ class EndpointRow(Base):  # type: ignore[misc]
     async def batch_load(
         cls,
         session: AsyncSession,
-        endpoint_ids: Sequence[EndpointId],
+        endpoint_ids: Sequence[DeploymentID],
         domain: str | None = None,
         project: UUID | None = None,
         user_uuid: UUID | None = None,
@@ -417,7 +508,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -444,13 +544,19 @@ class EndpointRow(Base):  # type: ignore[misc]
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> Sequence[Self]:
         from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+        from ai.backend.manager.models.replica_group import ReplicaGroupRow
 
-        # Join through current revision to find endpoints by model
+        # Join through the primary replica group's current revision to find
+        # endpoints by model.
         query = (
             sa.select(EndpointRow)
             .join(
+                ReplicaGroupRow,
+                EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
+            )
+            .join(
                 DeploymentRevisionRow,
-                EndpointRow.current_revision == DeploymentRevisionRow.id,
+                ReplicaGroupRow.current_revision_id == DeploymentRevisionRow.id,
             )
             .where(
                 EndpointRow.lifecycle_stage.in_(status_filter)
@@ -468,7 +574,16 @@ class EndpointRow(Base):  # type: ignore[misc]
             query = query.options(selectinload(EndpointRow.session_owner_row))
         if load_revisions:
             query = query.options(
-                selectinload(EndpointRow.revisions).selectinload(DeploymentRevisionRow.image_row)
+                # Revision-resolution helpers (``_find_current_revision`` /
+                # ``_find_active_revision``) read the group-sourced
+                # current/deploying revision relationships, so load only those
+                # two revision rows — not the full revision history.
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -484,8 +599,8 @@ class EndpointRow(Base):  # type: ignore[misc]
         session: AsyncSession,
         metric_source: AutoScalingMetricSource,
         metric_name: str,
-        threshold: Decimal,
-        comparator: AutoScalingMetricComparator,
+        min_threshold: Decimal | None,
+        max_threshold: Decimal | None,
         step_size: int,
         cooldown_seconds: int = 300,
         min_replicas: int | None = None,
@@ -496,8 +611,8 @@ class EndpointRow(Base):  # type: ignore[misc]
             endpoint=self.id,
             metric_source=metric_source,
             metric_name=metric_name,
-            threshold=threshold,
-            comparator=comparator,
+            min_threshold=min_threshold,
+            max_threshold=max_threshold,
             step_size=step_size,
             cooldown_seconds=cooldown_seconds,
             min_replicas=min_replicas,
@@ -550,74 +665,35 @@ class EndpointRow(Base):  # type: ignore[misc]
         for session_row in session_rows:
             session_row.delegate_ownership(target_user_uuid, target_access_key)
 
-    async def generate_route_info(
-        self, db_sess: AsyncSession
-    ) -> ModelServiceSerializableConnectionInfo:
-        from ai.backend.manager.models.kernel import KernelRow
-        from ai.backend.manager.models.routing import RoutingRow
+    @property
+    def current_revision_id(self) -> DeploymentRevisionID | None:
+        """Active revision id, sourced from the primary replica group.
 
-        active_routes = await RoutingRow.list(db_sess, self.id, load_session=True)
-        running_main_kernels = await KernelRow.batch_load_main_kernels_by_session_id(
-            db_sess,
-            [
-                r.session
-                for r in active_routes
-                if r.status in RouteStatus.active_route_statuses()
-                and r.session
-                and r.session_row is not None
-                and r.session_row.status in [SessionStatus.RUNNING, SessionStatus.CREATING]
-            ],
-        )
-        if (num_routes_without_session := len(active_routes) - len(running_main_kernels)) > 0:
-            log.info(
-                "generate_route_info(): There are {} active routes without corresponding RUNNING sessions, "
-                "which may be still provisioning or being terminated. (Endpoint: {})",
-                num_routes_without_session,
-                self.id,
-            )
-        session_id_to_route_map = {r.session: r for r in active_routes}
-        connection_info: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
-        for kernel in running_main_kernels:
-            if kernel.service_ports is None:
-                log.debug(
-                    "generate_route_info(): Kernel {} has no service ports defined. Skipping.",
-                    kernel.id,
-                )
-                continue
-            service_ports_list = kernel.service_ports
-            num_inference_ports = len([*filter(lambda x: x["is_inference"], service_ports_list)])
-            if num_inference_ports > 1:
-                log.warning(
-                    "generate_route_info(): Multiple ({}) inference ports found. "
-                    "Currently only the first-seen inference port is used. (Endpoint: {})",
-                    num_inference_ports,
-                    self.id,
-                )
-            for port_info in service_ports_list:
-                if port_info["is_inference"]:
-                    connection_info[port_info["name"]].append({
-                        "session_id": str(kernel.session_id),
-                        "route_id": str(session_id_to_route_map[kernel.session_id].id),
-                        "kernel_host": kernel.kernel_host,
-                        "kernel_port": port_info["host_ports"][0],
-                    })
-                    break
-        return connection_info
+        Requires ``primary_replica_group_row`` to be eagerly loaded.
+        """
+        group = self.primary_replica_group_row
+        return group.current_revision_id if group is not None else None
 
     def _find_current_revision(self) -> DeploymentRevisionRow | None:
-        """Find the current revision row from eagerly loaded revisions.
+        """Active revision row, sourced from the primary replica group.
 
-        Requires revisions to be eagerly loaded via selectinload.
-
-        Raises:
-            RuntimeError: If revisions are not loaded (programming error).
+        Requires ``current_revision_row`` to be eagerly loaded.
         """
-        if not self.current_revision:
-            return None
-        for rev in self.revisions:
-            if rev.id == self.current_revision:
-                return rev
-        return None
+        return self.current_revision_row
+
+    def _find_active_revision(self) -> DeploymentRevisionRow | None:
+        """Return the revision representing the deployment's active spec.
+
+        Falls back to the deploying revision (the target group's
+        ``target_revision_id``) when the current revision is unset (e.g.
+        during the initial DEPLOYING phase before strategy completion).
+        Used by display/serialization paths that should reflect the spec
+        being deployed rather than rendering empty fields.
+
+        Requires ``current_revision_row`` and ``deploying_revision_row`` to
+        be eagerly loaded.
+        """
+        return self.current_revision_row or self.deploying_revision_row
 
     def to_summary_data(self) -> DeploymentSummaryData:
         return DeploymentSummaryData(
@@ -632,8 +708,8 @@ class EndpointRow(Base):  # type: ignore[misc]
             tag=self.tag,
             open_to_public=self.open_to_public or False,
             url=self.url,
-            current_revision=self.current_revision,
-            deploying_revision=self.deploying_revision,
+            current_revision=self.current_revision_id,
+            deploying_revision=self.deploying_revision_id,
             replicas=self.replicas,
             desired_replicas=self.desired_replicas,
             created_at=self.created_at,
@@ -646,24 +722,44 @@ class EndpointRow(Base):  # type: ignore[misc]
 
         Requires revisions and revisions.image_row to be eagerly loaded
         via selectinload for revision field population.
+        ``_find_active_revision`` prefers ``current_revision`` and falls
+        back to ``deploying_revision`` so the projection reflects the
+        spec currently being deployed during the initial DEPLOYING
+        phase. When neither pointer is set (PENDING endpoint without a
+        revision yet, or leftover orphan data), revision-derived fields
+        degrade to ``None`` / sentinel defaults and
+        ``runtime_variant_id`` stays ``None``; legacy response surfaces
+        render that as the historical blank state.
         """
-        current_rev = self._find_current_revision()
+        current_rev = self._find_active_revision()
         return EndpointData(
             id=self.id,
             name=self.name,
             image=(
                 current_rev.image_row.to_dataclass()
-                if current_rev and current_rev.image_row
+                if current_rev is not None and current_rev.image_row is not None
                 else None
             ),
             domain=self.domain,
             project=self.project,
             resource_group=self.resource_group,
-            resource_slots=current_rev.resource_slots if current_rev else ResourceSlot({}),
+            resource_slots=ResourceSlot({
+                r.slot_name: r.quantity for r in current_rev.resource_slot_rows
+            })
+            if current_rev is not None
+            else ResourceSlot({}),
             url=self.url or "",
-            model=current_rev.model or uuid.UUID(int=0) if current_rev else uuid.UUID(int=0),
-            model_definition_path=current_rev.model_definition_path if current_rev else None,
-            model_mount_destination=(current_rev.model_mount_destination if current_rev else None),
+            model=(
+                current_rev.model or uuid.UUID(int=0)
+                if current_rev is not None
+                else uuid.UUID(int=0)
+            ),
+            model_definition_path=(
+                current_rev.model_definition_path if current_rev is not None else None
+            ),
+            model_mount_destination=(
+                current_rev.model_mount_destination if current_rev is not None else None
+            ),
             created_user_id=self.created_user,
             created_user_email=(
                 self.created_user_row.email if self.created_user_row is not None else None
@@ -671,28 +767,38 @@ class EndpointRow(Base):  # type: ignore[misc]
             session_owner_id=self.session_owner,
             session_owner_email=self.session_owner_row.email if self.session_owner_row else "",
             tag=self.tag,
-            startup_command=current_rev.startup_command if current_rev else None,
-            bootstrap_script=current_rev.bootstrap_script if current_rev else None,
+            startup_command=current_rev.startup_command if current_rev is not None else None,
+            bootstrap_script=current_rev.bootstrap_script if current_rev is not None else None,
             callback_url=(
                 yarl.URL(current_rev.callback_url)
-                if current_rev and current_rev.callback_url
+                if current_rev is not None and current_rev.callback_url
                 else None
             ),
-            environ=current_rev.environ if current_rev else None,
-            resource_opts=current_rev.resource_opts if current_rev else None,
+            environ=current_rev.environ if current_rev is not None else None,
+            resource_opts=current_rev.resource_opts if current_rev is not None else None,
             replicas=self.replicas,
             cluster_mode=(
-                ClusterMode(current_rev.cluster_mode) if current_rev else ClusterMode.SINGLE_NODE
+                ClusterMode(current_rev.cluster_mode)
+                if current_rev is not None
+                else ClusterMode.SINGLE_NODE
             ),
-            cluster_size=current_rev.cluster_size if current_rev else 1,
+            cluster_size=current_rev.cluster_size if current_rev is not None else 1,
             open_to_public=self.open_to_public if self.open_to_public is not None else False,
-            created_at=self.created_at or datetime.now(UTC),
+            created_at=self.created_at,
             destroyed_at=self.destroyed_at,
             retries=self.retries,
             lifecycle_stage=self.lifecycle_stage,
-            runtime_variant=(current_rev.runtime_variant if current_rev else RuntimeVariant.CUSTOM),
-            extra_mounts=current_rev.extra_mounts if current_rev else [],
-            routings=[routing.to_data() for routing in self.routings] if self.routings else None,
+            runtime_variant_id=(
+                RuntimeVariantID(current_rev.runtime_variant_id)
+                if current_rev is not None
+                else None
+            ),
+            extra_mounts=current_rev.extra_mounts if current_rev is not None else [],
+            scaling_state=self.scaling_state,
+            model_definition=current_rev.model_definition if current_rev is not None else None,
+            routings=[routing.to_data() for routing in self.routings]
+            if self.routings is not None
+            else [],
         )
 
     @classmethod
@@ -723,25 +829,47 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
 
     def to_deployment_info(self) -> DeploymentInfo:
-        """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
-        policy_data = None
-        if self.deployment_policy is not None:
-            policy_data = self.deployment_policy.to_data()
+        """Full DeploymentInfo including the resolved current/deploying revision
+        rows. Requires the revision-row relationships to be eagerly loaded
+        (legacy REST v1 / engine read paths). The revision ids are derived from
+        those rows, so no separate replica-group load is needed.
+        """
+        current_row = self.current_revision_row
+        deploying_row = self.deploying_revision_row
+        return self._build_deployment_info(
+            current_revision_id=DeploymentRevisionID(current_row.id) if current_row else None,
+            deploying_revision_id=DeploymentRevisionID(deploying_row.id) if deploying_row else None,
+            current_revision=current_row.to_data() if current_row else None,
+            deploying_revision=deploying_row.to_data() if deploying_row else None,
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+        )
 
-        model_revisions: list[ModelRevisionSpec] = []
-        for rev_row in self.revisions:
-            if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
-                model_revisions.append(rev_row.to_model_revision_spec())
+    def to_modern_deployment_info(self) -> DeploymentInfo:
+        """Lightweight DeploymentInfo carrying only the revision *ids* (sourced
+        from the replica groups), without loading the full revision rows. Used
+        by the modern (v2) read path, which only needs the ids. Requires the
+        replica-group relationships to be eagerly loaded.
+        """
+        return self._build_deployment_info(
+            current_revision_id=self.current_revision_id,
+            deploying_revision_id=self.deploying_revision_id,
+            current_revision=None,
+            deploying_revision=None,
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+        )
 
-        info = self._to_deployment_info_with_revisions(model_revisions)
-        info.policy = policy_data
-        return info
-
-    def _to_deployment_info_with_revisions(
+    def _build_deployment_info(
         self,
-        model_revisions: list[ModelRevisionSpec],
+        current_revision_id: DeploymentRevisionID | None,
+        deploying_revision_id: DeploymentRevisionID | None,
+        current_revision: ModelRevisionData | None,
+        deploying_revision: ModelRevisionData | None,
+        policy: DeploymentPolicyData | None = None,
     ) -> DeploymentInfo:
-        """Build DeploymentInfo with pre-built model_revisions dict."""
+        """Build DeploymentInfo. The revision *ids* and the full
+        ``current_revision`` / ``deploying_revision`` data are supplied by the
+        caller (the full data is ``None`` on the modern read path).
+        """
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(
@@ -757,21 +885,28 @@ class EndpointRow(Base):  # type: ignore[misc]
             ),
             state=DeploymentState(
                 lifecycle=self.lifecycle_stage,
+                scaling_state=self.scaling_state,
                 retry_count=self.retries,
             ),
-            replica_spec=ReplicaSpec(
+            replica=ReplicaData(
                 replica_count=self.replicas,
                 desired_replica_count=self.desired_replicas,
             ),
-            network=DeploymentNetworkSpec(
+            network=DeploymentNetworkData(
                 open_to_public=self.open_to_public if self.open_to_public is not None else False,
+                access_token_ids=None,
                 url=self.url,
+                preferred_domain_name=None,
             ),
-            model_revisions=list(model_revisions),
-            current_revision_id=self.current_revision,
-            deploying_revision_id=self.deploying_revision,
+            options=self.options,
+            current_revision_id=current_revision_id,
+            deploying_revision_id=deploying_revision_id,
+            current_revision=current_revision,
+            deploying_revision=deploying_revision,
             sub_step=self.sub_step,
-            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+            policy=policy,
+            primary_replica_group_id=self.primary_replica_group_id,
+            target_replica_group_id=self.target_replica_group_id,
         )
 
 
@@ -782,7 +917,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
     token: Mapped[str] = mapped_column("token", sa.String(), nullable=False)
-    endpoint: Mapped[UUID | None] = mapped_column("endpoint", GUID, nullable=True)
+    endpoint: Mapped[DeploymentID | None] = mapped_column("endpoint", GUID, nullable=True)
     session_owner: Mapped[UUID] = mapped_column("session_owner", GUID, nullable=False)
     domain: Mapped[str] = mapped_column(
         "domain",
@@ -796,8 +931,11 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         sa.ForeignKey("groups.id", ondelete="CASCADE"),
         nullable=False,
     )
-    created_at: Mapped[datetime | None] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
+    expires_at: Mapped[datetime | None] = mapped_column(
+        "expires_at", sa.DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
     )
 
     endpoint_row: Mapped[EndpointRow | None] = relationship(
@@ -811,10 +949,11 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         self,
         id: UUID,
         token: str,
-        endpoint: UUID,
+        endpoint: DeploymentID,
         domain: str,
         project: UUID,
         session_owner: UUID,
+        expires_at: datetime | None = None,
     ) -> None:
         self.id = id
         self.token = token
@@ -822,6 +961,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
         self.domain = domain
         self.project = project
         self.session_owner = session_owner
+        self.expires_at = expires_at
 
     @classmethod
     async def list(
@@ -887,7 +1027,7 @@ class EndpointTokenRow(Base):  # type: ignore[misc]
             domain=self.domain,
             project=self.project,
             session_owner=self.session_owner,
-            created_at=self.created_at or datetime.now(UTC),
+            created_at=self.created_at,
         )
 
 
@@ -901,9 +1041,11 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         "metric_source", StrEnumType(AutoScalingMetricSource, use_name=False), nullable=False
     )
     metric_name: Mapped[str] = mapped_column("metric_name", sa.Text(), nullable=False)
-    threshold: Mapped[Decimal] = mapped_column("threshold", DecimalType(), nullable=False)
-    comparator: Mapped[AutoScalingMetricComparator] = mapped_column(
-        "comparator", StrEnumType(AutoScalingMetricComparator, use_name=False), nullable=False
+    min_threshold: Mapped[Decimal | None] = mapped_column(
+        "min_threshold", DecimalType(), nullable=True
+    )
+    max_threshold: Mapped[Decimal | None] = mapped_column(
+        "max_threshold", DecimalType(), nullable=True
     )
     step_size: Mapped[int] = mapped_column("step_size", sa.Integer(), nullable=False)
     cooldown_seconds: Mapped[int] = mapped_column(
@@ -913,11 +1055,18 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     min_replicas: Mapped[int | None] = mapped_column("min_replicas", sa.Integer(), nullable=True)
     max_replicas: Mapped[int | None] = mapped_column("max_replicas", sa.Integer(), nullable=True)
 
-    created_at: Mapped[datetime | None] = mapped_column(
+    prometheus_query_preset_id: Mapped[UUID | None] = mapped_column(
+        "prometheus_query_preset_id",
+        GUID,
+        sa.ForeignKey("prometheus_query_presets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.text("now()"),
-        nullable=True,
+        nullable=False,
     )
     last_triggered_at: Mapped[datetime | None] = mapped_column(
         "last_triggered_at",
@@ -925,7 +1074,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         nullable=True,
     )
 
-    endpoint: Mapped[UUID] = mapped_column(
+    endpoint: Mapped[DeploymentID] = mapped_column(
         "endpoint",
         GUID,
         sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
@@ -974,18 +1123,27 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         await session.delete(self)
 
     def to_data(self) -> EndpointAutoScalingRuleData:
+        if self.max_threshold is not None:
+            threshold_str = str(self.max_threshold)
+            comparator = AutoScalingMetricComparator.GREATER_THAN
+        elif self.min_threshold is not None:
+            threshold_str = str(self.min_threshold)
+            comparator = AutoScalingMetricComparator.LESS_THAN
+        else:
+            threshold_str = "0"
+            comparator = AutoScalingMetricComparator.GREATER_THAN
         return EndpointAutoScalingRuleData(
             id=self.id,
             metric_source=self.metric_source,
             metric_name=self.metric_name,
-            threshold=str(self.threshold),
-            comparator=self.comparator,
+            threshold=threshold_str,
+            comparator=comparator,
             step_size=self.step_size,
             cooldown_seconds=self.cooldown_seconds,
             min_replicas=self.min_replicas or 0,
             max_replicas=self.max_replicas or 0,
-            created_at=self.created_at or datetime.now(UTC),
-            last_triggered_at=self.last_triggered_at or datetime.now(UTC),
+            created_at=self.created_at,
+            last_triggered_at=self.last_triggered_at,
             endpoint=self.endpoint,
         )
 
@@ -996,12 +1154,13 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
             endpoint=endpoint_id,
             metric_source=creator.condition.metric_source,
             metric_name=creator.condition.metric_name,
-            threshold=creator.condition.threshold,
-            comparator=creator.condition.comparator,
+            min_threshold=creator.condition.scale_down_threshold,
+            max_threshold=creator.condition.scale_up_threshold,
             step_size=creator.action.step_size,
             cooldown_seconds=creator.action.cooldown_seconds,
             min_replicas=creator.action.min_replicas,
             max_replicas=creator.action.max_replicas,
+            prometheus_query_preset_id=creator.condition.prometheus_query_preset_id,
         )
 
     def to_autoscaling_rule(self) -> AutoScalingRule:
@@ -1010,8 +1169,9 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
             condition=AutoScalingCondition(
                 metric_source=self.metric_source,
                 metric_name=self.metric_name,
-                threshold=str(self.threshold),
-                comparator=self.comparator,
+                scale_up_threshold=self.max_threshold,
+                scale_down_threshold=self.min_threshold,
+                prometheus_query_preset_id=self.prometheus_query_preset_id,
             ),
             action=AutoScalingAction(
                 step_size=self.step_size,
@@ -1019,7 +1179,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
                 min_replicas=self.min_replicas,
                 max_replicas=self.max_replicas,
             ),
-            created_at=self.created_at or datetime.now(UTC),
+            created_at=self.created_at,
             last_triggered_at=self.last_triggered_at,
         )
 
@@ -1028,60 +1188,36 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     @classmethod
     def from_model_deployment_creator(cls, creator: ModelDeploymentAutoScalingRuleCreator) -> Self:
         """Create from ModelDeploymentAutoScalingRuleCreator (new type)."""
-        # Map min/max threshold to single threshold + comparator
-        # If max_threshold is set, use it with GREATER_THAN (scale down when above)
-        # If only min_threshold is set, use it with LESS_THAN (scale up when below)
-        if creator.max_threshold is not None:
-            threshold = creator.max_threshold
-            comparator = AutoScalingMetricComparator.GREATER_THAN
-        elif creator.min_threshold is not None:
-            threshold = creator.min_threshold
-            comparator = AutoScalingMetricComparator.LESS_THAN
-        else:
-            # Default: no threshold means no scaling trigger
-            threshold = Decimal("0")
-            comparator = AutoScalingMetricComparator.GREATER_THAN
-
         return cls(
             id=uuid4(),
             endpoint=creator.model_deployment_id,
             metric_source=creator.metric_source,
             metric_name=creator.metric_name,
-            threshold=threshold,
-            comparator=comparator,
+            min_threshold=creator.min_threshold,
+            max_threshold=creator.max_threshold,
             step_size=creator.step_size,
-            cooldown_seconds=creator.time_window,  # Map time_window to cooldown_seconds
+            cooldown_seconds=creator.time_window,
             min_replicas=creator.min_replicas,
             max_replicas=creator.max_replicas,
+            prometheus_query_preset_id=creator.prometheus_query_preset_id,
         )
 
     def to_model_deployment_data(self) -> ModelDeploymentAutoScalingRuleData:
         """Convert to ModelDeploymentAutoScalingRuleData (new type)."""
-        # Map threshold + comparator back to min/max threshold
-        min_threshold: Decimal | None = None
-        max_threshold: Decimal | None = None
-
-        if self.comparator == AutoScalingMetricComparator.GREATER_THAN:
-            max_threshold = self.threshold
-        elif self.comparator == AutoScalingMetricComparator.LESS_THAN:
-            min_threshold = self.threshold
-        else:
-            # For other comparators (EQUAL, etc.), default to max_threshold
-            max_threshold = self.threshold
-
         return ModelDeploymentAutoScalingRuleData(
             id=self.id,
             model_deployment_id=self.endpoint,
             metric_source=self.metric_source,
             metric_name=self.metric_name,
-            min_threshold=min_threshold,
-            max_threshold=max_threshold,
+            min_threshold=self.min_threshold,
+            max_threshold=self.max_threshold,
             step_size=self.step_size,
-            time_window=self.cooldown_seconds,  # Map cooldown_seconds to time_window
+            time_window=self.cooldown_seconds,
             min_replicas=self.min_replicas,
             max_replicas=self.max_replicas,
-            created_at=self.created_at or datetime.now(UTC),
-            last_triggered_at=self.last_triggered_at or datetime.now(UTC),
+            created_at=self.created_at,
+            last_triggered_at=self.last_triggered_at,
+            prometheus_query_preset_id=self.prometheus_query_preset_id,
         )
 
     def apply_model_deployment_modifier(
@@ -1089,74 +1225,17 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     ) -> None:
         """Apply ModelDeploymentAutoScalingRuleModifier to update fields.
 
-        Uses OptionalState pattern where optional_value() returns the value to update
-        or None if no update should be performed.
+        Uses fields_to_update() which honours both OptionalState (NOP/UPDATE)
+        and TriState (NOP/UPDATE/NULLIFY). Dict keys match DB column names so
+        each entry can be applied directly via setattr, preserving NULLIFY
+        semantics for nullable columns (min/max_threshold, min/max_replicas,
+        prometheus_query_preset_id).
         """
-        if (metric_source := modifier.metric_source.optional_value()) is not None:
-            self.metric_source = metric_source
-        if (metric_name := modifier.metric_name.optional_value()) is not None:
-            self.metric_name = metric_name
-        if (step_size := modifier.step_size.optional_value()) is not None:
-            self.step_size = step_size
-        if (time_window := modifier.time_window.optional_value()) is not None:
-            self.cooldown_seconds = time_window
-        if (min_replicas := modifier.min_replicas.optional_value()) is not None:
-            self.min_replicas = min_replicas
-        if (max_replicas := modifier.max_replicas.optional_value()) is not None:
-            self.max_replicas = max_replicas
-
-        # Update threshold and comparator based on min/max threshold
-        if (max_threshold := modifier.max_threshold.optional_value()) is not None:
-            self.threshold = max_threshold
-            self.comparator = AutoScalingMetricComparator.GREATER_THAN
-        elif (min_threshold := modifier.min_threshold.optional_value()) is not None:
-            self.threshold = min_threshold
-            self.comparator = AutoScalingMetricComparator.LESS_THAN
+        for column_name, value in modifier.fields_to_update().items():
+            setattr(self, column_name, value)
 
 
 class ModelServiceHelper:
-    @staticmethod
-    async def check_scaling_group(
-        conn: AsyncConnection,
-        scaling_group: str,
-        owner_access_key: AccessKey,
-        target_domain: str,
-        target_project: str | UUID,
-    ) -> str:
-        """
-        Wrapper of `registry.check_scaling_group()` with additional guards flavored for
-        model service included
-        """
-        from ai.backend.manager.registry import check_scaling_group
-
-        checked_scaling_group = await check_scaling_group(
-            conn,
-            scaling_group,
-            SessionTypes.INFERENCE,
-            owner_access_key,
-            target_domain,
-            target_project,
-        )
-
-        query = (
-            sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
-            .select_from(scaling_groups)
-            .where(scaling_groups.c.name == checked_scaling_group)
-        )
-
-        result = await conn.execute(query)
-        sgroup = result.first()
-        if sgroup is None:
-            raise ServiceUnavailable("Scaling group not found")
-        wsproxy_addr = sgroup.wsproxy_addr
-        if not wsproxy_addr:
-            raise ServiceUnavailable("No coordinator configured for this resource group")
-
-        if not sgroup.wsproxy_api_token:
-            raise ServiceUnavailable("Scaling group not ready to start model service")
-
-        return checked_scaling_group
-
     @staticmethod
     async def check_extra_mounts(
         conn: AsyncConnection,
@@ -1179,25 +1258,17 @@ class ModelServiceHelper:
                 "Same VFolder appears on both model specification and VFolder mount"
             )
 
-        requested_mounts = [*extra_mounts.keys()]
-        requested_mount_map: dict[str | UUID, str] = {
-            folder_id: options.mount_destination
+        mount_requests = [
+            VFolderMountRequest(
+                ref=folder_id,
+                dst_path=options.mount_destination,
+                options=VFolderMountOptions(
+                    permission=options.permission,
+                    subpath=options.subpath,
+                ),
+            )
             for folder_id, options in extra_mounts.items()
-            if options.mount_destination
-        }
-        requested_mount_options: dict[str | UUID, Any] = {
-            folder_id: {
-                "type": options.type,
-                "permission": options.permission,
-            }
-            for folder_id, options in extra_mounts.items()
-        }
-        log.debug(
-            "requested mounts: {}, mount_map: {}, mount_options: {}",
-            requested_mounts,
-            requested_mount_map,
-            requested_mount_options,
-        )
+        ]
         allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
         vfolder_mounts = await prepare_vfolder_mounts(
             conn,
@@ -1205,9 +1276,7 @@ class ModelServiceHelper:
             allowed_vfolder_types,
             user_scope,
             resource_policy,
-            requested_mounts,
-            requested_mount_map,
-            requested_mount_options,
+            mount_requests,
         )
 
         for vfolder in vfolder_mounts:
@@ -1237,96 +1306,3 @@ class ModelServiceHelper:
             relpath,
         )
         return cast(dict[str, Any], result)
-
-    @staticmethod
-    async def validate_model_definition_file_exists(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        suggested_path: str | None,
-    ) -> str:
-        """
-        Checks if model definition file exists in target model VFolder. Returns path to resolved model definition filename.
-        Since model service counts both `model-definition.yml` and `model-definition.yaml` as valid definition file name, this function ensures
-        at least one model definition file exists under the target VFolder and returns the matched filename.
-        """
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
-
-        if suggested_path:
-            path = Path(suggested_path)
-            storage_reply = await ModelServiceHelper._listdir(
-                storage_manager, proxy_name, volume_name, vfid, path.parent.as_posix()
-            )
-            for item in storage_reply["items"]:
-                if item["name"] == path.name:
-                    return suggested_path
-            else:
-                raise InvalidAPIParameters(
-                    f"Model definition YAML file {suggested_path} not found inside the model storage"
-                )
-        else:
-            storage_reply = await ModelServiceHelper._listdir(
-                storage_manager, proxy_name, volume_name, vfid, "."
-            )
-            model_definition_candidates = ["model-definition.yaml", "model-definition.yml"]
-            for item in storage_reply["items"]:
-                if item["name"] in model_definition_candidates:
-                    result: str = item["name"]
-                    return result
-            else:
-                raise InvalidAPIParameters(
-                    'Model definition YAML file "model-definition.yaml" or "model-definition.yml" not found inside the model storage'
-                )
-
-    @staticmethod
-    async def _read_model_definition(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        model_definition_filename: str,
-    ) -> dict[str, Any]:
-        """
-        Reads specified model definition file from target VFolder and returns
-        """
-        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
-        manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
-        chunks = await manager_facing_client.fetch_file_content(
-            volume_name,
-            str(vfid),
-            f"./{model_definition_filename}",
-        )
-        model_definition_yaml = chunks.decode("utf-8")
-        yaml = YAML()
-        result: dict[str, Any] = yaml.load(model_definition_yaml)
-        return result
-
-    @staticmethod
-    async def validate_model_definition(
-        storage_manager: StorageSessionManager,
-        folder_host: str,
-        vfid: VFolderID,
-        model_definition_path: str,
-    ) -> dict[str, Any]:
-        """
-        Checks if model definition YAML exists and is syntactically perfect.
-        Returns validated model definition configuration.
-        """
-        raw_model_definition = await ModelServiceHelper._read_model_definition(
-            storage_manager,
-            folder_host,
-            vfid,
-            model_definition_path,
-        )
-
-        try:
-            model_definition = model_definition_iv.check(raw_model_definition)
-            if model_definition is None:
-                raise DataTransformationFailed("Model definition validation returned None")
-            result: dict[str, Any] = model_definition
-            return result
-        except t.DataError as e:
-            raise InvalidAPIParameters(
-                f"Failed to validate model definition from VFolder (ID {vfid.folder_id}): {e}",
-            ) from e
-        except YAMLError as e:
-            raise InvalidAPIParameters(f"Invalid YAML syntax: {e}") from e

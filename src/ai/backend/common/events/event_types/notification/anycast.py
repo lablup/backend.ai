@@ -4,16 +4,17 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any, override
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.json import dump_json_str, load_json
+from ai.backend.common.types import BackendAISchema
 
 __all__ = ("NotificationTriggeredEvent",)
 
 
-class NotificationTriggeredEvent(AbstractAnycastEvent, BaseModel):
+class NotificationTriggeredEvent(AbstractAnycastEvent, BackendAISchema):
     """
     Event triggered when a notification needs to be processed.
     This is an anycast event ensuring only one handler processes each notification.

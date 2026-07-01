@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SchedulingResultType,
     SessionHistoryOrderField,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestSessionHistoryFilter:
@@ -105,15 +106,15 @@ class TestSearchSessionHistoryInput:
         assert req.limit == 1000
 
     def test_limit_below_minimum_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchSessionHistoryInput(limit=0)
 
     def test_limit_above_maximum_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchSessionHistoryInput(limit=1001)
 
     def test_negative_offset_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchSessionHistoryInput(offset=-1)
 
     def test_with_filter_by_session_id(self) -> None:
@@ -177,7 +178,7 @@ class TestSearchDeploymentHistoryInput:
         assert req.offset == 0
 
     def test_limit_below_minimum_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchDeploymentHistoryInput(limit=0)
 
     def test_round_trip_serialization(self) -> None:
@@ -236,7 +237,7 @@ class TestSearchRouteHistoryInput:
         assert req.offset == 0
 
     def test_limit_below_minimum_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchRouteHistoryInput(limit=0)
 
     def test_round_trip_serialization(self) -> None:

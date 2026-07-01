@@ -123,3 +123,9 @@ async def auth_user_registry(
         yield registry
     finally:
         await registry.close()
+
+
+@pytest.fixture
+def sample_client_type_id() -> uuid.UUID:
+    """Well-known 'webui' login_client_type UUID from migration seed data."""
+    return uuid.UUID("00000000-0000-0000-0000-0000000000eb")

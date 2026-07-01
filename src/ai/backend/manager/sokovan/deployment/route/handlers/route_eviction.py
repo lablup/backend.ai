@@ -10,6 +10,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
     RouteStatusTransitions,
+    RouteSubStatus,
     RouteTargetStatuses,
     RouteTransitionTarget,
 )
@@ -25,10 +26,16 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 class RouteEvictionHandler(RouteHandler):
     """
-    Handler for evicting unhealthy routes based on scaling group configuration.
+    Handler for evicting routes that are no longer needed.
 
-    This handler checks routes in UNHEALTHY state and marks them for
-    termination if their status is in the scaling group's cleanup_target_statuses.
+    Two eviction reasons are checked together:
+
+    - **Health-based**: a RUNNING route whose health status is listed in
+      the scaling group's ``cleanup_target_statuses`` (default: UNHEALTHY).
+    - **Orphan revision**: an active (PROVISIONING / RUNNING) route whose
+      ``revision_id`` belongs to neither the endpoint's ``current_revision``
+      nor its ``deploying_revision``. This catches leftovers from a
+      preempted rollout, regardless of endpoint lifecycle.
     """
 
     def __init__(
@@ -55,26 +62,33 @@ class RouteEvictionHandler(RouteHandler):
 
     @classmethod
     def target_statuses(cls) -> RouteTargetStatuses:
+        # The handler runs over every active route (PROVISIONING / RUNNING)
+        # regardless of health, because the orphan-revision check applies
+        # to both lifecycle states. The scaling-group health policy still
+        # filters to UNHEALTHY internally inside the executor.
         return RouteTargetStatuses(
-            lifecycle=[RouteStatus.RUNNING],
-            health=[RouteHealthStatus.UNHEALTHY],
+            lifecycle=[RouteStatus.PROVISIONING, RouteStatus.RUNNING],
+            health=list(RouteHealthStatus),
         )
 
     @classmethod
     def status_transitions(cls) -> RouteStatusTransitions:
-        """Eviction: success → TERMINATING, failure → no change."""
+        """Eviction: success → TERMINATING (draining stage), failure → no change."""
         return RouteStatusTransitions(
-            success=RouteTransitionTarget(status=RouteStatus.TERMINATING),
+            success=RouteTransitionTarget(
+                status=RouteStatus.TERMINATING,
+                sub_status=RouteSubStatus.DRAINING,
+            ),
             failure=None,
             stale=None,
         )
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """
-        Execute eviction for unhealthy routes based on scaling group configuration.
+        Execute eviction for routes flagged by either eviction reason.
 
-        For each route, checks if its endpoint's scaling group has the route's current status
-        in cleanup_target_statuses. If so, marks the route for termination.
+        Delegates to the executor, which combines the orphan-revision
+        check with the scaling-group health policy in a single pass.
         """
         log.debug("Checking {} routes for eviction", len(routes))
 

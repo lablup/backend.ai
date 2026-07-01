@@ -274,11 +274,11 @@ async def user_fair_shares(
         added_version="26.2.0",
         description="Upsert user fair share weight (admin only). Creates a new record if it doesn't exist, or updates the weight if it does",
     )
-)  # type: ignore[misc]
+)
 async def admin_upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: UpsertUserFairShareWeightInput,
-) -> UpsertUserFairShareWeightPayload:
+) -> UpsertUserFairShareWeightPayload | None:
     """Upsert user fair share weight (admin only)."""
     check_admin_only()
 
@@ -293,11 +293,11 @@ async def admin_upsert_user_fair_share_weight(
         added_version="26.2.0",
         description="Bulk upsert user fair share weights (admin only). Creates new records if they don't exist, or updates weights if they do",
     )
-)  # type: ignore[misc]
+)
 async def admin_bulk_upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: BulkUpsertUserFairShareWeightInput,
-) -> BulkUpsertUserFairShareWeightPayload:
+) -> BulkUpsertUserFairShareWeightPayload | None:
     """Bulk upsert user fair share weights (admin only)."""
     check_admin_only()
 
@@ -314,11 +314,11 @@ async def admin_bulk_upsert_user_fair_share_weight(
         description="Upsert user fair share weight (superadmin only). Creates a new record if it doesn't exist, or updates the weight if it does",
     ),
     deprecation_reason="Use admin_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: UpsertUserFairShareWeightInput,
-) -> UpsertUserFairShareWeightPayload:
+) -> UpsertUserFairShareWeightPayload | None:
     """Upsert user fair share weight."""
     me = current_user()
     if me is None or not me.is_superadmin:
@@ -336,11 +336,11 @@ async def upsert_user_fair_share_weight(
         description="Bulk upsert user fair share weights (superadmin only). Creates new records if they don't exist, or updates weights if they do",
     ),
     deprecation_reason="Use admin_bulk_upsert_user_fair_share_weight instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
-)  # type: ignore[misc]
+)
 async def bulk_upsert_user_fair_share_weight(
     info: Info[StrawberryGQLContext],
     input: BulkUpsertUserFairShareWeightInput,
-) -> BulkUpsertUserFairShareWeightPayload:
+) -> BulkUpsertUserFairShareWeightPayload | None:
     """Bulk upsert user fair share weights."""
     me = current_user()
     if me is None or not me.is_superadmin:

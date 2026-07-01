@@ -22,19 +22,21 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.options import HandlerOptions
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
     SessionStatus,
     StatusTransitions,
     TransitionStatus,
 )
-from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
 from ai.backend.manager.sokovan.scheduler.coordinator import (
     FailureClassificationResult,
+    HookExecutionResult,
     ScheduleCoordinator,
 )
 from ai.backend.manager.sokovan.scheduler.post_processors import PostProcessorContext
+from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
     KernelExecutionResult,
     KernelTransitionInfo,
@@ -47,19 +49,33 @@ from ai.backend.manager.sokovan.scheduler.results import (
 # =============================================================================
 
 
+_TEST_HANDLER_NAME = "test-handler"
+
+
 def _create_session_with_kernels(
     session_id: SessionId,
     status: SessionStatus = SessionStatus.PREPARING,
     phase_attempts: int = 0,
     phase_started_at: datetime | None = None,
+    timeout: int | None = None,
+    max_retry_count: int | None = None,
 ) -> MagicMock:
-    """Create a mock SessionWithKernels for testing."""
+    """Create a mock SessionWithKernels with a stub ``handler_options``.
+
+    The stub's ``resolve(handler_name)`` returns a ``HandlerOptions``
+    built from ``timeout`` / ``max_retry_count``, mirroring the live
+    per-handler resolution path used by the coordinator.
+    """
     mock = MagicMock()
     mock.session_info.identity.id = session_id
     mock.session_info.lifecycle.status = status
     mock.phase_attempts = phase_attempts
     mock.phase_started_at = phase_started_at
     mock.kernel_infos = []
+    mock.session_info.handler_options.resolve.return_value = HandlerOptions(
+        timeout=timeout,
+        max_retry_count=max_retry_count,
+    )
     return mock
 
 
@@ -87,18 +103,17 @@ class TestScheduleCoordinatorFailureClassification:
     """Tests for failure classification logic in ScheduleCoordinator.
 
     The coordinator classifies failures into:
-    - give_up: phase_attempts >= SERVICE_MAX_RETRIES
-    - expired: timeout exceeded based on STATUS_TIMEOUT_MAP
+    - give_up: per-handler max_retry_count is set AND
+      phase_attempts >= max_retry_count
+    - expired: per-handler timeout is set AND elapsed > timeout
     - need_retry: default (can be retried)
+
+    `None` on either dimension means "no limit" — the matching
+    classification simply does not fire.
     """
 
     def test_give_up_on_max_attempts_exceeded(self) -> None:
-        """SC-CO-001: Give up when max attempts exceeded.
-
-        Given: Session with phase_attempts >= SERVICE_MAX_RETRIES
-        When: Coordinator classifies failures
-        Then: Session is classified as give_up
-        """
+        """SC-CO-001: Give up when max_retry_count is set and reached."""
         # Arrange
         session_id = SessionId(uuid4())
         failure = _create_session_transition_info(session_id=session_id)
@@ -106,15 +121,17 @@ class TestScheduleCoordinatorFailureClassification:
         session = _create_session_with_kernels(
             session_id=session_id,
             status=SessionStatus.PREPARING,
-            phase_attempts=SERVICE_MAX_RETRIES,  # At max retries
+            phase_attempts=5,
+            max_retry_count=5,  # Limit reached
         )
 
-        # Act - Directly test the classification method
+        # Act
         result = ScheduleCoordinator._classify_failures(
             None,  # type: ignore[arg-type]
             failures=[failure],
             sessions=[session],
             current_time=datetime.now(tzutc()),
+            handler_name=_TEST_HANDLER_NAME,
         )
 
         # Assert
@@ -124,12 +141,7 @@ class TestScheduleCoordinatorFailureClassification:
         assert result.give_up[0].session_id == session_id
 
     def test_expired_on_timeout_exceeded(self) -> None:
-        """SC-CO-002: Expire when timeout exceeded.
-
-        Given: Session in PREPARING status for longer than STATUS_TIMEOUT_MAP threshold
-        When: Coordinator classifies failures
-        Then: Session is classified as expired
-        """
+        """SC-CO-002: Expire when timeout is set and exceeded."""
         # Arrange
         session_id = SessionId(uuid4())
         failure = _create_session_transition_info(
@@ -137,13 +149,13 @@ class TestScheduleCoordinatorFailureClassification:
             from_status=SessionStatus.PREPARING,
         )
 
-        # Session started 20 minutes ago (exceeds 15 minute threshold)
         past_time = datetime.now(tzutc()) - timedelta(minutes=20)
         session = _create_session_with_kernels(
             session_id=session_id,
             status=SessionStatus.PREPARING,
             phase_attempts=0,
             phase_started_at=past_time,
+            timeout=900,  # 15 minutes — past_time is 20 minutes ago
         )
 
         # Act
@@ -152,6 +164,7 @@ class TestScheduleCoordinatorFailureClassification:
             failures=[failure],
             sessions=[session],
             current_time=datetime.now(tzutc()),
+            handler_name=_TEST_HANDLER_NAME,
         )
 
         # Assert
@@ -161,23 +174,19 @@ class TestScheduleCoordinatorFailureClassification:
         assert result.expired[0].session_id == session_id
 
     def test_need_retry_on_retryable_failure(self) -> None:
-        """SC-CO-003: Need retry for retryable failures.
-
-        Given: Session with low phase_attempts and within timeout
-        When: Coordinator classifies failures
-        Then: Session is classified as need_retry
-        """
+        """SC-CO-003: Need retry for retryable failures."""
         # Arrange
         session_id = SessionId(uuid4())
         failure = _create_session_transition_info(session_id=session_id)
 
-        # Session just started, low attempts
         recent_time = datetime.now(tzutc()) - timedelta(minutes=1)
         session = _create_session_with_kernels(
             session_id=session_id,
             status=SessionStatus.PREPARING,
             phase_attempts=1,
             phase_started_at=recent_time,
+            timeout=900,
+            max_retry_count=5,
         )
 
         # Act
@@ -186,6 +195,7 @@ class TestScheduleCoordinatorFailureClassification:
             failures=[failure],
             sessions=[session],
             current_time=datetime.now(tzutc()),
+            handler_name=_TEST_HANDLER_NAME,
         )
 
         # Assert
@@ -195,23 +205,19 @@ class TestScheduleCoordinatorFailureClassification:
         assert result.need_retry[0].session_id == session_id
 
     def test_give_up_takes_priority_over_expired(self) -> None:
-        """SC-CO-004: Give up takes priority over expired.
-
-        Given: Session with max attempts exceeded AND timeout exceeded
-        When: Coordinator classifies failures
-        Then: Session is classified as give_up (priority over expired)
-        """
+        """SC-CO-004: Give up takes priority over expired."""
         # Arrange
         session_id = SessionId(uuid4())
         failure = _create_session_transition_info(session_id=session_id)
 
-        # Both conditions met: max retries AND timeout
         past_time = datetime.now(tzutc()) - timedelta(minutes=20)
         session = _create_session_with_kernels(
             session_id=session_id,
             status=SessionStatus.PREPARING,
-            phase_attempts=SERVICE_MAX_RETRIES,
+            phase_attempts=5,
             phase_started_at=past_time,
+            timeout=900,
+            max_retry_count=5,
         )
 
         # Act
@@ -220,6 +226,7 @@ class TestScheduleCoordinatorFailureClassification:
             failures=[failure],
             sessions=[session],
             current_time=datetime.now(tzutc()),
+            handler_name=_TEST_HANDLER_NAME,
         )
 
         # Assert - give_up takes priority
@@ -228,19 +235,14 @@ class TestScheduleCoordinatorFailureClassification:
         assert len(result.need_retry) == 0
 
     def test_mixed_classification_results(self) -> None:
-        """SC-CO-005: Mixed failures are classified correctly.
-
-        Given: Three failures with different conditions
-        When: Coordinator classifies failures
-        Then: Each is correctly classified
-        """
-        # Arrange
+        """SC-CO-005: Mixed failures are classified correctly."""
         # Session 1: Max retries exceeded -> give_up
         session_id_1 = SessionId(uuid4())
         failure_1 = _create_session_transition_info(session_id=session_id_1)
         session_1 = _create_session_with_kernels(
             session_id=session_id_1,
-            phase_attempts=SERVICE_MAX_RETRIES,
+            phase_attempts=5,
+            max_retry_count=5,
         )
 
         # Session 2: Timeout exceeded -> expired
@@ -252,6 +254,8 @@ class TestScheduleCoordinatorFailureClassification:
             status=SessionStatus.PREPARING,
             phase_attempts=1,
             phase_started_at=past_time,
+            timeout=900,
+            max_retry_count=5,
         )
 
         # Session 3: Neither condition -> need_retry
@@ -262,6 +266,8 @@ class TestScheduleCoordinatorFailureClassification:
             session_id=session_id_3,
             phase_attempts=1,
             phase_started_at=recent_time,
+            timeout=900,
+            max_retry_count=5,
         )
 
         # Act
@@ -270,6 +276,7 @@ class TestScheduleCoordinatorFailureClassification:
             failures=[failure_1, failure_2, failure_3],
             sessions=[session_1, session_2, session_3],
             current_time=datetime.now(tzutc()),
+            handler_name=_TEST_HANDLER_NAME,
         )
 
         # Assert
@@ -278,18 +285,14 @@ class TestScheduleCoordinatorFailureClassification:
         assert len(result.need_retry) == 1
 
     def test_empty_failures_returns_empty_result(self) -> None:
-        """SC-CO-006: Empty failures list returns empty result.
-
-        Given: Empty failures list
-        When: Coordinator classifies failures
-        Then: All classification lists are empty
-        """
+        """SC-CO-006: Empty failures list returns empty result."""
         # Act
         result = ScheduleCoordinator._classify_failures(
             None,  # type: ignore[arg-type]
             failures=[],
             sessions=[],
             current_time=datetime.now(tzutc()),
+            handler_name=_TEST_HANDLER_NAME,
         )
 
         # Assert
@@ -298,15 +301,9 @@ class TestScheduleCoordinatorFailureClassification:
         assert len(result.need_retry) == 0
 
     def test_session_not_found_skipped(self) -> None:
-        """SC-CO-007: Failure without matching session is skipped.
-
-        Given: Failure with session_id not in sessions list
-        When: Coordinator classifies failures
-        Then: That failure is not included in any classification
-        """
+        """SC-CO-007: Failure without matching session is skipped."""
         # Arrange
         failure = _create_session_transition_info(session_id=SessionId(uuid4()))
-        # No matching session in the list
 
         # Act
         result = ScheduleCoordinator._classify_failures(
@@ -314,6 +311,7 @@ class TestScheduleCoordinatorFailureClassification:
             failures=[failure],
             sessions=[],  # Empty - no matching session
             current_time=datetime.now(tzutc()),
+            handler_name=_TEST_HANDLER_NAME,
         )
 
         # Assert
@@ -321,27 +319,29 @@ class TestScheduleCoordinatorFailureClassification:
         assert len(result.expired) == 0
         assert len(result.need_retry) == 0
 
-    def test_status_without_timeout_not_expired(self) -> None:
-        """SC-CO-008: Status not in timeout map is not expired.
+    def test_no_limits_means_always_need_retry(self) -> None:
+        """SC-CO-008: With no max_retry_count and no timeout, give_up and expired never fire.
 
-        Given: Session in status without timeout threshold (e.g., PENDING)
-        When: Coordinator classifies failures
-        Then: Session is classified as need_retry (not expired)
+        Given: Session whose handler_options.resolve() returns
+            ``HandlerOptions(timeout=None, max_retry_count=None)``,
+            even with high phase_attempts and an old phase_started_at.
+        Then: Always classified as need_retry.
         """
         # Arrange
         session_id = SessionId(uuid4())
         failure = _create_session_transition_info(
             session_id=session_id,
-            from_status=SessionStatus.PENDING,  # Not in STATUS_TIMEOUT_MAP
+            from_status=SessionStatus.PENDING,
         )
 
-        # Session started long ago, but PENDING has no timeout
         past_time = datetime.now(tzutc()) - timedelta(hours=2)
         session = _create_session_with_kernels(
             session_id=session_id,
             status=SessionStatus.PENDING,
-            phase_attempts=1,
+            phase_attempts=999,
             phase_started_at=past_time,
+            timeout=None,
+            max_retry_count=None,
         )
 
         # Act
@@ -350,9 +350,10 @@ class TestScheduleCoordinatorFailureClassification:
             failures=[failure],
             sessions=[session],
             current_time=datetime.now(tzutc()),
+            handler_name=_TEST_HANDLER_NAME,
         )
 
-        # Assert - PENDING has no timeout, so it's need_retry
+        # Assert - no limits configured, so always need_retry
         assert len(result.give_up) == 0
         assert len(result.expired) == 0
         assert len(result.need_retry) == 1
@@ -666,7 +667,8 @@ class TestScheduleCoordinatorStatusTransition:
 
         session = _create_session_with_kernels(
             session_id=session_id,
-            phase_attempts=SERVICE_MAX_RETRIES,  # Will be classified as give_up
+            phase_attempts=5,
+            max_retry_count=5,  # Will be classified as give_up
         )
 
         # Create the classification result that _classify_failures would return
@@ -693,6 +695,57 @@ class TestScheduleCoordinatorStatusTransition:
         assert len(classified.give_up) == 1
         # Verify _apply_transition was called for give_up
         mock_coordinator._apply_transition.assert_awaited()
+
+    async def test_need_retry_without_transition_records_history(
+        self,
+        mock_coordinator: MagicMock,
+        status_transitions_success_only: StatusTransitions,
+    ) -> None:
+        """SC-CO-015b: need_retry failures without a declared transition record history only.
+
+        Given: Failures classified as need_retry and a handler declaring need_retry=None
+        When: Handle result is called
+        Then: No status transition is applied, and history is recorded as NEED_RETRY
+              so the phase attempt counter keeps incrementing
+        """
+        # Arrange
+        mock_handler = MagicMock()
+        mock_handler.name.return_value = "test_handler"
+        mock_handler.status_transitions.return_value = status_transitions_success_only
+
+        session_id = SessionId(uuid4())
+        failure_info = _create_session_transition_info(session_id=session_id)
+        result = SessionExecutionResult(
+            successes=[],
+            failures=[failure_info],
+            skipped=[],
+        )
+        session = _create_session_with_kernels(session_id=session_id)
+
+        mock_coordinator._classify_failures = MagicMock(
+            return_value=FailureClassificationResult(
+                give_up=[], expired=[], need_retry=[failure_info]
+            )
+        )
+        mock_coordinator._apply_transition = AsyncMock()
+        mock_coordinator._record_history_without_transition = AsyncMock()
+
+        # Act
+        classified = await ScheduleCoordinator._handle_result(
+            mock_coordinator,
+            handler=mock_handler,
+            result=result,
+            records={},
+            sessions=[session],
+        )
+
+        # Assert
+        assert classified is not None
+        assert len(classified.need_retry) == 1
+        mock_coordinator._apply_transition.assert_not_awaited()
+        mock_coordinator._record_history_without_transition.assert_awaited_once_with(
+            "test_handler", [failure_info], {}, SchedulingResult.NEED_RETRY
+        )
 
     async def test_skipped_recorded_without_status_change(
         self,
@@ -721,7 +774,7 @@ class TestScheduleCoordinatorStatusTransition:
             return_value=FailureClassificationResult(give_up=[], expired=[], need_retry=[])
         )
         mock_coordinator._apply_transition = AsyncMock()
-        mock_coordinator._record_skipped_history = AsyncMock()
+        mock_coordinator._record_history_without_transition = AsyncMock()
 
         # Act
         await ScheduleCoordinator._handle_result(
@@ -733,7 +786,7 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         # Assert
-        mock_coordinator._record_skipped_history.assert_awaited_once()
+        mock_coordinator._record_history_without_transition.assert_awaited_once()
 
     async def test_empty_result_no_transitions(
         self,
@@ -758,7 +811,7 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         mock_coordinator._apply_transition = AsyncMock()
-        mock_coordinator._record_skipped_history = AsyncMock()
+        mock_coordinator._record_history_without_transition = AsyncMock()
 
         # Act
         classified = await ScheduleCoordinator._handle_result(
@@ -771,7 +824,7 @@ class TestScheduleCoordinatorStatusTransition:
 
         # Assert
         mock_coordinator._apply_transition.assert_not_awaited()
-        mock_coordinator._record_skipped_history.assert_not_awaited()
+        mock_coordinator._record_history_without_transition.assert_not_awaited()
         assert classified is None
 
     async def test_kernel_reset_on_pending_transition(
@@ -1104,3 +1157,70 @@ class TestScheduleCoordinatorPostProcessors:
         assert SessionStatus.SCHEDULED in target_statuses  # Success transition
         assert SessionStatus.CANCELLED in target_statuses  # give_up and expired transition
         assert SessionStatus.PENDING in target_statuses  # need_retry transition
+
+
+class TestScheduleCoordinatorPromotionRecordOrdering:
+    """Promotion records must be built AFTER hooks run (BA-6282).
+
+    Transition hooks (e.g. RunningTransitionHook triggering batch execution)
+    record sub-steps into the scope's pool while executing. If the coordinator
+    builds records before the hooks run, those sub-steps are lost from the
+    persisted scheduling history.
+    """
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid4())
+
+    @pytest.fixture
+    def mock_coordinator(self) -> MagicMock:
+        coordinator = MagicMock(spec=ScheduleCoordinator)
+        coordinator._hook_registry = MagicMock()
+        coordinator._repository = AsyncMock()
+        coordinator._repository.get_db_now = AsyncMock(return_value=datetime.now(tzutc()))
+        coordinator._apply_transition = AsyncMock()
+        coordinator._broadcast_transition_events = AsyncMock()
+        return coordinator
+
+    @pytest.fixture
+    def promotion_spec(self) -> MagicMock:
+        spec = MagicMock()
+        spec.success_status = SessionStatus.RUNNING
+        spec.name = "promote-to-running"
+        spec.reason = "started"
+        return spec
+
+    async def test_hook_recorded_substep_reaches_apply_transition(
+        self,
+        mock_coordinator: MagicMock,
+        promotion_spec: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        # Arrange: hooks record finalize_start into the pool while running,
+        # then report the session as passed (collaborator is mocked, not re-run).
+        async def run_hooks(sessions: list[Any], _status: SessionStatus) -> HookExecutionResult:
+            recorder = SessionRecorderContext.current_pool().recorder(session_id)
+            with recorder.phase("finalize_start"):
+                with recorder.step("trigger_batch_execution"):
+                    pass
+            return HookExecutionResult(successful_sessions=sessions, full_session_data=[])
+
+        mock_coordinator._hook_registry.get_hook.return_value = MagicMock()
+        mock_coordinator._execute_transition_hooks = AsyncMock(side_effect=run_hooks)
+
+        # One success carries the path past the early-return into _apply_transition;
+        # its contents are opaque here since both collaborators are mocked.
+        result = SessionExecutionResult(successes=[_create_session_transition_info()])
+
+        # Act
+        with SessionRecorderContext.scope("promote", entity_ids=[session_id]) as pool:
+            await ScheduleCoordinator._handle_promotion_status_transitions(
+                mock_coordinator, promotion_spec, result, pool
+            )
+
+        # Assert: records passed to _apply_transition include the sub-step recorded
+        # during hook execution, proving the build happened after hooks ran.
+        records = mock_coordinator._apply_transition.await_args.args[4]
+        (finalize,) = records[session_id].phases
+        assert finalize.name == "finalize_start"
+        assert [step.name for step in finalize.steps] == ["trigger_batch_execution"]

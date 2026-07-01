@@ -3,19 +3,19 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Self
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.agent.kernel import KernelOwnershipData
 from ai.backend.agent.proxy import DomainSocketPathPair
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.types import AgentId, KernelId, ServicePort, SessionTypes
+from ai.backend.common.types import AgentId, BackendAISchema, KernelId, ServicePort, SessionTypes
 
 if TYPE_CHECKING:
     from ai.backend.agent.docker.kernel import DockerKernel
 
 
-class KernelRecoveryData(BaseModel):
+class KernelRecoveryData(BackendAISchema):
     """
     Data required for recovering a Kernel.
     Agent should load and write Kernel data using this structure

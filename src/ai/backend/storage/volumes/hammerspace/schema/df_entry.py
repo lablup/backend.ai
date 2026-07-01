@@ -1,7 +1,7 @@
-from pydantic import BaseModel
+from ai.backend.common.types import BackendAISchema
 
 
-class DFEntry(BaseModel):
+class DFEntry(BackendAISchema):
     total: int
     used: int
     available: int

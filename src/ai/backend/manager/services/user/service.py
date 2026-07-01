@@ -1,11 +1,12 @@
-import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.user.types import (
@@ -16,6 +17,7 @@ from ai.backend.manager.data.user.types import (
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
@@ -42,8 +44,14 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairActionResult,
     AdminDeleteKeypairAction,
     AdminDeleteKeypairActionResult,
+    AdminDeleteSSHKeypairAction,
+    AdminDeleteSSHKeypairActionResult,
     AdminGetKeypairAction,
     AdminGetKeypairActionResult,
+    AdminGetSSHKeypairAction,
+    AdminGetSSHKeypairActionResult,
+    AdminRegisterSSHKeypairAction,
+    AdminRegisterSSHKeypairActionResult,
     AdminSearchKeypairsAction,
     AdminSearchKeypairsActionResult,
     AdminUpdateKeypairAction,
@@ -52,6 +60,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
     RevokeMyKeypairActionResult,
+    SearchKeypairsByResourcePolicyAction,
+    SearchKeypairsByResourcePolicyActionResult,
     SearchMyKeypairsAction,
     SearchMyKeypairsActionResult,
     SwitchMyMainAccessKeyAction,
@@ -95,6 +105,7 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -111,6 +122,7 @@ class UserService:
     _valkey_stat_client: ValkeyStatClient
     _agent_registry: AgentRegistry
     _user_repository: UserRepository
+    _scheduling_controller: SchedulingController
 
     def __init__(
         self,
@@ -118,15 +130,30 @@ class UserService:
         valkey_stat_client: ValkeyStatClient,
         agent_registry: AgentRegistry,
         user_repository: UserRepository,
+        scheduling_controller: SchedulingController,
     ) -> None:
         self._storage_manager = storage_manager
         self._valkey_stat_client = valkey_stat_client
         self._user_repository = user_repository
         self._agent_registry = agent_registry
+        self._scheduling_controller = scheduling_controller
 
     async def create_user(self, action: CreateUserAction) -> CreateUserActionResult:
         user_data_result = await self._user_repository.create_user_validated(
             action.creator, action.group_ids
+        )
+        # Grant the scope-level auto_assign roles for the user's initial domain
+        # and project memberships (user creation only provisions user-scope roles).
+        # action.scope_id() is the user's domain name (the action's DOMAIN scope).
+        await self._user_repository.assign_users_to_scope(
+            UserID(user_data_result.user.uuid),
+            user_data_result.user.domain_name,
+            [ProjectID(UUID(gid)) for gid in action.group_ids] if action.group_ids else [],
+        )
+        # The user is also a member of its domain's model-store project at
+        # creation, so grant that project scope's auto_assign roles too.
+        await self._user_repository.assign_user_to_model_store(
+            UserID(user_data_result.user.uuid), user_data_result.user.domain_name
         )
         return CreateUserActionResult(
             data=user_data_result,
@@ -134,6 +161,22 @@ class UserService:
 
     async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUserActionResult:
         result = await self._user_repository.bulk_create_users_validated(action.items)
+        # Grant the scope-level auto_assign roles for each created user's initial
+        # domain/project memberships, the same as the single-user create path.
+        # group_ids are not carried in the result, so correlate them by email.
+        group_ids_by_email = {
+            cast(UserCreatorSpec, item.creator.spec).email: item.group_ids for item in action.items
+        }
+        for created in result.successes:
+            group_ids = group_ids_by_email.get(created.user.email)
+            await self._user_repository.assign_users_to_scope(
+                UserID(created.user.uuid),
+                created.user.domain_name,
+                [ProjectID(UUID(gid)) for gid in group_ids] if group_ids else [],
+            )
+            await self._user_repository.assign_user_to_model_store(
+                UserID(created.user.uuid), created.user.domain_name
+            )
         return BulkCreateUserActionResult(data=result)
 
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
@@ -242,22 +285,11 @@ class UserService:
 
         # Handle active sessions
         if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
-            tasks = [
-                asyncio.create_task(
-                    self._agent_registry.destroy_session(
-                        session,
-                        forced=True,
-                        reason=KernelLifecycleEventReason.USER_PURGED,
-                    )
-                )
-                for session in active_sessions
-            ]
-
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for sess, result in zip(active_sessions, results, strict=True):
-                if isinstance(result, Exception):
-                    log.warning(f"Session {sess.id} not terminated properly: {result}")
+            await self._scheduling_controller.mark_sessions_for_termination(
+                [session.id for session in active_sessions],
+                reason=KernelLifecycleEventReason.USER_PURGED.value,
+                forced=True,
+            )
 
         # Delete vfolders
         await self._user_repository.delete_user_vfolders(
@@ -315,22 +347,11 @@ class UserService:
 
         # Handle active sessions
         if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
-            tasks = [
-                asyncio.create_task(
-                    self._agent_registry.destroy_session(
-                        session,
-                        forced=True,
-                        reason=KernelLifecycleEventReason.USER_PURGED,
-                    )
-                )
-                for session in active_sessions
-            ]
-
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for sess, result in zip(active_sessions, results, strict=True):
-                if isinstance(result, Exception):
-                    log.warning(f"Session {sess.id} not terminated properly: {result}")
+            await self._scheduling_controller.mark_sessions_for_termination(
+                [session.id for session in active_sessions],
+                reason=KernelLifecycleEventReason.USER_PURGED.value,
+                forced=True,
+            )
 
         # Delete vfolders
         await self._user_repository.delete_user_vfolders(
@@ -360,7 +381,7 @@ class UserService:
                 await self._purge_single_user(user_uuid, action, user_info_ctx)
                 purged_user_ids.append(user_uuid)
             except Exception as e:
-                log.error(f"Failed to purge user {user_uuid}: {e}")
+                log.error("Failed to purge user {}: {}", user_uuid, e)
                 failures.append(BulkPurgeError(user_id=user_uuid, exception=e))
 
         return BulkPurgeUserActionResult(
@@ -471,6 +492,18 @@ class UserService:
         )
         return SearchMyKeypairsActionResult(result=result)
 
+    async def search_keypairs_by_resource_policy(
+        self, action: SearchKeypairsByResourcePolicyAction
+    ) -> SearchKeypairsByResourcePolicyActionResult:
+        """Search keypairs assigned to a keypair resource policy."""
+        result = await self._user_repository.search_keypairs_by_resource_policy(
+            scope=action.scope, querier=action.querier
+        )
+        return SearchKeypairsByResourcePolicyActionResult(
+            result=result,
+            resource_policy_name=action.scope.resource_policy_name,
+        )
+
     # ------------------------------------------------------------------ admin keypair operations
 
     async def admin_create_keypair(
@@ -509,3 +542,35 @@ class UserService:
         """Admin retrieves a single keypair by access key."""
         keypair_data = await self._user_repository.admin_get_keypair(access_key=action.access_key)
         return AdminGetKeypairActionResult(keypair=keypair_data)
+
+    # ------------------------------------------------------------------ admin SSH keypair operations
+
+    async def admin_register_ssh_keypair(
+        self, action: AdminRegisterSSHKeypairAction
+    ) -> AdminRegisterSSHKeypairActionResult:
+        """Admin registers (overwrites) a user's SSH keypair."""
+        await self._user_repository.admin_update_ssh_keypair(
+            access_key=action.access_key,
+            ssh_public_key=action.ssh_public_key,
+            ssh_private_key=action.ssh_private_key,
+        )
+        return AdminRegisterSSHKeypairActionResult(access_key=action.access_key)
+
+    async def admin_delete_ssh_keypair(
+        self, action: AdminDeleteSSHKeypairAction
+    ) -> AdminDeleteSSHKeypairActionResult:
+        """Admin clears a user's SSH keypair."""
+        await self._user_repository.admin_clear_ssh_keypair(access_key=action.access_key)
+        return AdminDeleteSSHKeypairActionResult(access_key=action.access_key)
+
+    async def admin_get_ssh_keypair(
+        self, action: AdminGetSSHKeypairAction
+    ) -> AdminGetSSHKeypairActionResult:
+        """Admin retrieves a user's SSH public key (never the private key)."""
+        ssh_public_key = await self._user_repository.admin_get_ssh_public_key(
+            access_key=action.access_key
+        )
+        return AdminGetSSHKeypairActionResult(
+            access_key=action.access_key,
+            ssh_public_key=ssh_public_key,
+        )

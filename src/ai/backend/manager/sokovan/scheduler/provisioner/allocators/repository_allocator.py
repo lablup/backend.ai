@@ -5,9 +5,9 @@ This allocator delegates allocation operations to the schedule repository
 to ensure transactional consistency.
 """
 
+from ai.backend.common.types import SessionId
+from ai.backend.manager.data.sokovan import AllocationBatch
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.repositories.scheduler.types import ScheduledSessionData
-from ai.backend.manager.sokovan.data import AllocationBatch
 
 from .allocator import SchedulingAllocator
 
@@ -43,16 +43,15 @@ class RepositoryAllocator(SchedulingAllocator):
         """
         self._repository = schedule_repository
 
-    async def allocate(self, batch: AllocationBatch) -> list[ScheduledSessionData]:
+    async def allocate(self, batch: AllocationBatch) -> list[SessionId]:
         """
-        Allocate resources by delegating to repository and update session status.
-        Both allocations and failures are processed in a single transaction.
+        Reserve and assign the batch's sessions to agents by delegating to the
+        repository (single atomic transaction).
 
         Args:
-            batch: AllocationBatch containing allocations and failures to process
+            batch: AllocationBatch containing the allocations to process
 
         Returns:
-            List of ScheduledSessionData for allocated sessions
+            The ids of the sessions that were actually allocated.
         """
-        # Delegate to repository for atomic processing of both allocations and failures
         return await self._repository.allocate_sessions(batch)

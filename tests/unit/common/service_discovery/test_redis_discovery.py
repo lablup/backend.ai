@@ -411,7 +411,8 @@ async def test_redis_sync_model_service_routes_ttl_expiration(
     # by temporarily modifying the implementation behavior
     # For this test, we'll verify the TTL is set correctly instead of waiting
     key = redis_discovery._service_prefix(MODEL_SERVICE_GROUP, route.route_id)
-    ttl = await redis_discovery._valkey_client._client.client.ttl(key)
+    async with redis_discovery._valkey_client._client.client() as conn:
+        ttl = await conn.ttl(key)
 
     # TTL should be approximately MODEL_SERVICE_ROUTE_TTL (300 seconds)
     # Allow some variance due to execution time

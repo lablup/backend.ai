@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.types import AccessKey, ClusterMode, MountPermission, SessionTypes
+from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -21,15 +21,6 @@ class ResourceSlotEntry:
 
     resource_type: str
     quantity: str
-
-
-@dataclass(frozen=True)
-class VFolderMountItem:
-    """A single virtual folder mount specification."""
-
-    vfolder_id: uuid.UUID
-    mount_path: str | None = None
-    permission: MountPermission | None = None
 
 
 @dataclass(frozen=True)
@@ -88,7 +79,7 @@ class EnqueueSessionAction(SessionScopeAction):
 
     resource: SessionResourceSpec
     scheduling: SessionSchedulingSpec
-    mounts: list[VFolderMountItem] | None = None
+    mounts: list[MountInfoEntry] | None = None
     execution: SessionExecutionSpec | None = None
     batch: SessionBatchSpec | None = None
 
@@ -100,6 +91,11 @@ class EnqueueSessionAction(SessionScopeAction):
     access_key: AccessKey = AccessKey("")
     domain_name: str = ""
     group_id: uuid.UUID = field(default_factory=lambda: uuid.UUID(int=0))
+    owner_id: uuid.UUID | None = None
+    """Delegated owner user UUID. When set, the service resolves it and
+    overrides ``user_id``, ``user_role``, ``access_key``, and ``domain_name``
+    with the target user's values.
+    """
 
     @override
     def entity_id(self) -> str | None:

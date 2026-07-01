@@ -1,36 +1,60 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
-from uuid import UUID
+from decimal import Decimal, InvalidOperation
+from typing import Any, override
 
 from ai.backend.common.config import ModelDefinition
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.types import BinarySize
+from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetConflict
-from ai.backend.manager.models.base import ResourceOptsEntry, ResourceSlotEntry
+from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-from ai.backend.manager.models.deployment_revision_preset.types import PresetValueEntry
-from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow
+from ai.backend.manager.models.runtime_variant_preset.types import (
+    RuntimeVariantPresetValueEntry,
+)
+from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
+def _parse_quantity(value: str) -> Decimal:
+    try:
+        return Decimal(value)
+    except InvalidOperation:
+        return Decimal(BinarySize.from_str(value))
+
+
 @dataclass
-class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRow]):
-    runtime_variant_id: UUID
+class DeploymentRevisionPresetCreatorSpec(DependentCreatorSpec[int, DeploymentRevisionPresetRow]):
+    """Preset creator whose rank is assigned by the ops layer (next-value) at execution.
+
+    ``build_row`` receives the computed next rank as its dependency.
+    """
+
+    runtime_variant_id: RuntimeVariantID
     name: str
     description: str | None
-    rank: int
-    image: str | None
+    image_id: ImageID
     model_definition: ModelDefinition | None
-    resource_slots: list[ResourceSlotEntry]
     resource_opts: list[ResourceOptsEntry]
     cluster_mode: str
     cluster_size: int
     startup_command: str | None
     bootstrap_script: str | None
     environ: dict[str, str]
-    preset_values: list[PresetValueEntry]
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueEntry]
+    replica_count: int
+    deployment_strategy: DeploymentStrategy
+    deployment_strategy_spec: dict[str, Any]
+    open_to_public: bool | None = None
+    revision_history_limit: int | None = None
 
     @property
     @override
@@ -45,20 +69,46 @@ class DeploymentRevisionPresetCreatorSpec(CreatorSpec[DeploymentRevisionPresetRo
         )
 
     @override
-    def build_row(self) -> DeploymentRevisionPresetRow:
-        row = DeploymentRevisionPresetRow()
-        row.runtime_variant = self.runtime_variant_id
-        row.name = self.name
-        row.description = self.description
-        row.rank = self.rank
-        row.image = self.image
-        row.model_definition = self.model_definition
-        row.resource_slots = self.resource_slots
-        row.resource_opts = self.resource_opts
-        row.cluster_mode = self.cluster_mode
-        row.cluster_size = self.cluster_size
-        row.startup_command = self.startup_command
-        row.bootstrap_script = self.bootstrap_script
-        row.environ = self.environ
-        row.preset_values = self.preset_values
-        return row
+    def build_row(self, next_rank: int) -> DeploymentRevisionPresetRow:
+        return DeploymentRevisionPresetRow(
+            runtime_variant=self.runtime_variant_id,
+            name=self.name,
+            description=self.description,
+            rank=next_rank,
+            image_id=self.image_id,
+            model_definition=self.model_definition,
+            resource_opts=self.resource_opts,
+            cluster_mode=self.cluster_mode,
+            cluster_size=self.cluster_size,
+            startup_command=self.startup_command,
+            bootstrap_script=self.bootstrap_script,
+            environ=self.environ,
+            preset_values=self.runtime_variant_preset_values,
+            open_to_public=self.open_to_public,
+            replica_count=self.replica_count,
+            revision_history_limit=self.revision_history_limit,
+            deployment_strategy=self.deployment_strategy,
+            deployment_strategy_spec=self.deployment_strategy_spec,
+        )
+
+
+@dataclass(frozen=True)
+class PresetSlotDependency:
+    """Dependency value for creating preset resource slots: the owning preset's id."""
+
+    preset_id: uuid.UUID
+
+
+@dataclass
+class PresetResourceSlotDependentCreatorSpec(
+    DependentCreatorSpec[PresetSlotDependency, PresetResourceSlotRow]
+):
+    entry: ResourceSlotEntryData
+
+    @override
+    def build_row(self, dependency: PresetSlotDependency) -> PresetResourceSlotRow:
+        return PresetResourceSlotRow(
+            preset_id=dependency.preset_id,
+            slot_name=self.entry.resource_type,
+            quantity=_parse_quantity(self.entry.quantity),
+        )

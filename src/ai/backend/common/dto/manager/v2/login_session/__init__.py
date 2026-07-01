@@ -3,6 +3,7 @@
 from ai.backend.common.dto.manager.v2.login_session.request import (
     AdminRevokeLoginSessionInput,
     AdminSearchLoginSessionsInput,
+    AdminUnblockUserInput,
     LoginSessionFilter,
     LoginSessionOrder,
     LoginSessionStatusFilter,
@@ -14,6 +15,7 @@ from ai.backend.common.dto.manager.v2.login_session.response import (
     LoginSessionNode,
     MySearchLoginSessionsPayload,
     RevokeLoginSessionPayload,
+    UnblockUserPayload,
 )
 from ai.backend.common.dto.manager.v2.login_session.types import (
     LoginSessionOrderField,
@@ -25,6 +27,7 @@ __all__ = (
     "AdminRevokeLoginSessionInput",
     "AdminSearchLoginSessionsInput",
     "AdminSearchLoginSessionsPayload",
+    "AdminUnblockUserInput",
     "LoginSessionFilter",
     "LoginSessionNode",
     "LoginSessionOrder",
@@ -36,4 +39,5 @@ __all__ = (
     "MySearchLoginSessionsPayload",
     "OrderDirection",
     "RevokeLoginSessionPayload",
+    "UnblockUserPayload",
 )

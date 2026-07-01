@@ -7,24 +7,22 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
-from ai.backend.manager.sokovan.data import PromotionSpec
+from ai.backend.manager.data.sokovan import PromotionSpec
 from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,
@@ -37,6 +35,10 @@ from ai.backend.manager.sokovan.scheduler.handlers import (
     StartSessionsLifecycleHandler,
     SweepSessionsLifecycleHandler,
     TerminateSessionsLifecycleHandler,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.cleanup import (
+    CleanupForceTerminatedHandler,
+    CleanupHandler,
 )
 from ai.backend.manager.sokovan.scheduler.handlers.kernel import (
     KernelLifecycleHandler,
@@ -104,12 +106,10 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
 
 def create_default_scheduler_components(
     repository: SchedulerRepository,
-    deployment_repository: DeploymentRepository,
     fair_share_repository: FairShareRepository,
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
-    event_producer: EventProducer,
     valkey_schedule: ValkeyScheduleClient,
 ) -> SchedulerComponents:
     """
@@ -117,12 +117,10 @@ def create_default_scheduler_components(
 
     Args:
         repository: The repository for accessing system data
-        deployment_repository: The deployment repository
         fair_share_repository: The fair share repository for sequencing
         config_provider: The manager configuration provider
         agent_client_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
-        event_producer: Event producer for publishing events
         valkey_schedule: Valkey client for scheduling operations
 
     Returns:
@@ -184,10 +182,9 @@ def create_default_scheduler_components(
         launcher=launcher,
         terminator=terminator,
         repository=repository,
-        deployment_repository=deployment_repository,
         config_provider=config_provider,
         agent_client_pool=agent_client_pool,
-        event_producer=event_producer,
+        network_plugin_ctx=network_plugin_ctx,
     )
 
 
@@ -208,6 +205,7 @@ class CoordinatorHandlers:
     promotion_specs: Mapping[ScheduleType, PromotionSpec]
     kernel_handlers: Mapping[ScheduleType, KernelLifecycleHandler]
     kernel_observers: Mapping[ScheduleType, KernelObserver]
+    cleanup_handlers: Mapping[ScheduleType, CleanupHandler]
 
 
 @dataclass
@@ -236,12 +234,14 @@ def create_coordinator_handlers(args: CoordinatorHandlersArgs) -> CoordinatorHan
     promotion_specs = _create_promotion_specs()
     kernel_handlers = _create_kernel_handlers(args)
     kernel_observers = _create_kernel_observers(args)
+    cleanup_handlers = _create_cleanup_handlers(args)
 
     return CoordinatorHandlers(
         lifecycle_handlers=lifecycle_handlers,
         promotion_specs=promotion_specs,
         kernel_handlers=kernel_handlers,
         kernel_observers=kernel_observers,
+        cleanup_handlers=cleanup_handlers,
     )
 
 
@@ -309,11 +309,11 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
             success_status=SessionStatus.RUNNING,
             reason="triggered-by-scheduler",
         ),
-        # Promote to TERMINATED when all kernels are TERMINATED
+        # Promote to TERMINATED when all kernels are in terminal states
         ScheduleType.CHECK_TERMINATING_PROGRESS: PromotionSpec(
             name="promote-to-terminated",
             target_statuses=[SessionStatus.TERMINATING],
-            target_kernel_statuses=[KernelStatus.TERMINATED],
+            target_kernel_statuses=list(KernelStatus.terminal_statuses()),
             kernel_match_type=KernelMatchType.ALL,
             success_status=SessionStatus.TERMINATED,
             reason="triggered-by-scheduler",
@@ -366,5 +366,22 @@ def _create_kernel_observers(
             resource_usage_repository=args.resource_usage_repository,
             fair_share_repository=args.fair_share_repository,
             scheduler_repository=args.repository,
+        ),
+    }
+
+
+def _create_cleanup_handlers(
+    args: CoordinatorHandlersArgs,
+) -> Mapping[ScheduleType, CleanupHandler]:
+    """Create cleanup handlers mapping.
+
+    Cleanup handlers read work items from Valkey and perform cleanup operations.
+    Unlike lifecycle handlers, they do not rely on DB session status queries.
+    """
+    return {
+        ScheduleType.CLEANUP_FORCE_TERMINATED: CleanupForceTerminatedHandler(
+            terminator=args.terminator,
+            repository=args.repository,
+            valkey_schedule=args.valkey_schedule,
         ),
     }

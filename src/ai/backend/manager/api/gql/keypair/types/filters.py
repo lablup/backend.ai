@@ -5,10 +5,24 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Self
 
-from ai.backend.common.dto.manager.v2.keypair.request import KeypairFilter, KeypairOrderBy
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_enum, gql_pydantic_input
+from ai.backend.common.dto.manager.v2.keypair.request import (
+    KeypairFilter as KeypairFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.keypair.request import (
+    KeypairOrderBy as KeypairOrderByDTO,
+)
+from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_added_field,
+    gql_enum,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 
@@ -19,17 +33,24 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
             "Supports filtering by active state, admin flag, and access key. "
             "Multiple filters can be combined using AND, OR, and NOT logical operators."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="KeypairFilter",
 )
-class KeypairFilterGQL(PydanticInputMixin[KeypairFilter]):
+class KeypairFilterGQL(PydanticInputMixin[KeypairFilterDTO]):
     """Filter for keypair queries."""
 
     is_active: bool | None = None
     is_admin: bool | None = None
     access_key: StringFilter | None = None
     resource_policy: StringFilter | None = None
+    user_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="Filter keypairs by the UUID of their owner.",
+        ),
+        default=None,
+    )
     created_at: DateTimeFilter | None = None
     last_used: DateTimeFilter | None = None
     AND: list[Self] | None = None
@@ -39,7 +60,7 @@ class KeypairFilterGQL(PydanticInputMixin[KeypairFilter]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Fields available for ordering keypair query results. "
             "CREATED_AT: Order by creation timestamp. "
@@ -61,11 +82,11 @@ class KeypairOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Specifies ordering for keypair query results. Default direction is DESC.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="KeypairOrderBy",
 )
-class KeypairOrderByGQL(PydanticInputMixin[KeypairOrderBy]):
+class KeypairOrderByGQL(PydanticInputMixin[KeypairOrderByDTO]):
     """OrderBy for keypair queries."""
 
     field: KeypairOrderFieldGQL = KeypairOrderFieldGQL.CREATED_AT

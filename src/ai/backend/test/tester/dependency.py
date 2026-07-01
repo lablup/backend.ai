@@ -1,11 +1,16 @@
 from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
+    BackendAISchema,
+    ClusterMode,
+    RuntimeVariant,
+)
 
 
-class BaseDependencyModel(BaseModel):
+class BaseDependencyModel(BackendAISchema):
     @staticmethod
     def snake_to_kebab_case(string: str) -> str:
         return string.replace("_", "-")
@@ -149,9 +154,9 @@ class ModelServiceDep(BaseDependencyModel):
         examples=[1, 2, 3],
     )
     runtime_variant: RuntimeVariant = Field(
-        default=RuntimeVariant.CUSTOM,
+        default="custom",
         description="The runtime variant for the model service.",
-        examples=[v.name for v in RuntimeVariant],
+        examples=list(MODEL_SERVICE_RUNTIME_PROFILES.keys()),
     )
     # Separate group is required for the model service, so we placed this independently from the group context.
     group_name: str = Field(

@@ -4,25 +4,31 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.login_session.response import LoginSessionNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 
 @gql_enum(
-    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Status of a login session."),
+    BackendAIGQLMeta(added_version="26.4.2", description="Status of a login session."),
     name="LoginSessionStatus",
 )
 class LoginSessionStatusGQL(StrEnum):
@@ -33,7 +39,7 @@ class LoginSessionStatusGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Represents a login session entry tracking user authentication sessions.",
     ),
     name="LoginSessionV2",
@@ -52,13 +58,31 @@ class LoginSessionV2GQL(PydanticNodeMixin[LoginSessionNode]):
         description="Timestamp when the session was invalidated."
     )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The user who owns this login session.",
+        )
+    )  # type: ignore[misc]
+    async def user(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.user_loader.load(self.user_id)
+
 
 LoginSessionV2EdgeGQL = Edge[LoginSessionV2GQL]
 
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Connection type for paginated login session results.",
     ),
     name="LoginSessionV2Connection",

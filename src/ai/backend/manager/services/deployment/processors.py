@@ -6,16 +6,33 @@ from typing import TYPE_CHECKING, cast, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
+    BulkDeleteAccessTokensAction,
+    BulkDeleteAccessTokensActionResult,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
 )
+from ai.backend.manager.services.deployment.actions.access_token.delete_access_token import (
+    DeleteAccessTokenAction,
+    DeleteAccessTokenActionResult,
+)
+from ai.backend.manager.services.deployment.actions.access_token.get_access_token import (
+    GetAccessTokenAction,
+    GetAccessTokenActionResult,
+)
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
     SearchAccessTokensActionResult,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_delete_auto_scaling_rules import (
+    BulkDeleteAutoScalingRulesAction,
+    BulkDeleteAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -61,6 +78,10 @@ from ai.backend.manager.services.deployment.actions.get_deployment_by_id import 
     GetDeploymentByIdAction,
     GetDeploymentByIdActionResult,
 )
+from ai.backend.manager.services.deployment.actions.get_legacy_deployment_by_id import (
+    GetLegacyDeploymentByIdAction,
+    GetLegacyDeploymentByIdActionResult,
+)
 from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
     GetReplicaByIdAction,
     GetReplicaByIdActionResult,
@@ -73,9 +94,21 @@ from ai.backend.manager.services.deployment.actions.model_revision.get_revision_
     GetRevisionByIdAction,
     GetRevisionByIdActionResult,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.search_revision_resource_slots import (
+    SearchRevisionResourceSlotsAction,
+    SearchRevisionResourceSlotsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
     SearchRevisionsActionResult,
+)
+from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions import (
+    RefreshDeploymentRevisionsAction,
+    RefreshDeploymentRevisionsActionResult,
+)
+from ai.backend.manager.services.deployment.actions.replace_deployment_options import (
+    ReplaceDeploymentOptionsAction,
+    ReplaceDeploymentOptionsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
@@ -94,6 +127,10 @@ from ai.backend.manager.services.deployment.actions.search_deployments import (
 from ai.backend.manager.services.deployment.actions.search_deployments_in_project import (
     SearchDeploymentsInProjectAction,
     SearchDeploymentsInProjectActionResult,
+)
+from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
+    SearchLegacyDeploymentsAction,
+    SearchLegacyDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
@@ -120,13 +157,29 @@ class DeploymentProcessors(AbstractProcessorPackage):
     create_legacy_deployment: ActionProcessor[
         CreateLegacyDeploymentAction, CreateLegacyDeploymentActionResult
     ]
-    update_deployment: ActionProcessor[UpdateDeploymentAction, UpdateDeploymentActionResult]
-    destroy_deployment: ActionProcessor[DestroyDeploymentAction, DestroyDeploymentActionResult]
+    update_deployment: SingleEntityActionProcessor[
+        UpdateDeploymentAction, UpdateDeploymentActionResult
+    ]
+    replace_deployment_options: SingleEntityActionProcessor[
+        ReplaceDeploymentOptionsAction, ReplaceDeploymentOptionsActionResult
+    ]
+    destroy_deployment: SingleEntityActionProcessor[
+        DestroyDeploymentAction, DestroyDeploymentActionResult
+    ]
     search_deployments: ActionProcessor[SearchDeploymentsAction, SearchDeploymentsActionResult]
+    # Legacy (REST v1) read variants — full revision. DO NOT USE in new code.
+    search_legacy_deployments: ActionProcessor[
+        SearchLegacyDeploymentsAction, SearchLegacyDeploymentsActionResult
+    ]
     search_deployments_in_project: ActionProcessor[
         SearchDeploymentsInProjectAction, SearchDeploymentsInProjectActionResult
     ]
-    get_deployment_by_id: ActionProcessor[GetDeploymentByIdAction, GetDeploymentByIdActionResult]
+    get_deployment_by_id: SingleEntityActionProcessor[
+        GetDeploymentByIdAction, GetDeploymentByIdActionResult
+    ]
+    get_legacy_deployment_by_id: SingleEntityActionProcessor[
+        GetLegacyDeploymentByIdAction, GetLegacyDeploymentByIdActionResult
+    ]
     get_deployment_policy: ActionProcessor[
         GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
     ]
@@ -141,7 +194,13 @@ class DeploymentProcessors(AbstractProcessorPackage):
     add_model_revision: ActionProcessor[AddModelRevisionAction, AddModelRevisionActionResult]
     get_revision_by_id: ActionProcessor[GetRevisionByIdAction, GetRevisionByIdActionResult]
     search_revisions: ActionProcessor[SearchRevisionsAction, SearchRevisionsActionResult]
+    search_revision_resource_slots: ActionProcessor[
+        SearchRevisionResourceSlotsAction, SearchRevisionResourceSlotsActionResult
+    ]
     activate_revision: ActionProcessor[ActivateRevisionAction, ActivateRevisionActionResult]
+    admin_refresh_deployment_revisions: ActionProcessor[
+        RefreshDeploymentRevisionsAction, RefreshDeploymentRevisionsActionResult
+    ]
 
     # Route operations
     sync_replicas: ActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
@@ -165,12 +224,20 @@ class DeploymentProcessors(AbstractProcessorPackage):
     delete_auto_scaling_rule: ActionProcessor[
         DeleteAutoScalingRuleAction, DeleteAutoScalingRuleActionResult
     ]
+    bulk_delete_auto_scaling_rules: ActionProcessor[
+        BulkDeleteAutoScalingRulesAction, BulkDeleteAutoScalingRulesActionResult
+    ]
     search_auto_scaling_rules: ActionProcessor[
         SearchAutoScalingRulesAction, SearchAutoScalingRulesActionResult
     ]
 
     # Access token
     create_access_token: ActionProcessor[CreateAccessTokenAction, CreateAccessTokenActionResult]
+    get_access_token: ActionProcessor[GetAccessTokenAction, GetAccessTokenActionResult]
+    delete_access_token: ActionProcessor[DeleteAccessTokenAction, DeleteAccessTokenActionResult]
+    bulk_delete_access_tokens: ActionProcessor[
+        BulkDeleteAccessTokensAction, BulkDeleteAccessTokensActionResult
+    ]
     search_access_tokens: ActionProcessor[SearchAccessTokensAction, SearchAccessTokensActionResult]
 
     def __init__(
@@ -180,19 +247,39 @@ class DeploymentProcessors(AbstractProcessorPackage):
         validators: ActionValidators,
     ) -> None:
         # Deployment CRUD
+        rbac_single_entity_validators = [validators.rbac.single_entity]
         self.create_deployment = ActionProcessor(service.create_deployment, action_monitors)
         self.create_legacy_deployment = ActionProcessor(
             service.create_legacy_deployment, action_monitors
         )
-        self.update_deployment = ActionProcessor(service.update_deployment, action_monitors)
-        self.destroy_deployment = ActionProcessor(service.destroy_deployment, action_monitors)
+        self.update_deployment = SingleEntityActionProcessor(
+            service.update_deployment, action_monitors, validators=rbac_single_entity_validators
+        )
+        self.replace_deployment_options = SingleEntityActionProcessor(
+            service.replace_deployment_options,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
+        self.destroy_deployment = SingleEntityActionProcessor(
+            service.destroy_deployment, action_monitors, validators=rbac_single_entity_validators
+        )
         self.search_deployments = ActionProcessor(service.search_deployments, action_monitors)
+        self.search_legacy_deployments = ActionProcessor(
+            service.search_legacy_deployments, action_monitors
+        )
         self.search_deployments_in_project = ActionProcessor(
             service.search_deployments_in_project,
             action_monitors,
             validators=[cast(ActionValidator, validators.rbac.scope)],
         )
-        self.get_deployment_by_id = ActionProcessor(service.get_deployment_by_id, action_monitors)
+        self.get_deployment_by_id = SingleEntityActionProcessor(
+            service.get_deployment_by_id, action_monitors, validators=rbac_single_entity_validators
+        )
+        self.get_legacy_deployment_by_id = SingleEntityActionProcessor(
+            service.get_legacy_deployment_by_id,
+            action_monitors,
+            validators=rbac_single_entity_validators,
+        )
         self.get_deployment_policy = ActionProcessor(service.get_deployment_policy, action_monitors)
         self.search_deployment_policies = ActionProcessor(
             service.search_deployment_policies, action_monitors
@@ -205,7 +292,13 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.add_model_revision = ActionProcessor(service.add_model_revision, action_monitors)
         self.get_revision_by_id = ActionProcessor(service.get_revision_by_id, action_monitors)
         self.search_revisions = ActionProcessor(service.search_revisions, action_monitors)
+        self.search_revision_resource_slots = ActionProcessor(
+            service.search_revision_resource_slots, action_monitors
+        )
         self.activate_revision = ActionProcessor(service.activate_revision, action_monitors)
+        self.admin_refresh_deployment_revisions = ActionProcessor(
+            service.admin_refresh_deployment_revisions, action_monitors
+        )
 
         # Route operations
         self.sync_replicas = ActionProcessor(service.sync_replicas, action_monitors)
@@ -229,12 +322,20 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.delete_auto_scaling_rule = ActionProcessor(
             service.delete_auto_scaling_rule, action_monitors
         )
+        self.bulk_delete_auto_scaling_rules = ActionProcessor(
+            service.bulk_delete_auto_scaling_rules, action_monitors
+        )
         self.search_auto_scaling_rules = ActionProcessor(
             service.search_auto_scaling_rules, action_monitors
         )
 
         # Access token
         self.create_access_token = ActionProcessor(service.create_access_token, action_monitors)
+        self.get_access_token = ActionProcessor(service.get_access_token, action_monitors)
+        self.delete_access_token = ActionProcessor(service.delete_access_token, action_monitors)
+        self.bulk_delete_access_tokens = ActionProcessor(
+            service.bulk_delete_access_tokens, action_monitors
+        )
         self.search_access_tokens = ActionProcessor(service.search_access_tokens, action_monitors)
 
     @override
@@ -244,10 +345,13 @@ class DeploymentProcessors(AbstractProcessorPackage):
             CreateDeploymentAction.spec(),
             CreateLegacyDeploymentAction.spec(),
             UpdateDeploymentAction.spec(),
+            ReplaceDeploymentOptionsAction.spec(),
             DestroyDeploymentAction.spec(),
             SearchDeploymentsAction.spec(),
+            SearchLegacyDeploymentsAction.spec(),
             SearchDeploymentsInProjectAction.spec(),
             GetDeploymentByIdAction.spec(),
+            GetLegacyDeploymentByIdAction.spec(),
             GetDeploymentPolicyAction.spec(),
             SearchDeploymentPoliciesAction.spec(),
             UpsertDeploymentPolicyAction.spec(),
@@ -255,7 +359,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
             AddModelRevisionAction.spec(),
             GetRevisionByIdAction.spec(),
             SearchRevisionsAction.spec(),
+            SearchRevisionResourceSlotsAction.spec(),
             ActivateRevisionAction.spec(),
+            RefreshDeploymentRevisionsAction.spec(),
             # Route operations
             SyncReplicaAction.spec(),
             SearchRoutesAction.spec(),
@@ -268,8 +374,12 @@ class DeploymentProcessors(AbstractProcessorPackage):
             GetAutoScalingRuleAction.spec(),
             UpdateAutoScalingRuleAction.spec(),
             DeleteAutoScalingRuleAction.spec(),
+            BulkDeleteAutoScalingRulesAction.spec(),
             SearchAutoScalingRulesAction.spec(),
             # Access token
             CreateAccessTokenAction.spec(),
+            GetAccessTokenAction.spec(),
+            DeleteAccessTokenAction.spec(),
+            BulkDeleteAccessTokensAction.spec(),
             SearchAccessTokensAction.spec(),
         ]

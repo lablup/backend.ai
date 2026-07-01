@@ -116,7 +116,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         self,
         info: Info,
         scope: UserFairShareScopeGQL,
-    ) -> UserFairShareGQL:
+    ) -> UserFairShareGQL | None:
         from ai.backend.common.dto.manager.v2.fair_share.request import GetUserFairShareInput
 
         if self.organization.domain_name is None:
@@ -147,7 +147,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> UserUsageBucketConnection:
+    ) -> UserUsageBucketConnection | None:
         from strawberry.relay import PageInfo
 
         from ai.backend.manager.api.gql.base import encode_cursor
@@ -233,13 +233,16 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         last: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        ProjectV2Connection,
-        strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
-    ]:
+    ) -> (
+        Annotated[
+            ProjectV2Connection,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
         from strawberry.relay import PageInfo
 
-        from ai.backend.common.dto.manager.v2.group.request import AdminSearchGroupsInput
+        from ai.backend.common.dto.manager.v2.group.request import AdminSearchProjectsInput
         from ai.backend.manager.api.gql.base import encode_cursor
         from ai.backend.manager.api.gql.project_v2.types.node import (
             ProjectV2Connection,
@@ -251,7 +254,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         scope = UserProjectSearchScope(user_uuid=UUID(str(self.id)))
         payload = await info.context.adapters.project.search_by_user(
             scope=scope,
-            input=AdminSearchGroupsInput(
+            input=AdminSearchProjectsInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
                 first=first,

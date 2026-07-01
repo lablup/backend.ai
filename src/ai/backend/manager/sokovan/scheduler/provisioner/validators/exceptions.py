@@ -1,5 +1,11 @@
 """Exceptions for validators."""
 
+from __future__ import annotations
+
+from abc import abstractmethod
+from collections.abc import Sequence
+from datetime import datetime
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -8,27 +14,45 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.manager.sokovan.data import SchedulingPredicate
+from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.sokovan import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 
 
 class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
-    """Base exception for validation errors in the Sokovan scheduler."""
+    """Base exception for validation errors in the Sokovan scheduler.
+
+    Subclasses carry the structured data that describes *what* was violated
+    and provide :meth:`summary` so aggregators (e.g.
+    :class:`MultipleValidationErrors`) can render a single readable line
+    without re-parsing the exception's string representation.
+    """
 
     error_type = "https://api.backend.ai/probs/scheduling-validation-failed"
     error_title = "Scheduling validation failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.FORBIDDEN,
         )
 
+    @abstractmethod
+    def summary(self) -> str:
+        """Return a one-line, human-readable summary of this validation error.
+
+        Used by aggregators to format the error inside a bullet list.
+        """
+        raise NotImplementedError
+
     def failed_predicates(self) -> list[SchedulingPredicate]:
         """Return list of failed predicates for this error."""
         return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
+
+
+def _format_slots(slots: ResourceSlot) -> str:
+    return " ".join(f"{k}={v}" for k, v in slots.items() if v)
 
 
 class ConcurrencyLimitExceeded(SchedulingValidationError):
@@ -37,8 +61,18 @@ class ConcurrencyLimitExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/concurrency-limit-exceeded"
     error_title = "Concurrent session limit exceeded."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    _max_sessions: int
+    _session_type: str
+
+    def __init__(self, *, max_sessions: int, session_type: str) -> None:
+        self._max_sessions = max_sessions
+        self._session_type = session_type
+        super().__init__(self.summary())
+
+    def summary(self) -> str:
+        return f"You cannot run more than {self._max_sessions} {self._session_type} sessions"
+
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.CHECK_LIMIT,
@@ -52,8 +86,17 @@ class DependenciesNotSatisfied(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/dependencies-not-satisfied"
     error_title = "Session dependencies not satisfied."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    _pending_dependency_names: list[str]
+
+    def __init__(self, *, pending_dependency_names: Sequence[str]) -> None:
+        self._pending_dependency_names = list(pending_dependency_names)
+        super().__init__(self.summary())
+
+    def summary(self) -> str:
+        names = ", ".join(self._pending_dependency_names)
+        return f"Waiting dependency sessions to finish as success. ({names})"
+
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.CHECK_LIMIT,
@@ -67,8 +110,16 @@ class KeypairResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/keypair-resource-quota-exceeded"
     error_title = "Keypair resource quota exceeded."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    _quota_slots: ResourceSlot
+
+    def __init__(self, *, quota_slots: ResourceSlot) -> None:
+        self._quota_slots = quota_slots
+        super().__init__(self.summary())
+
+    def summary(self) -> str:
+        return f"Your keypair resource quota is exceeded. ({_format_slots(self._quota_slots)})"
+
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KEYPAIR,
             operation=ErrorOperation.CHECK_LIMIT,
@@ -82,8 +133,16 @@ class UserResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/user-resource-quota-exceeded"
     error_title = "User resource quota exceeded."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    _quota_slots: ResourceSlot
+
+    def __init__(self, *, quota_slots: ResourceSlot) -> None:
+        self._quota_slots = quota_slots
+        super().__init__(self.summary())
+
+    def summary(self) -> str:
+        return f"Your main-keypair resource quota is exceeded. ({_format_slots(self._quota_slots)})"
+
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.CHECK_LIMIT,
@@ -97,8 +156,16 @@ class GroupResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/group-resource-quota-exceeded"
     error_title = "Group resource quota exceeded."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    _quota_slots: ResourceSlot
+
+    def __init__(self, *, quota_slots: ResourceSlot) -> None:
+        self._quota_slots = quota_slots
+        super().__init__(self.summary())
+
+    def summary(self) -> str:
+        return f"Your group resource quota is exceeded. ({_format_slots(self._quota_slots)})"
+
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.CHECK_LIMIT,
@@ -112,8 +179,16 @@ class DomainResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/domain-resource-quota-exceeded"
     error_title = "Domain resource quota exceeded."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    _quota_slots: ResourceSlot
+
+    def __init__(self, *, quota_slots: ResourceSlot) -> None:
+        self._quota_slots = quota_slots
+        super().__init__(self.summary())
+
+    def summary(self) -> str:
+        return f"Your domain resource quota is exceeded. ({_format_slots(self._quota_slots)})"
+
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.CHECK_LIMIT,
@@ -127,8 +202,16 @@ class PendingSessionCountLimitExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/pending-session-count-limit-exceeded"
     error_title = "Pending session count limit exceeded."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    _max_pending_session_count: int
+
+    def __init__(self, *, max_pending_session_count: int) -> None:
+        self._max_pending_session_count = max_pending_session_count
+        super().__init__(self.summary())
+
+    def summary(self) -> str:
+        return f"You cannot create more than {self._max_pending_session_count} pending session(s)."
+
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.CHECK_LIMIT,
@@ -142,8 +225,45 @@ class PendingSessionResourceLimitExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/pending-session-resource-limit-exceeded"
     error_title = "Pending session resource limit exceeded."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    _current_pending_slots: ResourceSlot
+
+    def __init__(self, *, current_pending_slots: ResourceSlot) -> None:
+        self._current_pending_slots = current_pending_slots
+        super().__init__(self.summary())
+
+    def summary(self) -> str:
+        return (
+            f"Your pending session quota is exceeded."
+            f" ({_format_slots(self._current_pending_slots)})"
+        )
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CHECK_LIMIT,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class ReservedBatchSessionNotReady(SchedulingValidationError):
+    """Raised when a batch session has not yet reached its scheduled start time."""
+
+    error_type = "https://api.backend.ai/probs/reserved-batch-session-not-ready"
+    error_title = "Reserved batch session is not yet ready to start."
+
+    _scheduled_start: datetime
+
+    def __init__(self, *, scheduled_start: datetime) -> None:
+        self._scheduled_start = scheduled_start
+        super().__init__(self.summary())
+
+    def summary(self) -> str:
+        return (
+            f"Batch session is scheduled to start at {self._scheduled_start.isoformat()};"
+            " current time is before that."
+        )
+
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.CHECK_LIMIT,
@@ -159,34 +279,22 @@ class MultipleValidationErrors(SchedulingValidationError):
 
     _errors: list[SchedulingValidationError]
 
-    def __init__(self, errors: list[SchedulingValidationError]) -> None:
-        """
-        Initialize with a list of validation errors.
+    def __init__(self, errors: Sequence[SchedulingValidationError]) -> None:
+        self._errors = list(errors)
+        super().__init__(self.summary())
 
-        Args:
-            errors: List of validation errors that occurred
-        """
-        self._errors = errors
-        # Format each error on a new line for better readability
-        messages = []
-        for i, e in enumerate(errors, 1):
-            error_name = type(e).__name__
-            error_msg = str(e)
-            messages.append(f"  {i}. {error_name}: {error_msg}")
-
-        # Join with newlines for better formatting
-        formatted_errors = "\n".join(messages)
-        super().__init__(f"Multiple validation errors occurred:\n{formatted_errors}")
+    def summary(self) -> str:
+        lines = [f"- {type(e).__name__}: {e.summary()}" for e in self._errors]
+        return "Multiple validation errors occurred:\n" + "\n".join(lines)
 
     def failed_predicates(self) -> list[SchedulingPredicate]:
         """Return list of all failed predicates from all errors."""
-        predicates = []
+        predicates: list[SchedulingPredicate] = []
         for error in self._errors:
             predicates.extend(error.failed_predicates())
         return predicates
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.SCHEDULE,

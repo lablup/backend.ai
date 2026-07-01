@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.identifier.role_preset import RolePresetID
 
 
 class DomainNamePathParam(BaseRequestModel):
@@ -77,6 +78,22 @@ class PresetIdPathParam(BaseRequestModel):
     preset_id: UUID = Field(description="Preset UUID")
 
 
+class RolePresetIdPathParam(BaseRequestModel):
+    role_preset_id: RolePresetID = Field(description="Role preset UUID")
+
+
+class LoginClientTypeIdPathParam(BaseRequestModel):
+    login_client_type_id: UUID = Field(description="Login client type UUID")
+
+
+class AppConfigAllowListIdPathParam(BaseRequestModel):
+    app_config_allow_list_id: UUID = Field(description="App config allow-list entry UUID")
+
+
+class AppConfigDefinitionIdPathParam(BaseRequestModel):
+    app_config_definition_id: UUID = Field(description="App config definition UUID")
+
+
 class ReplicaIdPathParam(BaseRequestModel):
     replica_id: UUID = Field(description="Replica UUID")
 
@@ -85,5 +102,21 @@ class RouteIdPathParam(BaseRequestModel):
     route_id: UUID = Field(description="Route UUID")
 
 
+class VFolderIdPathParam(BaseRequestModel):
+    vfolder_id: UUID = Field(description="VFolder UUID")
+
+
+class TokenIdPathParam(BaseRequestModel):
+    token_id: UUID = Field(description="Token UUID")
+
+
+class CategoryIdPathParam(BaseRequestModel):
+    category_id: UUID = Field(description="Category UUID")
+
+
 class AccessKeyPathParam(BaseRequestModel):
     access_key: str = Field(description="Access key string")
+
+
+class InvitationIdPathParam(BaseRequestModel):
+    invitation_id: UUID = Field(description="Invitation UUID")

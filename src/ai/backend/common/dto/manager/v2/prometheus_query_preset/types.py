@@ -26,6 +26,7 @@ class QueryDefinitionOrderField(StrEnum):
     """Fields available for ordering prometheus query definitions."""
 
     NAME = "name"
+    RANK = "rank"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
 

@@ -5,11 +5,36 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    DeploymentHandlerOptionsInfo,
+    DeploymentOptionsInfo,
+)
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     CreateResourceGroupPayload,
     DeleteResourceGroupPayload,
+    PreemptionConfigInfo,
+    ResourceGroupDetailNode,
+    ResourceGroupMetadataInfo,
+    ResourceGroupNetworkConfigInfo,
     ResourceGroupNode,
+    ResourceGroupSchedulerConfigInfo,
+    ResourceGroupStatusInfo,
     UpdateResourceGroupPayload,
+)
+from ai.backend.common.dto.manager.v2.resource_group.types import (
+    PreemptionModeDTO,
+    PreemptionOrderDTO,
+    SchedulerTypeDTO,
+)
+from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
+from ai.backend.common.dto.manager.v2.session_options.response import (
+    DefaultSessionOptionsInfo,
+    HandlerOptionsInfo,
+    SessionHandlerOptionsInfo,
+)
+from ai.backend.common.dto.manager.v2.session_options.types import (
+    AgentSelectionPolicyEnum,
+    FailurePolicyEnum,
 )
 
 
@@ -22,10 +47,52 @@ def _make_resource_group_node(name: str = "test-group") -> ResourceGroupNode:
         is_active=True,
         total_resource_slots={"cpu": "4", "mem": "8g"},
         allowed_vfolder_hosts={"default": "rw"},
-        integration_id=None,
+        integration_name=None,
         resource_policy=None,
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         modified_at=datetime(2024, 6, 1, tzinfo=UTC),
+    )
+
+
+def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupDetailNode:
+    return ResourceGroupDetailNode(
+        id=name,
+        name=name,
+        status=ResourceGroupStatusInfo(is_active=True, is_public=True),
+        metadata=ResourceGroupMetadataInfo(
+            description="A test resource group",
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
+        ),
+        network=ResourceGroupNetworkConfigInfo(
+            wsproxy_addr="http://localhost:10200",
+            use_host_network=False,
+        ),
+        scheduler=ResourceGroupSchedulerConfigInfo(
+            type=SchedulerTypeDTO.FIFO,
+            preemption=PreemptionConfigInfo(
+                preemptible_priority=5,
+                order=PreemptionOrderDTO.OLDEST,
+                mode=PreemptionModeDTO.TERMINATE,
+            ),
+        ),
+        default_deployment_options=DeploymentOptionsInfo(
+            handler_options=DeploymentHandlerOptionsInfo(
+                default=HandlerOptionsInfo(timeout_sec=None, max_retry_count=None),
+                by_handler=[],
+            ),
+        ),
+        default_session_options=DefaultSessionOptionsInfo(
+            priority=0,
+            is_preemptible=False,
+            cluster_mode=ClusterModeEnum.SINGLE_NODE,
+            default_failure_policy=FailurePolicyEnum.STRICT,
+            default_kernel_execution_spec=None,
+            handler_options=SessionHandlerOptionsInfo(
+                default=HandlerOptionsInfo(timeout_sec=None, max_retry_count=None),
+                by_handler=[],
+            ),
+            agent_selection_policy=AgentSelectionPolicyEnum.STRICT,
+        ),
     )
 
 
@@ -42,7 +109,7 @@ class TestResourceGroupNode:
     def test_valid_creation_with_optional_none(self) -> None:
         node = _make_resource_group_node()
         assert node.description == "A test resource group"
-        assert node.integration_id is None
+        assert node.integration_name is None
         assert node.resource_policy is None
 
     def test_serializes_correctly(self) -> None:
@@ -68,12 +135,12 @@ class TestCreateResourceGroupPayload:
     """Tests for CreateResourceGroupPayload model."""
 
     def test_valid_creation(self) -> None:
-        node = _make_resource_group_node()
+        node = _make_resource_group_detail_node()
         payload = CreateResourceGroupPayload(resource_group=node)
         assert payload.resource_group.name == "test-group"
 
     def test_round_trip(self) -> None:
-        node = _make_resource_group_node()
+        node = _make_resource_group_detail_node()
         payload = CreateResourceGroupPayload(resource_group=node)
         json_data = payload.model_dump_json()
         restored = CreateResourceGroupPayload.model_validate_json(json_data)
@@ -84,12 +151,12 @@ class TestUpdateResourceGroupPayload:
     """Tests for UpdateResourceGroupPayload model."""
 
     def test_valid_creation(self) -> None:
-        node = _make_resource_group_node()
+        node = _make_resource_group_detail_node()
         payload = UpdateResourceGroupPayload(resource_group=node)
         assert payload.resource_group.name == "test-group"
 
     def test_round_trip(self) -> None:
-        node = _make_resource_group_node()
+        node = _make_resource_group_detail_node()
         payload = UpdateResourceGroupPayload(resource_group=node)
         json_data = payload.model_dump_json()
         restored = UpdateResourceGroupPayload.model_validate_json(json_data)
@@ -100,13 +167,11 @@ class TestDeleteResourceGroupPayload:
     """Tests for DeleteResourceGroupPayload model."""
 
     def test_valid_creation(self) -> None:
-        group_id = uuid.uuid4()
-        payload = DeleteResourceGroupPayload(id=group_id)
-        assert payload.id == group_id
+        payload = DeleteResourceGroupPayload(id="test-group")
+        assert payload.id == "test-group"
 
     def test_round_trip(self) -> None:
-        group_id = uuid.uuid4()
-        payload = DeleteResourceGroupPayload(id=group_id)
+        payload = DeleteResourceGroupPayload(id="test-group")
         json_data = payload.model_dump_json()
         restored = DeleteResourceGroupPayload.model_validate_json(json_data)
         assert restored.id == payload.id

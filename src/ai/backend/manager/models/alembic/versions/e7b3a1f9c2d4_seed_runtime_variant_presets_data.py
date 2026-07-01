@@ -1,0 +1,1504 @@
+"""seed runtime_variant_presets data
+
+Seeds the built-in runtime variant presets (vLLM, SGLang) into
+``runtime_variant_presets``. The presets previously lived only in the
+JSON fixtures, so a freshly migrated DB without ``fixture populate`` had
+an empty table while every sibling reference table is seeded via Alembic.
+
+The rows are an embedded snapshot of
+``fixtures/manager/example-runtime-variant-presets.json`` at this revision.
+FK is resolved by ``runtime_variants.name`` and inserts are idempotent
+(``ON CONFLICT DO NOTHING``), mirroring the fixture loader.
+
+Revision ID: e7b3a1f9c2d4
+Revises: 5d08e1164834
+Create Date: 2026-06-15
+
+"""
+
+# Part of: 26.4.4
+
+import json
+
+import sqlalchemy as sa
+from alembic import op
+
+# revision identifiers, used by Alembic.
+revision = "e7b3a1f9c2d4"
+down_revision = "5d08e1164834"
+branch_labels = None
+depends_on = None
+
+
+_SEED_DATA_JSON = r"""[
+    {
+        "runtime_variant_name": "vllm",
+        "name": "model",
+        "description": "HuggingFace model name or local path.",
+        "rank": 100,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "Qwen/Qwen3-0.6B",
+        "key": "--model",
+        "category": "model_loading",
+        "display_name": "Model",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "Qwen/Qwen3-0.6B"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "dtype",
+        "description": "Model weight dtype.",
+        "rank": 200,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "auto",
+        "key": "--dtype",
+        "category": "model_loading",
+        "display_name": "DType",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "auto",
+                        "label": "Auto"
+                    },
+                    {
+                        "value": "float",
+                        "label": "Float"
+                    },
+                    {
+                        "value": "bfloat16",
+                        "label": "BFloat16"
+                    },
+                    {
+                        "value": "float16",
+                        "label": "Float16"
+                    },
+                    {
+                        "value": "float32",
+                        "label": "Float32"
+                    },
+                    {
+                        "value": "half",
+                        "label": "Half"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "quantization",
+        "description": "Quantization backend.",
+        "rank": 300,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--quantization",
+        "category": "model_loading",
+        "display_name": "Quantization",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "awq",
+                        "label": "AWQ"
+                    },
+                    {
+                        "value": "awq_marlin",
+                        "label": "AWQ Marlin"
+                    },
+                    {
+                        "value": "gptq",
+                        "label": "GPTQ"
+                    },
+                    {
+                        "value": "gptq_marlin",
+                        "label": "GPTQ Marlin"
+                    },
+                    {
+                        "value": "fp8",
+                        "label": "FP8"
+                    },
+                    {
+                        "value": "gguf",
+                        "label": "GGUF"
+                    },
+                    {
+                        "value": "bitsandbytes",
+                        "label": "BitsAndBytes"
+                    },
+                    {
+                        "value": "modelopt",
+                        "label": "NVIDIA Model Optimizer"
+                    },
+                    {
+                        "value": "compressed-tensors",
+                        "label": "Compressed Tensors"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "max-model-len",
+        "description": "Maximum context length.",
+        "rank": 400,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": null,
+        "key": "--max-model-len",
+        "category": "model_loading",
+        "display_name": "Max Context Length",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 256,
+                "max": 131072
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "served-model-name",
+        "description": "Model name shown in API responses.",
+        "rank": 500,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--served-model-name",
+        "category": "model_loading",
+        "display_name": "Served Model Name",
+        "ui_option": {
+            "ui_type": "text_input"
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "trust-remote-code",
+        "description": "Trust HuggingFace remote code for custom architectures.",
+        "rank": 600,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--trust-remote-code",
+        "category": "model_loading",
+        "display_name": "Trust Remote Code",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "gpu-memory-utilization",
+        "description": "GPU memory utilization ratio.",
+        "rank": 700,
+        "preset_target": "args",
+        "value_type": "float",
+        "default_value": "0.9",
+        "key": "--gpu-memory-utilization",
+        "category": "resource_memory",
+        "display_name": "GPU Memory Utilization",
+        "ui_option": {
+            "ui_type": "slider",
+            "slider": {
+                "min": 0.1,
+                "max": 1.0,
+                "step": 0.05
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "tensor-parallel-size",
+        "description": "Number of GPUs for tensor parallelism.",
+        "rank": 800,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": "1",
+        "key": "--tensor-parallel-size",
+        "category": "resource_memory",
+        "display_name": "Tensor Parallel Size",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "1",
+                        "label": "1"
+                    },
+                    {
+                        "value": "2",
+                        "label": "2"
+                    },
+                    {
+                        "value": "4",
+                        "label": "4"
+                    },
+                    {
+                        "value": "8",
+                        "label": "8"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "pipeline-parallel-size",
+        "description": "Pipeline parallel stage count.",
+        "rank": 900,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": "1",
+        "key": "--pipeline-parallel-size",
+        "category": "resource_memory",
+        "display_name": "Pipeline Parallel Size",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 1,
+                "max": 16
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "data-parallel-size",
+        "description": "Data parallel replica count.",
+        "rank": 1000,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": "1",
+        "key": "--data-parallel-size",
+        "category": "resource_memory",
+        "display_name": "Data Parallel Size",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 1,
+                "max": 64
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "kv-cache-dtype",
+        "description": "KV cache dtype.",
+        "rank": 1100,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "auto",
+        "key": "--kv-cache-dtype",
+        "category": "resource_memory",
+        "display_name": "KV Cache DType",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "auto",
+                        "label": "Auto"
+                    },
+                    {
+                        "value": "fp8",
+                        "label": "FP8"
+                    },
+                    {
+                        "value": "fp8_e4m3",
+                        "label": "FP8 E4M3"
+                    },
+                    {
+                        "value": "fp8_e5m2",
+                        "label": "FP8 E5M2"
+                    },
+                    {
+                        "value": "bfloat16",
+                        "label": "BFloat16"
+                    },
+                    {
+                        "value": "float16",
+                        "label": "Float16"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "enable-prefix-caching",
+        "description": "Reuse KV cache for repeated prompts.",
+        "rank": 1200,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--enable-prefix-caching",
+        "category": "resource_memory",
+        "display_name": "Enable Prefix Caching",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "max-num-seqs",
+        "description": "Maximum sequences processed per iteration.",
+        "rank": 1300,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": null,
+        "key": "--max-num-seqs",
+        "category": "serving_performance",
+        "display_name": "Max Num Seqs",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 1,
+                "max": 1024
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "max-num-batched-tokens",
+        "description": "Maximum batched tokens per iteration.",
+        "rank": 1400,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": null,
+        "key": "--max-num-batched-tokens",
+        "category": "serving_performance",
+        "display_name": "Max Num Batched Tokens",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 256,
+                "max": 131072
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "enable-chunked-prefill",
+        "description": "Split long prompts into smaller prefill chunks.",
+        "rank": 1500,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--enable-chunked-prefill",
+        "category": "serving_performance",
+        "display_name": "Enable Chunked Prefill",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "scheduling-policy",
+        "description": "Scheduling policy for request handling.",
+        "rank": 1600,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "fcfs",
+        "key": "--scheduling-policy",
+        "category": "serving_performance",
+        "display_name": "Scheduling Policy",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "fcfs",
+                        "label": "FCFS"
+                    },
+                    {
+                        "value": "priority",
+                        "label": "Priority"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "performance-mode",
+        "description": "Serving optimization mode.",
+        "rank": 1700,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "balanced",
+        "key": "--performance-mode",
+        "category": "serving_performance",
+        "display_name": "Performance Mode",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "balanced",
+                        "label": "Balanced"
+                    },
+                    {
+                        "value": "interactivity",
+                        "label": "Interactivity"
+                    },
+                    {
+                        "value": "throughput",
+                        "label": "Throughput"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "limit-mm-per-prompt",
+        "description": "Per-prompt multimodal input limit.",
+        "rank": 1800,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "{}",
+        "key": "--limit-mm-per-prompt",
+        "category": "multimodal",
+        "display_name": "Limit MM Per Prompt",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "{\"image\": 5, \"audio\": 0}"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "enable-auto-tool-choice",
+        "description": "Enable automatic tool selection.",
+        "rank": 1900,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--enable-auto-tool-choice",
+        "category": "tool_reasoning",
+        "display_name": "Enable Auto Tool Choice",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "tool-call-parser",
+        "description": "Tool call parser implementation.",
+        "rank": 2000,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--tool-call-parser",
+        "category": "tool_reasoning",
+        "display_name": "Tool Call Parser",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "hermes",
+                        "label": "Hermes"
+                    },
+                    {
+                        "value": "mistral",
+                        "label": "Mistral"
+                    },
+                    {
+                        "value": "openai",
+                        "label": "OpenAI"
+                    },
+                    {
+                        "value": "pythonic",
+                        "label": "Pythonic"
+                    },
+                    {
+                        "value": "llama3_json",
+                        "label": "Llama 3 JSON"
+                    },
+                    {
+                        "value": "llama4_json",
+                        "label": "Llama 4 JSON"
+                    },
+                    {
+                        "value": "llama4_pythonic",
+                        "label": "Llama 4 Pythonic"
+                    },
+                    {
+                        "value": "qwen3_coder",
+                        "label": "Qwen3 Coder"
+                    },
+                    {
+                        "value": "qwen3_xml",
+                        "label": "Qwen3 XML"
+                    },
+                    {
+                        "value": "deepseek_v3",
+                        "label": "DeepSeek V3"
+                    },
+                    {
+                        "value": "deepseek_v31",
+                        "label": "DeepSeek V3.1"
+                    },
+                    {
+                        "value": "deepseek_v32",
+                        "label": "DeepSeek V3.2"
+                    },
+                    {
+                        "value": "glm45",
+                        "label": "GLM 4.5"
+                    },
+                    {
+                        "value": "glm47",
+                        "label": "GLM 4.7"
+                    },
+                    {
+                        "value": "kimi_k2",
+                        "label": "Kimi K2"
+                    },
+                    {
+                        "value": "granite",
+                        "label": "IBM Granite"
+                    },
+                    {
+                        "value": "granite4",
+                        "label": "IBM Granite 4"
+                    },
+                    {
+                        "value": "phi4_mini_json",
+                        "label": "Phi 4 Mini JSON"
+                    },
+                    {
+                        "value": "jamba",
+                        "label": "Jamba"
+                    },
+                    {
+                        "value": "hunyuan_a13b",
+                        "label": "Hunyuan A13B"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "reasoning-parser",
+        "description": "Parser for reasoning model output.",
+        "rank": 2100,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "",
+        "key": "--reasoning-parser",
+        "category": "tool_reasoning",
+        "display_name": "Reasoning Parser",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "deepseek_r1",
+                        "label": "DeepSeek R1"
+                    },
+                    {
+                        "value": "deepseek_v3",
+                        "label": "DeepSeek V3"
+                    },
+                    {
+                        "value": "qwen3",
+                        "label": "Qwen3"
+                    },
+                    {
+                        "value": "mistral",
+                        "label": "Mistral"
+                    },
+                    {
+                        "value": "glm45",
+                        "label": "GLM 4.5"
+                    },
+                    {
+                        "value": "kimi_k2",
+                        "label": "Kimi K2"
+                    },
+                    {
+                        "value": "openai_gptoss",
+                        "label": "OpenAI GPT-OSS"
+                    },
+                    {
+                        "value": "granite",
+                        "label": "IBM Granite"
+                    },
+                    {
+                        "value": "gemma4",
+                        "label": "Gemma 4"
+                    },
+                    {
+                        "value": "ernie45",
+                        "label": "ERNIE 4.5"
+                    },
+                    {
+                        "value": "hunyuan_a13b",
+                        "label": "Hunyuan A13B"
+                    },
+                    {
+                        "value": "nemotron_v3",
+                        "label": "Nemotron V3"
+                    },
+                    {
+                        "value": "olmo3",
+                        "label": "OLMo 3"
+                    },
+                    {
+                        "value": "seed_oss",
+                        "label": "Seed OSS"
+                    },
+                    {
+                        "value": "holo2",
+                        "label": "Holo 2"
+                    },
+                    {
+                        "value": "step3",
+                        "label": "Step3"
+                    },
+                    {
+                        "value": "step3p5",
+                        "label": "Step3.5"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "host",
+        "description": "Listen host.",
+        "rank": 2200,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--host",
+        "category": "network",
+        "display_name": "Host",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "0.0.0.0"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "port",
+        "description": "Listen port.",
+        "rank": 2300,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": "8000",
+        "key": "--port",
+        "category": "network",
+        "display_name": "Port",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 1,
+                "max": 65535
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "enable-log-requests",
+        "description": "Log incoming requests.",
+        "rank": 2400,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--enable-log-requests",
+        "category": "monitoring",
+        "display_name": "Enable Log Requests",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "disable-log-stats",
+        "description": "Disable periodic stats logging.",
+        "rank": 2500,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--disable-log-stats",
+        "category": "monitoring",
+        "display_name": "Disable Log Stats",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "enable-lora",
+        "description": "Enable LoRA support.",
+        "rank": 2600,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--enable-lora",
+        "category": "lora",
+        "display_name": "Enable LoRA",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "lora-modules",
+        "description": "LoRA module definitions.",
+        "rank": 2700,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--lora-modules",
+        "category": "lora",
+        "display_name": "LoRA Modules",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "adapter1=/path/to/adapter1"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "cuda-visible-devices",
+        "description": "CUDA device visibility override.",
+        "rank": 2800,
+        "preset_target": "env",
+        "value_type": "str",
+        "default_value": null,
+        "key": "CUDA_VISIBLE_DEVICES",
+        "category": "environment",
+        "display_name": "CUDA Visible Devices",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "0,1,2,3"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "vllm",
+        "name": "hf-token-env",
+        "description": "HuggingFace token for gated model downloads.",
+        "rank": 2900,
+        "preset_target": "env",
+        "value_type": "str",
+        "default_value": null,
+        "key": "HF_TOKEN",
+        "category": "environment",
+        "display_name": "HF Token",
+        "ui_option": {
+            "ui_type": "text_input"
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "model",
+        "description": "HuggingFace model name or local path.",
+        "rank": 100,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--model-path",
+        "category": "model_loading",
+        "display_name": "Model",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "meta-llama/Llama-3.3-70B"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "dtype",
+        "description": "Data type for model weights and activations.",
+        "rank": 200,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "auto",
+        "key": "--dtype",
+        "category": "model_loading",
+        "display_name": "DType",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "auto",
+                        "label": "Auto"
+                    },
+                    {
+                        "value": "half",
+                        "label": "Half"
+                    },
+                    {
+                        "value": "float",
+                        "label": "Float"
+                    },
+                    {
+                        "value": "bfloat16",
+                        "label": "BFloat16"
+                    },
+                    {
+                        "value": "float16",
+                        "label": "Float16"
+                    },
+                    {
+                        "value": "float32",
+                        "label": "Float32"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "quantization",
+        "description": "Quantization method.",
+        "rank": 300,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--quantization",
+        "category": "model_loading",
+        "display_name": "Quantization",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "awq / gptq / fp8"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "context-length",
+        "description": "Maximum context length.",
+        "rank": 400,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": null,
+        "key": "--context-length",
+        "category": "model_loading",
+        "display_name": "Context Length",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 256,
+                "max": 131072
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "served-model-name",
+        "description": "Overridden model name returned by the v1/models endpoint in the OpenAI API server.",
+        "rank": 500,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--served-model-name",
+        "category": "model_loading",
+        "display_name": "Served Model Name",
+        "ui_option": {
+            "ui_type": "text_input"
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "trust-remote-code",
+        "description": "Whether or not to allow for custom models defined on the Hub in their own modeling files.",
+        "rank": 600,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--trust-remote-code",
+        "category": "model_loading",
+        "display_name": "Trust Remote Code",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "gpu-memory-utilization",
+        "description": "Fraction of the memory used for static allocation.",
+        "rank": 700,
+        "preset_target": "args",
+        "value_type": "float",
+        "default_value": "0.9",
+        "key": "--mem-fraction-static",
+        "category": "resource_memory",
+        "display_name": "Memory Fraction Static",
+        "ui_option": {
+            "ui_type": "slider",
+            "slider": {
+                "min": 0.1,
+                "max": 1.0,
+                "step": 0.05
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "tensor-parallel-size",
+        "description": "Number of GPUs for tensor parallelism.",
+        "rank": 800,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": "1",
+        "key": "--tp-size",
+        "category": "resource_memory",
+        "display_name": "Tensor Parallel Size",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "1",
+                        "label": "1"
+                    },
+                    {
+                        "value": "2",
+                        "label": "2"
+                    },
+                    {
+                        "value": "4",
+                        "label": "4"
+                    },
+                    {
+                        "value": "8",
+                        "label": "8"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "pipeline-parallel-size",
+        "description": "Pipeline parallel stage count.",
+        "rank": 900,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": "1",
+        "key": "--pp-size",
+        "category": "resource_memory",
+        "display_name": "Pipeline Parallel Size",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 1,
+                "max": 16
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "data-parallel-size",
+        "description": "Data parallel replica count.",
+        "rank": 1000,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": "1",
+        "key": "--dp-size",
+        "category": "resource_memory",
+        "display_name": "Data Parallel Size",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 1,
+                "max": 64
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "kv-cache-dtype",
+        "description": "Data type for kv cache storage.",
+        "rank": 1100,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "auto",
+        "key": "--kv-cache-dtype",
+        "category": "resource_memory",
+        "display_name": "KV Cache DType",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "auto",
+                        "label": "Auto"
+                    },
+                    {
+                        "value": "fp8_e5m2",
+                        "label": "FP8 E5M2"
+                    },
+                    {
+                        "value": "fp8_e4m3",
+                        "label": "FP8 E4M3"
+                    },
+                    {
+                        "value": "fp4_e2m1",
+                        "label": "FP4 E2M1"
+                    },
+                    {
+                        "value": "bf16",
+                        "label": "BF16"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "disable-radix-cache",
+        "description": "Disable RadixAttention prefix caching.",
+        "rank": 1200,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--disable-radix-cache",
+        "category": "resource_memory",
+        "display_name": "Disable Prefix Caching",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "max-running-requests",
+        "description": "Maximum number of running requests.",
+        "rank": 1300,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": null,
+        "key": "--max-running-requests",
+        "category": "serving_performance",
+        "display_name": "Max Running Requests",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 1,
+                "max": 1024
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "max-total-tokens",
+        "description": "Maximum number of tokens in the memory pool.",
+        "rank": 1400,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": null,
+        "key": "--max-total-tokens",
+        "category": "serving_performance",
+        "display_name": "Max Total Tokens",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 256,
+                "max": 131072
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "chunked-prefill-size",
+        "description": "Maximum number of tokens in a chunk for chunked prefill. Use -1 to disable.",
+        "rank": 1500,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": null,
+        "key": "--chunked-prefill-size",
+        "category": "serving_performance",
+        "display_name": "Chunked Prefill Size",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": -1,
+                "max": 131072
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "scheduling-policy",
+        "description": "Scheduling policy for request handling.",
+        "rank": 1600,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "fcfs",
+        "key": "--schedule-policy",
+        "category": "serving_performance",
+        "display_name": "Scheduling Policy",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "fcfs",
+                        "label": "FCFS"
+                    },
+                    {
+                        "value": "lpm",
+                        "label": "LPM"
+                    },
+                    {
+                        "value": "priority",
+                        "label": "Priority"
+                    },
+                    {
+                        "value": "random",
+                        "label": "Random"
+                    },
+                    {
+                        "value": "dfs-weight",
+                        "label": "DFS-Weight"
+                    },
+                    {
+                        "value": "lof",
+                        "label": "LOF"
+                    },
+                    {
+                        "value": "routing-key",
+                        "label": "Routing-Key"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "tool-call-parser",
+        "description": "Tool call parser implementation.",
+        "rank": 1700,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--tool-call-parser",
+        "category": "tool_reasoning",
+        "display_name": "Tool Call Parser",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "qwen / pythonic / deepseekv3 / glm / gpt-oss"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "reasoning-parser",
+        "description": "Parser for reasoning model output.",
+        "rank": 1800,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--reasoning-parser",
+        "category": "tool_reasoning",
+        "display_name": "Reasoning Parser",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "deepseek-r1",
+                        "label": "DeepSeek R1"
+                    },
+                    {
+                        "value": "deepseek-v3",
+                        "label": "DeepSeek V3"
+                    },
+                    {
+                        "value": "qwen3",
+                        "label": "Qwen3"
+                    },
+                    {
+                        "value": "qwen3-thinking",
+                        "label": "Qwen3 Thinking"
+                    },
+                    {
+                        "value": "kimi",
+                        "label": "Kimi"
+                    },
+                    {
+                        "value": "gpt-oss",
+                        "label": "GPT-OSS"
+                    },
+                    {
+                        "value": "glm45",
+                        "label": "GLM 4.5"
+                    },
+                    {
+                        "value": "step3",
+                        "label": "STEP3"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "host",
+        "description": "Listen host.",
+        "rank": 1900,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "127.0.0.1",
+        "key": "--host",
+        "category": "network",
+        "display_name": "Host",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "127.0.0.1"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "port",
+        "description": "Listen port.",
+        "rank": 2000,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": "30000",
+        "key": "--port",
+        "category": "network",
+        "display_name": "Port",
+        "ui_option": {
+            "ui_type": "number_input",
+            "number": {
+                "min": 1,
+                "max": 65535
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "log-level",
+        "description": "The logging level of all loggers.",
+        "rank": 2400,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": "info",
+        "key": "--log-level",
+        "category": "monitoring",
+        "display_name": "Log Level",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "debug",
+                        "label": "Debug"
+                    },
+                    {
+                        "value": "info",
+                        "label": "Info"
+                    },
+                    {
+                        "value": "warning",
+                        "label": "Warning"
+                    },
+                    {
+                        "value": "error",
+                        "label": "Error"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "log-requests",
+        "description": "Log metadata, inputs, outputs of all requests. The verbosity is decided by --log-requests-level.",
+        "rank": 2100,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--log-requests",
+        "category": "monitoring",
+        "display_name": "Log Requests",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "log-requests-level",
+        "description": "Request logging verbosity. 0: metadata only, 1: metadata and sampling parameters, 2: partial input/output, 3: full input/output.",
+        "rank": 2200,
+        "preset_target": "args",
+        "value_type": "int",
+        "default_value": null,
+        "key": "--log-requests-level",
+        "category": "monitoring",
+        "display_name": "Log Requests Level",
+        "ui_option": {
+            "ui_type": "select",
+            "choices": {
+                "items": [
+                    {
+                        "value": "0",
+                        "label": "0 - Metadata only"
+                    },
+                    {
+                        "value": "1",
+                        "label": "1 - Metadata + sampling params"
+                    },
+                    {
+                        "value": "2",
+                        "label": "2 - Metadata + sampling params + Partial input/output"
+                    },
+                    {
+                        "value": "3",
+                        "label": "3 - Full input/output"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "enable-lora",
+        "description": "Enable LoRA support.",
+        "rank": 2300,
+        "preset_target": "args",
+        "value_type": "flag",
+        "default_value": null,
+        "key": "--enable-lora",
+        "category": "lora",
+        "display_name": "Enable LoRA",
+        "ui_option": {
+            "ui_type": "checkbox"
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "lora-modules",
+        "description": "LoRA adapter definitions. Each adapter must be specified in one of the following formats: <PATH> | <NAME>=<PATH> | JSON with schema {\"lora_name\": str, \"lora_path\": str, \"pinned\": bool}.",
+        "rank": 2400,
+        "preset_target": "args",
+        "value_type": "str",
+        "default_value": null,
+        "key": "--lora-paths",
+        "category": "lora",
+        "display_name": "LoRA Paths",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "adapter1=/path/to/adapter1"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "cuda-visible-devices",
+        "description": "CUDA device visibility override.",
+        "rank": 2500,
+        "preset_target": "env",
+        "value_type": "str",
+        "default_value": null,
+        "key": "CUDA_VISIBLE_DEVICES",
+        "category": "environment",
+        "display_name": "CUDA Visible Devices",
+        "ui_option": {
+            "ui_type": "text_input",
+            "text": {
+                "placeholder": "0,1,2,3"
+            }
+        }
+    },
+    {
+        "runtime_variant_name": "sglang",
+        "name": "hf-token-env",
+        "description": "HuggingFace token for gated model downloads.",
+        "rank": 2600,
+        "preset_target": "env",
+        "value_type": "str",
+        "default_value": null,
+        "key": "HF_TOKEN",
+        "category": "environment",
+        "display_name": "HF Token",
+        "ui_option": {
+            "ui_type": "text_input"
+        }
+    }
+]"""
+
+_SEED_DATA = json.loads(_SEED_DATA_JSON)
+
+_INSERT_SQL = sa.text(
+    """
+    INSERT INTO runtime_variant_presets
+        (runtime_variant, name, description, rank, preset_target, value_type,
+         default_value, key, category, display_name, ui_option)
+    SELECT
+        rv.id, :name, :description, :rank, :preset_target, :value_type,
+        :default_value, :key, :category, :display_name, CAST(:ui_option AS JSONB)
+    FROM runtime_variants rv
+    WHERE rv.name = :variant_name
+    ON CONFLICT ON CONSTRAINT uq_runtime_variant_presets_variant_name DO NOTHING
+    """
+)
+
+_DELETE_SQL = sa.text(
+    """
+    DELETE FROM runtime_variant_presets
+    WHERE name = :name
+      AND runtime_variant = (SELECT id FROM runtime_variants WHERE name = :variant_name)
+    """
+)
+
+
+def upgrade() -> None:
+    conn = op.get_bind()
+    for row in _SEED_DATA:
+        ui_option = row["ui_option"]
+        conn.execute(
+            _INSERT_SQL,
+            {
+                "variant_name": row["runtime_variant_name"],
+                "name": row["name"],
+                "description": row["description"],
+                "rank": row["rank"],
+                "preset_target": row["preset_target"],
+                "value_type": row["value_type"],
+                "default_value": row["default_value"],
+                "key": row["key"],
+                "category": row["category"],
+                "display_name": row["display_name"],
+                "ui_option": json.dumps(ui_option) if ui_option is not None else None,
+            },
+        )
+
+
+def downgrade() -> None:
+    conn = op.get_bind()
+    for row in _SEED_DATA:
+        conn.execute(
+            _DELETE_SQL,
+            {"name": row["name"], "variant_name": row["runtime_variant_name"]},
+        )

@@ -76,7 +76,7 @@ CPU_PRESET=$(./bai admin deployment revision-preset create "{
       \"name\": \"test-model\",
       \"model_path\": \"/models\",
       \"service\": {
-        \"start_command\": \"python /models/serve.py\",
+        \"start_command\": [\"python\", \"/models/serve.py\"],
         \"port\": 8000,
         \"health_check\": {
           \"path\": \"/health\",

@@ -47,6 +47,42 @@ trim() {
   echo "$1" | sed -e 's/^[[:space:]]*//g' -e 's/[[:space:]]*$//g'
 }
 
+enable_observability_in_toml() {
+  # Flip "enabled = false" to "enabled = true" inside observability sections of
+  # a component config. Sections enabled depend on the active flags:
+  #   - --enable-observability  -> [pyroscope] and [otel]
+  #   - --enable-telemetry      -> [otel] only
+  # No-op when neither flag is active.
+  local file="$1"
+  local sections=""
+  if [ $ENABLE_OBSERVABILITY -eq 1 ]; then
+    sections="pyroscope otel"
+  elif [ $ENABLE_TELEMETRY -eq 1 ]; then
+    sections="otel"
+  fi
+  if [ -z "$sections" ]; then
+    return
+  fi
+  if [ ! -f "$file" ]; then
+    return
+  fi
+  python3 - "$file" $sections <<'PY'
+import re, sys
+path = sys.argv[1]
+sections = sys.argv[2:]
+with open(path) as f:
+    text = f.read()
+for section in sections:
+    pat = re.compile(
+        r"(\[" + section + r"\][^\[]*?)^enabled\s*=\s*false",
+        re.MULTILINE | re.DOTALL,
+    )
+    text = pat.sub(r"\1enabled = true", text, count=1)
+with open(path, "w") as f:
+    f.write(text)
+PY
+}
+
 usage() {
   echo "${GREEN}Backend.AI Development Setup${NC}: ${CYAN}Auto-installer Tool${NC}"
   echo ""
@@ -91,6 +127,22 @@ usage() {
   echo "    Install ROCm accelerator mock plugin and pull a"
   echo "    TensorFlow ROCm kernel for testing/demo."
   echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-observability${NC}"
+  echo "    Bring up the halfstack 'observability' Compose profile"
+  echo "    (Prometheus, Grafana, OTel collector, Loki, Tempo, Pyroscope,"
+  echo "    exporters) and enable Pyroscope / OTel in component configs."
+  echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-storage${NC}"
+  echo "    Bring up the halfstack 'storage' Compose profile (MinIO)."
+  echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-telemetry / --disable-telemetry${NC}"
+  echo "    Bring up the halfstack 'telemetry' Compose profile (OTel collector"
+  echo "    + Loki) and enable [otel] in component configs. Default ON for the"
+  echo "    dev install; pass --disable-telemetry to opt out. Implied by"
+  echo "    --enable-observability."
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
   echo "    Install the webui as an editable repository under src/ai/backend/webui."
@@ -325,6 +377,9 @@ ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
 ENABLE_CUDA_MIG_MOCK=0
 ENABLE_ROCM_MOCK=0
+ENABLE_OBSERVABILITY=0
+ENABLE_STORAGE=0
+ENABLE_TELEMETRY=1  # default ON in dev install (override with --disable-telemetry)
 CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
@@ -370,6 +425,10 @@ while [ $# -gt 0 ]; do
     --enable-cuda-mock)    ENABLE_CUDA_MOCK=1 ;;
     --enable-cuda-mig-mock) ENABLE_CUDA_MIG_MOCK=1 ;;
     --enable-rocm-mock)    ENABLE_ROCM_MOCK=1 ;;
+    --enable-observability) ENABLE_OBSERVABILITY=1 ;;
+    --enable-storage)      ENABLE_STORAGE=1 ;;
+    --enable-telemetry)    ENABLE_TELEMETRY=1 ;;
+    --disable-telemetry)   ENABLE_TELEMETRY=0 ;;
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
@@ -407,6 +466,21 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+# Build the docker compose --profile flags from the ENABLE_* booleans now,
+# right after argument parsing, so every code path (including Codespaces
+# post-create that skips setup_environment) sees a consistent value.
+HALFSTACK_PROFILE_ARGS=""
+if [ $ENABLE_OBSERVABILITY -eq 1 ]; then
+  # observability profile already includes the telemetry services
+  HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile observability"
+elif [ $ENABLE_TELEMETRY -eq 1 ]; then
+  HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile telemetry"
+fi
+if [ $ENABLE_STORAGE -eq 1 ]; then
+  HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile storage"
+fi
+
 if [ "$CURRENT_BRANCH" = "main" ]; then
   EDITABLE_WEBUI=1  # auto-enable if we're on the main branch
 fi
@@ -704,7 +778,13 @@ install_editable_webui() {
   fi
   pushd ./packages/backend.ai-ui && pnpm install && popd
   pnpm i
-  make compile
+  # The production Web UI build can exceed Node's ~2GB default old-space heap and
+  # crash with "JavaScript heap out of memory" (exit code 134) on low-RAM machines
+  # (e.g. WSL2). Scope a larger heap to the build only, so users don't have to
+  # export NODE_OPTIONS globally before running this script. We append rather than
+  # replace, so an explicit user NODE_OPTIONS (e.g. a higher --max-old-space-size)
+  # still wins via Node's last-flag-wins rule.
+  NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=4096" make compile
   cd ../../../..
 }
 
@@ -946,6 +1026,16 @@ setup_environment() {
     sed_inplace "s/REDIS_SENTINEL_SELF_HOST/sentinel03/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_PASSWORD/develove/g" "$sentinel03_cfg_path"
     sed_inplace "s/REDIS_SENTINEL_SELF_PORT/9505/g" "$sentinel03_cfg_path"
+
+    # macOS only (BA-6289): Docker Desktop's bridge IPs aren't routable from the
+    # host, so uncomment announce-hostnames to reach master/replicas by hostname
+    # (node01-03) via /etc/hosts. Linux routes bridge IPs directly, so it stays
+    # commented.
+    if [ "$DISTRO" = "Darwin" ]; then
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel01_cfg_path"
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel02_cfg_path"
+      sed_inplace "s/^# sentinel announce-hostnames yes/sentinel announce-hostnames yes/" "$sentinel03_cfg_path"
+    fi
   else
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
     SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"
@@ -977,7 +1067,7 @@ setup_environment() {
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
 
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS pull
 
   show_info "Pre-pulling frequently used kernel images..."
   echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
@@ -991,15 +1081,19 @@ setup_environment() {
 configure_backendai() {
   wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see containers here.
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS up -d --wait
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS ps   # You should see containers here.
 
   # Install rover cli for Supergraph generation
   install_rover_cli
 
-  # Configure MinIO using separate configuration script
-  source "$(dirname "$0")/configure-minio.sh"
-  configure_minio "docker-compose.halfstack.current.yml"
+  # Configure MinIO only when the storage halfstack profile is active.
+  # The MinIO container is otherwise not running, so configure_minio would
+  # fall back to default credentials and emit a warning.
+  if [ $ENABLE_STORAGE -eq 1 ]; then
+    source "$(dirname "$0")/configure-minio.sh"
+    configure_minio "docker-compose.halfstack.current.yml"
+  fi
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
     cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
@@ -1073,6 +1167,18 @@ configure_backendai() {
   sed_inplace "s/jwt_secret = \"some_jwt_secret\"/jwt_secret = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-worker.toml
   sed_inplace "s/secret = \"some_permit_hash_secret\"/secret = \"${APPPROXY_PERMIT_HASH_SECRET}\"/" ./app-proxy-worker.toml
 
+  # In HA mode the app-proxy components must reach Redis through Sentinel (nothing
+  # listens on the standalone REDIS_PORT). Comment out the standalone `addr` and
+  # enable the Sentinel lines carried (commented) in the halfstack templates.
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    for f in ./app-proxy-coordinator.toml ./app-proxy-worker.toml; do
+      sed_inplace "s/^addr = { host = \"127.0.0.1\", port = ${REDIS_PORT} }/# addr = { host = \"127.0.0.1\", port = ${REDIS_PORT} }/" "$f"
+      sed_inplace "s/# sentinel = \[/sentinel = [/" "$f"
+      sed_inplace "s/# service_name = \"mymaster\"/service_name = \"mymaster\"/" "$f"
+      sed_inplace "s/# password = \"develove\"/password = \"develove\"/" "$f"
+    done
+  fi
+
   # configure agent
   cp configs/agent/halfstack.toml ./agent.toml
   mkdir -p "$VAR_BASE_PATH"
@@ -1125,20 +1231,23 @@ configure_backendai() {
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
-  # Configure storage-proxy MinIO settings using separate configuration script
-  configure_storage_proxy_minio "./storage-proxy.toml"
+  # Configure storage-proxy MinIO settings only when the storage profile is
+  # active; otherwise the [[artifact-storages]] placeholders stay in place.
+  if [ $ENABLE_STORAGE -eq 1 ]; then
+    configure_storage_proxy_minio "./storage-proxy.toml"
+  fi
 
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 
   if [ $CONFIGURE_HA -eq 1 ]; then
-    sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
-    sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
-    sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./webserver.conf
-    sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
+    sed_inplace "s/addr = \"localhost:8111\"/# addr = \"localhost:8111\"/" ./webserver.conf
+    sed_inplace "s/# password = \"mysecret\"/password = \"develove\"/" ./webserver.conf
+    sed_inplace "s/# service_name = \"mymaster\"/service_name = \"mymaster\"/" ./webserver.conf
+    sed_inplace "s/# sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/" ./webserver.conf
   else
-    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
+    sed_inplace "s/addr = \"localhost:8111\"/addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
   fi
 
   # install and configure webui
@@ -1152,9 +1261,18 @@ configure_backendai() {
 
   if [ "${CODESPACES}" = "true" ]; then
     $docker_sudo docker stop $($docker_sudo docker ps -q)
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" down
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS down
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS up -d --wait
   fi
+
+  # Enable Pyroscope / OTel in component configs when --enable-observability was passed.
+  enable_observability_in_toml ./manager.toml
+  enable_observability_in_toml ./account-manager.toml
+  enable_observability_in_toml ./agent.toml
+  enable_observability_in_toml ./storage-proxy.toml
+  enable_observability_in_toml ./app-proxy-coordinator.toml
+  enable_observability_in_toml ./app-proxy-worker.toml
+  enable_observability_in_toml ./webserver.conf
 
   # initialize the DB schema
   POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
@@ -1172,15 +1290,23 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-slot-types.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
   ./backend.ai mgr fixture populate fixtures/manager/example-runtime-variants.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-runtime-variant-presets.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-login-client-types.json
   ./backend.ai mgr fixture populate fixtures/manager/example-roles.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-preset-categories.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-presets.json
 
-  # Populate artifact registries with substituted MinIO credentials
-  TMP_ARTIFACT_REGISTRIES_JSON="/tmp/example-artifact-registries.json"
-  cp fixtures/manager/example-artifact-registries.json "$TMP_ARTIFACT_REGISTRIES_JSON"
-  sed_inplace "s/<access_key>/${MINIO_ACCESS_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
-  sed_inplace "s/<secret_key>/${MINIO_SECRET_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
-  ./backend.ai mgr fixture populate "$TMP_ARTIFACT_REGISTRIES_JSON"
-  rm -f "$TMP_ARTIFACT_REGISTRIES_JSON"
+  # Populate artifact registries only when the storage halfstack profile is
+  # active; the example registry points at the local MinIO and depends on
+  # the credentials produced by configure_minio.
+  if [ $ENABLE_STORAGE -eq 1 ]; then
+    TMP_ARTIFACT_REGISTRIES_JSON="/tmp/example-artifact-registries.json"
+    cp fixtures/manager/example-artifact-registries.json "$TMP_ARTIFACT_REGISTRIES_JSON"
+    sed_inplace "s/<access_key>/${MINIO_ACCESS_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
+    sed_inplace "s/<secret_key>/${MINIO_SECRET_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
+    ./backend.ai mgr fixture populate "$TMP_ARTIFACT_REGISTRIES_JSON"
+    rm -f "$TMP_ARTIFACT_REGISTRIES_JSON"
+  fi
 
   show_info "Setting up databases... (account-manager)"
   # TODO: add "schema oneshot" command for account-manager

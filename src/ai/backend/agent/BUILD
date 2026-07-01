@@ -28,13 +28,14 @@ visibility_private_component(
         "//src/ai/backend/testutils/**",
     ],
     allowed_dependencies=[
-        "//src/ai/backend/**",
-        "!//src/ai/backend/account_manager/**",
-        "!//src/ai/backend/web/**",
-        "!//src/ai/backend/manager/**",
-        "!//src/ai/backend/storage/**",
-        "!//src/ai/backend/wsproxy/**",
-        "!//src/ai/backend/client/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/runner/**",
+        "//src/ai/backend/helpers/**",
+        "//src/ai/backend/kernel/**",
+        "//src/ai/backend/accelerator/**",
     ],
 )
 

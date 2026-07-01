@@ -131,6 +131,30 @@ class TestUserAdapterQuerier:
         condition_result = querier.conditions[0]()
         assert condition_result is not None
 
+    def test_integration_name_equals_filter(self) -> None:
+        """Test integration_name equals filter"""
+        request = SearchUsersRequest(
+            filter=UserFilter(integration_name=StringFilter(equals="ext-abc"))
+        )
+        adapter = UserAdapter()
+        querier = adapter.build_querier(request)
+
+        assert len(querier.conditions) == 1
+        condition_result = querier.conditions[0]()
+        assert condition_result is not None
+
+    def test_integration_name_contains_filter(self) -> None:
+        """Test integration_name contains filter"""
+        request = SearchUsersRequest(
+            filter=UserFilter(integration_name=StringFilter(contains="ext"))
+        )
+        adapter = UserAdapter()
+        querier = adapter.build_querier(request)
+
+        assert len(querier.conditions) == 1
+        condition_result = querier.conditions[0]()
+        assert condition_result is not None
+
     def test_status_filter(self) -> None:
         """Test status filter with list of statuses"""
         request = SearchUsersRequest(

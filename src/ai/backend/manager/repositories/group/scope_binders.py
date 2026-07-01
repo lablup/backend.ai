@@ -7,7 +7,9 @@ from uuid import UUID
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.group.row import AssocGroupUserRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     RBACScopeEntityUnbinder,
@@ -16,18 +18,14 @@ from ai.backend.manager.repositories.group.purgers import UsersForProjectPurgerS
 
 
 @dataclass
-class UserProjectEntityUnbinder(RBACScopeEntityUnbinder[AssocGroupUserRow]):
-    """Unbind users from a project.
-
-    Deletes association_groups_users rows and corresponding
-    AssociationScopesEntitiesRow entries for the given users in the project scope.
-    """
+class UserProjectEntityUnbinder(RBACScopeEntityUnbinder[AssociationScopesEntitiesRow]):
+    """Unbind users from a project (PROJECT/USER ASE rows)."""
 
     user_uuids: list[UUID]
     project_id: UUID
 
     @override
-    def build_purger_spec(self) -> BatchPurgerSpec[AssocGroupUserRow]:
+    def build_purger_spec(self) -> BatchPurgerSpec[AssociationScopesEntitiesRow]:
         return UsersForProjectPurgerSpec(
             user_uuids=self.user_uuids,
             project_id=self.project_id,

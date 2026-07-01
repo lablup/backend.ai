@@ -14,6 +14,7 @@ import pytest
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
@@ -85,6 +86,7 @@ class TestResourceUsageHistoryRepository:
                 KeyPairRow,
                 GroupRow,
                 AgentRow,
+                ContainerRegistryRow,
                 ImageRow,
                 SessionRow,
                 KernelRow,

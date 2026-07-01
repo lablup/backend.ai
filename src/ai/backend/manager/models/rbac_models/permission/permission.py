@@ -11,11 +11,13 @@ from ai.backend.manager.data.permission.permission import PermissionCreator, Per
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     ScopeType,
 )
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    IntFlagType,
     StrEnumType,
 )
 
@@ -24,6 +26,7 @@ class PermissionRow(Base):  # type: ignore[misc]
     __tablename__ = "permissions"
     __table_args__ = (
         sa.Index("ix_permissions_role_scope", "role_id", "scope_type", "scope_id"),
+        sa.Index("ix_permissions_scope_entity", "scope_type", "scope_id", "entity_type"),
         sa.UniqueConstraint(
             "role_id",
             "scope_type",
@@ -53,6 +56,9 @@ class PermissionRow(Base):  # type: ignore[misc]
     operation: Mapped[OperationType] = mapped_column(
         "operation", StrEnumType(OperationType, length=32), nullable=False
     )
+    permission: Mapped[Permission] = mapped_column(
+        "permission", IntFlagType(Permission), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
@@ -65,6 +71,7 @@ class PermissionRow(Base):  # type: ignore[misc]
             scope_id=input.scope_id,
             entity_type=input.entity_type,
             operation=input.operation,
+            permission=input.permission,
         )
 
     def to_data(self) -> PermissionData:
@@ -75,5 +82,6 @@ class PermissionRow(Base):  # type: ignore[misc]
             scope_id=self.scope_id,
             entity_type=self.entity_type,
             operation=self.operation,
+            permission=self.permission,
             created_at=self.created_at,
         )

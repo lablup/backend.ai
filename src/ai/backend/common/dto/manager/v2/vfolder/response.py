@@ -12,26 +12,32 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 from .types import (
+    FileEntryType,
     VFolderAccessControlInfo,
     VFolderInvitationState,
     VFolderMetadataInfo,
     VFolderOperationStatusField,
     VFolderOwnershipInfo,
     VFolderPermissionField,
-    VFolderUsageInfo,
+    VFolderQuotaInfo,
 )
 
 __all__ = (
+    "BulkDeleteVFoldersPayload",
+    "BulkPurgeVFolderV2Error",
+    "BulkPurgeVFoldersPayload",
     "CloneVFolderPayload",
     "CreateDownloadSessionPayload",
     "CreateUploadSessionPayload",
     "CreateVFolderPayload",
     "DeleteFilesPayload",
     "DeleteVFolderPayload",
+    "DeployVFolderPayload",
     "FileEntryNode",
     "InviteVFolderPayload",
     "ListFilesPayload",
     "MkdirPayload",
+    "MoveFilePayload",
     "PurgeVFolderPayload",
     "RestoreVFolderPayload",
     "ShareVFolderPayload",
@@ -58,10 +64,7 @@ class VFolderNode(BaseResponseModel):
     metadata: VFolderMetadataInfo = Field(description="Descriptive metadata fields")
     access_control: VFolderAccessControlInfo = Field(description="Access control fields")
     ownership: VFolderOwnershipInfo = Field(description="Ownership context fields")
-    usage: VFolderUsageInfo | None = Field(
-        default=None,
-        description="Usage statistics; None for list responses where usage is not loaded",
-    )
+    quota: VFolderQuotaInfo = Field(description="Quota limits configured for the folder")
     unmanaged_path: str | None = Field(
         default=None, description="Path for unmanaged virtual folders"
     )
@@ -94,11 +97,11 @@ class FileEntryNode(BaseResponseModel):
     """Node model representing a file entry inside a virtual folder."""
 
     name: str = Field(description="File or directory name")
-    type: str = Field(description="Entry type (file or directory)")
+    type: FileEntryType = Field(description="Entry type")
     size: int = Field(description="File size in bytes")
-    mode: str = Field(description="File permission mode string")
-    created: str = Field(description="Creation timestamp string")
-    modified: str = Field(description="Last modification timestamp string")
+    mode: int = Field(description="POSIX file permission mode (e.g., 33188 for 0o100644)")
+    created_at: str = Field(description="Creation timestamp")
+    updated_at: str = Field(description="Last modification timestamp")
 
 
 # ============================================================
@@ -127,7 +130,29 @@ class DeleteVFolderPayload(BaseResponseModel):
 class PurgeVFolderPayload(BaseResponseModel):
     """Payload for virtual folder purge mutation result."""
 
-    id: UUID = Field(description="ID of the purged virtual folder")
+    id: UUID = Field(description="ID of the purged virtual folder.")
+
+
+class BulkDeleteVFoldersPayload(BaseResponseModel):
+    """Payload for bulk virtual folder soft-deletion."""
+
+    deleted_count: int = Field(description="Number of virtual folders successfully soft-deleted.")
+
+
+class BulkPurgeVFolderV2Error(BaseResponseModel):
+    """Error information for a single vfolder that failed during bulk purge."""
+
+    vfolder_id: UUID = Field(description="UUID of the vfolder that failed to purge.")
+    message: str = Field(description="Error message describing the failure.")
+
+
+class BulkPurgeVFoldersPayload(BaseResponseModel):
+    """Payload for bulk virtual folder purge."""
+
+    purged_count: int = Field(description="Number of virtual folders successfully purged.")
+    failed: list[BulkPurgeVFolderV2Error] = Field(
+        description="List of errors for vfolders that failed to purge."
+    )
 
 
 class RestoreVFolderPayload(BaseResponseModel):
@@ -168,12 +193,17 @@ class CreateUploadSessionPayload(BaseResponseModel):
     url: str = Field(description="Upload URL")
 
 
-class DeleteFilesPayload(BaseResponseModel):
-    """Payload for file deletion mutation result."""
+class MoveFilePayload(BaseResponseModel):
+    """Payload for file move mutation result."""
 
-    bgtask_id: str | None = Field(
-        default=None, description="Background task ID if deletion is async"
-    )
+    src: str = Field(description="Source path that was moved")
+    dst: str = Field(description="Destination path")
+
+
+class DeleteFilesPayload(BaseResponseModel):
+    """Payload for async file deletion. Always runs as a background task."""
+
+    bgtask_id: str = Field(description="Background task ID for the deletion operation")
 
 
 class ListFilesPayload(BaseResponseModel):
@@ -219,3 +249,15 @@ class SearchVFoldersPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of records matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+# ============================================================
+# Deploy Payload
+# ============================================================
+
+
+class DeployVFolderPayload(BaseResponseModel):
+    """Payload for deploying a model VFolder as a new deployment."""
+
+    deployment_id: UUID = Field(description="ID of the created deployment.")
+    deployment_name: str = Field(description="Name of the created deployment.")

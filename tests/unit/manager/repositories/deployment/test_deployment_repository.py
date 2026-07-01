@@ -6,56 +6,64 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
-from ai.backend.common.exception import DeploymentNameAlreadyExists
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    AutoScalingMetricComparator,
-    AutoScalingMetricSource,
     BinarySize,
     ClusterMode,
+    MountPermission,
+    QuotaScopeID,
     ResourceSlot,
-    RuntimeVariant,
     ServicePort,
     ServicePortProtocols,
     SessionId,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
+    DeploymentLifecycleSubStep,
+    DeploymentOptions,
     DeploymentPolicyData,
     ModelRevisionData,
+    ReplicaGroupLifecycle,
+    ReplicaGroupScalingStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
-from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
+from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import (
-    DeploymentAutoScalingPolicyData,
-    DeploymentAutoScalingPolicyRow,
-)
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     DeploymentPolicyRow,
     RollingUpdateSpec,
 )
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -66,13 +74,19 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_slot.row import (
+    DeploymentRevisionResourceSlotRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import (
     SessionResult,
@@ -83,7 +97,6 @@ from ai.backend.manager.models.session import (
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
@@ -92,24 +105,22 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
-    DeploymentAutoScalingPolicyCreatorSpec,
+    DeploymentCreatorSpec,
+    DeploymentMetadataFields,
+    DeploymentNetworkFields,
+    DeploymentReplicaFields,
     DeploymentRevisionCreatorSpec,
     RouteCreatorSpec,
 )
-from ai.backend.manager.repositories.deployment.creators.endpoint import (
-    LegacyEndpointCreatorSpec,
-)
 from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentAutoScalingPolicyUpdaterSpec,
     DeploymentMetadataUpdaterSpec,
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
-    RevisionStateUpdaterSpec,
     RouteStatusUpdaterSpec,
     RouteUpdaterSpec,
 )
 from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
-from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
@@ -121,6 +132,34 @@ def create_test_password_info(password: str) -> PasswordInfo:
         rounds=100_000,
         salt_size=32,
     )
+
+
+def attach_primary_replica_group(
+    db_sess: Any,
+    endpoint: EndpointRow,
+    *,
+    current_revision_id: uuid.UUID | None = None,
+    target_revision_id: uuid.UUID | None = None,
+) -> ReplicaGroupRow:
+    """Create the primary replica group for a hand-built endpoint and wire its
+    revision pointers, mirroring what ``create_endpoint`` does at runtime.
+
+    Revision pointers now live on the replica group, so tests that construct
+    ``EndpointRow`` directly must attach a group for the revision-resolution
+    paths to see ``current``/``deploying`` revisions.
+    """
+    group_id = uuid.uuid4()
+    group = ReplicaGroupRow(
+        id=ReplicaGroupID(group_id),
+        deployment_id=endpoint.id,
+        current_revision_id=current_revision_id,
+        target_revision_id=target_revision_id,
+    )
+    db_sess.add(group)
+    endpoint.primary_replica_group_id = ReplicaGroupID(group_id)
+    if target_revision_id is not None:
+        endpoint.target_replica_group_id = ReplicaGroupID(group_id)
+    return group
 
 
 class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
@@ -150,13 +189,28 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 VFolderRow,
                 ContainerRegistryRow,
                 ImageRow,
+                ResourceSlotTypeRow,
                 SessionRow,
                 KernelRow,
                 EndpointRow,
+                ReplicaGroupRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
+                DeploymentRevisionResourceSlotRow,
                 RoutingRow,
             ],
         ):
+            async with database_connection.begin_session() as sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    await sess.execute(
+                        sa.text(
+                            "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                            " VALUES (:slot_name, :slot_type, 0)"
+                            " ON CONFLICT DO NOTHING"
+                        ),
+                        {"slot_name": slot_name, "slot_type": slot_type},
+                    )
             yield database_connection
 
     @pytest.fixture
@@ -554,12 +608,13 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint with revision and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
         revision_id = uuid.uuid4()
         registry_id = uuid.uuid4()
         image_id = uuid.uuid4()
+        runtime_variant_id = uuid.uuid4()
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Create container registry for image FK
@@ -591,8 +646,17 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 labels={},
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
+            # Create runtime_variant for revision FK
+            db_sess.add(
+                RuntimeVariantRow(
+                    id=runtime_variant_id,
+                    name=f"vllm-{runtime_variant_id.hex[:8]}",
+                    description="test variant",
+                    default_model_definition=ModelDefinitionDraft(),
+                )
+            )
             await db_sess.flush()
 
             # Create endpoint
@@ -608,9 +672,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.READY,
-                current_revision=revision_id,
             )
             db_sess.add(endpoint)
+            attach_primary_replica_group(db_sess, endpoint, current_revision_id=revision_id)
             await db_sess.flush()
 
             # Create revision for endpoint
@@ -621,15 +685,19 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 image=image_id,
                 model=None,
                 model_mount_destination="/models",
+                vfolder_subpath=None,
                 resource_group=test_scaling_group_name,
-                resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant_id=runtime_variant_id,
                 environ={},
                 extra_mounts=[],
             )
+            revision.resource_slot_rows = [
+                DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("4")),
+                DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("8192")),
+            ]
             db_sess.add(revision)
             await db_sess.commit()
 
@@ -639,7 +707,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     async def test_route_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_session_id: SessionId,
         test_domain_name: str,
         test_user_uuid: uuid.UUID,
@@ -688,7 +756,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         self,
         deployment_repository: DeploymentRepository,
         test_route_id: uuid.UUID,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_kernel_with_inference_port: tuple[uuid.UUID, str, int],
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
@@ -696,15 +764,17 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         """Test fetching service discovery info for a single route with inference port."""
         kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
 
-        result = await deployment_repository.fetch_route_service_discovery_info({test_route_id})
+        result = await deployment_repository.fetch_route_service_discovery_info({
+            ReplicaID(test_route_id)
+        })
 
         assert len(result) == 1
         info = result[0]
         assert info.route_id == test_route_id
-        assert info.endpoint_id == test_endpoint_id
+        assert info.deployment_id == test_endpoint_id
         assert info.kernel_host == kernel_host
         assert info.kernel_port == inference_port
-        assert info.runtime_variant == "vllm"
+        assert info.runtime_variant.startswith("vllm")
         assert "test-endpoint" in info.endpoint_name
         assert info.session_owner == test_user_uuid
         assert info.project == test_group_id
@@ -713,7 +783,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_session_id: SessionId,
         test_domain_name: str,
         test_user_uuid: uuid.UUID,
@@ -737,7 +807,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             db_sess.add(route)
             await db_sess.flush()
 
-        result = await deployment_repository.fetch_route_service_discovery_info({route_id})
+        result = await deployment_repository.fetch_route_service_discovery_info({
+            ReplicaID(route_id)
+        })
 
         # Should return empty list because kernel has no inference port
         assert len(result) == 0
@@ -756,7 +828,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Test that nonexistent route IDs return empty list."""
-        nonexistent_id = uuid.uuid4()
+        nonexistent_id = ReplicaID(uuid.uuid4())
 
         result = await deployment_repository.fetch_route_service_discovery_info({nonexistent_id})
 
@@ -775,7 +847,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     ) -> None:
         """Test fetching service discovery info for multiple routes."""
         # Create 3 sets of endpoint/session/kernel/route
-        route_ids = set()
+        route_ids: set[ReplicaID] = set()
         endpoint_ids = []
 
         async with db_with_cleanup.begin_session() as db_sess:
@@ -808,13 +880,22 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 labels={},
                 resources={"cpu": {"min": "1"}, "mem": {"min": "1073741824"}},
             )
-            image.id = image_id
+            image.id = ImageID(image_id)
             db_sess.add(image)
+            runtime_variant_id = uuid.uuid4()
+            db_sess.add(
+                RuntimeVariantRow(
+                    id=runtime_variant_id,
+                    name=f"vllm-{runtime_variant_id.hex[:8]}",
+                    description="test variant",
+                    default_model_definition=ModelDefinitionDraft(),
+                )
+            )
             await db_sess.flush()
 
             for i in range(3):
                 # Create endpoint + revision
-                endpoint_id = uuid.uuid4()
+                endpoint_id = DeploymentID(uuid.uuid4())
                 revision_id = uuid.uuid4()
                 endpoint = EndpointRow(
                     id=endpoint_id,
@@ -828,9 +909,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     url=f"http://test{i}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.READY,
-                    current_revision=revision_id,
                 )
                 db_sess.add(endpoint)
+                attach_primary_replica_group(db_sess, endpoint, current_revision_id=revision_id)
                 revision = DeploymentRevisionRow(
                     id=revision_id,
                     endpoint=endpoint_id,
@@ -839,14 +920,17 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     model=None,
                     model_mount_destination="/models",
                     resource_group=test_scaling_group_name,
-                    resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
                     resource_opts={},
                     cluster_mode=ClusterMode.SINGLE_NODE.name,
                     cluster_size=1,
-                    runtime_variant=RuntimeVariant.VLLM,
+                    runtime_variant_id=runtime_variant_id,
                     environ={},
                     extra_mounts=[],
                 )
+                revision.resource_slot_rows = [
+                    DeploymentRevisionResourceSlotRow(slot_name="cpu", quantity=Decimal("2")),
+                    DeploymentRevisionResourceSlotRow(slot_name="mem", quantity=Decimal("4096")),
+                ]
                 db_sess.add(revision)
                 endpoint_ids.append(endpoint_id)
 
@@ -917,7 +1001,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 db_sess.add(kernel)
 
                 # Create route
-                route_id = uuid.uuid4()
+                route_id = ReplicaID(uuid.uuid4())
                 route = RoutingRow(
                     id=route_id,
                     endpoint=endpoint_id,
@@ -941,10 +1025,10 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         # Verify each result has correct structure
         for info in result:
             assert info.route_id in route_ids
-            assert info.endpoint_id in endpoint_ids
+            assert info.deployment_id in endpoint_ids
             assert info.kernel_host.startswith("10.0.1.")
             assert 8080 <= info.kernel_port <= 8082
-            assert info.runtime_variant == RuntimeVariant.VLLM.value
+            assert info.runtime_variant.startswith("vllm")
             assert info.endpoint_name.startswith("endpoint-")
 
 
@@ -1303,19 +1387,37 @@ class TestDeploymentRevisionOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,  # KeyPairRow relationship dependency
                 RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
+                KeyPairRow,  # UserRow.main_access_key FK target
                 GroupRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
+                ResourceSlotTypeRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
                 AssociationScopesEntitiesRow,  # RBACEntityCreator dependency
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
+                DeploymentRevisionResourceSlotRow,
                 DeploymentPolicyRow,
             ],
         ):
+            async with database_connection.begin_session() as sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    await sess.execute(
+                        sa.text(
+                            "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                            " VALUES (:slot_name, :slot_type, 0)"
+                            " ON CONFLICT DO NOTHING"
+                        ),
+                        {"slot_name": slot_name, "slot_type": slot_type},
+                    )
             yield database_connection
 
     @pytest.fixture
@@ -1460,13 +1562,25 @@ class TestDeploymentRevisionOperations:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> uuid.UUID:
         """Create test image and return image ID."""
+        registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            registry = ContainerRegistryRow(
+                id=registry_id,
+                url="https://test-registry.example.com",
+                registry_name=f"test-registry-{registry_id.hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+                is_global=True,
+            )
+            db_sess.add(registry)
+            await db_sess.flush()
+
             image = ImageRow(
                 name="test-image:latest",
                 project=str(uuid.uuid4()),
                 image="test-image",
                 registry="docker.io",
-                registry_id=uuid.uuid4(),
+                registry_id=registry_id,
                 architecture="x86_64",
                 is_local=False,
                 config_digest="sha256:abc123",
@@ -1487,9 +1601,9 @@ class TestDeploymentRevisionOperations:
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
         test_image_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
@@ -1504,12 +1618,54 @@ class TestDeploymentRevisionOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.CREATED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
+            attach_primary_replica_group(db_sess, endpoint)
             await db_sess.commit()
 
         return endpoint_id
+
+    @pytest.fixture
+    async def test_vfolder_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_uuid: uuid.UUID,
+    ) -> VFolderUUID:
+        """Create a vfolder that satisfies the deployment_revisions model FK."""
+        vfolder_id = VFolderUUID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                VFolderRow(
+                    id=vfolder_id,
+                    host="local:volume1",
+                    domain_name=test_domain_name,
+                    quota_scope_id=QuotaScopeID.parse(f"user:{test_user_uuid}"),
+                    name=f"model-vfolder-{uuid.uuid4().hex[:8]}",
+                    creator="test@example.com",
+                )
+            )
+            await db_sess.commit()
+        return vfolder_id
+
+    @pytest.fixture
+    async def test_runtime_variant_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> RuntimeVariantID:
+        """Create a runtime_variant row and return its ID."""
+        variant_id = RuntimeVariantID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                RuntimeVariantRow(
+                    id=variant_id,
+                    name=f"test-variant-{variant_id.hex[:8]}",
+                    description="test",
+                    default_model_definition=ModelDefinitionDraft(),
+                )
+            )
+            await db_sess.commit()
+        return variant_id
 
     @pytest.fixture
     def deployment_repository(
@@ -1534,30 +1690,34 @@ class TestDeploymentRevisionOperations:
     async def test_revision_data(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_image_id: uuid.UUID,
+        test_vfolder_id: VFolderUUID,
+        test_runtime_variant_id: RuntimeVariantID,
         test_scaling_group_name: str,
     ) -> ModelRevisionData:
         """Create a single test revision."""
 
         spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             revision_number=1,
-            image_id=test_image_id,
+            image_id=ImageID(test_image_id),
             resource_group=test_scaling_group_name,
             resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             resource_opts={},
             cluster_mode=ClusterMode.SINGLE_NODE.name,
             cluster_size=1,
-            model_id=None,
+            model_vfolder_id=test_vfolder_id,
             model_mount_destination="/models",
+            model_mount_perm=MountPermission.READ_ONLY,
+            vfolder_subpath=None,
             model_definition_path=None,
             model_definition=None,
             startup_command=None,
             bootstrap_script=None,
             environ={},
             callback_url=None,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant_id=test_runtime_variant_id,
             extra_mounts=[],
         )
         return await deployment_repository.create_revision(
@@ -1575,31 +1735,35 @@ class TestDeploymentRevisionOperations:
     async def test_multiple_revisions(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_image_id: uuid.UUID,
+        test_vfolder_id: VFolderUUID,
+        test_runtime_variant_id: RuntimeVariantID,
         test_scaling_group_name: str,
     ) -> list[ModelRevisionData]:
         """Create multiple test revisions (revision 1, 2, 3)."""
         revisions: list[ModelRevisionData] = []
         for rev_num in [1, 2, 3]:
             spec = DeploymentRevisionCreatorSpec(
-                endpoint_id=test_endpoint_id,
+                deployment_id=test_endpoint_id,
                 revision_number=rev_num,
-                image_id=test_image_id,
+                image_id=ImageID(test_image_id),
                 resource_group=test_scaling_group_name,
                 resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                model_id=None,
+                model_vfolder_id=test_vfolder_id,
                 model_mount_destination="/models",
+                model_mount_perm=MountPermission.READ_ONLY,
+                vfolder_subpath=None,
                 model_definition_path=None,
                 model_definition=None,
                 startup_command=None,
                 bootstrap_script=None,
                 environ={},
                 callback_url=None,
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant_id=test_runtime_variant_id,
                 extra_mounts=[],
             )
             revision = await deployment_repository.create_revision(
@@ -1619,31 +1783,35 @@ class TestDeploymentRevisionOperations:
     async def test_five_revisions(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_image_id: uuid.UUID,
+        test_vfolder_id: VFolderUUID,
+        test_runtime_variant_id: RuntimeVariantID,
         test_scaling_group_name: str,
     ) -> list[ModelRevisionData]:
         """Create 5 test revisions for pagination tests."""
         revisions: list[ModelRevisionData] = []
         for rev_num in range(1, 6):
             spec = DeploymentRevisionCreatorSpec(
-                endpoint_id=test_endpoint_id,
+                deployment_id=test_endpoint_id,
                 revision_number=rev_num,
-                image_id=test_image_id,
+                image_id=ImageID(test_image_id),
                 resource_group=test_scaling_group_name,
                 resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 resource_opts={},
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,
-                model_id=None,
+                model_vfolder_id=test_vfolder_id,
                 model_mount_destination="/models",
+                model_mount_perm=MountPermission.READ_ONLY,
+                vfolder_subpath=None,
                 model_definition_path=None,
                 model_definition=None,
                 startup_command=None,
                 bootstrap_script=None,
                 environ={},
                 callback_url=None,
-                runtime_variant=RuntimeVariant.CUSTOM,
+                runtime_variant_id=test_runtime_variant_id,
                 extra_mounts=[],
             )
             revision = await deployment_repository.create_revision(
@@ -1662,29 +1830,33 @@ class TestDeploymentRevisionOperations:
     async def test_create_revision(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_image_id: uuid.UUID,
+        test_vfolder_id: VFolderUUID,
+        test_runtime_variant_id: RuntimeVariantID,
         test_scaling_group_name: str,
     ) -> None:
         """Test creating a deployment revision using RBACEntityCreator."""
         spec = DeploymentRevisionCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             revision_number=1,
-            image_id=test_image_id,
+            image_id=ImageID(test_image_id),
             resource_group=test_scaling_group_name,
             resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             resource_opts={},
             cluster_mode=ClusterMode.SINGLE_NODE.name,
             cluster_size=1,
-            model_id=None,
+            model_vfolder_id=test_vfolder_id,
             model_mount_destination="/models",
+            model_mount_perm=MountPermission.READ_ONLY,
+            vfolder_subpath=None,
             model_definition_path=None,
             model_definition=None,
             startup_command=None,
             bootstrap_script=None,
             environ={},
             callback_url=None,
-            runtime_variant=RuntimeVariant.CUSTOM,
+            runtime_variant_id=test_runtime_variant_id,
             extra_mounts=[],
         )
         creator = RBACEntityCreator(
@@ -1702,8 +1874,7 @@ class TestDeploymentRevisionOperations:
         assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
         assert result.cluster_config.size == 1
         assert result.resource_config.resource_group_name == test_scaling_group_name
-        assert result.model_runtime_config.runtime_variant == RuntimeVariant.CUSTOM
-        assert result.name == "revision-1"
+        assert result.model_runtime_config.runtime_variant_id is not None
 
     async def test_get_revision(
         self,
@@ -1714,7 +1885,6 @@ class TestDeploymentRevisionOperations:
         result = await deployment_repository.get_revision(test_revision_data.id)
 
         assert result.id == test_revision_data.id
-        assert result.name == "revision-1"
         assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
 
     async def test_get_revision_not_found(
@@ -1722,7 +1892,7 @@ class TestDeploymentRevisionOperations:
         deployment_repository: DeploymentRepository,
     ) -> None:
         """Test that get_revision raises DeploymentRevisionNotFound for nonexistent ID."""
-        nonexistent_id = uuid.uuid4()
+        nonexistent_id = DeploymentRevisionID(uuid.uuid4())
 
         with pytest.raises(DeploymentRevisionNotFound):
             await deployment_repository.get_revision(nonexistent_id)
@@ -1730,7 +1900,7 @@ class TestDeploymentRevisionOperations:
     async def test_get_latest_revision_number_no_revisions(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
         """Test that get_latest_revision_number returns None when no revisions exist."""
         result = await deployment_repository.get_latest_revision_number(test_endpoint_id)
@@ -1740,7 +1910,7 @@ class TestDeploymentRevisionOperations:
     async def test_get_latest_revision_number_with_revisions(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_multiple_revisions: list[ModelRevisionData],
     ) -> None:
         """Test that get_latest_revision_number returns correct value."""
@@ -1748,10 +1918,64 @@ class TestDeploymentRevisionOperations:
 
         assert result == 3
 
+    async def test_get_latest_revision_returns_highest_revision_number(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: DeploymentID,
+        test_multiple_revisions: list[ModelRevisionData],
+    ) -> None:
+        """`get_latest_revision` returns the revision with the highest revision_number."""
+        result = await deployment_repository.get_latest_revision(test_endpoint_id)
+
+        expected_latest = test_multiple_revisions[-1]
+        assert result.id == expected_latest.id
+
+    async def test_get_latest_revision_ignores_endpoint_current_revision(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: DeploymentID,
+        test_multiple_revisions: list[ModelRevisionData],
+    ) -> None:
+        """`get_latest_revision` returns the latest revision even when ``current_revision`` points elsewhere.
+
+        This is the legacy ``modify_endpoint`` scenario: a previous revision
+        is still serving (``current_revision`` = v1) while a more recent
+        revision has been created (latest = v3). The base for the next
+        modify must be v3, not v1.
+        """
+        first_revision = test_multiple_revisions[0]
+        latest_revision = test_multiple_revisions[-1]
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            # Current revision now lives on the primary replica group.
+            await db_sess.execute(
+                sa.update(ReplicaGroupRow)
+                .where(ReplicaGroupRow.deployment_id == test_endpoint_id)
+                .values(current_revision_id=first_revision.id)
+            )
+            await db_sess.commit()
+
+        latest = await deployment_repository.get_latest_revision(test_endpoint_id)
+        current = await deployment_repository.get_current_revision(test_endpoint_id)
+
+        assert latest.id == latest_revision.id
+        assert current.id == first_revision.id
+        assert latest.id != current.id
+
+    async def test_get_latest_revision_no_revisions_raises(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        """`get_latest_revision` raises ``DeploymentRevisionNotFound`` when no revisions exist."""
+        with pytest.raises(DeploymentRevisionNotFound):
+            await deployment_repository.get_latest_revision(test_endpoint_id)
+
     async def test_search_revisions_empty(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
         """Test search_revisions returns empty result when no revisions exist."""
         querier = BatchQuerier(
@@ -1769,7 +1993,7 @@ class TestDeploymentRevisionOperations:
     async def test_search_revisions_with_results(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_multiple_revisions: list[ModelRevisionData],
     ) -> None:
         """Test search_revisions returns correct results."""
@@ -1788,7 +2012,7 @@ class TestDeploymentRevisionOperations:
     async def test_search_revisions_with_pagination(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_five_revisions: list[ModelRevisionData],
     ) -> None:
         """Test search_revisions respects pagination."""
@@ -1816,104 +2040,16 @@ class TestDeploymentRevisionOperations:
         assert result.has_next_page is True
         assert result.has_previous_page is True
 
-    async def test_update_endpoint_deploying_revision(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
-        test_revision_data: ModelRevisionData,
-    ) -> None:
-        """Test updating endpoint deploying_revision using Updater."""
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                deploying_revision=TriState.update(test_revision_data.id),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-
-        # Verify returned DeploymentInfo
-        assert deployment_info.id == test_endpoint_id
-
-        # Verify database state (deploying_revision is not part of DeploymentInfo)
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one()
-            assert endpoint.deploying_revision == test_revision_data.id
-
-    async def test_update_endpoint_current_revision(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
-        test_revision_data: ModelRevisionData,
-    ) -> None:
-        """Test updating endpoint current_revision using Updater."""
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                current_revision=TriState.update(test_revision_data.id),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-
-        # Verify returned DeploymentInfo
-        assert deployment_info.id == test_endpoint_id
-        assert deployment_info.current_revision_id == test_revision_data.id
-
-        # Verify database state
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one()
-            assert endpoint.current_revision == test_revision_data.id
-
-    async def test_update_endpoint_nullify_deploying_revision(
-        self,
-        deployment_repository: DeploymentRepository,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
-        test_revision_data: ModelRevisionData,
-    ) -> None:
-        """Test nullifying endpoint deploying_revision using TriState.nullify()."""
-        # First set deploying_revision
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                deploying_revision=TriState.update(test_revision_data.id),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-        assert deployment_info.id == test_endpoint_id
-
-        # Then nullify it
-        updater = Updater(
-            spec=RevisionStateUpdaterSpec(
-                deploying_revision=TriState.nullify(),
-            ),
-            pk_value=test_endpoint_id,
-        )
-        deployment_info = await deployment_repository.update_endpoint(updater)
-        assert deployment_info.id == test_endpoint_id
-
-        # Verify database state (deploying_revision is not part of DeploymentInfo)
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            query = sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one()
-            assert endpoint.deploying_revision is None
-
     async def test_update_endpoint_returns_updated_deployment_info(
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_revision_data: ModelRevisionData,
     ) -> None:
         """Test that update_endpoint returns DeploymentInfo with updated values."""
         new_name = "updated-deployment-name"
-        new_desired_replica_count = 5
+        new_replica_count = 5
 
         updater = Updater(
             spec=DeploymentUpdaterSpec(
@@ -1921,10 +2057,7 @@ class TestDeploymentRevisionOperations:
                     name=OptionalState.update(new_name),
                 ),
                 replica_spec=ReplicaSpecUpdaterSpec(
-                    desired_replica_count=OptionalState.update(new_desired_replica_count),
-                ),
-                revision_state=RevisionStateUpdaterSpec(
-                    current_revision=TriState.update(test_revision_data.id),
+                    replica_count=OptionalState.update(new_replica_count),
                 ),
             ),
             pk_value=test_endpoint_id,
@@ -1934,8 +2067,7 @@ class TestDeploymentRevisionOperations:
         # Verify returned DeploymentInfo contains updated values
         assert deployment_info.id == test_endpoint_id
         assert deployment_info.metadata.name == new_name
-        assert deployment_info.replica_spec.desired_replica_count == new_desired_replica_count
-        assert deployment_info.current_revision_id == test_revision_data.id
+        assert deployment_info.replica.replica_count == new_replica_count
 
         # Verify database state matches returned values
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -1943,384 +2075,78 @@ class TestDeploymentRevisionOperations:
             result = await db_sess.execute(query)
             endpoint = result.scalar_one()
             assert endpoint.name == new_name
-            assert endpoint.desired_replicas == new_desired_replica_count
-            assert endpoint.current_revision == test_revision_data.id
+            assert endpoint.replicas == new_replica_count
+            # Manual scale syncs desired_replicas so the COALESCE(desired_replicas,
+            # replicas) scaling goal reflects the new count immediately.
+            assert endpoint.desired_replicas == new_replica_count
 
-
-class TestDeploymentAutoScalingPolicyOperations:
-    """Test cases for deployment auto-scaling policy repository operations."""
-
-    @pytest.fixture
-    async def db_with_cleanup(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
-        async with with_tables(
-            database_connection,
-            [
-                DomainRow,
-                ScalingGroupRow,
-                ResourcePresetRow,  # ScalingGroupRow relationship dependency
-                UserResourcePolicyRow,
-                ProjectResourcePolicyRow,
-                RoleRow,
-                UserRoleRow,  # UserRow relationship dependency
-                UserRow,
-                GroupRow,
-                VFolderRow,
-                EndpointRow,
-                DeploymentAutoScalingPolicyRow,
-            ],
-        ):
-            yield database_connection
-
-    @pytest.fixture
-    async def test_domain_name(
+    async def test_retire_replica_groups_on_destroy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test domain and return domain name."""
-        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            domain = DomainRow(
-                name=domain_name,
-                description="Test domain",
-                is_active=True,
-                total_resource_slots=ResourceSlot(),
-                allowed_vfolder_hosts={},
-                allowed_docker_registries=[],
-            )
-            db_sess.add(domain)
-            await db_sess.commit()
-
-        return domain_name
-
-    @pytest.fixture
-    async def test_scaling_group_name(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test scaling group and return name."""
-        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            sgroup = ScalingGroupRow(
-                name=sgroup_name,
-                description="Test scaling group",
-                is_active=True,
-                driver="static",
-                driver_opts={},
-                scheduler="fifo",
-                scheduler_opts=ScalingGroupOpts(),
-            )
-            db_sess.add(sgroup)
-            await db_sess.commit()
-
-        return sgroup_name
-
-    @pytest.fixture
-    async def test_resource_policy_name(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test resource policy and return policy name."""
-        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            policy = UserResourcePolicyRow(
-                name=policy_name,
-                max_vfolder_count=10,
-                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
-                max_session_count_per_model_session=5,
-                max_customized_image_count=3,
-            )
-            db_sess.add(policy)
-            await db_sess.commit()
-
-        return policy_name
-
-    @pytest.fixture
-    async def test_project_resource_policy_name(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> str:
-        """Create test project resource policy and return policy name."""
-        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            policy = ProjectResourcePolicyRow(
-                name=policy_name,
-                max_vfolder_count=10,
-                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
-                max_network_count=5,
-            )
-            db_sess.add(policy)
-            await db_sess.commit()
-
-        return policy_name
-
-    @pytest.fixture
-    async def test_user_uuid(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_resource_policy_name: str,
-    ) -> uuid.UUID:
-        """Create test user and return user UUID."""
-        user_uuid = uuid.uuid4()
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            user = UserRow(
-                uuid=user_uuid,
-                username=f"testuser-{user_uuid.hex[:8]}",
-                email=f"test-{user_uuid.hex[:8]}@example.com",
-                password=create_test_password_info("test_password"),
-                need_password_change=False,
-                status=UserStatus.ACTIVE,
-                status_info="active",
-                domain_name=test_domain_name,
-                role=UserRole.USER,
-                resource_policy=test_resource_policy_name,
-            )
-            db_sess.add(user)
-            await db_sess.commit()
-
-        return user_uuid
-
-    @pytest.fixture
-    async def test_group_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_project_resource_policy_name: str,
-    ) -> uuid.UUID:
-        """Create test group and return group ID."""
-        group_id = uuid.uuid4()
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            group = GroupRow(
-                id=group_id,
-                name=f"test-group-{uuid.uuid4().hex[:8]}",
-                domain_name=test_domain_name,
-                resource_policy=test_project_resource_policy_name,
-            )
-            db_sess.add(group)
-            await db_sess.commit()
-
-        return group_id
-
-    @pytest.fixture
-    async def test_endpoint_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_scaling_group_name: str,
-        test_user_uuid: uuid.UUID,
-        test_group_id: uuid.UUID,
-    ) -> uuid.UUID:
-        """Create test endpoint and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            endpoint = EndpointRow(
-                id=endpoint_id,
-                name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
-                created_user=test_user_uuid,
-                session_owner=test_user_uuid,
-                domain=test_domain_name,
-                project=test_group_id,
-                resource_group=test_scaling_group_name,
-                desired_replicas=1,
-                url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
-                open_to_public=False,
-                lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
-            )
-            db_sess.add(endpoint)
-            await db_sess.commit()
-
-        return endpoint_id
-
-    @pytest.fixture
-    def deployment_repository(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> DeploymentRepository:
-        """Create DeploymentRepository instance."""
-        storage_manager = MagicMock()
-        valkey_stat = MagicMock()
-        valkey_live = MagicMock()
-        valkey_schedule = MagicMock()
-
-        return DeploymentRepository(
-            db=db_with_cleanup,
-            storage_manager=storage_manager,
-            valkey_stat=valkey_stat,
-            valkey_live=valkey_live,
-            valkey_schedule=valkey_schedule,
-        )
-
-    @pytest.fixture
-    async def test_auto_scaling_policy_data(
-        self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
-    ) -> DeploymentAutoScalingPolicyData:
-        """Create a single test auto-scaling policy."""
-        spec = DeploymentAutoScalingPolicyCreatorSpec(
-            endpoint_id=test_endpoint_id,
-            min_replicas=1,
-            max_replicas=10,
-            metric_source=AutoScalingMetricSource.KERNEL,
-            metric_name="cpu_utilization",
-            comparator=AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL,
-            scale_up_threshold=Decimal("80"),
-            scale_down_threshold=Decimal("20"),
-            scale_up_step_size=2,
-            scale_down_step_size=1,
-            cooldown_seconds=300,
-        )
-        return await deployment_repository.create_auto_scaling_policy(Creator(spec=spec))
-
-    async def test_create_auto_scaling_policy(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
-        """Test creating an auto-scaling policy using Creator."""
-        spec = DeploymentAutoScalingPolicyCreatorSpec(
-            endpoint_id=test_endpoint_id,
-            min_replicas=2,
-            max_replicas=20,
-            metric_source=AutoScalingMetricSource.KERNEL,
-            metric_name="cpu_utilization",
-            comparator=AutoScalingMetricComparator.GREATER_THAN,
-            scale_up_threshold=Decimal("70"),
-            scale_down_threshold=Decimal("30"),
-            scale_up_step_size=3,
-            scale_down_step_size=2,
-            cooldown_seconds=600,
-        )
-        creator = Creator(spec=spec)
+        """Drains live groups to DRAINING with zeroed desired counts and clears the endpoint's
+        deploy pointer, leaving already-DRAINED groups untouched."""
+        drained_group_id = ReplicaGroupID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            # The endpoint's primary group is live and still requesting replicas.
+            await db_sess.execute(
+                sa.update(ReplicaGroupRow)
+                .where(ReplicaGroupRow.deployment_id == test_endpoint_id)
+                .values(
+                    lifecycle=ReplicaGroupLifecycle.ROLLING,
+                    desired_current_replica_count=1,
+                    desired_target_replica_count=1,
+                    scaling_status=ReplicaGroupScalingStatus.SCALING,
+                )
+            )
+            # A second group that has already finished draining.
+            db_sess.add(
+                ReplicaGroupRow(
+                    id=drained_group_id,
+                    deployment_id=test_endpoint_id,
+                    lifecycle=ReplicaGroupLifecycle.DRAINED,
+                    desired_current_replica_count=0,
+                    desired_target_replica_count=0,
+                )
+            )
+            await db_sess.execute(
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == test_endpoint_id)
+                .values(sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING)
+            )
 
-        result = await deployment_repository.create_auto_scaling_policy(creator)
+        await deployment_repository.retire_replica_groups_on_destroy({test_endpoint_id})
 
-        assert result.id is not None
-        assert result.endpoint == test_endpoint_id
-        assert result.min_replicas == 2
-        assert result.max_replicas == 20
-        assert result.metric_source == AutoScalingMetricSource.KERNEL
-        assert result.metric_name == "cpu_utilization"
-        assert result.comparator == AutoScalingMetricComparator.GREATER_THAN
-        assert result.scale_up_threshold == Decimal("70")
-        assert result.scale_down_threshold == Decimal("30")
-        assert result.scale_up_step_size == 3
-        assert result.scale_down_step_size == 2
-        assert result.cooldown_seconds == 600
-
-    async def test_get_auto_scaling_policy(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
-        test_auto_scaling_policy_data: DeploymentAutoScalingPolicyData,
-    ) -> None:
-        """Test getting an auto-scaling policy by endpoint ID."""
-        result = await deployment_repository.get_auto_scaling_policy(test_endpoint_id)
-
-        assert result.id == test_auto_scaling_policy_data.id
-        assert result.endpoint == test_endpoint_id
-        assert result.min_replicas == 1
-        assert result.max_replicas == 10
-        assert result.metric_source == AutoScalingMetricSource.KERNEL
-        assert result.metric_name == "cpu_utilization"
-
-    async def test_get_auto_scaling_policy_not_found(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
-    ) -> None:
-        """Test that get_auto_scaling_policy raises AutoScalingPolicyNotFound."""
-        with pytest.raises(AutoScalingPolicyNotFound):
-            await deployment_repository.get_auto_scaling_policy(test_endpoint_id)
-
-    async def test_update_auto_scaling_policy(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_auto_scaling_policy_data: DeploymentAutoScalingPolicyData,
-    ) -> None:
-        """Test updating an auto-scaling policy using Updater."""
-        updater = Updater(
-            spec=DeploymentAutoScalingPolicyUpdaterSpec(
-                min_replicas=OptionalState.update(5),
-                max_replicas=OptionalState.update(50),
-                scale_up_threshold=TriState.update(Decimal("90")),
-            ),
-            pk_value=test_auto_scaling_policy_data.id,
-        )
-
-        result = await deployment_repository.update_auto_scaling_policy(updater)
-
-        assert result.id == test_auto_scaling_policy_data.id
-        assert result.min_replicas == 5
-        assert result.max_replicas == 50
-        assert result.scale_up_threshold == Decimal("90")
-        # Unchanged fields should remain the same
-        assert result.scale_down_threshold == Decimal("20")
-        assert result.cooldown_seconds == 300
-
-    async def test_update_auto_scaling_policy_not_found(
-        self,
-        deployment_repository: DeploymentRepository,
-    ) -> None:
-        """Test that update_auto_scaling_policy raises AutoScalingPolicyNotFound."""
-        nonexistent_id = uuid.uuid4()
-        updater = Updater(
-            spec=DeploymentAutoScalingPolicyUpdaterSpec(
-                min_replicas=OptionalState.update(5),
-            ),
-            pk_value=nonexistent_id,
-        )
-
-        with pytest.raises(AutoScalingPolicyNotFound):
-            await deployment_repository.update_auto_scaling_policy(updater)
-
-    async def test_delete_auto_scaling_policy(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
-        test_auto_scaling_policy_data: DeploymentAutoScalingPolicyData,
-    ) -> None:
-        """Test deleting an auto-scaling policy using Purger."""
-        purger = Purger(
-            row_class=DeploymentAutoScalingPolicyRow,
-            pk_value=test_auto_scaling_policy_data.id,
-        )
-
-        result = await deployment_repository.delete_auto_scaling_policy(purger)
-
-        assert result is not None
-        assert result.row.id == test_auto_scaling_policy_data.id
-
-        # Verify the policy no longer exists
-        with pytest.raises(AutoScalingPolicyNotFound):
-            await deployment_repository.get_auto_scaling_policy(test_endpoint_id)
-
-    async def test_delete_auto_scaling_policy_not_found(
-        self,
-        deployment_repository: DeploymentRepository,
-    ) -> None:
-        """Test that delete_auto_scaling_policy returns None for nonexistent policy."""
-        nonexistent_id = uuid.uuid4()
-        purger = Purger(
-            row_class=DeploymentAutoScalingPolicyRow,
-            pk_value=nonexistent_id,
-        )
-
-        result = await deployment_repository.delete_auto_scaling_policy(purger)
-
-        assert result is None
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            groups = (
+                (
+                    await db_sess.execute(
+                        sa.select(ReplicaGroupRow).where(
+                            ReplicaGroupRow.deployment_id == test_endpoint_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            by_id = {group.id: group for group in groups}
+            live = next(group for group in groups if group.id != drained_group_id)
+            # Live group is driven to DRAINING with zeroed desired counts.
+            assert live.lifecycle is ReplicaGroupLifecycle.DRAINING
+            assert live.desired_current_replica_count == 0
+            assert live.desired_target_replica_count == 0
+            assert live.scaling_status is ReplicaGroupScalingStatus.SCALING
+            # The already-DRAINED group is left as-is.
+            assert by_id[drained_group_id].lifecycle is ReplicaGroupLifecycle.DRAINED
+            # The endpoint's deploy pointer/sub-step is cleared.
+            endpoint = (
+                await db_sess.execute(
+                    sa.select(EndpointRow).where(EndpointRow.id == test_endpoint_id)
+                )
+            ).scalar_one()
+            assert endpoint.sub_step is None
 
 
 class TestDeploymentPolicyOperations:
@@ -2346,6 +2172,7 @@ class TestDeploymentPolicyOperations:
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 DeploymentPolicyRow,
             ],
         ):
@@ -2495,9 +2322,9 @@ class TestDeploymentPolicyOperations:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
@@ -2512,7 +2339,6 @@ class TestDeploymentPolicyOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -2542,11 +2368,11 @@ class TestDeploymentPolicyOperations:
     async def test_deployment_policy_data(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> DeploymentPolicyData:
         """Create a single test deployment policy via upsert."""
         spec = DeploymentPolicyUpserterSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(
                 max_surge=IntOrPercent(count=1),
@@ -2559,11 +2385,11 @@ class TestDeploymentPolicyOperations:
     async def test_upsert_deployment_policy_insert(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
         """Test upserting a deployment policy (insert path)."""
         spec = DeploymentPolicyUpserterSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=60),
         )
@@ -2581,12 +2407,12 @@ class TestDeploymentPolicyOperations:
     async def test_upsert_deployment_policy_update(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_deployment_policy_data: DeploymentPolicyData,
     ) -> None:
         """Test upserting a deployment policy (update path)."""
         spec = DeploymentPolicyUpserterSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
         )
@@ -2600,7 +2426,7 @@ class TestDeploymentPolicyOperations:
     async def test_get_deployment_policy(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_deployment_policy_data: DeploymentPolicyData,
     ) -> None:
         """Test getting a deployment policy by endpoint ID."""
@@ -2617,7 +2443,7 @@ class TestDeploymentPolicyOperations:
     async def test_get_deployment_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
     ) -> None:
         """Test that get_deployment_policy raises DeploymentPolicyNotFound."""
         with pytest.raises(DeploymentPolicyNotFound):
@@ -2626,7 +2452,7 @@ class TestDeploymentPolicyOperations:
     async def test_delete_deployment_policy(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_deployment_policy_data: DeploymentPolicyData,
     ) -> None:
         """Test deleting a deployment policy using Purger."""
@@ -2683,6 +2509,7 @@ class TestSearchDeploymentPolicies:
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 DeploymentPolicyRow,
             ],
         ):
@@ -2814,12 +2641,12 @@ class TestSearchDeploymentPolicies:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> list[uuid.UUID]:
+    ) -> list[DeploymentID]:
         """Create 4 endpoints and return their IDs."""
-        endpoint_ids: list[uuid.UUID] = []
+        endpoint_ids: list[DeploymentID] = []
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(4):
-                eid = uuid.uuid4()
+                eid = DeploymentID(uuid.uuid4())
                 endpoint = EndpointRow(
                     id=eid,
                     name=f"test-endpoint-{i}-{uuid.uuid4().hex[:8]}",
@@ -2832,7 +2659,6 @@ class TestSearchDeploymentPolicies:
                     url=f"http://test-{eid.hex[:8]}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
-                    current_revision=uuid.uuid4(),
                 )
                 db_sess.add(endpoint)
                 endpoint_ids.append(eid)
@@ -2843,7 +2669,7 @@ class TestSearchDeploymentPolicies:
     async def sample_policies(
         self,
         deployment_repository: DeploymentRepository,
-        sample_endpoint_ids: list[uuid.UUID],
+        sample_endpoint_ids: list[DeploymentID],
     ) -> list[DeploymentPolicyData]:
         """Create deployment policies for all sample endpoints."""
         policies: list[DeploymentPolicyData] = []
@@ -2875,7 +2701,7 @@ class TestSearchDeploymentPolicies:
             result = await deployment_repository.upsert_deployment_policy(
                 Upserter(
                     spec=DeploymentPolicyUpserterSpec(
-                        endpoint_id=eid,
+                        deployment_id=eid,
                         strategy=strategy,
                         strategy_spec=spec,
                     )
@@ -2967,7 +2793,7 @@ class TestSearchDeploymentPolicies:
         self,
         deployment_repository: DeploymentRepository,
         sample_policies: list[DeploymentPolicyData],
-        sample_endpoint_ids: list[uuid.UUID],
+        sample_endpoint_ids: list[DeploymentID],
     ) -> None:
         """Test filtering deployment policies by endpoint ID."""
         target_endpoint_id = sample_endpoint_ids[0]
@@ -3066,6 +2892,7 @@ class TestRouteOperations:
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
+                ReplicaGroupRow,
                 RoutingRow,
                 AssociationScopesEntitiesRow,
             ],
@@ -3216,9 +3043,9 @@ class TestRouteOperations:
         test_scaling_group_name: str,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> DeploymentID:
         """Create test endpoint and return endpoint ID."""
-        endpoint_id = uuid.uuid4()
+        endpoint_id = DeploymentID(uuid.uuid4())
 
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
@@ -3233,7 +3060,6 @@ class TestRouteOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
-                current_revision=uuid.uuid4(),
             )
             db_sess.add(endpoint)
             await db_sess.commit()
@@ -3259,21 +3085,43 @@ class TestRouteOperations:
             valkey_schedule=valkey_schedule,
         )
 
+    @pytest.fixture
+    async def test_replica_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: DeploymentID,
+    ) -> ReplicaGroupID:
+        """Create a replica group for the test endpoint and return its ID."""
+        group_id = ReplicaGroupID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ReplicaGroupRow(
+                    id=group_id,
+                    deployment_id=test_endpoint_id,
+                )
+            )
+            await db_sess.commit()
+        return group_id
+
     async def test_create_route(
         self,
         deployment_repository: DeploymentRepository,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_replica_group_id: ReplicaGroupID,
     ) -> None:
         """Test creating a route using Creator with RouteCreatorSpec."""
         spec = RouteCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
-            revision_id=uuid.uuid4(),
+            revision_id=DeploymentRevisionID(uuid.uuid4()),
+            health_check=None,
+            termination_grace_period=30.0,
+            replica_group_id=test_replica_group_id,
             traffic_ratio=1.0,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
@@ -3295,19 +3143,23 @@ class TestRouteOperations:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_replica_group_id: ReplicaGroupID,
     ) -> None:
         """Test updating route status using RouteStatusUpdaterSpec."""
         # Create a route first
         spec = RouteCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
-            revision_id=uuid.uuid4(),
+            revision_id=DeploymentRevisionID(uuid.uuid4()),
+            health_check=None,
+            termination_grace_period=30.0,
+            replica_group_id=test_replica_group_id,
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3343,19 +3195,23 @@ class TestRouteOperations:
         self,
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_endpoint_id: uuid.UUID,
+        test_endpoint_id: DeploymentID,
         test_user_uuid: uuid.UUID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_replica_group_id: ReplicaGroupID,
     ) -> None:
         """Test updating route using unified RouteUpdaterSpec."""
         # Create a route first
         spec = RouteCreatorSpec(
-            endpoint_id=test_endpoint_id,
+            deployment_id=test_endpoint_id,
             session_owner_id=test_user_uuid,
             domain=test_domain_name,
             project_id=test_group_id,
-            revision_id=uuid.uuid4(),
+            revision_id=DeploymentRevisionID(uuid.uuid4()),
+            health_check=None,
+            termination_grace_period=30.0,
+            replica_group_id=test_replica_group_id,
         )
         creator = RBACEntityCreator(
             spec=spec,
@@ -3432,13 +3288,30 @@ class TestDeploymentRepositoryDuplicateName:
                 KeyPairRow,
                 GroupRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
+                ResourceSlotTypeRow,
                 EndpointRow,
+                ReplicaGroupRow,
+                EndpointTokenRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
+                DeploymentRevisionResourceSlotRow,
                 AssociationScopesEntitiesRow,
                 DeploymentPolicyRow,
             ],
         ):
+            async with database_connection.begin_session() as sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    await sess.execute(
+                        sa.text(
+                            "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                            " VALUES (:slot_name, :slot_type, 0)"
+                            " ON CONFLICT DO NOTHING"
+                        ),
+                        {"slot_name": slot_name, "slot_type": slot_type},
+                    )
             yield database_connection
 
     @pytest.fixture
@@ -3447,13 +3320,25 @@ class TestDeploymentRepositoryDuplicateName:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> uuid.UUID:
         """Create test image and return image ID."""
+        registry_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            registry = ContainerRegistryRow(
+                id=registry_id,
+                url="https://test-registry.example.com",
+                registry_name=f"test-registry-{registry_id.hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+                project=None,
+                is_global=True,
+            )
+            db_sess.add(registry)
+            await db_sess.flush()
+
             image = ImageRow(
                 name="test-image:latest",
                 project=str(uuid.uuid4()),
                 image="test-image",
                 registry="docker.io",
-                registry_id=uuid.uuid4(),
+                registry_id=registry_id,
                 architecture="x86_64",
                 is_local=False,
                 config_digest="sha256:abc123",
@@ -3593,34 +3478,21 @@ class TestDeploymentRepositoryDuplicateName:
     ) -> RBACEntityCreator[EndpointRow]:
         """Helper to create RBACEntityCreator for endpoint creation."""
         user_id = uuid.uuid4()
-        spec = LegacyEndpointCreatorSpec(
-            name=name,
-            domain=domain.name,
-            project=group.id,
-            resource_group=scaling_group.name,
-            created_user=user_id,
-            session_owner=user_id,
-            revision_history_limit=10,
-            tag=None,
-            replicas=1,
-            desired_replicas=1,
-            open_to_public=False,
-            url=None,
-            image_id=image_id,
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            cluster_size=1,
-            resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal(str(1024**3))}),
-            resource_opts=None,
-            model=None,
-            model_mount_destination="/models",
-            model_definition_path=None,
-            extra_mounts=[],
-            runtime_variant=RuntimeVariant.CUSTOM,
-            startup_command=None,
-            bootstrap_script=None,
-            environ=None,
-            callback_url=None,
-            policy=None,
+        spec = DeploymentCreatorSpec(
+            metadata=DeploymentMetadataFields(
+                name=name,
+                domain=domain.name,
+                project_id=group.id,
+                resource_group=scaling_group.name,
+                created_user_id=user_id,
+                session_owner_id=user_id,
+                revision_history_limit=10,
+                tag=None,
+            ),
+            replica=DeploymentReplicaFields(replica_count=1, desired_replica_count=1),
+            network=DeploymentNetworkFields(open_to_public=False, url=None),
+            options=DeploymentOptions(),
+            revision=None,
         )
         return RBACEntityCreator(
             spec=spec,
@@ -3630,37 +3502,6 @@ class TestDeploymentRepositoryDuplicateName:
             ),
         )
 
-    async def test_create_endpoint_raises_when_duplicate_name(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_domain: DomainRow,
-        test_group: GroupRow,
-        test_scaling_group: ScalingGroupRow,
-        test_image_id: uuid.UUID,
-    ) -> None:
-        """Test that create_endpoint_legacy raises DeploymentNameAlreadyExists for duplicate name."""
-        # Create first endpoint with specific name
-        first_creator = self._create_endpoint_creator(
-            name="duplicate-test-endpoint",
-            domain=test_domain,
-            group=test_group,
-            scaling_group=test_scaling_group,
-            image_id=test_image_id,
-        )
-        await deployment_repository.create_endpoint_legacy(first_creator)
-
-        # Attempt to create second endpoint with same name should fail
-        second_creator = self._create_endpoint_creator(
-            name="duplicate-test-endpoint",
-            domain=test_domain,
-            group=test_group,
-            scaling_group=test_scaling_group,
-            image_id=test_image_id,
-        )
-
-        with pytest.raises(DeploymentNameAlreadyExists):
-            await deployment_repository.create_endpoint_legacy(second_creator)
-
     async def test_create_endpoint_succeeds_with_different_name(
         self,
         deployment_repository: DeploymentRepository,
@@ -3669,7 +3510,7 @@ class TestDeploymentRepositoryDuplicateName:
         test_scaling_group: ScalingGroupRow,
         test_image_id: uuid.UUID,
     ) -> None:
-        """Test that create_endpoint_legacy succeeds with a different name."""
+        """Test that create_endpoint succeeds with a different name."""
         # Create first endpoint
         first_creator = self._create_endpoint_creator(
             name="existing-endpoint",
@@ -3678,7 +3519,7 @@ class TestDeploymentRepositoryDuplicateName:
             scaling_group=test_scaling_group,
             image_id=test_image_id,
         )
-        await deployment_repository.create_endpoint_legacy(first_creator)
+        await deployment_repository.create_endpoint(first_creator)
 
         # Create second endpoint with different name should succeed
         second_creator = self._create_endpoint_creator(
@@ -3689,7 +3530,7 @@ class TestDeploymentRepositoryDuplicateName:
             image_id=test_image_id,
         )
 
-        result = await deployment_repository.create_endpoint_legacy(second_creator)
+        result = await deployment_repository.create_endpoint(second_creator)
 
         assert result.metadata.name == "different-endpoint-name"
         assert result.metadata.project == test_group.id
@@ -3703,7 +3544,7 @@ class TestDeploymentRepositoryDuplicateName:
         test_scaling_group: ScalingGroupRow,
         test_image_id: uuid.UUID,
     ) -> None:
-        """Test that create_endpoint_legacy allows same name in different project."""
+        """Test that create_endpoint allows same name in different project."""
         # Create endpoint in first project
         first_creator = self._create_endpoint_creator(
             name="same-name-endpoint",
@@ -3712,7 +3553,7 @@ class TestDeploymentRepositoryDuplicateName:
             scaling_group=test_scaling_group,
             image_id=test_image_id,
         )
-        await deployment_repository.create_endpoint_legacy(first_creator)
+        await deployment_repository.create_endpoint(first_creator)
 
         # Create endpoint with same name in different project should succeed
         second_creator = self._create_endpoint_creator(
@@ -3723,7 +3564,7 @@ class TestDeploymentRepositoryDuplicateName:
             image_id=test_image_id,
         )
 
-        result = await deployment_repository.create_endpoint_legacy(second_creator)
+        result = await deployment_repository.create_endpoint(second_creator)
 
         assert result.metadata.name == "same-name-endpoint"
         assert result.metadata.project == different_group.id
@@ -3737,7 +3578,7 @@ class TestDeploymentRepositoryDuplicateName:
         test_scaling_group: ScalingGroupRow,
         test_image_id: uuid.UUID,
     ) -> None:
-        """Test that create_endpoint_legacy allows same name when existing endpoint is destroyed."""
+        """Test that create_endpoint allows same name when existing endpoint is destroyed."""
         # Create first endpoint
         first_creator = self._create_endpoint_creator(
             name="reusable-endpoint",
@@ -3746,7 +3587,7 @@ class TestDeploymentRepositoryDuplicateName:
             scaling_group=test_scaling_group,
             image_id=test_image_id,
         )
-        first_result = await deployment_repository.create_endpoint_legacy(first_creator)
+        first_result = await deployment_repository.create_endpoint(first_creator)
 
         # Mark the first endpoint as destroyed
         async with db_with_cleanup.begin_session() as db_sess:
@@ -3765,7 +3606,325 @@ class TestDeploymentRepositoryDuplicateName:
             image_id=test_image_id,
         )
 
-        result = await deployment_repository.create_endpoint_legacy(second_creator)
+        result = await deployment_repository.create_endpoint(second_creator)
 
         assert result.metadata.name == "reusable-endpoint"
         assert result.metadata.project == test_group.id
+
+    @pytest.fixture
+    async def coexisting_active_and_destroying_endpoints(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> tuple[uuid.UUID, uuid.UUID]:
+        """Seed two endpoints sharing (name, domain, project) — one CREATED and
+        one already in DESTROYING — bypassing the application-level uniqueness
+        check to reproduce the corrupt state described in BA-5698.
+
+        Returns (target_id, sibling_id) where target is the active row to be
+        destroyed and sibling is the DESTROYING row.
+        """
+        duplicate_name = f"dup-destroy-{uuid.uuid4().hex[:8]}"
+        target_id = uuid.uuid4()
+        sibling_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            target = EndpointRow(
+                id=target_id,
+                name=duplicate_name,
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.name,
+                project=test_group.id,
+                resource_group=test_scaling_group.name,
+                replicas=1,
+                desired_replicas=1,
+                url=None,
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.CREATED,
+            )
+            sibling = EndpointRow(
+                id=sibling_id,
+                name=duplicate_name,
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.name,
+                project=test_group.id,
+                resource_group=test_scaling_group.name,
+                replicas=0,
+                desired_replicas=0,
+                url=None,
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DESTROYING,
+            )
+            db_sess.add_all([target, sibling])
+            await db_sess.commit()
+
+        return target_id, sibling_id
+
+    async def test_destroy_endpoint_with_destroying_sibling_does_not_conflict(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        coexisting_active_and_destroying_endpoints: tuple[uuid.UUID, uuid.UUID],
+    ) -> None:
+        """Destroying an active endpoint succeeds even when a sibling row with
+        the same (name, domain, project) is already in DESTROYING."""
+        target_id, _ = coexisting_active_and_destroying_endpoints
+
+        succeeded = await deployment_repository.destroy_endpoint(DeploymentID(target_id))
+        assert succeeded is True
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            target_stage = (
+                await db_sess.execute(
+                    sa.select(EndpointRow.lifecycle_stage).where(EndpointRow.id == target_id)
+                )
+            ).scalar_one()
+            assert target_stage == EndpointLifecycle.DESTROYING
+
+    async def test_activate_revision_overrides_in_flight(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> None:
+        """``activate_revision`` records the deploy intent on the endpoint.
+
+        Writes ``endpoints.deploying_revision_id`` and transitions to
+        DEPLOYING / DEPLOYING_INITIALIZING, overwriting any previous
+        deploy intent. Orphan routes from a preempted rollout are cleaned
+        up by ``RouteEvictionHandler``'s orphan branch.
+        """
+        endpoint_id = DeploymentID(uuid.uuid4())
+        previous_deploying = DeploymentRevisionID(uuid.uuid4())
+        new_deploying = DeploymentRevisionID(uuid.uuid4())
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"override-{uuid.uuid4().hex[:8]}",
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.name,
+                project=test_group.id,
+                resource_group=test_scaling_group.name,
+                replicas=1,
+                desired_replicas=1,
+                url=None,
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                deploying_revision_id=previous_deploying,
+            )
+            db_sess.add(endpoint)
+            attach_primary_replica_group(db_sess, endpoint)
+            await db_sess.commit()
+
+        previous_current, updated = await deployment_repository.activate_revision(
+            endpoint_id, new_deploying
+        )
+
+        assert updated is True
+        assert previous_current is None  # current_revision was not set on this fixture
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(
+                        EndpointRow.deploying_revision_id,
+                        EndpointRow.lifecycle_stage,
+                        EndpointRow.sub_step,
+                    ).where(EndpointRow.id == endpoint_id)
+                )
+            ).one()
+            assert row.deploying_revision_id == new_deploying
+            assert row.lifecycle_stage == EndpointLifecycle.DEPLOYING
+            assert row.sub_step == DeploymentLifecycleSubStep.DEPLOYING_INITIALIZING
+
+    async def test_activate_revision_returns_false_for_missing_endpoint(
+        self,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        """``activate_revision`` returns updated=False when the endpoint id
+        does not match any row, instead of raising."""
+        previous_current, updated = await deployment_repository.activate_revision(
+            DeploymentID(uuid.uuid4()), DeploymentRevisionID(uuid.uuid4())
+        )
+        assert updated is False
+        assert previous_current is None
+
+    async def test_clear_deploying_revision_clears_intent(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> None:
+        """``clear_deploying_revision`` wipes the deploy intent: the endpoint's
+        ``deploying_revision_id`` / ``target_replica_group_id`` / ``sub_step`` and
+        the primary group's ``target_revision_id``."""
+        endpoint_id = DeploymentID(uuid.uuid4())
+        deploying = DeploymentRevisionID(uuid.uuid4())
+        target_revision = uuid.uuid4()
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                name=f"clear-{uuid.uuid4().hex[:8]}",
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.name,
+                project=test_group.id,
+                resource_group=test_scaling_group.name,
+                replicas=1,
+                desired_replicas=1,
+                url=None,
+                open_to_public=False,
+                lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONED,
+                deploying_revision_id=deploying,
+            )
+            db_sess.add(endpoint)
+            group = attach_primary_replica_group(
+                db_sess, endpoint, target_revision_id=target_revision
+            )
+            await db_sess.commit()
+            group_id = group.id
+
+        await deployment_repository.clear_deploying_revision({endpoint_id})
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(
+                        EndpointRow.deploying_revision_id,
+                        EndpointRow.target_replica_group_id,
+                        EndpointRow.sub_step,
+                    ).where(EndpointRow.id == endpoint_id)
+                )
+            ).one()
+            assert row.deploying_revision_id is None
+            assert row.target_replica_group_id is None
+            assert row.sub_step is None
+            group_target = (
+                await db_sess.execute(
+                    sa.select(ReplicaGroupRow.target_revision_id).where(
+                        ReplicaGroupRow.id == group_id
+                    )
+                )
+            ).scalar_one()
+            assert group_target is None
+
+    async def test_destroy_endpoint_deletes_associated_tokens(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+    ) -> None:
+        """Destroying an endpoint also wipes its access tokens in the same
+        transaction so the destroyed endpoint cannot be re-authenticated.
+        Tokens for unrelated endpoints are left untouched."""
+        endpoint_id = DeploymentID(uuid.uuid4())
+        sibling_id = DeploymentID(uuid.uuid4())
+        user_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add_all([
+                EndpointRow(
+                    id=endpoint_id,
+                    name=f"with-tokens-{uuid.uuid4().hex[:8]}",
+                    created_user=user_id,
+                    session_owner=user_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    resource_group=test_scaling_group.name,
+                    replicas=1,
+                    desired_replicas=1,
+                    url=None,
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.CREATED,
+                ),
+                EndpointRow(
+                    id=sibling_id,
+                    name=f"sibling-{uuid.uuid4().hex[:8]}",
+                    created_user=user_id,
+                    session_owner=user_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    resource_group=test_scaling_group.name,
+                    replicas=1,
+                    desired_replicas=1,
+                    url=None,
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.CREATED,
+                ),
+            ])
+            target_token_ids = [uuid.uuid4(), uuid.uuid4()]
+            sibling_token_id = uuid.uuid4()
+            db_sess.add_all([
+                EndpointTokenRow(
+                    id=target_token_ids[0],
+                    token=f"tok-{uuid.uuid4().hex}",
+                    endpoint=endpoint_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    session_owner=user_id,
+                ),
+                EndpointTokenRow(
+                    id=target_token_ids[1],
+                    token=f"tok-{uuid.uuid4().hex}",
+                    endpoint=endpoint_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    session_owner=user_id,
+                ),
+                EndpointTokenRow(
+                    id=sibling_token_id,
+                    token=f"tok-{uuid.uuid4().hex}",
+                    endpoint=sibling_id,
+                    domain=test_domain.name,
+                    project=test_group.id,
+                    session_owner=user_id,
+                ),
+            ])
+            await db_sess.commit()
+
+        succeeded = await deployment_repository.destroy_endpoint(endpoint_id)
+        assert succeeded is True
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            remaining_target_tokens = (
+                (
+                    await db_sess.execute(
+                        sa.select(EndpointTokenRow.id).where(
+                            EndpointTokenRow.endpoint == endpoint_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert remaining_target_tokens == []
+
+            remaining_sibling_tokens = (
+                (
+                    await db_sess.execute(
+                        sa.select(EndpointTokenRow.id).where(
+                            EndpointTokenRow.endpoint == sibling_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert set(remaining_sibling_tokens) == {sibling_token_id}

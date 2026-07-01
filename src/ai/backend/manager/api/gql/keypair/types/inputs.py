@@ -8,6 +8,9 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminCreateKeypairInput as AdminCreateKeypairInputDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.request import (
+    AdminRegisterSSHKeypairInput as AdminRegisterSSHKeypairInputDTO,
+)
+from ai.backend.common.dto.manager.v2.keypair.request import (
     AdminUpdateKeypairInput as AdminUpdateKeypairInputDTO,
 )
 from ai.backend.common.dto.manager.v2.keypair.request import (
@@ -19,7 +22,6 @@ from ai.backend.common.dto.manager.v2.keypair.request import (
 from ai.backend.common.dto.manager.v2.keypair.request import (
     UpdateMyKeypairInput as UpdateMyKeypairInputDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -71,7 +73,7 @@ class UpdateMyKeypairInputGQL(PydanticInputMixin[UpdateMyKeypairInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Admin input for creating a keypair for a user.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="AdminCreateKeypairInput",
 )
@@ -88,7 +90,7 @@ class AdminCreateKeypairInputGQL(PydanticInputMixin[AdminCreateKeypairInputDTO])
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Admin input for updating a keypair.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="AdminUpdateKeypairInput",
 )
@@ -98,3 +100,16 @@ class AdminUpdateKeypairInputGQL(PydanticInputMixin[AdminUpdateKeypairInputDTO])
     is_admin: bool | None = gql_field(default=None, description="New admin privilege state.")
     resource_policy: str | None = gql_field(default=None, description="New resource policy name.")
     rate_limit: int | None = gql_field(default=None, description="New API rate limit.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Admin input for registering (overwriting) a user's SSH keypair.",
+        added_version="26.4.2",
+    ),
+    name="AdminRegisterSSHKeypairInput",
+)
+class AdminRegisterSSHKeypairInputGQL(PydanticInputMixin[AdminRegisterSSHKeypairInputDTO]):
+    access_key: str = gql_field(description="Access key whose SSH keypair will be replaced.")
+    ssh_public_key: str = gql_field(description="PEM-encoded SSH public key.")
+    ssh_private_key: str = gql_field(description="PEM-encoded SSH private key.")

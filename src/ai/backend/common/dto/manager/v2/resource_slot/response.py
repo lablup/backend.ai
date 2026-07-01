@@ -4,6 +4,8 @@ Response DTOs for resource slot DTO v2.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
@@ -17,8 +19,10 @@ __all__ = (
     "AdminSearchResourceAllocationsPayload",
     "AdminSearchResourceSlotTypesPayload",
     "AgentResourceNode",
+    "AllocatedResourceSlotNode",
     "ResourceAllocationNode",
     "ResourceSlotTypeNode",
+    "SearchAllocatedResourceSlotsPayload",
 )
 
 
@@ -105,6 +109,28 @@ class AdminSearchResourceAllocationsPayload(BaseResponseModel):
     items: list[ResourceAllocationNode] = Field(description="List of resource allocation nodes.")
     total_count: int = Field(
         description="Total number of resource allocations matching the filter."
+    )
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AllocatedResourceSlotNode(BaseResponseModel):
+    """Node model for an allocated resource slot entry (revision or preset)."""
+
+    slot_name: str = Field(
+        description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
+    )
+    quantity: Decimal = Field(description="Allocated quantity for this resource slot.")
+
+
+class SearchAllocatedResourceSlotsPayload(BaseResponseModel):
+    """Payload for paginated allocated resource slot search results."""
+
+    items: list[AllocatedResourceSlotNode] = Field(
+        description="List of allocated resource slot nodes."
+    )
+    total_count: int = Field(
+        description="Total number of allocated resource slots matching the filter."
     )
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")

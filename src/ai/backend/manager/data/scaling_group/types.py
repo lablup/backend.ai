@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     PreemptionMode,
@@ -16,6 +17,8 @@ from ai.backend.common.types import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.data.deployment.types import DeploymentOptions
+    from ai.backend.manager.data.session.options import DefaultSessionOptions
     from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 
 
@@ -113,6 +116,7 @@ class ScalingGroupSchedulerConfig:
 
 @dataclass
 class ScalingGroupData:
+    id: ResourceGroupID
     name: str
     status: ScalingGroupStatus
     metadata: ScalingGroupMetadata
@@ -120,6 +124,8 @@ class ScalingGroupData:
     driver: ScalingGroupDriverConfig
     scheduler: ScalingGroupSchedulerConfig
     fair_share_spec: FairShareScalingGroupSpec
+    default_deployment_options: DeploymentOptions
+    default_session_options: DefaultSessionOptions
 
 
 @dataclass

@@ -4,6 +4,9 @@ import pytest
 
 from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
 )
@@ -20,12 +23,18 @@ def auth_service(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
     mock_config_provider: AsyncMock,
+    mock_user_repository: AsyncMock,
+    mock_group_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
         valkey_session_client=AsyncMock(),
+        user_resource_policy_repository=AsyncMock(spec=UserResourcePolicyRepository),
+        user_repository=mock_user_repository,
+        group_repository=mock_group_repository,
+        ssh_key_validator=AsyncMock(),
     )
 
 

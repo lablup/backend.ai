@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import urllib.parse
+import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
@@ -22,6 +23,8 @@ from typing import (
     cast,
 )
 
+import aiofiles
+import aiofiles.os
 import aiohttp_cors
 import janus
 import trafaret as t
@@ -38,7 +41,6 @@ from ai.backend.common.dto.storage.request import (
     ArchiveDownloadQueryParams,
     ArchiveDownloadTokenData,
 )
-from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
@@ -47,7 +49,10 @@ from ai.backend.common.types import BinarySize, VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage import __version__
 from ai.backend.storage.dto.context import StorageRootCtx
-from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
+from ai.backend.storage.errors import (
+    InvalidAPIParameters,
+    UploadOffsetMismatchError,
+)
 from ai.backend.storage.services.file_stream.zip import (
     ZipArchiveStreamReader,
 )
@@ -59,13 +64,56 @@ from ai.backend.storage.utils import (
 )
 
 if TYPE_CHECKING:
+    from aiohttp import StreamReader
+
     from ai.backend.storage.context import RootContext
     from ai.backend.storage.volumes.abc import AbstractVolume
+
+from ai.backend.common.clients.valkey_client.valkey_tus import (
+    TusSessionId,
+    TusSessionNotFoundError,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
+
+
+async def _drain_into_upload_file(
+    content: StreamReader,
+    upload_temp_path: Path,
+    start_offset: int,
+    session_id: TusSessionId,
+) -> int:
+    """Truncate ``upload_temp_path`` to ``start_offset`` and append the body. Returns bytes written.
+
+    First PATCH uses ``w+b`` (create or truncate to 0); continuations use
+    ``r+b`` which refuses to create. A continuation with a missing staging
+    file means it was wiped out of band (NFS GC, manual ``rm``, etc.) —
+    re-creating would silently zero-pad the prefix via ``truncate`` and
+    corrupt the upload. Surface it as a vanished session instead.
+    """
+    mode: Literal["w+b", "r+b"] = "w+b" if start_offset == 0 else "r+b"
+    bytes_written = 0
+    try:
+        async with aiofiles.open(upload_temp_path, mode=mode) as f:
+            # Discard any orphan tail bytes left by a prior crashed holder.
+            await f.truncate(start_offset)
+            await f.seek(start_offset)
+            while not content.at_eof():
+                chunk = await content.read(DEFAULT_CHUNK_SIZE)
+                if not chunk:
+                    continue
+                await f.write(chunk)
+                bytes_written += len(chunk)
+            await f.flush()
+            await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
+    except FileNotFoundError as e:
+        raise TusSessionNotFoundError(
+            f"Upload session {session_id} staging file is missing at offset {start_offset}"
+        ) from e
+    return bytes_written
 
 
 class DownloadTokenData(TypedDict):
@@ -169,9 +217,9 @@ async def download(request: web.Request) -> web.StreamResponse:
     ):
         token_data = params["token"]
         if token_data["unmanaged_path"] is not None:
-            vfpath = Path(token_data["unmanaged_path"])
+            vfpath = Path(token_data["unmanaged_path"]).resolve()
         else:
-            vfpath = volume.mangle_vfpath(token_data["vfid"])
+            vfpath = volume.mangle_vfpath(token_data["vfid"]).resolve()
         try:
             parent_dir = vfpath
             if (dst_dir := params["dst_dir"]) is not None:
@@ -380,23 +428,42 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     f"Invalid Upload-Offset header value: {upload_offset_header}"
                 ) from e
 
-            actual_offset = int(headers["Upload-Offset"])
+            await aiofiles.os.makedirs(upload_temp_path.parent, exist_ok=True)
+
+            session_id = TusSessionId(token_data["session"])
+            holder_token = f"{ctx.node_id}:{uuid.uuid4().hex}"
+            actual_offset = await ctx.valkey_tus_client.try_load_offset(session_id, holder_token)
             if client_offset != actual_offset:
+                # We hold the lease but the precondition fails — release it
+                # before bailing so the next PATCH does not have to wait for
+                # the TTL.
+                await ctx.valkey_tus_client.release_lease(session_id, holder_token)
                 raise UploadOffsetMismatchError(
                     f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
                 )
+            watcher_task = asyncio.create_task(
+                ctx.valkey_tus_client.watch_lease(session_id),
+                name=f"tus-lease-watch-{session_id}",
+            )
+            try:
+                bytes_written = await _drain_into_upload_file(
+                    request.content, upload_temp_path, actual_offset, session_id
+                )
+            except BaseException:
+                await ctx.valkey_tus_client.release_lease(session_id, holder_token)
+                raise
+            finally:
+                watcher_task.cancel()
+                try:
+                    await watcher_task
+                except asyncio.CancelledError:
+                    pass
+            new_offset = await ctx.valkey_tus_client.advance_offset(
+                session_id, holder_token, bytes_written
+            )
 
-            async with AsyncFileWriter(
-                target_filename=upload_temp_path,
-                access_mode="ab",
-                max_chunks=DEFAULT_INFLIGHT_CHUNKS,
-            ) as writer:
-                while not request.content.at_eof():
-                    chunk = await request.content.read(DEFAULT_CHUNK_SIZE)
-                    await writer.write(chunk)
-
-            current_size = Path(upload_temp_path).stat().st_size
-            if current_size >= int(token_data["size"]):
+            headers["Upload-Offset"] = str(new_offset)
+            if new_offset >= int(token_data["size"]):
                 parent_dir = vfpath
                 if (dst_dir := params["dst_dir"]) is not None:
                     parent_dir = vfpath / dst_dir
@@ -405,14 +472,9 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     target_path.parent.mkdir(parents=True, exist_ok=True)
                 upload_temp_path.rename(target_path)
                 try:
-                    loop = asyncio.get_running_loop()
-                    await loop.run_in_executor(
-                        None,
-                        lambda: upload_temp_path.parent.rmdir(),
-                    )
+                    await aiofiles.os.rmdir(upload_temp_path.parent)
                 except OSError:
                     pass
-            headers["Upload-Offset"] = str(current_size)
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
@@ -440,21 +502,15 @@ async def tus_options(request: web.Request) -> web.Response:
 
 
 async def prepare_tus_session_headers(
-    _request: web.Request,
+    request: web.Request,
     token_data: Mapping[str, Any],
     volume: AbstractVolume,
 ) -> MutableMapping[str, str]:
     vfpath = volume.mangle_vfpath(token_data["vfid"])
     upload_temp_path = vfpath / ".upload" / token_data["session"]
     if not Path(upload_temp_path).exists():
-        raise web.HTTPNotFound(
-            body=dump_json_str(
-                {
-                    "title": "No such upload session",
-                    "type": "https://api.backend.ai/probs/storage/no-such-upload-session",
-                },
-            ),
-            content_type="application/problem+json",
+        raise TusSessionNotFoundError(
+            f"Upload session {token_data['session']} has no on-disk staging file"
         )
     headers = {}
     headers["Access-Control-Allow-Origin"] = "*"
@@ -467,7 +523,13 @@ async def prepare_tus_session_headers(
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"
-    headers["Upload-Offset"] = str(Path(upload_temp_path).stat().st_size)
+    ctx: RootContext = request.app["ctx"]
+    redis_offset = await ctx.valkey_tus_client.get_offset(TusSessionId(token_data["session"]))
+    if redis_offset is None:
+        raise TusSessionNotFoundError(
+            f"Upload session {token_data['session']} is not registered or has expired"
+        )
+    headers["Upload-Offset"] = str(redis_offset)
     headers["Upload-Length"] = str(token_data["size"])
     return headers
 

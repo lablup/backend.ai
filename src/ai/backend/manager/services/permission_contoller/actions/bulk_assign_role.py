@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType
@@ -15,6 +16,7 @@ from ai.backend.manager.services.permission_contoller.actions.base import RoleAc
 @dataclass
 class BulkAssignRoleAction(RoleAction):
     bulk_creator: BulkCreator[UserRoleRow]
+    project_id: uuid.UUID | None = field(default=None)
 
     @override
     @classmethod

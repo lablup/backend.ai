@@ -1,7 +1,8 @@
 """Shared fixtures for auth service tests"""
 
 from datetime import timedelta
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -9,6 +10,8 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.repositories.group.repository import GroupRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
 
 
 @pytest.fixture
@@ -28,3 +31,20 @@ def mock_config_provider() -> MagicMock:
         login_session_max_age=604800,
     )
     return mock_provider
+
+
+@pytest.fixture
+def mock_user_repository() -> AsyncMock:
+    return AsyncMock(spec=UserRepository)
+
+
+@pytest.fixture
+def mock_group_repository() -> AsyncMock:
+    repo = AsyncMock(spec=GroupRepository)
+    repo.project_id_by_name_in_domain.return_value = None
+    return repo
+
+
+@pytest.fixture
+def sample_client_type_id() -> UUID:
+    return uuid4()

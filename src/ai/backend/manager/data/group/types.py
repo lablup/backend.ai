@@ -47,7 +47,7 @@ class GroupData:
     is_active: bool | None
     created_at: datetime | None = field(compare=False)
     modified_at: datetime | None = field(compare=False)
-    integration_id: str | None
+    integration_name: str | None
     domain_name: str
     total_resource_slots: ResourceSlot
     allowed_vfolder_hosts: VFolderHostPermissionMap
@@ -66,9 +66,41 @@ class GroupData:
         return f"project-{str(self.id)[:8]}-admin"
 
     def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
-        return {
+        operations: dict[RBACElementType, Iterable[OperationType]] = {
             entity.to_element(): OperationType.admin_operations()
             for entity in EntityType.admin_accessible_entity_types_in_project()
+        }
+        operations[RBACElementType.PROJECT_ADMIN_PAGE] = {OperationType.READ}
+        return operations
+
+
+@dataclass(frozen=True)
+class ProjectResourceInfo:
+    project_id: uuid.UUID
+    max_vfolder_count: int
+    max_quota_scope_size: int
+    project_type: ProjectType
+
+
+@dataclass(frozen=True)
+class ProjectMemberRoleSpec:
+    """ScopeSystemRoleData implementation for the project-scoped member role."""
+
+    project_id: uuid.UUID
+
+    def scope_id(self) -> ScopeId:
+        return ScopeId(
+            scope_type=ScopeType.PROJECT,
+            scope_id=str(self.project_id),
+        )
+
+    def role_name(self) -> str:
+        return f"project-{str(self.project_id)[:8]}-member"
+
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
+        return {
+            entity.to_element(): OperationType.member_operations()
+            for entity in EntityType.member_accessible_entity_types_in_project()
         }
 
 
@@ -88,7 +120,7 @@ class GroupModifier(PartialModifier):
     allowed_vfolder_hosts: OptionalState[dict[str, str]] = field(
         default_factory=OptionalState[dict[str, str]].nop
     )
-    integration_id: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    integration_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     container_registry: TriState[dict[str, str]] = field(
         default_factory=TriState[dict[str, str]].nop
@@ -103,7 +135,8 @@ class GroupModifier(PartialModifier):
         self.domain_name.update_dict(to_update, "domain_name")
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
-        self.integration_id.update_dict(to_update, "integration_id")
+        # Field is named integration_name above model layer; DB column remains integration_id.
+        self.integration_name.update_dict(to_update, "integration_id")
         self.resource_policy.update_dict(to_update, "resource_policy")
         self.container_registry.update_dict(to_update, "container_registry")
         return to_update

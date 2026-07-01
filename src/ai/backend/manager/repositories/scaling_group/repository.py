@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -12,11 +13,13 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
+from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.scaling_group.types import (
     ResourceInfo,
     ScalingGroupData,
     ScalingGroupListResult,
 )
+from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
@@ -87,6 +90,10 @@ class ScalingGroupRepository:
         return await self._db_source.search_scaling_groups(querier=querier)
 
     @scaling_group_repository_resilience.apply()
+    async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
+        return await self._db_source.get_resource_group_id_by_name(name)
+
+    @scaling_group_repository_resilience.apply()
     async def get_scaling_group_by_name(
         self,
         name: str,
@@ -125,6 +132,40 @@ class ScalingGroupRepository:
         Raises ScalingGroupNotFound if the scaling group does not exist.
         """
         return await self._db_source.update_scaling_group(updater)
+
+    @scaling_group_repository_resilience.apply()
+    async def replace_default_deployment_options(
+        self,
+        name: ResourceGroupName,
+        options: DeploymentOptions,
+    ) -> DeploymentOptions:
+        """Fully replace a scaling group's ``default_deployment_options``.
+
+        Returns the persisted :class:`DeploymentOptions` value via
+        ``UPDATE ... RETURNING`` so this path does a single round-trip and
+        does not re-materialise the surrounding scaling group node.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        return await self._db_source.replace_default_deployment_options(name, options)
+
+    @scaling_group_repository_resilience.apply()
+    async def replace_default_session_options(
+        self,
+        name: ResourceGroupName,
+        options: DefaultSessionOptions,
+    ) -> DefaultSessionOptions:
+        """Fully replace a scaling group's ``default_session_options``.
+
+        Returns the persisted :class:`DefaultSessionOptions` value via
+        ``UPDATE ... RETURNING`` so this path does a single round-trip
+        and does not re-materialise the surrounding scaling group node.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        return await self._db_source.replace_default_session_options(name, options)
 
     async def associate_scaling_group_with_domains(
         self,

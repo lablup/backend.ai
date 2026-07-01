@@ -65,6 +65,7 @@ class TestCreateUser:
             valkey_stat_client=MagicMock(),
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
+            scheduling_controller=MagicMock(),
         )
 
     @pytest.fixture
@@ -182,7 +183,7 @@ class TestCreateUser:
         assert sample_user_data.username is not None
         assert sample_user_data.need_password_change is not None
         assert sample_user_data.domain_name is not None
-        group_ids = ["group1", "group2"]
+        group_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
         action = CreateUserAction(
             creator=Creator(
                 spec=UserCreatorSpec(
@@ -247,6 +248,7 @@ class TestModifyUser:
             valkey_stat_client=MagicMock(),
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
+            scheduling_controller=MagicMock(),
         )
 
     @pytest.fixture
@@ -348,6 +350,7 @@ class TestDeleteUser:
             valkey_stat_client=MagicMock(),
             agent_registry=MagicMock(),
             user_repository=mock_user_repository,
+            scheduling_controller=MagicMock(),
         )
 
     async def test_delete_existing_user_returns_success(
@@ -405,6 +408,7 @@ class TestPurgeUser:
             valkey_stat_client=MagicMock(),
             agent_registry=mock_agent_registry,
             user_repository=mock_user_repository,
+            scheduling_controller=MagicMock(),
         )
 
     @pytest.fixture
@@ -641,6 +645,7 @@ class TestBulkPurgeUsers:
             valkey_stat_client=MagicMock(),
             agent_registry=mock_agent_registry,
             user_repository=mock_user_repository,
+            scheduling_controller=MagicMock(),
         )
 
     @pytest.fixture

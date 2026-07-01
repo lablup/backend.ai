@@ -12,12 +12,13 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     SearchRuntimeVariantsInput,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.runtime_variant.types import (
     CreateRuntimeVariantInputGQL,
     CreateRuntimeVariantPayloadGQL,
     DeleteRuntimeVariantPayloadGQL,
+    DeleteRuntimeVariantsInputGQL,
+    DeleteRuntimeVariantsPayloadGQL,
     RuntimeVariantConnection,
     RuntimeVariantEdge,
     RuntimeVariantFilterGQL,
@@ -32,7 +33,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Search runtime variants.",
     )
 )  # type: ignore[misc]
@@ -91,7 +92,7 @@ async def runtime_variants(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Get a single runtime variant by ID.",
     )
 )  # type: ignore[misc]
@@ -105,14 +106,14 @@ async def runtime_variant(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Create a new runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_create_runtime_variant(
     info: Info[StrawberryGQLContext],
     input: CreateRuntimeVariantInputGQL,
-) -> CreateRuntimeVariantPayloadGQL:
+) -> CreateRuntimeVariantPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.runtime_variant.create(dto)
@@ -121,14 +122,14 @@ async def admin_create_runtime_variant(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Update a runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_update_runtime_variant(
     info: Info[StrawberryGQLContext],
     input: UpdateRuntimeVariantInputGQL,
-) -> UpdateRuntimeVariantPayloadGQL:
+) -> UpdateRuntimeVariantPayloadGQL | None:
     check_admin_only()
     dto = input.to_pydantic()
     payload = await info.context.adapters.runtime_variant.update(dto)
@@ -137,14 +138,40 @@ async def admin_update_runtime_variant(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Delete a runtime variant (superadmin only).",
     )
-)  # type: ignore[misc]
+)
 async def admin_delete_runtime_variant(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteRuntimeVariantPayloadGQL:
+) -> DeleteRuntimeVariantPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.runtime_variant.delete(id)
     return DeleteRuntimeVariantPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.4.2",
+        description="Delete multiple runtime variants (superadmin only).",
+    )
+)
+async def admin_delete_runtime_variants(
+    info: Info[StrawberryGQLContext],
+    input: DeleteRuntimeVariantsInputGQL,
+) -> DeleteRuntimeVariantsPayloadGQL | None:
+    """Delete multiple runtime variants.
+
+    Args:
+        info: Strawberry GraphQL context.
+        input: Input containing list of runtime variant UUIDs to delete.
+
+    Returns:
+        DeleteRuntimeVariantsPayloadGQL with count of deleted runtime variants.
+    """
+    check_admin_only()
+    ctx = info.context
+    dto = input.to_pydantic()
+    payload = await ctx.adapters.runtime_variant.bulk_delete(dto)
+    return DeleteRuntimeVariantsPayloadGQL.from_pydantic(payload)

@@ -9,7 +9,11 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    print_result,
+)
 
 
 @click.group()
@@ -158,8 +162,10 @@ def logs(session_id: str, kernel_id: str | None) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            kid = UUID(kernel_id) if kernel_id else None
-            result = await registry.session.get_logs(UUID(session_id), kid)
+            result = await registry.session.get_logs(
+                UUID(session_id),
+                UUID(kernel_id) if kernel_id else None,
+            )
             click.echo(result.logs)
         finally:
             await registry.close()

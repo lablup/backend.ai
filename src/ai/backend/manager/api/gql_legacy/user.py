@@ -19,12 +19,13 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.exception import UserNotFound
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import (
     UserData,
     UserInfoContext,
 )
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, groups
-from ai.backend.manager.models.group import association_groups_users as agus
+from ai.backend.manager.models.base import GUID
+from ai.backend.manager.models.group import GroupRow, groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.minilang import (
     ExternalTableFilterSpec,
@@ -34,6 +35,9 @@ from ai.backend.manager.models.minilang import (
 )
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     INACTIVE_USER_STATUSES,
@@ -233,9 +237,16 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             target_column="name",
             join_builder=lambda base_table: sa.join(
                 base_table,
-                AssocGroupUserRow,
-                base_table.c.uuid == AssocGroupUserRow.user_id,
-            ).join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id),
+                AssociationScopesEntitiesRow,
+                sa.and_(
+                    sa.cast(base_table.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                ),
+            ).join(
+                GroupRow,
+                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+            ),
         ),
     }
 
@@ -418,7 +429,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[GroupNode]:
-        from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+        from ai.backend.manager.models.group import GroupRow
 
         from .group import GroupNode
 
@@ -452,9 +463,21 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        j = sa.join(GroupRow, AssocGroupUserRow)
-        prj_query = query.select_from(j).where(AssocGroupUserRow.user_id == self.id)
-        cnt_query = cnt_query.select_from(j).where(AssocGroupUserRow.user_id == self.id)
+        j = sa.join(
+            GroupRow,
+            AssociationScopesEntitiesRow,
+            sa.and_(
+                sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+            ),
+        )
+        prj_query = query.select_from(j).where(
+            AssociationScopesEntitiesRow.entity_id == str(self.id)
+        )
+        cnt_query = cnt_query.select_from(j).where(
+            AssociationScopesEntitiesRow.entity_id == str(self.id)
+        )
         result: list[GroupNode] = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
             total_cnt = await db_session.scalar(cnt_query)
@@ -491,11 +514,23 @@ class UserGroup(graphene.ObjectType):  # type: ignore[misc]
         cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]
     ) -> Sequence[Sequence[UserGroup]]:
         async with ctx.db.begin() as conn:
-            j = agus.join(groups, agus.c.group_id == groups.c.id)
+            user_id_strs = [str(uid) for uid in user_ids]
+            j = groups.join(
+                AssociationScopesEntitiesRow,
+                sa.cast(groups.c.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
+            )
             query = (
-                sa.select(agus.c.user_id, groups.c.name, groups.c.id)
+                sa.select(
+                    sa.cast(AssociationScopesEntitiesRow.entity_id, GUID).label("user_id"),
+                    groups.c.name,
+                    groups.c.id,
+                )
                 .select_from(j)
-                .where(agus.c.user_id.in_(user_ids))
+                .where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id.in_(user_id_strs),
+                )
             )
             return await batch_multiresult(
                 ctx,
@@ -633,8 +668,19 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         Load user's information. Group names associated with the user are also returned.
         """
         if group_id is not None:
-            j = users.join(agus, agus.c.user_id == users.c.uuid)
-            query = sa.select(users).select_from(j).where(agus.c.group_id == group_id)
+            j = users.join(
+                AssociationScopesEntitiesRow,
+                sa.and_(
+                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                ),
+            )
+            query = (
+                sa.select(users)
+                .select_from(j)
+                .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
+            )
         else:
             query = sa.select(users).select_from(users)
         if ctx.user["role"] != UserRole.SUPERADMIN:
@@ -705,8 +751,19 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         filter: str | None = None,
     ) -> int:
         if group_id is not None:
-            j = users.join(agus, agus.c.user_id == users.c.uuid)
-            query = sa.select(sa.func.count()).select_from(j).where(agus.c.group_id == group_id)
+            j = users.join(
+                AssociationScopesEntitiesRow,
+                sa.and_(
+                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                ),
+            )
+            query = (
+                sa.select(sa.func.count())
+                .select_from(j)
+                .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
+            )
         else:
             query = sa.select(sa.func.count()).select_from(users)
         if domain_name is not None:
@@ -745,11 +802,18 @@ class User(graphene.ObjectType):  # type: ignore[misc]
         order: str | None = None,
     ) -> Sequence[User]:
         if group_id is not None:
-            j = users.join(agus, agus.c.user_id == users.c.uuid)
+            j = users.join(
+                AssociationScopesEntitiesRow,
+                sa.and_(
+                    sa.cast(users.c.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                ),
+            )
             query = (
                 sa.select(users)
                 .select_from(j)
-                .where(agus.c.group_id == group_id)
+                .where(AssociationScopesEntitiesRow.scope_id == str(group_id))
                 .limit(limit)
                 .offset(offset)
             )

@@ -4,7 +4,6 @@ from collections.abc import Iterable
 
 import aiohttp_cors
 from aiohttp import web
-from pydantic import BaseModel
 
 from ai.backend.appproxy.common.errors import AuthorizationFailed
 from ai.backend.appproxy.common.types import CORSOptions, PydanticResponse, WebMiddleware
@@ -13,12 +12,13 @@ from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 from ai.backend.appproxy.coordinator.errors import InvalidSessionParameterError
 from ai.backend.appproxy.coordinator.models import Token
 from ai.backend.appproxy.coordinator.types import RootContext
+from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class TokenResponseModel(BaseModel):
+class TokenResponseModel(BackendAISchema):
     token: str
 
 
@@ -49,7 +49,7 @@ async def conf_v2(
             params.kernel_port,
             params.session.id,
             params.session.user_uuid,
-            params.session.group_id,
+            params.session.project_id,
             params.session.access_key,
             params.session.domain_name,
         )

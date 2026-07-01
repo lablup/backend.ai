@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from yarl import URL
 
+from ai.backend.appproxy.common.client_ip import ClientIPValidator
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.errors import ObjectNotFound, UnsupportedProtocol
 from ai.backend.appproxy.common.types import (
@@ -22,18 +24,16 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.coordinator.config import ServerConfig
 from ai.backend.appproxy.coordinator.errors import (
     InvalidCircuitConfigError,
-    InvalidCircuitStateError,
     MissingTraefikConfigError,
 )
-from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
+from ai.backend.common.types import RuntimeVariant
 
 from .base import (
     GUID,
     Base,
     BaseMixin,
     EnumType,
-    StrEnumType,
-    StructuredJSONObjectListColumn,
+    PydanticListColumn,
 )
 
 if TYPE_CHECKING:
@@ -79,8 +79,8 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
     )  # null if `app_mode` is set to `INFERENCE`
     endpoint_id: Mapped[UUID | None] = mapped_column(GUID, nullable=True)
     # null if `app_mode` is set to `INTERACTIVE`
-    runtime_variant: Mapped[RuntimeVariant | None] = mapped_column(
-        StrEnumType(RuntimeVariant), nullable=True
+    runtime_variant: Mapped[str | None] = mapped_column(
+        sa.String(length=64), nullable=True
     )  # null if `app_mode` is set to `INTERACTIVE`
 
     session_ids: Mapped[list[UUID]] = mapped_column(
@@ -89,7 +89,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         default=[],
     )
     route_info: Mapped[list[RouteInfo]] = mapped_column(
-        StructuredJSONObjectListColumn(RouteInfo), nullable=False, default=[]
+        PydanticListColumn(RouteInfo), nullable=False, default=[]
     )
 
     created_at: Mapped[datetime | None] = mapped_column(
@@ -295,10 +295,22 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         worker: Worker = self.worker_row
         return f"{worker.authority}:{self.port or self.subdomain}"
 
+    @cached_property
+    def _ip_validator(self) -> ClientIPValidator:
+        """Client-IP allowlist parsed once from ``allowed_client_ips``."""
+        return ClientIPValidator(self.allowed_client_ips)
+
     @property
     def traefik_rule(self) -> str:
         match self.protocol:
             case ProxyProtocol.TCP:
+                # TCP routers cannot use HTTP middlewares, so the allowlist is
+                # encoded into the router's ClientIP match rule: connections from
+                # other sources match no router and are dropped. Falls back to
+                # accepting any source when unrestricted.
+                ranges = self._ip_validator.ranges
+                if ranges:
+                    return "ClientIP(" + ", ".join(f"`{cidr}`" for cidr in ranges) + ")"
                 return "ClientIP(`0.0.0.0/0`)"
             case _:
                 match self.frontend_mode:
@@ -331,15 +343,21 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
     def traefik_routers(self) -> dict[str, Any]:
         match self.protocol:
             case ProxyProtocol.HTTP:
+                # The ipAllowList middleware must precede the auth plugins so that
+                # disallowed clients are rejected before any credential handling.
+                middlewares = ["CORSHeaders"]
+                ranges = self._ip_validator.ranges
+                if ranges:
+                    middlewares.append(f"bai_ipallowlist_{self.id}")
+                middlewares += [
+                    f"bai_appproxy_plugin_{self.id}",
+                    f"bai_appproxy_plugin_{self.id}_go",
+                ]
                 base = {
                     "rule": self.traefik_rule,
                     "service": f"bai_service_{self.id}",
                     "entrypoints": [self.traefik_entrypoint],
-                    "middlewares": [
-                        "CORSHeaders",
-                        f"bai_appproxy_plugin_{self.id}",
-                        f"bai_appproxy_plugin_{self.id}_go",
-                    ],
+                    "middlewares": middlewares,
                 }
                 if self.worker_row.tls_listen:
                     base["tls"] = ""
@@ -353,76 +371,6 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                     },
                 }
         return {}
-
-    @property
-    def healthy_routes(self) -> list[RouteInfo]:
-        """
-        Get only healthy routes for this circuit.
-
-        Health filtering is only applied for circuits in INFERENCE mode.
-        For other modes, all routes are considered healthy.
-
-        Returns:
-            List of healthy RouteInfo objects
-        """
-        # Only apply health filtering for circuits in INFERENCE mode
-        if self.app_mode != AppMode.INFERENCE or not self.endpoint_id:
-            # No health filtering, return all routes
-            return self.route_info
-
-        if not self.endpoint_row:
-            raise InvalidCircuitStateError("Endpoint row is not loaded for health filtering")
-        # Filter routes based on health status stored in JSON
-        healthy_routes = []
-        for route in self.route_info:
-            # Include routes that are explicitly healthy or have no health status (not health-checked)
-            if (
-                not self.endpoint_row.health_check_enabled
-                or route.health_status == ModelServiceStatus.HEALTHY
-            ):
-                healthy_routes.append(route)
-
-        return healthy_routes
-
-    def update_route_health_status(
-        self,
-        route_id: UUID,
-        health_status: ModelServiceStatus | None,
-        last_check_time: float | None = None,
-        consecutive_failures: int | None = None,
-    ) -> bool:
-        """
-        Update health status for a specific route in the circuit's route_info
-
-        Args:
-            route_id: ID of the route to update
-            health_status: New health status
-            last_check_time: Timestamp of last health check
-            consecutive_failures: Number of consecutive failures
-
-        Returns:
-            True if route was found and updated, False otherwise
-        """
-        for route in self.route_info:
-            if route.route_id == route_id:
-                did_update_status = False
-                if route.health_status != health_status:
-                    route.health_status = health_status
-                    did_update_status = True
-                if last_check_time is not None:
-                    route.last_health_check = last_check_time
-                if consecutive_failures is not None:
-                    route.consecutive_failures = consecutive_failures
-
-                # Mark the route_info column as modified for SQLAlchemy change tracking
-                # This is necessary because SQLAlchemy doesn't automatically detect
-                # changes to nested objects within JSON columns
-                from sqlalchemy.orm import attributes
-
-                attributes.flag_modified(self, "route_info")
-
-                return did_update_status
-        return False
 
     async def generate_jwt(
         self, db_sess: AsyncSession, jwt_secret: str, created_user: UUID, exp: datetime
@@ -440,50 +388,65 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
 
     @property
     def traefik_services(self) -> dict[str, Any]:
-        # Use health-aware route filtering
-        healthy_routes = self.healthy_routes
+        # Emit a single bai_service_{circuit.id} loadBalancer fanning traffic
+        # to every active-traffic route's kernel (manager already filters out
+        # routes with traffic_status != ACTIVE before publishing). We no longer
+        # split per session into weighted sub-services: per-route weighting is
+        # intentionally removed and will be reintroduced at the revision level
+        # once blue-green/canary rollout lands.
+        routes = self.route_info
 
-        # If no healthy routes, return empty config to remove from load balancer
-        if not healthy_routes:
+        # If no routes, return empty config to remove from load balancer
+        if not routes:
             return {}
 
-        base = {  # services should be inserted separately to prevent overwritting whole `services` prefix
-            f"bai_service_{self.id}": {
-                "weighted": {
-                    "services": [
-                        {
-                            "name": f"bai_session_{r.session_id}_{self.id}",
-                            "weight": int(r.traffic_ratio),
-                        }
-                        for r in healthy_routes
-                    ]
-                }
-            },
-        }
+        # Build Traefik loadBalancer.healthCheck directive from endpoint config
+        # so that Traefik probes kernels directly and ejects unhealthy replicas
+        # without the coordinator polling them itself. Applied once at the
+        # loadBalancer level (not per-route) now that we have a flat structure.
+        health_check_block: dict[str, Any] | None = None
+        if (
+            self.app_mode == AppMode.INFERENCE
+            and self.endpoint_row is not None
+            and self.endpoint_row.health_check_enabled
+            and self.endpoint_row.health_check_config is not None
+        ):
+            hc = self.endpoint_row.health_check_config
+            health_check_block = {
+                "path": hc.path,
+                "interval": f"{int(hc.interval)}s",
+                "timeout": f"{int(hc.max_wait_time)}s",
+            }
+
         match self.protocol:
             case ProxyProtocol.HTTP:
-                for r in healthy_routes:
-                    base.update({
-                        f"bai_session_{r.session_id}_{self.id}": {
-                            "loadBalancer": {
-                                "servers": [
-                                    {"url": f"http://{r.current_kernel_host}:{r.kernel_port}/"}
-                                ],
-                            }
-                        }
-                    })
+                load_balancer: dict[str, Any] = {
+                    "servers": [
+                        {"url": f"http://{r.current_kernel_host}:{r.kernel_port}/"} for r in routes
+                    ],
+                }
+                if health_check_block is not None:
+                    load_balancer["healthCheck"] = health_check_block
+                return {
+                    f"bai_service_{self.id}": {
+                        "loadBalancer": load_balancer,
+                    },
+                }
             case ProxyProtocol.TCP:
-                for r in healthy_routes:
-                    base.update({
-                        f"bai_session_{r.session_id}_{self.id}": {
-                            "loadBalancer": {
-                                "servers": [
-                                    {"address": f"{r.current_kernel_host}:{r.kernel_port}"}
-                                ],
-                            }
-                        }
-                    })
-        return base
+                # Traefik TCP services use a different healthCheck syntax; skip
+                # directive injection here and rely on the coordinator's existing
+                # behaviour for TCP circuits (follow-up PR will add TCP support).
+                return {
+                    f"bai_service_{self.id}": {
+                        "loadBalancer": {
+                            "servers": [
+                                {"address": f"{r.current_kernel_host}:{r.kernel_port}"}
+                                for r in routes
+                            ],
+                        },
+                    },
+                }
+        return {}
 
     def get_traefik_middlewares(self, local_config: ServerConfig) -> dict[str, Any]:
         match self.protocol:
@@ -492,7 +455,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 if not traefik_config:
                     raise MissingTraefikConfigError("Traefik configuration is required")
 
-                return {
+                middlewares: dict[str, Any] = {
                     "CORSHeaders": {
                         "headers": {
                             "accessControlAllowHeaders": "*",
@@ -522,4 +485,25 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                         }
                     },
                 }
+                ranges = self._ip_validator.ranges
+                if ranges:
+                    # ipAllowList matches against the IP Traefik selects per its
+                    # ipStrategy. Without a strategy Traefik uses the direct
+                    # connection address (correct when Traefik is directly
+                    # exposed); behind a load balancer, client_ip_strategy must
+                    # be configured so the real client IP is read from
+                    # X-Forwarded-For instead of the balancer's address.
+                    ip_allowlist: dict[str, Any] = {"sourceRange": ranges}
+                    strategy = traefik_config.client_ip_strategy
+                    if strategy is not None:
+                        if strategy.depth is not None:
+                            ip_allowlist["ipStrategy"] = {"depth": strategy.depth}
+                        elif strategy.excluded_ips:
+                            ip_allowlist["ipStrategy"] = {
+                                "excludedIPs": [str(net) for net in strategy.excluded_ips],
+                            }
+                    middlewares[f"bai_ipallowlist_{self.id}"] = {
+                        "ipAllowList": ip_allowlist,
+                    }
+                return middlewares
         return {}

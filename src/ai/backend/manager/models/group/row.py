@@ -122,6 +122,14 @@ container_registry_iv = t.Dict({}) | t.Dict({
 
 
 class AssocGroupUserRow(Base):  # type: ignore[misc]
+    """DEPRECATED -- scheduled for sunset.
+
+    Project membership is moving to ``association_scopes_entities`` (ASE) with
+    ``scope_type=PROJECT, entity_type=USER`` as the single source of truth. New
+    code MUST query ASE; do not add new readers or writers against this table.
+    The table itself will be dropped after every reader is migrated.
+    """
+
     __tablename__ = "association_groups_users"
     __table_args__ = (
         sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
@@ -147,8 +155,8 @@ class AssocGroupUserRow(Base):  # type: ignore[misc]
     group: Mapped[GroupRow] = relationship("GroupRow", back_populates="users")
 
 
-# NOTE: Deprecated legacy table reference for backward compatibility.
-# Use AssocGroupUserRow class directly for new code.
+# DEPRECATED: scheduled for sunset; project membership lives in
+# `association_scopes_entities`. Do not use in new code.
 association_groups_users = AssocGroupUserRow.__table__
 
 
@@ -256,7 +264,7 @@ class GroupRow(Base):  # type: ignore[misc]
             is_active=self.is_active,
             created_at=self.created_at,
             modified_at=self.modified_at,
-            integration_id=self.integration_id,
+            integration_name=self.integration_id,  # DB column is integration_id
             domain_name=self.domain_name,
             total_resource_slots=self.total_resource_slots,
             allowed_vfolder_hosts=self.allowed_vfolder_hosts,
@@ -373,7 +381,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
     domain_name: str
     type: str
 
-    _integration_id: str | None
+    _integration_name: str | None
     _total_resource_slots: ResourceSlot
     _allowed_vfolder_hosts: VFolderHostPermissionMap
     _dotfiles: bytes
@@ -388,8 +396,8 @@ class ProjectModel(RBACModel[ProjectPermission]):
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def integration_id(self) -> str | None:
-        return self._integration_id
+    def integration_name(self) -> str | None:
+        return self._integration_name
 
     @property
     @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
@@ -427,7 +435,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
             modified_at=row.modified_at,
             domain_name=row.domain_name,
             type=row.type,
-            _integration_id=row.integration_id,
+            _integration_name=row.integration_id,  # DB column is integration_id
             _total_resource_slots=row.total_resource_slots,
             _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             _dotfiles=row.dotfiles,

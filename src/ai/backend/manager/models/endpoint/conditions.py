@@ -5,26 +5,31 @@ from __future__ import annotations
 import uuid
 from collections.abc import Collection
 from datetime import datetime
-from typing import cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
 )
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class DeploymentConditions:
     """Query conditions for deployments."""
 
     @staticmethod
-    def by_ids(deployment_ids: Collection[uuid.UUID]) -> QueryCondition:
+    def by_ids(deployment_ids: Collection[DeploymentID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointRow.id.in_(deployment_ids)
 
@@ -82,10 +87,59 @@ class DeploymentConditions:
 
         return inner
 
+    by_name_in = staticmethod(make_string_in_factory(EndpointRow.name))
+    by_domain_name_in = staticmethod(make_string_in_factory(EndpointRow.domain))
+    by_tag_in = staticmethod(make_string_in_factory(EndpointRow.tag))
+    by_url_in = staticmethod(make_string_in_factory(EndpointRow.url))
+    by_resource_group_in = staticmethod(make_string_in_factory(EndpointRow.resource_group))
+
     @staticmethod
     def by_project_id(project_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointRow.project == project_id
+
+        return inner
+
+    @staticmethod
+    def by_created_user_id(user_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.created_user == user_id
+
+        return inner
+
+    @staticmethod
+    def by_project_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return EndpointRow.project != spec.value
+            return EndpointRow.project == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_project_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return EndpointRow.project.notin_(spec.values)
+            return EndpointRow.project.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_created_user_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return EndpointRow.created_user != spec.value
+            return EndpointRow.created_user == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_created_user_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return EndpointRow.created_user.notin_(spec.values)
+            return EndpointRow.created_user.in_(spec.values)
 
         return inner
 
@@ -142,16 +196,30 @@ class DeploymentConditions:
         return inner
 
     @staticmethod
-    def by_status_equals(status: ModelDeploymentStatus) -> QueryCondition:
+    def by_status_equals(lifecycle: EndpointLifecycle) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.lifecycle_stage == status
+            return EndpointRow.lifecycle_stage == lifecycle
 
         return inner
 
     @staticmethod
-    def by_status_in(statuses: Collection[ModelDeploymentStatus]) -> QueryCondition:
+    def by_status_in(lifecycles: Collection[EndpointLifecycle]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointRow.lifecycle_stage.in_(statuses)
+            return EndpointRow.lifecycle_stage.in_(lifecycles)
+
+        return inner
+
+    @staticmethod
+    def by_status_not_equals(lifecycle: EndpointLifecycle) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.lifecycle_stage != lifecycle
+
+        return inner
+
+    @staticmethod
+    def by_status_not_in(lifecycles: Collection[EndpointLifecycle]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.lifecycle_stage.not_in(lifecycles)
 
         return inner
 
@@ -159,6 +227,20 @@ class DeploymentConditions:
     def by_lifecycle_stages(statuses: Collection[EndpointLifecycle]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointRow.lifecycle_stage.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_scaling_state_in(states: Collection[ScalingState]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.scaling_state.in_(states)
+
+        return inner
+
+    @staticmethod
+    def by_sub_step_in(sub_steps: Collection[DeploymentLifecycleSubStep]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.sub_step.in_(sub_steps)
 
         return inner
 
@@ -274,6 +356,114 @@ class DeploymentConditions:
         return inner
 
     @staticmethod
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(EndpointRow.resource_group) == spec.value.lower()
+            else:
+                condition = EndpointRow.resource_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.resource_group.ilike(f"%{spec.value}%")
+            else:
+                condition = EndpointRow.resource_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.resource_group.ilike(f"{spec.value}%")
+            else:
+                condition = EndpointRow.resource_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointRow.resource_group.ilike(f"%{spec.value}")
+            else:
+                condition = EndpointRow.resource_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_created_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.created_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.created_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.created_at == dt
+
+        return inner
+
+    @staticmethod
+    def by_destroyed_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.destroyed_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_destroyed_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.destroyed_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_destroyed_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.destroyed_at == dt
+
+        return inner
+
+    @staticmethod
+    def by_destroyed_at_is_null() -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.destroyed_at.is_(None)
+
+        return inner
+
+    @staticmethod
+    def by_destroyed_at_is_not_null() -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointRow.destroyed_at.isnot(None)
+
+        return inner
+
+    @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
         """Cursor condition for forward pagination (after cursor).
 
@@ -329,38 +519,78 @@ class AccessTokenConditions:
 
     # Token string conditions
     @staticmethod
-    def by_token_equals(value: str) -> QueryCondition:
+    def by_token_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointTokenRow.token == value
+            if spec.case_insensitive:
+                condition = sa.func.lower(EndpointTokenRow.token) == spec.value.lower()
+            else:
+                condition = EndpointTokenRow.token == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_token_contains(value: str) -> QueryCondition:
+    def by_token_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return EndpointTokenRow.token.contains(value)
-
-        return inner
-
-    # valid_until datetime conditions
-    @staticmethod
-    def by_valid_until_before(dt: datetime) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(sa.sql.expression.ColumnElement[bool], EndpointTokenRow.valid_until < dt)
-
-        return inner
-
-    @staticmethod
-    def by_valid_until_after(dt: datetime) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(sa.sql.expression.ColumnElement[bool], EndpointTokenRow.valid_until > dt)
+            if spec.case_insensitive:
+                condition = EndpointTokenRow.token.ilike(f"%{spec.value}%")
+            else:
+                condition = EndpointTokenRow.token.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_valid_until_equals(dt: datetime) -> QueryCondition:
+    def by_token_starts_with(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(sa.sql.expression.ColumnElement[bool], EndpointTokenRow.valid_until == dt)
+            if spec.case_insensitive:
+                condition = EndpointTokenRow.token.ilike(f"{spec.value}%")
+            else:
+                condition = EndpointTokenRow.token.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_token_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = EndpointTokenRow.token.ilike(f"%{spec.value}")
+            else:
+                condition = EndpointTokenRow.token.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_token_in = staticmethod(make_string_in_factory(EndpointTokenRow.token))
+
+    # expires_at datetime conditions
+    @staticmethod
+    def by_expires_at_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointTokenRow.expires_at < dt
+
+        return inner
+
+    @staticmethod
+    def by_expires_at_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointTokenRow.expires_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_expires_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointTokenRow.expires_at == dt
 
         return inner
 
@@ -488,6 +718,20 @@ class AutoScalingRuleConditions:
     def by_last_triggered_at_equals(dt: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return EndpointAutoScalingRuleRow.last_triggered_at == dt
+
+        return inner
+
+    @staticmethod
+    def by_last_triggered_at_is_null() -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.last_triggered_at.is_(None)
+
+        return inner
+
+    @staticmethod
+    def by_last_triggered_at_is_not_null() -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return EndpointAutoScalingRuleRow.last_triggered_at.isnot(None)
 
         return inner
 

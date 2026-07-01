@@ -124,7 +124,8 @@ class AgentRow(Base):  # type: ignore[misc]
 
     def actual_occupied_slots(self) -> ResourceSlot:
         occupied = ResourceSlot()
-        for resource_row in self.agent_resource_rows:
+        sorted_rows = sorted(self.agent_resource_rows, key=lambda r: r.slot_type_row.rank)
+        for resource_row in sorted_rows:
             occupied[resource_row.slot_name] = resource_row.used
         return occupied
 

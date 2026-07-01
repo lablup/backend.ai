@@ -89,7 +89,9 @@ class ClusterModeEnum(StrEnum):
 class SessionStatusFilter(BaseRequestModel):
     """Filter for session status values."""
 
+    equals: SessionStatusEnum | None = None
     in_: list[SessionStatusEnum] | None = None
+    not_equals: SessionStatusEnum | None = None
     not_in: list[SessionStatusEnum] | None = None
 
 

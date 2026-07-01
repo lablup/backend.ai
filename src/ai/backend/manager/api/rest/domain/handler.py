@@ -82,7 +82,7 @@ class DomainHandler:
                 ),
                 allowed_vfolder_hosts=body.parsed.allowed_vfolder_hosts,
                 allowed_docker_registries=body.parsed.allowed_docker_registries,
-                integration_id=body.parsed.integration_id,
+                integration_name=body.parsed.integration_id,  # v1 DTO uses integration_id
             )
         )
         user_info = UserInfo(

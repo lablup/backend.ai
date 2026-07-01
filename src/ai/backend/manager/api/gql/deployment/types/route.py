@@ -37,6 +37,7 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -64,6 +65,7 @@ from ai.backend.manager.models.routing.row import RoutingRow
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
     from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
+    from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
 
 RouteStatusGQL: type[RouteStatusEnum] = gql_enum(
@@ -119,7 +121,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     @gql_field(description="The deployment this route belongs to.")  # type: ignore[misc]
     async def deployment(
         self, info: Info[StrawberryGQLContext]
-    ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
+    ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")] | None:
         """Resolve deployment using dataloader."""
         deployment_id = UUID(str(self.deployment_id))
         deployment_data = await info.context.data_loaders.deployment_loader.load(deployment_id)
@@ -128,7 +130,8 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         return deployment_data
 
     @gql_field(
-        description="The session associated with the route. Can be null if the route is still provisioning."
+        description="The session associated with the route. Can be null if the route is still provisioning.",
+        deprecation_reason="Use session_v2 instead.",
     )  # type: ignore[misc]
     async def session(self, info: Info[StrawberryGQLContext]) -> ID | None:
         """Return session global ID if available."""
@@ -138,6 +141,29 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
             ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
         )
         return ID(session_global_id)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The compute session associated with this route, resolved via DataLoader.",
+        )
+    )  # type: ignore[misc]
+    async def session_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            SessionV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.session.types"),
+        ]
+        | None
+    ):
+        if self.session_id is None:
+            return None
+        from ai.backend.common.types import SessionId
+
+        return await info.context.data_loaders.session_loader.load(
+            SessionId(UUID(str(self.session_id)))
+        )
 
     @gql_field(description="The revision associated with the route.")  # type: ignore[misc]
     async def revision(

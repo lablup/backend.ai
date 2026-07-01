@@ -38,10 +38,14 @@ from ai.backend.common.dto.manager.template.response import (
     SessionTemplateListItemDTO,
     UpdateSessionTemplateResponse,
 )
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.services.group.actions.resolve_project_id_by_name import (
+    ResolveProjectIdByNameAction,
+)
 from ai.backend.manager.services.template.actions.create_task_template import (
     CreateTaskTemplateAction,
     TaskTemplateItemInput,
@@ -60,6 +64,7 @@ from ai.backend.manager.services.template.actions.update_task_template import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.services.group.processors import GroupProcessors
     from ai.backend.manager.services.template.processors import TemplateProcessors
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -68,8 +73,24 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class SessionTemplateHandler:
     """Session template API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, template: TemplateProcessors) -> None:
+    def __init__(
+        self,
+        *,
+        template: TemplateProcessors,
+        group: GroupProcessors,
+    ) -> None:
         self._template = template
+        self._group = group
+
+    async def _resolve_project_id(self, domain_name: str, project_name: str) -> ProjectID:
+        result = await self._group.resolve_project_id_by_name.wait_for_complete(
+            ResolveProjectIdByNameAction(domain_name=domain_name, project_name=project_name)
+        )
+        if result.project_id is None:
+            raise InvalidAPIParameters(
+                f"No active group named {project_name!r} exists in domain {domain_name!r}"
+            )
+        return result.project_id
 
     async def create(
         self,
@@ -104,9 +125,10 @@ class SessionTemplateHandler:
             for st in payload
         ]
 
+        project_id = await self._resolve_project_id(domain, params.group)
         action = CreateTaskTemplateAction(
             domain_name=domain,
-            requesting_group=params.group,
+            requesting_project=project_id,
             requester_uuid=ctx.user_uuid,
             requester_access_key=ctx.access_key,
             requester_role=req.request["user"]["role"],
@@ -220,10 +242,11 @@ class SessionTemplateHandler:
             for st in payload
         ]
 
+        project_id = await self._resolve_project_id(domain, params.group)
         action = UpdateTaskTemplateAction(
             template_id=template_id,
             domain_name=domain,
-            requesting_group=params.group,
+            requesting_project=project_id,
             requester_uuid=ctx.user_uuid,
             requester_access_key=ctx.access_key,
             requester_role=req.request["user"]["role"],

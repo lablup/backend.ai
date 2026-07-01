@@ -9,85 +9,32 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 from ai.backend.common.types import (
     AgentId,
     BinarySize,
     ClusterMode,
+    KernelId,
     ResourceSlot,
     SessionId,
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.sokovan import AgentInfo
 
 from .exceptions import (
     ContainerLimitExceededError,
     InsufficientResourcesError,
+    NoAgentsInResourceGroupError,
     NoAvailableAgentError,
     NoCompatibleAgentError,
+    TrackerCompatibilityError,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
-    from ai.backend.manager.sokovan.data import AgentOccupancy
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class AgentInfo:
-    """Essential information about an agent for selection."""
-
-    # Unique identifier of the agent
-    agent_id: AgentId
-    # Network address of the agent
-    agent_addr: str
-    # Architecture of the agent (e.g., "x86_64", "aarch64")
-    architecture: str
-    # Available resource slots on the agent
-    available_slots: ResourceSlot
-    # Currently occupied resource slots
-    occupied_slots: ResourceSlot
-    # Scaling group the agent belongs to
-    scaling_group: str
-    # Number of containers currently running on the agent
-    container_count: int
-
-    @classmethod
-    def from_meta_and_occupancy(
-        cls,
-        meta: AgentMeta,
-        occupancy_map: Mapping[AgentId, AgentOccupancy],
-    ) -> AgentInfo:
-        """
-        Create an AgentInfo from agent metadata and occupancy mapping.
-
-        Args:
-            meta: Agent metadata containing static information
-            occupancy_map: Mapping of agent IDs to occupancy data
-
-        Returns:
-            AgentInfo instance with occupancy data looked up by agent ID
-        """
-        occupancy = occupancy_map.get(meta.id)
-        if occupancy:
-            occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in occupancy.occupied_slots})
-        else:
-            occupied = ResourceSlot()
-        return cls(
-            agent_id=meta.id,
-            agent_addr=meta.addr,
-            architecture=meta.architecture,
-            scaling_group=meta.scaling_group,
-            available_slots=meta.available_slots,
-            occupied_slots=occupied,
-            container_count=occupancy.container_count if occupancy else 0,
-        )
 
 
 @dataclass
@@ -157,7 +104,7 @@ class ResourceRequirements:
     # Kernel IDs that these requirements are for
     # For single-node, this includes all kernel IDs
     # For multi-node, this includes only one kernel ID
-    kernel_ids: Sequence[UUID]
+    kernel_ids: Sequence[KernelId]
 
 
 @dataclass
@@ -219,7 +166,7 @@ class AgentSelectionCriteria:
             # Use the common architecture
             architecture = list(architectures)[0]
             # Include all kernel IDs in the aggregated requirement
-            kernel_ids = list(self.kernel_requirements.keys())
+            kernel_ids = [KernelId(k) for k in self.kernel_requirements.keys()]
             return [
                 ResourceRequirements(
                     requested_slots=total_slots,
@@ -232,7 +179,7 @@ class AgentSelectionCriteria:
             ResourceRequirements(
                 requested_slots=req.requested_slots,
                 required_architecture=req.required_architecture,
-                kernel_ids=[kernel_id],
+                kernel_ids=[KernelId(kernel_id)],
             )
             for kernel_id, req in self.kernel_requirements.items()
         ]
@@ -343,9 +290,7 @@ class AgentSelector:
             # Return empty list for sessions with no kernels
             return []
         if not agents:
-            raise NoAvailableAgentError(
-                f"No agents available in scaling group '{criteria.session_metadata.scaling_group}'"
-            )
+            raise NoAgentsInResourceGroupError(criteria.session_metadata.scaling_group)
 
         # Track agent state changes as diffs using AgentStateTracker
         state_trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
@@ -407,8 +352,7 @@ class AgentSelector:
 
         # Second pass: filter by resource availability (quantitative check)
         compatible_trackers: list[AgentStateTracker] = []
-        error_messages: defaultdict[str, int] = defaultdict(int)
-        agent_errors: dict[AgentId, str] = {}
+        agent_errors: dict[AgentId, TrackerCompatibilityError] = {}
         for tracker in arch_compatible_trackers:
             try:
                 self._check_tracker_compatibility(
@@ -417,15 +361,16 @@ class AgentSelector:
                     config,
                 )
                 compatible_trackers.append(tracker)
-            except Exception as e:
-                error_messages[str(e)] += 1
-                agent_errors[tracker.original_agent.agent_id] = str(e)
+            except TrackerCompatibilityError as e:
+                agent_errors[tracker.original_agent.agent_id] = e
 
         if not compatible_trackers:
-            error_messages_summary = "; ".join(
-                f"{count}x {msg}" for msg, count in error_messages.items()
+            raise NoAvailableAgentError(
+                kernel_ids=resource_req.kernel_ids,
+                required_architecture=resource_req.required_architecture,
+                requested_slots=resource_req.requested_slots,
+                agent_errors=agent_errors,
             )
-            raise NoAvailableAgentError(f"no available agents. Details: {error_messages_summary}")
 
         # Handle designated agent first (user's explicit choice takes precedence)
         if designated_agent_ids:
@@ -433,15 +378,12 @@ class AgentSelector:
                 if tracker.original_agent.agent_id in designated_agent_ids:
                     return tracker
 
-            error_messages_list = []
-            for designated_agent_id in designated_agent_ids:
-                if designated_agent_id in agent_errors:
-                    error_messages_list.append(
-                        f"Designated agent '{designated_agent_id}' is not compatible. Details: {agent_errors[designated_agent_id]}"
-                    )
-            error_message = " ".join(error_messages) if error_messages else "not found"
             raise NoAvailableAgentError(
-                f"Designated agent '{designated_agent_ids}' is not compatible. Details: {error_message}"
+                kernel_ids=resource_req.kernel_ids,
+                required_architecture=resource_req.required_architecture,
+                requested_slots=resource_req.requested_slots,
+                agent_errors=agent_errors,
+                designated_agent_ids=designated_agent_ids,
             )
 
         # Third pass: deprioritize agents that previously failed for this session

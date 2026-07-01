@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import secrets
 import uuid
+from collections.abc import AsyncIterator
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import ConflictError, InvalidRequestError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.dto.manager.user import (
     CreateUserRequest,
     CreateUserResponse,
@@ -16,9 +20,17 @@ from ai.backend.common.dto.manager.user import (
     GetUserResponse,
     UserStatus,
 )
-from ai.backend.manager.models.group import association_groups_users
+from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import users
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import UserFactory
 
@@ -55,15 +67,17 @@ class TestUserCreateCrud:
         group_fixture: uuid.UUID,
         db_engine: SAEngine,
     ) -> None:
-        """S-3: User created with group_ids → verify association_groups_users mapping in DB."""
+        """S-3: User created with group_ids → verify association_scopes_entities mapping in DB."""
         result = await user_factory(group_ids=[str(group_fixture)])
 
         async with db_engine.begin() as conn:
             row = await conn.execute(
-                sa.select(association_groups_users).where(
+                sa.select(AssociationScopesEntitiesRow).where(
                     sa.and_(
-                        association_groups_users.c.group_id == str(group_fixture),
-                        association_groups_users.c.user_id == str(result.user.id),
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id == str(result.user.id),
                     )
                 )
             )
@@ -109,7 +123,7 @@ class TestUserCreateCrud:
     async def test_f_biz_1_duplicate_email_raises_conflict(
         self,
         user_factory: UserFactory,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         resource_policy_fixture: str,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
@@ -122,7 +136,7 @@ class TestUserCreateCrud:
                     email=existing.user.email,
                     username="another-username-xyz",
                     password="test-password-1234",
-                    domain_name=domain_fixture,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy=resource_policy_fixture,
                 )
             )
@@ -146,7 +160,7 @@ class TestUserCreateCrud:
 
     async def test_f_biz_3_nonexistent_resource_policy_raises_error(
         self,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         """F-BIZ-3: Non-existent resource_policy → ConflictError (409, FK violation)."""
@@ -156,7 +170,7 @@ class TestUserCreateCrud:
                     email="no-policy@test.local",
                     username="no-policy-user",
                     password="test-password-1234",
-                    domain_name=domain_fixture,
+                    domain_name=domain_fixture.domain_name,
                     resource_policy="nonexistent-policy-xyz",
                 )
             )
@@ -320,3 +334,171 @@ class TestUserDeleteCrud:
         # Second delete on already-deleted user is idempotent (UPDATE without status filter)
         result = await admin_registry.user.delete(DeleteUserRequest(user_id=created.user.id))
         assert result.success is True
+
+
+class TestUserCreateAutoAssignRoles:
+    """A new user receives the auto_assign roles of its initial scopes."""
+
+    async def _create_auto_assign_role_for_project(
+        self, conn: AsyncConnection, project_id: uuid.UUID, name: str
+    ) -> uuid.UUID:
+        """Insert an active auto_assign role bound to the given project scope."""
+        role_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(RoleRow.__table__).values(
+                id=role_id,
+                name=name,
+                status=RoleStatus.ACTIVE,
+                auto_assign=True,
+            )
+        )
+        await conn.execute(
+            sa.insert(AssociationScopesEntitiesRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=str(project_id),
+                entity_type=EntityType.ROLE,
+                entity_id=str(role_id),
+                relation_type=RelationType.AUTO,
+            )
+        )
+        return role_id
+
+    async def _delete_role(self, conn: AsyncConnection, role_id: uuid.UUID) -> None:
+        """Remove a role together with its user mappings and scope binding."""
+        await conn.execute(
+            UserRoleRow.__table__.delete().where(UserRoleRow.__table__.c.role_id == role_id)
+        )
+        await conn.execute(
+            AssociationScopesEntitiesRow.__table__.delete().where(
+                sa.and_(
+                    AssociationScopesEntitiesRow.__table__.c.entity_type == EntityType.ROLE,
+                    AssociationScopesEntitiesRow.__table__.c.entity_id == str(role_id),
+                )
+            )
+        )
+        await conn.execute(RoleRow.__table__.delete().where(RoleRow.__table__.c.id == role_id))
+
+    @pytest.fixture()
+    async def project_auto_assign_role(
+        self,
+        db_engine: SAEngine,
+        group_fixture: uuid.UUID,
+    ) -> AsyncIterator[uuid.UUID]:
+        """An active auto_assign role bound to the test project (group) scope."""
+        async with db_engine.begin() as conn:
+            role_id = await self._create_auto_assign_role_for_project(
+                conn, group_fixture, f"auto-project-{secrets.token_hex(4)}"
+            )
+        yield role_id
+        async with db_engine.begin() as conn:
+            await self._delete_role(conn, role_id)
+
+    @pytest.fixture()
+    async def model_store_project(
+        self,
+        db_engine: SAEngine,
+        domain_fixture: DomainFixtureData,
+        resource_policy_fixture: str,
+    ) -> AsyncIterator[uuid.UUID]:
+        """A model-store project in the test domain (new users auto-join it)."""
+        project_id = uuid.uuid4()
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.insert(GroupRow.__table__).values(
+                    id=project_id,
+                    name=f"model-store-{secrets.token_hex(4)}",
+                    description="Model Store",
+                    is_active=True,
+                    domain_name=domain_fixture.domain_name,
+                    resource_policy=resource_policy_fixture,
+                    type=ProjectType.MODEL_STORE,
+                )
+            )
+        yield project_id
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id)
+            )
+
+    @pytest.fixture()
+    async def model_store_auto_assign_role(
+        self,
+        db_engine: SAEngine,
+        model_store_project: uuid.UUID,
+    ) -> AsyncIterator[uuid.UUID]:
+        """An active auto_assign role bound to the model-store project scope."""
+        async with db_engine.begin() as conn:
+            role_id = await self._create_auto_assign_role_for_project(
+                conn, model_store_project, f"auto-modelstore-{secrets.token_hex(4)}"
+            )
+        yield role_id
+        async with db_engine.begin() as conn:
+            await self._delete_role(conn, role_id)
+
+    async def test_create_grants_project_scope_auto_assign_role(
+        self,
+        user_factory: UserFactory,
+        group_fixture: uuid.UUID,
+        project_auto_assign_role: uuid.UUID,
+        db_engine: SAEngine,
+    ) -> None:
+        """User created into a project is a scope member and gets its auto_assign role."""
+        result = await user_factory(group_ids=[str(group_fixture)])
+
+        async with db_engine.begin() as conn:
+            membership = (
+                await conn.execute(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(group_fixture),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id == str(result.user.id),
+                    )
+                )
+            ).fetchone()
+            role_mapping = (
+                await conn.execute(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id == result.user.id,
+                        UserRoleRow.role_id == project_auto_assign_role,
+                    )
+                )
+            ).fetchone()
+
+        assert membership is not None, "User should be a member of the project scope"
+        assert role_mapping is not None, "User should be mapped to the project's auto_assign role"
+
+    async def test_create_grants_model_store_auto_assign_role(
+        self,
+        user_factory: UserFactory,
+        model_store_project: uuid.UUID,
+        model_store_auto_assign_role: uuid.UUID,
+        db_engine: SAEngine,
+    ) -> None:
+        """A new user auto-joins the domain's model-store project and gets its auto_assign role."""
+        result = await user_factory()
+
+        async with db_engine.begin() as conn:
+            membership = (
+                await conn.execute(
+                    sa.select(AssociationScopesEntitiesRow).where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id == str(model_store_project),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id == str(result.user.id),
+                    )
+                )
+            ).fetchone()
+            role_mapping = (
+                await conn.execute(
+                    sa.select(UserRoleRow).where(
+                        UserRoleRow.user_id == result.user.id,
+                        UserRoleRow.role_id == model_store_auto_assign_role,
+                    )
+                )
+            ).fetchone()
+
+        assert membership is not None, "User should be a member of the model-store project scope"
+        assert role_mapping is not None, (
+            "User should be mapped to the model-store's auto_assign role"
+        )

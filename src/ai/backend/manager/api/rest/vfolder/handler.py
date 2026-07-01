@@ -97,7 +97,6 @@ from ai.backend.common.dto.manager.vfolder.response import (
     VFolderSharedInfoDTO,
     VolumeInfoDTO,
 )
-from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.types import ScopeType
@@ -176,7 +175,7 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
     GetFstabContentsAction,
     GetQuotaAction,
-    GetVFolderUsageAction,
+    GetVFolderUsageLegacyAction,
     GetVFolderUsedBytesAction,
     GetVolumePerfMetricAction,
     ListAllHostsAction,
@@ -276,8 +275,11 @@ class VFolderHandler:
             )
         except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
             raise InvalidAPIParameters(str(e)) from e
-        except BackendAIError as e:
-            raise InternalServerError(str(e)) from e
+        # Every other BackendAIError carries its own HTTP status (Forbidden ->
+        # 403, ProjectNotFound -> 404, VFolderCreationFailure -> 400); let it
+        # propagate so the exception middleware serializes the real error.
+        # Collapsing them into InternalServerError hid the actual cause behind
+        # a generic 500 "Internal server error." title.
 
         item = VFolderItemField(
             id=result.id.hex,
@@ -644,8 +646,8 @@ class VFolderHandler:
             ctx.user_email,
             params.id,
         )
-        result = await self._vfolder.get_usage.wait_for_complete(
-            GetVFolderUsageAction(
+        result = await self._vfolder.get_usage_legacy.wait_for_complete(
+            GetVFolderUsageLegacyAction(
                 folder_host=params.folder_host,
                 vfolder_id=str(VFolderID(vfolder_row["quota_scope_id"], params.id)),
                 unmanaged_path=vfolder_row["unmanaged_path"],
@@ -1088,7 +1090,7 @@ class VFolderHandler:
             invs_info.append(
                 VFolderInvitationDTO(
                     id=str(inv.id),
-                    inviter=inv.inviter_user_email,
+                    inviter=inv.inviter_user_email or inv.inviter_username or "",
                     invitee=inv.invitee_user_email,
                     perm=VFolderPermissionField(inv.mount_permission.value),
                     state=inv.status.value,
@@ -1189,7 +1191,7 @@ class VFolderHandler:
             invs.append(
                 VFolderInvitationDTO(
                     id=inv_json.get("id", ""),
-                    inviter=inv_json.get("inviter", ""),
+                    inviter=info.inviter_user_email or info.inviter_username or "",
                     invitee=inv_json.get("invitee", ""),
                     perm=VFolderPermissionField(info.mount_permission.value),
                     state=inv_json.get("state", ""),
@@ -1642,7 +1644,7 @@ class VFolderHandler:
             cloneable=params.cloneable,
             bgtask_id=str(result.bgtask_id),
         )
-        resp = VFolderCloneResponse(item=dto)
+        resp = VFolderCloneResponse(dto)
         return APIResponse.build(HTTPStatus.CREATED, resp)
 
     # ------------------------------------------------------------------

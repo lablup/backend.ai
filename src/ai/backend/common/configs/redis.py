@@ -2,16 +2,25 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from pydantic import AliasChoices, BaseModel, Field, field_serializer, field_validator
+from pydantic import AliasChoices, Field, field_serializer, field_validator
 
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import (
+    BackendAISchema,
+    RedisProfileTarget,
+    ValkeyProfileTarget,
+    ValkeyTarget,
+)
 from ai.backend.common.types import RedisHelperConfig as RedisHelperConfigDict
-from ai.backend.common.types import RedisProfileTarget, ValkeyProfileTarget, ValkeyTarget
 from ai.backend.common.types import RedisTarget as _RedisTarget
 
 
-class RedisHelperConfig(BaseModel):
+class RedisHelperConfig(BackendAISchema):
     socket_timeout: Annotated[
         float,
         Field(
@@ -90,7 +99,7 @@ class RedisHelperConfig(BaseModel):
         )
 
 
-class SingleRedisConfig(BaseModel):
+class SingleRedisConfig(BackendAISchema):
     addr: Annotated[
         HostPortPairModel | None,
         Field(default=None),
@@ -143,13 +152,31 @@ class SingleRedisConfig(BaseModel):
         Field(default=None),
         BackendAIConfigMeta(
             description=(
-                "Password for authenticating with Redis. "
+                "Password for authenticating with Redis master. "
                 "Set to None if Redis doesn't require authentication. "
                 "Should be kept secret in production environments."
             ),
             added_version="25.13.0",
             secret=True,
             example=ConfigExample(local="", prod="REDIS_PASSWORD"),
+        ),
+    ]
+    sentinel_password: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("sentinel_password", "sentinel-password"),
+            serialization_alias="sentinel-password",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Password for authenticating with Redis Sentinel nodes. "
+                "If None, falls back to the master password. "
+                "Set explicitly when Sentinel nodes use a different password than the master."
+            ),
+            added_version="26.4.2",
+            secret=True,
+            example=ConfigExample(local="", prod="REDIS_SENTINEL_PASSWORD"),
         ),
     ]
     request_timeout: Annotated[
@@ -256,6 +283,7 @@ class SingleRedisConfig(BaseModel):
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
+            sentinel_password=self.sentinel_password,
             redis_helper_config=self.redis_helper_config.to_dict(),
         )
 
@@ -274,6 +302,7 @@ class SingleRedisConfig(BaseModel):
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
+            sentinel_password=self.sentinel_password,
             request_timeout=self.request_timeout,
         )
 
@@ -316,6 +345,7 @@ class RedisConfig(SingleRedisConfig):
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
+            sentinel_password=self.sentinel_password,
             redis_helper_config=self.redis_helper_config.to_dict(),
             override_targets=override_targets,
         )
@@ -338,6 +368,7 @@ class RedisConfig(SingleRedisConfig):
             sentinel=sentinel_addrs,
             service_name=self.service_name,
             password=self.password,
+            sentinel_password=self.sentinel_password,
             override_targets=override_targets,
             request_timeout=self.request_timeout,
         )

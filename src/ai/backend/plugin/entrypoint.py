@@ -92,8 +92,6 @@ _optimized_glob_search_patterns = {
     "backendai_error_monitor_v20": ["ai/backend/*", "ai/backend/appproxy/*"],
     "backendai_hook_v20": ["ai/backend/*"],
     "backendai_webapp_v20": ["ai/backend/*"],
-    "backendai_scheduler_v10": ["ai/backend/manager"],
-    "backendai_agentselector_v10": ["ai/backend/manager"],
 }
 
 

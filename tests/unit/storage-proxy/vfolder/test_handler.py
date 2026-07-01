@@ -10,7 +10,7 @@ import pytest
 from aiohttp import web
 from aiohttp.web import StreamResponse
 
-from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType, VFolderID
+from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType, VFolderID, VolumeID
 from ai.backend.storage.api.vfolder.handler import VFolderHandler, VFolderServiceProtocol
 from ai.backend.storage.volumes.types import (
     QuotaScopeKey,
@@ -27,7 +27,7 @@ UUID2 = uuid.UUID("123e4567-e89b-12d3-a456-426614174002")
 
 class MockVFolderService(VFolderServiceProtocol):
     @override
-    async def get_volume(self, volume_id: uuid.UUID) -> VolumeMeta:
+    async def get_volume(self, volume_id: VolumeID) -> VolumeMeta:
         return VolumeMeta(
             volume_id=volume_id,
             backend="vfs",
@@ -39,8 +39,8 @@ class MockVFolderService(VFolderServiceProtocol):
     @override
     async def get_volumes(self) -> list[VolumeMeta]:
         volumes = {
-            UUID1: {"backend": "vfs", "path": "/mnt/volume1", "fsprefix": "vfs-test-1"},
-            UUID2: {"backend": "nfs", "path": "/mnt/volume2", "fsprefix": "nfs-test-2"},
+            VolumeID(UUID1): {"backend": "vfs", "path": "/mnt/volume1", "fsprefix": "vfs-test-1"},
+            VolumeID(UUID2): {"backend": "nfs", "path": "/mnt/volume2", "fsprefix": "nfs-test-2"},
         }
         return [
             VolumeMeta(

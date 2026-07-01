@@ -14,6 +14,7 @@ import pytest
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
@@ -91,6 +92,7 @@ class TestFairShareRepository:
                 ScalingGroupForProjectRow,
                 AssocGroupUserRow,
                 AgentRow,
+                ContainerRegistryRow,
                 ImageRow,
                 SessionRow,
                 KernelRow,

@@ -15,6 +15,7 @@ class CreateDeploymentAction(DeploymentBaseAction):
     """Action to create a new deployment(Model Service)."""
 
     creator: NewDeploymentCreator
+    auto_activate: bool
 
     @override
     def entity_id(self) -> str | None:

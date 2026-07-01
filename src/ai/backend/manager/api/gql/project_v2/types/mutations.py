@@ -5,13 +5,13 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.group.request import (
-    CreateGroupInput as CreateGroupInputDTO,
+    CreateProjectInput as CreateProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.request import (
     UnassignUsersFromProjectInput as UnassignUsersFromProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.request import (
-    UpdateGroupInput as UpdateGroupInputDTO,
+    UpdateProjectInput as UpdateProjectInputDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     DeleteProjectPayload as DeleteProjectPayloadDTO,
@@ -28,7 +28,6 @@ from ai.backend.common.dto.manager.v2.group.response import (
 from ai.backend.common.dto.manager.v2.group.response import (
     UnassignUsersFromProjectPayload as UnassignUsersFromProjectPayloadDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -47,17 +46,18 @@ UNSET = None
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for creating a new project.",
-    )
+    ),
+    name="CreateProjectInput",
 )
-class CreateProjectInputGQL(PydanticInputMixin[CreateGroupInputDTO]):
+class CreateProjectInputGQL(PydanticInputMixin[CreateProjectInputDTO]):
     """Input for creating a new project."""
 
     name: str = gql_field(description="Project name. Must be unique within the domain.")
     domain_name: str = gql_field(description="Name of the domain this project belongs to.")
     description: str | None = gql_field(default=UNSET, description="Optional description.")
-    integration_id: str | None = gql_field(
+    integration_name: str | None = gql_field(
         default=UNSET, description="External integration identifier."
     )
     resource_policy: str | None = gql_field(
@@ -67,17 +67,18 @@ class CreateProjectInputGQL(PydanticInputMixin[CreateGroupInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for updating project information. All fields optional.",
-    )
+    ),
+    name="UpdateProjectInput",
 )
-class UpdateProjectInputGQL(PydanticInputMixin[UpdateGroupInputDTO]):
+class UpdateProjectInputGQL(PydanticInputMixin[UpdateProjectInputDTO]):
     """Input for updating project information."""
 
     name: str | None = gql_field(default=UNSET, description="New project name.")
     description: str | None = gql_field(default=UNSET, description="New description.")
     is_active: bool | None = gql_field(default=UNSET, description="Updated active status.")
-    integration_id: str | None = gql_field(
+    integration_name: str | None = gql_field(
         default=UNSET, description="New external integration identifier."
     )
     resource_policy: str | None = gql_field(default=UNSET, description="New resource policy name.")
@@ -88,10 +89,11 @@ class UpdateProjectInputGQL(PydanticInputMixin[UpdateGroupInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for project mutation responses.",
     ),
     model=ProjectPayloadDTO,
+    name="ProjectPayload",
 )
 class ProjectPayloadGQL(PydanticOutputMixin[ProjectPayloadDTO]):
     """Payload for project create/update mutations."""
@@ -101,10 +103,11 @@ class ProjectPayloadGQL(PydanticOutputMixin[ProjectPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for project deletion mutation.",
     ),
     model=DeleteProjectPayloadDTO,
+    name="DeleteProjectPayload",
 )
 class DeleteProjectPayloadGQL(PydanticOutputMixin[DeleteProjectPayloadDTO]):
     """Payload for project soft-delete."""
@@ -114,10 +117,11 @@ class DeleteProjectPayloadGQL(PydanticOutputMixin[DeleteProjectPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for project permanent deletion mutation.",
     ),
     model=PurgeProjectPayloadDTO,
+    name="PurgeProjectPayload",
 )
 class PurgeProjectPayloadGQL(PydanticOutputMixin[PurgeProjectPayloadDTO]):
     """Payload for project permanent purge."""
@@ -130,7 +134,7 @@ class PurgeProjectPayloadGQL(PydanticOutputMixin[PurgeProjectPayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Input for unassigning users from a project.",
     ),
     name="UnassignUsersFromProjectInput",
@@ -143,7 +147,7 @@ class UnassignUsersFromProjectInputGQL(PydanticInputMixin[UnassignUsersFromProje
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Error information for a user that failed to be unassigned.",
     ),
     model=UnassignUserErrorDTO,
@@ -158,7 +162,7 @@ class UnassignUserErrorGQL(PydanticOutputMixin[UnassignUserErrorDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Payload for user unassignment from project.",
     ),
     model=UnassignUsersFromProjectPayloadDTO,

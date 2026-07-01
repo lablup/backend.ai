@@ -28,11 +28,10 @@ def test_parse_build() -> None:
                         "mgr": "ai.backend.manager.cli.__main__:main",
                         "mgr.start-server": "ai.backend.manager.server:main",
                     },
-                    "backendai_scheduler_v10": {
-                        "fifo": "ai.backend.manager.scheduler.fifo:FIFOSlotScheduler",
-                        "lifo": "ai.backend.manager.scheduler.fifo:LIFOSlotScheduler",
-                        "drf": "ai.backend.manager.scheduler.drf:DRFScheduler",
-                        "mof": "ai.backend.manager.scheduler.mof:MOFScheduler",
+                    "backendai_hook_v20": {
+                        "totp": "ai.backend.manager.plugin.totp.hook:TOTPHook",
+                        "openid": "ai.backend.manager.plugin.openid.hook:OIDCHookPlugin",
+                        "auth_keypair": "ai.backend.manager.plugin.keypair.hook:KeypairAuthHookPlugin",
                     },
                     "backendai_error_monitor_v20": {
                         "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorMonitor",
@@ -59,26 +58,21 @@ def test_parse_build() -> None:
             "ai.backend.manager.server",
             "main",
         )
-        items = [*extract_entrypoints_from_buildscript("backendai_scheduler_v10", p)]
+        items = [*extract_entrypoints_from_buildscript("backendai_hook_v20", p)]
         assert (items[0].name, items[0].module, items[0].attr) == (
-            "fifo",
-            "ai.backend.manager.scheduler.fifo",
-            "FIFOSlotScheduler",
+            "totp",
+            "ai.backend.manager.plugin.totp.hook",
+            "TOTPHook",
         )
         assert (items[1].name, items[1].module, items[1].attr) == (
-            "lifo",
-            "ai.backend.manager.scheduler.fifo",
-            "LIFOSlotScheduler",
+            "openid",
+            "ai.backend.manager.plugin.openid.hook",
+            "OIDCHookPlugin",
         )
         assert (items[2].name, items[2].module, items[2].attr) == (
-            "drf",
-            "ai.backend.manager.scheduler.drf",
-            "DRFScheduler",
-        )
-        assert (items[3].name, items[3].module, items[3].attr) == (
-            "mof",
-            "ai.backend.manager.scheduler.mof",
-            "MOFScheduler",
+            "auth_keypair",
+            "ai.backend.manager.plugin.keypair.hook",
+            "KeypairAuthHookPlugin",
         )
         items = [*extract_entrypoints_from_buildscript("backendai_error_monitor_v20", p)]
         assert (items[0].name, items[0].module, items[0].attr) == (
@@ -91,7 +85,5 @@ def test_parse_build() -> None:
 def test_match_blocklist() -> None:
     assert match_plugin_list("ai.backend.manager:abc", {"ai.backend.manager"})
     assert not match_plugin_list("ai.backend.manager:abc", {"ai.backend.agent"})
-    assert match_plugin_list(
-        "ai.backend.manager.scheduler.fifo:FIFOScheduler", {"ai.backend.manager"}
-    )
+    assert match_plugin_list("ai.backend.manager.plugin.totp.hook:TOTPHook", {"ai.backend.manager"})
     assert not match_plugin_list("ai.backend.common.monitor:ErrorMonitor", {"ai.backend.manager"})

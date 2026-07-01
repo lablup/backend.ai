@@ -9,13 +9,16 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.scaling_group.types import (
     ResourceInfo,
     ScalingGroupData,
     ScalingGroupListResult,
 )
+from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -116,6 +119,14 @@ class ScalingGroupDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == name)
+            resource_group_id = await db_sess.scalar(query)
+            if resource_group_id is None:
+                raise ScalingGroupNotFound(name)
+            return resource_group_id
+
     async def get_scaling_group_by_name(
         self,
         name: str,
@@ -202,6 +213,64 @@ class ScalingGroupDBSource:
             if result is None:
                 raise ScalingGroupNotFound(f"Scaling group not found (name:{updater.pk_value})")
             return result.row.to_dataclass()
+
+    async def replace_default_deployment_options(
+        self,
+        name: ResourceGroupName,
+        options: DeploymentOptions,
+    ) -> DeploymentOptions:
+        """Fully replace the ``default_deployment_options`` JSONB column
+        and return the stored value in a single ``UPDATE ... RETURNING``
+        round-trip.
+
+        The column is typed as ``PydanticColumn(DeploymentOptions)`` so
+        the domain model is persisted verbatim.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        async with self._db.begin_session() as session:
+            stmt = (
+                sa.update(ScalingGroupRow)
+                .where(ScalingGroupRow.name == name)
+                .values(default_deployment_options=options)
+                .returning(ScalingGroupRow.default_deployment_options)
+            )
+            result = await session.execute(stmt)
+            row = result.first()
+            if row is None:
+                raise ScalingGroupNotFound(f"Scaling group not found (name:{name})")
+            stored: DeploymentOptions = row[0]
+            return stored
+
+    async def replace_default_session_options(
+        self,
+        name: ResourceGroupName,
+        options: DefaultSessionOptions,
+    ) -> DefaultSessionOptions:
+        """Fully replace the ``default_session_options`` JSONB column
+        and return the stored value in a single ``UPDATE ... RETURNING``
+        round-trip.
+
+        The column is typed as ``PydanticColumn(DefaultSessionOptions)``
+        so the domain model is persisted verbatim.
+
+        Raises:
+            ScalingGroupNotFound: If the scaling group does not exist.
+        """
+        async with self._db.begin_session() as session:
+            stmt = (
+                sa.update(ScalingGroupRow)
+                .where(ScalingGroupRow.name == name)
+                .values(default_session_options=options)
+                .returning(ScalingGroupRow.default_session_options)
+            )
+            result = await session.execute(stmt)
+            row = result.first()
+            if row is None:
+                raise ScalingGroupNotFound(f"Scaling group not found (name:{name})")
+            stored: DefaultSessionOptions = row[0]
+            return stored
 
     async def associate_scaling_group_with_domains(
         self,

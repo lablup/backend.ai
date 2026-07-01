@@ -7,52 +7,75 @@ Tests verify service layer business logic using mocked repositories.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.config import ModelDefinition
-from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.config import ModelDefinitionDraft
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
+    MintEndpointTokenResponse,
+)
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
 )
+from ai.backend.manager.clients.appproxy.client import AppProxyClient, AppProxyClientPool
+from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.creator import (
     ModelRevisionCreator,
     VFolderMountsCreator,
 )
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
-    DeploymentConfig,
     DeploymentInfo,
     DeploymentMetadata,
-    DeploymentNetworkSpec,
+    DeploymentNetworkData,
+    DeploymentOptions,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
     DeploymentState,
+    ExecutionData,
     ExecutionSpec,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRuntimeConfigData,
-    ReplicaSpec,
+    PresetAttributionData,
+    ReplicaData,
     ResourceConfigData,
     ResourceSpec,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     RollingUpdateSpec,
 )
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.creators import EndpointTokenCreatorSpec
+from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
+    CreateAccessTokenAction,
+)
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     SearchDeploymentPoliciesAction,
     UpsertDeploymentPolicyAction,
@@ -61,11 +84,12 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
     AddModelRevisionAction,
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.deployment.service import DeploymentService
-from ai.backend.manager.sokovan.deployment import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
+from ai.backend.manager.services.deployment.service import (
+    DeploymentService,
+    _convert_deployment_info_to_data,
+    _convert_deployment_info_to_legacy_data,
 )
+from ai.backend.manager.sokovan.deployment import DeploymentController
 
 
 class DeploymentServiceBaseFixtures:
@@ -82,31 +106,22 @@ class DeploymentServiceBaseFixtures:
         return MagicMock(spec=DeploymentController)
 
     @pytest.fixture
-    def mock_revision_generator_registry(self) -> MagicMock:
-        """Mock RevisionGeneratorRegistry for testing."""
-        return MagicMock(spec=RevisionGeneratorRegistry)
-
-    @pytest.fixture
-    def mock_model_definition_generator_registry(self) -> AsyncMock:
-        """Mock ModelDefinitionGeneratorRegistry."""
-        registry = AsyncMock()
-        registry.generate_model_definition.return_value = ModelDefinition()
-        return registry
+    def mock_appproxy_client_pool(self) -> MagicMock:
+        """Mock AppProxyClientPool for testing."""
+        return MagicMock(spec=AppProxyClientPool)
 
     @pytest.fixture
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
-        mock_revision_generator_registry: MagicMock,
-        mock_model_definition_generator_registry: AsyncMock,
+        mock_appproxy_client_pool: MagicMock,
     ) -> DeploymentService:
         """Create DeploymentService with mock dependencies."""
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
-            revision_generator_registry=mock_revision_generator_registry,
-            model_definition_generator_registry=mock_model_definition_generator_registry,
+            appproxy_client_pool=mock_appproxy_client_pool,
         )
 
     @pytest.fixture
@@ -119,6 +134,7 @@ class DeploymentServiceBaseFixtures:
                 rbac=RBACValidators(
                     scope=MagicMock(spec=ScopeActionRBACValidator),
                     single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
+                    bulk=MagicMock(spec=BulkActionRBACValidator),
                 ),
             ),
         )
@@ -202,7 +218,7 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
         mock_deployment_repository.upsert_deployment_policy.assert_called_once()
         upserter_arg = mock_deployment_repository.upsert_deployment_policy.call_args[0][0]
         spec = upserter_arg.spec
-        assert spec.endpoint_id == endpoint_id
+        assert spec.deployment_id == endpoint_id
         assert spec.strategy == DeploymentStrategy.ROLLING
 
     async def test_upsert_deployment_policy_update(
@@ -327,21 +343,14 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     """Fixtures for model revision tests."""
 
     @pytest.fixture(autouse=True)
-    def _setup_revision_generator(self, mock_revision_generator_registry: MagicMock) -> None:
-        """Set up mock revision generator to return no deployment config by default."""
-        mock_generator = MagicMock()
-        mock_generator.load_deployment_config = AsyncMock(return_value=None)
-        mock_revision_generator_registry.get.return_value = mock_generator
-
-    @pytest.fixture(autouse=True)
     def _setup_default_repository_mocks(
         self,
         mock_deployment_repository: MagicMock,
-        endpoint_info: DeploymentInfo,
+        deployment_info: DeploymentInfo,
         revision_data: ModelRevisionData,
     ) -> None:
         """Set up default mock responses for repository methods used in add_model_revision."""
-        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=deployment_info)
         mock_deployment_repository.create_revision_with_next_number = AsyncMock(
             return_value=revision_data
         )
@@ -359,9 +368,10 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
         return uuid.uuid4()
 
     @pytest.fixture
-    def endpoint_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
+    def deployment_info(self, deployment_id: uuid.UUID) -> DeploymentInfo:
         return DeploymentInfo(
-            id=deployment_id,
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
+            id=DeploymentID(deployment_id),
             metadata=DeploymentMetadata(
                 name="test-deployment",
                 domain="default",
@@ -374,11 +384,14 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
             ),
             state=DeploymentState(
                 lifecycle=EndpointLifecycle.READY,
+                scaling_state=ScalingState.STABLE,
                 retry_count=0,
             ),
-            replica_spec=ReplicaSpec(replica_count=1),
-            network=DeploymentNetworkSpec(open_to_public=False),
-            model_revisions=[],
+            replica=ReplicaData(replica_count=1, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
+            options=DeploymentOptions(),
         )
 
     @pytest.fixture
@@ -386,7 +399,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
         self, image_id: uuid.UUID, model_vfolder_id: uuid.UUID
     ) -> ModelRevisionCreator:
         return ModelRevisionCreator(
-            image_id=image_id,
+            image_id=ImageID(image_id),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -394,25 +407,28 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 resource_opts={"shmem": "1g"},
             ),
             mounts=VFolderMountsCreator(
-                model_vfolder_id=model_vfolder_id,
+                model_vfolder_id=VFolderUUID(model_vfolder_id),
                 model_definition_path="model-definition.yaml",
                 model_mount_destination="/models",
+                extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
                 startup_command="python serve.py",
                 bootstrap_script="pip install -r requirements.txt",
                 environ={"CUDA_VISIBLE_DEVICES": "0"},
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 callback_url=None,
             ),
-            model_definition=ModelDefinition(),
+            model_definition=ModelDefinitionDraft(),
         )
 
     @pytest.fixture
     def revision_data(self, image_id: uuid.UUID, model_vfolder_id: uuid.UUID) -> ModelRevisionData:
         return ModelRevisionData(
-            id=uuid.uuid4(),
-            name="rev-1",
+            id=DeploymentRevisionID(uuid.uuid4()),
+            deployment_id=DeploymentID(uuid.uuid4()),
+            revision_number=1,
             cluster_config=ClusterConfigData(
                 mode=ClusterMode.SINGLE_NODE,
                 size=1,
@@ -422,14 +438,22 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 resource_slot=ResourceSlot({"cpu": "4", "mem": "8g"}),
             ),
             model_runtime_config=ModelRuntimeConfigData(
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
             ),
             model_mount_config=ModelMountConfigData(
-                vfolder_id=model_vfolder_id,
+                vfolder_id=VFolderUUID(model_vfolder_id),
                 mount_destination="/models",
                 definition_path="model-definition.yaml",
+                extra_mounts=[],
+                model_mount_perm=MountPermission.READ_ONLY,
             ),
-            image_id=image_id,
+            image_id=ImageID(image_id),
+            execution=ExecutionData(
+                startup_command=None,
+                bootstrap_script=None,
+                callback_url=None,
+            ),
+            revision_preset=PresetAttributionData(preset_id=None, values=[]),
             created_at=datetime(2024, 1, 1, tzinfo=UTC),
         )
 
@@ -439,7 +463,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
     ) -> ModelRevisionCreator:
         """Creator with None environ and resource_opts for edge case testing."""
         return ModelRevisionCreator(
-            image_id=image_id,
+            image_id=ImageID(image_id),
             resource_spec=ResourceSpec(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
@@ -447,236 +471,305 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 resource_opts=None,
             ),
             mounts=VFolderMountsCreator(
-                model_vfolder_id=model_vfolder_id,
+                model_vfolder_id=VFolderUUID(model_vfolder_id),
+                model_definition_path=None,
+                model_mount_destination="/models",
+                extra_mounts=[],
+                model_mount_perm=None,
             ),
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant.VLLM,
+                runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                 environ=None,
             ),
-            model_definition=ModelDefinition(),
+            model_definition=ModelDefinitionDraft(),
         )
 
 
 class TestAddModelRevision(ModelRevisionFixtures):
-    """Tests for DeploymentService.add_model_revision"""
+    """Tests for DeploymentService.add_model_revision — now delegates to controller."""
 
-    async def test_add_model_revision_first_revision(
+    @pytest.fixture
+    def requester(self) -> UserData:
+        return UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+
+    @pytest.fixture(autouse=True)
+    def set_user_context(self, requester: UserData) -> Iterator[None]:
+        with with_user(requester):
+            yield
+
+    async def test_add_model_revision_delegates_to_controller(
         self,
         processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
+        mock_deployment_controller: MagicMock,
         deployment_id: uuid.UUID,
-        endpoint_info: DeploymentInfo,
+        requester: UserData,
         revision_creator: ModelRevisionCreator,
         revision_data: ModelRevisionData,
     ) -> None:
-        """Adding the first revision should delegate to create_revision_with_next_number."""
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
+        """add_model_revision delegates to the controller with the current user as requester.
+
+        The service resolves the requesting user from the request context and
+        forwards it as ``requester_id``; the controller owns the projection onto
+        ``RevisionDraft`` + ``MountMetadata`` + ``preset_id`` and the optional
+        activation step.
+        """
+        mock_deployment_controller.add_deployment_revision = AsyncMock(return_value=revision_data)
+
+        action = AddModelRevisionAction(
+            model_deployment_id=DeploymentID(deployment_id),
+            adder=revision_creator,
+            auto_activate=False,
+        )
         result = await processors.add_model_revision.wait_for_complete(action)
 
         assert result.revision == revision_data
-        mock_deployment_repository.get_endpoint_info.assert_called_once_with(deployment_id)
-        mock_deployment_repository.create_revision_with_next_number.assert_called_once()
-
-        call_args = mock_deployment_repository.create_revision_with_next_number.call_args
-        creator_arg = call_args[0][0]
-        endpoint_id_arg = call_args[0][1]
-        spec = creator_arg.spec
-        assert endpoint_id_arg == deployment_id
-        assert spec.image_id == revision_creator.image_id
-        assert spec.resource_group == endpoint_info.metadata.resource_group
-        assert spec.model_id == revision_creator.mounts.model_vfolder_id
-        assert spec.runtime_variant == RuntimeVariant.VLLM
-
-    async def test_add_model_revision_maps_resource_fields(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-    ) -> None:
-        """All fields from ModelRevisionCreator should be mapped to the spec correctly."""
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
-        await processors.add_model_revision.wait_for_complete(action)
-
-        creator_arg = mock_deployment_repository.create_revision_with_next_number.call_args[0][0]
-        spec = creator_arg.spec
-        assert spec.resource_slots == ResourceSlot(revision_creator.resource_spec.resource_slots)
-        assert spec.resource_opts == revision_creator.resource_spec.resource_opts
-        assert spec.cluster_mode == revision_creator.resource_spec.cluster_mode.value
-        assert spec.cluster_size == revision_creator.resource_spec.cluster_size
-        assert spec.model_mount_destination == revision_creator.mounts.model_mount_destination
-        assert spec.model_definition_path == revision_creator.mounts.model_definition_path
-        assert spec.model_definition == revision_creator.model_definition
-        assert spec.startup_command == revision_creator.execution.startup_command
-        assert spec.bootstrap_script == revision_creator.execution.bootstrap_script
-        assert spec.environ == revision_creator.execution.environ
-        assert spec.callback_url is None
-        assert spec.extra_mounts == ()
-
-    async def test_add_model_revision_with_none_environ(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator_with_none_environ: ModelRevisionCreator,
-    ) -> None:
-        """None environ and resource_opts should be converted to empty dict."""
-        action = AddModelRevisionAction(
-            model_deployment_id=deployment_id, adder=revision_creator_with_none_environ
+        mock_deployment_controller.add_deployment_revision.assert_awaited_once_with(
+            deployment_id=deployment_id,
+            revision=revision_creator,
+            requester_id=requester.user_id,
+            auto_activate=False,
         )
-        await processors.add_model_revision.wait_for_complete(action)
 
-        creator_arg = mock_deployment_repository.create_revision_with_next_number.call_args[0][0]
-        spec = creator_arg.spec
-        assert spec.environ == {}
-        assert spec.resource_opts == {}
 
-    @pytest.fixture
-    def sample_model_definition(self) -> ModelDefinition:
-        return ModelDefinition.model_validate({
-            "models": [
-                {
-                    "name": "test-model",
-                    "model-path": "/models",
-                    "service": {"start-command": "serve", "port": 8000},
-                }
-            ]
-        })
+class TestCreateAccessToken(DeploymentServiceBaseFixtures):
+    """Regression tests for DeploymentService.create_access_token (BA-5881).
+
+    The previous implementation persisted ``secrets.token_urlsafe(32)`` as the
+    deployment access token, which app-proxy worker rejects with 401 because
+    it expects a coordinator-signed JWT. These tests pin the new contract:
+    the service must call the app-proxy coordinator to mint a JWT, persist it
+    via the CreatorSpec, and return it to the caller.
+    """
 
     @pytest.fixture
-    def revision_creator_with_model_definition(
+    def deployment_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def session_owner_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def project_id(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def deployment_info(
         self,
-        image_id: uuid.UUID,
-        model_vfolder_id: uuid.UUID,
-        sample_model_definition: ModelDefinition,
-    ) -> ModelRevisionCreator:
-        return ModelRevisionCreator(
-            image_id=image_id,
-            resource_spec=ResourceSpec(
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                cluster_size=1,
-                resource_slots={"cpu": "4"},
+        deployment_id: uuid.UUID,
+        session_owner_id: uuid.UUID,
+        project_id: uuid.UUID,
+    ) -> DeploymentInfo:
+        return DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
+            id=DeploymentID(deployment_id),
+            metadata=DeploymentMetadata(
+                name="ba5881-test",
+                domain="default",
+                project=project_id,
+                resource_group="default",
+                created_user=uuid.uuid4(),
+                session_owner=session_owner_id,
+                created_at=datetime(2024, 1, 1, tzinfo=UTC),
+                revision_history_limit=10,
             ),
-            mounts=VFolderMountsCreator(model_vfolder_id=model_vfolder_id),
-            execution=ExecutionSpec(runtime_variant=RuntimeVariant.VLLM),
-            model_definition=sample_model_definition,
+            state=DeploymentState(
+                lifecycle=EndpointLifecycle.READY,
+                scaling_state=ScalingState.STABLE,
+                retry_count=0,
+            ),
+            replica=ReplicaData(replica_count=1, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
+            options=DeploymentOptions(),
         )
-
-    async def test_add_model_revision_stores_resolved_model_definition(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        mock_model_definition_generator_registry: AsyncMock,
-        deployment_id: uuid.UUID,
-        revision_creator_with_model_definition: ModelRevisionCreator,
-        sample_model_definition: ModelDefinition,
-    ) -> None:
-        """Resolved model_definition (from generator registry) should be stored in the DB spec."""
-        mock_model_definition_generator_registry.generate_model_definition.return_value = (
-            sample_model_definition
-        )
-
-        action = AddModelRevisionAction(
-            model_deployment_id=deployment_id, adder=revision_creator_with_model_definition
-        )
-        await processors.add_model_revision.wait_for_complete(action)
-
-        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        assert spec.model_definition is not None
-        assert spec.model_definition == sample_model_definition
-
-
-class TestDeploymentConfigMerge(ModelRevisionFixtures):
-    """Tests for deployment config merging in revision creation."""
 
     @pytest.fixture
-    def setup_mock_deployment_config(
-        self, mock_revision_generator_registry: MagicMock
-    ) -> Callable[[DeploymentConfig], None]:
-        """Factory fixture to inject a deployment config into the mock generator registry."""
-
-        def _setup(deployment_config: DeploymentConfig) -> None:
-            mock_generator = MagicMock()
-            mock_generator.load_deployment_config = AsyncMock(return_value=deployment_config)
-            mock_revision_generator_registry.get.return_value = mock_generator
-
-        return _setup
-
-    async def test_merge_environ_from_deployment_config(
-        self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
-    ) -> None:
-        """Deployment config environ should be merged with creator environ as base."""
-        setup_mock_deployment_config(
-            DeploymentConfig(
-                environ={"SERVICE_VAR": "from_def", "CUDA_VISIBLE_DEVICES": "1"},
-            )
+    def sample_proxy_target(self) -> ScalingGroupProxyTarget:
+        return ScalingGroupProxyTarget(
+            addr="http://app-proxy.local:10200",
+            api_token="proxy-api-token",
         )
 
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
-        await processors.add_model_revision.wait_for_complete(action)
+    @pytest.fixture
+    def sample_coordinator_jwt(self) -> str:
+        # The exact bytes are irrelevant; the test only cares that this string
+        # round-trips from the (mocked) coordinator into the persisted token.
+        return "eyJhbGciOiJIUzI1NiJ9.coordinator-signed-payload.signature"
 
-        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        # Creator value overrides deployment config for overlapping keys
-        assert spec.environ["CUDA_VISIBLE_DEVICES"] == "0"
-        # Deployment config provides new keys
-        assert spec.environ["SERVICE_VAR"] == "from_def"
-
-    async def test_merge_resource_slots_from_deployment_config(
+    @pytest.fixture
+    def sample_token_row(
         self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
-    ) -> None:
-        """Deployment config resource_slots should be merged with creator slots as base."""
-        setup_mock_deployment_config(
-            DeploymentConfig(
-                resource_slots={"cpu": "2", "mem": "4g", "cuda.shares": "1.0"},
-            )
+        sample_coordinator_jwt: str,
+    ) -> MagicMock:
+        row = MagicMock()
+        row.id = uuid.uuid4()
+        row.token = sample_coordinator_jwt
+        row.endpoint = DeploymentID(deployment_id)
+        row.expires_at = None
+        row.created_at = datetime(2024, 1, 1, tzinfo=UTC)
+        return row
+
+    @pytest.fixture
+    def configure_repository(
+        self,
+        mock_deployment_repository: MagicMock,
+        deployment_info: DeploymentInfo,
+        sample_proxy_target: ScalingGroupProxyTarget,
+        sample_token_row: MagicMock,
+    ) -> MagicMock:
+        mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=deployment_info)
+        mock_deployment_repository.fetch_scaling_group_proxy_targets = AsyncMock(
+            return_value={deployment_info.metadata.resource_group: sample_proxy_target}
+        )
+        mock_deployment_repository.create_access_token = AsyncMock(return_value=sample_token_row)
+        return mock_deployment_repository
+
+    @pytest.fixture
+    def mock_appproxy_client_pool(self, sample_coordinator_jwt: str) -> MagicMock:
+        client = MagicMock(spec=AppProxyClient)
+        client.mint_endpoint_token = AsyncMock(
+            return_value=MintEndpointTokenResponse(token=sample_coordinator_jwt)
+        )
+        pool = MagicMock(spec=AppProxyClientPool)
+        pool.load_client = MagicMock(return_value=client)
+        return pool
+
+    @pytest.fixture
+    def deployment_service(
+        self,
+        mock_deployment_controller: MagicMock,
+        mock_deployment_repository: MagicMock,
+        mock_appproxy_client_pool: MagicMock,
+    ) -> DeploymentService:
+        return DeploymentService(
+            deployment_controller=mock_deployment_controller,
+            deployment_repository=mock_deployment_repository,
+            appproxy_client_pool=mock_appproxy_client_pool,
         )
 
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
-        await processors.add_model_revision.wait_for_complete(action)
-
-        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        expected = ResourceSlot({"cpu": "4", "mem": "8g", "cuda.shares": "1.0"})
-        assert spec.resource_slots == expected
-
-    async def test_no_deployment_config_uses_creator_values_as_is(
+    async def test_persists_coordinator_jwt_instead_of_random(
         self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
+        deployment_service: DeploymentService,
+        configure_repository: MagicMock,
         deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
+        sample_coordinator_jwt: str,
     ) -> None:
-        """When no deployment config exists, creator values are used unchanged."""
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
-        await processors.add_model_revision.wait_for_complete(action)
+        """Regression: BA-5881. The token persisted via the CreatorSpec must
+        be the JWT returned by the app-proxy coordinator, not a locally
+        generated random string. If this fails, ``./bai deployment access-token
+        create`` is producing tokens that app-proxy worker rejects with 401.
+        """
+        action = CreateAccessTokenAction(
+            creator=ModelDeploymentAccessTokenCreator(
+                model_deployment_id=DeploymentID(deployment_id),
+                expires_at=datetime(2099, 1, 1, tzinfo=UTC),
+            ),
+        )
+        result = await deployment_service.create_access_token(action)
 
-        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        assert spec.environ == revision_creator.execution.environ
-        assert spec.resource_slots == ResourceSlot(revision_creator.resource_spec.resource_slots)
+        assert result.data.token == sample_coordinator_jwt
 
-    async def test_deployment_config_with_empty_fields_no_effect(
+        repo_call = configure_repository.create_access_token.await_args
+        assert repo_call is not None
+        creator = cast(RBACEntityCreator[object], repo_call.args[0])
+        spec = cast(EndpointTokenCreatorSpec, creator.spec)
+        assert spec.token == sample_coordinator_jwt
+
+
+class TestConvertDeploymentInfoToData:
+    """Regression test for ``_convert_deployment_info_to_data`` (BA-5963)."""
+
+    @pytest.fixture
+    def make_revision_data(self) -> Callable[[int], ModelRevisionData]:
+        def make(revision_number: int) -> ModelRevisionData:
+            return ModelRevisionData(
+                id=DeploymentRevisionID(uuid.uuid4()),
+                deployment_id=DeploymentID(uuid.uuid4()),
+                revision_number=revision_number,
+                cluster_config=ClusterConfigData(
+                    mode=ClusterMode.SINGLE_NODE,
+                    size=1,
+                ),
+                resource_config=ResourceConfigData(
+                    resource_group_name="default",
+                    resource_slot=ResourceSlot({"cpu": "1"}),
+                ),
+                model_runtime_config=ModelRuntimeConfigData(
+                    runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
+                ),
+                model_mount_config=ModelMountConfigData(
+                    vfolder_id=VFolderUUID(uuid.uuid4()),
+                    mount_destination="/models",
+                    definition_path="model-definition.yaml",
+                    extra_mounts=[],
+                    model_mount_perm=MountPermission.READ_ONLY,
+                ),
+                created_at=datetime(2024, 1, 1, tzinfo=UTC),
+                image_id=ImageID(uuid.uuid4()),
+                execution=ExecutionData(
+                    startup_command=None,
+                    bootstrap_script=None,
+                    callback_url=None,
+                ),
+                revision_preset=PresetAttributionData(preset_id=None, values=[]),
+            )
+
+        return make
+
+    def test_current_revision_resolved_by_id_match_not_list_order(
         self,
-        processors: DeploymentProcessors,
-        mock_deployment_repository: MagicMock,
-        deployment_id: uuid.UUID,
-        revision_creator: ModelRevisionCreator,
-        setup_mock_deployment_config: Callable[[DeploymentConfig], None],
+        make_revision_data: Callable[[int], ModelRevisionData],
     ) -> None:
-        """Deployment config with None environ/resource_slots should not affect creator."""
-        setup_mock_deployment_config(DeploymentConfig(environ=None, resource_slots=None))
+        """Pin: revision lookup must use explicit ``current_revision_id``, not list[0]."""
+        deploying_data = make_revision_data(1)
+        current_data = make_revision_data(2)
 
-        action = AddModelRevisionAction(model_deployment_id=deployment_id, adder=revision_creator)
-        await processors.add_model_revision.wait_for_complete(action)
+        deployment_info = DeploymentInfo(
+            primary_replica_group_id=ReplicaGroupID(uuid.uuid4()),
+            id=DeploymentID(uuid.uuid4()),
+            metadata=DeploymentMetadata(
+                name="ba5963-test",
+                domain="default",
+                project=uuid.uuid4(),
+                resource_group="default",
+                created_user=uuid.uuid4(),
+                session_owner=uuid.uuid4(),
+                created_at=datetime(2024, 1, 1, tzinfo=UTC),
+                revision_history_limit=10,
+            ),
+            state=DeploymentState(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                scaling_state=ScalingState.STABLE,
+                retry_count=0,
+            ),
+            replica=ReplicaData(replica_count=1, desired_replica_count=None),
+            network=DeploymentNetworkData(
+                open_to_public=False, access_token_ids=None, url=None, preferred_domain_name=None
+            ),
+            options=DeploymentOptions(),
+            current_revision_id=current_data.id,
+            deploying_revision_id=deploying_data.id,
+            current_revision=current_data,
+            deploying_revision=deploying_data,
+        )
 
-        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
-        assert spec.environ == revision_creator.execution.environ
-        assert spec.resource_slots == ResourceSlot(revision_creator.resource_spec.resource_slots)
+        deployment_data = _convert_deployment_info_to_data(deployment_info)
+
+        assert deployment_data.current_revision_id == current_data.id
+        assert deployment_data.deploying_revision_id == deploying_data.id
+        assert deployment_data.current_revision_id != deployment_data.deploying_revision_id
+
+        # The full current revision now lives on the legacy (REST v1) projection.
+        legacy_data = _convert_deployment_info_to_legacy_data(deployment_info)
+        assert legacy_data.revision is not None
+        assert legacy_data.revision.id == current_data.id

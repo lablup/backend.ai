@@ -344,30 +344,28 @@ class TestVFolderInviteAcceptReject:
     Scenario file: vfolder/invitation.md — S-4, S-5, S-6, F-ACCEPT-1, F-REJECT-1.
     """
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="Server bug: ObjectNotFound.__init__() receives unsupported 'object_id' kwarg "
-        "when user system role is missing (repository.py:812)",
-    )
     async def test_invitee_accepts_invitation(
         self,
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
         vfolder_factory: VFolderFactory,
         regular_user_fixture: Any,
+        user_system_role: uuid.UUID,
         db_engine: SAEngine,
     ) -> None:
         """S-4: Invitee accepts → state becomes ACCEPTED, vfolder_permissions row created."""
         vf = await vfolder_factory()
-        invite_result = await admin_registry.vfolder.invite(
+        # invite() returns the invited emails, not invitation ids, so the invitee
+        # looks up the actual invitation id via list_invitations before accepting.
+        await admin_registry.vfolder.invite(
             vf["name"],
             InviteVFolderReq(
                 permission=VFolderPermissionField.READ_ONLY,
                 emails=[regular_user_fixture.email],
             ),
         )
-        assert len(invite_result.invited_ids) == 1
-        inv_id = invite_result.invited_ids[0]
+        invitations = await user_registry.vfolder.list_invitations()
+        inv_id = invitations.invitations[0].id
 
         accept_result = await user_registry.vfolder.accept_invitation(
             AcceptInvitationReq(inv_id=inv_id),
@@ -384,6 +382,33 @@ class TestVFolderInviteAcceptReject:
             ).first()
             assert row is not None
             assert row.state == VFolderInvitationState.ACCEPTED
+
+    async def test_accept_fails_when_invitee_has_no_system_role(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        regular_user_fixture: Any,
+    ) -> None:
+        """Accepting an invitation fails with a 5xx UserSystemRoleNotProvisioned error
+        when the invitee is missing the RBAC SYSTEM role (a server-side data-integrity
+        condition). Note: the user_system_role fixture is intentionally omitted here."""
+        vf = await vfolder_factory()
+        await admin_registry.vfolder.invite(
+            vf["name"],
+            InviteVFolderReq(
+                permission=VFolderPermissionField.READ_ONLY,
+                emails=[regular_user_fixture.email],
+            ),
+        )
+        invitations = await user_registry.vfolder.list_invitations()
+        inv_id = invitations.invitations[0].id
+
+        with pytest.raises(BackendAPIError) as exc_info:
+            await user_registry.vfolder.accept_invitation(
+                AcceptInvitationReq(inv_id=inv_id),
+            )
+        assert exc_info.value.status >= 500
 
     async def test_invitee_rejects_invitation(
         self,

@@ -7,9 +7,14 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class PrometheusQueryPresetConditions:
@@ -68,6 +73,28 @@ class PrometheusQueryPresetConditions:
                 condition = PrometheusQueryPresetRow.name.ilike(f"%{spec.value}")
             else:
                 condition = PrometheusQueryPresetRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_name_in = staticmethod(make_string_in_factory(PrometheusQueryPresetRow.name))
+
+    @staticmethod
+    def by_category_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.ColumnElement[bool]:
+            condition = PrometheusQueryPresetRow.category_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_category_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.ColumnElement[bool]:
+            condition = PrometheusQueryPresetRow.category_id.in_(spec.values)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition

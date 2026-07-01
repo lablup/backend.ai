@@ -4,12 +4,12 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, override
 
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
     ResourceSlot,
-    RuntimeVariant,
 )
 from ai.backend.manager.data.model_serving.modifier import ExtraMount, ImageRef
 from ai.backend.manager.models.endpoint import EndpointAutoScalingRuleRow, EndpointRow
@@ -38,8 +38,8 @@ class EndpointUpdaterSpec(UpdaterSpec[EndpointRow]):
         default_factory=OptionalState[list[ExtraMount]].nop
     )
     environ: TriState[dict[str, str]] = field(default_factory=TriState[dict[str, str]].nop)
-    runtime_variant: OptionalState[RuntimeVariant] = field(
-        default_factory=OptionalState[RuntimeVariant].nop
+    runtime_variant_id: OptionalState[RuntimeVariantID] = field(
+        default_factory=OptionalState[RuntimeVariantID].nop
     )
 
     @property
@@ -76,7 +76,7 @@ class EndpointUpdaterSpec(UpdaterSpec[EndpointRow]):
             self.model_definition_path.optional_value() is not None,
             self.extra_mounts.optional_value() is not None,
             self.environ.optional_value() is not None,
-            self.runtime_variant.optional_value() is not None,
+            self.runtime_variant_id.optional_value() is not None,
         ])
 
 
@@ -105,8 +105,19 @@ class EndpointAutoScalingRuleUpdaterSpec(UpdaterSpec[EndpointAutoScalingRuleRow]
         to_update: dict[str, Any] = {}
         self.metric_source.update_dict(to_update, "metric_source")
         self.metric_name.update_dict(to_update, "metric_name")
-        self.threshold.update_dict(to_update, "threshold")
-        self.comparator.update_dict(to_update, "comparator")
+        # Convert legacy threshold+comparator to DB min/max_threshold columns
+        threshold_val = self.threshold.optional_value()
+        comparator_val = self.comparator.optional_value()
+        if threshold_val is not None and comparator_val is not None:
+            if comparator_val in (
+                AutoScalingMetricComparator.GREATER_THAN,
+                AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL,
+            ):
+                to_update["max_threshold"] = threshold_val
+            else:
+                to_update["min_threshold"] = threshold_val
+        elif threshold_val is not None:
+            to_update["max_threshold"] = threshold_val
         self.step_size.update_dict(to_update, "step_size")
         self.cooldown_seconds.update_dict(to_update, "cooldown_seconds")
         self.min_replicas.update_dict(to_update, "min_replicas")

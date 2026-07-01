@@ -1,6 +1,6 @@
 """Validator for pending session count limits."""
 
-from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
+from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
 from .exceptions import PendingSessionCountLimitExceeded
 from .validator import ValidatorRule
@@ -40,5 +40,5 @@ class PendingSessionCountLimitValidator(ValidatorRule):
         # Check if creating this session would exceed the limit
         if current_pending_count >= pending_count_limit:
             raise PendingSessionCountLimitExceeded(
-                f"You cannot create more than {pending_count_limit} pending session(s)."
+                max_pending_session_count=pending_count_limit,
             )

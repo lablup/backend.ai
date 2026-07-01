@@ -169,3 +169,79 @@ def delete(access_key: str) -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+@keypair.group(name="ssh")
+def ssh() -> None:
+    """Admin SSH keypair commands (register/get/delete a user's SSH keypair)."""
+
+
+@ssh.command(name="register")
+@click.option("--access-key", required=True, type=str, help="Target access key.")
+@click.option(
+    "--public-key-file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    help="Path to PEM-encoded SSH public key file.",
+)
+@click.option(
+    "--private-key-file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    help="Path to PEM-encoded SSH private key file.",
+)
+def ssh_register(access_key: str, public_key_file: str, private_key_file: str) -> None:
+    """Register (overwrite) a user's SSH keypair (superadmin only)."""
+    from pathlib import Path
+
+    from ai.backend.common.dto.manager.v2.keypair.request import AdminRegisterSSHKeypairInput
+
+    ssh_public_key = Path(public_key_file).read_text(encoding="utf-8")
+    ssh_private_key = Path(private_key_file).read_text(encoding="utf-8")
+    input_dto = AdminRegisterSSHKeypairInput(
+        access_key=access_key,
+        ssh_public_key=ssh_public_key,
+        ssh_private_key=ssh_private_key,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.keypair.admin_register_ssh_keypair(input_dto)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@ssh.command(name="get")
+@click.argument("access_key")
+def ssh_get(access_key: str) -> None:
+    """Get a user's SSH public key (superadmin only)."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.keypair.admin_get_ssh_keypair(access_key)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@ssh.command(name="delete")
+@click.argument("access_key")
+def ssh_delete(access_key: str) -> None:
+    """Clear a user's SSH keypair (superadmin only)."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.keypair.admin_delete_ssh_keypair(access_key)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

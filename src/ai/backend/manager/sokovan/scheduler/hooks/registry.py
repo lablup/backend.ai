@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.plugin.network import NetworkPluginContext
 
 from .status import (
     RunningHookDependencies,
@@ -23,9 +22,6 @@ from .status import (
     TerminatedTransitionHook,
 )
 
-if TYPE_CHECKING:
-    from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
@@ -33,10 +29,9 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 class HookRegistryArgs:
     """Arguments for creating HookRegistry."""
 
-    scheduler_repository: SchedulerRepository
-    deployment_repository: DeploymentRepository
     agent_client_pool: AgentClientPool
-    event_producer: EventProducer
+    network_plugin_ctx: NetworkPluginContext
+    config_provider: ManagerConfigProvider
 
 
 class HookRegistry:
@@ -56,17 +51,15 @@ class HookRegistry:
         """Initialize status-based hooks."""
         # RUNNING transition hook
         running_deps = RunningHookDependencies(
-            scheduler_repository=args.scheduler_repository,
             agent_client_pool=args.agent_client_pool,
-            deployment_repository=args.deployment_repository,
-            event_producer=args.event_producer,
         )
         self._status_hooks[SessionStatus.RUNNING] = RunningTransitionHook(running_deps)
 
         # TERMINATED transition hook
         terminated_deps = TerminatedHookDependencies(
-            deployment_repository=args.deployment_repository,
-            event_producer=args.event_producer,
+            agent_client_pool=args.agent_client_pool,
+            network_plugin_ctx=args.network_plugin_ctx,
+            config_provider=args.config_provider,
         )
         self._status_hooks[SessionStatus.TERMINATED] = TerminatedTransitionHook(terminated_deps)
 

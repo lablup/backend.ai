@@ -165,6 +165,42 @@ If the package content varies by the target platform, use:
     >   src/ai/backend/runner:dist
     $ ls -l dist/*.whl
 
+Building scie executables
+-------------------------
+
+Each component exposes ``…:<name>`` (lazy) and ``…:<name>-fat`` (eager)
+``pex_binary`` targets that PEX bundles into a `scie
+<https://github.com/a-scie/jump>`_ self-contained executable. For example:
+
+.. code-block:: console
+
+    $ pants package src/ai/backend/client:backendai-client-fat
+    $ ls -l dist/backendai-client-fat
+
+During the build, PEX delegates to the ``science`` binary, which downloads
+``scie-jump``, ``ptex``, and the embedded Python interpreter from GitHub.
+Anonymous GitHub requests are rate-limited per IP; when the limit is hit, the
+``science-fat-<platform>.sha256`` or ``scie-jump-…sha256`` URL returns an HTML
+error page and the build fails with a checksum mismatch where the expected
+digest looks like ``<!DOCTYPE…`` instead of a hex string.
+
+To avoid this on local machines, export a GitHub Personal Access Token (a
+read-only token works — only public release assets are fetched) and let Pants
+forward it to its subprocesses. ``pants.toml`` already declares
+``SCIENCE_AUTH_GITHUB_COM_BEARER`` and ``SCIENCE_AUTH_API_GITHUB_COM_BEARER``
+under ``[subprocess-environment]``, so all you need is to provide the values.
+The easiest place is the (gitignored) ``.pants.env`` file at the repo root:
+
+.. code-block:: bash
+
+    # .pants.env
+    SCIENCE_AUTH_GITHUB_COM_BEARER=ghp_xxx...      # for scie-jump / ptex / science downloads
+    SCIENCE_AUTH_API_GITHUB_COM_BEARER=ghp_xxx...  # for python-build-standalone release listing
+
+Alternatively, export the same variables in your shell profile. Either way the
+``science`` subprocess will authenticate to ``github.com`` and
+``api.github.com`` and the digest URLs will return the real ``.sha256`` body.
+
 Using IDEs and editors
 ----------------------
 

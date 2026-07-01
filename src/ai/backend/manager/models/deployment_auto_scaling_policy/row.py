@@ -10,6 +10,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.base import (
@@ -52,7 +53,7 @@ class DeploymentAutoScalingPolicyRow(Base):  # type: ignore[misc]
     id: Mapped[UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    endpoint: Mapped[UUID] = mapped_column("endpoint", GUID, nullable=False)
+    endpoint: Mapped[DeploymentID] = mapped_column("endpoint", GUID, nullable=False)
 
     # Replica bounds (always enforced)
     min_replicas: Mapped[int] = mapped_column(

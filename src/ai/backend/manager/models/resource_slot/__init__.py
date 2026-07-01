@@ -1,5 +1,8 @@
 from .row import (
     AgentResourceRow,
+    DeploymentRevisionResourceSlotRow,
+    ModelCardResourceRequirementRow,
+    PresetResourceSlotRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
@@ -9,5 +12,8 @@ __all__ = (
     "ResourceSlotTypeRow",
     "AgentResourceRow",
     "ResourceAllocationRow",
+    "ModelCardResourceRequirementRow",
+    "PresetResourceSlotRow",
+    "DeploymentRevisionResourceSlotRow",
     "NumberFormat",
 )

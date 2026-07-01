@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from pydantic import BaseModel as PydanticBaseModel
+from ai.backend.common.types import BackendAISchema
 
-if TYPE_CHECKING:
-    from pydantic import BaseModel
-
-NEXT_RELEASE_VERSION = "UNRELEASED"
+NEXT_RELEASE_VERSION = "26.7.0"
 """Placeholder for the next release version.
 
 Used in GQL type decorators for newly added types/fields that have not yet
@@ -166,7 +163,7 @@ class BackendAIGQLMeta(BackendAIFieldMeta):
 
 
 def get_field_meta(
-    model: type[BaseModel],
+    model: type[BackendAISchema],
     field_name: str,
 ) -> BackendAIFieldMeta | None:
     """Retrieve BackendAI metadata for a field.
@@ -183,7 +180,7 @@ def get_field_meta(
         The BackendAIFieldMeta instance if found, None otherwise.
 
     Example:
-        >>> class MyConfig(BaseModel):
+        >>> class MyConfig(BackendAISchema):
         ...     name: Annotated[str, Field(), BackendAIConfigMeta(
         ...         description="Config name",
         ...         added_version="25.1.0",
@@ -203,7 +200,7 @@ def get_field_meta(
     return None
 
 
-def get_field_type(model: type[BaseModel], field_name: str) -> type | None:
+def get_field_type(model: type[BackendAISchema], field_name: str) -> type | None:
     """Get the actual type of a field.
 
     In Pydantic v2, Annotated types are already unwrapped by the time they're
@@ -217,7 +214,7 @@ def get_field_type(model: type[BaseModel], field_name: str) -> type | None:
         The underlying type of the field, or None if field doesn't exist.
 
     Example:
-        >>> class MyConfig(BaseModel):
+        >>> class MyConfig(BackendAISchema):
         ...     name: Annotated[str, Field()]
         >>> get_field_type(MyConfig, "name")
         <class 'str'>
@@ -231,7 +228,7 @@ def get_field_type(model: type[BaseModel], field_name: str) -> type | None:
 
 
 def generate_example(
-    model: type[BaseModel],
+    model: type[BackendAISchema],
     field_name: str,
     env: ConfigEnvironment = ConfigEnvironment.LOCAL,
 ) -> str:
@@ -272,7 +269,7 @@ def generate_example(
 
 
 def generate_composite_example(
-    model: type[BaseModel],
+    model: type[BackendAISchema],
     env: ConfigEnvironment = ConfigEnvironment.LOCAL,
 ) -> dict[str, Any]:
     """Recursively generate example for composite types from child fields.
@@ -288,7 +285,7 @@ def generate_composite_example(
         A dictionary mapping field names to their example values.
 
     Example:
-        >>> class SessionConfig(BaseModel):
+        >>> class SessionConfig(BackendAISchema):
         ...     cpu: Annotated[int, BackendAIConfigMeta(
         ...         description="CPU cores", added_version="25.1.0",
         ...         example=ConfigExample(local="2", prod="8")
@@ -313,7 +310,7 @@ def generate_composite_example(
             if (
                 child_type is not None
                 and isinstance(child_type, type)
-                and issubclass(child_type, PydanticBaseModel)
+                and issubclass(child_type, BackendAISchema)
             ):
                 result[name] = generate_composite_example(child_type, env)
         else:
@@ -325,7 +322,7 @@ def generate_composite_example(
 
 
 def generate_model_example(
-    model: type[BaseModel],
+    model: type[BackendAISchema],
     env: ConfigEnvironment = ConfigEnvironment.LOCAL,
 ) -> dict[str, Any]:
     """Generate example for entire model by collecting all field examples.
@@ -340,7 +337,7 @@ def generate_model_example(
         A dictionary mapping field names to their example values.
 
     Example:
-        >>> class CreateSessionRequest(BaseModel):
+        >>> class CreateSessionRequest(BackendAISchema):
         ...     name: Annotated[str, BackendAIConfigMeta(
         ...         description="Session name", added_version="25.1.0",
         ...         example=ConfigExample(local="dev-session", prod="prod-session")

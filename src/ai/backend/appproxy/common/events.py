@@ -203,7 +203,14 @@ class DoCheckUnusedPortEvent(AbstractAnycastEvent):
         return None
 
 
-class DoHealthCheckEvent(AbstractAnycastEvent):
+class DoReconcileTraefikRoutesEvent(AbstractAnycastEvent):
+    """Periodic trigger emitted by the coordinator leader cron to reconcile
+    every active inference circuit's routing config against the live Circuit
+    DB state. Acts as a safety net against missed propagation events so that
+    the etcd-based Traefik provider eventually converges on the DB-backed
+    source of truth.
+    """
+
     def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
@@ -214,7 +221,7 @@ class DoHealthCheckEvent(AbstractAnycastEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
-        return "do_health_check"
+        return "do_reconcile_traefik_routes"
 
     @classmethod
     @override

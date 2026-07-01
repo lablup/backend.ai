@@ -2,7 +2,7 @@
 
 from ai.backend.common.types import SessionResult
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
+from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
 from .exceptions import DependenciesNotSatisfied
 from .validator import ValidatorRule
@@ -39,6 +39,4 @@ class DependenciesValidator(ValidatorRule):
             dep_names = [
                 f"{dep.dependency_name} ({dep.depends_on})" for dep in pending_dependencies
             ]
-            raise DependenciesNotSatisfied(
-                f"Waiting dependency sessions to finish as success. ({', '.join(dep_names)})"
-            )
+            raise DependenciesNotSatisfied(pending_dependency_names=dep_names)

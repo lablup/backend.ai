@@ -50,31 +50,31 @@ def search(
 ) -> None:
     """Search projects (superadmin only)."""
     from ai.backend.common.dto.manager.v2.group.request import (
-        AdminSearchGroupsInput,
-        GroupFilter,
-        GroupOrder,
+        AdminSearchProjectsInput,
+        ProjectFilter,
+        ProjectOrder,
     )
-    from ai.backend.common.dto.manager.v2.group.types import GroupOrderField
+    from ai.backend.common.dto.manager.v2.group.types import ProjectOrderField
 
     # Build filter only if any filter option is provided
-    filter_dto: GroupFilter | None = None
+    filter_dto: ProjectFilter | None = None
     if any(opt is not None for opt in (name_contains, domain_name, is_active)):
         from ai.backend.common.dto.manager.query import StringFilter
 
-        filter_dto = GroupFilter(
+        filter_dto = ProjectFilter(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
             domain_name=StringFilter(equals=domain_name) if domain_name is not None else None,
             is_active=is_active,
         )
 
     # Build order only if --order-by is provided
-    orders = parse_order_options(order_by, GroupOrderField, GroupOrder) if order_by else None
+    orders = parse_order_options(order_by, ProjectOrderField, ProjectOrder) if order_by else None
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.project.admin_search(
-                AdminSearchGroupsInput(
+                AdminSearchProjectsInput(
                     filter=filter_dto,
                     order=orders,
                     limit=limit,
@@ -98,7 +98,7 @@ def create(body: str) -> None:
     import json
     import sys
 
-    from ai.backend.common.dto.manager.v2.group.request import CreateGroupInput
+    from ai.backend.common.dto.manager.v2.group.request import CreateProjectInput
 
     try:
         data = json.loads(body)
@@ -109,7 +109,7 @@ def create(body: str) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.project.admin_create(CreateGroupInput(**data))
+            result = await registry.project.admin_create(CreateProjectInput(**data))
             print_result(result)
         finally:
             await registry.close()
@@ -128,7 +128,7 @@ def update(project_id: UUID, body: str) -> None:
     import json
     import sys
 
-    from ai.backend.common.dto.manager.v2.group.request import UpdateGroupInput
+    from ai.backend.common.dto.manager.v2.group.request import UpdateProjectInput
 
     try:
         data = json.loads(body)
@@ -139,7 +139,7 @@ def update(project_id: UUID, body: str) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.project.admin_update(project_id, UpdateGroupInput(**data))
+            result = await registry.project.admin_update(project_id, UpdateProjectInput(**data))
             print_result(result)
         finally:
             await registry.close()
@@ -151,12 +151,12 @@ def update(project_id: UUID, body: str) -> None:
 @click.argument("project_id", type=click.UUID)
 def delete(project_id: UUID) -> None:
     """Soft-delete a project (superadmin only)."""
-    from ai.backend.common.dto.manager.v2.group.request import DeleteGroupInput
+    from ai.backend.common.dto.manager.v2.group.request import DeleteProjectInput
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.project.admin_delete(DeleteGroupInput(group_id=project_id))
+            result = await registry.project.admin_delete(DeleteProjectInput(group_id=project_id))
             print_result(result)
         finally:
             await registry.close()
@@ -168,12 +168,12 @@ def delete(project_id: UUID) -> None:
 @click.argument("project_id", type=click.UUID)
 def purge(project_id: UUID) -> None:
     """Permanently purge a project (superadmin only)."""
-    from ai.backend.common.dto.manager.v2.group.request import PurgeGroupInput
+    from ai.backend.common.dto.manager.v2.group.request import PurgeProjectInput
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.project.admin_purge(PurgeGroupInput(group_id=project_id))
+            result = await registry.project.admin_purge(PurgeProjectInput(group_id=project_id))
             print_result(result)
         finally:
             await registry.close()

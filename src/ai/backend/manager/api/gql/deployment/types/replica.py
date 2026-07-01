@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
+import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -31,13 +32,16 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ReplicaStatusChangedPayload as ReplicaStatusChangedPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    ReplicaOrderField,
+)
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
-    to_global_id,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -48,14 +52,17 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
-    ReplicaOrderField,
+    RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
 
 from .revision import ModelRevision
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
+    from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
 # ========== Enums ==========
 
@@ -104,6 +111,15 @@ TrafficStatus: type[RouteTrafficStatus] = gql_enum(
     name="TrafficStatus",
 )
 
+ReplicaHealthStatusGQL: type[RouteHealthStatus] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.4.4",
+        description="This enum represents the health check status of a replica.",
+    ),
+    RouteHealthStatus,
+    name="ReplicaHealthStatus",
+)
+
 
 # ========== Status Filters ==========
 
@@ -116,6 +132,12 @@ class ReplicaStatusFilter(PydanticInputMixin[ReplicaStatusFilterDTO]):
         description="The in  field.", name="in", default=None
     )
     equals: ReplicaStatus | None = None
+    not_in: list[ReplicaStatus] | None = gql_field(
+        description="Excludes statuses in the list.", name="notIn", default=None
+    )
+    not_equals: ReplicaStatus | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
+    )
 
 
 @gql_pydantic_input(
@@ -126,6 +148,12 @@ class TrafficStatusFilter(PydanticInputMixin[ReplicaTrafficStatusFilterDTO]):
         description="The in  field.", name="in", default=None
     )
     equals: TrafficStatus | None = None
+    not_in: list[TrafficStatus] | None = gql_field(
+        description="Excludes traffic statuses in the list.", name="notIn", default=None
+    )
+    not_equals: TrafficStatus | None = gql_field(
+        description="Excludes exact traffic status match.", name="notEquals", default=None
+    )
 
 
 # ========== ModelReplica Types ==========
@@ -155,13 +183,19 @@ class ReplicaOrderBy(PydanticInputMixin[ReplicaOrderDTO]):
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
-        description="A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness) and traffic weight for load balancing.",
+        description="A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness).",
     )
 )
 class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     id: NodeID[str]
-    session_id: ID
+    session_id: ID | None
     revision_id: ID
+    deployment_id: ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="ID of the model deployment this replica belongs to.",
+        )
+    )
     readiness_status: ReadinessStatus = gql_field(
         description="Whether the replica has been checked and its health state."
     )
@@ -169,25 +203,86 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         description="Whether the replica is currently running and able to serve requests."
     )
     activeness_status: ActivenessStatus = gql_field(
-        description="Whether the replica is currently active and able to serve requests."
+        description="Whether the replica is actively receiving traffic."
     )
-    weight: int = gql_field(description="Traffic weight for load balancing between replicas.")
+    status: ReplicaStatus = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="Provisioning status of the replica (mirrors the underlying route status).",
+        )
+    )
+    traffic_status: TrafficStatus = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="Traffic status of the replica.",
+        )
+    )
+    health_status: ReplicaHealthStatusGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="Health check status of the replica.",
+        )
+    )
     created_at: datetime = gql_field(description="Timestamp when the replica was created.")
 
     @gql_field(
-        description="The session ID associated with the replica. This can be null right after replica creation."
+        description="The session associated with the replica. Can be null if the replica is still provisioning.",
+        deprecation_reason="Use session_v2 instead.",
     )  # type: ignore[misc]
-    async def session(self, info: Info[StrawberryGQLContext]) -> Session:
-        session_global_id = to_global_id(
-            ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
+    async def session(self, info: Info[StrawberryGQLContext]) -> Session | None:
+        if self.session_id is None:
+            return None
+        # The federated ComputeSessionNode stub is a relay.Node; pass the inner id so
+        # Strawberry re-encodes the same global ID the graphene subgraph expects.
+        return Session(id=ID(str(UUID(str(self.session_id)))))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The compute session running this replica, resolved via DataLoader.",
         )
-        return Session(id=ID(session_global_id))
+    )  # type: ignore[misc]
+    async def session_v2(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            SessionV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.session.types"),
+        ]
+        | None
+    ):
+        if self.session_id is None:
+            return None
+        from ai.backend.common.types import SessionId
+
+        return await info.context.data_loaders.session_loader.load(
+            SessionId(UUID(str(self.session_id)))
+        )
 
     @gql_field(description="The revision of this entity.")  # type: ignore[misc]
-    async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
-        """Resolve revision by ID."""
-        node = await info.context.adapters.deployment.get_revision(UUID(str(self.revision_id)))
-        return ModelRevision.from_pydantic(node)
+    async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
+        """Resolve revision by ID using DataLoader."""
+        result = await info.context.data_loaders.revision_loader.load(UUID(str(self.revision_id)))
+        if result is None:
+            raise ValueError(f"Revision not found: {self.revision_id}")
+        return result
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="The model deployment this replica belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def deployment(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            ModelDeployment,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.deployment"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

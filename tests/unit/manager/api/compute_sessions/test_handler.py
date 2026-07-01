@@ -83,6 +83,7 @@ def create_session_data(
         access_key=None,
         agent_ids=["agent-001"],
         images=images or ["cr.backend.ai/stable/python:3.11"],
+        image_ids=None,
         tag=None,
         vfolder_mounts=None,
         environ=None,
@@ -132,6 +133,7 @@ def create_kernel_info(
             gids=None,
         ),
         image=ImageInfo(
+            image_id=None,
             identifier=None,
             registry=None,
             tag=None,

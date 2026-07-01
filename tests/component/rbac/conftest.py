@@ -4,7 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -15,7 +15,6 @@ from ai.backend.common.dto.manager.rbac.request import (
 )
 from ai.backend.common.dto.manager.rbac.response import CreateRoleResponse
 from ai.backend.common.dto.manager.rbac.types import RoleSource, RoleStatus
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.rbac.handler import RBACHandler
@@ -39,9 +38,15 @@ def permission_controller_processors(
     database_engine: ExtendedAsyncSAEngine,
 ) -> PermissionControllerProcessors:
     repo = PermissionControllerRepository(database_engine)
-    service = PermissionControllerService(repo, rbac_action_registry=[])
+    service = PermissionControllerService(
+        repo,
+        group_repository=MagicMock(),
+        rbac_action_registry=[],
+    )
+    validators = MagicMock()
+    validators.rbac.scope.validate = AsyncMock()
     return PermissionControllerProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service, action_monitors=[], validators=validators
     )
 
 
@@ -57,10 +62,14 @@ def server_module_registries(
     return [
         register_admin_routes(
             AdminHandler(
-                gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()
+                gql_schema=MagicMock(),
+                gql_deps=MagicMock(),
+                strawberry_schema=MagicMock(),
+                public_strawberry_schema=MagicMock(),
             ),
             route_deps,
             sub_registries=[rbac_registry],
+            gql_ws_handler=MagicMock(),
         ),
     ]
 

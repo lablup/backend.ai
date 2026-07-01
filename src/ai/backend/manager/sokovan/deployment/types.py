@@ -5,6 +5,8 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     RouteStatus,
@@ -14,14 +16,15 @@ from ai.backend.manager.data.deployment.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.types import DeploymentInfoWithRoutes, RouteInfo
+    from ai.backend.manager.data.deployment.types import (
+        DeploymentInfoWithRoutes,
+        DeploymentPolicyData,
+        RouteInfo,
+    )
 
 
 class DeploymentLifecycleType(StrEnum):
-    CHECK_PENDING = "check_pending"
     CHECK_REPLICA = "check_replica"
-    SCALING = "scaling"
-    RECONCILE = "reconcile"
     DEPLOYING = "deploying"
     DESTROYING = "destroying"
 
@@ -49,6 +52,28 @@ class DeploymentExecutionResult:
 
 
 @dataclass
+class EndpointRegistrationResult:
+    """Outcome of registering appproxy endpoints: which deployments registered and which failed.
+    The caller composes its own lifecycle result from this."""
+
+    registered: list[DeploymentWithHistory] = field(default_factory=list)
+    failures: list[DeploymentExecutionError] = field(default_factory=list)
+
+
+@dataclass
+class ActivateRevisionResult:
+    """Result of activating a deployment revision.
+
+    Returned by DeploymentController.activate_revision().
+    """
+
+    deployment_info: DeploymentInfo
+    previous_revision_id: DeploymentRevisionID | None
+    activated_revision_id: DeploymentRevisionID
+    deployment_policy: DeploymentPolicyData
+
+
+@dataclass
 class AutoScalingDecision:
     """Decision made by autoscaling evaluation."""
 
@@ -63,7 +88,7 @@ class AutoScalingDecision:
 class RouteCreationSpec:
     """Specification for creating a new route and session."""
 
-    endpoint_id: UUID
+    deployment_id: DeploymentID
     endpoint_name: str
     traffic_ratio: float
     image_id: UUID
@@ -79,7 +104,7 @@ class RouteCreationSpec:
     def get_target_replicas_from_deployment(deployment_info: DeploymentInfo) -> int:
         """Get the target number of replicas for a DeploymentInfo."""
         # DeploymentInfo has replica_spec.replica_count
-        return deployment_info.replica_spec.replica_count
+        return deployment_info.replica.replica_count
 
     # Extension methods for DeploymentInfoWithRoutes compatibility
     @staticmethod

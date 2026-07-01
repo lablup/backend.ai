@@ -11,13 +11,24 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.deployment.types import RouteHealthStatus, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteSubStatus,
+    RouteTrafficStatus,
+)
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.group.row import GroupRow
-from ai.backend.manager.repositories.base.types import ExistenceCheck, QueryCondition, SearchScope
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 
 @dataclass
@@ -40,7 +51,7 @@ class EndpointCreationArgs:
 class EndpointData:
     """Data structure for model service endpoint."""
 
-    endpoint_id: uuid.UUID
+    deployment_id: DeploymentID
     name: str
     model_id: uuid.UUID
     owner_id: uuid.UUID
@@ -60,26 +71,74 @@ class EndpointData:
 class RouteData:
     """Data structure for model service route."""
 
-    route_id: uuid.UUID
-    endpoint_id: uuid.UUID
+    route_id: ReplicaID
+    deployment_id: DeploymentID
     session_id: SessionId | None
     status: RouteStatus
     health_status: RouteHealthStatus
     traffic_ratio: float
     created_at: datetime
-    revision_id: uuid.UUID
+    revision_id: DeploymentRevisionID
+    traffic_status: RouteTrafficStatus
+    health_check: ModelHealthCheck | None
+    termination_grace_period: float
     replica_host: str | None = None
     replica_port: int | None = None
     updated_at: datetime | None = None
+    sub_status: RouteSubStatus | None = None
+    last_transition_at: datetime | None = None
     error_data: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def enabled_health_check(self) -> ModelHealthCheck | None:
+        """The health check to enforce, or ``None`` when absent or disabled.
+
+        A ``health_check`` with ``enable=False`` means the route activates
+        immediately and the remaining fields are ignored, so it must be
+        treated the same as no health check at all.
+        """
+        if self.health_check is None or not self.health_check.enable:
+            return None
+        return self.health_check
+
+    def is_termination_grace_elapsed(self, now: datetime) -> bool:
+        """Whether the session may be cleaned up at ``now``.
+
+        The grace period counts from ``last_transition_at`` — for a
+        COOLING_DOWN route, the moment the draining stage finished. When
+        no transition history exists (pre-migration rows) or the grace
+        period is non-positive, the session is cleaned up immediately.
+        """
+        if self.last_transition_at is None:
+            return True
+        if self.termination_grace_period <= 0:
+            return True
+        elapsed = (now - self.last_transition_at).total_seconds()
+        return elapsed >= self.termination_grace_period
+
+
+@dataclass(frozen=True)
+class RouteSessionKernelInfo:
+    """Kernel connection info — only present when session is RUNNING with inference port."""
+
+    replica_host: str
+    replica_port: int
+
+
+@dataclass(frozen=True)
+class RouteSessionInfo:
+    """Session state for a STARTING route. kernel is None when not yet RUNNING or no port."""
+
+    status: SessionStatus
+    kernel: RouteSessionKernelInfo | None
 
 
 @dataclass
 class RouteServiceDiscoveryInfo:
     """Service discovery information for a model service route."""
 
-    route_id: uuid.UUID
-    endpoint_id: uuid.UUID
+    route_id: ReplicaID
+    deployment_id: DeploymentID
     endpoint_name: str
     runtime_variant: str
     kernel_host: str

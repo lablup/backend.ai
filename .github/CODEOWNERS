@@ -1,0 +1,17 @@
+# CODEOWNERS — auto-request reviewers based on changed paths.
+#
+# This file is advisory: it makes GitHub auto-request the right reviewers
+# on each PR. It is NOT (yet) wired into branch protection, so CODEOWNERS
+# approval is not required to merge. See issue #11466.
+#
+# `@lablup/core_dev` is used as the default owner because the team's
+# membership matches the active human reviewer pool observed across
+# recent merged PRs. Migrate to more granular per-component handles
+# (e.g. specialists for storage, accelerator) only when a real review-
+# coverage gap surfaces.
+#
+# NOTE: requires GitHub "Code review assignment" to be enabled on the
+# `core_dev` team — otherwise every PR auto-requests all members.
+
+# Default owner — applies to every path not matched below.
+*    @lablup/core_dev

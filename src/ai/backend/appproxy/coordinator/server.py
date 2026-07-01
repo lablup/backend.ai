@@ -6,6 +6,7 @@ import grp
 import importlib
 import importlib.resources
 import ipaddress
+import json
 import logging
 import os
 import pwd
@@ -54,7 +55,7 @@ from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.common.events import (
     DoCheckUnusedPortEvent,
     DoCheckWorkerLostEvent,
-    DoHealthCheckEvent,
+    DoReconcileTraefikRoutesEvent,
     WorkerLostEvent,
 )
 from ai.backend.appproxy.common.types import (
@@ -62,7 +63,6 @@ from ai.backend.appproxy.common.types import (
     AppMode,
     EventLoopType,
     ProxyProtocol,
-    RouteInfo,
     WebMiddleware,
     WebRequestHandler,
 )
@@ -72,20 +72,16 @@ from ai.backend.appproxy.common.utils import (
     mime_match,
     ping_redis_connection,
 )
-from ai.backend.appproxy.coordinator.api.types import AppProxyStatusResponse
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
+from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    EndpointRouteListUpdatedEvent,
-)
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
@@ -101,7 +97,7 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
-from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
@@ -117,7 +113,6 @@ from ai.backend.common.service_discovery.service_discovery import (
 from ai.backend.common.types import (
     AgentId,
     HostPortPair,
-    ModelServiceStatus,
     RedisProfileTarget,
     ServiceDiscoveryType,
 )
@@ -131,22 +126,20 @@ from .config import load as load_config
 from .defs import EVENT_DISPATCHER_CONSUMER_GROUP
 from .errors import (
     CleanupContextNotInitializedError,
-    MissingHealthCheckInfoError,
     MissingProfilingConfigError,
-    MissingRouteInfoError,
     MissingTraefikConfigError,
 )
 from .health.database import DatabaseHealthChecker
-from .health_checker import HealthCheckEngine
-from .models import Circuit, Endpoint, Worker
+from .models import Circuit, Worker
 from .models.utils import connect_database, execute_with_txn_retry
 from .pglock import PgAdvisoryLock
+from .repositories.endpoint import EndpointRepository
+from .services.endpoint import EndpointService
 from .types import (
     CircuitManager,
     CleanupContext,
     CoordinatorMetricRegistry,
     DistributedLockFactory,
-    InferenceAppConfigDict,
     RootContext,
 )
 
@@ -205,14 +198,22 @@ async def exception_middleware(
     root_ctx: RootContext = request.app["_root.context"]
     try:
         resp = await handler(request)
-    except ValidationError as ex:
-        log.exception("Failed to create response model: {}", ex.json(indent=2))
+    except (BackendAISchemaValidationFailed, ValidationError) as ex:
+        # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+        # skip the ``BackendAISchema`` auto-conversion override.
+        log.exception(
+            "Failed to create response model: {}",
+            json.dumps(ex.errors(), indent=2, default=str),
+        )
         raise InternalServerError() from ex
     except BackendAIError as ex:
         if ex.status_code == 500:
             log.warning("Internal server error raised inside handlers")
         log.exception("")
-        if mime_match(request.headers.get("accept", "text/html"), "application/json"):
+        # The coordinator only serves JSON APIs, so default to JSON when the
+        # client did not send an Accept header. The HTML template is kept as a
+        # fallback for clients that explicitly prefer text/html (e.g. browsers).
+        if mime_match(request.headers.get("accept", "application/json"), "application/json"):
             return web.json_response(
                 ensure_json_serializable(ex.body_dict),
                 status=ex.status_code,
@@ -405,14 +406,16 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         config=leader_config,
     )
 
-    # Create task specs for all periodic tasks
+    # Create task specs for all periodic tasks.
+    #
+    # When Traefik is enabled, the coordinator no longer polls kernels itself
+    # for health status — instead Traefik probes kernels directly via the
+    # loadBalancer.healthCheck directive baked into the etcd config. We therefore
+    # skip the ``health_check`` task and add a ``reconcile_traefik_routes`` task
+    # that periodically re-publishes every inference circuit's etcd config as a
+    # safety net against missed propagation events (e.g. on coordinator restart
+    # or transient Redis issues).
     task_specs: list[EventTaskSpec] = [
-        EventTaskSpec(
-            name="health_check",
-            event_factory=lambda: DoHealthCheckEvent(),
-            interval=root_ctx.local_config.proxy_coordinator.health_check_timer_interval,
-            initial_delay=5.0,
-        ),
         EventTaskSpec(
             name="unused_port_collection",
             event_factory=lambda: DoCheckUnusedPortEvent(),
@@ -426,6 +429,15 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             initial_delay=10.0,
         ),
     ]
+    if root_ctx.local_config.proxy_coordinator.enable_traefik:
+        task_specs.append(
+            EventTaskSpec(
+                name="reconcile_traefik_routes",
+                event_factory=lambda: DoReconcileTraefikRoutesEvent(),
+                interval=30.0,
+                initial_delay=15.0,
+            )
+        )
 
     # Create and register LeaderCron
     leader_tasks: list[PeriodicTask] = [
@@ -492,90 +504,98 @@ async def on_worker_lost_event(
         await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
 
 
-async def on_route_update_event(
+async def _reconcile_worker_occupied_slots(
     context: RootContext,
-    _worker_id: AgentId,
-    event: EndpointRouteListUpdatedEvent,
+    circuits: Sequence[Circuit],
+    workers: Sequence[Worker],
 ) -> None:
-    (
-        route_connection_info_json,
-        health_check_enabled_str,
-        health_check_config_json,
-    ) = await context.core_valkey_live.get_multiple_live_data([
-        f"endpoint.{event.endpoint_id}.route_connection_info",
-        f"endpoint.{event.endpoint_id}.health_check_enabled",
-        f"endpoint.{event.endpoint_id}.health_check_config",
-    ])
-    if not route_connection_info_json:
-        raise MissingRouteInfoError(
-            f"EndpointRouteListUpdatedEvent fired but no route info present on redis - "
-            f"expected 'endpoint.{event.endpoint_id}.route_connection_info' key to be present on redis_live"
-        )
-    if not health_check_enabled_str:
-        raise MissingHealthCheckInfoError(
-            f"EndpointRouteListUpdatedEvent fired but no health check info present on redis - "
-            f"expected 'endpoint.{event.endpoint_id}.health_check_enabled' key to be present on redis_live"
-        )
-    route_connection_info = InferenceAppConfigDict.validate_json(route_connection_info_json)
+    """Recompute Worker.occupied_slots from the live circuit set and write back
+    any drifts.
 
-    health_check_enabled = health_check_enabled_str.decode("utf-8") == "true"
-    health_check_config: ModelHealthCheck | None
-    if health_check_enabled:
-        if not health_check_config_json:
-            raise MissingHealthCheckInfoError(
-                f"EndpointRouteListUpdatedEvent fired but invalid health check configuration provided - "
-                f"expected 'endpoint.{event.endpoint_id}.health_check_config' key to be present on redis_live"
+    ``Worker.occupied_slots`` is currently maintained as an incremental counter
+    (``+= 1`` on add_circuit, ``-= 1`` on unload), which can drift out of sync
+    with the actual ``circuits`` table whenever an unload event is missed, a
+    transaction rolls back partially, or external schema manipulation removes
+    rows. Once drifted, ``pick_worker`` filters every worker out and the
+    coordinator returns ``WorkerNotAvailable`` even though there are free
+    slots. This helper rebuilds the counter from the rows actually present in
+    the DB and writes back any worker whose stored value disagrees.
+    """
+    actual_counts: dict[UUID, int] = {}
+    for circuit in circuits:
+        actual_counts[circuit.worker] = actual_counts.get(circuit.worker, 0) + 1
+
+    drifted: list[tuple[Worker, int]] = []
+    for worker in workers:
+        expected = actual_counts.get(worker.id, 0)
+        if worker.occupied_slots != expected:
+            drifted.append((worker, expected))
+    if not drifted:
+        return
+
+    async def _fix(sess: SASession) -> None:
+        for worker, expected in drifted:
+            fresh = await Worker.get(sess, worker.id)
+            log.info(
+                "occupied_slots reconcile: worker={} {} -> {}",
+                fresh.authority,
+                fresh.occupied_slots,
+                expected,
             )
-        health_check_config = ModelHealthCheck.model_validate_json(
-            health_check_config_json.decode("utf-8")
-        )
-    else:
-        health_check_config = None
+            fresh.occupied_slots = expected
 
-    app_names = list(route_connection_info.keys())
-    if len(app_names) > 0:
-        app = app_names[0]
-        new_routes = {r.session_id: RouteInfo(**r.model_dump()) for r in route_connection_info[app]}
-    else:
-        app = ""
-        new_routes = {}
+    try:
+        async with context.db.connect() as db_conn:
+            await execute_with_txn_retry(_fix, context.db.begin_session, db_conn)
+    except Exception:
+        log.exception("Failed to reconcile worker occupied_slots")
 
-    async def _update(db_sess: SASession) -> None:
-        endpoint = await Endpoint.get(db_sess, event.endpoint_id)
-        circuit = await Circuit.get_by_endpoint(db_sess, endpoint.id)
-        old_routes = circuit.route_info or []
-        if new_routes:
-            traffic_ratios = await context.core_valkey_live.get_multiple_live_data([
-                f"endpoint.{event.endpoint_id}.session.{route.session_id}.traffic_ratio"
-                for route in new_routes.values()
-            ])
-            for idx, route in enumerate(new_routes.values()):
-                ratio_bytes = traffic_ratios[idx]
-                route.traffic_ratio = float(ratio_bytes.decode("utf-8")) if ratio_bytes else 1.0
-            for route in old_routes:
-                if _duplicate_route := new_routes.get(route.session_id):
-                    _duplicate_route.health_status = route.health_status
-                    _duplicate_route.last_health_check = route.last_health_check
-                    _duplicate_route.consecutive_failures = route.consecutive_failures
-        circuit.route_info = list(new_routes.values())
 
-        endpoint.health_check_enabled = health_check_enabled
-        endpoint.health_check_config = health_check_config
+async def on_reconcile_traefik_routes(
+    context: RootContext,
+    _source: AgentId,
+    _event: DoReconcileTraefikRoutesEvent,
+) -> None:
+    """Periodic reconcile handler that re-publishes every active circuit's
+    etcd routing config from the PG source of truth, then drops any stale
+    circuit keys that were left behind in etcd by missed unloads.
 
-        await db_sess.commit()
+    Three phases:
 
-        if not endpoint.health_check_enabled:
-            # mark all routes as healthy
-            # Publish health status transition events
-            await context.health_engine.publish_health_transition_events([
-                (r.session_id, None, ModelServiceStatus.HEALTHY) for r in circuit.route_info
-            ])
+    1. **Put reconcile** — iterate every circuit in the coordinator DB
+       (both inference and interactive) and re-invoke ``update_circuit_routes``.
+       Acts as a safety net for missed propagation events on the happy path.
+    2. **Stale cleanup** — compare the DB circuit set against etcd via
+       ``reconcile_traefik_etcd_state`` and remove any orphan
+       ``bai_service_*`` / ``bai_router_*`` / ``bai_appproxy_plugin_*``
+       prefixes so etcd cannot accumulate dead entries across crashes.
+    3. **Worker counter reconcile** — recompute ``Worker.occupied_slots``
+       from the actual circuit count and fix drifts. Without this the
+       counter can wedge a worker permanently after a missed unload.
 
-        # Propagate updated route information to AppProxy workers
-        await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
-
-    async with context.db.connect() as db_conn:
-        await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
+    Each phase swallows its own errors so a single bad circuit or worker
+    cannot short-circuit the entire reconcile cycle.
+    """
+    if not context.local_config.proxy_coordinator.enable_traefik:
+        return
+    async with context.db.begin_readonly_session() as db_sess:
+        circuits = await Circuit.list_circuits(db_sess, load_worker=True, load_endpoint=True)
+        workers = await Worker.list_workers(db_sess)
+    reconciled = 0
+    for circuit in circuits:
+        try:
+            await context.circuit_manager.update_circuit_routes(
+                circuit, list(circuit.route_info or [])
+            )
+            reconciled += 1
+        except Exception:
+            log.exception("Failed to reconcile traefik routes for circuit {}", circuit.id)
+    try:
+        await context.circuit_manager.reconcile_traefik_etcd_state(circuits, workers)
+    except Exception:
+        log.exception("Failed to reconcile stale traefik etcd state")
+    await _reconcile_worker_occupied_slots(context, circuits, workers)
+    log.debug("reconcile_traefik_routes cycle completed: {} circuits reconciled", reconciled)
 
 
 @asynccontextmanager
@@ -583,17 +603,17 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     worker_lost_handler = root_ctx.event_dispatcher.consume(
         WorkerLostEvent, root_ctx, on_worker_lost_event, name="proxy-coordinator"
     )
-    endpoint_route_update_handler = root_ctx.core_event_dispatcher.consume(
-        EndpointRouteListUpdatedEvent,
+    reconcile_traefik_routes_handler = root_ctx.event_dispatcher.consume(
+        DoReconcileTraefikRoutesEvent,
         root_ctx,
-        on_route_update_event,
+        on_reconcile_traefik_routes,
         name="proxy-coordinator",
     )
     try:
         yield
     finally:
         root_ctx.event_dispatcher.unconsume(worker_lost_handler)
-        root_ctx.core_event_dispatcher.unconsume(endpoint_route_update_handler)
+        root_ctx.event_dispatcher.unconsume(reconcile_traefik_routes_handler)
 
 
 @asynccontextmanager
@@ -607,43 +627,6 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.distributed_lock_factory = init_lock_factory(root_ctx)
     yield
-
-
-@asynccontextmanager
-async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    health_engine = HealthCheckEngine(
-        root_ctx.db,
-        root_ctx.core_event_producer,
-        root_ctx.valkey_live,
-        root_ctx.circuit_manager,
-        root_ctx.local_config.proxy_coordinator.health_check_timer_interval,
-        root_ctx.valkey_schedule,
-    )
-    root_ctx.health_engine = health_engine
-    await health_engine.start()
-
-    async def _check_health(_context: None, _src: AgentId, _event: DoHealthCheckEvent) -> None:
-        try:
-            # Check all endpoints with health checking enabled
-            # This now only performs individual route health checks
-            await health_engine.check_all_endpoints()
-            log.debug("Health check cycle completed - individual route health updated")
-
-        except Exception:
-            log.exception("Error during health check")
-            raise
-
-    health_check_evh = root_ctx.event_dispatcher.consume(
-        DoHealthCheckEvent,
-        None,
-        _check_health,
-    )
-    # Note: Timer is now managed by leader_election_ctx via LeaderCron
-    try:
-        yield
-    finally:
-        root_ctx.event_dispatcher.unconsume(health_check_evh)
-        await health_engine.stop()
 
 
 @asynccontextmanager
@@ -814,14 +797,26 @@ async def circuit_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @asynccontextmanager
+async def endpoint_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Wire the endpoint repository + service once, for API handlers to share."""
+    root_ctx.endpoint_service = EndpointService(
+        repository=EndpointRepository(root_ctx.db),
+        circuit_manager=root_ctx.circuit_manager,
+    )
+    yield
+
+
+@asynccontextmanager
 async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     """Initialize and start health probe with all health checkers."""
     probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
     root_ctx.health_probe = probe
 
-    # Register health checkers using already-initialized resources
-    await probe.register(DatabaseHealthChecker(db=root_ctx.db))
-    await probe.register(
+    # Database: readiness only — no connection-stuck restart pattern needed.
+    await probe.register_readiness(DatabaseHealthChecker(db=root_ctx.db))
+
+    # Valkey: liveness — also surfaced in readiness.
+    await probe.register_liveness(
         ValkeyHealthChecker(
             clients={
                 ComponentId("live"): root_ctx.valkey_live,
@@ -988,8 +983,8 @@ def build_root_app(
             leader_election_ctx,
             etcd_ctx,
             circuit_manager_ctx,
+            endpoint_service_ctx,
             health_probe_ctx,
-            health_check_ctx,
             unused_port_collection_ctx,
             event_handler_ctx,
             service_discovery_ctx,

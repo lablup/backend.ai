@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.repositories.base import QueryOrder
 
 
 class ImageOrders:

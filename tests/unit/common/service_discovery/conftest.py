@@ -85,11 +85,13 @@ async def redis_discovery(
     )
     try:
         # Flush the database to ensure clean state
-        await discovery._valkey_client._client.client.flushdb()
+        async with discovery._valkey_client._client.client() as conn:
+            await conn.flushdb()
         yield discovery
     finally:
         # Cleanup: flush database before closing
-        await discovery._valkey_client._client.client.flushdb()
+        async with discovery._valkey_client._client.client() as conn:
+            await conn.flushdb()
         await discovery.close()
 
 

@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     DeleteResourceGroupInput,
     UpdateResourceGroupInput,
 )
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateResourceGroupInput:
@@ -25,7 +26,7 @@ class TestCreateResourceGroupInput:
         assert req.description is None
         assert req.total_resource_slots is None
         assert req.allowed_vfolder_hosts is None
-        assert req.integration_id is None
+        assert req.integration_name is None
         assert req.resource_policy is None
 
     def test_valid_creation_with_all_fields(self) -> None:
@@ -35,7 +36,7 @@ class TestCreateResourceGroupInput:
             description="A test group",
             total_resource_slots={"cpu": "4"},
             allowed_vfolder_hosts={"default": "rw"},
-            integration_id="ext-001",
+            integration_name="ext-001",
             resource_policy="default",
         )
         assert req.name == "my-group"
@@ -47,15 +48,15 @@ class TestCreateResourceGroupInput:
         assert req.name == "my-group"
 
     def test_empty_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateResourceGroupInput(name="", domain_name="default")
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateResourceGroupInput(name="   ", domain_name="default")
 
     def test_name_exceeding_max_length_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateResourceGroupInput(name="a" * 257, domain_name="default")
 
     def test_name_at_max_length_is_valid(self) -> None:
@@ -63,7 +64,7 @@ class TestCreateResourceGroupInput:
         assert len(req.name) == 256
 
     def test_missing_domain_name_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateResourceGroupInput.model_validate({"name": "my-group"})
 
     def test_round_trip(self) -> None:
@@ -91,7 +92,7 @@ class TestUpdateResourceGroupInput:
         assert isinstance(req.description, Sentinel)
         assert req.total_resource_slots is SENTINEL
         assert req.allowed_vfolder_hosts is SENTINEL
-        assert req.integration_id is SENTINEL
+        assert req.integration_name is SENTINEL
         assert req.resource_policy is SENTINEL
 
     def test_sentinel_description_signals_clear(self) -> None:
@@ -121,7 +122,7 @@ class TestUpdateResourceGroupInput:
             is_active=None,
             total_resource_slots=None,
             allowed_vfolder_hosts=None,
-            integration_id=None,
+            integration_name=None,
             resource_policy=None,
         )
         json_data = req.model_dump_json()
@@ -144,11 +145,11 @@ class TestDeleteResourceGroupInput:
         assert req.id == group_id
 
     def test_invalid_uuid_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteResourceGroupInput.model_validate({"id": "not-a-uuid"})
 
     def test_missing_id_raises_validation_error(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteResourceGroupInput.model_validate({})
 
     def test_round_trip(self) -> None:

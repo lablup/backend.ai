@@ -14,7 +14,7 @@ from typing import (
 )
 
 import sqlalchemy as sa
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import ConfigDict, Field, field_serializer
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -30,13 +30,18 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
+    BackendAISchema,
     PreemptionMode,
     PreemptionOrder,
     SessionTypes,
 )
+from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
+from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -81,7 +86,7 @@ __all__: Sequence[str] = (
 )
 
 
-class PreemptionConfig(BaseModel):
+class PreemptionConfig(BackendAISchema):
     model_config = ConfigDict(frozen=True)
 
     preemptible_priority: int = 5
@@ -102,7 +107,7 @@ class PreemptionConfig(BaseModel):
         return value.value
 
 
-class ScalingGroupOpts(BaseModel):
+class ScalingGroupOpts(BackendAISchema):
     model_config = ConfigDict(frozen=True)
 
     allowed_session_types: list[SessionTypes] = Field(
@@ -264,6 +269,13 @@ def _get_resource_preset_join_condition() -> Any:
 class ScalingGroupRow(Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
     name: Mapped[str] = mapped_column("name", sa.String(length=64), primary_key=True)
+    id: Mapped[ResourceGroupID] = mapped_column(
+        "id",
+        GUID,
+        nullable=False,
+        unique=True,
+        server_default=sa.text("uuid_generate_v4()"),
+    )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool | None] = mapped_column(
         "is_active", sa.Boolean, index=True, default=True
@@ -299,6 +311,23 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         PydanticColumn(FairShareScalingGroupSpec),
         nullable=True,
         default=None,
+    )
+    # Default operational options snapshot-copied onto each new
+    # deployment in this scaling group. See :class:`DeploymentOptions`.
+    default_deployment_options: Mapped[DeploymentOptions] = mapped_column(
+        "default_deployment_options",
+        PydanticColumn(DeploymentOptions),
+        nullable=False,
+        default=DeploymentOptions,
+    )
+    # Default session-side operational options used by the resolver
+    # when a create-session request omits fields. See
+    # :class:`DefaultSessionOptions`.
+    default_session_options: Mapped[DefaultSessionOptions] = mapped_column(
+        "default_session_options",
+        PydanticColumn(DefaultSessionOptions),
+        nullable=False,
+        default=DefaultSessionOptions,
     )
 
     sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="scaling_group")
@@ -338,6 +367,7 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         )
 
         return ScalingGroupData(
+            id=self.id,
             name=self.name,
             status=ScalingGroupStatus(
                 is_active=self.is_active if self.is_active is not None else True,
@@ -375,6 +405,8 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
                 ),
             ),
             fair_share_spec=self.fair_share_spec or FairShareScalingGroupSpec(),
+            default_deployment_options=self.default_deployment_options,
+            default_session_options=self.default_session_options,
         )
 
     @classmethod
@@ -401,6 +433,7 @@ scaling_groups = ScalingGroupRow.__table__
 
 @dataclass
 class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
+    id: ResourceGroupID
     name: str
     description: str | None
     is_active: bool
@@ -425,6 +458,7 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
     @classmethod
     def from_row(cls, row: ScalingGroupRow, permissions: Iterable[ScalingGroupPermission]) -> Self:
         return cls(
+            id=row.id,
             name=row.name,
             description=row.description,
             is_active=row.is_active if row.is_active is not None else True,
@@ -446,7 +480,7 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: uuid.UUID,
+    group: ProjectID,
     access_key: str,
 ) -> Sequence[Row[Any]]: ...
 
@@ -455,7 +489,7 @@ async def query_allowed_sgroups(
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: Iterable[uuid.UUID],
+    group: Iterable[ProjectID],
     access_key: str,
 ) -> Sequence[Row[Any]]: ...
 
@@ -481,7 +515,7 @@ async def query_allowed_sgroups(
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
+    group: ProjectID | Iterable[ProjectID] | str | Iterable[str],
     access_key: str,
 ) -> Sequence[Row[Any]]:
     query = sa.select(sgroups_for_domains).where(sgroups_for_domains.c.domain == domain_name)

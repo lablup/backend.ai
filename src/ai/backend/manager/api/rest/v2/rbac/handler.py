@@ -7,35 +7,40 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BaseRootResponseModel, BodyParam, PathParam
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
-    AdminSearchRoleAssignmentsGQLInput,
-    AdminSearchRolesGQLInput,
     AssignRoleInput,
+    BulkAddRolePermissionsInput,
     BulkAssignRoleInput,
+    BulkRemoveRolePermissionsInput,
     BulkRevokeRoleInput,
     CreatePermissionInput,
     CreateRoleInput,
     DeletePermissionInput,
     DeleteRoleInput,
     PurgeRoleInput,
+    ReplaceRolePermissionsInput,
     RevokeRoleInput,
+    SearchRoleAssignmentsInput,
+    SearchRolesInput,
     UpdatePermissionInput,
     UpdateRoleInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     AdminSearchAssociationsPayload,
     AdminSearchPermissionsPayload,
-    AdminSearchRoleAssignmentsPayload,
     AdminSearchRolesPayload,
     ScopeEntityOperationCombinationInfo,
+    SearchRoleAssignmentsPayload,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.rest.v2.path_params import RoleIdPathParam
+from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
+from ai.backend.manager.repositories.permission_controller.types import ScopedRoleSearchScope
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.rbac import RBACAdapter
+    from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -64,10 +69,30 @@ class V2RBACHandler:
 
     async def search_roles(
         self,
-        body: BodyParam[AdminSearchRolesGQLInput],
+        body: BodyParam[SearchRolesInput],
     ) -> APIResponse:
         """Search roles with filters, orders, and pagination."""
         result = await self._adapter.admin_search_roles_gql(body.parsed)
+        payload = AdminSearchRolesPayload(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def project_search_roles(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[SearchRolesInput],
+    ) -> APIResponse:
+        """Search roles registered in a project scope."""
+        result = await self._adapter.search_roles_in_scope(
+            ScopedRoleSearchScope(
+                element_type=RBACElementType.PROJECT, scope_id=str(path.parsed.project_id)
+            ),
+            body.parsed,
+        )
         payload = AdminSearchRolesPayload(
             items=result.items,
             total_count=result.total_count,
@@ -149,6 +174,32 @@ class V2RBACHandler:
         result = await self._adapter.delete_permission(body.parsed.id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    # -------------------------------------------------------- Bulk role permissions
+
+    async def bulk_add_role_permissions(
+        self,
+        body: BodyParam[BulkAddRolePermissionsInput],
+    ) -> APIResponse:
+        """Bulk-insert scoped permission rows across one or more roles."""
+        result = await self._adapter.bulk_add_role_permissions(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def bulk_remove_role_permissions(
+        self,
+        body: BodyParam[BulkRemoveRolePermissionsInput],
+    ) -> APIResponse:
+        """Bulk-delete permission rows by primary key."""
+        result = await self._adapter.bulk_remove_role_permissions(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def replace_role_permissions(
+        self,
+        body: BodyParam[ReplaceRolePermissionsInput],
+    ) -> APIResponse:
+        """Replace one role's entire scoped-permission set in one call."""
+        result = await self._adapter.replace_role_permissions(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     # ------------------------------------------------------------------ Assignments
 
     async def assign_role(
@@ -169,11 +220,25 @@ class V2RBACHandler:
 
     async def search_assignments(
         self,
-        body: BodyParam[AdminSearchRoleAssignmentsGQLInput],
+        body: BodyParam[SearchRoleAssignmentsInput],
     ) -> APIResponse:
         """Search role assignments with filters, orders, and pagination."""
-        result = await self._adapter.admin_search_role_assignments_gql(body.parsed)
-        payload = AdminSearchRoleAssignmentsPayload(
+        result = await self._adapter.admin_search_role_assignments(body.parsed)
+        payload = SearchRoleAssignmentsPayload(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def my_search_assignments(
+        self,
+        body: BodyParam[SearchRoleAssignmentsInput],
+    ) -> APIResponse:
+        """Search role assignments for the current authenticated user."""
+        result = await self._adapter.my_search_role_assignments(body.parsed)
+        payload = SearchRoleAssignmentsPayload(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

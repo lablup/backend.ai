@@ -9,7 +9,6 @@ from strawberry.relay import PageInfo
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.container_registry.filters import (
     ContainerRegistryV2Filter,
@@ -29,7 +28,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="List container registries with filtering, ordering, and pagination (admin only).",
     )
 )  # type: ignore[misc]

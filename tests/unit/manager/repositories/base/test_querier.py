@@ -19,15 +19,14 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.manager.models.base import Base, IDColumn
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BatchQuerierResult,
-    ExistenceCheck,
     OffsetPagination,
     Querier,
     QuerierResult,
-    QueryCondition,
-    SearchScope,
     execute_batch_querier,
     execute_querier,
 )
@@ -463,7 +462,7 @@ class TestBatchQuerierScopeValidation:
                 pagination=OffsetPagination(offset=0, limit=10),
             )
 
-            result = await execute_batch_querier(db_sess, query, querier, scope=None)
+            result = await execute_batch_querier(db_sess, query, querier)
 
             assert len(result.rows) == 4
             assert result.total_count == 4
@@ -483,7 +482,7 @@ class TestBatchQuerierScopeValidation:
             )
             scope = MockSearchScope(checks=[])
 
-            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             assert len(result.rows) == 4
             assert result.total_count == 4
@@ -511,7 +510,7 @@ class TestBatchQuerierScopeValidation:
                 ],
             )
 
-            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             assert len(result.rows) == 4
             assert result.total_count == 4
@@ -540,7 +539,7 @@ class TestBatchQuerierScopeValidation:
             )
 
             with pytest.raises(TestScopeValidationError):
-                await execute_batch_querier(db_sess, query, querier, scope=scope)
+                await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
     async def test_passes_validation_when_all_checks_succeed(
         self,
@@ -570,7 +569,7 @@ class TestBatchQuerierScopeValidation:
                 ],
             )
 
-            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             assert len(result.rows) == 4
             assert result.total_count == 4
@@ -604,7 +603,7 @@ class TestBatchQuerierScopeValidation:
             )
 
             with pytest.raises(TestScopeValidationError) as exc_info:
-                await execute_batch_querier(db_sess, query, querier, scope=scope)
+                await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             assert "first error" in str(exc_info.value)
 
@@ -637,7 +636,7 @@ class TestBatchQuerierScopeValidation:
             )
 
             with pytest.raises(TestScopeValidationError2) as exc_info:
-                await execute_batch_querier(db_sess, query, querier, scope=scope)
+                await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             assert "second error" in str(exc_info.value)
 
@@ -670,7 +669,7 @@ class TestBatchQuerierScopeValidation:
             )
 
             with pytest.raises(TestScopeValidationError) as exc_info:
-                await execute_batch_querier(db_sess, query, querier, scope=scope)
+                await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             assert "first error - priority" in str(exc_info.value)
 
@@ -698,9 +697,218 @@ class TestBatchQuerierScopeValidation:
                 filter_category="cat1",  # filter by cat1 category
             )
 
-            result = await execute_batch_querier(db_sess, query, querier, scope=scope)
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             assert len(result.rows) == 2  # item-a, item-b belong to cat1
             assert result.total_count == 2
             for row in result.rows:
                 assert row.category == "cat1"
+
+
+class TestBatchQuerierMultipleScopes:
+    """Tests for batch querier with multiple SearchScopes OR-combined."""
+
+    @pytest.fixture
+    async def scope_test_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[ScopeValidationTestRow], None]:
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(c, [ScopeValidationTestRow.__table__])
+            )
+
+        yield ScopeValidationTestRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_scope_validation CASCADE"))
+
+    @pytest.fixture
+    async def sample_data(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+    ) -> AsyncGenerator[list[dict[str, int | str]], None]:
+        data: list[dict[str, int | str]] = [
+            {"id": 1, "name": "item-a", "category": "cat1"},
+            {"id": 2, "name": "item-b", "category": "cat1"},
+            {"id": 3, "name": "item-c", "category": "cat2"},
+            {"id": 4, "name": "item-d", "category": "cat2"},
+            {"id": 5, "name": "item-e", "category": "cat3"},
+        ]
+
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            await db_sess.execute(table.insert(), data)
+
+        yield data
+
+    async def test_empty_scopes_skips_validation_and_filtering(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """When scopes is empty (default), behaves like the no-scope case."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+
+            result = await execute_batch_querier(db_sess, query, querier, scopes=())
+
+            assert len(result.rows) == 5
+            assert result.total_count == 5
+
+    async def test_multiple_scopes_are_or_combined(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """Multiple scopes' to_condition() results are OR-combined, not AND-combined."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope_cat1 = MockSearchScope(checks=[], filter_category="cat1")
+            scope_cat2 = MockSearchScope(checks=[], filter_category="cat2")
+
+            result = await execute_batch_querier(
+                db_sess, query, querier, scopes=[scope_cat1, scope_cat2]
+            )
+
+            assert {row.category for row in result.rows} == {"cat1", "cat2"}
+            assert result.total_count == 4
+
+    async def test_multiple_scopes_or_combined_with_querier_conditions_as_and(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """OR-combined scope predicate is AND-merged with the rest of querier.conditions."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+                conditions=[lambda: ScopeValidationTestRow.name == "item-a"],
+            )
+            scope_cat1 = MockSearchScope(checks=[], filter_category="cat1")
+            scope_cat2 = MockSearchScope(checks=[], filter_category="cat2")
+
+            result = await execute_batch_querier(
+                db_sess, query, querier, scopes=[scope_cat1, scope_cat2]
+            )
+
+            assert len(result.rows) == 1
+            assert result.rows[0].name == "item-a"
+
+    async def test_multiple_and_conditions_combined_with_multiple_or_scopes(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """Final WHERE is `(c1 AND c2) AND (s1 OR s2)` — multiple ANDs + multiple ORs."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+                conditions=[
+                    lambda: ScopeValidationTestRow.id >= 2,
+                    lambda: ScopeValidationTestRow.id <= 4,
+                ],
+            )
+            scope_cat1 = MockSearchScope(checks=[], filter_category="cat1")
+            scope_cat2 = MockSearchScope(checks=[], filter_category="cat2")
+
+            result = await execute_batch_querier(
+                db_sess, query, querier, scopes=[scope_cat1, scope_cat2]
+            )
+
+            # (id ∈ [2,4]) ∩ (category ∈ {cat1, cat2}) = {2:cat1, 3:cat2, 4:cat2}
+            assert {row.id for row in result.rows} == {2, 3, 4}
+            assert result.total_count == 3
+
+    async def test_existence_checks_aggregated_across_scopes(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """existence_checks from all scopes are validated together; success path runs."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope_a = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="item-a",
+                        error=TestScopeValidationError("item-a missing"),
+                    ),
+                ],
+                filter_category="cat1",
+            )
+            scope_b = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="item-c",
+                        error=TestScopeValidationError2("item-c missing"),
+                    ),
+                ],
+                filter_category="cat2",
+            )
+
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope_a, scope_b])
+
+            assert {row.category for row in result.rows} == {"cat1", "cat2"}
+            assert result.total_count == 4
+
+    async def test_existence_check_failure_in_any_scope_raises(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        scope_test_row_class: type[ScopeValidationTestRow],
+        sample_data: list[dict[str, int | str]],
+    ) -> None:
+        """If any scope's existence check fails, the aggregated validation raises."""
+        async with database_connection.begin_session() as db_sess:
+            table = scope_test_row_class.__table__
+            query = sa.select(table)
+            querier = BatchQuerier(
+                pagination=OffsetPagination(offset=0, limit=10),
+            )
+            scope_a = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="item-a",
+                        error=TestScopeValidationError("item-a missing"),
+                    ),
+                ],
+                filter_category="cat1",
+            )
+            scope_b = MockSearchScope(
+                checks=[
+                    ExistenceCheck(
+                        column=ScopeValidationTestRow.name,
+                        value="nonexistent",
+                        error=TestScopeValidationError2("nonexistent missing"),
+                    ),
+                ],
+                filter_category="cat2",
+            )
+
+            with pytest.raises(TestScopeValidationError2):
+                await execute_batch_querier(db_sess, query, querier, scopes=[scope_a, scope_b])

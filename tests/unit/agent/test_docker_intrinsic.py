@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import subprocess
-import sys
-import time
-from collections.abc import Generator, Iterator
-from concurrent.futures import ProcessPoolExecutor
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,7 +10,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.agent.docker.intrinsic import CPUPlugin, MemoryPlugin, netstat_ns_work
+from ai.backend.agent.docker.intrinsic import (
+    ContainerNetStat,
+    CPUPlugin,
+    MemoryPlugin,
+    read_proc_net_dev,
+)
 from ai.backend.agent.stats import StatModes
 
 
@@ -151,7 +152,7 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
 
     @pytest.fixture
     def memory_cgroup_context(
-        self, cgroup_stat_context: MagicMock, tmp_path: Path
+        self, cgroup_stat_context: MagicMock
     ) -> Generator[MagicMock, None, None]:
         """CGROUP stat context with memory/io cgroup v2 path mocks and related patches."""
         ctx = cgroup_stat_context
@@ -173,10 +174,8 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
 
         ctx.agent.get_cgroup_path = mock_get_cgroup_path
 
-        sandbox_file = tmp_path / "fake_netns"
-        sandbox_file.touch()
         mock_container_data = {
-            "NetworkSettings": {"SandboxKey": str(sandbox_file)},
+            "State": {"Pid": 12345},
         }
 
         with (
@@ -188,8 +187,8 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
                 return_value=1048576,
             ),
             patch(
-                "ai.backend.agent.docker.intrinsic.netstat_ns",
-                return_value={},
+                "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
+                return_value=ContainerNetStat(rx_bytes=0, tx_bytes=0),
             ),
             patch(
                 "ai.backend.agent.docker.intrinsic.current_loop",
@@ -198,7 +197,13 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
             mock_container_instance = AsyncMock()
             mock_container_instance.show.return_value = mock_container_data
             mock_container_cls.return_value = mock_container_instance
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
+
+            async def default_run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
+                return fn(*args)
+
+            mock_loop.return_value.run_in_executor = AsyncMock(
+                side_effect=default_run_in_executor,
+            )
             yield ctx
 
     async def test_init_creates_docker_client(self, memory_plugin: MemoryPlugin) -> None:
@@ -233,14 +238,14 @@ class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
         container_ids: list[str],
         memory_cgroup_context: MagicMock,
     ) -> None:
-        """Even in CGROUP mode, Docker is needed for SandboxKey. Verify instance client is used."""
+        """Even in CGROUP mode, Docker is needed for container PID. Verify instance client is used."""
         with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
             await memory_plugin.gather_container_measures(memory_cgroup_context, container_ids)
             mock_docker_cls.assert_not_called()
 
 
-class TestMemoryPluginNamespaceValidation(BaseDockerIntrinsicTest):
-    """Tests for namespace path pre-validation before netstat_ns call."""
+class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
+    """Tests for container PID validation before reading /proc/[pid]/net/dev."""
 
     @pytest.fixture
     def memory_plugin(self) -> MemoryPlugin:
@@ -253,12 +258,12 @@ class TestMemoryPluginNamespaceValidation(BaseDockerIntrinsicTest):
     def _make_cgroup_context(
         self,
         cgroup_stat_context: MagicMock,
-        sandbox_key: str,
+        container_pid: int,
     ) -> Generator[tuple[MagicMock, MagicMock], None, None]:
-        """Build a CGROUP stat context with configurable sandbox_key.
+        """Build a CGROUP stat context with configurable container PID.
 
-        Pass a real filesystem path for sandbox_key — an existing path
-        triggers netstat_ns, a non-existent one skips it.
+        PID=0 means container not running (skips read_proc_net_dev).
+        PID>0 calls read_proc_net_dev via executor.
         """
         ctx = cgroup_stat_context
         ctx.agent.get_cgroup_version = MagicMock(return_value="2")
@@ -280,7 +285,7 @@ class TestMemoryPluginNamespaceValidation(BaseDockerIntrinsicTest):
         ctx.agent.get_cgroup_path = mock_get_cgroup_path
 
         mock_container_data = {
-            "NetworkSettings": {"SandboxKey": sandbox_key},
+            "State": {"Pid": container_pid},
         }
 
         with (
@@ -292,132 +297,88 @@ class TestMemoryPluginNamespaceValidation(BaseDockerIntrinsicTest):
                 return_value=1048576,
             ),
             patch(
-                "ai.backend.agent.docker.intrinsic.netstat_ns",
-                new_callable=AsyncMock,
-            ) as mock_netstat,
+                "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
+            ) as mock_read_proc_net_dev,
             patch(
                 "ai.backend.agent.docker.intrinsic.current_loop",
             ) as mock_loop,
         ):
-            mock_netstat.return_value = {
-                "eth0": MagicMock(bytes_recv=4096, bytes_sent=8192),
-            }
+            mock_read_proc_net_dev.return_value = ContainerNetStat(rx_bytes=4096, tx_bytes=8192)
+
+            async def run_in_executor_impl(executor: Any, fn: Any, *args: Any) -> Any:
+                return fn(*args)
+
             mock_container_instance = AsyncMock()
             mock_container_instance.show.return_value = mock_container_data
             mock_container_cls.return_value = mock_container_instance
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
-            yield ctx, mock_netstat
+            mock_loop.return_value.run_in_executor = AsyncMock(
+                side_effect=run_in_executor_impl,
+            )
+            yield ctx, mock_read_proc_net_dev
 
-    async def test_nonexistent_namespace_path_returns_zero_net_stats(
+    async def test_pid_zero_returns_zero_net_stats(
         self,
         memory_plugin: MemoryPlugin,
         cgroup_stat_context: MagicMock,
-        tmp_path: Path,
     ) -> None:
-        """When namespace path does not exist, net stats should be 0 but other stats collected."""
-        gone_path = tmp_path / "nonexistent_netns"
+        """When container PID is 0 (not running), net stats should be 0
+        but other stats collected."""
         with self._make_cgroup_context(
             cgroup_stat_context,
-            sandbox_key=str(gone_path),
-        ) as (ctx, mock_netstat):
+            container_pid=0,
+        ) as (ctx, mock_read):
             results = await memory_plugin.gather_container_measures(ctx, ["cid_001"])
-            mock_netstat.assert_not_called()
+            mock_read.assert_not_called()
             # mem stats should be collected (read_sysfs returns 1048576)
             assert results[0].per_container["cid_001"].value == 1048576
             # net_rx and net_tx should be 0
             assert results[3].per_container["cid_001"].value == 0
             assert results[4].per_container["cid_001"].value == 0
 
-    async def test_empty_sandbox_key_returns_zero_net_stats(
+    async def test_valid_pid_calls_read_proc_net_dev(
         self,
         memory_plugin: MemoryPlugin,
         cgroup_stat_context: MagicMock,
     ) -> None:
-        """When sandbox_key is empty string, net stats should be 0 but other stats collected."""
+        """When container PID > 0, read_proc_net_dev should be called
+        and net stats collected."""
         with self._make_cgroup_context(
             cgroup_stat_context,
-            sandbox_key="",
-        ) as (ctx, mock_netstat):
+            container_pid=12345,
+        ) as (ctx, mock_read):
             results = await memory_plugin.gather_container_measures(ctx, ["cid_001"])
-            mock_netstat.assert_not_called()
+            mock_read.assert_called_once_with(12345)
             # mem stats should be collected
             assert results[0].per_container["cid_001"].value == 1048576
-            # net_rx and net_tx should be 0
-            assert results[3].per_container["cid_001"].value == 0
-            assert results[4].per_container["cid_001"].value == 0
-
-    async def test_valid_namespace_path_calls_netstat_ns(
-        self,
-        memory_plugin: MemoryPlugin,
-        cgroup_stat_context: MagicMock,
-        tmp_path: Path,
-    ) -> None:
-        """When namespace path exists, netstat_ns should be called and net stats collected."""
-        valid_path = tmp_path / "valid_netns"
-        valid_path.touch()
-        with self._make_cgroup_context(
-            cgroup_stat_context,
-            sandbox_key=str(valid_path),
-        ) as (ctx, mock_netstat):
-            results = await memory_plugin.gather_container_measures(ctx, ["cid_001"])
-            mock_netstat.assert_called()
-            # mem stats should be collected
-            assert results[0].per_container["cid_001"].value == 1048576
-            # net_rx and net_tx should have values from mock netstat_ns
+            # net_rx and net_tx should have values from mock read_proc_net_dev
             assert results[3].per_container["cid_001"].value == 4096
             assert results[4].per_container["cid_001"].value == 8192
 
-
-@pytest.mark.skipif(sys.platform != "linux", reason="Network namespaces require Linux")
-class TestNetstatNsWork:
-    """Tests for netstat_ns_work with real namespace switching."""
-
-    @pytest.fixture
-    def netns_process(self) -> Iterator[subprocess.Popen[bytes]]:
-        """Spawn a sleep process in a new network namespace via unshare."""
-        proc = subprocess.Popen(
-            ["unshare", "--net", "sleep", "30"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        time.sleep(0.3)
-        if proc.poll() is not None:
-            pytest.skip("unshare --net failed (insufficient privileges)")
-        try:
-            yield proc
-        finally:
-            proc.terminate()
-            proc.wait()
-
-    def test_netstat_ns_work_reads_isolated_namespace(
-        self, netns_process: subprocess.Popen[bytes]
+    async def test_oserror_returns_zero_net_stats(
+        self,
+        memory_plugin: MemoryPlugin,
+        cgroup_stat_context: MagicMock,
     ) -> None:
-        """netstat_ns_work should read counters from the target namespace,
-        not from the host."""
-        pid = netns_process.pid
-        ns_path = Path(f"/proc/{pid}/ns/net")
-        with ProcessPoolExecutor(max_workers=1) as pool:
-            result = pool.submit(netstat_ns_work, ns_path).result()
-        # A fresh network namespace only has loopback with zero counters.
-        assert "lo" in result
-        lo = result["lo"]
-        assert lo.bytes_recv == 0
-        assert lo.bytes_sent == 0
-
-    def test_netstat_ns_work_raises_on_invalid_namespace(self) -> None:
-        """netstat_ns_work should raise OSError when setns() fails
-        on a non-namespace fd (e.g. /dev/null)."""
-        with ProcessPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(netstat_ns_work, Path("/dev/null"))
-            with pytest.raises(OSError):
-                future.result()
+        """When read_proc_net_dev raises OSError, net stats should be 0
+        but other stats collected."""
+        with self._make_cgroup_context(
+            cgroup_stat_context,
+            container_pid=12345,
+        ) as (ctx, mock_read):
+            mock_read.side_effect = OSError("No such file or directory")
+            results = await memory_plugin.gather_container_measures(ctx, ["cid_001"])
+            # mem stats should be collected
+            assert results[0].per_container["cid_001"].value == 1048576
+            # net_rx and net_tx should be 0 due to OSError fallback
+            assert results[3].per_container["cid_001"].value == 0
+            assert results[4].per_container["cid_001"].value == 0
 
 
 @dataclass
 class _SysfsMocks:
     ctx: MagicMock
     container: AsyncMock
-    netstat_ns: MagicMock
+    read_proc_net_dev: MagicMock
     loop: MagicMock
     container_data: dict[str, Any]
 
@@ -433,9 +394,7 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         return plugin
 
     @pytest.fixture
-    def sysfs_mocks(
-        self, cgroup_stat_context: MagicMock, tmp_path: Path
-    ) -> Generator[_SysfsMocks, None, None]:
+    def sysfs_mocks(self, cgroup_stat_context: MagicMock) -> Generator[_SysfsMocks, None, None]:
         """Fully patched sysfs_impl environment with default happy-path behavior.
 
         Tests override specific mock side_effects before calling the target function.
@@ -453,10 +412,8 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         io_path.__truediv__ = MagicMock(return_value=io_stat)
         ctx.agent.get_cgroup_path = lambda subsys, cid: mem_path if subsys == "memory" else io_path
 
-        fake_ns = tmp_path / "fake_netns"
-        fake_ns.touch()
         container_data: dict[str, Any] = {
-            "NetworkSettings": {"SandboxKey": str(fake_ns)},
+            "State": {"Pid": 12345},
         }
 
         with (
@@ -464,18 +421,27 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
                 "ai.backend.agent.docker.intrinsic.DockerContainer",
             ) as mock_container_cls,
             patch("ai.backend.agent.docker.intrinsic.read_sysfs", return_value=1048576),
-            patch("ai.backend.agent.docker.intrinsic.netstat_ns", return_value={}) as mock_netstat,
+            patch(
+                "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
+                return_value=ContainerNetStat(rx_bytes=0, tx_bytes=0),
+            ) as mock_read_proc_net_dev,
             patch("ai.backend.agent.docker.intrinsic.current_loop") as mock_loop,
         ):
             mock_container = AsyncMock()
             mock_container.show.return_value = container_data
             mock_container_cls.return_value = mock_container
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0)
+
+            async def default_run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
+                return fn(*args)
+
+            mock_loop.return_value.run_in_executor = AsyncMock(
+                side_effect=default_run_in_executor,
+            )
 
             yield _SysfsMocks(
                 ctx=ctx,
                 container=mock_container,
-                netstat_ns=mock_netstat,
+                read_proc_net_dev=mock_read_proc_net_dev,
                 loop=mock_loop,
                 container_data=container_data,
             )
@@ -505,23 +471,25 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         assert "slow_container" not in results[0].per_container
         assert "normal_container" in results[0].per_container
 
-    async def test_slow_netstat_ns_times_out(
+    async def test_slow_container_show_for_net_stats_times_out(
         self,
         memory_plugin: MemoryPlugin,
         sysfs_mocks: _SysfsMocks,
     ) -> None:
-        """When netstat_ns() hangs, the call times out and returns None
-        for that container while other containers succeed."""
+        """When container.show() hangs during net stat collection,
+        the call times out and returns None for that container
+        while other containers succeed."""
         call_count = 0
 
-        async def slow_netstat_for_first(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        async def slow_show_on_second_call(*args: Any, **kwargs: Any) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
+            # First call succeeds quickly, second call hangs
             if call_count == 1:
                 await asyncio.sleep(10)
-            return {}
+            return sysfs_mocks.container_data
 
-        sysfs_mocks.netstat_ns.side_effect = slow_netstat_for_first
+        sysfs_mocks.container.show.side_effect = slow_show_on_second_call
 
         results = await memory_plugin.gather_container_measures(
             sysfs_mocks.ctx, ["slow_container", "normal_container"]
@@ -543,10 +511,10 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         branch in the results loop.
         """
 
-        async def selective_run_in_executor(executor: Any, fn: Any, *args: Any) -> int:
+        async def selective_run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
             if args and args[0] == "broken_container":
                 raise RuntimeError("unexpected executor failure")
-            return 0
+            return fn(*args)
 
         sysfs_mocks.loop.return_value.run_in_executor = selective_run_in_executor
 
@@ -566,10 +534,10 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         Exception), it must propagate instead of being silently skipped.
         This ensures shutdown signals are not swallowed by return_exceptions=True."""
 
-        async def cancel_on_first(executor: Any, fn: Any, *args: Any) -> int:
+        async def cancel_on_first(executor: Any, fn: Any, *args: Any) -> Any:
             if args and args[0] == "cancelled_container":
                 raise asyncio.CancelledError()
-            return 0
+            return fn(*args)
 
         sysfs_mocks.loop.return_value.run_in_executor = cancel_on_first
 
@@ -577,3 +545,68 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
             await memory_plugin.gather_container_measures(
                 sysfs_mocks.ctx, ["cancelled_container", "healthy_container"]
             )
+
+
+class TestReadProcNetDev:
+    """Tests for read_proc_net_dev() parsing /proc/[pid]/net/dev format."""
+
+    SAMPLE_NET_DEV = (
+        "Inter-|   Receive                                                |  Transmit\n"
+        " face |bytes    packets errs drop fifo frame compressed multicast"
+        "|bytes    packets errs drop fifo colls carrier compressed\n"
+        "    lo:    1234       10    0    0    0     0          0         0"
+        "        5678       10    0    0    0     0       0          0\n"
+        "  eth0:   50000      100    0    0    0     0          0         0"
+        "       80000      200    0    0    0     0       0          0\n"
+    )
+
+    MULTI_IFACE_NET_DEV = (
+        "Inter-|   Receive                                                |  Transmit\n"
+        " face |bytes    packets errs drop fifo frame compressed multicast"
+        "|bytes    packets errs drop fifo colls carrier compressed\n"
+        "    lo:       0        0    0    0    0     0          0         0"
+        "           0        0    0    0    0     0       0          0\n"
+        "  eth0:   10000       50    0    0    0     0          0         0"
+        "       20000      100    0    0    0     0       0          0\n"
+        "  eth1:   30000       70    0    0    0     0          0         0"
+        "       40000      150    0    0    0     0       0          0\n"
+    )
+
+    LO_ONLY_NET_DEV = (
+        "Inter-|   Receive                                                |  Transmit\n"
+        " face |bytes    packets errs drop fifo frame compressed multicast"
+        "|bytes    packets errs drop fifo colls carrier compressed\n"
+        "    lo:    9999       10    0    0    0     0          0         0"
+        "        8888       10    0    0    0     0       0          0\n"
+    )
+
+    @pytest.mark.parametrize(
+        ("content_attr", "expected_rx", "expected_tx"),
+        [
+            ("SAMPLE_NET_DEV", 50000, 80000),
+            ("MULTI_IFACE_NET_DEV", 40000, 60000),
+            ("LO_ONLY_NET_DEV", 0, 0),
+        ],
+        ids=["standard_format", "multiple_interfaces", "loopback_only"],
+    )
+    def test_parse_net_dev(
+        self,
+        tmp_path: Path,
+        content_attr: str,
+        expected_rx: int,
+        expected_tx: int,
+    ) -> None:
+        net_dev = tmp_path / "net_dev"
+        net_dev.write_text(getattr(self, content_attr))
+        with patch(
+            "ai.backend.agent.docker.intrinsic.Path",
+            return_value=net_dev,
+        ):
+            result = read_proc_net_dev(42)
+        assert result.rx_bytes == expected_rx
+        assert result.tx_bytes == expected_tx
+
+    def test_raises_oserror_for_nonexistent_pid(self) -> None:
+        """Raises OSError when /proc/[pid]/net/dev does not exist."""
+        with pytest.raises(OSError):
+            read_proc_net_dev(999999999)

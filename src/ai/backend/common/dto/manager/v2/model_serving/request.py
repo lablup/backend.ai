@@ -4,12 +4,12 @@ Request DTOs for Model Serving DTO v2.
 
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, NonNegativeFloat, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.session.types import MountOption
 from ai.backend.common.types import RuntimeVariant
 
 __all__ = (
@@ -36,9 +36,12 @@ class ServiceConfigInput(BaseRequestModel):
         default="/models",
         description="Mount destination for the model VFolder inside the inference session",
     )
-    extra_mounts: dict[UUID, Any] = Field(
+    extra_mounts: dict[UUID, MountOption] = Field(
         default_factory=dict,
-        description="Extra VFolders mounted to model service session",
+        description=(
+            "Extra VFolders mounted to the model service session, keyed by vfolder UUID."
+            " Each value carries per-mount options (mount destination, permission, subpath)."
+        ),
     )
     environ: dict[str, str] | None = Field(
         default=None,
@@ -47,7 +50,9 @@ class ServiceConfigInput(BaseRequestModel):
     scaling_group: str = Field(
         description="Name of the resource group to spawn inference sessions",
     )
-    resources: dict[str, str | int] | None = Field(
+    # TODO: Consider aligning with the compute session pattern (ResourceSlotEntryInput)
+    #  which accepts quantity as str and defers numeric parsing to ResourceSlot.
+    resources: dict[str, str | int | NonNegativeFloat] | None = Field(
         default=None,
         description="Resource requirements for the inference session",
     )
@@ -89,7 +94,7 @@ class CreateServiceInput(BaseRequestModel):
         description="Number of sessions to serve traffic",
     )
     runtime_variant: RuntimeVariant = Field(
-        default=RuntimeVariant.CUSTOM,
+        default=RuntimeVariant("custom"),
         description="Type of the inference runtime",
     )
     cluster_size: int = Field(

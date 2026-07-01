@@ -10,11 +10,11 @@ from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
+from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.sokovan.data import SessionWithKernels
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
@@ -66,8 +66,12 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
         - success: Session/kernel → CREATING
         - need_retry: None (stays PREPARED)
-        - expired: Session/kernel → PENDING (re-scheduling after timeout)
-        - give_up: None (container creation is time-based, only timeout applies)
+        - expired: Session/kernel → PENDING (re-scheduling after timeout —
+          a different agent or a later slot may succeed)
+        - give_up: Session/kernel → TERMINATING (retry budget exhausted —
+          repeatedly failing to start a kernel signals a persistent
+          problem with the kernel spec or environment; we surface the
+          failure rather than rescheduling indefinitely)
         """
         return StatusTransitions(
             success=TransitionStatus(
@@ -79,7 +83,10 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
                 session=SessionStatus.PENDING,
                 kernel=KernelStatus.PENDING,
             ),
-            give_up=None,
+            give_up=TransitionStatus(
+                session=SessionStatus.TERMINATING,
+                kernel=KernelStatus.TERMINATING,
+            ),
         )
 
     @property

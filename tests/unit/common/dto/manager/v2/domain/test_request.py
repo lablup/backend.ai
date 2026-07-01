@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestCreateDomainInput:
@@ -27,7 +28,7 @@ class TestCreateDomainInput:
         assert req.description is None
         assert req.is_active is True
         assert req.allowed_docker_registries is None
-        assert req.integration_id is None
+        assert req.integration_name is None
 
     def test_valid_creation_with_all_fields(self) -> None:
         req = CreateDomainInput(
@@ -35,15 +36,15 @@ class TestCreateDomainInput:
             description="Production domain",
             is_active=True,
             allowed_docker_registries=["registry.example.com"],
-            integration_id="ext-123",
+            integration_name="ext-123",
         )
         assert req.name == "production"
         assert req.description == "Production domain"
         assert req.allowed_docker_registries == ["registry.example.com"]
-        assert req.integration_id == "ext-123"
+        assert req.integration_name == "ext-123"
 
     def test_name_max_length_64_enforced(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateDomainInput(name="a" * 65)
 
     def test_name_at_max_length_valid(self) -> None:
@@ -55,7 +56,7 @@ class TestCreateDomainInput:
         assert req.name == "d"
 
     def test_missing_name_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateDomainInput.model_validate({})
 
     def test_is_active_default_true(self) -> None:
@@ -88,8 +89,8 @@ class TestUpdateDomainInput:
         assert isinstance(req.description, Sentinel)
         assert req.allowed_docker_registries is SENTINEL
         assert isinstance(req.allowed_docker_registries, Sentinel)
-        assert req.integration_id is SENTINEL
-        assert isinstance(req.integration_id, Sentinel)
+        assert req.integration_name is SENTINEL
+        assert isinstance(req.integration_name, Sentinel)
 
     def test_non_sentinel_fields_default_to_none(self) -> None:
         req = UpdateDomainInput()
@@ -109,7 +110,7 @@ class TestUpdateDomainInput:
         assert req.name == "new-name"
 
     def test_name_max_length_enforced(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateDomainInput(name="a" * 65)
 
     def test_is_active_update(self) -> None:
@@ -124,27 +125,27 @@ class TestUpdateDomainInput:
         req = UpdateDomainInput(allowed_docker_registries=["reg1.example.com", "reg2.example.com"])
         assert req.allowed_docker_registries == ["reg1.example.com", "reg2.example.com"]
 
-    def test_integration_id_none_clears(self) -> None:
-        req = UpdateDomainInput(integration_id=None)
-        assert req.integration_id is None
+    def test_integration_name_none_clears(self) -> None:
+        req = UpdateDomainInput(integration_name=None)
+        assert req.integration_name is None
 
-    def test_integration_id_string_update(self) -> None:
-        req = UpdateDomainInput(integration_id="new-integration")
-        assert req.integration_id == "new-integration"
+    def test_integration_name_string_update(self) -> None:
+        req = UpdateDomainInput(integration_name="new-integration")
+        assert req.integration_name == "new-integration"
 
     def test_round_trip_with_none_fields(self) -> None:
         req = UpdateDomainInput(
             name="updated-name",
             description=None,
             is_active=True,
-            integration_id=None,
+            integration_name=None,
         )
         json_data = req.model_dump_json()
         restored = UpdateDomainInput.model_validate_json(json_data)
         assert restored.name == "updated-name"
         assert restored.description is None
         assert restored.is_active is True
-        assert restored.integration_id is None
+        assert restored.integration_name is None
 
 
 class TestDeleteDomainInput:
@@ -155,7 +156,7 @@ class TestDeleteDomainInput:
         assert req.name == "test-domain"
 
     def test_missing_name_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             DeleteDomainInput.model_validate({})
 
     def test_round_trip(self) -> None:
@@ -173,7 +174,7 @@ class TestPurgeDomainInput:
         assert req.name == "test-domain"
 
     def test_missing_name_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             PurgeDomainInput.model_validate({})
 
     def test_round_trip(self) -> None:
@@ -239,11 +240,11 @@ class TestSearchDomainsRequest:
         assert req.limit >= 1
 
     def test_limit_zero_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchDomainsRequest(limit=0)
 
     def test_negative_offset_raises(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             SearchDomainsRequest(offset=-1)
 
     def test_with_filter_and_order(self) -> None:

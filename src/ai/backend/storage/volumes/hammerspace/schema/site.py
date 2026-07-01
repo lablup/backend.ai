@@ -1,6 +1,8 @@
 import enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from ai.backend.common.types import BackendAISchema
 
 from .uoid import UOID
 
@@ -10,7 +12,7 @@ class SiteType(enum.StrEnum):
     REMOTE = "REMOTE"
 
 
-class Site(BaseModel):
+class Site(BackendAISchema):
     model_config = ConfigDict(extra="allow")
 
     uoid: UOID

@@ -10,7 +10,7 @@ from aiohttp import web
 from ai.backend.appproxy.common.errors import (
     ServerMisconfiguredError,
 )
-from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.appproxy.common.types import RouteInfo, SerializableCircuit
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.proxy.backend import TCPBackend
 from ai.backend.appproxy.worker.types import (
@@ -84,15 +84,35 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         # TCP does not support authentication
         return
 
+    def _is_peer_allowed(self, writer: asyncio.StreamWriter, circuit: SerializableCircuit) -> bool:
+        # TCP carries no forwarded-for header, so the allowlist is matched
+        # against the direct connection peer only.
+        validator = circuit.ip_validator
+        if not validator.is_restricted:
+            return True
+        peername = writer.get_extra_info("peername")
+        if not peername:
+            log.debug("rejecting TCP connection with unknown peer for circuit {}", circuit.id)
+            return False
+        peer_ip = peername[0]
+        if not validator.is_allowed(peer_ip):
+            log.debug(
+                "rejecting TCP client {} for circuit {} (not in allowed_client_ips)",
+                peer_ip,
+                circuit.id,
+            )
+            return False
+        return True
+
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TCPBackend:
         return TCPBackend(routes, self.root_context, circuit)
 
     async def update_backend(self, backend: TCPBackend, routes: list[RouteInfo]) -> TCPBackend:
-        backend.routes = routes
+        await backend.update_routes(routes)
         return backend
 
     async def terminate_backend(self, backend: TCPBackend) -> None:
-        return
+        await backend.close()
 
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
@@ -102,6 +122,10 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             if (backend.last_used - now) >= threshold
         ]
 
+    async def _close_writer(self, writer: asyncio.StreamWriter) -> None:
+        writer.close()
+        await writer.wait_closed()
+
     async def pipe(
         self, circuit_key: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
@@ -109,8 +133,11 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         backend: TCPBackend | None = self.backends.get(circuit_key)
 
         if not backend:
-            writer.close()
-            await writer.wait_closed()
+            await self._close_writer(writer)
+            return
+
+        if not self._is_peer_allowed(writer, backend.circuit):
+            await self._close_writer(writer)
             return
 
         circuit_id = str(backend.circuit.id)

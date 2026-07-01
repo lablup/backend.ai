@@ -19,6 +19,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.service import ModelServiceNotFound
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
     DeleteModelServiceActionResult,
@@ -28,9 +29,6 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.testutils.scenario import ScenarioBase
 
@@ -119,8 +117,14 @@ class TestDeleteModelService:
         return mock
 
     @pytest.fixture
-    def mock_revision_generator_registry(self) -> MagicMock:
-        return MagicMock(spec=RevisionGeneratorRegistry)
+    def mock_route_controller(self) -> MagicMock:
+        mock = MagicMock()
+        mock.mark_lifecycle_needed = AsyncMock()
+        return mock
+
+    @pytest.fixture
+    def mock_runtime_variant_repository(self) -> MagicMock:
+        return MagicMock(spec=RuntimeVariantRepository)
 
     @pytest.fixture
     def model_serving_service(
@@ -134,9 +138,10 @@ class TestDeleteModelService:
         mock_valkey_live: MagicMock,
         mock_repositories: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
-        mock_revision_generator_registry: MagicMock,
+        mock_route_controller: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -148,9 +153,11 @@ class TestDeleteModelService:
             valkey_live=mock_valkey_live,
             repository=mock_repositories.repository,
             deployment_repository=mock_deployment_repository,
+            runtime_variant_repository=mock_runtime_variant_repository,
+            scheduler_repository=MagicMock(),
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
-            revision_generator_registry=mock_revision_generator_registry,
+            route_controller=mock_route_controller,
         )
 
     @pytest.fixture

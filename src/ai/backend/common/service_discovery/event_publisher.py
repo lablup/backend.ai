@@ -6,11 +6,12 @@ ServiceRegisteredEvent and ServiceDeregisteredEvent via EventProducer.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime
+from typing import Final
 
 from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
+from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.service_discovery.anycast import (
     ServiceDeregisteredEvent,
@@ -24,6 +25,34 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("ServiceDiscoveryEventPublisher",)
 
 
+class _ServiceDiscoveryHeartbeatTask(PeriodicTask):
+    """Periodically re-publish ServiceRegisteredEvent as a heartbeat."""
+
+    _publisher: Final[ServiceDiscoveryEventPublisher]
+    _interval: Final[float]
+
+    def __init__(self, publisher: ServiceDiscoveryEventPublisher, interval: float) -> None:
+        self._publisher = publisher
+        self._interval = interval
+
+    @property
+    def name(self) -> str:
+        return "service_discovery_heartbeat"
+
+    @property
+    def interval(self) -> float:
+        return self._interval
+
+    @property
+    def initial_delay(self) -> float:
+        # The original loop slept for `interval` before publishing the first
+        # heartbeat (the initial registration is published by start() directly).
+        return self._interval
+
+    async def run(self) -> None:
+        await self._publisher.publish_registered()
+
+
 class ServiceDiscoveryEventPublisher:
     """Builds and publishes SD events from ServiceDiscoveryConfig.
 
@@ -35,8 +64,7 @@ class ServiceDiscoveryEventPublisher:
     _config: ServiceDiscoveryConfig
     _component_version: str
     _startup_time: datetime
-    _heartbeat_task: asyncio.Task[None] | None
-    _stopped: bool
+    _local_cron: LocalCron
 
     def __init__(
         self,
@@ -44,13 +72,15 @@ class ServiceDiscoveryEventPublisher:
         config: ServiceDiscoveryConfig,
         component_version: str,
         startup_time: datetime,
+        heartbeat_interval: float = 60.0,
     ) -> None:
         self._event_producer = event_producer
         self._config = config
         self._component_version = component_version
         self._startup_time = startup_time
-        self._heartbeat_task = None
-        self._stopped = False
+        self._local_cron = LocalCron([
+            _ServiceDiscoveryHeartbeatTask(self, heartbeat_interval),
+        ])
 
     def _build_registered_event(self) -> ServiceRegisteredEvent:
         endpoints = [
@@ -101,34 +131,14 @@ class ServiceDiscoveryEventPublisher:
             event.instance_id,
         )
 
-    async def _heartbeat_loop(self, interval: int) -> None:
-        """Periodically re-publish ServiceRegisteredEvent as a heartbeat."""
-        while not self._stopped:
-            try:
-                await asyncio.sleep(interval)
-                if not self._stopped:
-                    await self.publish_registered()
-            except asyncio.CancelledError:
-                break
-            except Exception:
-                log.exception("Error publishing SD heartbeat")
-
-    async def start(self, heartbeat_interval: int = 60) -> None:
+    async def start(self) -> None:
         """Publish initial registration and start periodic heartbeat loop."""
         await self.publish_registered()
-        self._heartbeat_task = asyncio.create_task(
-            self._heartbeat_loop(heartbeat_interval),
-        )
+        await self._local_cron.start()
 
     async def stop(self) -> None:
         """Stop heartbeat loop and publish deregistered event."""
-        self._stopped = True
-        if self._heartbeat_task is not None and not self._heartbeat_task.done():
-            self._heartbeat_task.cancel()
-            try:
-                await self._heartbeat_task
-            except asyncio.CancelledError:
-                pass
+        await self._local_cron.stop()
         try:
             await self.publish_deregistered()
         except Exception:

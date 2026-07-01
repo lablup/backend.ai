@@ -6,11 +6,12 @@ All database operations go through the repository pattern.
 """
 
 import logging
+from uuid import UUID
 
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.sokovan import KernelCreationInfo
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.sokovan.data import KernelCreationInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -154,6 +155,7 @@ class KernelStateEngine:
         agent_id: AgentId,
         image: str,
         image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> None:
         """
         Update kernel status from PREPARING to PULLING for the specified image on an agent.
@@ -161,20 +163,25 @@ class KernelStateEngine:
         :param agent_id: The agent ID where kernels should be updated
         :param image: The image name to match kernels
         :param image_ref: Optional image reference
+        :param image_id: Optional image UUID for precise matching
         """
         log.debug(
-            "Updating kernels to PULLING for agent:{} image:{}",
+            "Updating kernels to PULLING for agent:{} image:{} image_id:{}",
             agent_id,
             image,
+            image_id,
         )
 
-        await self._repository.update_kernels_to_pulling_for_image(agent_id, image, image_ref)
+        await self._repository.update_kernels_to_pulling_for_image(
+            agent_id, image, image_ref, image_id=image_id
+        )
 
     async def update_kernels_to_prepared_for_image(
         self,
         agent_id: AgentId,
         image: str,
         image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> int:
         """
         Update kernel status to PREPARED for the specified image on an agent.
@@ -183,10 +190,11 @@ class KernelStateEngine:
         :param agent_id: The agent ID where kernels should be updated
         :param image: The image name to match kernels
         :param image_ref: Optional image reference
+        :param image_id: Optional image UUID for precise matching
         :return: The number of kernels updated to PREPARED state
         """
         return await self._repository.update_kernels_to_prepared_for_image(
-            agent_id, image, image_ref
+            agent_id, image, image_ref, image_id=image_id
         )
 
     async def cancel_kernels_for_failed_image(
@@ -195,6 +203,7 @@ class KernelStateEngine:
         image: str,
         error_msg: str,
         image_ref: str | None = None,
+        image_id: UUID | None = None,
     ) -> None:
         """
         Cancel kernels for an image that failed to be available on an agent.
@@ -203,16 +212,18 @@ class KernelStateEngine:
         :param image: The image name that failed
         :param error_msg: The error message to include in status
         :param image_ref: Optional image reference
+        :param image_id: Optional image UUID for precise matching
         """
         log.warning(
-            "Cancelling kernels for failed image on agent:{} image:{}, msg:{}",
+            "Cancelling kernels for failed image on agent:{} image:{} image_id:{}, msg:{}",
             agent_id,
             image,
+            image_id,
             error_msg,
         )
 
         await self._repository.cancel_kernels_for_failed_image(
-            agent_id, image, error_msg, image_ref
+            agent_id, image, error_msg, image_ref, image_id=image_id
         )
 
     async def reset_kernels_to_pending_for_sessions(

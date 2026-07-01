@@ -134,7 +134,8 @@ class ValkeyContainerLogClient:
             key,
             3600,  # 1 hour expiration
         )
-        await self._client.client.exec(tx, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(tx, raise_on_error=True)
 
     @valkey_container_log_resilience.apply()
     async def container_log_len(
@@ -149,7 +150,8 @@ class ValkeyContainerLogClient:
         :raises: GlideClientError if the length cannot be retrieved.
         """
         key = self._container_log_key(container_id)
-        return await self._client.client.llen(key)
+        async with self._client.client() as conn:
+            return await conn.llen(key)
 
     @valkey_container_log_resilience.apply()
     async def pop_container_logs(
@@ -165,7 +167,8 @@ class ValkeyContainerLogClient:
         :raises: GlideClientError if the logs cannot be popped.
         """
         key = self._container_log_key(container_id)
-        logs = await self._client.client.lpop_count(key, count)
+        async with self._client.client() as conn:
+            logs = await conn.lpop_count(key, count)
         if logs is None:
             return None
 
@@ -183,7 +186,8 @@ class ValkeyContainerLogClient:
         :raises: GlideClientError if the logs cannot be cleared.
         """
         key = self._container_log_key(container_id)
-        await self._client.client.delete([key])
+        async with self._client.client() as conn:
+            await conn.delete([key])
 
     def _container_log_key(self, container_id: str) -> str:
         return f"containerlog.{container_id}"

@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from aiohttp import web
@@ -12,7 +12,9 @@ from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookRes
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -20,6 +22,9 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
     LoginSessionCreationResult,
 )
 from ai.backend.manager.repositories.auth.repository import AuthRepository
+from ai.backend.manager.repositories.user_resource_policy.repository import (
+    UserResourcePolicyRepository,
+)
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
 )
@@ -58,17 +63,39 @@ def mock_valkey_session_client() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_user_resource_policy_repository() -> AsyncMock:
+    mock_repo = AsyncMock(spec=UserResourcePolicyRepository)
+    # Default: policy with no concurrent login limit (unlimited)
+    mock_repo.get_by_name.return_value = UserResourcePolicyData(
+        name="default",
+        max_vfolder_count=10,
+        max_quota_scope_size=0,
+        max_session_count_per_model_session=5,
+        max_customized_image_count=3,
+        max_concurrent_logins=None,
+    )
+    return mock_repo
+
+
+@pytest.fixture
 def auth_service(
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
     mock_config_provider: MagicMock,
     mock_valkey_session_client: AsyncMock,
+    mock_user_resource_policy_repository: AsyncMock,
+    mock_user_repository: AsyncMock,
+    mock_group_repository: AsyncMock,
 ) -> AuthService:
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
         valkey_session_client=mock_valkey_session_client,
+        user_resource_policy_repository=mock_user_resource_policy_repository,
+        user_repository=mock_user_repository,
+        group_repository=mock_group_repository,
+        ssh_key_validator=AsyncMock(),
     )
 
 
@@ -79,6 +106,7 @@ def _make_mock_user(
     role: UserRole = UserRole.USER,
     status: UserStatus = UserStatus.ACTIVE,
     password_changed_at: datetime | None = None,
+    resource_policy: str = "default",
 ) -> MagicMock:
     """Create a mock user RowMapping with attribute and item access."""
     mock_user = MagicMock()
@@ -87,6 +115,7 @@ def _make_mock_user(
     mock_user.role = role
     mock_user.status = status
     mock_user.password_changed_at = password_changed_at
+    mock_user.resource_policy = resource_policy
     mock_user.__getitem__ = lambda self, key: getattr(self, key)
     return mock_user
 
@@ -95,12 +124,14 @@ def _make_mock_keypair_row(
     *,
     access_key: str = "test_access_key",
     secret_key: str = "test_secret_key",
+    max_concurrent_sessions: int = 1,
 ) -> MagicMock:
     """Create a mock keypair row with access_key, secret_key, and mapping."""
     mock_keypair = MagicMock()
     mock_keypair.access_key = access_key
     mock_keypair.secret_key = secret_key
     mock_keypair.mapping = {"access_key": access_key}
+    mock_keypair.resource_policy_row.max_concurrent_sessions = max_concurrent_sessions
     return mock_keypair
 
 
@@ -155,6 +186,7 @@ async def test_authorize_success(
         password="correct_password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -181,6 +213,7 @@ async def test_authorize_invalid_token_type(
         password="password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -207,6 +240,7 @@ async def test_authorize_invalid_credentials(
         password="wrong_password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -228,6 +262,7 @@ async def test_authorize_with_hook_authorization(
         password="any_password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -284,6 +319,7 @@ async def test_authorize_with_password_expiry(
         password="old_password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -326,6 +362,7 @@ async def test_authorize_with_post_hook_response(
         password="password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -369,6 +406,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
         password="password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
     )
 
@@ -405,7 +443,9 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     result = await auth_service.authorize(action)
 
     # Stale session should have been invalidated in DB
-    mock_auth_repository.invalidate_login_session_by_token.assert_awaited_once_with("stale_token")
+    mock_auth_repository.delete_login_session_by_token.assert_awaited_once_with(
+        "stale_token", LoginAttemptResult.EXPIRED
+    )
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "new_session_token"
 
@@ -414,9 +454,10 @@ async def test_authorize_force_invalidates_existing_sessions(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
+    mock_user_resource_policy_repository: AsyncMock,
     mock_valkey_session_client: AsyncMock,
 ) -> None:
-    """Test that force=True invalidates existing live sessions and creates a new one."""
+    """Test that force=True evicts the oldest live session when the user-level limit is reached."""
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,
         domain_name="default",
@@ -424,8 +465,19 @@ async def test_authorize_force_invalidates_existing_sessions(
         password="password",
         request=MagicMock(),
         stoken=None,
+        client_type_id=uuid4(),
         otp=None,
         force=True,
+    )
+
+    # Set max_concurrent_logins=1 so that the one live session triggers force-eviction.
+    mock_user_resource_policy_repository.get_by_name.return_value = UserResourcePolicyData(
+        name="default",
+        max_vfolder_count=10,
+        max_quota_scope_size=0,
+        max_session_count_per_model_session=5,
+        max_customized_image_count=3,
+        max_concurrent_logins=1,
     )
 
     mock_user = _make_mock_user()
@@ -460,13 +512,61 @@ async def test_authorize_force_invalidates_existing_sessions(
 
     result = await auth_service.authorize(action)
 
-    # create_login_session should have been called with tokens_to_invalidate
+    # Eviction happens via a dedicated repository call before create_login_session.
+    mock_auth_repository.delete_login_sessions_by_tokens.assert_awaited_once_with(
+        ["existing_live_token"], LoginAttemptResult.EVICTED
+    )
     mock_auth_repository.create_login_session.assert_awaited_once()
-    call_kwargs = mock_auth_repository.create_login_session.call_args
-    assert call_kwargs.kwargs.get("tokens_to_invalidate") == ["existing_live_token"]
+    create_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
+    assert "tokens_to_invalidate" not in create_kwargs
 
     # Old session should be deleted from Valkey
     mock_valkey_session_client.delete_login_session.assert_awaited_once_with("existing_live_token")
 
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "forced_new_token"
+
+
+async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_repo(
+    auth_service: AuthService,
+    mock_auth_repository: AsyncMock,
+) -> None:
+    """create_login_session must not pass any enforcement knobs to the repository.
+
+    Enforcement now lives entirely in the service layer; the repository only receives
+    the identity fields needed to create the row. Eviction, when needed, is performed
+    via a separate ``invalidate_login_sessions_by_tokens`` call.
+    """
+    mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
+        session_token="new_token",
+    )
+
+    test_client_type_id = uuid4()
+    await auth_service._create_login_session(
+        action=AuthorizeAction(
+            type=AuthTokenType.KEYPAIR,
+            domain_name="default",
+            email="test@example.com",
+            password="password",
+            request=MagicMock(),
+            stoken=None,
+            client_type_id=uuid4(),
+            otp=None,
+        ),
+        user=_make_mock_user(),
+        keypair_row=_make_mock_keypair_row(),
+        live_sessions=[],
+        auth_config=AuthConfig(
+            max_password_age=timedelta(days=90),
+            password_hash_algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            password_hash_rounds=100_000,
+            password_hash_salt_size=32,
+            login_session_max_age=604800,
+        ),
+        login_client_type_id=test_client_type_id,
+    )
+
+    call_kwargs = mock_auth_repository.create_login_session.call_args.kwargs
+    assert "max_concurrent_sessions" not in call_kwargs
+    assert "tokens_to_invalidate" not in call_kwargs
+    mock_auth_repository.delete_login_sessions_by_tokens.assert_not_called()

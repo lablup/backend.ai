@@ -13,7 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.manager.models.base import (
     GUID,
@@ -26,6 +26,9 @@ __all__ = (
     "ResourceSlotTypeRow",
     "AgentResourceRow",
     "ResourceAllocationRow",
+    "ModelCardResourceRequirementRow",
+    "PresetResourceSlotRow",
+    "DeploymentRevisionResourceSlotRow",
 )
 
 
@@ -39,6 +42,20 @@ class ResourceSlotTypeRow(Base):  # type: ignore[misc]
 
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
     slot_type: Mapped[str] = mapped_column("slot_type", sa.String(length=16), nullable=False)
+    required: Mapped[bool] = mapped_column(
+        "required",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
+    enabled: Mapped[bool] = mapped_column(
+        "enabled",
+        sa.Boolean,
+        nullable=False,
+        default=True,
+        server_default=sa.true(),
+    )
     display_name: Mapped[str] = mapped_column(
         "display_name",
         sa.String(length=128),
@@ -105,6 +122,9 @@ class AgentResourceRow(Base):  # type: ignore[misc]
     capacity: Mapped[Decimal] = mapped_column(
         "capacity", sa.Numeric(precision=24, scale=6), nullable=False
     )
+    reserved: Mapped[Decimal] = mapped_column(
+        "reserved", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
+    )
     used: Mapped[Decimal] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
     )
@@ -120,6 +140,10 @@ class AgentResourceRow(Base):  # type: ignore[misc]
         nullable=False,
         server_default=sa.func.now(),
         onupdate=sa.func.now(),
+    )
+
+    slot_type_row: Mapped[ResourceSlotTypeRow] = relationship(
+        "ResourceSlotTypeRow", foreign_keys=[slot_name], lazy="raise"
     )
 
     __table_args__ = (
@@ -140,6 +164,7 @@ class AgentResourceRow(Base):  # type: ignore[misc]
             "agent_id",
             "slot_name",
             "capacity",
+            "reserved",
             "used",
         ),
     )
@@ -198,4 +223,94 @@ class ResourceAllocationRow(Base):  # type: ignore[misc]
             "slot_name",
             postgresql_where=sa.text("free_at IS NULL"),
         ),
+    )
+
+
+class ModelCardResourceRequirementRow(Base):  # type: ignore[misc]
+    """Per-model-card, per-slot minimum resource requirement.
+
+    Composite primary key: (model_card_id, slot_name).
+    """
+
+    __tablename__ = "model_card_resource_requirements"
+
+    model_card_id: Mapped[uuid.UUID] = mapped_column("model_card_id", GUID, primary_key=True)
+    slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
+    min_quantity: Mapped[Decimal] = mapped_column(
+        "min_quantity", sa.Numeric(precision=24, scale=6), nullable=False
+    )
+
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["model_card_id"],
+            ["model_cards.id"],
+            name="fk_mc_resource_req_model_card_id_model_cards",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["slot_name"],
+            ["resource_slot_types.slot_name"],
+            name="fk_mc_resource_req_slot_name_resource_slot_types",
+        ),
+        sa.Index("ix_mc_resource_req_slot_name", "slot_name"),
+    )
+
+
+class PresetResourceSlotRow(Base):  # type: ignore[misc]
+    """Per-preset, per-slot resource allocation.
+
+    Composite primary key: (preset_id, slot_name).
+    """
+
+    __tablename__ = "preset_resource_slots"
+
+    preset_id: Mapped[uuid.UUID] = mapped_column("preset_id", GUID, primary_key=True)
+    slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
+    quantity: Mapped[Decimal] = mapped_column(
+        "quantity", sa.Numeric(precision=24, scale=6), nullable=False
+    )
+
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["preset_id"],
+            ["deployment_revision_presets.id"],
+            name="fk_preset_resource_slots_preset_id_drp",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["slot_name"],
+            ["resource_slot_types.slot_name"],
+            name="fk_preset_resource_slots_slot_name_resource_slot_types",
+        ),
+        sa.Index("ix_preset_resource_slots_slot_name", "slot_name"),
+    )
+
+
+class DeploymentRevisionResourceSlotRow(Base):  # type: ignore[misc]
+    """Per-revision, per-slot resource allocation.
+
+    Composite primary key: (revision_id, slot_name).
+    """
+
+    __tablename__ = "deployment_revision_resource_slots"
+
+    revision_id: Mapped[uuid.UUID] = mapped_column("revision_id", GUID, primary_key=True)
+    slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), primary_key=True)
+    quantity: Mapped[Decimal] = mapped_column(
+        "quantity", sa.Numeric(precision=24, scale=6), nullable=False
+    )
+
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["revision_id"],
+            ["deployment_revisions.id"],
+            name="fk_dr_resource_slots_revision_id_deployment_revisions",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["slot_name"],
+            ["resource_slot_types.slot_name"],
+            name="fk_dr_resource_slots_slot_name_resource_slot_types",
+        ),
+        sa.Index("ix_dr_resource_slots_slot_name", "slot_name"),
     )

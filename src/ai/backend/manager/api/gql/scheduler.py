@@ -4,7 +4,6 @@ import logging
 import uuid
 from collections.abc import AsyncGenerator
 from enum import StrEnum
-from typing import TYPE_CHECKING
 
 import strawberry
 from strawberry import Info
@@ -18,7 +17,6 @@ from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagato
 from ai.backend.common.events.types import EventDomain
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_enum,
@@ -26,13 +24,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
     gql_subscription,
 )
-from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
 from .session_federation import Session
-
-if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -80,14 +75,13 @@ class SchedulingBroadcastEventPayloadGQL:
     @gql_field(
         description="The session ID associated with the replica. This can be null right after replica creation."
     )  # type: ignore[misc]
-    async def session(self, info: Info[StrawberryGQLContext]) -> Session:
-        session_global_id = to_global_id(
-            ComputeSessionNode, self.session_id, is_target_graphene_object=True
-        )
-        return Session(id=strawberry.ID(session_global_id))
+    async def session(self, info: Info[StrawberryGQLContext]) -> Session | None:
+        # The federated ComputeSessionNode stub is a relay.Node; pass the inner id so
+        # Strawberry re-encodes the same global ID the graphene subgraph expects.
+        return Session(id=strawberry.ID(str(self.session_id)))
 
 
-@gql_subscription(  # type: ignore[misc]
+@gql_subscription(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description=(
@@ -120,7 +114,7 @@ async def scheduling_events_by_session(
     try:
         session_uuid = SessionId(uuid.UUID(session_id))
     except (ValueError, AttributeError) as e:
-        log.warning(f"Invalid session ID format: {session_id}")
+        log.warning("Invalid session ID format: {}", session_id)
         raise InvalidSessionId(f"Invalid session ID format: {session_id}") from e
 
     event_hub = info.context.event_hub
@@ -136,7 +130,7 @@ async def scheduling_events_by_session(
                 try:
                     status_dto = SchedulingStatusDTO(event.status_transition)
                 except ValueError:
-                    log.warning(f"Unknown status transition: {event.status_transition}")
+                    log.warning("Unknown status transition: {}", event.status_transition)
                     status_dto = SchedulingStatusDTO.ERROR
                 dto = SchedulingBroadcastEventPayloadNode(
                     session_id=str(event.session_id),

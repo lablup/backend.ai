@@ -1,3 +1,5 @@
+from typing import Any, Self
+
 from ai.backend.common.types import CIStrEnum
 
 
@@ -19,15 +21,32 @@ class ActivenessStatus(CIStrEnum):
     INACTIVE = "INACTIVE"
 
 
+# Map ``EndpointLifecycle`` (legacy lifecycle column form) values onto the
+# corresponding v2 :class:`ModelDeploymentStatus`. Read by ``_missing_`` to
+# resolve historical ``deployment_history`` rows where the writer stored
+# :class:`EndpointLifecycle` values instead of v2 status names.
+_LIFECYCLE_TO_DEPLOYMENT_STATUS_ALIASES: dict[str, str] = {
+    "destroying": "STOPPING",
+    "destroyed": "STOPPED",
+    "created": "PENDING",  # never-deployed initial state
+}
+
+
 class ModelDeploymentStatus(CIStrEnum):
     PENDING = "PENDING"
     SCALING = "SCALING"
     DEPLOYING = "DEPLOYING"
     READY = "READY"
-    DESTROYING = "DESTROYING"
-    DESTROYED = "DESTROYED"
     STOPPING = "STOPPING"
     STOPPED = "STOPPED"
+
+    @classmethod
+    def _missing_(cls, value: Any) -> Self | None:
+        if isinstance(value, str):
+            alias = _LIFECYCLE_TO_DEPLOYMENT_STATUS_ALIASES.get(value.lower())
+            if alias is not None:
+                return cls(alias)
+        return super()._missing_(value)
 
 
 class DeploymentStrategy(CIStrEnum):

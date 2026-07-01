@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderStatusFilter,
     VFolderUsageModeFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -30,15 +29,19 @@ from .enum import VFolderOperationStatusGQL, VFolderUsageModeGQL
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for VFolder operation status enum fields. Supports in and not_in operations.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="VFolderOperationStatusFilter",
 )
 class VFolderOperationStatusFilterGQL(PydanticInputMixin[VFolderStatusFilter]):
     """Filter for vfolder operation status enum fields."""
 
+    equals: VFolderOperationStatusGQL | None = None
     in_: list[VFolderOperationStatusGQL] | None = gql_field(
         description="The in field.", name="in", default=None
+    )
+    not_equals: VFolderOperationStatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
     )
     not_in: list[VFolderOperationStatusGQL] | None = gql_field(
         description="Exclude statuses not in this list.", default=None
@@ -48,15 +51,19 @@ class VFolderOperationStatusFilterGQL(PydanticInputMixin[VFolderStatusFilter]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for VFolder usage mode enum fields. Supports in and not_in operations.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="VFolderUsageModeFilter",
 )
 class VFolderUsageModeFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
     """Filter for vfolder usage mode enum fields."""
 
+    equals: VFolderUsageModeGQL | None = None
     in_: list[VFolderUsageModeGQL] | None = gql_field(
         description="The in field.", name="in", default=None
+    )
+    not_equals: VFolderUsageModeGQL | None = gql_field(
+        description="Excludes exact usage mode match.", name="notEquals", default=None
     )
     not_in: list[VFolderUsageModeGQL] | None = gql_field(
         description="Exclude usage modes not in this list.", default=None
@@ -66,7 +73,7 @@ class VFolderUsageModeFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for querying virtual folders. Supports filtering by name, host, status, usage mode, and creation time. Multiple filters can be combined using AND, OR, and NOT logical operators.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="VFolderFilter",
 )
@@ -86,7 +93,7 @@ class VFolderFilterGQL(PydanticInputMixin[VFolderFilter]):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description=(
             "Fields available for ordering virtual folder query results. "
             "NAME: Order by folder name alphabetically. "
@@ -109,7 +116,7 @@ class VFolderOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Specifies ordering for virtual folder query results. Combine field selection with direction to sort results. Default direction is DESC (descending).",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
     ),
     name="VFolderOrderBy",
 )

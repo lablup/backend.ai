@@ -62,16 +62,14 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatingBroadcastEvent,
 )
 from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    ModelServiceStatusAnycastEvent,
-    RouteCreatedAnycastEvent,
-)
 from ai.backend.common.events.event_types.notification.anycast import (
     NotificationTriggeredEvent,
 )
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoDeploymentLifecycleEvent,
     DoDeploymentLifecycleIfNeededEvent,
+    DoReconcileProcessEvent,
+    DoReconcileProcessIfNeededEvent,
     DoRouteLifecycleEvent,
     DoRouteLifecycleIfNeededEvent,
     DoSokovanProcessIfNeededEvent,
@@ -130,6 +128,7 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
+from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -138,7 +137,6 @@ from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
 from .handlers.log_cleanup import LogCleanupEventHandler
-from .handlers.model_serving import ModelServingEventHandler
 from .handlers.notification import NotificationEventHandler
 from .handlers.service_catalog import ServiceCatalogEventHandler
 from .handlers.session import SessionEventHandler
@@ -156,6 +154,7 @@ class DispatcherArgs:
     scheduling_controller: SchedulingController
     deployment_coordinator: DeploymentCoordinator
     route_coordinator: RouteCoordinator
+    reconciler_coordinator: ReconcilerCoordinator
     scheduler_repository: SchedulerRepository
     event_hub: EventHub
     agent_registry: AgentRegistry
@@ -177,7 +176,6 @@ class Dispatchers:
     _image_event_handler: ImageEventHandler
     _kernel_event_handler: KernelEventHandler
     _schedule_event_handler: ScheduleEventHandler
-    _model_serving_event_handler: ModelServingEventHandler
     _session_event_handler: SessionEventHandler
     _vfolder_event_handler: VFolderEventHandler
     _idle_check_event_handler: IdleCheckEventHandler
@@ -216,14 +214,15 @@ class Dispatchers:
             args.scheduling_controller,
             args.deployment_coordinator,
             args.route_coordinator,
+            args.reconciler_coordinator,
             args.event_hub,
         )
-        self._model_serving_event_handler = ModelServingEventHandler(args.agent_registry, args.db)
         self._session_event_handler = SessionEventHandler(
             args.agent_registry,
             args.db,
             args.event_dispatcher_plugin_ctx,
             args.idle_checker_host,
+            args.scheduling_controller,
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
@@ -258,7 +257,6 @@ class Dispatchers:
         self._dispatch_image_events(event_dispatcher)
         self._dispatch_kernel_events(event_dispatcher)
         self._dispatch_schedule_events(event_dispatcher)
-        self._dispatch_model_serving_events(event_dispatcher)
         self._dispatch_session_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
         self._dispatch_idle_check_events(event_dispatcher)
@@ -397,16 +395,6 @@ class Dispatchers:
             name="api.session.kterm",
         )
 
-    def _dispatch_model_serving_events(self, event_dispatcher: EventDispatcher) -> None:
-        event_dispatcher.consume(
-            ModelServiceStatusAnycastEvent,
-            None,
-            self._model_serving_event_handler.handle_model_service_status_update,
-        )
-        event_dispatcher.consume(
-            RouteCreatedAnycastEvent, None, self._model_serving_event_handler.handle_route_creation
-        )
-
     def _dispatch_schedule_events(self, event_dispatcher: EventDispatcher) -> None:
         coalescing_opts: CoalescingOptions = {
             "max_wait": 0.5,
@@ -476,6 +464,19 @@ class Dispatchers:
             None,
             self._schedule_event_handler.handle_do_route_lifecycle,
             name="route.lifecycle",
+        )
+        # Generic reconcile events (reconcile_type routes to the registered stage)
+        event_dispatcher.consume(
+            DoReconcileProcessIfNeededEvent,
+            None,
+            self._schedule_event_handler.handle_do_reconcile_if_needed,
+            name="reconcile.process_if_needed",
+        )
+        event_dispatcher.consume(
+            DoReconcileProcessEvent,
+            None,
+            self._schedule_event_handler.handle_do_reconcile,
+            name="reconcile.process",
         )
 
     def _dispatch_session_events(self, event_dispatcher: EventDispatcher) -> None:

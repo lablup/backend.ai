@@ -51,10 +51,14 @@ def server_module_registries(
     return [
         register_admin_routes(
             AdminHandler(
-                gql_schema=MagicMock(), gql_deps=MagicMock(), strawberry_schema=MagicMock()
+                gql_schema=MagicMock(),
+                gql_deps=MagicMock(),
+                strawberry_schema=MagicMock(),
+                public_strawberry_schema=MagicMock(),
             ),
             route_deps,
             sub_registries=[domain_registry],
+            gql_ws_handler=MagicMock(),
         ),
     ]
 

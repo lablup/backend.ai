@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -14,12 +15,15 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
 )
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
+from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.deployment_revision_preset.repository import (
+        DeploymentRevisionPresetRepository,
+    )
 
 
 @dataclass
@@ -32,7 +36,8 @@ class DeploymentControllerInput:
     storage_manager: StorageSessionManager
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
-    revision_generator_registry: RevisionGeneratorRegistry
+    revision_draft_reader: RevisionDraftReader
+    deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
 
 
 class DeploymentControllerDependency(
@@ -64,7 +69,8 @@ class DeploymentControllerDependency(
                 storage_manager=setup_input.storage_manager,
                 event_producer=setup_input.event_producer,
                 valkey_schedule=setup_input.valkey_schedule,
-                revision_generator_registry=setup_input.revision_generator_registry,
+                revision_draft_reader=setup_input.revision_draft_reader,
+                deployment_revision_preset_repository=setup_input.deployment_revision_preset_repository,
             )
         )
         yield controller

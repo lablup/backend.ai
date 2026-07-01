@@ -4,12 +4,14 @@ Shared pagination DTOs for manager API responses.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from ai.backend.common.types import BackendAISchema
 
 __all__ = ("PaginationInfo",)
 
 
-class PaginationInfo(BaseModel):
+class PaginationInfo(BackendAISchema):
     """Pagination information for list responses."""
 
     total: int = Field(description="Total number of items", ge=0)

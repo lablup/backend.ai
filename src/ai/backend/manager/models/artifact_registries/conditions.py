@@ -8,7 +8,7 @@ from collections.abc import Collection
 import sqlalchemy as sa
 
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.models.clauses import QueryCondition
 
 
 class ArtifactRegistryConditions:

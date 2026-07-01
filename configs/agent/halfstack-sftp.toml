@@ -1,0 +1,137 @@
+[etcd]
+namespace = "local"
+addr = { host = "127.0.0.1", port = 8120 }
+user = ""
+password = ""
+
+
+[agent]
+mode = "docker"
+# SFTP agent uses a distinct RPC port (primary is 6001 in the template,
+# rewritten to 6011 by the dev installer).
+rpc-listen-addr = { host = "127.0.0.1", port = 6013 }
+# metric API service address — must not collide with the primary agent's 6003.
+service-addr = { host = "0.0.0.0", port = 6023 }
+ssl-enabled = false
+#ssl-cert = ""
+#ssl-key = ""
+# Distinct from the primary agent's default 6007.
+agent-sock-port = 6017
+# Distinguishable agent id so that the manager treats this as a separate node
+# from the primary agent.
+id = "i-local-sftp"
+# Dedicated scaling group for SFTP upload sessions.
+scaling-group = "upload"
+pid-file = "./agent-sftp.pid"
+event-loop = "uvloop"
+ipc-base-path = "ipc/agent-sftp"
+var-base-path = "var/agent-sftp"
+# The SFTP agent does NOT load any accelerator plugin — otherwise it would
+# try to import libraries that may not be installed in a dev environment
+# (e.g. Tenstorrent's `tt_tools_common`). Leaving this explicitly empty
+# instead of relying on the default (None → load all discovered plugins).
+allow-compute-plugins = []
+# block-compute-plugins = []
+image-commit-path = "./tmp/backend.ai/commit/"
+# Share the same vfolder root as the primary agent so that files uploaded
+# via SFTP are visible to compute sessions running on the primary agent.
+# This path is rewritten by the installer to an absolute path under
+# `<base>/vfolder/local/volume1`.
+mount-path = "./vfroot/local"
+cohabiting-storage-proxy = true
+# aiomonitor / metadata-server ports — must not collide with the primary
+# agent's defaults (38200 / 39200 / 40128).
+aiomonitor-termui-port = 38201
+aiomonitor-webui-port = 39201
+metadata-server-port = 40129
+
+
+[container]
+# Non-overlapping with the primary agent's default 30000-31000. SFTP
+# upload sessions don't typically allocate compute kernels but we still
+# need a non-overlapping range to be safe.
+port-range = [31100, 31200]
+kernel-uid = -1
+kernel-gid = -1
+bind-host = "127.0.0.1"
+sandbox-type = "docker"
+scratch-type = "hostdir"
+scratch-root = "./scratches"
+scratch-size = "1G"
+
+
+[watcher]
+# Distinct watcher service-addr (primary is 6009).
+service-addr = { host = "127.0.0.1", port = 6015 }
+ssl-enabled = false
+#ssl-cert = ""
+#ssl-key = ""
+target-service = "backendai-agent.service"
+soft-reset-available = false
+
+
+[pyroscope]
+enabled = true
+# Differentiated pyroscope app-name so the two agents show up separately
+# in dashboards.
+app-name = "backendai-half-sftp-agent"
+server-addr = "http://localhost:4040"
+sample-rate = 100
+
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiodocker" = "INFO"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "agent-sftp.log"
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = true
+ssl-verify = false
+
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+ssl-verify = false
+ca-certs = ""
+keyfile = ""
+certfile = ""
+
+[resource]
+reserved-cpu = 1
+reserved-mem = "1G"
+reserved-disk = "8G"
+allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+affinity-policy = "INTERLEAVED"
+
+
+[debug]
+enabled = true
+skip-container-deletion = false
+
+[debug.coredump]
+enabled = false
+path = "./coredumps"
+backup-count = 10
+size-limit = "64M"
+
+[otel]
+enabled = true
+log-level = "INFO"
+endpoint = "http://127.0.0.1:4317"

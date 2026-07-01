@@ -8,6 +8,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.single_entity import (
     SingleEntityActionRBACValidator,
@@ -16,6 +17,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
 from ai.backend.manager.api.rest.service.registry import register_service_routes
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -35,10 +37,6 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-    RevisionGeneratorRegistryArgs,
-)
 
 
 @pytest.fixture()
@@ -58,9 +56,6 @@ def model_serving_processors(
         valkey_clients.live,
         valkey_clients.schedule,
     )
-    revision_gen = RevisionGeneratorRegistry(
-        RevisionGeneratorRegistryArgs(deployment_repository=deployment_repo)
-    )
     service = ModelServingService(
         agent_registry=AsyncMock(),
         background_task_manager=background_task_manager,
@@ -71,9 +66,11 @@ def model_serving_processors(
         valkey_live=valkey_clients.live,
         repository=ms_repo,
         deployment_repository=deployment_repo,
+        runtime_variant_repository=AsyncMock(),
+        scheduler_repository=AsyncMock(),
         deployment_controller=AsyncMock(),
         scheduling_controller=AsyncMock(),
-        revision_generator_registry=revision_gen,
+        route_controller=AsyncMock(),
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return ModelServingProcessors(
@@ -81,8 +78,11 @@ def model_serving_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo),
-                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
+                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
+                single_entity=SingleEntityActionRBACValidator(
+                    permission_controller_repo, MagicMock()
+                ),
+                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
         ),
     )
@@ -101,11 +101,20 @@ def auto_scaling_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo),
-                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
+                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
+                single_entity=SingleEntityActionRBACValidator(
+                    permission_controller_repo, MagicMock()
+                ),
+                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
         ),
     )
+
+
+@pytest.fixture()
+def mock_appproxy_client_pool() -> MagicMock:
+    """Stub AppProxyClientPool for tests that do not exercise app-proxy IO."""
+    return MagicMock(spec=AppProxyClientPool)
 
 
 @pytest.fixture()
@@ -113,6 +122,7 @@ def deployment_processors(
     database_engine: ExtendedAsyncSAEngine,
     storage_manager: AsyncMock,
     valkey_clients: ValkeyClients,
+    mock_appproxy_client_pool: MagicMock,
 ) -> DeploymentProcessors:
     """Real DeploymentProcessors with real DeploymentService and DeploymentRepository."""
     repo = DeploymentRepository(
@@ -123,15 +133,10 @@ def deployment_processors(
         valkey_clients.schedule,
     )
     deployment_controller = AsyncMock()
-    revision_generator_registry = RevisionGeneratorRegistry(
-        RevisionGeneratorRegistryArgs(deployment_repository=repo)
-    )
-    model_definition_generator_registry = MagicMock()
     service = DeploymentService(
         deployment_controller,
         repo,
-        revision_generator_registry,
-        model_definition_generator_registry,
+        appproxy_client_pool=mock_appproxy_client_pool,
     )
     permission_controller_repo = PermissionControllerRepository(database_engine)
     return DeploymentProcessors(
@@ -139,8 +144,11 @@ def deployment_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(permission_controller_repo),
-                single_entity=SingleEntityActionRBACValidator(permission_controller_repo),
+                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
+                single_entity=SingleEntityActionRBACValidator(
+                    permission_controller_repo, MagicMock()
+                ),
+                bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
         ),
     )
@@ -162,6 +170,7 @@ def server_module_registries(
                 deployment=deployment_processors,
                 model_serving=model_serving_processors,
                 model_serving_auto_scaling=auto_scaling_processors,
+                runtime_variant=MagicMock(),
             ),
             route_deps,
         ),

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Self
 
 from aiohttp import web
+from pydantic_core import ErrorDetails
 
 from .json import dump_json
 
@@ -182,7 +183,9 @@ class ErrorDomain(enum.StrEnum):
     DATABASE = "database"
     USER_RESOURCE_POLICY = "user-resource-policy"
     PROMETHEUS_QUERY_PRESET = "prometheus-query-preset"
+    PROMETHEUS_QUERY_PRESET_CATEGORY = "prometheus-query-preset-category"
     RUNTIME_VARIANT = "runtime-variant"
+    ROLE_INVITATION = "role-invitation"
 
     EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 
@@ -438,6 +441,87 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class BackendAISchemaValidationFailed(BackendAIError, web.HTTPBadRequest):
+    """Default 400 raised by :class:`BackendAISchema.build_validation_error`.
+
+    Kept distinct from :class:`InvalidAPIParameters` so handlers can
+    catch one without picking up the other.
+    """
+
+    error_type = "https://api.backend.ai/probs/schema-validation-failed"
+    error_title = "Schema validation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+    def errors(self) -> list[ErrorDetails]:
+        """Per-field errors in the same shape as
+        ``pydantic.ValidationError.errors()``. Empty when no
+        ``extra_data["errors"]`` is attached."""
+        if not self.extra_data:
+            return []
+        return list(self.extra_data.get("errors") or [])
+
+
+class ModelDefinitionValidationError(BackendAIError, web.HTTPBadRequest):
+    """400 raised by ``ModelDefinition.model_validate`` (via its
+    :meth:`BackendAISchema.build_validation_error` override).
+
+    Lives in ``common`` so ``ModelDefinition`` (also in ``common``) can
+    construct it without an upward-layer import.
+    """
+
+    error_type = "https://api.backend.ai/probs/model-definition-validation-failed"
+    error_title = "Model definition validation failed."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class DeprecatedAPI(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/deprecated"
+    error_title = "This API is deprecated."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.DEPRECATED,
+        )
+
+
+class InvalidResourceSlotQuantity(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-resource-slot-quantity"
+    error_title = "Invalid resource slot quantity."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class UnknownResourceSlotType(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/unknown-resource-slot-type"
+    error_title = "Unknown resource slot type."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.NOT_FOUND,
         )
 
 
@@ -792,16 +876,24 @@ class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
-class DeploymentNameAlreadyExists(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/deployment-name-already-exists"
-    error_title = "Deployment name already exists."
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_DEPLOYMENT,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.ALREADY_EXISTS,
-        )
+# Standard HTTP error statuses -> ErrorDetail. Statuses without a corresponding ErrorDetail
+# (e.g. 405, 429) fall back to INTERNAL_ERROR.
+_HTTP_STATUS_TO_ERROR_DETAIL: dict[int, ErrorDetail] = {
+    400: ErrorDetail.BAD_REQUEST,
+    401: ErrorDetail.UNAUTHORIZED,
+    403: ErrorDetail.FORBIDDEN,
+    404: ErrorDetail.NOT_FOUND,
+    408: ErrorDetail.TIMEOUT,
+    409: ErrorDetail.CONFLICT,
+    410: ErrorDetail.GONE,
+    415: ErrorDetail.CONTENT_TYPE_MISMATCH,
+    422: ErrorDetail.INVALID_PARAMETERS,
+    500: ErrorDetail.INTERNAL_ERROR,
+    501: ErrorDetail.NOT_IMPLEMENTED,
+    502: ErrorDetail.UNREACHABLE,
+    503: ErrorDetail.UNAVAILABLE,
+    504: ErrorDetail.TIMEOUT,
+}
 
 
 class PassthroughError(BackendAIError):
@@ -823,6 +915,26 @@ class PassthroughError(BackendAIError):
         self._error_code = error_code
         extra_msg = error_message or f"An error occurred with status code {status_code}"
         super().__init__(extra_msg=extra_msg)
+
+    @classmethod
+    def from_http_status(
+        cls,
+        status_code: int,
+        *,
+        domain: ErrorDomain,
+        operation: ErrorOperation,
+        error_message: str | None = None,
+    ) -> Self:
+        """
+        Build from an upstream HTTP status, mapping standard error statuses to an ErrorDetail
+        (unmapped statuses -> INTERNAL_ERROR) so the failure category is preserved.
+        """
+        error_detail = _HTTP_STATUS_TO_ERROR_DETAIL.get(status_code, ErrorDetail.INTERNAL_ERROR)
+        return cls(
+            status_code=status_code,
+            error_code=ErrorCode(domain=domain, operation=operation, error_detail=error_detail),
+            error_message=error_message,
+        )
 
     def error_code(self) -> ErrorCode:
         return self._error_code
@@ -851,6 +963,23 @@ class ValkeySentinelMasterNotFound(BackendAIError, web.HTTPServiceUnavailable):
 
     error_type = "https://api.backend.ai/probs/valkey-sentinel-master-not-found"
     error_title = "Valkey Sentinel Master Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class ValkeyRoleMismatchError(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Raised when a Valkey connection points to a node whose role is not the expected one
+    (e.g., the connected node has been demoted from master to replica after a Sentinel failover).
+    """
+
+    error_type = "https://api.backend.ai/probs/valkey-role-mismatch"
+    error_title = "Valkey Role Mismatch"
 
     def error_code(self) -> ErrorCode:
         return ErrorCode(
@@ -1015,7 +1144,7 @@ class InvalidNotificationChannelSpec(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class PrometheusConnectionError(BackendAIError):
+class PrometheusConnectionError(BackendAIError, web.HTTPServiceUnavailable):
     """Exception raised when a connection to Prometheus fails."""
 
     error_type = "https://api.backend.ai/probs/prometheus-connection-error"
@@ -1029,7 +1158,7 @@ class PrometheusConnectionError(BackendAIError):
         )
 
 
-class FailedToGetMetric(BackendAIError):
+class FailedToGetMetric(BackendAIError, web.HTTPBadGateway):
     """Exception raised when a metric cannot be retrieved."""
 
     error_type = "https://api.backend.ai/probs/failed-to-get-metric"
@@ -1040,6 +1169,39 @@ class FailedToGetMetric(BackendAIError):
             domain=ErrorDomain.METRIC,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class InvalidMetricPresetTemplate(BackendAIError, web.HTTPBadRequest):
+    """Exception raised when a metric preset template cannot be rendered."""
+
+    error_type = "https://api.backend.ai/probs/invalid-metric-preset-template"
+    error_title = "Invalid metric preset template."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.METRIC,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class PrometheusQueryEvaluationFailed(BackendAIError, web.HTTPBadRequest):
+    """Raised when Prometheus rejects a rendered PromQL query.
+
+    Used by user-facing flows (e.g., preset preview) to attribute query
+    rejection to the caller's input rather than treating it as a downstream
+    gateway failure (502).
+    """
+
+    error_type = "https://api.backend.ai/probs/prometheus-query-evaluation-failed"
+    error_title = "Prometheus rejected the query."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.METRIC,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 
@@ -1192,6 +1354,18 @@ class PrometheusQueryPresetInvalidLabel(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.PROMETHEUS_QUERY_PRESET,
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class PrometheusQueryPresetCategoryNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/prometheus-query-preset-category-not-found"
+    error_title = "The prometheus query preset category does not exist."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PROMETHEUS_QUERY_PRESET_CATEGORY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )
 
 

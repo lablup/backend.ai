@@ -17,6 +17,8 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.permission.types import ScopeType as RBACScopeType
 from ai.backend.common.exception import (
     GroupNotFound,
     InvalidAPIParameters,
@@ -24,10 +26,8 @@ from ai.backend.common.exception import (
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.group import (
-    AssocGroupUserRow,
     GroupRow,
     ProjectType,
-    association_groups_users,
     get_permission_ctx,
     groups,
 )
@@ -37,6 +37,9 @@ from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -213,11 +216,21 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             before=before,
             last=last,
         )
-        j = sa.join(UserRow, AssocGroupUserRow)
-        user_query = query.select_from(j).where(AssocGroupUserRow.group_id == self.id)
-        cnt_query = (
-            sa.select(sa.func.count()).select_from(j).where(AssocGroupUserRow.group_id == self.id)
+        # Project membership comes from association_scopes_entities (PROJECT/USER).
+        # Cast UserRow.uuid (GUID) to String to match the non-UUID String(64)
+        # entity_id column safely.
+        j = sa.join(
+            UserRow,
+            AssociationScopesEntitiesRow,
+            sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
         )
+        membership_filter = sa.and_(
+            AssociationScopesEntitiesRow.scope_type == RBACScopeType.PROJECT,
+            AssociationScopesEntitiesRow.scope_id == str(self.id),
+            AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+        )
+        user_query = query.select_from(j).where(membership_filter)
+        cnt_query = sa.select(sa.func.count()).select_from(j).where(membership_filter)
         for cond in conditions:
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
@@ -397,7 +410,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             if dto.total_resource_slots
             else {},
             allowed_vfolder_hosts=dto.allowed_vfolder_hosts.to_json(),
-            integration_id=dto.integration_id,
+            integration_id=dto.integration_name,  # GroupData uses integration_name
             resource_policy=dto.resource_policy,
             type=dto.type.name,
             container_registry=dto.container_registry,
@@ -496,15 +509,21 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
             _type = [ProjectType.GENERAL]
         else:
             _type = type
+        ase = AssociationScopesEntitiesRow.__table__
+        user_id_strs = [str(uid) for uid in user_ids]
         j = sa.join(
             groups,
-            association_groups_users,
-            groups.c.id == association_groups_users.c.group_id,
+            ase,
+            sa.and_(
+                sa.cast(groups.c.id, sa.String) == ase.c.scope_id,
+                ase.c.scope_type == RBACScopeType.PROJECT,
+                ase.c.entity_type == EntityType.USER,
+            ),
         )
         query = (
-            sa.select(groups, association_groups_users.c.user_id)
+            sa.select(groups, ase.c.entity_id.label("user_id_str"))
             .select_from(j)
-            .where(association_groups_users.c.user_id.in_(user_ids) & (groups.c.type.in_(_type)))
+            .where(ase.c.entity_id.in_(user_id_strs) & (groups.c.type.in_(_type)))
         )
         if is_active is not None:
             query = query.where(groups.c.is_active == is_active)
@@ -515,7 +534,7 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
                 query,
                 cls,
                 user_ids,
-                lambda row: row.user_id,
+                lambda row: uuid.UUID(row.user_id_str),
             )
 
     @classmethod
@@ -524,14 +543,17 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext,
         user_id: uuid.UUID,
     ) -> Sequence[Group]:
+        ase = AssociationScopesEntitiesRow.__table__
         j = sa.join(
             groups,
-            association_groups_users,
-            groups.c.id == association_groups_users.c.group_id,
+            ase,
+            sa.and_(
+                sa.cast(groups.c.id, sa.String) == ase.c.scope_id,
+                ase.c.scope_type == RBACScopeType.PROJECT,
+                ase.c.entity_type == EntityType.USER,
+            ),
         )
-        query = (
-            sa.select(groups).select_from(j).where(association_groups_users.c.user_id == user_id)
-        )
+        query = sa.select(groups).select_from(j).where(ase.c.entity_id == str(user_id))
         async with graph_ctx.db.begin_readonly() as conn:
             return [
                 obj
@@ -590,7 +612,7 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
                     is_active=is_active_val,
                     total_resource_slots=total_resource_slots_val,
                     allowed_vfolder_hosts=allowed_vfolder_hosts_val,
-                    integration_id=integration_id_val,
+                    integration_name=integration_id_val,
                     resource_policy=resource_policy_val,
                     container_registry=container_registry_val,
                 )
@@ -636,7 +658,7 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             allowed_vfolder_hosts=OptionalState[dict[str, str]].from_graphql(
                 self.allowed_vfolder_hosts,
             ),
-            integration_id=OptionalState[str].from_graphql(
+            integration_name=TriState[str].from_graphql(
                 self.integration_id,
             ),
             resource_policy=OptionalState[str].from_graphql(

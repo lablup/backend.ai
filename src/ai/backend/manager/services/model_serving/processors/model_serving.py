@@ -2,17 +2,14 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
-from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validator.single_entity import SingleEntityActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
-)
-from ai.backend.manager.services.model_serving.actions.create_model_service import (
-    CreateModelServiceAction,
-    CreateModelServiceActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.delete_model_service import (
     DeleteModelServiceAction,
@@ -68,10 +65,6 @@ from ai.backend.manager.services.model_serving.services.model_serving import (
 
 
 class ModelServingProcessors(AbstractProcessorPackage):
-    # Scope actions (with RBAC)
-    create_model_service: ScopeActionProcessor[
-        CreateModelServiceAction, CreateModelServiceActionResult
-    ]
     list_model_service: ActionProcessor[ListModelServiceAction, ListModelServiceActionResult]
     search_services: ActionProcessor[SearchServicesAction, SearchServicesActionResult]
 
@@ -102,10 +95,6 @@ class ModelServingProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        # Scope actions with RBAC validator
-        self.create_model_service = ScopeActionProcessor(
-            service.create, action_monitors, validators=[validators.rbac.scope]
-        )
         self.list_model_service = ActionProcessor(service.list_serve, action_monitors)
         self.search_services = ActionProcessor(service.search_services, action_monitors)
 
@@ -118,8 +107,19 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self.delete_model_service = SingleEntityActionProcessor(
             service.delete, action_monitors, validators=[validators.rbac.single_entity]
         )
+        # modify_endpoint is invoked only from gql_legacy — non-enforcing validator.
+        # Mocked test fixtures do not provide a legacy_rbac, so isinstance
+        # guards against MagicMock attribute access returning a truthy mock.
+        legacy_rbac = validators.legacy_rbac
+        legacy_single_entity_validator: SingleEntityActionValidator = (
+            legacy_rbac.single_entity
+            if isinstance(legacy_rbac, LegacyRBACValidators)
+            else validators.rbac.single_entity
+        )
         self.modify_endpoint = SingleEntityActionProcessor(
-            service.modify_endpoint, action_monitors, validators=[validators.rbac.single_entity]
+            service.modify_endpoint,
+            action_monitors,
+            validators=[legacy_single_entity_validator],
         )
         self.update_route = SingleEntityActionProcessor(
             service.update_route, action_monitors, validators=[validators.rbac.single_entity]
@@ -141,7 +141,6 @@ class ModelServingProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
-            CreateModelServiceAction.spec(),
             ListModelServiceAction.spec(),
             DeleteModelServiceAction.spec(),
             DryRunModelServiceAction.spec(),

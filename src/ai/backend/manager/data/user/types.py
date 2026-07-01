@@ -4,7 +4,7 @@ import enum
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Self, override
+from typing import Any, Self, override
 from uuid import UUID
 
 from sqlalchemy.engine import Row
@@ -12,6 +12,7 @@ from sqlalchemy.engine import Row
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import (
@@ -20,11 +21,6 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.user import UserRow
-    from ai.backend.manager.repositories.base.creator import BulkCreatorError
-    from ai.backend.manager.repositories.base.updater import BulkUpdaterError
 
 
 class UserStatus(enum.StrEnum):
@@ -63,6 +59,16 @@ class UserInfoContext:
     main_access_key: AccessKey
 
 
+@dataclass(frozen=True)
+class SessionOwnerContext:
+    """Resolved owner context for session creation."""
+
+    owner_uuid: UUID
+    group_id: UUID
+    resource_policy: dict[str, Any]
+    owner_role: UserRole
+
+
 @dataclass
 class UserData:
     id: UUID = field(compare=False)
@@ -88,6 +94,7 @@ class UserData:
     container_uid: int | None = field(compare=False)
     container_main_gid: int | None = field(compare=False)
     container_gids: list[int] | None = field(compare=False)
+    integration_name: str | None = None
 
     def scope_id(self) -> ScopeId:
         return ScopeId(
@@ -137,6 +144,7 @@ class UserData:
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
+            integration_name=row.integration_id,  # DB column is integration_id
         )
 
 
@@ -168,12 +176,12 @@ class BulkUserCreateResultData:
     """Result of bulk user creation operation.
 
     Attributes:
-        successes: Successfully created users
+        successes: Successfully created users, each with its generated default keypair
         failures: Failed user creation attempts with error info
     """
 
-    successes: list[UserData] = field(default_factory=list)
-    failures: list[BulkCreatorError[UserRow]] = field(default_factory=list)
+    successes: list[UserCreateResultData] = field(default_factory=list)
+    failures: list[BulkCreateFailure] = field(default_factory=list)
 
     def success_count(self) -> int:
         """Get count of successfully created users."""
@@ -194,7 +202,7 @@ class BulkUserUpdateResultData:
     """
 
     successes: list[UserData] = field(default_factory=list)
-    failures: list[BulkUpdaterError[UserRow]] = field(default_factory=list)
+    failures: list[BulkUpdateFailure] = field(default_factory=list)
 
     def success_count(self) -> int:
         """Get count of successfully updated users."""

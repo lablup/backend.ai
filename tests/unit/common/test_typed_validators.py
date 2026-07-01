@@ -4,6 +4,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from ai.backend.common import typed_validators as tv
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.typed_validators import HostPortPair
 
 
@@ -21,11 +22,11 @@ def test_time_duration() -> None:
     NormalModel.model_validate({"duration": 7.2})
     NormalModel.model_validate({"duration": "2d"})
     NormalModel.model_validate({"duration": "6yr"})
-    with pytest.raises(ValidationError):
+    with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
         NormalModel.model_validate({"duration": "6y"})
-    with pytest.raises(ValidationError):
+    with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
         NormalModel.model_validate({"duration": "6k"})
-    with pytest.raises(ValidationError):
+    with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
         NormalModel.model_validate({"duration": "-6y"})
     GenerousModel.model_validate({"duration": -12})
     GenerousModel.model_validate({"duration": 2})
@@ -63,5 +64,5 @@ def test_hostport_pair_valid(
     ],
 )
 def test_hostport_pair_invalid(input: str | list[str] | dict[str, str] | int) -> None:
-    with pytest.raises((ValidationError, TypeError)):
+    with pytest.raises((BackendAISchemaValidationFailed, ValidationError, TypeError)):
         HostPortPair.model_validate(input)

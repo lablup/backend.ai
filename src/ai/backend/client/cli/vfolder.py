@@ -676,11 +676,7 @@ def invitations() -> None:
                     perm = "read-only"
                 else:
                     perm = inv["perm"]
-                print(
-                    "[{}] {}, {}, {}".format(
-                        cnt + 1, inv["inviter_user_email"], inv["vfolder_id"], perm
-                    )
-                )
+                print("[{}] {}, {}, {}".format(cnt + 1, inv["inviter"], inv["vfolder_id"], perm))
 
             selection = input("Choose invitation number to manage: ")
             if selection.isdigit():

@@ -5,13 +5,13 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.services.model_card.actions.base import ModelCardAction
 
 
 @dataclass
 class CreateModelCardAction(ModelCardAction):
-    creator: Creator[ModelCardRow]
+    creator: RBACEntityCreator[ModelCardRow]
 
     @override
     def entity_id(self) -> str | None:

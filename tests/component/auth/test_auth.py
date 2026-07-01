@@ -40,15 +40,21 @@ from ai.backend.common.dto.manager.auth.response import (
     VerifyAuthResponse,
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import GroupRow, association_groups_users
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.user import UserRole, users
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import AuthUserFixtureData
 
@@ -98,16 +104,62 @@ class _RSAKeypairData:
     private_key: str
 
 
+@dataclass
+class _SignupDefaultProjectData:
+    """Holds the test domain's ``default`` project and tracks signup-created
+    user emails so the fixture can clean them up on teardown."""
+
+    project_id: ProjectID
+    cleanup_emails: list[str]
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture()
+async def signup_default_project(
+    db_engine: SAEngine,
+    domain_fixture: DomainFixtureData,
+    resource_policy_fixture: str,
+) -> AsyncIterator[_SignupDefaultProjectData]:
+    """Create a project named ``default`` in the test domain so that the
+    signup flow can bind new users to it. On teardown, removes any ASE rows
+    scoped to this project, the signup-registered users / keypairs, and the
+    project itself."""
+    data = _SignupDefaultProjectData(project_id=ProjectID(uuid.uuid4()), cleanup_emails=[])
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(GroupRow.__table__).values(
+                id=data.project_id,
+                name="default",
+                description="Default project for signup binding test",
+                is_active=True,
+                domain_name=domain_fixture.domain_name,
+                resource_policy=resource_policy_fixture,
+            )
+        )
+    yield data
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.delete(AssociationScopesEntitiesRow).where(
+                AssociationScopesEntitiesRow.scope_id == str(data.project_id),
+            ),
+        )
+        for email in data.cleanup_emails:
+            await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
+            await conn.execute(users.delete().where(users.c.email == email))
+        await conn.execute(
+            GroupRow.__table__.delete().where(GroupRow.__table__.c.id == data.project_id),
+        )
+
+
+@pytest.fixture()
 async def expired_password_user(
     db_engine: SAEngine,
     group_fixture: uuid.UUID,
-    domain_fixture: str,
+    domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
 ) -> AsyncIterator[_ExpiredPasswordUserData]:
     """Insert a user whose password_changed_at is far in the past."""
@@ -120,7 +172,7 @@ async def expired_password_user(
         secret_key=secrets.token_hex(20),
         password=password,
         email=email,
-        domain_name=domain_fixture,
+        domain_name=domain_fixture.domain_name,
     )
     # Set password_changed_at to 200 days ago so it's expired with a 90-day policy
     expired_at = datetime.now(UTC) - timedelta(days=200)
@@ -141,7 +193,7 @@ async def expired_password_user(
                 description=f"Test expired password user {unique_id}",
                 status=UserStatus.ACTIVE,
                 status_info="admin-requested",
-                domain_name=domain_fixture,
+                domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
                 role=UserRole.USER,
                 password_changed_at=expired_at,
@@ -528,6 +580,7 @@ class TestAuthorize:
         self,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """Authorizing with correct credentials must return non-empty access_key,
         secret_key, and the correct user role."""
@@ -537,6 +590,7 @@ class TestAuthorize:
                 domain=auth_user_fixture.domain_name,
                 username=auth_user_fixture.email,
                 password=auth_user_fixture.password,
+                client_type_id=sample_client_type_id,
             ),
         )
         assert isinstance(result, AuthorizeResponse)
@@ -548,6 +602,7 @@ class TestAuthorize:
         self,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """Authorizing with an incorrect password must raise AuthenticationError (401)."""
         with pytest.raises(AuthenticationError):
@@ -557,6 +612,7 @@ class TestAuthorize:
                     domain=auth_user_fixture.domain_name,
                     username=auth_user_fixture.email,
                     password="completely-wrong-password",
+                    client_type_id=sample_client_type_id,
                 ),
             )
 
@@ -644,6 +700,7 @@ class TestPasswordChange:
         auth_user_registry: BackendAIClientRegistry,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """After a password change, authorize (login) with the new password must succeed.
         This is an end-to-end check that the change is actually persisted to the database."""
@@ -661,6 +718,7 @@ class TestPasswordChange:
                 domain=auth_user_fixture.domain_name,
                 username=auth_user_fixture.email,
                 password=new_password,
+                client_type_id=sample_client_type_id,
             ),
         )
         assert isinstance(result, AuthorizeResponse)
@@ -671,6 +729,7 @@ class TestPasswordChange:
         auth_user_registry: BackendAIClientRegistry,
         admin_registry: BackendAIClientRegistry,
         auth_user_fixture: AuthUserFixtureData,
+        sample_client_type_id: uuid.UUID,
     ) -> None:
         """After a password change, authorize with the old password must fail
         with AuthenticationError (401).
@@ -691,6 +750,7 @@ class TestPasswordChange:
                     domain=auth_user_fixture.domain_name,
                     username=auth_user_fixture.email,
                     password=old_password,
+                    client_type_id=sample_client_type_id,
                 ),
             )
 
@@ -710,6 +770,7 @@ class TestPasswordExpiry:
         admin_registry: BackendAIClientRegistry,
         expired_password_user: _ExpiredPasswordUserData,
         config_provider: ManagerConfigProvider,
+        sample_client_type_id: uuid.UUID,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """With max_password_age=90 days, a user whose password_changed_at is 200 days ago
@@ -723,6 +784,7 @@ class TestPasswordExpiry:
                     domain=expired_password_user.domain_name,
                     username=expired_password_user.email,
                     password=expired_password_user.password,
+                    client_type_id=sample_client_type_id,
                 ),
             )
 
@@ -910,7 +972,7 @@ class TestSignup:
     async def test_signup_creates_user_with_keypair(
         self,
         admin_registry: BackendAIClientRegistry,
-        domain_fixture: str,
+        domain_fixture: DomainFixtureData,
         resource_policy_fixture: str,
         db_engine: SAEngine,
     ) -> None:
@@ -919,7 +981,7 @@ class TestSignup:
         email = f"signup-{unique}@test.local"
         result = await admin_registry.auth.signup(
             SignupRequest(
-                domain=domain_fixture,
+                domain=domain_fixture.domain_name,
                 email=email,
                 password=f"SignupP@ss{unique}",
                 username=f"signup-{unique}",
@@ -934,6 +996,47 @@ class TestSignup:
         async with db_engine.begin() as conn:
             await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
             await conn.execute(users.delete().where(users.c.email == email))
+
+    async def test_signup_binds_user_to_default_project_via_ase(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        db_engine: SAEngine,
+        signup_default_project: _SignupDefaultProjectData,
+    ) -> None:
+        """When a project named ``default`` exists in the signup domain, the
+        signup flow must bind the new user to that project via
+        ``association_scopes_entities`` (scope_type=PROJECT, entity_type=USER).
+        """
+        unique = secrets.token_hex(4)
+        email = f"signup-bind-{unique}@test.local"
+        signup_default_project.cleanup_emails.append(email)
+
+        result = await admin_registry.auth.signup(
+            SignupRequest(
+                domain=domain_fixture.domain_name,
+                email=email,
+                password=f"SignupP@ss{unique}",
+                username=f"signup-bind-{unique}",
+                full_name=f"Signup Bind User {unique}",
+            ),
+        )
+        assert isinstance(result, SignupResponse)
+
+        async with db_engine.begin() as conn:
+            user_uuid = await conn.scalar(
+                sa.select(users.c.uuid).where(users.c.email == email),
+            )
+            assert user_uuid is not None
+            ase_count = await conn.scalar(
+                sa.select(sa.func.count()).where(
+                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_id == str(signup_default_project.project_id),
+                    AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                    AssociationScopesEntitiesRow.entity_id == str(user_uuid),
+                ),
+            )
+            assert ase_count == 1
 
 
 class TestCrossDomainAccess:

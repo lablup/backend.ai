@@ -222,6 +222,7 @@ def _create_kernel_info(
             gids=None,
         ),
         image=ImageInfo(
+            image_id=None,
             identifier=None,
             registry="docker.io",
             tag="latest",

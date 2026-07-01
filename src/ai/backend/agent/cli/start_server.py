@@ -47,12 +47,12 @@ def main(
 
     This is a thin wrapper that defers the heavy import of server module.
     """
-    from ai.backend.common.metrics.multiprocess import setup_prometheus_multiprocess_dir
-    from ai.backend.logging import LogLevel
-
-    setup_prometheus_multiprocess_dir("agent")
-
+    # Do NOT set up the prometheus multiprocess dir here: the agent runs a
+    # single worker, and multiprocess mode stores gauge samples in per-process
+    # mmap files where individual series cannot be removed — terminated
+    # kernels' utilization metrics would be exported forever.
     from ai.backend.agent.server import main as server_main
+    from ai.backend.logging import LogLevel
 
     ctx.invoke(
         server_main,

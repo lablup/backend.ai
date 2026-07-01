@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Iterable
 from typing import Self, cast
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -70,7 +70,7 @@ class VFSStorage(PydanticNodeMixin[VFSStorageNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.vfs_storage_loader.load_many([
-            uuid.UUID(nid) for nid in node_ids
+            UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -92,7 +92,7 @@ class VFSStorageConnection(Connection[VFSStorage]):
 
 @gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="Get a VFS storage by ID"))  # type: ignore[misc]
 async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> VFSStorage | None:
-    node = await info.context.adapters.vfs_storage.get(uuid.UUID(id))
+    node = await info.context.adapters.vfs_storage.get(UUID(id))
     return VFSStorage.from_pydantic(node)
 
 
@@ -175,22 +175,21 @@ class UpdateVFSStoragePayload:
         description="Payload for deleting VFS storage.",
     ),
     model=DeleteVFSStoragePayloadDTO,
-    fields=["id"],
     name="DeleteVFSStoragePayload",
 )
 class DeleteVFSStoragePayload(PydanticOutputMixin[DeleteVFSStoragePayloadDTO]):
     """Payload for VFS storage deletion mutation."""
 
-    id: ID = gql_field(description="ID of the deleted VFS storage.")
+    id: UUID = gql_field(description="ID of the deleted VFS storage")
 
 
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Create a new VFS storage"),
     name="createVFSStorage",
-)  # type: ignore[misc]
+)
 async def create_vfs_storage(
     input: CreateVFSStorageInput, info: Info[StrawberryGQLContext]
-) -> CreateVFSStoragePayload:
+) -> CreateVFSStoragePayload | None:
     result = await info.context.adapters.vfs_storage.create(input.to_pydantic())
     return CreateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
@@ -198,10 +197,10 @@ async def create_vfs_storage(
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Update an existing VFS storage"),
     name="updateVFSStorage",
-)  # type: ignore[misc]
+)
 async def update_vfs_storage(
     input: UpdateVFSStorageInput, info: Info[StrawberryGQLContext]
-) -> UpdateVFSStoragePayload:
+) -> UpdateVFSStoragePayload | None:
     result = await info.context.adapters.vfs_storage.update(input.to_pydantic())
     return UpdateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
@@ -209,9 +208,9 @@ async def update_vfs_storage(
 @gql_mutation(
     BackendAIGQLMeta(added_version="25.16.0", description="Delete a VFS storage"),
     name="deleteVFSStorage",
-)  # type: ignore[misc]
+)
 async def delete_vfs_storage(
     input: DeleteVFSStorageInput, info: Info[StrawberryGQLContext]
-) -> DeleteVFSStoragePayload:
+) -> DeleteVFSStoragePayload | None:
     result = await info.context.adapters.vfs_storage.delete(input.to_pydantic())
     return DeleteVFSStoragePayload.from_pydantic(result)

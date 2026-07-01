@@ -28,8 +28,10 @@ def build_v2_routes(
     # Lazy imports to avoid circular dependencies at module level
     from .agent.handler import V2AgentHandler
     from .agent.registry import register_v2_agent_routes
-    from .app_config.handler import V2AppConfigHandler
-    from .app_config.registry import register_v2_app_config_routes
+    from .app_config_allow_list.handler import V2AppConfigAllowListHandler
+    from .app_config_allow_list.registry import register_v2_app_config_allow_list_routes
+    from .app_config_definition.handler import V2AppConfigDefinitionHandler
+    from .app_config_definition.registry import register_v2_app_config_definition_routes
     from .artifact.handler import V2ArtifactHandler
     from .artifact.registry import register_v2_artifact_routes
     from .artifact_registry.handler import V2ArtifactRegistryHandler
@@ -54,6 +56,8 @@ def build_v2_routes(
     from .image.registry import register_v2_image_routes
     from .keypair.handler import V2KeypairHandler
     from .keypair.registry import register_v2_keypair_routes
+    from .login_client_type.handler import V2LoginClientTypeHandler
+    from .login_client_type.registry import register_v2_login_client_type_routes
     from .login_history.handler import V2LoginHistoryHandler
     from .login_history.registry import register_v2_login_history_routes
     from .login_session.handler import V2LoginSessionHandler
@@ -68,6 +72,10 @@ def build_v2_routes(
     from .project.registry import register_v2_project_routes
     from .prometheus_query_preset.handler import V2PrometheusQueryPresetHandler
     from .prometheus_query_preset.registry import register_v2_prometheus_query_preset_routes
+    from .prometheus_query_preset_category.handler import V2PrometheusQueryPresetCategoryHandler
+    from .prometheus_query_preset_category.registry import (
+        register_v2_prometheus_query_preset_category_routes,
+    )
     from .rbac.handler import V2RBACHandler
     from .rbac.registry import register_v2_rbac_routes
     from .reservoir_registry.handler import V2ReservoirRegistryHandler
@@ -84,16 +92,24 @@ def build_v2_routes(
     from .resource_slot.registry import register_v2_resource_slot_routes
     from .resource_usage.handler import V2ResourceUsageHandler
     from .resource_usage.registry import register_v2_resource_usage_routes
+    from .role_invitation.handler import V2RoleInvitationHandler
+    from .role_invitation.registry import register_v2_role_invitation_routes
+    from .role_preset.handler import V2RolePresetHandler
+    from .role_preset.registry import register_v2_role_preset_routes
     from .runtime_variant.handler import V2RuntimeVariantHandler
     from .runtime_variant.registry import register_v2_runtime_variant_routes
     from .runtime_variant_preset.handler import V2RuntimeVariantPresetHandler
     from .runtime_variant_preset.registry import register_v2_runtime_variant_preset_routes
+    from .scheduling_handler.handler import V2SchedulingHandlerHandler
+    from .scheduling_handler.registry import register_v2_scheduling_handler_routes
     from .scheduling_history.handler import V2SchedulingHistoryHandler
     from .scheduling_history.registry import register_v2_scheduling_history_routes
     from .service_catalog.handler import V2ServiceCatalogHandler
     from .service_catalog.registry import register_v2_service_catalog_routes
     from .session.handler import V2SessionHandler
     from .session.registry import register_v2_session_routes
+    from .storage_host.handler import V2StorageHostHandler
+    from .storage_host.registry import register_v2_storage_host_routes
     from .storage_namespace.handler import V2StorageNamespaceHandler
     from .storage_namespace.registry import register_v2_storage_namespace_routes
     from .user.handler import V2UserHandler
@@ -105,7 +121,12 @@ def build_v2_routes(
 
     # Build all handlers (each takes its individual adapter)
     agent_handler = V2AgentHandler(adapter=adapters.agent)
-    app_config_handler = V2AppConfigHandler(adapter=adapters.app_config)
+    app_config_allow_list_handler = V2AppConfigAllowListHandler(
+        adapter=adapters.app_config_allow_list
+    )
+    app_config_definition_handler = V2AppConfigDefinitionHandler(
+        adapter=adapters.app_config_definition
+    )
     artifact_handler = V2ArtifactHandler(adapter=adapters.artifact)
     artifact_registry_handler = V2ArtifactRegistryHandler(adapter=adapters.artifact_registry)
     audit_log_handler = V2AuditLogHandler(adapter=adapters.audit_log)
@@ -118,13 +139,19 @@ def build_v2_routes(
     )
     image_handler = V2ImageHandler(adapter=adapters.image)
     keypair_handler = V2KeypairHandler(adapter=adapters.user)
+    login_client_type_handler = V2LoginClientTypeHandler(adapter=adapters.login_client_type)
     login_history_handler = V2LoginHistoryHandler(adapter=adapters.login_history)
     login_session_handler = V2LoginSessionHandler(adapter=adapters.login_session)
     notification_handler = V2NotificationHandler(adapter=adapters.notification)
     object_storage_handler = V2ObjectStorageHandler(adapter=adapters.object_storage)
     project_handler = V2ProjectHandler(adapter=adapters.project)
+    role_invitation_handler = V2RoleInvitationHandler(adapter=adapters.rbac)
+    role_preset_handler = V2RolePresetHandler(adapter=adapters.role_preset)
     prometheus_query_preset_handler = V2PrometheusQueryPresetHandler(
         adapter=adapters.prometheus_query_preset
+    )
+    prometheus_query_preset_category_handler = V2PrometheusQueryPresetCategoryHandler(
+        adapter=adapters.prometheus_query_preset_category
     )
     rbac_handler = V2RBACHandler(adapter=adapters.rbac)
     reservoir_registry_handler = V2ReservoirRegistryHandler(adapter=adapters.reservoir_registry)
@@ -142,9 +169,11 @@ def build_v2_routes(
     )
     model_card_handler = V2ModelCardHandler(adapter=adapters.model_card)
     resource_usage_handler = V2ResourceUsageHandler(adapter=adapters.resource_usage)
+    scheduling_handler_handler = V2SchedulingHandlerHandler(adapter=adapters.scheduling_handler)
     scheduling_history_handler = V2SchedulingHistoryHandler(adapter=adapters.scheduling_history)
     service_catalog_handler = V2ServiceCatalogHandler(adapter=adapters.service_catalog)
     session_handler = V2SessionHandler(adapter=adapters.session)
+    storage_host_handler = V2StorageHostHandler(adapter=adapters.storage_host)
     storage_namespace_handler = V2StorageNamespaceHandler(adapter=adapters.storage_namespace)
     user_handler = V2UserHandler(adapter=adapters.user)
     vfolder_handler = V2VFolderHandler(adapter=adapters.vfolder)
@@ -155,7 +184,12 @@ def build_v2_routes(
 
     # Add all domain sub-registries
     v2_reg.add_subregistry(register_v2_agent_routes(agent_handler, route_deps))
-    v2_reg.add_subregistry(register_v2_app_config_routes(app_config_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_app_config_allow_list_routes(app_config_allow_list_handler, route_deps)
+    )
+    v2_reg.add_subregistry(
+        register_v2_app_config_definition_routes(app_config_definition_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_artifact_routes(artifact_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_artifact_registry_routes(artifact_registry_handler, route_deps)
@@ -177,13 +211,23 @@ def build_v2_routes(
     )
     v2_reg.add_subregistry(register_v2_image_routes(image_handler, route_deps))
     v2_reg.add_subregistry(register_v2_keypair_routes(keypair_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_login_client_type_routes(login_client_type_handler, route_deps)
+    )
     v2_reg.add_subregistry(register_v2_login_history_routes(login_history_handler, route_deps))
     v2_reg.add_subregistry(register_v2_login_session_routes(login_session_handler, route_deps))
     v2_reg.add_subregistry(register_v2_notification_routes(notification_handler, route_deps))
     v2_reg.add_subregistry(register_v2_object_storage_routes(object_storage_handler, route_deps))
     v2_reg.add_subregistry(register_v2_project_routes(project_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_role_invitation_routes(role_invitation_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_role_preset_routes(role_preset_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_prometheus_query_preset_routes(prometheus_query_preset_handler, route_deps)
+    )
+    v2_reg.add_subregistry(
+        register_v2_prometheus_query_preset_category_routes(
+            prometheus_query_preset_category_handler, route_deps
+        )
     )
     v2_reg.add_subregistry(register_v2_rbac_routes(rbac_handler, route_deps))
     v2_reg.add_subregistry(
@@ -203,10 +247,14 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_model_card_routes(model_card_handler, route_deps))
     v2_reg.add_subregistry(register_v2_resource_usage_routes(resource_usage_handler, route_deps))
     v2_reg.add_subregistry(
+        register_v2_scheduling_handler_routes(scheduling_handler_handler, route_deps)
+    )
+    v2_reg.add_subregistry(
         register_v2_scheduling_history_routes(scheduling_history_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_service_catalog_routes(service_catalog_handler, route_deps))
     v2_reg.add_subregistry(register_v2_session_routes(session_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_storage_host_routes(storage_host_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_storage_namespace_routes(storage_namespace_handler, route_deps)
     )

@@ -165,6 +165,17 @@
         "round_length": 0
       },
       "display_icon": "tenstorrent"
+    },
+    "xpu.device": {
+      "slot_name": "xpu.device",
+      "human_readable_name": "GPU",
+      "description": "Intel XPU-capable GPU",
+      "display_unit": "GPU",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "gpu1"
     }
   }
 }

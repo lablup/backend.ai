@@ -222,7 +222,7 @@ These are N:N scope-accessibility mappings — entity visibility propagates to c
 | `ScalingGroupForKeypairsRow` | User ━━auto━━► ResourceGroup | `auto` |
 | (new) | Domain ━━auto━━► ContainerRegistry | `auto` |
 | `AssociationContainerRegistriesGroupsRow` | Project ━━auto━━► ContainerRegistry | `auto` |
-| `AssocGroupUserRow` | Project ━━ref━━► User | `ref` |
+| `AssocGroupUserRow` | (sunset — replaced by `entity_type='user'` entries auto-synced on role assign/unassign) | `auto` |
 | `VFolderPermissionRow` | User ━━ref━━► VFolder (+ entity-scope permissions) | `ref` |
 
 ### Final RBAC Tables
@@ -240,7 +240,7 @@ After migration, the core RBAC tables are:
   - **Invite**: INSERT ref edge in `association_scopes_entities` + INSERT entity-scope permissions (read/write) in the invitee's system role.
   - **Revoke**: DELETE ref edge + DELETE entity-scope permissions.
   - The ref edge prevents the invitee's User-scope CRUD from escalating to the shared entity. Only explicitly granted entity-scope permissions apply.
-- Project membership is managed through `user_roles` and excluded from RBAC scope chain (Visibility only).
+- Project membership is stored directly in `association_scopes_entities` (`entity_type='user'`), auto-synced when roles are assigned/unassigned. This replaces the previous `association_groups_users` table and enables single-table membership lookups.
 
 ## Implementation Plan
 

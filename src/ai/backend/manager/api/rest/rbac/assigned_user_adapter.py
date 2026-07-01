@@ -15,16 +15,12 @@ from ai.backend.common.dto.manager.rbac import (
     SearchUsersAssignedToRolePathParam,
     SearchUsersAssignedToRoleRequest,
 )
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
+from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.role import AssignedUserData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
 from ai.backend.manager.models.rbac_models.orders import AssignedUserOrders
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
-    QueryCondition,
-    QueryOrder,
-)
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 
 __all__ = ("AssignedUserAdapter",)
 
@@ -83,6 +79,7 @@ class AssignedUserAdapter(BaseFilterAdapter):
                 equals_factory=AssignedUserConditions.by_username_equals,
                 starts_with_factory=AssignedUserConditions.by_username_starts_with,
                 ends_with_factory=AssignedUserConditions.by_username_ends_with,
+                in_factory=AssignedUserConditions.by_username_in,
             )
             if condition is not None:
                 user_conditions.append(condition)
@@ -94,6 +91,7 @@ class AssignedUserAdapter(BaseFilterAdapter):
                 equals_factory=AssignedUserConditions.by_email_equals,
                 starts_with_factory=AssignedUserConditions.by_email_starts_with,
                 ends_with_factory=AssignedUserConditions.by_email_ends_with,
+                in_factory=AssignedUserConditions.by_email_in,
             )
             if condition is not None:
                 user_conditions.append(condition)

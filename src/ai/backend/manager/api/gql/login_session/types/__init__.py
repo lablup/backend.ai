@@ -8,7 +8,7 @@ from .node import (
     LoginSessionV2GQL,
 )
 from .order import LoginSessionOrderByGQL, LoginSessionOrderFieldGQL
-from .payloads import RevokeLoginSessionPayloadGQL
+from .payloads import RevokeLoginSessionPayloadGQL, UnblockUserPayloadGQL
 
 __all__ = [
     "LoginSessionFilterGQL",
@@ -20,4 +20,5 @@ __all__ = [
     "LoginSessionV2EdgeGQL",
     "LoginSessionV2GQL",
     "RevokeLoginSessionPayloadGQL",
+    "UnblockUserPayloadGQL",
 ]

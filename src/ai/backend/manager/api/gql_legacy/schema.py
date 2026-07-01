@@ -28,6 +28,7 @@ from ai.backend.common.exception import (
     ErrorCode,
     PermissionDeniedError,
 )
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -91,7 +92,7 @@ if TYPE_CHECKING:
         SlotName,
         SlotTypes,
     )
-    from ai.backend.manager.api import ManagerStatus
+    from ai.backend.manager.data.manager_status.types import ManagerStatus
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.storage import StorageSessionManager
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -514,6 +515,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
     Type name changed from 'Queries' to 'Query' in 25.14.0
     """
 
+    # Relay node(id:) runtime resolution is migrated to the Strawberry (v2) subgraph via
+    # federation ``@override`` (see ``api/gql/node_field.py``). This field stays declared so the
+    # v1 graphene schema contract is unchanged; at runtime the supergraph resolves ``node`` in the
+    # Strawberry subgraph.
     node = AsyncNode.Field()
 
     # super-admin only
@@ -2276,7 +2281,9 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
         domain_name = domain_name or ctx.user["domain_name"]
         async with ctx.db.begin() as db_conn:
-            sgroup_rows = await query_allowed_sgroups(db_conn, domain_name, project_id, access_key)
+            sgroup_rows = await query_allowed_sgroups(
+                db_conn, domain_name, ProjectID(project_id), access_key
+            )
         conditions = [and_names([sgroup.name for sgroup in sgroup_rows])]
         sgroup_rows = await ScalingGroupRow.list_by_condition(conditions, db=ctx.db)
         return [ScalingGroup.from_orm_row(row).masked for row in sgroup_rows]
@@ -2586,6 +2593,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         )
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_session_pending_queue(
         root: Any,
         info: graphene.ResolveInfo,

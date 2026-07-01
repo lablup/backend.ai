@@ -6,7 +6,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -20,17 +20,22 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.models.network import NetworkType
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ImageConfigData,
     KernelBindingData,
     SessionDataForPull,
     SessionDataForStart,
 )
+from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
 )
+
+# Shared image IDs for linking kernel <-> image config in tests
+_DEFAULT_IMAGE_ID = UUID("00000000-0000-0000-0000-000000000001")
+_IMAGE_ID_1 = UUID("00000000-0000-0000-0000-000000000002")
+_IMAGE_ID_2 = UUID("00000000-0000-0000-0000-000000000003")
 
 # =============================================================================
 # Mock Dependencies
@@ -124,6 +129,7 @@ def _create_kernel_binding_data(
     kernel_id: KernelId | None = None,
     agent_id: AgentId | None = None,
     image: str = "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+    image_id: UUID | None = _DEFAULT_IMAGE_ID,
     cluster_role: str = "main",
     cluster_idx: int = 0,
 ) -> KernelBindingData:
@@ -133,6 +139,7 @@ def _create_kernel_binding_data(
         agent_id=agent_id or AgentId("agent-1"),
         agent_addr="tcp://agent-1:6001",
         image=image,
+        image_id=image_id,
         architecture="x86_64",
         cluster_role=cluster_role,
         cluster_idx=cluster_idx,
@@ -197,8 +204,8 @@ def session_for_pull_multiple_kernels_same_agent() -> SessionDataForPull:
     agent_id = AgentId("agent-1")
     return _create_session_for_pull(
         kernels=[
-            _create_kernel_binding_data(agent_id=agent_id, image="image-1"),
-            _create_kernel_binding_data(agent_id=agent_id, image="image-2"),
+            _create_kernel_binding_data(agent_id=agent_id, image="image-1", image_id=_IMAGE_ID_1),
+            _create_kernel_binding_data(agent_id=agent_id, image="image-2", image_id=_IMAGE_ID_2),
         ]
     )
 
@@ -310,9 +317,11 @@ def session_for_start_kernel_no_agent() -> SessionDataForStart:
 
 def _create_image_config_data(
     canonical: str = "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+    image_id: UUID = _DEFAULT_IMAGE_ID,
 ) -> ImageConfigData:
     """Create ImageConfigData for tests."""
     return ImageConfigData(
+        id=image_id,
         canonical=canonical,
         architecture="x86_64",
         project="stable",
@@ -327,17 +336,20 @@ def _create_image_config_data(
 
 
 @pytest.fixture
-def image_config_default() -> dict[str, ImageConfigData]:
+def image_config_default() -> dict[UUID, ImageConfigData]:
     """Default image configuration."""
+    config = _create_image_config_data()
     return {
-        "cr.backend.ai/stable/python:3.9-ubuntu20.04": _create_image_config_data(),
+        config.id: config,
     }
 
 
 @pytest.fixture
-def image_configs_multiple() -> dict[str, ImageConfigData]:
+def image_configs_multiple() -> dict[UUID, ImageConfigData]:
     """Multiple image configurations."""
+    config1 = _create_image_config_data(canonical="image-1", image_id=_IMAGE_ID_1)
+    config2 = _create_image_config_data(canonical="image-2", image_id=_IMAGE_ID_2)
     return {
-        "image-1": _create_image_config_data(canonical="image-1"),
-        "image-2": _create_image_config_data(canonical="image-2"),
+        config1.id: config1,
+        config2.id: config2,
     }

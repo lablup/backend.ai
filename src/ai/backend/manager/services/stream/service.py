@@ -8,8 +8,10 @@ from typing import Final
 from ai.backend.common import validators as tx
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.types import AccessKey, KernelId, SessionId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.api import NotImplementedAPI
+from ai.backend.manager.errors.resource import AgentNotAllocated
 from ai.backend.manager.idle import AppStreamingStatus, IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.stream.repository import StreamRepository
@@ -74,7 +76,7 @@ class StreamService:
         self, action: GetStreamingSessionAction
     ) -> GetStreamingSessionActionResult:
         session = await self._repository.get_streaming_session(
-            action.session_name, AccessKey(action.access_key)
+            action.session_name, action.user_uuid
         )
         kernel = session.main_kernel
         return GetStreamingSessionActionResult(
@@ -89,7 +91,7 @@ class StreamService:
 
     async def execute_in_stream(self, action: ExecuteInStreamAction) -> ExecuteInStreamActionResult:
         session = await self._repository.get_streaming_session(
-            action.session_name, AccessKey(action.access_key)
+            action.session_name, action.user_uuid
         )
         result = await self._registry.execute(
             session,
@@ -103,17 +105,18 @@ class StreamService:
         return ExecuteInStreamActionResult(result=dict(result))
 
     async def restart_in_stream(self, action: RestartInStreamAction) -> RestartInStreamActionResult:
-        session = await self._repository.get_streaming_session(
-            action.session_name, AccessKey(action.access_key)
+        raise NotImplementedAPI(
+            extra_msg=(
+                "Session restart is no longer supported. "
+                "Terminate the session and enqueue a new one instead."
+            ),
         )
-        await self._registry.restart_session(session)
-        return RestartInStreamActionResult()
 
     async def interrupt_in_stream(
         self, action: InterruptInStreamAction
     ) -> InterruptInStreamActionResult:
         session = await self._repository.get_streaming_session(
-            action.session_name, AccessKey(action.access_key)
+            action.session_name, action.user_uuid
         )
         result = await self._registry.interrupt_session(session)
         return InterruptInStreamActionResult(result=dict(result))
@@ -122,9 +125,14 @@ class StreamService:
         self, action: StartServiceInStreamAction
     ) -> StartServiceInStreamActionResult:
         session = await self._repository.get_streaming_session(
-            action.session_name, AccessKey(action.access_key)
+            action.session_name, action.user_uuid
         )
-        result = await self._registry.start_service(session, action.service, action.opts)
+        main_kernel = session.main_kernel
+        if main_kernel.agent is None:
+            raise AgentNotAllocated(f"Session {session.id} main kernel has no agent allocated")
+        result = await self._registry.start_service(
+            main_kernel.id, AgentId(main_kernel.agent), action.service, action.opts
+        )
         return StartServiceInStreamActionResult(result=dict(result))
 
     def create_connection_refresh_callback(

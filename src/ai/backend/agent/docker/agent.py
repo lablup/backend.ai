@@ -50,12 +50,13 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
-from ai.backend.agent.etcd import AgentEtcdClientView
-from ai.backend.agent.exception import (
+from ai.backend.agent.errors import (
     ContainerCreationError,
     InvalidArgumentError,
     UnsupportedResource,
 )
+from ai.backend.agent.errors.resources import PortPoolExhaustedError
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
 from ai.backend.agent.kernel_registry.adapter import (
@@ -79,6 +80,7 @@ from ai.backend.agent.plugin.network import (
     ContainerNetworkInfo,
     NetworkPluginContext,
 )
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
@@ -269,14 +271,14 @@ async def _clean_scratch(
 def _DockerError_reduce(self: DockerError) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
-        (self.status, {"message": self.message}, *self.args),
+        (self.status, self.message, *self.args),
     )
 
 
 def _DockerContainerError_reduce(self: DockerContainerError) -> tuple[type, tuple[Any, ...]]:
     return (
         type(self),
-        (self.status, {"message": self.message}, self.container_id, *self.args),
+        (self.status, self.message, self.container_id, *self.args),
     )
 
 
@@ -295,7 +297,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     container_configs: list[Mapping[str, Any]]
     domain_socket_proxies: list[DomainSocketProxy]
     computer_docker_args: dict[str, Any]
-    port_pool: set[int]
+    port_pool: PortPool
     agent_sockpath: Path
     resource_lock: asyncio.Lock
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
@@ -312,7 +314,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         distro: str,
         local_config: AgentUnifiedConfig,
         computers: Mapping[DeviceName, ComputerContext],
-        port_pool: set[int],
+        port_pool: PortPool,
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         network_plugin_ctx: NetworkPluginContext,
@@ -463,6 +465,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 zshrc_path = Path(str(files("ai.backend.runner").joinpath(".zshrc")))
                 vimrc_path = Path(str(files("ai.backend.runner").joinpath(".vimrc")))
                 tmux_conf_path = Path(str(files("ai.backend.runner").joinpath(".tmux.conf")))
+                persistent_files_warning_doc_path = Path(
+                    str(
+                        files("ai.backend.runner").joinpath("DO_NOT_STORE_PERSISTENT_FILES_HERE.md")
+                    )
+                )
                 jupyter_custom_dir = self.work_dir / ".jupyter" / "custom"
                 jupyter_custom_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copy(jupyter_custom_css_path.resolve(), jupyter_custom_dir / "custom.css")
@@ -474,6 +481,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 shutil.copy(zshrc_path.resolve(), self.work_dir / ".zshrc")
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
+                shutil.copy(
+                    persistent_files_warning_doc_path.resolve(),
+                    self.work_dir / "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
+                )
 
                 def chown_scratch(uid: int | None, gid: int | None) -> None:
                     paths = [
@@ -485,6 +496,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         self.work_dir / ".zshrc",
                         self.work_dir / ".vimrc",
                         self.work_dir / ".tmux.conf",
+                        self.work_dir / "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
                     ]
                     self._chown_paths_if_root(paths, uid, gid)
 
@@ -1042,6 +1054,40 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 f"seccomp={json.dumps(seccomp_profile)}"
             ]
 
+    async def _attach_additional_networks(
+        self,
+        docker: Docker,
+        container: DockerContainer,
+        requested_networks: Iterable[str],
+    ) -> None:
+        """
+        Connect the container to each requested network, skipping any that
+        Docker has already attached (e.g. `bridge` auto-attached when
+        `NetworkMode` is unset). `requested_networks` may contain network
+        names or IDs per the `Resources.get_docker_networks` contract.
+        """
+        requested = set(requested_networks)
+        if not requested:
+            return
+        container_info = await container.show()
+        networks = {}
+        if (network_settings := container_info.get("NetworkSettings")) is not None:
+            if (networks_dict := network_settings.get("Networks")) is not None:
+                networks = networks_dict
+        already_attached = set(networks.keys()) | {
+            n["NetworkID"] for n in networks.values() if n is not None and n.get("NetworkID")
+        }
+        for ref in requested - already_attached:
+            network = await docker.networks.get(ref)
+            try:
+                await network.connect({"Container": container._id})
+            except DockerError as e:
+                # Defense against a race between container.show() and connect()
+                # where Docker may attach the network in between.
+                if e.status == HTTPStatus.FORBIDDEN and "already exists" in str(e.message):
+                    continue
+                raise
+
     @override
     async def start_container(
         self,
@@ -1061,11 +1107,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         container_bind_host = self.local_config.container.bind_host
         advertised_kernel_host = self.local_config.container.advertised_host
         if len(service_ports) + len(self.repl_ports) > len(self.port_pool):
-            raise RuntimeError(
-                f"Container ports are not sufficiently available. (remaining ports: {self.port_pool})"
+            raise PortPoolExhaustedError(
+                f"Container ports are not sufficiently available. "
+                f"(remaining ports: {self.port_pool.remaining()})"
             )
         exposed_ports = [*self.repl_ports]
-        host_ports = [self.port_pool.pop() for _ in self.repl_ports]
+        host_ports = [self.port_pool.acquire() for _ in self.repl_ports]
         host_ips = []
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
@@ -1080,7 +1127,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             ):
                 host_ports.append(ssh_host_port[1])
             else:
-                hport = self.port_pool.pop()
+                hport = self.port_pool.acquire()
                 host_ports.append(hport)
         protected_service_ports: set[int] = set()
         for sport in service_ports:
@@ -1231,7 +1278,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 self.local_config.container.scratch_root,
                 self.kernel_id,
             )
-            self.port_pool.update(host_ports)
+            self.port_pool.release_many(host_ports)
             async with self.resource_lock:
                 for dev_name, device_alloc in resource_spec.allocations.items():
                     self.computers[dev_name].alloc_map.free(device_alloc)
@@ -1248,7 +1295,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         container_id="",
                         message="Docker API returned None when creating container",
                     )
-                cid = cast(str, container._id)
+                cid = container._id
                 async with AsyncFileWriter(
                     target_filename=self.config_dir / "resource.txt",
                     access_mode="a",
@@ -1310,9 +1357,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
                 additional_network_names |= set(n)
 
-            for name in additional_network_names:
-                network = await docker.networks.get(name)
-                await network.connect({"Container": container._id})
+            await self._attach_additional_networks(docker, container, additional_network_names)
 
             kernel_obj.set_container_id(ContainerId(cid))
             container_network_info: ContainerNetworkInfo | None = None
@@ -1609,10 +1654,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         return cast(str, self.docker_info["CgroupVersion"])
 
     @override
-    async def extract_image_command(self, image: str) -> str | None:
+    async def extract_image_command(self, image: str) -> list[str] | None:
         async with closing_async(Docker()) as docker:
             result = await docker.images.get(image)
-            return cast(str | None, result["Config"].get("Cmd"))
+            command = result["Config"].get("Cmd")
+            if command is None:
+                return None
+            if isinstance(command, str):
+                return [command]
+
+            if isinstance(command, list):
+                return cast(list[str], command)
+            return None
 
     @override
     async def enumerate_containers(
@@ -1920,7 +1973,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await docker.images.delete(request.image, force=request.force, noprune=request.noprune)
             return PurgeImageResp.success(image=request.image)
         except Exception as e:
-            log.error(f'Failed to purge image "{request.image}": {e}')
+            log.error('Failed to purge image "{}": {}', request.image, e)
             return PurgeImageResp.failure(image=request.image, error=str(e))
 
     @override

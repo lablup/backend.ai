@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import enum
 import ipaddress
 import json
@@ -10,6 +11,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -27,6 +29,7 @@ import yarl
 from dateutil.parser import isoparse
 from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
+from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicode, UnicodeText
@@ -34,9 +37,10 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, TypeEngine, Unicod
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.exception import InvalidIpAddressValue
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import (
     AbstractPermission,
-    EndpointId,
+    BackendAISchema,
     JSONSerializableMixin,
     KernelId,
     QuotaScopeID,
@@ -111,6 +115,47 @@ def zero_if_none(val: int | None) -> int:
 class FixtureOpModes(enum.StrEnum):
     INSERT = "insert"
     UPDATE = "update"
+
+
+@dataclass(frozen=True)
+class FixtureReferenceSpec:
+    """Declarative spec for resolving a human-friendly alias in a fixture row
+    into a value looked up from another table.
+
+    For each matching fixture row, the value in `fixture_alias_column` is
+    looked up against `lookup_table.lookup_match_column`, and the resulting
+    `lookup_table.lookup_referenced_column` is written into `fixture_fk_column`.
+    In SQL terms, the fixture's FK column ends up referencing
+    `lookup_table(lookup_referenced_column)`.
+    """
+
+    fixture_alias_column: str
+    fixture_fk_column: str
+    lookup_table: str
+    lookup_match_column: str
+    lookup_referenced_column: str
+
+
+FIXTURE_REFERENCE_SPECS: Final[Mapping[str, Sequence[FixtureReferenceSpec]]] = {
+    "runtime_variant_presets": (
+        FixtureReferenceSpec(
+            fixture_alias_column="runtime_variant_name",
+            fixture_fk_column="runtime_variant",
+            lookup_table="runtime_variants",
+            lookup_match_column="name",
+            lookup_referenced_column="id",
+        ),
+    ),
+    "prometheus_query_presets": (
+        FixtureReferenceSpec(
+            fixture_alias_column="category_name",
+            fixture_fk_column="category_id",
+            lookup_table="prometheus_query_preset_categories",
+            lookup_match_column="name",
+            lookup_referenced_column="id",
+        ),
+    ),
+}
 
 
 T_Enum = TypeVar("T_Enum", bound=enum.Enum, covariant=True)
@@ -269,6 +314,51 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
 
     @property
     def python_type(self) -> type[T_StrEnum]:
+        return self._enum_cls
+
+
+class IntFlagType[T_IntFlag: enum.IntFlag](TypeDecorator[T_IntFlag]):
+    """
+    Maps a Postgres SMALLINT column with a Python enum.IntFlag bitmask.
+
+    Stores the flag's integer value so membership/cap checks reduce to bitwise
+    operations both in Python (``flag & MASK``) and in SQL (``column & :mask``).
+    A SMALLINT integer bitmask is the idiomatic representation for a small flag
+    enum; PostgreSQL's BIT / BIT VARYING string types are reserved for actual
+    bit-vector data and would require explicit int<->bitstring conversion.
+    """
+
+    impl = sa.SmallInteger
+    cache_ok = True
+
+    def __init__(self, enum_cls: type[T_IntFlag], **opts: Any) -> None:
+        self._opts = opts
+        super().__init__(**opts)
+        self._enum_cls = enum_cls
+
+    def process_bind_param(
+        self,
+        value: T_IntFlag | None,
+        dialect: Dialect,
+    ) -> int | None:
+        if value is None:
+            return None
+        return int(value)
+
+    def process_result_value(
+        self,
+        value: int | None,
+        dialect: Dialect,
+    ) -> T_IntFlag | None:
+        if value is None:
+            return None
+        return self._enum_cls(value)
+
+    def copy(self, **_kw: Any) -> Self:
+        return IntFlagType(self._enum_cls, **self._opts)  # type: ignore[return-value]
+
+    @property
+    def python_type(self) -> type[T_IntFlag]:
         return self._enum_cls
 
 
@@ -548,6 +638,60 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]])
         return PydanticListColumn(self._schema)  # type: ignore[return-value]
 
 
+class ABCColumnPayload(abc.ABC):
+    """
+    Storage contract for :class:`ABCColumn`: ``serialize`` produces a JSONB
+    dict, ``load`` rehydrates one (and may dispatch by discriminator to a
+    concrete subtype). Informal abstracts rather than ``@abc.abstractmethod`` so
+    the base can be passed to ``ABCColumn(...)`` without tripping mypy's
+    ``type-abstract`` check; subclasses must override both.
+    """
+
+    def serialize(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @classmethod
+    def load(cls, raw: dict[str, Any]) -> ABCColumnPayload:
+        raise NotImplementedError
+
+
+class ABCColumn(TypeDecorator[ABCColumnPayload]):
+    """Polymorphic JSONB column: stores ``value.serialize()``, reads via
+    ``schema.load(...)``. Domain-agnostic; modeled on :class:`PydanticColumn`."""
+
+    impl = JSONB
+    cache_ok = True
+
+    _schema: type[ABCColumnPayload]
+
+    def __init__(self, schema: type[ABCColumnPayload]) -> None:
+        super().__init__()
+        self._schema = schema
+
+    def process_bind_param(
+        self,
+        value: ABCColumnPayload | None,
+        dialect: Dialect,
+    ) -> dict[str, Any] | None:
+        # JSONB accepts Python objects directly, not JSON strings
+        if value is None:
+            return None
+        return value.serialize()
+
+    def process_result_value(
+        self,
+        value: dict[str, Any] | None,
+        dialect: Dialect,
+    ) -> ABCColumnPayload | None:
+        # JSONB returns already parsed Python objects, not strings
+        if value is None:
+            return None
+        return self._schema.load(value)
+
+    def copy(self, **_kw: Any) -> Self:
+        return ABCColumn(self._schema)  # type: ignore[return-value]
+
+
 class URLColumn(TypeDecorator[yarl.URL]):
     """
     A column type for URL strings
@@ -676,11 +820,25 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
     """
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
+
+    The optional ``subtype`` argument accepts a ``NewType`` (or any callable
+    that wraps a ``uuid.UUID``) so the ORM-level attribute can be a typed
+    identifier such as ``ImageID`` or ``VFolderUUID``. Prefer
+    ``mapped_column("col", GUID(ImageID), ...)`` over declaring a dedicated
+    subclass per identifier — ``NewType`` is identity at runtime, and the
+    subtype is invoked only to satisfy the type checker.
     """
 
     impl = CHAR
+    # ``uuid_subtype_func`` (ClassVar) is kept for the legacy subclass pattern
+    # (``SessionIDColumnType`` etc.). Instances constructed via ``GUID(subtype)``
+    # use ``self._subtype_func`` instead.
     uuid_subtype_func: ClassVar[Callable[[Any], uuid.UUID]] = lambda v: v
     cache_ok = True
+
+    def __init__(self, subtype: Callable[[uuid.UUID], TUUIDSubType] | None = None) -> None:
+        super().__init__()
+        self._subtype_func: Callable[[uuid.UUID], Any] | None = subtype
 
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "postgresql":
@@ -688,7 +846,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
         return dialect.type_descriptor(CHAR(16))
 
     def process_bind_param(self, value: Any | None, dialect: Dialect) -> str | bytes | None:
-        # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
+        # NOTE: DeploymentID, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
         #       Therefore, we just do isinstance on uuid.UUID only below.
@@ -702,17 +860,26 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
             return value.bytes
         return uuid.UUID(value).bytes
 
+    def _apply_subtype(self, raw: uuid.UUID) -> Any:
+        # Prefer the per-instance subtype (``GUID(ImageID)``). Fall back to the
+        # class-level ``uuid_subtype_func`` so existing subclasses still work.
+        if self._subtype_func is not None:
+            return self._subtype_func(raw)
+        return type(self).uuid_subtype_func(raw)
+
     def process_result_value(self, value: Any, _dialect: Dialect) -> TUUIDSubType | None:
         if value is None:
             return value
-        cls = type(self)
         if isinstance(value, bytes):
-            return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
+            return cast(TUUIDSubType, self._apply_subtype(uuid.UUID(bytes=value)))
         # Handle asyncpg's UUID type (asyncpg.pgproto.pgproto.UUID) and standard uuid.UUID
         # Both have a 'bytes' attribute, so we can use it to construct a standard uuid.UUID
         if hasattr(value, "bytes"):
-            return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(bytes=value.bytes)))
-        return cast(TUUIDSubType, cls.uuid_subtype_func(uuid.UUID(value)))
+            return cast(TUUIDSubType, self._apply_subtype(uuid.UUID(bytes=value.bytes)))
+        return cast(TUUIDSubType, self._apply_subtype(uuid.UUID(value)))
+
+    def copy(self, **_kw: Any) -> Self:
+        return type(self)(self._subtype_func)
 
 
 class SlugType(TypeDecorator[str]):
@@ -752,8 +919,12 @@ class SlugType(TypeDecorator[str]):
         return cast(str, value)
 
 
-class EndpointIDColumnType(GUID[EndpointId]):
-    uuid_subtype_func = lambda v: EndpointId(v)
+# Legacy subclass kept solely so the released alembic migration
+# ``f108628f032b_add_endpoint_and_routing_tables`` keeps working without
+# modification. New call sites should use ``GUID(DeploymentID)`` directly.
+# Safe to drop once that migration ages out of the LTS support window.
+class EndpointIDColumnType(GUID[DeploymentID]):
+    uuid_subtype_func = lambda v: DeploymentID(v)
     cache_ok = True
 
 
@@ -767,14 +938,14 @@ class KernelIDColumnType(GUID[KernelId]):
     cache_ok = True
 
 
-class ResourceSlotEntry(BaseModel):
+class ResourceSlotEntry(BackendAISchema):
     """A single resource slot entry for PydanticListColumn storage."""
 
     resource_type: str
     quantity: str
 
 
-class ResourceOptsEntry(BaseModel):
+class ResourceOptsEntry(BackendAISchema):
     """A single resource option entry for PydanticListColumn storage."""
 
     name: str
@@ -783,12 +954,6 @@ class ResourceOptsEntry(BaseModel):
 
 def IDColumn(name: str = "id") -> sa.Column[Any]:
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
-
-
-def EndpointIDColumn(name: str = "id") -> sa.Column[Any]:
-    return sa.Column(
-        name, EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
-    )
 
 
 def SessionIDColumn(name: str = "id") -> sa.Column[Any]:
@@ -832,6 +997,7 @@ async def populate_fixture(
         from .hasher.types import PasswordColumn
 
         async with engine.begin() as conn:
+            await _resolve_fixture_references(conn, table, rows)
             # Apply typedecorator manually for required columns
             for col in table.columns:
                 if isinstance(col.type, sa.sql.sqltypes.DateTime):
@@ -946,6 +1112,70 @@ async def populate_fixture(
                                 ) from e
                         update_data.append(update_row)
                     await conn.execute(update_stmt, update_data)
+
+
+async def _resolve_fixture_references(
+    conn: AsyncConnection,
+    table: sa.Table,
+    rows: Sequence[dict[str, Any]],
+) -> None:
+    reference_specs = FIXTURE_REFERENCE_SPECS.get(table.name, ())
+    for reference_spec in reference_specs:
+        await _resolve_fixture_reference(conn, table, rows, reference_spec)
+
+
+async def _resolve_fixture_reference(
+    conn: AsyncConnection,
+    table: sa.Table,
+    rows: Sequence[dict[str, Any]],
+    reference_spec: FixtureReferenceSpec,
+) -> None:
+    # Pop alias column from every row, collecting rows that still need a resolved FK.
+    rows_to_resolve: list[tuple[dict[str, Any], str]] = []
+    for row in rows:
+        alias_value = row.pop(reference_spec.fixture_alias_column, None)
+        if alias_value is not None and reference_spec.fixture_fk_column not in row:
+            rows_to_resolve.append((row, cast(str, alias_value)))
+
+    if not rows_to_resolve:
+        return
+
+    alias_values = {alias for _, alias in rows_to_resolve}
+
+    lookup_table = metadata.tables.get(reference_spec.lookup_table)
+    if lookup_table is None:
+        raise DataTransformationFailed(f"Table {reference_spec.lookup_table} not found in metadata")
+
+    match_column = lookup_table.columns.get(reference_spec.lookup_match_column)
+    if match_column is None:
+        raise DataTransformationFailed(
+            f"Column {reference_spec.lookup_table}.{reference_spec.lookup_match_column} "
+            "not found in metadata"
+        )
+    referenced_column = lookup_table.columns.get(reference_spec.lookup_referenced_column)
+    if referenced_column is None:
+        raise DataTransformationFailed(
+            f"Column {reference_spec.lookup_table}.{reference_spec.lookup_referenced_column} "
+            "not found in metadata"
+        )
+
+    result = await conn.execute(
+        sa.select(match_column, referenced_column).where(match_column.in_(alias_values))
+    )
+    # Access via `_mapping` with column objects so that match/referenced being the same
+    # column still yields the expected identity mapping.
+    resolved_values: dict[str, Any] = {
+        row._mapping[match_column]: row._mapping[referenced_column] for row in result
+    }
+    missing_values = sorted(alias_values - resolved_values.keys())
+    if missing_values:
+        raise DataTransformationFailed(
+            f"Unknown {reference_spec.fixture_alias_column} in fixture for {table.name}: "
+            + ", ".join(missing_values)
+        )
+
+    for row, alias_value in rows_to_resolve:
+        row[reference_spec.fixture_fk_column] = resolved_values[alias_value]
 
 
 class DecimalType(TypeDecorator[Decimal], Decimal):

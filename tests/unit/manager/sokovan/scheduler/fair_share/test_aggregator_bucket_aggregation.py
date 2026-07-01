@@ -15,14 +15,16 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.fair_share import (
+    DomainUsageBucketKey,
+    ProjectUsageBucketKey,
+    UserUsageBucketKey,
+)
 from ai.backend.manager.repositories.resource_usage_history import (
     KernelUsageRecordCreatorSpec,
 )
 from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import (
-    DomainUsageBucketKey,
     FairShareAggregator,
-    ProjectUsageBucketKey,
-    UserUsageBucketKey,
 )
 
 

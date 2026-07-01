@@ -13,7 +13,7 @@ import aiohttp_cors
 import attrs
 from aiohttp import web
 from dateutil.tz import tzutc
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.errors import ObjectNotFound
@@ -35,7 +35,7 @@ from ai.backend.appproxy.coordinator.models import Token, Worker, WorkerAppFilte
 from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.events.dispatcher import EventHandler
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, BackendAISchema
 from ai.backend.logging import BraceStyleAdapter
 
 from .types import CircuitListResponseModel, SlotModel, StubResponseModel
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class WorkerModel(BaseModel):
+class WorkerModel(BackendAISchema):
     authority: Annotated[
         str,
         Field(
@@ -73,7 +73,7 @@ class WorkerModel(BaseModel):
     accepted_traffics: list[AppMode]
 
 
-class AppFilter(BaseModel):
+class AppFilter(BackendAISchema):
     key: str
     value: str
 
@@ -112,11 +112,11 @@ class WorkerResponseModel(WorkerModel):
     slots: list[SlotModel]
 
 
-class WorkerListResponseModel(BaseModel):
+class WorkerListResponseModel(BackendAISchema):
     workers: list[WorkerResponseModel]
 
 
-class TokenResponseModel(BaseModel):
+class TokenResponseModel(BackendAISchema):
     login_session_token: str | None
     kernel_host: str
     kernel_port: int
@@ -212,6 +212,8 @@ async def update_worker(
             worker.wildcard_traffic_port = params.wildcard_traffic_port
             worker.filtered_apps_only = params.filtered_apps_only
             worker.traefik_last_used_marker_path = params.traefik_last_used_marker_path
+            # Reflect port_range / frontend_mode changes on restart.
+            worker.refresh_available_slots()
             worker.updated_at = datetime.now(UTC)
             worker.nodes += 1
             worker.status = WorkerStatus.ALIVE

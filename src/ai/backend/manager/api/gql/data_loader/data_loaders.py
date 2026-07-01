@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
+from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
+from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 
@@ -13,6 +16,12 @@ if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.rbac.response import EntityNode  # pants: no-infer-dep
     from ai.backend.manager.api.adapters.registry import Adapters  # pants: no-infer-dep
     from ai.backend.manager.api.gql.agent.types import AgentV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.app_config_allow_list.types import (  # pants: no-infer-dep
+        AppConfigAllowListGQL,
+    )
+    from ai.backend.manager.api.gql.app_config_definition.types import (  # pants: no-infer-dep
+        AppConfigDefinitionGQL,
+    )
     from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
         ArtifactRevision,
     )
@@ -41,6 +50,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.revision import (  # pants: no-infer-dep
         ModelRevision,
     )
+    from ai.backend.manager.api.gql.deployment.types.revision_preset import (  # pants: no-infer-dep
+        DeploymentRevisionPresetGQL,
+    )
     from ai.backend.manager.api.gql.deployment.types.route import Route  # pants: no-infer-dep
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.huggingface_registry import (  # pants: no-infer-dep
@@ -59,6 +71,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import (  # pants: no-infer-dep
         ProjectV2GQL,
     )
+    from ai.backend.manager.api.gql.prometheus_query_preset.types.category import (  # pants: no-infer-dep
+        CategoryGQL,
+    )
+    from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (  # pants: no-infer-dep
+        QueryDefinitionGQL,
+    )
     from ai.backend.manager.api.gql.rbac.types.entity import EntityRefGQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.rbac.types.permission import (  # pants: no-infer-dep
         PermissionGQL,
@@ -73,6 +91,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.resource_group.types import (  # pants: no-infer-dep
         ResourceGroupGQL,
     )
+    from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
+        RuntimeVariantGQL,
+    )
+    from ai.backend.manager.api.gql.runtime_variant_preset.types import (  # pants: no-infer-dep
+        RuntimeVariantPresetGQL,
+    )
     from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
         DeploymentHistory,
         RouteHistory,
@@ -83,6 +107,9 @@ if TYPE_CHECKING:
         StorageNamespace,
     )
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.vfolder_v2.types.node import (  # pants: no-infer-dep
+        VFolderGQL,
+    )
     from ai.backend.manager.api.gql.vfs_storage import VFSStorage  # pants: no-infer-dep
 
 
@@ -99,6 +126,42 @@ class DataLoaders:
 
     def __init__(self, adapters: Adapters) -> None:
         self._adapters = adapters
+
+    @cached_property
+    def app_config_allow_list_loader(
+        self,
+    ) -> DataLoader[AppConfigAllowListID, AppConfigAllowListGQL | None]:
+        adapter = self._adapters.app_config_allow_list
+
+        async def load_fn(
+            ids: list[AppConfigAllowListID],
+        ) -> list[AppConfigAllowListGQL | None]:
+            from ai.backend.manager.api.gql.app_config_allow_list.types import (  # pants: no-infer-dep
+                AppConfigAllowListGQL as ACL,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [ACL.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def app_config_definition_loader(
+        self,
+    ) -> DataLoader[AppConfigDefinitionID, AppConfigDefinitionGQL | None]:
+        adapter = self._adapters.app_config_definition
+
+        async def load_fn(
+            ids: list[AppConfigDefinitionID],
+        ) -> list[AppConfigDefinitionGQL | None]:
+            from ai.backend.manager.api.gql.app_config_definition.types import (  # pants: no-infer-dep
+                AppConfigDefinitionGQL as ACD,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [ACD.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
 
     @cached_property
     def audit_log_loader(
@@ -129,6 +192,22 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_names(names)
             return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def vfolder_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, VFolderGQL | None]:
+        adapter = self._adapters.vfolder
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[VFolderGQL | None]:
+            from ai.backend.manager.api.gql.vfolder_v2.types.node import (  # pants: no-infer-dep
+                VFolderGQL as VF,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [VF.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 
@@ -331,7 +410,7 @@ class DataLoaders:
                 ModelDeployment as MD,
             )
 
-            dtos = await adapter.batch_load_by_ids(ids)
+            dtos = await adapter.batch_load_by_ids([DeploymentID(i) for i in ids])
             return [MD.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
@@ -349,6 +428,38 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_revisions_by_ids(ids)
             return [MRev.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def revision_preset_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, DeploymentRevisionPresetGQL | None]:
+        adapter = self._adapters.deployment_revision_preset
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[DeploymentRevisionPresetGQL | None]:
+            from ai.backend.common.dto.manager.query import UUIDFilter
+            from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (  # pants: no-infer-dep
+                DeploymentRevisionPresetFilter,
+                SearchDeploymentRevisionPresetsInput,
+            )
+            from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (  # pants: no-infer-dep
+                DeploymentRevisionPresetNode,
+            )
+            from ai.backend.manager.api.gql.deployment.types.revision_preset import (  # pants: no-infer-dep
+                DeploymentRevisionPresetGQL as DRP,
+            )
+
+            payload = await adapter.search(
+                SearchDeploymentRevisionPresetsInput(
+                    filter=DeploymentRevisionPresetFilter(id=UUIDFilter(in_=list(ids))),
+                    limit=len(ids),
+                )
+            )
+            node_map: dict[uuid.UUID, DeploymentRevisionPresetNode] = {
+                item.id: item for item in payload.items
+            }
+            return [DRP.from_pydantic(node) if (node := node_map.get(pid)) else None for pid in ids]
 
         return DataLoader(load_fn=load_fn)
 
@@ -746,5 +857,69 @@ class DataLoaders:
             return [
                 [RAG.from_pydantic(dto) for dto in role_assignments] for role_assignments in dtos
             ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def runtime_variant_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, RuntimeVariantGQL | None]:
+        adapter = self._adapters.runtime_variant
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[RuntimeVariantGQL | None]:
+            from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
+                RuntimeVariantGQL as RV,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [RV.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def runtime_variant_preset_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, RuntimeVariantPresetGQL | None]:
+        adapter = self._adapters.runtime_variant_preset
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[RuntimeVariantPresetGQL | None]:
+            from ai.backend.manager.api.gql.runtime_variant_preset.types import (  # pants: no-infer-dep
+                RuntimeVariantPresetGQL as RVP,
+            )
+
+            nodes = await adapter.batch_load_by_ids(ids)
+            return [RVP.from_pydantic(node) if node is not None else None for node in nodes]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def query_definition_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, QueryDefinitionGQL | None]:
+        adapter = self._adapters.prometheus_query_preset
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[QueryDefinitionGQL | None]:
+            from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (  # pants: no-infer-dep
+                QueryDefinitionGQL as QD,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [QD.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def category_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, CategoryGQL | None]:
+        adapter = self._adapters.prometheus_query_preset_category
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[CategoryGQL | None]:
+            from ai.backend.manager.api.gql.prometheus_query_preset.types.category import (  # pants: no-infer-dep
+                CategoryGQL as CG,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [CG.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)

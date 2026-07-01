@@ -5,7 +5,7 @@ import logging
 import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterator, Mapping
-from typing import Any, ClassVar, TypeVar
+from typing import Any, ClassVar, TypeVar, cast
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks
@@ -44,6 +44,13 @@ class AbstractPlugin(metaclass=ABCMeta):
     """
     If set True (default), the hosting plugin context will watch and automatically update
     the etcd's plugin configuration changes via the ``update_plugin_config()`` method.
+    """
+
+    require_explicit_allow: ClassVar[bool] = False
+    """
+    If set True, this plugin will only be loaded when explicitly listed in the
+    ``allowed_plugins`` configuration. When the allowlist is None (load all discovered
+    plugins), plugins with this flag set will be skipped.
     """
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
@@ -131,8 +138,24 @@ class BasePluginContext[P: AbstractPlugin]:
             allowlist=cls_allowlist | arg_allowlist if allowlist_enabled else None,
             blocklist=cls_blocklist | arg_blocklist,
         ):
+            plugin_cls = entrypoint.load()
+            if not (isinstance(plugin_cls, type) and issubclass(plugin_cls, AbstractPlugin)):
+                log.warning(
+                    "skipping plugin (group:{}): {} (not a valid AbstractPlugin subclass, got {})",
+                    plugin_group,
+                    entrypoint.name,
+                    type(plugin_cls),
+                )
+                continue
+            if not allowlist_enabled and plugin_cls.require_explicit_allow:
+                log.info(
+                    "skipping plugin (group:{}): {} (requires explicit allow)",
+                    plugin_group,
+                    entrypoint.name,
+                )
+                continue
             log.info("loading plugin (group:{}): {}", plugin_group, entrypoint.name)
-            yield entrypoint.name, entrypoint.load()
+            yield entrypoint.name, cast(type[P], plugin_cls)
 
     async def init(
         self,

@@ -9,10 +9,14 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.condition_utils import (
+    make_nested_string_in_factory,
+    make_string_in_factory,
+)
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 from .row import DomainRow
 
@@ -83,6 +87,8 @@ class DomainConditions:
 
         return inner
 
+    by_name_in = staticmethod(make_string_in_factory(DomainRow.name))
+
     # ==================== Description Filters ====================
 
     @staticmethod
@@ -137,6 +143,8 @@ class DomainConditions:
 
         return inner
 
+    by_description_in = staticmethod(make_string_in_factory(DomainRow.description))
+
     # ==================== Active Status Filters ====================
 
     @staticmethod
@@ -146,17 +154,17 @@ class DomainConditions:
 
         return inner
 
-    # ==================== Integration ID Filters ====================
+    # ==================== Integration Name Filters ====================
 
     @staticmethod
-    def by_integration_id_equals(integration_id: str) -> QueryCondition:
+    def by_integration_name_equals(integration_name: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return DomainRow.integration_id == integration_id
+            return DomainRow.integration_id == integration_name  # DB column is integration_id
 
         return inner
 
     @staticmethod
-    def by_has_integration_id(has_integration: bool) -> QueryCondition:
+    def by_has_integration_name(has_integration: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             if has_integration:
                 return DomainRow.integration_id.is_not(None)
@@ -338,6 +346,10 @@ class DomainConditions:
 
         return inner
 
+    by_project_name_in = staticmethod(
+        make_nested_string_in_factory(GroupRow.name, lambda c: DomainConditions._exists_project(c))
+    )
+
     @staticmethod
     def by_project_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -472,6 +484,13 @@ class DomainConditions:
             return DomainConditions._exists_user(cond)
 
         return inner
+
+    by_user_username_in = staticmethod(
+        make_nested_string_in_factory(UserRow.username, lambda c: DomainConditions._exists_user(c))
+    )
+    by_user_email_in = staticmethod(
+        make_nested_string_in_factory(UserRow.email, lambda c: DomainConditions._exists_user(c))
+    )
 
     @staticmethod
     def by_user_is_active(is_active: bool) -> QueryCondition:

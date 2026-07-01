@@ -9,7 +9,7 @@ import asyncio
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from time import time
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from glide import ExpirySet, ExpiryType
@@ -22,9 +22,14 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
     HealthCheckStatus,
     ValkeyScheduleClient,
 )
+from ai.backend.common.clients.valkey_client.valkey_schedule.types import (
+    ReplicaHealthResult,
+    ReplicaProbeTarget,
+)
 from ai.backend.common.defs import REDIS_LIVE_DB
+from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import AgentId, KernelId, ValkeyTarget
+from ai.backend.common.types import AgentId, KernelId, SessionId, ValkeyTarget
 
 
 class TestValkeyScheduleClient:
@@ -57,15 +62,16 @@ class TestValkeyScheduleClient:
         """Helper: Manually set stale health data for testing staleness detection"""
         key = client._get_route_health_key(route_id)
         stale_timestamp = str(int(time()) - MAX_HEALTH_STALENESS_SEC - 10)
-        await client._client.client.hset(
-            key,
-            {
-                "readiness": "1",
-                "last_readiness": stale_timestamp,
-                "liveness": "1",
-                "last_liveness": stale_timestamp,
-            },
-        )
+        async with client._client.client() as conn:
+            await conn.hset(
+                key,
+                {
+                    "readiness": "1",
+                    "last_readiness": stale_timestamp,
+                    "liveness": "1",
+                    "last_liveness": stale_timestamp,
+                },
+            )
 
     async def test_initialize_routes_health_status_batch(
         self, valkey_schedule_client: ValkeyScheduleClient
@@ -285,10 +291,11 @@ class TestValkeyScheduleClient:
         # Set route with old last_check timestamp
         key = valkey_schedule_client._get_route_health_key(route_id)
         old_timestamp = str(int(time()) - 60)  # 60 seconds ago
-        await valkey_schedule_client._client.client.hset(
-            key,
-            {"readiness": "1", "last_readiness": old_timestamp, "last_check": old_timestamp},
-        )
+        async with valkey_schedule_client._client.client() as conn:
+            await conn.hset(
+                key,
+                {"readiness": "1", "last_readiness": old_timestamp, "last_check": old_timestamp},
+            )
 
         # Check health status should update last_check
         await valkey_schedule_client.check_route_health_status([route_id])
@@ -402,16 +409,17 @@ class TestKernelPresenceStatus:
         kernel_id = KernelId(uuid4())
         key = valkey_schedule_client._get_kernel_presence_key(kernel_id)
         stale_timestamp = str(int(time()) - MAX_KERNEL_HEALTH_STALENESS_SEC - 10)
-        await valkey_schedule_client._client.client.hset(
-            key,
-            {
-                "presence": "1",
-                "last_presence": stale_timestamp,
-                "last_check": stale_timestamp,
-                "created_at": stale_timestamp,
-            },
-        )
-        await valkey_schedule_client._client.client.expire(key, KERNEL_HEALTH_TTL_SEC)
+        async with valkey_schedule_client._client.client() as conn:
+            await conn.hset(
+                key,
+                {
+                    "presence": "1",
+                    "last_presence": stale_timestamp,
+                    "last_check": stale_timestamp,
+                    "created_at": stale_timestamp,
+                },
+            )
+            await conn.expire(key, KERNEL_HEALTH_TTL_SEC)
         return kernel_id
 
     @pytest.fixture
@@ -564,15 +572,16 @@ class TestKernelPresenceStatus:
         kernel_id = KernelId(uuid4())
         key = valkey_schedule_client._get_kernel_presence_key(kernel_id)
         old_timestamp = str(int(time()) - 60)  # 60 seconds ago
-        await valkey_schedule_client._client.client.hset(
-            key,
-            {
-                "presence": "1",
-                "last_presence": old_timestamp,
-                "last_check": old_timestamp,
-                "created_at": old_timestamp,
-            },
-        )
+        async with valkey_schedule_client._client.client() as conn:
+            await conn.hset(
+                key,
+                {
+                    "presence": "1",
+                    "last_presence": old_timestamp,
+                    "last_check": old_timestamp,
+                    "created_at": old_timestamp,
+                },
+            )
 
         # Check should update last_check
         statuses = await valkey_schedule_client.check_kernel_presence_status_batch([kernel_id])
@@ -681,11 +690,12 @@ class TestAgentLastCheck:
         # Manually set agent_last_check
         key = valkey_schedule_client._get_agent_last_check_key(agent_id)
         expected_timestamp = int(time())
-        await valkey_schedule_client._client.client.set(
-            key,
-            str(expected_timestamp),
-            expiry=ExpirySet(ExpiryType.SEC, AGENT_LAST_CHECK_TTL_SEC),
-        )
+        async with valkey_schedule_client._client.client() as conn:
+            await conn.set(
+                key,
+                str(expected_timestamp),
+                expiry=ExpirySet(ExpiryType.SEC, AGENT_LAST_CHECK_TTL_SEC),
+            )
 
         result = await valkey_schedule_client.get_agent_last_check(agent_id)
         assert result == expected_timestamp
@@ -833,3 +843,295 @@ class TestAgentLastCheck:
         statuses = await valkey_schedule_client.get_kernel_presence_batch([])
 
         assert statuses == {}
+
+
+class TestForceTerminatedCleanupQueue:
+    """Test cases for force-terminated session cleanup queue operations."""
+
+    @pytest.fixture
+    async def valkey_schedule_client(
+        self,
+        redis_container: tuple[str, HostPortPairModel],
+    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+        _, hostport_pair = redis_container
+        valkey_target = ValkeyTarget(addr=hostport_pair.address)
+        client = await ValkeyScheduleClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_LIVE_DB,
+            human_readable_name="test-force-terminated-cleanup",
+        )
+        try:
+            key = ValkeyScheduleClient._get_force_terminated_cleanup_key()
+            async with client._client.client() as conn:
+                await conn.delete([key])
+            yield client
+        finally:
+            await client.close()
+
+    async def test_add_and_get_returns_session_ids(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """Stored session IDs are returned as list[SessionId] by get."""
+        session_ids = [SessionId(uuid4()) for _ in range(3)]
+
+        await valkey_schedule_client.add_force_terminated_sessions(session_ids)
+        result = await valkey_schedule_client.get_force_terminated_sessions()
+
+        assert isinstance(result, list)
+        assert set(result) == set(session_ids)
+        for item in result:
+            assert isinstance(item, UUID)
+
+    async def test_get_empty_queue_returns_empty_list(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """Get from empty queue returns empty list."""
+        result = await valkey_schedule_client.get_force_terminated_sessions()
+
+        assert isinstance(result, list)
+        assert result == []
+
+    async def test_remove_deletes_only_specified_sessions(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """remove_force_terminated_sessions removes only specified IDs."""
+        sid_keep = SessionId(uuid4())
+        sid_remove = SessionId(uuid4())
+
+        await valkey_schedule_client.add_force_terminated_sessions([sid_keep, sid_remove])
+        await valkey_schedule_client.remove_force_terminated_sessions([sid_remove])
+        result = await valkey_schedule_client.get_force_terminated_sessions()
+
+        assert result == [sid_keep]
+
+
+class TestReplicaProbeTargetClient:
+    """Test ValkeyScheduleClient methods for ReplicaProbeTarget."""
+
+    @pytest.fixture
+    async def valkey_schedule_client(
+        self,
+        redis_container: tuple[str, HostPortPairModel],
+    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+        _, hostport_pair = redis_container
+        client = await ValkeyScheduleClient.create(
+            valkey_target=ValkeyTarget(addr=hostport_pair.address),
+            db_id=REDIS_LIVE_DB,
+            human_readable_name="test-route-probe-target",
+        )
+        try:
+            yield client
+        finally:
+            await client.close()
+
+    @pytest.fixture
+    def replica_id(self) -> ReplicaID:
+        return ReplicaID(uuid4())
+
+    def _make_target(self, replica_id: ReplicaID) -> ReplicaProbeTarget:
+        return ReplicaProbeTarget(
+            replica_id=replica_id,
+            health_path="/health",
+            inference_port=8080,
+            replica_host="10.0.0.1",
+        )
+
+    async def test_register_and_get(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        target = self._make_target(replica_id)
+        await valkey_schedule_client.register_route_probe_targets_batch([target])
+        results = await valkey_schedule_client.get_route_probe_targets_batch([replica_id])
+        assert results[replica_id] == target
+
+    async def test_register_batch_multiple(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+    ) -> None:
+        targets = [self._make_target(ReplicaID(uuid4())) for _ in range(3)]
+        await valkey_schedule_client.register_route_probe_targets_batch(targets)
+        replica_ids = [t.replica_id for t in targets]
+        results = await valkey_schedule_client.get_route_probe_targets_batch(replica_ids)
+        for target in targets:
+            assert results[target.replica_id] == target
+
+    async def test_get_missing_returns_none(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        results = await valkey_schedule_client.get_route_probe_targets_batch([replica_id])
+        assert results[replica_id] is None
+
+    async def test_register_empty_does_nothing(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+    ) -> None:
+        await valkey_schedule_client.register_route_probe_targets_batch([])
+
+    async def test_get_empty_returns_empty_dict(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+    ) -> None:
+        results = await valkey_schedule_client.get_route_probe_targets_batch([])
+        assert results == {}
+
+    async def test_register_overwrites_existing(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        await valkey_schedule_client.register_route_probe_targets_batch([
+            self._make_target(replica_id)
+        ])
+        updated = ReplicaProbeTarget(
+            replica_id=replica_id,
+            health_path="/healthz",
+            inference_port=9000,
+            replica_host="10.0.0.2",
+        )
+        await valkey_schedule_client.register_route_probe_targets_batch([updated])
+        results = await valkey_schedule_client.get_route_probe_targets_batch([replica_id])
+        assert results[replica_id] == updated
+
+
+class TestReplicaHealthStatusClient:
+    """Test ValkeyScheduleClient methods for ReplicaHealthStatus."""
+
+    @pytest.fixture
+    async def valkey_schedule_client(
+        self,
+        redis_container: tuple[str, HostPortPairModel],
+    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+        _, hostport_pair = redis_container
+        client = await ValkeyScheduleClient.create(
+            valkey_target=ValkeyTarget(addr=hostport_pair.address),
+            db_id=REDIS_LIVE_DB,
+            human_readable_name="test-route-health-status",
+        )
+        try:
+            yield client
+        finally:
+            await client.close()
+
+    @pytest.fixture
+    def replica_id(self) -> ReplicaID:
+        return ReplicaID(uuid4())
+
+    async def test_record_healthy_and_get(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=True)
+        ])
+        results = await valkey_schedule_client.get_route_health_statuses_batch([replica_id])
+        status = results[replica_id]
+        assert status is not None
+        assert status.healthy is True
+        assert status.last_check > 0
+
+    async def test_record_unhealthy_and_get(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=False)
+        ])
+        results = await valkey_schedule_client.get_route_health_statuses_batch([replica_id])
+        status = results[replica_id]
+        assert status is not None
+        assert status.healthy is False
+
+    async def test_get_missing_returns_none(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        results = await valkey_schedule_client.get_route_health_statuses_batch([replica_id])
+        assert results[replica_id] is None
+
+    async def test_get_empty_returns_empty_dict(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+    ) -> None:
+        results = await valkey_schedule_client.get_route_health_statuses_batch([])
+        assert results == {}
+
+    async def test_key_deletion_simulates_ttl_expiry(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        """Deleting the key (simulating TTL expiry) results in None → DEGRADED."""
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=True)
+        ])
+        key = valkey_schedule_client._get_route_health_status_key(replica_id)
+        async with valkey_schedule_client._client.client() as conn:
+            await conn.delete([key])
+        results = await valkey_schedule_client.get_route_health_statuses_batch([replica_id])
+        assert results[replica_id] is None
+
+    async def test_record_batch_multiple(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+    ) -> None:
+        replica_ids = [ReplicaID(uuid4()) for _ in range(3)]
+        for rid in replica_ids:
+            await valkey_schedule_client.record_route_health_statuses_batch([
+                ReplicaHealthResult(replica_id=rid, healthy=True)
+            ])
+        results = await valkey_schedule_client.get_route_health_statuses_batch(replica_ids)
+        assert len(results) == 3
+        for rid in replica_ids:
+            status = results[rid]
+            assert status is not None
+            assert status.healthy is True
+
+    async def test_record_overwrites_previous(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=True)
+        ])
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=False)
+        ])
+        results = await valkey_schedule_client.get_route_health_statuses_batch([replica_id])
+        status = results[replica_id]
+        assert status is not None
+        assert status.healthy is False
+
+    async def test_record_consecutive_failures_round_trip(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=False, consecutive_failures=4)
+        ])
+        results = await valkey_schedule_client.get_route_health_statuses_batch([replica_id])
+        status = results[replica_id]
+        assert status is not None
+        assert status.consecutive_failures == 4
+
+    async def test_record_with_custom_ttl(
+        self,
+        valkey_schedule_client: ValkeyScheduleClient,
+        replica_id: ReplicaID,
+    ) -> None:
+        """Per-route ttl_sec is applied to the health status key."""
+        await valkey_schedule_client.record_route_health_statuses_batch([
+            ReplicaHealthResult(replica_id=replica_id, healthy=True, ttl_sec=7)
+        ])
+        key = valkey_schedule_client._get_route_health_status_key(replica_id)
+        async with valkey_schedule_client._client.client() as conn:
+            ttl = await conn.ttl(key)
+        assert 0 < ttl <= 7

@@ -15,6 +15,7 @@ from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginConte
 from ai.backend.common.types import ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.metrics.scheduler import (
@@ -27,31 +28,35 @@ from ai.backend.manager.repositories.scheduler import (
     MarkTerminatingResult,
     SchedulerRepository,
 )
-from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    AllowedScalingGroup,
-    SessionCreationSpec,
-)
-from ai.backend.manager.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 
-from .calculators.resource_calculator import ResourceCalculator
 from .preparers import (
-    ClusterConfigurationRule,
-    InternalDataRule,
-    MountPreparationRule,
-    SessionPreparer,
+    AssignContainerUserMappingRule,
+    AssignNetworkConfigRule,
+    AssignUserIdentityRule,
+    BuildInternalDataRule,
+    ComputeKernelResourcesRule,
+    ExpandKernelGroupsRule,
+    InjectSessionEnvironRule,
+    MergeResourceGroupDefaultsRule,
+    ResolveVFolderMountsRule,
+    SessionSpecPreparationContext,
+    SessionSpecPreparer,
 )
-from .resolvers.scaling_group_resolver import ScalingGroupResolver
 from .validators import (
-    ClusterValidationRule,
+    ConcurrentSessionLimitRule,
     ContainerLimitRule,
+    DotfileVFolderConflictRule,
+    ImageSlotTypeRule,
     InferenceModelFolderRule,
     MountNameValidationRule,
-    PublicPrivateFilterRule,
-    ScalingGroupFilter,
+    RequestedSlotTypeRule,
+    RequiredResourceSlotRule,
+    ResourceLimitRule,
     ServicePortRule,
-    SessionTypeFilterRule,
-    SessionValidator,
+    SessionSpecValidationContext,
+    SessionSpecValidator,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -81,11 +86,8 @@ class SchedulingController:
     _network_plugin_ctx: NetworkPluginContext
 
     # Services
-    _scaling_group_resolver: ScalingGroupResolver
-    _scaling_group_filter: ScalingGroupFilter
-    _validator: SessionValidator
-    _preparer: SessionPreparer
-    _resource_calculator: ResourceCalculator
+    _spec_preparer: SessionSpecPreparer
+    _spec_validator: SessionSpecValidator
     _metric_observer: SchedulerPhaseMetricObserver
     _operation_metrics: SchedulerOperationMetricObserver
     _hook_plugin_ctx: HookPluginContext
@@ -104,182 +106,130 @@ class SchedulingController:
         self._metric_observer = SchedulerPhaseMetricObserver.instance()
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
-        # Initialize services
-        self._scaling_group_resolver = ScalingGroupResolver()
+        # Draft-based spec preparer chain: builds a fully-resolved
+        # ``SessionSpec`` from a caller-supplied ``SessionSpecDraft``.
+        # Order matters — RG defaults merge first so later rules see the
+        # merged baseline; expand last on the options side so kernel
+        # specs exist before per-kernel rules run.
+        self._spec_preparer = SessionSpecPreparer([
+            AssignUserIdentityRule(),
+            MergeResourceGroupDefaultsRule(),
+            ComputeKernelResourcesRule(),
+            ExpandKernelGroupsRule(),
+            AssignNetworkConfigRule(),
+            AssignContainerUserMappingRule(),
+            InjectSessionEnvironRule(),
+            BuildInternalDataRule(),
+            ResolveVFolderMountsRule(),
+        ])
 
-        # Initialize scaling group filter with rules
-        filter_rules = [
-            PublicPrivateFilterRule(),
-            SessionTypeFilterRule(),
-        ]
-        self._scaling_group_filter = ScalingGroupFilter(filter_rules)
-
-        # Initialize validator with rules
-        validator_rules = [
+        # Draft-based spec validator chain. Runs against the finalized
+        # ``SessionSpec`` + ``SessionSpecValidationContext``.
+        self._spec_validator = SessionSpecValidator([
+            ConcurrentSessionLimitRule(),
             ContainerLimitRule(),
+            ImageSlotTypeRule(),
+            RequestedSlotTypeRule(),
+            RequiredResourceSlotRule(),
+            ResourceLimitRule(),
             ServicePortRule(),
-            ClusterValidationRule(),
             MountNameValidationRule(),
             InferenceModelFolderRule(),
-        ]
-        self._validator = SessionValidator(validator_rules)
+            DotfileVFolderConflictRule(),
+        ])
 
-        # Initialize preparer with rules
-        preparer_rules = [
-            ClusterConfigurationRule(),
-            MountPreparationRule(),
-            InternalDataRule(),
-        ]
-        self._preparer = SessionPreparer(preparer_rules)
-
-        # Initialize resource calculator (still needed for resource calculations)
-        self._resource_calculator = ResourceCalculator(args.config_provider)
-
-    async def _resolve_scaling_group(
+    async def enqueue_session_from_draft(
         self,
-        session_spec: SessionCreationSpec,
-    ) -> AllowedScalingGroup:
-        """
-        Resolve the scaling group for the session.
-
-        If scaling group is specified in spec, use it.
-        Otherwise, fetch allowed groups and auto-select.
-
-        Args:
-            session_spec: Session creation specification
-
-        Returns:
-            str: The resolved scaling group name
-        """
-        # Fetch allowed groups to determine the scaling group
-        allowed_groups = await self._repository.query_allowed_scaling_groups(
-            session_spec.user_scope.domain_name,
-            str(session_spec.user_scope.group_id),
-            session_spec.access_key,
-        )
-        if session_spec.scaling_group:
-            for sg in allowed_groups:
-                if sg.name == session_spec.scaling_group:
-                    return sg
-            raise InvalidAPIParameters(
-                f"Scaling group '{session_spec.scaling_group}' is not accessible"
-            )
-
-        # Resolve the scaling group
-        return self._scaling_group_resolver.resolve(
-            session_spec,
-            allowed_groups,
-        )
-
-    async def enqueue_session(
-        self,
-        session_spec: SessionCreationSpec,
+        draft: SessionSpecDraft,
     ) -> SessionId:
+        """Draft-based session enqueue entry point.
+
+        Only input is the :class:`SessionSpecDraft` — request-envelope
+        extras (sudo, model-definition overlay) ride on
+        ``draft.internal_data_extras``. Every validation-adjacent DB read
+        (image metadata, keypair policy, resource-group network,
+        container uid/gid, resolved vfolder mounts, dotfiles, active
+        session count) flows through
+        :meth:`SchedulerRepository.fetch_session_spec_contexts`.
+
+        Flow:
+
+        1. Batch fetch — resolve prep / validation context bundles.
+        2. Preparer chain — draft → finalized ``SessionSpec``.
+        3. ``PRE_ENQUEUE_SESSION`` hook — rejected calls raise.
+        4. Validator chain — spec + context.
+        5. ``SchedulerRepository.enqueue_session_from_spec`` — writer tx.
+        6. Broadcast PENDING + ask the coordinator to schedule.
+        7. ``POST_ENQUEUE_SESSION`` hook notification.
         """
-        Enqueue a new session for scheduling.
+        rg_name = str(draft.scope.resource_group_name) if draft.scope.resource_group_name else ""
 
-        Steps:
-        1. Resolve scaling group
-        2. Fetch all required data from repository
-        3. Validate the specification
-        4. Calculate resources and prepare session data
-        5. Enqueue in repository
+        allowed_vfolder_types = list(
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
 
-        Args:
-            session_spec: Session creation specification
-
-        Returns:
-            SessionId: The ID of the created session
-        """
-        # Phase 1: Resolve scaling group
         with self._metric_observer.measure_phase(
-            "scheduling_controller", "", "resolve_scaling_group"
+            "scheduling_controller", rg_name, "spec_fetch_contexts"
         ):
-            validated_scaling_group = await self._resolve_scaling_group(session_spec)
+            fetched = await self._repository.fetch_session_spec_contexts(
+                draft,
+                storage_manager=self._storage_manager,
+                allowed_vfolder_types=allowed_vfolder_types,
+            )
 
-        # Phase 2: Fetch all required data
+        prep_ctx = SessionSpecPreparationContext(
+            resource_group_defaults=fetched.resource_group_defaults,
+            resource_group_network=fetched.resource_group_network,
+            container_user_info=fetched.container_user_info,
+            image_infos=fetched.image_infos,
+            resource_group_allow_fractional=fetched.resource_group_allow_fractional,
+            dotfile_data=fetched.dotfile_data,
+            vfolder_mounts_by_role=fetched.vfolder_mounts_by_role,
+        )
+        val_ctx = SessionSpecValidationContext(
+            keypair_resource_policy=fetched.keypair_resource_policy,
+            image_infos=fetched.image_infos,
+            known_slot_types=fetched.known_slot_types,
+            slot_type_policy=fetched.slot_type_policy,
+            dotfile_data=fetched.dotfile_data,
+            active_session_count=fetched.active_session_count,
+        )
+
         with self._metric_observer.measure_phase(
-            "scheduling_controller", validated_scaling_group.name, "fetch_data"
+            "scheduling_controller", rg_name, "spec_preparation"
         ):
-            allowed_vfolder_types = list(
-                await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
-            )
-            creation_context = await self._repository.fetch_session_creation_data(
-                session_spec,
-                validated_scaling_group.name,
-                self._storage_manager,
-                allowed_vfolder_types,
-            )
-
-        # Phase 3: Filter and validate
-        with self._metric_observer.measure_phase(
-            "scheduling_controller", validated_scaling_group.name, "validation"
-        ):
-            # Filter scaling groups based on session requirements
-            # This will raise NoAvailableScalingGroup if filtering fails
-            filter_result = self._scaling_group_filter.filter(
-                session_spec,
-                creation_context.allowed_scaling_groups,
-            )
-
-            # Update context with filtered scaling groups for remaining validation
-            creation_context.allowed_scaling_groups = filter_result.allowed_groups
-            session_spec.scaling_group = filter_result.selected_scaling_group
-
-            # Run remaining validation rules
-            self._validator.validate(
-                session_spec,
-                creation_context,
-            )
-
-        # Phase 4: Calculate resources and prepare session data
-        with self._metric_observer.measure_phase(
-            "scheduling_controller", validated_scaling_group.name, "preparation"
-        ):
-            # Pre-calculate resources
-            calculated_resources = await self._resource_calculator.calculate(
-                validated_scaling_group,
-                session_spec,
-                creation_context,
-            )
-
-            # Get DB time for session enqueue timestamp
-            enqueue_time = await self._repository.get_db_now()
-
-            # Prepare session data with calculated resources
-            session_data = await self._preparer.prepare(
-                session_spec,
-                validated_scaling_group,
-                creation_context,
-                calculated_resources,
-                enqueue_time,
-            )
+            spec = await self._spec_preparer.prepare(draft, prep_ctx)
 
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
-            (session_data.id, session_data.name, session_data.access_key),
+            (
+                spec.identity.session_id,
+                spec.identity.session_name,
+                spec.identity.access_key,
+            ),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        # Phase 5: Enqueue in repository
         with self._metric_observer.measure_phase(
-            "scheduling_controller", validated_scaling_group.name, "enqueue"
+            "scheduling_controller", rg_name, "spec_validation"
         ):
-            session_id = await self._repository.enqueue_session(session_data)
+            self._spec_validator.validate(spec, val_ctx)
+
+        with self._metric_observer.measure_phase("scheduling_controller", rg_name, "enqueue"):
+            session_id = await self._repository.enqueue_session_from_spec(spec)
 
         log.info(
-            "Session {} ({}) enqueued successfully",
-            session_data.name,
+            "Session {} ({}) enqueued successfully via draft path",
+            spec.identity.session_name,
             session_id,
         )
 
-        # Broadcast PENDING status event
         await self._event_producer.broadcast_events_batch([
             SchedulingBroadcastEvent(
                 session_id=session_id,
-                creation_id=session_data.creation_id,
+                creation_id=spec.identity.creation_id,
                 status_transition=str(SessionStatus.PENDING),
                 reason="Session enqueued",
             )
@@ -295,7 +245,7 @@ class SchedulingController:
             )
         await self._hook_plugin_ctx.notify(
             "POST_ENQUEUE_SESSION",
-            (session_id, session_data.name, session_data.access_key),
+            (session_id, spec.identity.session_name, spec.identity.access_key),
         )
         return session_id
 
@@ -388,26 +338,37 @@ class SchedulingController:
                 count=result.processed_count(),
             )
             # Request termination scheduling for the next cycle
-            # For force-terminated sessions, agents still need cleanup RPCs
-            await self.mark_scheduling_needed([ScheduleType.TERMINATE])
+            schedule_types = [ScheduleType.TERMINATE]
+
+            # For force-terminated sessions, store session IDs in Valkey for container cleanup
+            if result.force_terminated_sessions:
+                await self._valkey_schedule.add_force_terminated_sessions(
+                    result.force_terminated_sessions
+                )
+                schedule_types.append(ScheduleType.CLEANUP_FORCE_TERMINATED)
+
+            await self.mark_scheduling_needed(schedule_types)
 
         return result
 
     async def validate_session_spec(self, spec: SessionValidationSpec) -> None:
         # TODO: Refactor to use ValidationRule
-        alias_folders = spec.mount_spec.mount_map.values()
-        if len(alias_folders) != len(set(alias_folders)):
+        alias_destinations = [
+            entry.mount_destination
+            for entry in spec.mount_entries
+            if entry.mount_destination is not None
+        ]
+        if len(alias_destinations) != len(set(alias_destinations)):
             raise InvalidAPIParameters("Duplicate alias folder name exists.")
-        original_folders = spec.mount_spec.mount_map.keys()
-        alias_name: str
-        for alias_name in alias_folders:
+        original_refs = {str(entry.vfolder_id) for entry in spec.mount_entries}
+        for alias_name in alias_destinations:
             if alias_name.startswith("/home/work/"):
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
             if not _verify_vfolder_name(alias_name):
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
-            if alias_name in original_folders:
+            if alias_name in original_refs:
                 raise InvalidAPIParameters(
                     "Alias name cannot be set to an existing folder name: " + str(alias_name)
                 )
@@ -425,9 +386,7 @@ class SchedulingController:
         user = current_user()
         if user is None:
             raise InvalidAPIParameters("User context is required for image validation.")
-        await self._repository.check_available_image(
-            spec.image_identifier, user.domain_name, user.user_id
-        )
+        await self._repository.check_available_image(spec.image_id, user.domain_name, user.user_id)
 
 
 def _verify_vfolder_name(folder: str) -> bool:

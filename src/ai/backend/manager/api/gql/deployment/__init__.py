@@ -16,24 +16,30 @@ from .resolver import (
     # Revision
     activate_deployment_revision,
     add_model_revision,
+    # Revision Preset
+    admin_create_deployment_revision_preset,
+    admin_delete_deployment_revision_preset,
+    admin_deployments,
+    admin_refresh_deployment_revisions,
+    admin_update_deployment_revision_preset,
     # Access Token
     create_access_token,
     # Auto Scaling
     create_auto_scaling_rule,
-    # Revision Preset
-    create_deployment_revision_preset,
     # Deployment
     create_model_deployment,
+    delete_access_token,
     delete_auto_scaling_rule,
-    delete_deployment_revision_preset,
     delete_model_deployment,
     deployment,
     deployment_revision_preset,
     deployment_revision_presets,
     deployment_status_changed,
-    deployments,
     inference_runtime_config,
     inference_runtime_configs,
+    my_deployments,
+    project_deployments,
+    replace_deployment_options,
     # Replica
     replica,
     replica_status_changed,
@@ -47,7 +53,6 @@ from .resolver import (
     update_auto_scaling_rule,
     # Policy
     update_deployment_policy,
-    update_deployment_revision_preset,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -65,6 +70,8 @@ from .types import (
     ActivenessStatus,
     AddRevisionInput,
     AddRevisionPayload,
+    # Admin refresh revisions
+    AdminRefreshDeploymentRevisionsPayload,
     # Auto Scaling
     AutoScalingMetricSource,
     AutoScalingRule,
@@ -90,6 +97,11 @@ from .types import (
     DeleteDeploymentInput,
     DeleteDeploymentPayload,
     DeploymentFilter,
+    DeploymentHandlerOptionsInfoGQL,
+    DeploymentHandlerOptionsInputGQL,
+    # Deployment Options
+    DeploymentOptionsInfoGQL,
+    DeploymentOptionsInputGQL,
     DeploymentOrderBy,
     DeploymentPolicyGQL,
     DeploymentStatusChangedPayload,
@@ -100,6 +112,10 @@ from .types import (
     DeploymentStrategySpecGQL,
     DeploymentStrategyTypeGQL,
     ExtraVFolderMountInput,
+    HandlerOptionsEntryInfoGQL,
+    HandlerOptionsEntryInputGQL,
+    HandlerOptionsInfoGQL,
+    HandlerOptionsInputGQL,
     ImageInput,
     LivenessStatus,
     ModelDeployment,
@@ -122,7 +138,10 @@ from .types import (
     ModelRuntimeConfig,
     ModelRuntimeConfigInput,
     MountPermission,
+    ProjectDeploymentScopeGQL,
     ReadinessStatus,
+    ReplaceDeploymentOptionsInputGQL,
+    ReplaceDeploymentOptionsPayload,
     ReplicaFilter,
     ReplicaOrderBy,
     ReplicaState,
@@ -131,7 +150,7 @@ from .types import (
     ReplicaStatusFilter,
     ResourceConfig,
     ResourceConfigInput,
-    ResourceGroupInput,
+    RevisionRefreshResult,
     RollingUpdateConfigInputGQL,
     RollingUpdateStrategySpecGQL,
     # Route
@@ -182,6 +201,7 @@ __all__ = [
     "UpdateAutoScalingRuleInput",
     "UpdateAutoScalingRulePayload",
     # Deployment Types
+    "AdminRefreshDeploymentRevisionsPayload",
     "CreateDeploymentInput",
     "CreateDeploymentPayload",
     "DeleteDeploymentInput",
@@ -201,6 +221,7 @@ __all__ = [
     "ModelDeploymentNetworkAccess",
     "ModelDeploymentNetworkAccessInput",
     "ReplicaState",
+    "RevisionRefreshResult",
     "SyncReplicaInput",
     "SyncReplicaPayload",
     "UpdateDeploymentInput",
@@ -249,9 +270,9 @@ __all__ = [
     "ModelRuntimeConfig",
     "ModelRuntimeConfigInput",
     "MountPermission",
+    "ProjectDeploymentScopeGQL",
     "ResourceConfig",
     "ResourceConfigInput",
-    "ResourceGroupInput",
     # Route Types
     "Route",
     "RouteConnection",
@@ -266,6 +287,7 @@ __all__ = [
     "get_route_pagination_spec",
     # Resolvers - Access Token
     "create_access_token",
+    "delete_access_token",
     # Resolvers - Auto Scaling
     "create_auto_scaling_rule",
     "delete_auto_scaling_rule",
@@ -275,9 +297,24 @@ __all__ = [
     "delete_model_deployment",
     "deployment",
     "deployment_status_changed",
-    "deployments",
+    "admin_deployments",
+    "admin_refresh_deployment_revisions",
+    "my_deployments",
+    "project_deployments",
+    "replace_deployment_options",
     "sync_replicas",
     "update_model_deployment",
+    # Replace Deployment Options
+    "DeploymentHandlerOptionsInfoGQL",
+    "DeploymentHandlerOptionsInputGQL",
+    "DeploymentOptionsInfoGQL",
+    "DeploymentOptionsInputGQL",
+    "HandlerOptionsEntryInfoGQL",
+    "HandlerOptionsEntryInputGQL",
+    "HandlerOptionsInfoGQL",
+    "HandlerOptionsInputGQL",
+    "ReplaceDeploymentOptionsInputGQL",
+    "ReplaceDeploymentOptionsPayload",
     # Resolvers - Policy
     "update_deployment_policy",
     # Resolvers - Replica
@@ -296,9 +333,9 @@ __all__ = [
     "routes",
     "update_route_traffic_status",
     # Resolvers - Revision Preset
-    "create_deployment_revision_preset",
-    "delete_deployment_revision_preset",
+    "admin_create_deployment_revision_preset",
+    "admin_delete_deployment_revision_preset",
+    "admin_update_deployment_revision_preset",
     "deployment_revision_preset",
     "deployment_revision_presets",
-    "update_deployment_revision_preset",
 ]

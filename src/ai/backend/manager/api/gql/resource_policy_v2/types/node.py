@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
@@ -12,7 +14,6 @@ from ai.backend.common.dto.manager.v2.resource_policy.response import (
     ProjectResourcePolicyNode,
     UserResourcePolicyNode,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     ResourceLimitEntryGQL,
@@ -20,18 +21,27 @@ from ai.backend.manager.api.gql.common_types import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_field,
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.keypair.types.filters import (
+        KeypairFilterGQL,
+        KeypairOrderByGQL,
+    )
+    from ai.backend.manager.api.gql.keypair.types.node import KeyPairConnection
 
 # ── Keypair Resource Policy ──
 
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Keypair resource policy defining session and storage limits for API keypairs.",
     ),
     name="KeypairResourcePolicyV2",
@@ -65,13 +75,86 @@ class KeypairResourcePolicyV2GQL(PydanticNodeMixin[KeypairResourcePolicyNode]):
         description="Allowed vfolder host permissions."
     )
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.4",
+            description="Keypairs assigned to this resource policy.",
+        )
+    )  # type: ignore[misc]
+    async def keypairs(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            KeypairFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.keypair.types.filters"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                KeypairOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.keypair.types.filters"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            KeyPairConnection,
+            strawberry.lazy("ai.backend.manager.api.gql.keypair.types.node"),
+        ]
+        | None
+    ):
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.keypair.request import SearchKeypairsRequest
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.keypair.types.node import (
+            KeyPairConnection,
+            KeyPairEdge,
+            KeyPairGQL,
+        )
+        from ai.backend.manager.repositories.keypair.types import (
+            KeypairResourcePolicyKeypairSearchScope,
+        )
+
+        result = await info.context.adapters.user.gql_search_keypairs_by_resource_policy(
+            scope=KeypairResourcePolicyKeypairSearchScope(resource_policy_name=self.name),
+            input=SearchKeypairsRequest(
+                filter=filter.to_pydantic() if filter is not None else None,
+                order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [KeyPairGQL.from_pydantic(item) for item in result.items]
+        edges = [KeyPairEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return KeyPairConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=result.total_count,
+        )
+
 
 KeypairResourcePolicyV2Edge = Edge[KeypairResourcePolicyV2GQL]
 
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Paginated connection for keypair resource policies.",
     )
 )
@@ -88,7 +171,7 @@ class KeypairResourcePolicyV2Connection(Connection[KeypairResourcePolicyV2GQL]):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="User resource policy defining vfolder and quota limits per user.",
     ),
     name="UserResourcePolicyV2",
@@ -98,6 +181,17 @@ class UserResourcePolicyV2GQL(PydanticNodeMixin[UserResourcePolicyNode]):
     name: str = gql_field(description="Policy name.")
     created_at: datetime | None = gql_field(description="Timestamp when the policy was created.")
     max_vfolder_count: int = gql_field(description="Maximum vfolders a user can create.")
+    max_concurrent_logins: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.2",
+            description=(
+                "Maximum number of concurrent authenticated login sessions per user."
+                " Null means unlimited."
+                " Distinct from keypair_resource_policies.max_concurrent_sessions"
+                " which caps compute sessions."
+            ),
+        ),
+    )
     max_quota_scope_size: BinarySizeInfoGQL = gql_field(description="Maximum quota scope size.")
     max_session_count_per_model_session: int = gql_field(
         description="Maximum sessions per model session."
@@ -112,7 +206,7 @@ UserResourcePolicyV2Edge = Edge[UserResourcePolicyV2GQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Paginated connection for user resource policies.",
     )
 )
@@ -129,7 +223,7 @@ class UserResourcePolicyV2Connection(Connection[UserResourcePolicyV2GQL]):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Project resource policy defining vfolder, quota, and network limits per project.",
     ),
     name="ProjectResourcePolicyV2",
@@ -150,7 +244,7 @@ ProjectResourcePolicyV2Edge = Edge[ProjectResourcePolicyV2GQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Paginated connection for project resource policies.",
     )
 )

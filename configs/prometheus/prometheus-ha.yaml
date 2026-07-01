@@ -40,3 +40,7 @@ scrape_configs:
     static_configs:
       - targets:
           - backendai-half-db-exporter:9187
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+          - backendai-half-node-exporter:9100

@@ -1,1 +1,252 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Backend.AI"><meta http-equiv="X-UA-Compatible" content="ie=edge"><meta name="theme-color" content="#fff"><base href="/"><link rel="icon" href="manifest/favicon.ico"><link rel="apple-touch-icon" sizes="256x256" href="manifest/backend-ai.iconset/icon_256x256@2x.png"><link rel="icon" type="image/png" sizes="32x32" href="manifest/backend-ai.iconset/icon_32x32@1x.png"><link rel="icon" type="image/png" sizes="16x16" href="manifest/backend-ai.iconset/icon_16x16@1x.png"><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="resources/fonts/roboto/roboto.css"><link rel="stylesheet" href="resources/fonts/ubuntu/ubuntu.css"><link rel="stylesheet" href="resources/webui.css"><link rel="stylesheet" href="resources/custom.css"><script src="manifest/app.js"></script><title>Backend.AI</title><script nonce="{{nonce}}">globalThis.isElectron=isElectron(),isElectron&&(globalThis.electronInitialHref=window.location.href),globalThis.enableSW=!0,globalThis.packageVersion="26.3.0",globalThis.buildNumber="1",globalThis.baiNonce="{{nonce}}"</script><script defer="defer" src="/static/js/main.0aa9f7cd.js"></script><link href="/static/css/main.87c24c8a.css" rel="stylesheet"></head><body><script nonce="{{nonce}}">const userPrefersDark=localStorage.getItem("backendaiwebui.settings.isDarkMode"),systemPrefersDark=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;globalThis.isDarkMode=null==userPrefersDark?systemPrefersDark:"true"===userPrefersDark,globalThis.isDarkMode&&document.body.classList.add("dark-theme")</script><div><div id="react-root"><div class="splash"><div class="splash-header"><div class="logo"></div></div><div class="splash-information"><ul><li>Backend.AI Web UI <span id="version-detail" class="detail"></span></li><li><span id="license-detail"></span></li><li><span id="mode-detail" class="detail"></span> <span id="build-detail" class="detail"></span></li></ul><ul><li>Powered by open-source software</li><li class="copyright">Copyright &copy; 2015-2026 Lablup Inc.</li></ul></div><div class="sk-folding-cube"><div class="sk-cube1 sk-cube"></div><div class="sk-cube2 sk-cube"></div><div class="sk-cube4 sk-cube"></div><div class="sk-cube3 sk-cube"></div></div><div id="loading-message" class="loading-message">Loading components...</div></div></div><noscript><p>Could not render Backend.AI Web UI. Check that JavaScript is enabled.</p></noscript><script nonce="{{nonce}}">document.getElementById("version-detail").innerText=globalThis.packageVersion,document.getElementById("build-detail").innerText=" Build "+globalThis.buildVersion,document.getElementById("license-detail").innerText="",globalThis.isElectron?document.getElementById("mode-detail").innerText="App":document.getElementById("mode-detail").innerText="WebServer",globalThis.isIE&&(alert("Internet Explorer is not supported. Please visit with modern browsers."),document.getElementById("loading-message").innerText="Not supported browser.",document.getElementById("loading-message").style.color="red"),!["127.0.0.1","localhost"].includes(window.location.hostname)&&"enableSW"in globalThis&&!0===globalThis.enableSW&&"serviceWorker"in navigator&&!1===globalThis.isElectron&&window.addEventListener("load",(()=>{navigator.serviceWorker.register("/sw.js")}))</script></div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Backend.AI">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta name="theme-color" content="#fff">
+  <!-- CSP nonce source for Vite's module-preload helper: Vite reads this meta's
+       nonce at runtime and stamps it on the <link rel="modulepreload"> tags it
+       injects for code-split chunks, so they pass a strict script-src nonce
+       policy. The web server substitutes {{nonce}} per request (empty in dev). -->
+  <meta property="csp-nonce" nonce="{{nonce}}">
+  <base href="/">
+  <link rel="icon" href="manifest/favicon.ico">
+  <link rel="apple-touch-icon" sizes="256x256" href="manifest/backend-ai.iconset/icon_256x256@2x.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="manifest/backend-ai.iconset/icon_32x32@1x.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="manifest/backend-ai.iconset/icon_16x16@1x.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="resources/fonts/roboto/roboto.css">
+  <link rel="stylesheet" href="resources/fonts/ubuntu/ubuntu.css">
+  <link rel="stylesheet" href="resources/webui.css">
+  <link rel="stylesheet" href="resources/custom.css">
+  <script nonce="{{nonce}}" src="manifest/app.js"></script>
+  <title>Backend.AI</title>
+  <!-- Critical inline CSS: paints the page/splash backdrop immediately so there
+       is no color flash before the stylesheet applies. The full splash (Diagonal
+       Weave) styling lives in resources/webui.css. -->
+  <style nonce="{{nonce}}">
+    body { margin: 0; background-color: rgba(247, 247, 246, 1); }
+    body.dark-theme { background-color: #191919; }
+    #splash {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 10000; display: flex; align-items: center; justify-content: center;
+      background-color: rgba(247, 247, 246, 1); transition: opacity 0.3s ease-out;
+    }
+    body.dark-theme #splash { background-color: #191919; }
+    .splash-hidden { opacity: 0; pointer-events: none; }
+  </style>
+  <script nonce="{{nonce}}">
+    globalThis.isElectron = isElectron();
+    if (isElectron) {
+      globalThis.electronInitialHref = window.location.href;
+    }
+    globalThis.enableSW = true;
+
+    globalThis.packageVersion = "26.4.9";
+    globalThis.buildNumber = "8373";
+    globalThis.baiNonce = "{{nonce}}";
+
+    // DO NOT CHANGE BELOW LINE
+    
+  </script>
+  <!-- DO NOT CHANGE BELOW LINE -->
+  <script type="module" nonce="{{nonce}}" crossorigin src="/assets/index-r5M52Un8.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CDgRDCYd.css">
+</head>
+
+<body>
+  <script nonce="{{nonce}}">
+    //To avoid flickering when first loading the page, we add a class to the body to indicate the theme.
+    const storedThemeMode = localStorage.getItem('backendaiwebui.settings.themeMode');
+    const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // ahooks stores JSON-serialized values, so parse the stored themeMode
+    let parsedThemeMode;
+    try { parsedThemeMode = storedThemeMode ? JSON.parse(storedThemeMode) : null; } catch(e) { parsedThemeMode = null; }
+    if (parsedThemeMode === 'dark') {
+      globalThis.isDarkMode = true;
+    } else if (parsedThemeMode === 'light') {
+      globalThis.isDarkMode = false;
+    } else {
+      // 'system' or unset: use system preference
+      globalThis.isDarkMode = systemPrefersDark;
+    }
+    if (globalThis.isDarkMode) {
+      document.body.classList.add('dark-theme');
+    }
+    // Set body background immediately to prevent white flash before CSS loads
+    document.body.style.backgroundColor = globalThis.isDarkMode ? '#191919' : 'rgba(247, 247, 246, 1)';
+  </script>
+  <div>
+    <div id="react-root"></div>
+    <div id="splash" class="splash">
+      <div class="splash-drag-area"></div>
+      <!-- Diagonal Weave background: two woven line layers, drifting slowly -->
+      <svg class="splash-bg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <g transform="rotate(23 720 450)"><g id="splash-weaveA" class="splash-weave splash-drift"></g></g>
+        <g transform="rotate(-23 720 450)"><g id="splash-weaveB" class="splash-weave splash-driftB"></g></g>
+      </svg>
+      <div class="splash-veil"></div>
+      <!-- Centered logo + wire-cube loader -->
+      <div class="splash-center">
+        <div class="splash-logo" role="img" aria-label="Backend.AI"></div>
+        <div class="splash-loader">
+          <span class="splash-cube" aria-hidden="true">
+            <svg viewBox="0 0 40 40" width="22" height="22">
+              <line class="edge" x1="20" y1="6" x2="31.9" y2="13" style="--i:2"></line>
+              <line class="edge" x1="31.9" y1="13" x2="31.9" y2="27" style="--i:4"></line>
+              <line class="edge" x1="31.9" y1="27" x2="20" y2="34" style="--i:5"></line>
+              <line class="edge" x1="20" y1="34" x2="8.1" y2="27" style="--i:7"></line>
+              <line class="edge" x1="8.1" y1="27" x2="8.1" y2="13" style="--i:8"></line>
+              <line class="edge" x1="8.1" y1="13" x2="20" y2="6" style="--i:1"></line>
+              <line class="edge" x1="20" y1="20" x2="20" y2="34" style="--i:6"></line>
+              <line class="edge" x1="20" y1="20" x2="31.9" y2="13" style="--i:3"></line>
+              <line class="edge" x1="20" y1="20" x2="8.1" y2="13" style="--i:0"></line>
+            </svg>
+          </span>
+          <div id="loading-message" class="splash-msg">Loading components...</div>
+        </div>
+      </div>
+      <!-- Corner metadata: version/build bottom-left, copyright bottom-right -->
+      <div class="splash-meta">
+        <div class="splash-meta-id">
+          <div class="splash-meta-main">Backend.AI Web UI <span id="version-detail" class="splash-ver"></span></div>
+          <div class="splash-meta-sub"><span id="mode-detail"></span><span id="build-detail"></span></div>
+        </div>
+        <div class="splash-meta-foot">Powered by open-source software &middot; Copyright &copy; 2015-2026 Lablup Inc.<span id="license-detail"></span></div>
+      </div>
+    </div>
+    <noscript>
+      <p>Could not render Backend.AI Web UI. Check that JavaScript is enabled.</p>
+    </noscript>
+    <!-- Backend.AI client classes are now initialized by React global-stores.ts -->
+    <script nonce="{{nonce}}">
+      document.getElementById('version-detail').innerText = globalThis.packageVersion;
+      document.getElementById('build-detail').innerText = ' · Build ' + globalThis.buildNumber;
+      document.getElementById('license-detail').innerText = '';
+      if (globalThis.isElectron) {
+        document.getElementById('mode-detail').innerText = 'App';
+      } else {
+        document.getElementById('mode-detail').innerText = 'WebServer';
+      }
+
+      // Diagonal Weave splash: build the woven line layers and prime the wire-cube loader.
+      (function () {
+        var NS = 'http://www.w3.org/2000/svg';
+        var layerA = document.getElementById('splash-weaveA');
+        var layerB = document.getElementById('splash-weaveB');
+        if (layerA && layerB) {
+          var spacing = 28, x1 = -1100, x2 = 2540, k = 0;
+          for (var y = -1200; y < 1200; y += spacing) {
+            var la = document.createElementNS(NS, 'line');
+            la.setAttribute('x1', x1); la.setAttribute('y1', y);
+            la.setAttribute('x2', x2); la.setAttribute('y2', y);
+            if (k % 9 === 0) la.setAttribute('class', 'warm');
+            layerA.appendChild(la);
+            var lb = document.createElementNS(NS, 'line');
+            lb.setAttribute('x1', x1); lb.setAttribute('y1', y);
+            lb.setAttribute('x2', x2); lb.setAttribute('y2', y);
+            layerB.appendChild(lb);
+            k++;
+          }
+        }
+        // Wire-cube loader: set each edge's dash length so the spiral draw animates.
+        var edges = document.querySelectorAll('#splash .splash-cube .edge');
+        for (var i = 0; i < edges.length; i++) {
+          var L = edges[i].getTotalLength();
+          edges[i].style.setProperty('--L', L.toFixed(2));
+          edges[i].style.strokeDasharray = L.toFixed(2);
+          edges[i].style.strokeDashoffset = L.toFixed(2);
+        }
+      })();
+
+      if (globalThis.isIE) {
+        alert('Internet Explorer is not supported. Please visit with modern browsers.');
+        document.getElementById('loading-message').innerText = 'Not supported browser.';
+        document.getElementById('loading-message').style.color = 'red';
+      }
+      if (window.location.hostname !== '127.0.0.1' &&
+        !window.location.hostname.endsWith('localhost') &&
+        'enableSW' in globalThis &&
+        globalThis.enableSW === true) {
+        // Service worker routine.
+        if ('serviceWorker' in navigator && globalThis.isElectron === false) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js');
+          });
+        }
+      }
+
+      // Splash lifecycle: loading -> (login-backdrop | removed).
+      //
+      // - window.__enterLoginBackdrop(): called by LoginView when the login
+      //   form becomes visible (logged-out). Keeps the weave + corner
+      //   metadata as the login screen background, hides only the loader.
+      // - window.__dismissSplash(): called by MainLayout when the authenticated
+      //   UI is ready (logged-in). Fades out and removes the whole splash so it
+      //   can't cover the app (it sits at z-index 10000).
+      //
+      // A MutationObserver + timers serve as fallbacks for routes that call
+      // neither (e.g. /verify-email, /change-password).
+      (function () {
+        var splash = document.getElementById('splash');
+        if (!splash) return;
+        var state = 'loading'; // 'loading' | 'backdrop' | 'removed'
+        var observer = null;
+        var fallbackTimer = null;
+
+        function clearFallbacks() {
+          if (observer) { observer.disconnect(); observer = null; }
+          if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+        }
+
+        // Full removal (authenticated UI ready, or fallback).
+        function dismiss() {
+          if (state === 'removed') return;
+          state = 'removed';
+          clearFallbacks();
+          splash.classList.add('splash-hidden');
+          splash.addEventListener('transitionend', function handler(e) {
+            if (e.propertyName === 'opacity') {
+              splash.removeEventListener('transitionend', handler);
+              if (splash.parentNode) splash.remove();
+            }
+          });
+          // Safety net: remove even if transitionend never fires (e.g. prefers-reduced-motion)
+          setTimeout(function () { if (splash.parentNode) splash.remove(); }, 1000);
+        }
+
+        // Transition to the login backdrop (logged-out login screen).
+        function enterLoginBackdrop() {
+          if (state !== 'loading') return;
+          state = 'backdrop';
+          // The backdrop must persist through the whole login flow, so cancel
+          // the auto-removal fallbacks.
+          clearFallbacks();
+          splash.classList.add('splash-backdrop');
+        }
+
+        window.__dismissSplash = dismiss;
+        window.__enterLoginBackdrop = enterLoginBackdrop;
+
+        // Fallback: MutationObserver for routes that don't explicitly signal.
+        var reactRoot = document.getElementById('react-root');
+        if (reactRoot) {
+          observer = new MutationObserver(function () {
+            if (reactRoot.childNodes.length > 0) {
+              observer.disconnect();
+              observer = null;
+              fallbackTimer = setTimeout(dismiss, 3000);
+            }
+          });
+          observer.observe(reactRoot, { childList: true });
+        }
+        // Ultimate safety fallback — but never tear down an active login backdrop.
+        setTimeout(function () { if (state !== 'backdrop') dismiss(); }, 10000);
+      })();
+    </script>
+</body>
+
+</html>

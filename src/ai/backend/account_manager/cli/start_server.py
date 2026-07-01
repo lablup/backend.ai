@@ -7,21 +7,59 @@ until the command is actually executed, improving CLI startup time.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 
 
 @click.command()
+@click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "The config file path. "
+        "(default: ./account-manager.toml and /etc/backend.ai/account-manager.toml)"
+    ),
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="A shortcut to set `--log-level=DEBUG`",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(
+        ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"],
+        case_sensitive=False,
+    ),
+    default="NOTSET",
+    help="Set the logging verbosity level",
+)
 @click.pass_context
-def main(ctx: click.Context) -> None:
+def main(
+    ctx: click.Context,
+    config_path: Path | None,
+    debug: bool,
+    log_level: str,
+) -> None:
     """
     Start the account-manager service as a foreground process.
 
     This is a thin wrapper that defers the heavy import of server module.
     """
-    from ai.backend.common.metrics.multiprocess import setup_prometheus_multiprocess_dir
+    from ai.backend.common.metrics.multiprocess_setup import setup_prometheus_multiprocess_dir
+    from ai.backend.logging import LogLevel
 
     setup_prometheus_multiprocess_dir("account-manager")
 
     from ai.backend.account_manager.server import main as server_main
 
-    ctx.invoke(server_main)
+    ctx.invoke(
+        server_main,
+        config_path=config_path,
+        debug=debug,
+        log_level=LogLevel[log_level.upper()],
+    )

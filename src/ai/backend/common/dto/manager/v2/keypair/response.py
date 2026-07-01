@@ -11,16 +11,22 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.types import SecretKey
 
 __all__ = (
     "AdminCreateKeypairPayload",
     "AdminDeleteKeypairPayload",
+    "AdminDeleteSSHKeypairPayload",
+    "AdminGetSSHKeypairPayload",
+    "AdminRegisterSSHKeypairPayload",
     "AdminSearchKeypairsPayload",
     "AdminUpdateKeypairPayload",
+    "CreateKeypairPayload",
     "IssueMyKeypairPayload",
     "KeypairNode",
     "RevokeMyKeypairPayload",
     "SearchMyKeypairsPayload",
+    "SSHKeypairNode",
     "SwitchMyMainAccessKeyPayload",
     "UpdateMyKeypairPayload",
 )
@@ -51,6 +57,19 @@ class KeypairNode(BaseResponseModel):
         default=None, description="The SSH public key associated with this keypair."
     )
     user_id: uuid.UUID = Field(description="UUID of the user who owns this keypair.")
+
+
+class CreateKeypairPayload(BaseResponseModel):
+    """A keypair returned at creation time, including its one-time secret key.
+
+    Wraps the keypair read model together with the secret key, which is only
+    available immediately after creation and never returned again.
+    """
+
+    keypair: KeypairNode = Field(description="The newly created keypair.")
+    secret_key: SecretKey = Field(
+        description="The secret key of the generated keypair. Only returned at creation time."
+    )
 
 
 class IssueMyKeypairPayload(BaseResponseModel):
@@ -119,3 +138,30 @@ class AdminSearchKeypairsPayload(BaseResponseModel):
     pagination: PaginationInfo = Field(
         description="Pagination information for the result set.",
     )
+
+
+class SSHKeypairNode(BaseResponseModel):
+    """SSH keypair read model. Never includes the private key."""
+
+    access_key: str = Field(description="Access key owning this SSH keypair.")
+    ssh_public_key: str | None = Field(
+        default=None, description="PEM-encoded SSH public key, or null if none is registered."
+    )
+
+
+class AdminRegisterSSHKeypairPayload(BaseResponseModel):
+    """Payload returned after admin registers an SSH keypair for a user."""
+
+    access_key: str = Field(description="Access key whose SSH keypair was updated.")
+
+
+class AdminDeleteSSHKeypairPayload(BaseResponseModel):
+    """Payload returned after admin clears a user's SSH keypair."""
+
+    access_key: str = Field(description="Access key whose SSH keypair was cleared.")
+
+
+class AdminGetSSHKeypairPayload(BaseResponseModel):
+    """Payload returned by admin SSH keypair lookup (public key only)."""
+
+    keypair: SSHKeypairNode = Field(description="SSH keypair public information.")

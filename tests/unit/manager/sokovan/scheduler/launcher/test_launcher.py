@@ -11,10 +11,11 @@ Test Scenarios:
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID
 
 import pytest
 
-from ai.backend.manager.sokovan.data import (
+from ai.backend.manager.data.sokovan import (
     ImageConfigData,
     SessionDataForPull,
     SessionDataForStart,
@@ -38,7 +39,7 @@ class TestSessionLauncherImagePulling:
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
         sessions_for_pull_multiple: list[SessionDataForPull],
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-001: Image pulling triggered for all agents.
 
@@ -63,7 +64,7 @@ class TestSessionLauncherImagePulling:
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
         session_for_pull_duplicate_images: SessionDataForPull,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-002: Duplicate images are deduplicated per agent.
 
@@ -89,7 +90,7 @@ class TestSessionLauncherImagePulling:
         self,
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-003: Empty session list does nothing.
 
@@ -109,7 +110,7 @@ class TestSessionLauncherImagePulling:
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
         sessions_for_pull_multiple: list[SessionDataForPull],
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-004: Agent pulling failure doesn't block other agents.
 
@@ -157,7 +158,7 @@ class TestSessionLauncherKernelCreation:
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
         session_for_start_single_kernel: SessionDataForStart,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-005: Single kernel session started successfully.
 
@@ -186,7 +187,7 @@ class TestSessionLauncherKernelCreation:
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
         session_for_start_multi_kernel: SessionDataForStart,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-006: Multi-kernel cluster session started.
 
@@ -215,7 +216,7 @@ class TestSessionLauncherKernelCreation:
         launcher: SessionLauncher,
         mock_repository: AsyncMock,
         session_for_start_no_kernels: SessionDataForStart,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-007: Session without kernels updates error info.
 
@@ -239,7 +240,7 @@ class TestSessionLauncherKernelCreation:
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
         session_for_start_single_kernel: SessionDataForStart,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-008: Multiple sessions started concurrently.
 
@@ -277,7 +278,7 @@ class TestSessionLauncherNetworkSetup:
         mock_agent_client_pool: MagicMock,
         mock_repository: AsyncMock,
         session_for_start_multi_kernel: SessionDataForStart,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-009: Volatile network for single-node multi-kernel session.
 
@@ -301,7 +302,7 @@ class TestSessionLauncherNetworkSetup:
         launcher: SessionLauncher,
         mock_network_plugin_ctx: MagicMock,
         session_for_start_multi_node: SessionDataForStart,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-010: Volatile network for multi-node uses overlay.
 
@@ -325,7 +326,7 @@ class TestSessionLauncherNetworkSetup:
         launcher: SessionLauncher,
         mock_agent_client_pool: MagicMock,
         session_for_start_host_network: SessionDataForStart,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-011: Host network creates SSH port mapping.
 
@@ -350,7 +351,7 @@ class TestSessionLauncherNetworkSetup:
         launcher: SessionLauncher,
         mock_repository: AsyncMock,
         session_for_start_single_kernel: SessionDataForStart,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-012: Network ID is persisted after setup.
 
@@ -374,7 +375,7 @@ class TestSessionLauncherNetworkSetup:
         mock_network_plugin_ctx: MagicMock,
         mock_repository: AsyncMock,
         session_for_start_multi_node: SessionDataForStart,
-        image_config_default: dict[str, ImageConfigData],
+        image_config_default: dict[UUID, ImageConfigData],
     ) -> None:
         """SC-LA-013: Missing network plugin reports error.
 

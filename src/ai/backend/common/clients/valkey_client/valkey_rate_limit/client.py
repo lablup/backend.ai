@@ -124,11 +124,12 @@ class ValkeyRateLimitClient:
         now = Decimal(time.time()).quantize(_TIME_PRECISION)
         now_float = float(now)
         # Increment request ID counter
-        result = await self._client.client.invoke_script(
-            Script(_RATE_LIMIT_SCRIPT),
-            keys=[access_key],
-            args=[str(now_float), str(window)],
-        )
+        async with self._client.client() as conn:
+            result = await conn.invoke_script(
+                Script(_RATE_LIMIT_SCRIPT),
+                keys=[access_key],
+                args=[str(now_float), str(window)],
+            )
 
         # The last result is the count
         return cast(int, result)
@@ -141,7 +142,8 @@ class ValkeyRateLimitClient:
         :param access_key: The access key to get the count for.
         :return: The current count.
         """
-        return await self._client.client.zcard(access_key)
+        async with self._client.client() as conn:
+            return await conn.zcard(access_key)
 
     @valkey_rate_limit_resilience.apply()
     async def set_rate_limit_config(
@@ -157,11 +159,12 @@ class ValkeyRateLimitClient:
         :param value: The configuration value to set.
         :param expiration: The expiration time in seconds.
         """
-        await self._client.client.set(
-            key=key,
-            value=value,
-            expiry=ExpirySet(ExpiryType.SEC, expiration),
-        )
+        async with self._client.client() as conn:
+            await conn.set(
+                key=key,
+                value=value,
+                expiry=ExpirySet(ExpiryType.SEC, expiration),
+            )
 
     @valkey_rate_limit_resilience.apply()
     async def increment_with_expiration(
@@ -179,7 +182,8 @@ class ValkeyRateLimitClient:
         tx = self._create_batch()
         tx.incr(key)
         tx.expire(key, expiration)
-        results = await self._client.client.exec(tx, raise_on_error=True)
+        async with self._client.client() as conn:
+            results = await conn.exec(tx, raise_on_error=True)
         # Handle the result properly by extracting the first result
         if results and len(results) > 0:
             return cast(int, results[0])
@@ -193,7 +197,8 @@ class ValkeyRateLimitClient:
         :param key: The key to get.
         :return: The rate limit data or None if not found.
         """
-        result = await self._client.client.get(key)
+        async with self._client.client() as conn:
+            result = await conn.get(key)
         return result.decode("utf-8") if result else None
 
     @valkey_rate_limit_resilience.apply()
@@ -204,7 +209,8 @@ class ValkeyRateLimitClient:
         :param key: The key to get.
         :return: The value or None if not found.
         """
-        result = await self._client.client.get(key)
+        async with self._client.client() as conn:
+            result = await conn.get(key)
         return result.decode("utf-8") if result else None
 
     @valkey_rate_limit_resilience.apply()
@@ -215,7 +221,8 @@ class ValkeyRateLimitClient:
         :param key: The key to delete.
         :return: True if the key was deleted, False otherwise.
         """
-        result = await self._client.client.delete([key])
+        async with self._client.client() as conn:
+            result = await conn.delete([key])
         return result > 0
 
     @valkey_rate_limit_resilience.apply()
@@ -223,7 +230,8 @@ class ValkeyRateLimitClient:
         """
         Flush all keys in the current database.
         """
-        await self._client.client.flushdb()
+        async with self._client.client() as conn:
+            await conn.flushdb()
 
     @valkey_rate_limit_resilience.apply()
     async def remove_expired_entries(
@@ -240,9 +248,8 @@ class ValkeyRateLimitClient:
         :param window: The time window in seconds.
         """
         cutoff_time = now - window
-        await self._client.client.zremrangebyscore(
-            key, ScoreBoundary(0), ScoreBoundary(cutoff_time)
-        )
+        async with self._client.client() as conn:
+            await conn.zremrangebyscore(key, ScoreBoundary(0), ScoreBoundary(cutoff_time))
 
     @valkey_rate_limit_resilience.apply()
     async def add_to_sorted_set_with_expiration(
@@ -263,7 +270,8 @@ class ValkeyRateLimitClient:
         tx = self._create_batch()
         tx.zadd(key, {member: score})
         tx.expire(key, expiration)
-        await self._client.client.exec(tx, raise_on_error=True)
+        async with self._client.client() as conn:
+            await conn.exec(tx, raise_on_error=True)
 
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         """

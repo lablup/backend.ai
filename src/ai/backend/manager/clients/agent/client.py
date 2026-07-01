@@ -2,14 +2,23 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
+
+from pydantic import ConfigDict
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.request import BaseAgentRequestModel, GatherHwinfoReq, HealthReq
+from ai.backend.common.dto.agent.response import (
+    BaseAgentResponseModel,
+    GatherHwinfoResp,
+    HealthResp,
+)
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AgentId,
+    BackendAISchema,
     ClusterInfo,
     ImageConfig,
     KernelCreationConfig,
@@ -30,6 +39,25 @@ agent_client_resilience = Resilience(
         MetricPolicy(MetricArgs(domain=DomainType.CLIENT, layer=LayerType.AGENT_CLIENT)),
     ]
 )
+
+
+TResp = TypeVar("TResp", bound=BaseAgentResponseModel)
+
+
+class AgentRPCCall(BackendAISchema):
+    """Manager-side envelope describing a single v3 agent RPC invocation.
+
+    Grouping ``method`` / ``agent_id`` / ``payload`` into one pydantic
+    object keeps ``AgentClient._call_v3`` call sites one-liner friendly
+    and gives future cross-cutting concerns (logging, retries, tracing,
+    recorded fixtures) a single value to pass around.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    method: str
+    agent_id: AgentId | None = None
+    payload: BaseAgentRequestModel
 
 
 class AgentClient(BackendAIClient):
@@ -55,30 +83,96 @@ class AgentClient(BackendAIClient):
         return self._agent_id
 
     async def connect(self) -> None:
-        """Establish connection to the agent."""
-        await self._peer.__aenter__()
+        """Establish connection to the agent.
+
+        Atomic: if the peer's ``__aenter__`` raises mid-way, the
+        partially-initialized peer — which already owns a
+        ``zmq.asyncio.Context`` and the background IO thread the
+        context manages — is released here before re-raising.
+        Without this the caller would have to remember to call
+        ``close()`` on every failure path; a missed cleanup leaks
+        one IO thread per attempt.
+        """
+        try:
+            await self._peer.__aenter__()
+        except BaseException:
+            # The original error must propagate; swallow only the
+            # cleanup exception (the peer may not have reached a state
+            # where ``__aexit__`` can run cleanly).
+            try:
+                await self._peer.__aexit__(None, None, None)
+            except Exception as exit_exc:
+                log.debug(
+                    "agent {} peer __aexit__ raised during connect cleanup: {}",
+                    self._agent_id,
+                    exit_exc,
+                )
+            raise
 
     async def close(self) -> None:
-        """Close connection to the agent."""
+        """Close connection to the agent.
+
+        Errors during teardown are logged at DEBUG instead of being
+        swallowed silently so that regressions in callosum's exit chain
+        (which is what releases the underlying ``zmq.asyncio.Context``)
+        are at least observable.
+        """
         try:
             await self._peer.__aexit__(None, None, None)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(
+                "agent {} peer __aexit__ raised during close: {}",
+                self._agent_id,
+                e,
+            )
 
     async def ping(self) -> str:
         """Ping the agent to check connection health."""
         return cast(str, await self._peer.call.ping("ping"))
 
+    async def _call_v3(
+        self,
+        call: AgentRPCCall,
+        resp_cls: type[TResp],
+    ) -> TResp:
+        """Invoke a v3 pydantic-typed RPC method on the agent peer.
+
+        Serialises ``call.payload`` via ``model_dump(mode="json")``,
+        forwards it as the ``req`` envelope field, and validates the raw
+        response back into ``resp_cls``. Agent-side counterpart lives in
+        ``ai.backend.agent.rpc.routing.AgentRPCRegistry._parse_request_body``
+        — keep the two in lock-step when the envelope shape changes.
+        """
+        raw = await getattr(self._peer.call, call.method)(
+            req=call.payload.model_dump(mode="json"),
+            agent_id=call.agent_id,
+        )
+        return resp_cls.model_validate(raw)
+
     # Hardware information methods
     @agent_client_resilience.apply()
-    async def health(self) -> Mapping[str, Any]:
-        """Get lightweight health information from the agent."""
-        return cast(Mapping[str, Any], await self._peer.call.health())
+    async def health(self) -> HealthResp:
+        """Get lightweight health information from the agent (v3, pydantic-typed)."""
+        return await self._call_v3(
+            AgentRPCCall(
+                method="health_v2",
+                agent_id=self.agent_id,
+                payload=HealthReq(),
+            ),
+            HealthResp,
+        )
 
     @agent_client_resilience.apply()
-    async def gather_hwinfo(self) -> Mapping[str, Any]:
-        """Gather hardware information from the agent."""
-        return cast(Mapping[str, Any], await self._peer.call.gather_hwinfo(agent_id=self.agent_id))
+    async def gather_hwinfo(self) -> GatherHwinfoResp:
+        """Gather hardware information from the agent (v3, pydantic-typed)."""
+        return await self._call_v3(
+            AgentRPCCall(
+                method="gather_hwinfo_v2",
+                agent_id=self.agent_id,
+                payload=GatherHwinfoReq(),
+            ),
+            GatherHwinfoResp,
+        )
 
     @agent_client_resilience.apply()
     async def scan_gpu_alloc_map(self) -> Mapping[str, Any]:

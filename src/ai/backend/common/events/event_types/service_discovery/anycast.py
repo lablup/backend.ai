@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, override
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.json import dump_json_str, load_json
+from ai.backend.common.types import BackendAISchema
 
 __all__ = (
     "DoSweepStaleServicesEvent",
@@ -17,7 +18,7 @@ __all__ = (
 )
 
 
-class ServiceEndpointInfo(BaseModel):
+class ServiceEndpointInfo(BackendAISchema):
     """Data model for a service endpoint."""
 
     role: str = Field(description="Role of this endpoint (e.g., 'main', 'health', 'internal').")
@@ -52,7 +53,7 @@ class BaseServiceDiscoveryEvent(AbstractAnycastEvent):
         return None
 
 
-class ServiceRegisteredEvent(BaseServiceDiscoveryEvent, BaseModel):
+class ServiceRegisteredEvent(BaseServiceDiscoveryEvent, BackendAISchema):
     """Event emitted when a service instance registers or sends a heartbeat.
 
     Contains full service metadata and endpoint information.
@@ -130,7 +131,7 @@ class DoSweepStaleServicesEvent(BaseServiceDiscoveryEvent):
         return cls()
 
 
-class ServiceDeregisteredEvent(BaseServiceDiscoveryEvent, BaseModel):
+class ServiceDeregisteredEvent(BaseServiceDiscoveryEvent, BackendAISchema):
     """Event emitted when a service instance is deregistered."""
 
     instance_id: str = Field(description="Unique instance identifier.")

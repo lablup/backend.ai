@@ -19,7 +19,6 @@ from ai.backend.common.health_checker import (
     HealthProbe,
     HealthProbeOptions,
     PrometheusHealthChecker,
-    ServiceHealthChecker,
     ValkeyHealthChecker,
 )
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
@@ -47,10 +46,18 @@ class HealthProbeDependency(DependencyProvider[HealthProbeInput, HealthProbe]):
     async def provide(self, setup_input: HealthProbeInput) -> AsyncIterator[HealthProbe]:
         probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
 
-        await probe.register(DatabaseHealthChecker(db=setup_input.db))
-        await probe.register(EtcdHealthChecker(etcd=setup_input.etcd))
-        await probe.register(PrometheusHealthChecker())
-        await probe.register(
+        # Readiness-only: failure should drain traffic, but no restart is warranted.
+        await probe.register_readiness(DatabaseHealthChecker(db=setup_input.db))
+
+        # Informational: surfaced in detail /health but does not gate either
+        # probe. Prometheus is an observability dependency — its outage
+        # should neither restart the manager nor cut user traffic.
+        await probe.register_informational(PrometheusHealthChecker())
+
+        # Liveness-registered: also surfaced in readiness — connection-stuck
+        # issues observed where restart is the actual recovery path.
+        await probe.register_liveness(EtcdHealthChecker(etcd=setup_input.etcd))
+        await probe.register_liveness(
             ValkeyHealthChecker(
                 clients={
                     CID_REDIS_ARTIFACT: setup_input.valkey.artifact,
@@ -70,6 +77,3 @@ class HealthProbeDependency(DependencyProvider[HealthProbeInput, HealthProbe]):
             yield probe
         finally:
             await probe.stop()
-
-    def gen_health_checkers(self, resource: HealthProbe) -> ServiceHealthChecker | None:
-        return None

@@ -13,7 +13,9 @@ from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
-from ai.backend.common.types import RuntimeVariant
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -21,6 +23,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import ServiceInfo
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.services.model_serving.actions.get_model_service_info import (
     GetModelServiceInfoAction,
     GetModelServiceInfoActionResult,
@@ -30,9 +33,6 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
-    RevisionGeneratorRegistry,
-)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.testutils.scenario import ScenarioBase
 
@@ -121,8 +121,14 @@ class TestGetModelServiceInfo:
         return mock
 
     @pytest.fixture
-    def mock_revision_generator_registry(self) -> MagicMock:
-        return MagicMock(spec=RevisionGeneratorRegistry)
+    def mock_route_controller(self) -> MagicMock:
+        mock = MagicMock()
+        mock.mark_lifecycle_needed = AsyncMock()
+        return mock
+
+    @pytest.fixture
+    def mock_runtime_variant_repository(self) -> MagicMock:
+        return MagicMock(spec=RuntimeVariantRepository)
 
     @pytest.fixture
     def model_serving_service(
@@ -136,9 +142,10 @@ class TestGetModelServiceInfo:
         mock_valkey_live: MagicMock,
         mock_repositories: MagicMock,
         mock_deployment_repository: MagicMock,
+        mock_runtime_variant_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
-        mock_revision_generator_registry: MagicMock,
+        mock_route_controller: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -150,9 +157,11 @@ class TestGetModelServiceInfo:
             valkey_live=mock_valkey_live,
             repository=mock_repositories.repository,
             deployment_repository=mock_deployment_repository,
+            runtime_variant_repository=mock_runtime_variant_repository,
+            scheduler_repository=MagicMock(),
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
-            revision_generator_registry=mock_revision_generator_registry,
+            route_controller=mock_route_controller,
         )
 
     @pytest.fixture
@@ -215,8 +224,12 @@ class TestGetModelServiceInfo:
                 ),
                 GetModelServiceInfoActionResult(
                     data=ServiceInfo(
-                        endpoint_id=uuid.UUID("33333333-4444-5555-6666-777777777777"),
-                        model_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+                        deployment_id=DeploymentID(
+                            uuid.UUID("33333333-4444-5555-6666-777777777777")
+                        ),
+                        model_vfolder_id=VFolderUUID(
+                            uuid.UUID("11111111-1111-1111-1111-111111111111")
+                        ),
                         extra_mounts=[],
                         name="test-model-v1.0",
                         model_definition_path=None,
@@ -227,7 +240,7 @@ class TestGetModelServiceInfo:
                             "https://api.example.com/v1/models/test-model/v1.0"
                         ),
                         is_public=False,
-                        runtime_variant=RuntimeVariant.CUSTOM,
+                        runtime_variant_id=RuntimeVariantID(uuid.uuid4()),
                     ),
                 ),
             ),
@@ -253,8 +266,8 @@ class TestGetModelServiceInfo:
         mock_get_endpoint_access_validation_data_get_info.return_value = mock_validation_data
 
         mock_endpoint = MagicMock(
-            id=expected.data.endpoint_id,
-            model=expected.data.model_id,
+            id=expected.data.deployment_id,
+            model=expected.data.model_vfolder_id,
             extra_mounts=[
                 MagicMock(vfid=MagicMock(folder_id=mount_id))
                 for mount_id in expected.data.extra_mounts
@@ -273,7 +286,7 @@ class TestGetModelServiceInfo:
             else [],
             url=str(expected.data.service_endpoint) if expected.data.service_endpoint else None,
             open_to_public=expected.data.is_public,
-            runtime_variant=expected.data.runtime_variant,
+            runtime_variant_id=expected.data.runtime_variant_id,
         )
         mock_endpoint.name = expected.data.name
 

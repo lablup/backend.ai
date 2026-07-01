@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -20,10 +20,15 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.fair_share.types import ResourceSlotInfo
+from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.types import (
+    BackendAISchema,
+    ClusterMode,
+    MountPermission,
+    RuntimeVariant,
+)
 
 __all__ = (
     "AccessTokenOrderField",
@@ -37,7 +42,6 @@ __all__ = (
     "DeploymentNetworkAccessInfoDTO",
     "DeploymentOrderField",
     "DeploymentPolicyInfo",
-    "DeploymentRevisionInfo",
     "DeploymentStrategy",
     "DeploymentStrategyInfoDTO",
     "DeploymentStrategySpecInfo",
@@ -52,6 +56,7 @@ __all__ = (
     "ModelMountConfigInfoDTO",
     "ModelMetadataInfoDTO",
     "ModelRuntimeConfigInfoDTO",
+    "RuntimeVariantPresetValueInfoDTO",
     "ModelServiceConfigInfoDTO",
     "NetworkConfigInfo",
     "OrderDirection",
@@ -68,7 +73,14 @@ __all__ = (
     "RouteTrafficStatus",
     "RuntimeVariant",
     "IntOrPercent",
+    "ProjectDeploymentScope",
 )
+
+
+class ProjectDeploymentScope(BackendAISchema):
+    """Scope for project-level deployment operations."""
+
+    project_id: UUID = Field(description="Project UUID to scope the deployment operation.")
 
 
 class DeploymentOrderField(StrEnum):
@@ -76,14 +88,21 @@ class DeploymentOrderField(StrEnum):
 
     NAME = "name"
     CREATED_AT = "created_at"
-    UPDATED_AT = "updated_at"
+    DESTROYED_AT = "destroyed_at"
+    DOMAIN = "domain"
+    PROJECT = "project"
+    RESOURCE_GROUP = "resource_group"
+    TAG = "tag"
 
 
 class RevisionOrderField(StrEnum):
     """Fields available for ordering deployment revisions."""
 
-    NAME = "name"
+    REVISION_NUMBER = "revision_number"
     CREATED_AT = "created_at"
+    RESOURCE_GROUP = "resource_group"
+    CLUSTER_MODE = "cluster_mode"
+    RUNTIME_VARIANT_NAME = "runtime_variant_name"
 
 
 class RouteOrderField(StrEnum):
@@ -94,7 +113,7 @@ class RouteOrderField(StrEnum):
     TRAFFIC_RATIO = "traffic_ratio"
 
 
-class IntOrPercent(BaseModel):
+class IntOrPercent(BackendAISchema):
     """A rolling-update budget value: either an absolute count or a percentage.
 
     Exactly one of ``count`` or ``percent`` must be provided (oneOf semantics).
@@ -138,23 +157,6 @@ class DeploymentBasicInfo(BaseResponseModel):
     project_id: UUID
     domain_name: str
     created_user_id: UUID
-
-
-class DeploymentRevisionInfo(BaseResponseModel):
-    """Revision configuration details for a deployment."""
-
-    cluster_mode: ClusterMode
-    cluster_size: int
-    resource_group: str
-    resource_slots: dict[str, Any]
-    resource_opts: dict[str, Any] | None = None
-    image_id: UUID
-    runtime_variant: RuntimeVariant
-    inference_runtime_config: dict[str, Any] | None = None
-    environ: dict[str, str] | None = None
-    model_vfolder_id: UUID | None
-    model_mount_destination: str | None
-    model_definition_path: str | None
 
 
 class NetworkConfigInfo(BaseResponseModel):
@@ -239,14 +241,27 @@ class ReplicaOrderField(StrEnum):
 
 
 class EnvironmentVariableEntryInfoDTO(BaseResponseModel):
-    """A single environment variable entry with name and value."""
+    """A single environment variable entry with name and value.
+
+    .. deprecated::
+        Retained only for legacy deployment/session response DTOs that already expose ``name``.
+        New code should use
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariableEntryInfo`
+        (``key``/``value``) instead.
+    """
 
     name: str
     value: str
 
 
 class EnvironmentVariablesInfoDTO(BaseResponseModel):
-    """A collection of environment variable entries."""
+    """A collection of environment variable entries.
+
+    .. deprecated::
+        Retained only for legacy deployment/session response DTOs.
+        New code should use
+        :class:`ai.backend.common.dto.manager.v2.common.EnvironmentVariablesInfo`.
+    """
 
     entries: list[EnvironmentVariableEntryInfoDTO]
 
@@ -263,6 +278,10 @@ class PreStartActionInfoDTO(BaseResponseModel):
 class ModelHealthCheckInfoDTO(BaseResponseModel):
     """Output DTO for model health check configuration."""
 
+    enable: bool = Field(
+        default=False,
+        description="Whether the route is health-checked. When false the route activates immediately.",
+    )
     interval: float = Field(description="Interval in seconds between health checks.")
     path: str = Field(description="Path to check for health status.")
     max_retries: int = Field(description="Maximum number of retries for health check.")
@@ -284,9 +303,21 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: str | list[str] = Field(description="Command to start the model service.")
-    shell: str = Field(
-        default="/bin/bash", description="Shell to use if start_command is a string."
+    command: str | None = Field(
+        default=None,
+        description=("Added in 26.7.0. Single-string command to start the model service."),
+    )
+    start_command: list[str] | None = Field(
+        default=None,
+        description=(
+            "Deprecated since 26.7.0. Command to start the model service. Do "
+            "not set together with `command`; when both are set, `command` takes precedence and "
+            "this field is ignored."
+        ),
+    )
+    shell: str | None = Field(
+        default="/bin/bash",
+        description="Shell configured for the model service.",
     )
     port: int = Field(description="Port number for the model service.")
     health_check: ModelHealthCheckInfoDTO | None = Field(
@@ -356,12 +387,28 @@ class ResourceConfigInfoDTO(BaseResponseModel):
     resource_opts: ResourceOptsInfoDTO | None = None
 
 
-class ModelRuntimeConfigInfoDTO(BaseResponseModel):
-    """Runtime configuration backing DTO for ModelRuntimeConfig GQL type."""
+class RuntimeVariantPresetValueInfoDTO(BaseResponseModel):
+    """A runtime variant preset value materialised on a revision (``{preset_id, value}``)."""
 
-    runtime_variant: str
+    preset_id: UUID = Field(description="Runtime variant preset ID.")
+    value: str = Field(description="Value bound to the preset.")
+
+
+class ModelRuntimeConfigInfoDTO(BaseResponseModel):
+    """Runtime configuration backing DTO for ModelRuntimeConfig GQL type.
+
+    Only the ``runtime_variant_id`` is exposed on v2 responses; clients
+    resolve the full variant node via a separate GraphQL field resolver
+    (or REST lookup) when the name/metadata is needed.
+    """
+
+    runtime_variant_id: RuntimeVariantID
     inference_runtime_config: dict[str, Any] | None = None
     environ: EnvironmentVariablesInfoDTO | None = None
+    runtime_variant_preset_values: list[RuntimeVariantPresetValueInfoDTO] = Field(
+        default_factory=list,
+        description="Preset values materialised on this revision.",
+    )
 
 
 class ModelMountConfigInfoDTO(BaseResponseModel):
@@ -375,6 +422,12 @@ class ModelMountConfigInfoDTO(BaseResponseModel):
     vfolder_id: str
     mount_destination: str
     definition_path: str
+    subpath: str | None = Field(
+        default=None,
+        description=(
+            "Added in 26.4.4. Subpath within the model vfolder. ``None`` means the vfolder root."
+        ),
+    )
 
 
 class ExtraVFolderMountGQLDTO(BaseResponseModel):
@@ -386,6 +439,23 @@ class ExtraVFolderMountGQLDTO(BaseResponseModel):
 
     vfolder_id: str
     mount_destination: str | None = None
+    mount_perm: MountPermission | None = Field(
+        default=None,
+        description=(
+            "The concrete permission snapshot fixed at revision-write time. "
+            "``INHERIT`` policies are resolved against the vfolder's current "
+            "permission at that point, so this value is immutable and does "
+            "not change when the vfolder's permission later changes. ``None`` "
+            "when the caller left it unset to inherit the vfolder's stored "
+            "permission at session-creation time (task #83)."
+        ),
+    )
+    subpath: str | None = Field(
+        default=None,
+        description=(
+            "Added in 26.4.4. Subpath within the vfolder. ``None`` means the vfolder root."
+        ),
+    )
 
 
 class DeploymentMetadataInfoDTO(BaseResponseModel):
@@ -401,6 +471,7 @@ class DeploymentMetadataInfoDTO(BaseResponseModel):
     name: str
     status: ModelDeploymentStatus
     tags: list[str]
+    resource_group_name: str
     created_at: datetime
     updated_at: datetime
 

@@ -1,7 +1,7 @@
 """Validator for group resource limits."""
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
+from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
 from .exceptions import GroupResourceQuotaExceeded
 from .validator import ValidatorRule
@@ -37,12 +37,4 @@ class GroupResourceLimitValidator(ValidatorRule):
         # Check if adding this workload would exceed the limit
         total_after = group_occupied + workload.requested_slots
         if not (total_after <= group_limit):
-            # Format the limit for human-readable output
-            if group_limit and any(v for v in group_limit.values()):
-                limit_str = " ".join(f"{k}={v}" for k, v in group_limit.items() if v)
-                exceeded_msg = f"limit: {limit_str}, current: {group_occupied}, requested: {workload.requested_slots}"
-            else:
-                exceeded_msg = f"No resource limits defined. current: {group_occupied}, requested: {workload.requested_slots}"
-            raise GroupResourceQuotaExceeded(
-                f"Your group resource quota is exceeded. ({exceeded_msg})"
-            )
+            raise GroupResourceQuotaExceeded(quota_slots=group_limit)

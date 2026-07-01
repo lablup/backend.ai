@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
+    PresetTarget,
+    PresetValueType,
+    UIOption,
+)
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
@@ -13,10 +18,18 @@ class RuntimeVariantPresetUpdaterSpec(UpdaterSpec[RuntimeVariantPresetRow]):
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    preset_target: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    value_type: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    preset_target: OptionalState[PresetTarget] = field(
+        default_factory=OptionalState[PresetTarget].nop
+    )
+    value_type: OptionalState[PresetValueType] = field(
+        default_factory=OptionalState[PresetValueType].nop
+    )
     default_value: TriState[str] = field(default_factory=TriState[str].nop)
     key: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    required: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    category: TriState[str] = field(default_factory=TriState[str].nop)
+    display_name: TriState[str] = field(default_factory=TriState[str].nop)
+    ui_option: TriState[UIOption] = field(default_factory=TriState[UIOption].nop)
 
     @property
     @override
@@ -33,4 +46,8 @@ class RuntimeVariantPresetUpdaterSpec(UpdaterSpec[RuntimeVariantPresetRow]):
         self.value_type.update_dict(to_update, "value_type")
         self.default_value.update_dict(to_update, "default_value")
         self.key.update_dict(to_update, "key")
+        self.required.update_dict(to_update, "required")
+        self.category.update_dict(to_update, "category")
+        self.display_name.update_dict(to_update, "display_name")
+        self.ui_option.update_dict(to_update, "ui_option")
         return to_update

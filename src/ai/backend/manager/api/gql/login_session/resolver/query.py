@@ -10,10 +10,10 @@ from strawberry import Info
 from ai.backend.common.dto.manager.v2.login_session.request import (
     AdminRevokeLoginSessionInput,
     AdminSearchLoginSessionsInput,
+    AdminUnblockUserInput,
     MyRevokeLoginSessionInput,
     MySearchLoginSessionsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -27,6 +27,7 @@ from ai.backend.manager.api.gql.login_session.types import (
     LoginSessionV2EdgeGQL,
     LoginSessionV2GQL,
     RevokeLoginSessionPayloadGQL,
+    UnblockUserPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -34,7 +35,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Query login sessions with pagination and filtering. (admin only)",
     )
 )  # type: ignore[misc]
@@ -48,7 +49,7 @@ async def admin_login_sessions_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> LoginSessionV2ConnectionGQL:
+) -> LoginSessionV2ConnectionGQL | None:
     check_admin_only()
     result = await info.context.adapters.login_session.admin_search(
         AdminSearchLoginSessionsInput(
@@ -78,7 +79,7 @@ async def admin_login_sessions_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Query login sessions of the current user with pagination and filtering.",
     )
 )  # type: ignore[misc]
@@ -92,7 +93,7 @@ async def my_login_sessions_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> LoginSessionV2ConnectionGQL:
+) -> LoginSessionV2ConnectionGQL | None:
     result = await info.context.adapters.login_session.my_search(
         MySearchLoginSessionsInput(
             filter=filter.to_pydantic() if filter else None,
@@ -121,14 +122,14 @@ async def my_login_sessions_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Revoke a login session. (admin only)",
     )
-)  # type: ignore[misc]
+)
 async def admin_revoke_login_session(
     info: Info[StrawberryGQLContext],
     session_id: UUID,
-) -> RevokeLoginSessionPayloadGQL:
+) -> RevokeLoginSessionPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.login_session.admin_revoke(
         AdminRevokeLoginSessionInput(session_id=session_id)
@@ -138,15 +139,32 @@ async def admin_revoke_login_session(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Revoke a login session owned by the current user.",
     )
-)  # type: ignore[misc]
+)
 async def my_revoke_login_session(
     info: Info[StrawberryGQLContext],
     session_id: UUID,
-) -> RevokeLoginSessionPayloadGQL:
+) -> RevokeLoginSessionPayloadGQL | None:
     payload = await info.context.adapters.login_session.my_revoke(
         MyRevokeLoginSessionInput(session_id=session_id)
     )
     return RevokeLoginSessionPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.4.2",
+        description="Clear the failed-login rate limit block for a user. (admin only)",
+    )
+)
+async def admin_unblock_user(
+    info: Info[StrawberryGQLContext],
+    username: str,
+) -> UnblockUserPayloadGQL | None:
+    check_admin_only()
+    payload = await info.context.adapters.login_session.admin_unblock_user(
+        AdminUnblockUserInput(username=username)
+    )
+    return UnblockUserPayloadGQL.from_pydantic(payload)

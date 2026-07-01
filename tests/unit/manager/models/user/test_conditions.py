@@ -14,11 +14,14 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyRow,
 )
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
@@ -27,6 +30,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -34,6 +38,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -41,7 +46,7 @@ from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, QueryCondition
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.testutils.db import with_tables
 
@@ -58,18 +63,94 @@ _WITH_TABLES = [
     KeyPairRow,
     GroupRow,
     AssocGroupUserRow,
+    ContainerRegistryRow,
     ImageRow,
     VFolderRow,
     EndpointRow,
     DeploymentPolicyRow,
     DeploymentAutoScalingPolicyRow,
+    RuntimeVariantRow,
+    DeploymentRevisionPresetRow,
     DeploymentRevisionRow,
     SessionRow,
     AgentRow,
     KernelRow,
+    ReplicaGroupRow,
     RoutingRow,
     ResourcePresetRow,
 ]
+
+
+class TestUserConditionsIntegrationNameFilters:
+    """Tests for integration_name filter conditions in UserConditions."""
+
+    def test_by_integration_name_contains(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_name_contains(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
+        assert "integration_id" in sql
+        assert "LIKE" in sql.upper()
+        assert "%ext-abc%" in sql
+
+    def test_by_integration_name_contains_case_insensitive(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=True, negated=False)
+        condition = UserConditions.by_integration_name_contains(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "lower" in sql.lower()
+
+    def test_by_integration_name_contains_negated(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
+        condition = UserConditions.by_integration_name_contains(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "NOT LIKE" in sql.upper()
+
+    def test_by_integration_name_equals(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_name_equals(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
+        assert "integration_id" in sql
+        assert "ext-abc" in sql
+
+    def test_by_integration_name_equals_case_insensitive(self) -> None:
+        spec = StringMatchSpec(value="Ext-ABC", case_insensitive=True, negated=False)
+        condition = UserConditions.by_integration_name_equals(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "lower" in sql.lower()
+
+    def test_by_integration_name_equals_negated(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
+        condition = UserConditions.by_integration_name_equals(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "!=" in sql or "NOT" in sql.upper()
+
+    def test_by_integration_name_starts_with(self) -> None:
+        spec = StringMatchSpec(value="ext-", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_name_starts_with(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
+        assert "integration_id" in sql
+        assert "LIKE" in sql.upper()
+
+    def test_by_integration_name_ends_with(self) -> None:
+        spec = StringMatchSpec(value="-abc", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_name_ends_with(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        # SQL references the DB column (integration_id), not the API field name (integration_name)
+        assert "integration_id" in sql
+        assert "LIKE" in sql.upper()
+
+    def test_closure_independence(self) -> None:
+        spec_a = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
+        spec_b = StringMatchSpec(value="beta", case_insensitive=False, negated=False)
+        cond_a = UserConditions.by_integration_name_contains(spec_a)
+        cond_b = UserConditions.by_integration_name_contains(spec_b)
+        sql_a = str(cond_a().compile(compile_kwargs={"literal_binds": True}))
+        sql_b = str(cond_b().compile(compile_kwargs={"literal_binds": True}))
+        assert sql_a != sql_b
+        assert "alpha" in sql_a
+        assert "beta" in sql_b
 
 
 class TestUserConditionsDomainNestedFilters:

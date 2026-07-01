@@ -1,24 +1,37 @@
 from __future__ import annotations
 
-import strawberry
-from strawberry import ID, Info
+from collections.abc import Iterable
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from strawberry import ID, Info, relay
+
+from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_federation_type
 
 
 @gql_federation_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Federation stub for legacy ComputeSessionNode.",
     ),
     name="ComputeSessionNode",
     keys=["id"],
     extend=True,
 )
-class Session:
-    id: ID = strawberry.federation.field(external=True)
+class Session(relay.Node):
+    id: relay.NodeID[str]
+
+    @classmethod
+    def resolve_nodes(
+        cls,
+        *,
+        info: Info,
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> list[Session]:
+        # Legacy node owned by the graphene subgraph: return id-only stubs;
+        # the router resolves the remaining fields from graphene via _entities.
+        return [cls(id=node_id) for node_id in node_ids]
 
     @classmethod
     def resolve_reference(cls, id: ID, info: Info) -> Session:
-        return cls(id=id)
+        return cls(id=resolve_global_id(str(id))[1])

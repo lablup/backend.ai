@@ -1,16 +1,15 @@
 import asyncio
 import logging
-import random
 import socket
-from typing import Any, Final
+from typing import Any, Final, override
 
-import aiotools
-
-from ai.backend.appproxy.common.errors import WorkerNotAvailable
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.common.cron import LocalCron
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseBackend
+from .last_access_marker import LastAccessMarkerTask
+from .pool import RoutePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -18,24 +17,27 @@ MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 
 
 class TCPBackend(BaseBackend):
-    routes: list[RouteInfo]
+    """TCP proxy backend that keeps routes in a health-checked pool.
+
+    Route selection defers to the pool so that upstreams with repeated
+    connect failures are excluded from traffic. The pool also tracks
+    route identity by ``(host, port)`` and treats ``route_id`` changes on
+    the same endpoint as kernel swaps (fresh health state).
+    """
+
+    _pool: RoutePool
 
     def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.routes = routes
+        self._pool = RoutePool(initial_routes=routes)
 
-    @property
-    def selected_route(self) -> RouteInfo:
-        if len(self.routes) == 0:
-            raise WorkerNotAvailable
-        if len(self.routes) == 1:
-            selected_route = self.routes[0]
-            if selected_route.traffic_ratio == 0:
-                raise WorkerNotAvailable
-        else:
-            ratios: list[float] = [r.traffic_ratio for r in self.routes]
-            selected_route = random.choices(self.routes, weights=ratios, k=1)[0]
-        return selected_route
+    @override
+    async def update_routes(self, routes: list[RouteInfo]) -> None:
+        await self._pool.update(routes)
+
+    @override
+    async def close(self) -> None:
+        await self._pool.close()
 
     async def bind(
         self, down_reader: asyncio.StreamReader, down_writer: asyncio.StreamWriter
@@ -71,28 +73,31 @@ class TCPBackend(BaseBackend):
                 log.debug("setting stop event")
                 stop_event.set()
 
-        async def _last_access_marker_task(_interval: float) -> None:
-            await self.mark_last_used_time(route)
-
-        route = self.selected_route
+        route = await self._pool.select()
         log.debug(
             "Proxying TCP Request to {}:{}",
             route.current_kernel_host,
             route.kernel_port,
         )
 
-        marker_task = aiotools.create_timer(_last_access_marker_task, 1.5)
+        marker_cron = LocalCron([LastAccessMarkerTask(self, route)])
+        await marker_cron.start()
         await self.increase_request_counter()
 
         try:
             sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             # unlike .frontend.tcp this has a chance of being a blocking call since kernel host can be a domain
-            await asyncio.get_running_loop().run_in_executor(
-                None, sock.connect, (route.current_kernel_host, route.kernel_port)
-            )
+            try:
+                await asyncio.get_running_loop().run_in_executor(
+                    None, sock.connect, (route.current_kernel_host, route.kernel_port)
+                )
+            except Exception:
+                self._pool.record_failure(route)
+                raise
 
             up_reader, up_writer = await asyncio.open_connection(sock=sock)
+            self._pool.record_success(route)
             log.debug(
                 "Connected to {}:{}",
                 route.current_kernel_host,
@@ -104,8 +109,7 @@ class TCPBackend(BaseBackend):
         finally:
             log.debug("tasks ended")
             metrics.proxy.observe_upstream_tcp_traffic_chunk(total_bytes)
-            marker_task.cancel()
-            await marker_task
+            await marker_cron.stop()
             down_writer.close()
             await down_writer.wait_closed()
         log.debug("TCP connection closed")

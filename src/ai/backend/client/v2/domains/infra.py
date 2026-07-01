@@ -103,11 +103,12 @@ class InfraClient(BaseDomainClient):
     async def get_wsproxy_version(
         self, scaling_group: str, request: GetWSProxyVersionRequest | None = None
     ) -> GetWSProxyVersionResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"/scaling-groups/{scaling_group}/wsproxy-version",
-            request=request,
             response_model=GetWSProxyVersionResponse,
+            params=params,
         )
 
     # ---- Resources ----
@@ -139,13 +140,13 @@ class InfraClient(BaseDomainClient):
         )
 
     async def get_usage_per_month(self, request: UsagePerMonthRequest) -> UsagePerMonthResponse:
-        json_body = request.model_dump(exclude_none=True)
-        data = await self._client._request("GET", "/resource/usage/month", json=json_body)
+        params = request.model_dump(mode="json", exclude_none=True)
+        data = await self._client._request("GET", "/resource/usage/month", params=params)
         return UsagePerMonthResponse.model_validate(data)
 
     async def get_usage_per_period(self, request: UsagePerPeriodRequest) -> UsagePerPeriodResponse:
-        json_body = request.model_dump(exclude_none=True)
-        data = await self._client._request("GET", "/resource/usage/period", json=json_body)
+        params = request.model_dump(mode="json", exclude_none=True)
+        data = await self._client._request("GET", "/resource/usage/period", params=params)
         return UsagePerPeriodResponse.model_validate(data)
 
     async def get_user_month_stats(self) -> MonthStatsResponse:
@@ -159,8 +160,8 @@ class InfraClient(BaseDomainClient):
     # ---- Watcher ----
 
     async def get_watcher_status(self, request: WatcherAgentRequest) -> WatcherStatusResponse:
-        json_body = request.model_dump(exclude_none=True)
-        data = await self._client._request("GET", "/resource/watcher", json=json_body)
+        params = request.model_dump(mode="json", exclude_none=True)
+        data = await self._client._request("GET", "/resource/watcher", params=params)
         return WatcherStatusResponse.model_validate(data)
 
     async def start_watcher_agent(self, request: WatcherAgentRequest) -> WatcherAgentActionResponse:

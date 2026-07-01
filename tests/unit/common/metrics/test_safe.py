@@ -38,7 +38,7 @@ class TestCircuitBreakerState:
         _trip(ValueError("mmap slice assignment is wrong size"))
         tripped_at, error_msg = metrics_trip_info()
         assert tripped_at is not None
-        assert error_msg == "mmap slice assignment is wrong size"
+        assert error_msg == "ValueError: mmap slice assignment is wrong size"
 
     def test_trip_is_idempotent(self) -> None:
         _trip(ValueError("first error"))
@@ -46,7 +46,7 @@ class TestCircuitBreakerState:
         _trip(ValueError("second error"))
         second_tripped_at, second_msg = metrics_trip_info()
         assert first_tripped_at == second_tripped_at
-        assert first_msg == second_msg == "first error"
+        assert first_msg == second_msg == "ValueError: first error"
 
     def test_trip_logs_warning_once(self) -> None:
         with patch.object(safe_mod, "log") as mock_log:
@@ -103,13 +103,12 @@ class TestSafeLabeledMetric:
         metric.observe(1.0)
         assert is_metrics_disabled() is True
 
-    def test_other_exceptions_propagate(self) -> None:
+    def test_other_exceptions_trip_circuit_breaker(self) -> None:
         child = MagicMock()
-        child.inc.side_effect = TypeError("unexpected")
+        child.inc.side_effect = IndexError("mmap slice assignment is wrong size")
         metric = SafeLabeledMetric(child)
-        with pytest.raises(TypeError, match="unexpected"):
-            metric.inc()
-        assert is_metrics_disabled() is False
+        metric.inc()
+        assert is_metrics_disabled() is True
 
 
 class TestNoopLabeledMetric:

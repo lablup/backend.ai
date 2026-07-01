@@ -5,11 +5,19 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.types import BinarySize, QuotaScopeID, ResourceSlot
+from ai.backend.manager.data.permission.types import (
+    EntityType as PermissionEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as PermissionScopeType,
+)
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
@@ -17,6 +25,10 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -24,6 +36,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import (
@@ -63,15 +76,20 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 GroupRow,
                 AgentRow,
                 VFolderRow,
+                ContainerRegistryRow,
                 ImageRow,
                 ResourcePresetRow,
                 EndpointRow,
+                RuntimeVariantRow,
+                DeploymentRevisionPresetRow,
                 DeploymentRevisionRow,
                 DeploymentAutoScalingPolicyRow,
                 DeploymentPolicyRow,
                 SessionRow,
                 KernelRow,
+                ReplicaGroupRow,
                 RoutingRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -353,3 +371,124 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 quota_scope,
                 domain_user_data_dict,
             )
+
+    @pytest.fixture
+    def regular_user_data_dict(
+        self,
+        regular_user: UUID,
+        test_domain_name: str,
+    ) -> dict[str, Any]:
+        """User dict for a regular user (USER role)."""
+        return {
+            "uuid": regular_user,
+            "role": UserRole.USER,
+            "domain_name": test_domain_name,
+        }
+
+    @pytest.fixture
+    async def regular_user_membership_in_test_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        regular_user: UUID,
+        test_group: UUID,
+    ) -> AsyncGenerator[None, None]:
+        """Insert ASE row binding regular_user to test_group."""
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=PermissionScopeType.PROJECT,
+                    scope_id=str(test_group),
+                    entity_type=PermissionEntityType.USER,
+                    entity_id=str(regular_user),
+                )
+            )
+            await session.flush()
+        yield
+
+    @pytest.fixture
+    async def other_group_with_regular_user_membership(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        regular_user: UUID,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> AsyncGenerator[UUID, None]:
+        """Insert a separate group in the same domain plus an ASE row for regular_user."""
+        other_group_id = uuid4()
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                GroupRow(
+                    id=other_group_id,
+                    name=f"other_group_{other_group_id.hex[:8]}",
+                    domain_name=test_domain_name,
+                    resource_policy=test_project_resource_policy_name,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    type=ProjectType.GENERAL,
+                )
+            )
+            session.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=PermissionScopeType.PROJECT,
+                    scope_id=str(other_group_id),
+                    entity_type=PermissionEntityType.USER,
+                    entity_id=str(regular_user),
+                )
+            )
+            await session.flush()
+        yield other_group_id
+
+    async def test_user_can_access_group_quota_when_ase_membership_present(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group: UUID,
+        regular_user_data_dict: dict[str, Any],
+        regular_user_membership_in_test_group: None,
+    ) -> None:
+        """Regular user with ASE (PROJECT, group, USER) row passes the project quota check."""
+        quota_scope = QuotaScopeID.parse(f"project:{test_group}")
+
+        async with db_with_cleanup.begin_session() as session:
+            # Should not raise any exception
+            await ensure_quota_scope_accessible_by_user(
+                session,
+                quota_scope,
+                regular_user_data_dict,
+            )
+
+    async def test_user_cannot_access_group_quota_without_ase_membership(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group: UUID,
+        regular_user_data_dict: dict[str, Any],
+    ) -> None:
+        """Regular user without ASE membership row is rejected at the project quota check."""
+        quota_scope = QuotaScopeID.parse(f"project:{test_group}")
+
+        async with db_with_cleanup.begin_session() as session:
+            with pytest.raises(InvalidAPIParameters):
+                await ensure_quota_scope_accessible_by_user(
+                    session,
+                    quota_scope,
+                    regular_user_data_dict,
+                )
+
+    async def test_user_membership_in_other_project_does_not_grant_access(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group: UUID,
+        regular_user_data_dict: dict[str, Any],
+        other_group_with_regular_user_membership: UUID,
+    ) -> None:
+        """Membership in project A does not grant quota access to project B."""
+        quota_scope = QuotaScopeID.parse(f"project:{test_group}")
+
+        async with db_with_cleanup.begin_session() as session:
+            with pytest.raises(InvalidAPIParameters):
+                await ensure_quota_scope_accessible_by_user(
+                    session,
+                    quota_scope,
+                    regular_user_data_dict,
+                )

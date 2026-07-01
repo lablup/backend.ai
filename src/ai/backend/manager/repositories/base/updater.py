@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.clauses import QueryCondition
 
 from .integrity import match_integrity_error, parse_integrity_error
-from .types import IntegrityErrorCheck, QueryCondition
+from .types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -66,8 +68,8 @@ class UpdaterSpec[TRow: Base](ABC):
         Args:
             row: The ORM row object to apply updates to
         """
-        for field, value in self.build_values().items():
-            setattr(row, field, value)
+        for column, value in self.build_values().items():
+            setattr(row, column, value)
 
 
 class BatchUpdaterSpec[TRow: Base](ABC):
@@ -161,6 +163,31 @@ class BulkUpdaterError[TRow: Base]:
     index: int
 
 
+@dataclass
+class BulkUpdaterResult[TRow: Base]:
+    """Result of bulk update operation supporting partial failures.
+
+    Follows the BulkCreatorResultWithFailures / BulkPurgerResultWithFailures pattern
+    with successes and errors. Unlike execute_batch_updater which fails atomically,
+    this allows some rows to succeed while others fail.
+
+    Attributes:
+        successes: Successfully updated rows
+        errors: Failed updaters with error information
+    """
+
+    successes: list[TRow] = field(default_factory=list)
+    errors: list[BulkUpdaterError[TRow]] = field(default_factory=list)
+
+    def success_count(self) -> int:
+        """Get count of successfully updated rows."""
+        return len(self.successes)
+
+    def has_failures(self) -> bool:
+        """Check if any failures occurred."""
+        return len(self.errors) > 0
+
+
 async def execute_updater[TRow: Base](
     db_sess: SASession,
     updater: Updater[TRow],
@@ -172,8 +199,8 @@ async def execute_updater[TRow: Base](
         updater: Updater containing spec and pk_value
 
     Returns:
-        UpdaterResult containing the updated row, or None if no row matched
-        or if there are no values to update
+        UpdaterResult containing the updated row (or the current row when there are no
+        values to update), or None only if no row matched the primary key.
 
     Example:
         class SessionStatusUpdaterSpec(UpdaterSpec[SessionRow]):
@@ -198,14 +225,20 @@ async def execute_updater[TRow: Base](
     row_class = updater.spec.row_class
     table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
+    if len(pk_columns) != 1:
+        raise UnsupportedCompositePrimaryKeyError(
+            "Updater only supports single-column primary keys",
+        )
     values = updater.spec.build_values()
 
-    # Return None if there are no values to update
     if not values:
-        return None
-
-    if len(pk_columns) != 1:
-        raise ValueError("Updater only supports single-column primary keys")
+        # No columns to update: return the current row if it exists so callers can tell
+        # "nothing to change" apart from "row not found". None means not found only.
+        existing = await db_sess.execute(
+            sa.select(row_class).where(pk_columns[0] == updater.pk_value)
+        )
+        current_row = existing.scalar_one_or_none()
+        return UpdaterResult(row=current_row) if current_row is not None else None
 
     update_stmt = (
         sa.update(table)
@@ -228,6 +261,75 @@ async def execute_updater[TRow: Base](
         return None
 
     return UpdaterResult(row=updated_row)
+
+
+async def execute_bulk_updater_partial[TRow: Base](
+    db_sess: SASession,
+    updaters: Sequence[Updater[TRow]],
+) -> BulkUpdaterResult[TRow]:
+    """Execute bulk UPDATE with partial failure support.
+
+    Unlike execute_batch_updater which uses condition-based update and fails
+    atomically, this function processes each updater individually and collects
+    both successes and failures.
+
+    Processing strategy:
+    - Each updater is executed individually within a savepoint (begin_nested)
+    - If an updater succeeds, the updated row is added to successes
+    - If an updater fails (any exception), it's added to errors with context
+    - If an updater targets a non-existent PK, no row is returned (not an error)
+    - Order is preserved in successes list
+
+    Args:
+        db_sess: Database session (must be writable)
+        updaters: List of Updater instances targeting rows to update
+
+    Returns:
+        BulkUpdaterResult containing successes and errors
+
+    Note:
+        The caller controls the transaction boundary (commit/rollback).
+        Successful updates are flushed immediately and will persist on commit.
+        Failed updates do not affect successful ones.
+
+    Example:
+        updaters = [
+            Updater(spec=NameUpdaterSpec("alice"), pk_value=user_id_1),
+            Updater(spec=NameUpdaterSpec("bob"), pk_value=user_id_2),
+            Updater(spec=NameUpdaterSpec("duplicate"), pk_value=user_id_3),  # Fails
+        ]
+        result = await execute_bulk_updater_partial(db_sess, updaters)
+
+        print(f"Updated {result.success_count()} rows")
+        for error in result.errors:
+            print(f"  - Index {error.index}: {error.exception}")
+    """
+    if not updaters:
+        return BulkUpdaterResult(successes=[], errors=[])
+
+    successes: list[TRow] = []
+    errors: list[BulkUpdaterError[TRow]] = []
+
+    for index, updater in enumerate(updaters):
+        # Use nested transaction (savepoint) to isolate each row update.
+        # If this row fails, only this savepoint is rolled back, not the entire session.
+        try:
+            async with db_sess.begin_nested():
+                result = await execute_updater(db_sess, updater)
+                # If no row matched the PK, just skip (not an error)
+                if result is not None:
+                    successes.append(result.row)
+        except sa.exc.IntegrityError as e:
+            # execute_updater normally converts IntegrityError into a domain error;
+            # this branch is a safety net should a raw error ever propagate.
+            parsed = parse_integrity_error(e)
+            errors.append(BulkUpdaterError(spec=updater.spec, exception=parsed, index=index))
+        except Exception as e:
+            # The nested transaction automatically rolls back on exception.
+            # This only affects the current row, not previous successful ones.
+            errors.append(BulkUpdaterError(spec=updater.spec, exception=e, index=index))
+
+    return BulkUpdaterResult(successes=successes, errors=errors)
 
 
 async def execute_batch_updater[TRow: Base](

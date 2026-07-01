@@ -12,16 +12,23 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
 )
+from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 
 __all__ = (
     "AdminSearchResourceGroupsInput",
     "CreateResourceGroupInput",
     "DeleteResourceGroupInput",
     "PreemptionConfigInputDTO",
+    "ReplaceResourceGroupDefaultDeploymentOptionsGQLInput",
+    "ReplaceResourceGroupDefaultDeploymentOptionsInput",
+    "ReplaceResourceGroupDefaultSessionOptionsGQLInput",
+    "ReplaceResourceGroupDefaultSessionOptionsInput",
     "ResourceGroupFilter",
     "ResourceGroupOrder",
     "ResourceWeightEntryInput",
@@ -58,7 +65,7 @@ class CreateResourceGroupInput(BaseRequestModel):
         default=None,
         description="Allowed vfolder host permissions for the resource group.",
     )
-    integration_id: str | None = Field(
+    integration_name: str | None = Field(
         default=None,
         description="External integration ID associated with this resource group.",
     )
@@ -105,7 +112,7 @@ class UpdateResourceGroupInput(BaseRequestModel):
             "Use SENTINEL to clear, null to keep existing value."
         ),
     )
-    integration_id: str | Sentinel | None = Field(
+    integration_name: str | Sentinel | None = Field(
         default=SENTINEL,
         description=(
             "Updated external integration ID. Use SENTINEL to clear, null to keep existing value."
@@ -291,3 +298,65 @@ class UpdateAllowedProjectsForResourceGroupInput(BaseRequestModel):
     )
     add: list[UUID] | None = Field(default=None, description="Project IDs to allow.")
     remove: list[UUID] | None = Field(default=None, description="Project IDs to disallow.")
+
+
+class ReplaceResourceGroupDefaultDeploymentOptionsInput(BaseRequestModel):
+    """REST body for replacing a resource group's ``default_deployment_options``.
+
+    Replace semantics — the supplied payload is the complete new value.
+    Admin-only: future deployments created in this resource group will
+    snapshot this new default. Existing deployments are not affected.
+    """
+
+    options: DeploymentOptionsInput = Field(
+        description=(
+            "New default deployment options payload. Replaces the existing"
+            " default_deployment_options atomically."
+        ),
+    )
+
+
+class ReplaceResourceGroupDefaultDeploymentOptionsGQLInput(BaseRequestModel):
+    """GraphQL mutation input for replacing a resource group's ``default_deployment_options``.
+
+    Mirrors :class:`ReplaceResourceGroupDefaultDeploymentOptionsInput`
+    with the resource group name bundled in, since GQL mutations take a
+    single input object.
+    """
+
+    resource_group_name: ResourceGroupName = Field(description="Target resource group name.")
+    options: DeploymentOptionsInput = Field(
+        description="New default deployment options payload.",
+    )
+
+
+class ReplaceResourceGroupDefaultSessionOptionsInput(BaseRequestModel):
+    """REST body for replacing a resource group's ``default_session_options``.
+
+    Replace semantics — the supplied payload is the complete new value.
+    Admin-only: future sessions enqueued into this resource group will
+    consult this new default via the scheduling controller's options
+    resolver. Already-enqueued sessions are unaffected because they
+    snapshot the old default at their own enqueue time.
+    """
+
+    options: DefaultSessionOptionsInput = Field(
+        description=(
+            "New default session options payload. Replaces the existing"
+            " default_session_options atomically."
+        ),
+    )
+
+
+class ReplaceResourceGroupDefaultSessionOptionsGQLInput(BaseRequestModel):
+    """GraphQL mutation input for replacing a resource group's ``default_session_options``.
+
+    Mirrors :class:`ReplaceResourceGroupDefaultSessionOptionsInput` with
+    the resource group name bundled in, since GQL mutations take a
+    single input object.
+    """
+
+    resource_group_name: ResourceGroupName = Field(description="Target resource group name.")
+    options: DefaultSessionOptionsInput = Field(
+        description="New default session options payload.",
+    )

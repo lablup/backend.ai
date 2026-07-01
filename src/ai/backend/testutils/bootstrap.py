@@ -26,6 +26,7 @@ RedisContainerFixture = tuple[str, HostPortPairModel]
 EtcdContainerFixture = tuple[str, HostPortPairModel]
 PostgresContainerFixture = tuple[str, HostPortPairModel]
 MinioContainerFixture = tuple[str, HostPortPairModel]
+PrometheusContainerFixture = tuple[str, HostPortPairModel]
 
 log = logging.getLogger(__spec__.name)
 
@@ -193,5 +194,38 @@ def minio_container() -> Iterator[tuple[str, HostPortPairModel]]:
         time.sleep(0.2)
 
         yield container.get_container_host_ip(), HostPortPairModel(host="127.0.0.1", port=api_port)
+    finally:
+        container.stop()
+
+
+@pytest.fixture(scope="session", autouse=False)
+def prometheus_container() -> Iterator[tuple[str, HostPortPairModel]]:
+    # Spawn a single-node Prometheus container for a testing session.
+    random_id = secrets.token_hex(8)
+
+    container = (
+        DockerContainer("prom/prometheus:v2.53.0")
+        .with_name(f"test--prometheus-slot-{get_parallel_slot()}-{random_id}")
+        .with_exposed_ports(9090)
+        .with_kwargs(tmpfs={"/prometheus": "rw,uid=65534,gid=65534"})
+        .with_command(
+            "--config.file=/etc/prometheus/prometheus.yml "
+            "--storage.tsdb.path=/prometheus "
+            "--storage.tsdb.retention.time=1h"
+        )
+    )
+
+    log.info("spawning prometheus container (parallel slot: %d)", get_parallel_slot())
+    container.start()
+    published_port = int(container.get_exposed_port(9090))
+
+    try:
+        wait_for_logs(container, "Server is ready to receive web requests.")
+        time.sleep(0.5)
+
+        yield (
+            container.get_container_host_ip(),
+            HostPortPairModel(host="127.0.0.1", port=published_port),
+        )
     finally:
         container.stop()

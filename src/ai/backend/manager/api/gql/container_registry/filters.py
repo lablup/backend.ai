@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Self
 
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     ContainerRegistryFilter as ContainerRegistryFilterDTO,
@@ -21,6 +22,7 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryTypeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_pydantic_input,
@@ -30,7 +32,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Filter by container registry type.",
     ),
     name="ContainerRegistryTypeFilter",
@@ -44,7 +46,7 @@ class ContainerRegistryTypeFilterGQL(PydanticInputMixin[ContainerRegistryTypeFil
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Filter for container registries.",
     ),
     name="ContainerRegistryV2Filter",
@@ -53,11 +55,29 @@ class ContainerRegistryV2Filter(PydanticInputMixin[ContainerRegistryFilterDTO]):
     registry_name: StringFilter | None = None
     type: ContainerRegistryTypeFilterGQL | None = None
     is_global: bool | None = None
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
+        ),
+        default=None,
+    )
 
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Fields available for ordering container registries.",
     ),
     name="ContainerRegistryV2OrderField",
@@ -71,7 +91,7 @@ class ContainerRegistryV2OrderField(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.2",
         description="Ordering specification for container registries.",
     ),
     name="ContainerRegistryV2OrderBy",

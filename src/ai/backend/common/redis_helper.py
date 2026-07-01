@@ -243,11 +243,13 @@ def get_redis_object(
 
         service_name = redis_target.get("service_name")
         password = redis_target.get("password")
+        sentinel_password = redis_target.get("sentinel_password")
+        sentinel_auth = sentinel_password if sentinel_password is not None else password
         if service_name is None:
             raise ValueError("config/redis/service_name is required when using Redis Sentinel")
 
-        kwargs = {
-            "password": password,
+        sentinel_conn_kwargs = {
+            "password": sentinel_auth,
             "ssl": redis_target.use_tls,
             "ssl_cert_reqs": SSL_CERT_NONE if redis_target.tls_skip_verify else SSL_CERT_REQUIRED,
         }
@@ -255,10 +257,7 @@ def get_redis_object(
             [(str(host), port) for host, port in sentinel_addresses],
             password=password,
             db=str(db),
-            sentinel_kwargs={
-                "password": password,
-                **kwargs,
-            },
+            sentinel_kwargs=sentinel_conn_kwargs,
         )
         return RedisConnectionInfo(
             client=sentinel.master_for(
@@ -332,11 +331,13 @@ def get_redis_object_for_lock(
 
         service_name = redis_target.get("service_name")
         password = redis_target.get("password")
+        sentinel_password = redis_target.get("sentinel_password")
+        sentinel_auth = sentinel_password if sentinel_password is not None else password
         if service_name is None:
             raise ValueError("config/redis/service_name is required when using Redis Sentinel")
 
-        kwargs = {
-            "password": password,
+        sentinel_conn_kwargs = {
+            "password": sentinel_auth,
             "ssl": redis_target.use_tls,
             "ssl_cert_reqs": SSL_CERT_NONE if redis_target.tls_skip_verify else SSL_CERT_REQUIRED,
         }
@@ -344,10 +345,7 @@ def get_redis_object_for_lock(
             [(str(host), port) for host, port in sentinel_addresses],
             password=password,
             db=str(db),
-            sentinel_kwargs={
-                "password": password,
-                **kwargs,
-            },
+            sentinel_kwargs=sentinel_conn_kwargs,
         )
         return RedisConnectionInfo(
             client=sentinel.master_for(

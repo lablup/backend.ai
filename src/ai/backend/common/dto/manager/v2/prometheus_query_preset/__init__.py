@@ -11,12 +11,12 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     MetricLabelEntry,
     ModifyQueryDefinitionInput,
     ModifyQueryDefinitionOptionsInput,
+    PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
     SearchQueryDefinitionsInput,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
-    AdminSearchQueryDefinitionsPayload,
     CreateQueryDefinitionPayload,
     DeleteQueryDefinitionPayload,
     ExecuteQueryDefinitionPayload,
@@ -58,6 +58,8 @@ __all__ = (
     # Request (execute supporting)
     "MetricLabelEntry",
     "ExecuteQueryDefinitionInput",
+    # Request (preview)
+    "PreviewQueryDefinitionInput",
     # Response (node)
     "QueryDefinitionNode",
     # Response (CRUD payloads)
@@ -66,7 +68,6 @@ __all__ = (
     "DeleteQueryDefinitionPayload",
     "GetQueryDefinitionPayload",
     # Response (search payloads)
-    "AdminSearchQueryDefinitionsPayload",
     "SearchQueryDefinitionsPayload",
     # Response (execute payloads)
     "QueryDefinitionMetricResultInfo",

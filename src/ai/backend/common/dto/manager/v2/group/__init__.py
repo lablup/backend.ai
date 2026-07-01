@@ -3,16 +3,16 @@ Group (Project) DTOs for Manager API v2.
 """
 
 from ai.backend.common.dto.manager.v2.group.request import (
-    AdminSearchGroupsInput,
+    AdminSearchProjectsInput,
     AssignUsersToProjectInput,
-    CreateGroupInput,
-    DeleteGroupInput,
-    GroupFilter,
-    GroupOrder,
-    PurgeGroupInput,
-    SearchGroupsRequest,
+    CreateProjectInput,
+    DeleteProjectInput,
+    ProjectFilter,
+    ProjectOrder,
+    PurgeProjectInput,
+    SearchProjectsRequest,
     UnassignUsersFromProjectInput,
-    UpdateGroupInput,
+    UpdateProjectInput,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
@@ -32,33 +32,33 @@ from ai.backend.common.dto.manager.v2.group.response import (
 )
 from ai.backend.common.dto.manager.v2.group.types import (
     DomainProjectScopeDTO,
-    GroupDomainFilter,
-    GroupOrderField,
-    GroupUserFilter,
     OrderDirection,
+    ProjectDomainFilter,
+    ProjectOrderField,
     ProjectType,
     ProjectTypeFilter,
+    ProjectUserFilter,
 )
 
 __all__ = (
     # Types
     "DomainProjectScopeDTO",
-    "ProjectType",
     "OrderDirection",
-    "GroupOrderField",
-    "GroupDomainFilter",
-    "GroupUserFilter",
+    "ProjectDomainFilter",
+    "ProjectOrderField",
+    "ProjectType",
     "ProjectTypeFilter",
+    "ProjectUserFilter",
     # Request DTOs
-    "AdminSearchGroupsInput",
+    "AdminSearchProjectsInput",
     "AssignUsersToProjectInput",
-    "CreateGroupInput",
-    "UpdateGroupInput",
-    "DeleteGroupInput",
-    "PurgeGroupInput",
-    "GroupFilter",
-    "GroupOrder",
-    "SearchGroupsRequest",
+    "CreateProjectInput",
+    "UpdateProjectInput",
+    "DeleteProjectInput",
+    "PurgeProjectInput",
+    "ProjectFilter",
+    "ProjectOrder",
+    "SearchProjectsRequest",
     "UnassignUsersFromProjectInput",
     # Response DTOs
     "AdminSearchGroupsPayload",

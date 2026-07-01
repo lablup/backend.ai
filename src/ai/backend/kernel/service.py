@@ -61,7 +61,7 @@ class ServiceParser:
 
     async def parse(self, path: Path) -> None:
         for service_def_file in path.glob("*.json"):
-            log.debug(f"loading service-definition from {service_def_file}")
+            log.debug("loading service-definition from {}", service_def_file)
             try:
                 with service_def_file.absolute().open("rb") as fr:
                     raw_service_def = json.load(fr)
@@ -218,6 +218,18 @@ class ServiceArgumentInterpolator:
                     case TokenType.TEXT:
                         tokens.append(token)
                     case TokenType.EXPR:
-                        tokens.append(("{" + token + "}").format_map(variables))
+                        try:
+                            tokens.append(("{" + token + "}").format_map(variables))
+                        except (KeyError, IndexError) as e:
+                            raise InvalidServiceDefinition(
+                                f"Cannot interpolate service argument {part!r}: "
+                                f"undefined template variable {e}."
+                            ) from e
+                        except ValueError as e:
+                            raise InvalidServiceDefinition(
+                                f"Cannot interpolate service argument {part!r}: {e}. "
+                                "Literal braces (e.g. JSON like vLLM '--hf-overrides') "
+                                "are not supported."
+                            ) from e
             processed_parts.append("".join(tokens))
         return processed_parts

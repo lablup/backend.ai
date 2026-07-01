@@ -50,7 +50,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.types import (
     ImageSpec,
     MountSpec,
@@ -68,11 +68,8 @@ from ai.backend.manager.data.session.types import (
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import (
-    KernelCreationFailed,
-    KernelDestructionFailed,
     KernelExecutionFailed,
     KernelNotFound,
-    KernelRestartFailed,
     MainKernelNotFound,
     SessionNotFound,
     TooManyKernelsFound,
@@ -82,7 +79,7 @@ from ai.backend.manager.exceptions import AgentError
 from ai.backend.manager.models.base import (
     GUID,
     Base,
-    EnumType,
+    PydanticColumn,
     ResourceSlotColumn,
     SessionIDColumnType,
     StrEnumType,
@@ -115,10 +112,8 @@ from ai.backend.manager.models.types import (
 )
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
-    JSONCoalesceExpr,
     execute_with_retry,
     execute_with_txn_retry,
-    sql_json_merge,
 )
 
 if TYPE_CHECKING:
@@ -133,14 +128,13 @@ __all__ = (
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
     "DEAD_SESSION_STATUSES",
+    "TERMINAL_SESSION_STATUSES",
     "PRIVATE_SESSION_TYPES",
-    "SESSION_STATUS_TRANSITION_MAP",
     "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "KernelLoadingStrategy",
     "SessionDependencyRow",
     "SessionRow",
     "check_all_dependencies",
-    "determine_session_status_by_kernels",
     "handle_session_exception",
 )
 
@@ -163,6 +157,16 @@ LEADING_SESSION_STATUSES = tuple(
 DEAD_SESSION_STATUSES = frozenset([
     SessionStatus.CANCELLED,
     SessionStatus.TERMINATED,
+])
+
+# Statuses treated as terminal for session-name reuse. Mirrors the
+# `ix_sessions_unique_name_per_user_nonterminal` partial unique index predicate
+# (`status NOT IN ('ERROR', 'TERMINATED', 'CANCELLED')`), which guarantees at most
+# one non-terminal session per (name, user_uuid).
+TERMINAL_SESSION_STATUSES = frozenset([
+    SessionStatus.ERROR,
+    SessionStatus.TERMINATED,
+    SessionStatus.CANCELLED,
 ])
 
 # statuses to consider when calculating current resource usage
@@ -193,9 +197,6 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
 PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
 
 OP_EXC = {
-    "create_session": KernelCreationFailed,
-    "restart_session": KernelRestartFailed,
-    "destroy_session": KernelDestructionFailed,
     "execute": KernelExecutionFailed,
     "shutdown_service": KernelExecutionFailed,
     "upload_file": KernelExecutionFailed,
@@ -203,246 +204,28 @@ OP_EXC = {
     "download_single": KernelExecutionFailed,
     "list_files": KernelExecutionFailed,
     "get_logs_from_agent": KernelExecutionFailed,
-    "refresh_session": KernelExecutionFailed,
     "commit_session": KernelExecutionFailed,
     "commit_session_to_file": KernelExecutionFailed,
     "trigger_batch_execution": KernelExecutionFailed,
 }
 
 
-KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
-    KernelStatus.PENDING: SessionStatus.PENDING,
-    KernelStatus.SCHEDULED: SessionStatus.SCHEDULED,
-    KernelStatus.PREPARING: SessionStatus.PREPARING,
-    KernelStatus.BUILDING: SessionStatus.PREPARING,
-    KernelStatus.PULLING: SessionStatus.PULLING,
-    KernelStatus.PREPARED: SessionStatus.PREPARED,
-    KernelStatus.CREATING: SessionStatus.CREATING,
-    KernelStatus.RUNNING: SessionStatus.RUNNING,
-    KernelStatus.RESTARTING: SessionStatus.RESTARTING,
-    KernelStatus.RESIZING: SessionStatus.RUNNING,
-    KernelStatus.SUSPENDED: SessionStatus.ERROR,
-    KernelStatus.TERMINATING: SessionStatus.TERMINATING,
-    KernelStatus.TERMINATED: SessionStatus.TERMINATED,
-    KernelStatus.ERROR: SessionStatus.ERROR,
-    KernelStatus.CANCELLED: SessionStatus.CANCELLED,
-}
-
-SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
-    SessionStatus.PENDING: KernelStatus.PENDING,
-    SessionStatus.SCHEDULED: KernelStatus.SCHEDULED,
-    SessionStatus.PREPARING: KernelStatus.PREPARING,
-    SessionStatus.PULLING: KernelStatus.PULLING,
-    SessionStatus.PREPARED: KernelStatus.PREPARED,
-    SessionStatus.CREATING: KernelStatus.CREATING,
-    SessionStatus.RUNNING: KernelStatus.RUNNING,
-    SessionStatus.RESTARTING: KernelStatus.RESTARTING,
-    SessionStatus.TERMINATING: KernelStatus.TERMINATING,
-    SessionStatus.TERMINATED: KernelStatus.TERMINATED,
-    SessionStatus.ERROR: KernelStatus.ERROR,
-    SessionStatus.CANCELLED: KernelStatus.CANCELLED,
-}
-
-SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
-    SessionStatus.PENDING: {
-        SessionStatus.SCHEDULED,
-        SessionStatus.ERROR,
-        SessionStatus.CANCELLED,
-    },
-    SessionStatus.SCHEDULED: {
-        SessionStatus.PREPARING,
-        SessionStatus.PULLING,
-        SessionStatus.PREPARED,
-        SessionStatus.ERROR,
-        SessionStatus.CANCELLED,
-    },
-    SessionStatus.PREPARING: {
-        SessionStatus.PULLING,
-        SessionStatus.PREPARED,
-        SessionStatus.ERROR,
-        SessionStatus.CANCELLED,
-    },
-    SessionStatus.PULLING: {
-        SessionStatus.PREPARED,
-        SessionStatus.ERROR,
-        SessionStatus.CANCELLED,
-    },
-    SessionStatus.PREPARED: {
-        SessionStatus.PREPARING,
-        SessionStatus.ERROR,
-        SessionStatus.CANCELLED,
-    },
-    SessionStatus.CREATING: {
-        SessionStatus.RUNNING,
-        SessionStatus.ERROR,
-        SessionStatus.CANCELLED,
-    },
-    SessionStatus.RUNNING: {
-        SessionStatus.RESTARTING,
-        SessionStatus.RUNNING_DEGRADED,
-        SessionStatus.TERMINATING,
-        SessionStatus.TERMINATED,
-        SessionStatus.ERROR,
-    },
-    SessionStatus.RESTARTING: {
-        SessionStatus.RUNNING,
-        SessionStatus.RUNNING_DEGRADED,
-        SessionStatus.TERMINATING,
-        SessionStatus.TERMINATED,
-        SessionStatus.ERROR,
-    },
-    SessionStatus.RUNNING_DEGRADED: {
-        SessionStatus.RUNNING,
-        SessionStatus.TERMINATING,
-        SessionStatus.TERMINATED,
-        SessionStatus.ERROR,
-    },
-    SessionStatus.TERMINATING: {SessionStatus.TERMINATED, SessionStatus.ERROR},
-    SessionStatus.TERMINATED: set(),
-    SessionStatus.ERROR: {SessionStatus.TERMINATING, SessionStatus.TERMINATED},
-    SessionStatus.CANCELLED: set(),
-}
-
-
-# TODO:
-def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> SessionStatus:
-    if not kernels:
-        raise KernelNotFound
-    candidate = KERNEL_SESSION_STATUS_MAPPING[kernels[0].status]
-    if len(kernels) == 1:
-        return candidate
-
-    for k in kernels:
-        match k.status:
-            case KernelStatus.ERROR:
-                # If any kernel status is ERROR, determines session status as ERROR
-                return SessionStatus.ERROR
-            case (
-                KernelStatus.BUILDING
-                | KernelStatus.RESTARTING
-                | KernelStatus.RESIZING
-                | KernelStatus.SUSPENDED
-            ):
-                raise RuntimeError("Status not used.")
-
-        match candidate:
-            case SessionStatus.PENDING:
-                match k.status:
-                    case KernelStatus.PENDING:
-                        continue
-                    case KernelStatus.CANCELLED:
-                        candidate = SessionStatus.CANCELLED
-                    case _:
-                        return SessionStatus.ERROR
-            case SessionStatus.SCHEDULED:
-                match k.status:
-                    case KernelStatus.SCHEDULED | KernelStatus.PREPARED:
-                        continue
-                    case KernelStatus.CANCELLED:
-                        candidate = SessionStatus.CANCELLED
-                    case KernelStatus.PULLING:
-                        candidate = SessionStatus.PULLING
-                    case _:
-                        return SessionStatus.ERROR
-            case SessionStatus.PREPARING:
-                match k.status:
-                    case KernelStatus.PREPARING | KernelStatus.PREPARED:
-                        continue
-                    case KernelStatus.PULLING:
-                        candidate = SessionStatus.PULLING
-                    case KernelStatus.CANCELLED:
-                        candidate = SessionStatus.CANCELLED
-                    case _:
-                        return SessionStatus.ERROR
-            case SessionStatus.PULLING:
-                match k.status:
-                    case KernelStatus.PULLING | KernelStatus.PREPARING | KernelStatus.PREPARED:
-                        continue
-                    case KernelStatus.CANCELLED:
-                        candidate = SessionStatus.CANCELLED
-                    case _:
-                        return SessionStatus.ERROR
-            case SessionStatus.PREPARED:
-                match k.status:
-                    case KernelStatus.PREPARED:
-                        continue
-                    case KernelStatus.PREPARING:
-                        candidate = SessionStatus.PREPARING
-                    case KernelStatus.PULLING:
-                        candidate = SessionStatus.PULLING
-                    case KernelStatus.CANCELLED:
-                        candidate = SessionStatus.CANCELLED
-                    case _:
-                        return SessionStatus.ERROR
-            case SessionStatus.CREATING:
-                match k.status:
-                    case KernelStatus.CREATING | KernelStatus.RUNNING:
-                        continue
-                    case KernelStatus.CANCELLED:
-                        candidate = SessionStatus.CANCELLED
-                    case _:
-                        # Set status to ERROR if any kernel is in exceptional state
-                        return SessionStatus.ERROR
-            case SessionStatus.CANCELLED:
-                match k.status:
-                    case (
-                        KernelStatus.CANCELLED
-                        | KernelStatus.PENDING
-                        | KernelStatus.SCHEDULED
-                        | KernelStatus.PREPARING
-                        | KernelStatus.PULLING
-                        | KernelStatus.PREPARED
-                    ):
-                        continue
-                    case _:
-                        return SessionStatus.ERROR
-            case SessionStatus.RUNNING:
-                match k.status:
-                    case KernelStatus.RUNNING:
-                        continue
-                    case KernelStatus.CREATING:
-                        candidate = SessionStatus.CREATING
-                    case _:
-                        return SessionStatus.ERROR
-            case SessionStatus.TERMINATING:
-                match k.status:
-                    case KernelStatus.TERMINATING | KernelStatus.TERMINATED:
-                        continue
-                    case _:
-                        return SessionStatus.ERROR
-            case SessionStatus.TERMINATED:
-                match k.status:
-                    case KernelStatus.TERMINATED:
-                        continue
-                    case KernelStatus.TERMINATING:
-                        candidate = SessionStatus.TERMINATING
-                    case _:
-                        return SessionStatus.ERROR
-            case SessionStatus.RESTARTING | SessionStatus.RUNNING_DEGRADED:
-                raise RuntimeError("Status not used.")
-    return candidate
-
-
 @actxmgr
 async def handle_session_exception(
-    db: ExtendedAsyncSAEngine,
     op: str,
-    session_id: SessionId,
     error_callback: Callable[[], Any] | None = None,
     cancellation_callback: Callable[[], Any] | None = None,
-    set_error: bool = False,
 ) -> AsyncIterator[None]:
+    """Translate per-op exceptions to the corresponding OP_EXC subclass.
+
+    Session status is not touched — sokovan's coordinator reconciles
+    session state from kernel events; error marking is not a manager
+    responsibility.
+    """
     exc_class = OP_EXC[op]
     try:
         yield
     except TimeoutError:
-        if set_error:
-            await SessionRow.set_session_status(
-                db,
-                session_id,
-                SessionStatus.ERROR,
-                reason=f"operation-timeout ({op})",
-            )
         if error_callback:
             await error_callback()
         raise exc_class("TIMEOUT") from None
@@ -451,42 +234,13 @@ async def handle_session_exception(
             await cancellation_callback()
         raise
     except AgentError as e:
-        if set_error:
-            await SessionRow.set_session_status(
-                db,
-                session_id,
-                SessionStatus.ERROR,
-                reason=f"agent-error ({e!r})",
-                status_data={
-                    "error": {
-                        "src": "agent",
-                        "agent_id": e.agent_id,
-                        "name": e.exc_name,
-                        "repr": e.exc_repr,
-                    },
-                },
-            )
         if error_callback:
             await error_callback()
         raise exc_class("FAILURE", e) from None
     except BackendAIError:
         # silently re-raise to make them handled by gateway http handlers
         raise
-    except Exception as e:
-        if set_error:
-            await SessionRow.set_session_status(
-                db,
-                session_id,
-                SessionStatus.ERROR,
-                reason=f"other-error ({e!r})",
-                status_data={
-                    "error": {
-                        "src": "other",
-                        "name": e.__class__.__name__,
-                        "repr": repr(e),
-                    },
-                },
-            )
+    except Exception:
         if error_callback:
             await error_callback()
         raise
@@ -610,19 +364,6 @@ class ConcurrencyUsed:
         }
 
 
-class SessionOp(enum.StrEnum):
-    CREATE = "create_session"
-    DESTROY = "destroy_session"
-    RESTART = "restart_session"
-    EXECUTE = "execute"
-    REFRESH = "refresh_session"
-    SHUTDOWN_SERVICE = "shutdown_service"
-    UPLOAD_FILE = "upload_file"
-    DOWNLOAD_FILE = "download_file"
-    LIST_FILE = "list_files"
-    GET_AGENT_LOGS = "get_logs_from_agent"
-
-
 class KernelLoadingStrategy(enum.StrEnum):
     ALL_KERNELS = "all"
     MAIN_KERNEL_ONLY = "main"
@@ -658,7 +399,9 @@ class SessionRow(Base):  # type: ignore[misc]
     creation_id: Mapped[str | None] = mapped_column(
         "creation_id", sa.String(length=32), unique=False, index=False
     )
-    name: Mapped[str | None] = mapped_column("name", sa.String(length=64), unique=False, index=True)
+    name: Mapped[str | None] = mapped_column(
+        "name", sa.String(length=128), unique=False, index=True
+    )
     session_type: Mapped[SessionTypes] = mapped_column(
         "session_type",
         StrEnumType(SessionTypes, use_name=True),
@@ -690,6 +433,17 @@ class SessionRow(Base):  # type: ignore[misc]
         server_default=ClusterMode.SINGLE_NODE.name,
     )
     cluster_size: Mapped[int] = mapped_column("cluster_size", sa.Integer, nullable=False, default=1)
+    # JSONB side of SessionOptions — only fields that do not map to a
+    # dedicated column (kernel_groups, timeouts, agent_selection_policy).
+    # Individual columns still carry priority / is_preemptible /
+    # cluster_mode / cluster_size / scaling_group_name /
+    # designated_agent_ids so pre-existing filters keep working.
+    options: Mapped[SessionStoredOptions] = mapped_column(
+        "options",
+        PydanticColumn(SessionStoredOptions),
+        nullable=False,
+        default=SessionStoredOptions,
+    )
     agent_ids: Mapped[list[str] | None] = mapped_column(
         "agent_ids", sa.ARRAY(sa.String), nullable=True
     )
@@ -738,8 +492,10 @@ class SessionRow(Base):  # type: ignore[misc]
         foreign_keys=[access_key],
     )
 
-    # `image` column is identical to kernels `image` column.
+    # `images` stores canonical image name strings for historical audit.
     images: Mapped[list[str] | None] = mapped_column("images", sa.ARRAY(sa.String), nullable=True)
+    # `image_ids` stores active references to ImageRow; SET NULL cascades from kernels.
+    image_ids: Mapped[list[UUID] | None] = mapped_column("image_ids", sa.ARRAY(GUID), nullable=True)
     tag: Mapped[str | None] = mapped_column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
@@ -808,7 +564,7 @@ class SessionRow(Base):  # type: ignore[misc]
     #         // an ISO 8601 formatted timestamp of the last attempt
     #     "failed_predicates": [
     #       { "name": "concurrency", "msg": "You cannot run more than 30 concurrent sessions." },
-    #           // see the manager.scheduler.predicates module for possible messages
+    #           // see the sokovan scheduler validator modules for possible messages
     #       ...
     #     ],
     #     "passed_predicates": [ {"name": "reserved_time"}, ... ],  // names only
@@ -841,7 +597,7 @@ class SessionRow(Base):  # type: ignore[misc]
     startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
     result: Mapped[SessionResult] = mapped_column(
         "result",
-        EnumType(SessionResult),
+        StrEnumType(SessionResult, use_name=True),
         default=SessionResult.UNDEFINED,
         server_default=SessionResult.UNDEFINED.name,
         nullable=False,
@@ -866,7 +622,27 @@ class SessionRow(Base):  # type: ignore[misc]
     Use `get_network_ref()` method to reveal actual network ref (generated by network plugin).
     """
 
-    routing: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="session_row")
+    # The routing replica (RoutingRow.id) this session serves, if any.
+    # FK to routings.id with ON DELETE SET NULL: when the replica's route row is
+    # deleted, this auto-clears instead of dangling. This forms an intentional
+    # nullable cycle with routings.session -> sessions.id; `use_alter` lets
+    # create_all() order the two tables, and the routing/session_row relationship
+    # below pins `foreign_keys` so SQLAlchemy can disambiguate the two FK paths.
+    replica_id: Mapped[UUID | None] = mapped_column(
+        "replica_id",
+        GUID,
+        sa.ForeignKey(
+            "routings.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_sessions_replica_id_routings",
+        ),
+        nullable=True,
+    )
+
+    routing: Mapped[list[RoutingRow]] = relationship(
+        "RoutingRow", back_populates="session_row", foreign_keys="RoutingRow.session"
+    )
 
     __table_args__ = (
         # indexing
@@ -924,6 +700,7 @@ class SessionRow(Base):  # type: ignore[misc]
             user_uuid=session_data.user_uuid,
             access_key=session_data.access_key,
             images=session_data.images,
+            image_ids=session_data.image_ids,
             tag=session_data.tag,
             occupying_slots=session_data.occupying_slots,
             requested_slots=session_data.requested_slots,
@@ -969,6 +746,7 @@ class SessionRow(Base):  # type: ignore[misc]
             user_uuid=self.user_uuid,
             access_key=AccessKey(self.access_key) if self.access_key else None,
             images=self.images,
+            image_ids=self.image_ids,
             tag=self.tag,
             occupying_slots=self.occupying_slots,
             requested_slots=self.requested_slots,
@@ -998,6 +776,7 @@ class SessionRow(Base):  # type: ignore[misc]
             if self.main_kernel.service_ports
             else None,
             owner=owner if owner is not None else None,
+            replica_id=self.replica_id,
         )
 
     @classmethod
@@ -1109,6 +888,7 @@ class SessionRow(Base):  # type: ignore[misc]
                 network_type=self.network_type,
                 network_id=self.network_id,
             ),
+            handler_options=self.options.handler_options,
         )
 
     @property
@@ -1210,25 +990,6 @@ class SessionRow(Base):  # type: ignore[misc]
             raise SessionNotFound(f"Session not found (id:{session_id})")
         return session_row
 
-    def determine_and_set_status(
-        self,
-        status_info: str | None = None,
-        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
-        status_changed_at: datetime | None = None,
-    ) -> bool:
-        """
-        Determine the current status of a session based on its sibling kernels.
-        If it is possible to transit from the current status to the determined status, set status.
-        Else, do nothing.
-        Return True if a transition happened, else return False.
-        """
-        determined_status = determine_session_status_by_kernels(self.kernels)
-        if determined_status not in SESSION_STATUS_TRANSITION_MAP[self.status]:
-            return False
-
-        self.set_status(determined_status, status_info, status_data, status_changed_at)
-        return True
-
     @classmethod
     async def list_session_by_condition(
         cls,
@@ -1249,39 +1010,6 @@ class SessionRow(Base):  # type: ignore[misc]
         async with db.connect() as db_conn:
             return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
 
-    def set_status(
-        self,
-        status: SessionStatus,
-        status_info: str | None = None,
-        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
-        status_changed_at: datetime | None = None,
-    ) -> None:
-        """
-        Set the status of the session.
-        """
-        now = status_changed_at or datetime.now(tzutc())
-        if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
-            self.terminated_at = now
-        self.status = status
-        self.status_history = {
-            **(self.status_history or {}),
-            status.name: now.isoformat(),
-        }
-        if status_data is not None:
-            if not isinstance(status_data, Mapping):
-                # It's a JSONCoalesceExpr, cannot assign directly to ORM attribute
-                pass
-            else:
-                self.status_data = dict(status_data)
-
-        _status_info: str | None = None
-        if status_info is None:
-            _status_info = self.main_kernel.status_info
-        else:
-            _status_info = status_info
-        if _status_info is not None:
-            self.status_info = _status_info
-
     def delegate_ownership(self, user_uuid: UUID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
@@ -1292,44 +1020,6 @@ class SessionRow(Base):  # type: ignore[misc]
     async def delete_by_user_id(user_uuid: UUID, *, db_session: SASession) -> None:
         await db_session.execute(sa.delete(KernelRow).where(KernelRow.user_uuid == user_uuid))
         await db_session.execute(sa.delete(SessionRow).where(SessionRow.user_uuid == user_uuid))
-
-    @staticmethod
-    async def set_session_status(
-        db: ExtendedAsyncSAEngine,
-        session_id: SessionId,
-        status: SessionStatus,
-        *,
-        status_data: Mapping[str, Any] | None = None,
-        reason: str | None = None,
-        status_changed_at: datetime | None = None,
-    ) -> None:
-        if status_changed_at is None:
-            now = datetime.now(tzutc())
-        else:
-            now = status_changed_at
-        data: dict[str, Any] = {
-            "status": status,
-            "status_history": sql_json_merge(
-                SessionRow.__table__.c.status_history,
-                (),
-                {
-                    status.name: datetime.now(tzutc()).isoformat(),
-                },
-            ),
-        }
-        if status_data is not None:
-            data["status_data"] = status_data
-        if reason is not None:
-            data["status_info"] = reason
-        if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
-            data["terminated_at"] = now
-
-        async def _update() -> None:
-            async with db.begin_session() as db_sess:
-                query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
-                await db_sess.execute(query)
-
-        await execute_with_retry(_update)
 
     @classmethod
     async def set_session_result(

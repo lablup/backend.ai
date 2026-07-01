@@ -110,6 +110,14 @@ class UserResourcePolicyNode(BaseResponseModel):
     max_vfolder_count: int = Field(
         description="Maximum number of vfolders a user can create.",
     )
+    max_concurrent_logins: int | None = Field(
+        default=None,
+        description=(
+            "Maximum number of concurrent authenticated login sessions per user."
+            " Null means unlimited."
+            " Distinct from keypair_resource_policies.max_concurrent_sessions which caps compute sessions."
+        ),
+    )
     max_quota_scope_size: BinarySizeInfo = Field(
         description="Maximum quota scope size.",
     )

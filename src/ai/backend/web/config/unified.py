@@ -23,12 +23,17 @@ from ai.backend.common.configs import (
 )
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
 )
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.web.clients.endpoint_pool import EndpointSelectionPolicy
 
 
 class ServiceMode(enum.StrEnum):
@@ -762,10 +767,20 @@ class CSPConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "CSP script-src directive. Specifies valid sources for JavaScript. "
-                "\"'unsafe-inline'\" allows inline scripts (less secure but often required). "
-                "\"'strict-dynamic'\" can be used with nonces for better security."
+                "Add \"'nonce'\" to opt in to a per-request nonce: the webserver replaces it "
+                "with \"'nonce-<random>'\" and renders the same value into index.html so inline "
+                "scripts there are allowed. Keep \"'self'\" and avoid \"'strict-dynamic'\" so the "
+                "bundled module script keeps loading. \"'unsafe-inline'\" allows inline scripts "
+                "instead (less secure); do NOT combine it with \"'nonce'\" since a browser ignores "
+                "\"'unsafe-inline'\" when a nonce is present, so the webserver drops the nonce in "
+                "that case. Other unsafe-* keywords (\"'unsafe-eval'\" etc.) are orthogonal and may "
+                "coexist with \"'nonce'\". Example: [\"'self'\", \"'nonce'\"]."
             ),
             added_version="25.12.0",
+            example=ConfigExample(
+                local="""["'self'", "'nonce'"]""",
+                prod="""["'self'", "'nonce'"]""",
+            ),
         ),
     ]
     style_src: Annotated[
@@ -778,10 +793,20 @@ class CSPConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "CSP style-src directive. Specifies valid sources for stylesheets. "
-                "\"'unsafe-inline'\" is often needed for frameworks that inject styles dynamically. "
-                "Consider using hashes or nonces for stricter security."
+                "Add \"'nonce'\" to opt in to a per-request nonce: the webserver replaces it "
+                "with \"'nonce-<random>'\" and renders the same value into index.html so nonce-aware "
+                "style injectors (e.g. antd via globalThis.baiNonce) are allowed. "
+                "\"'unsafe-inline'\" is often needed for frameworks that inject styles dynamically; "
+                "do NOT combine it with \"'nonce'\" since a browser ignores \"'unsafe-inline'\" when a "
+                "nonce is present, so the webserver drops the nonce in that case. Other unsafe-* "
+                "keywords are orthogonal and may coexist with \"'nonce'\". "
+                "Example: [\"'self'\", \"'nonce'\"]."
             ),
             added_version="25.12.0",
+            example=ConfigExample(
+                local="""["'self'", "'nonce'"]""",
+                prod="""["'self'", "'nonce'"]""",
+            ),
         ),
     ]
     frame_src: Annotated[
@@ -857,6 +882,24 @@ class SecurityConfig(BaseConfigSchema):
     request/response middleware policies, and other browser security headers.
     """
 
+    cookie_secure: Annotated[
+        bool,
+        Field(
+            default=True,
+            validation_alias=AliasChoices("cookie_secure", "cookie-secure"),
+            serialization_alias="cookie-secure",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Set the Secure flag on session cookies. When enabled, browsers will only "
+                "send session cookies over HTTPS connections. Should be true for production "
+                "environments where HTTPS is terminated at a reverse proxy or load balancer. "
+                "Set to false only for local development without HTTPS."
+            ),
+            added_version="26.4.3",
+            example=ConfigExample(local="false", prod="true"),
+        ),
+    ]
     request_policies: Annotated[
         list[str],
         Field(
@@ -896,7 +939,12 @@ class SecurityConfig(BaseConfigSchema):
             description=(
                 "Content Security Policy configuration. When set, adds CSP headers to responses "
                 "to protect against XSS and other injection attacks. Leave unset (None) to skip "
-                "CSP headers entirely."
+                "CSP headers entirely. Any directive that lists the \"'nonce'\" keyword opts in to a "
+                "per-request nonce: the webserver replaces the keyword with \"'nonce-<random>'\" and "
+                "renders the same value into index.html (the {{nonce}} placeholders / "
+                "globalThis.baiNonce). A directive that also lists \"'unsafe-inline'\" keeps that "
+                "source and drops the nonce (a browser ignores \"'unsafe-inline'\" when a nonce is "
+                "present); other unsafe-* keywords may coexist with the nonce."
             ),
             added_version="25.12.0",
             composite=CompositeType.FIELD,
@@ -1494,6 +1542,121 @@ class APIConfig(BaseConfigSchema):
             example=ConfigExample(local="50", prod="200"),
         ),
     ]
+    health_check_probe_path: Annotated[
+        str,
+        Field(
+            default="/health/readyz",
+            validation_alias=AliasChoices("health_check_probe_path", "health-check-probe-path"),
+            serialization_alias="health-check-probe-path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "HTTP path that the manager pool's background probe targets on each "
+                "Manager endpoint. Must return 2xx for the endpoint to be considered "
+                "ready to accept traffic. Default '/health/readyz' matches the "
+                "Backend.AI public readiness route — it requires the Manager's "
+                "gating dependencies (DB, etcd, Redis) to be up, so the webserver "
+                "does not forward requests to a half-broken Manager. Use "
+                "'/health/livez' if you only want a liveness signal."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="/health/readyz", prod="/health/readyz"),
+        ),
+    ]
+    health_check_interval: Annotated[
+        float,
+        Field(
+            default=10.0,
+            gt=0,
+            validation_alias=AliasChoices("health_check_interval", "health-check-interval"),
+            serialization_alias="health-check-interval",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds between background liveness probes per Manager endpoint. "
+                "Smaller values detect upstream failures faster at the cost of probe traffic."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="10.0", prod="10.0"),
+        ),
+    ]
+    health_check_failure_threshold: Annotated[
+        int,
+        Field(
+            default=3,
+            ge=1,
+            validation_alias=AliasChoices(
+                "health_check_failure_threshold", "health-check-failure-threshold"
+            ),
+            serialization_alias="health-check-failure-threshold",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Consecutive probe (or caller-reported) failures required before an "
+                "endpoint flips from healthy to unhealthy."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="3", prod="3"),
+        ),
+    ]
+    health_check_recovery_timeout: Annotated[
+        float,
+        Field(
+            default=60.0,
+            gt=0,
+            validation_alias=AliasChoices(
+                "health_check_recovery_timeout", "health-check-recovery-timeout"
+            ),
+            serialization_alias="health-check-recovery-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds the unhealthy_since timestamp is retained after an endpoint "
+                "is marked unhealthy. Reserved for future eviction policies; the "
+                "endpoint itself flips back to healthy on the next successful probe."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="60.0", prod="60.0"),
+        ),
+    ]
+    health_check_probe_timeout: Annotated[
+        float,
+        Field(
+            default=2.0,
+            gt=0,
+            validation_alias=AliasChoices(
+                "health_check_probe_timeout", "health-check-probe-timeout"
+            ),
+            serialization_alias="health-check-probe-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Per-endpoint HTTP probe timeout in seconds. Independent of "
+                "health-check-interval: the probe must finish within this window or "
+                "it counts as a failure."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="2.0", prod="2.0"),
+        ),
+    ]
+    endpoint_selection_policy: Annotated[
+        EndpointSelectionPolicy,
+        Field(
+            default=EndpointSelectionPolicy.ROUND_ROBIN,
+            validation_alias=AliasChoices("endpoint_selection_policy", "endpoint-selection-policy"),
+            serialization_alias="endpoint-selection-policy",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Selection policy ManagerClientPool uses to pick an endpoint per "
+                "request. 'round_robin' rotates across the healthy set; 'random' "
+                "picks uniformly; 'least_connections' favors the endpoint with the "
+                "fewest in-flight acquisitions."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="round_robin", prod="least_connections"),
+        ),
+    ]
 
 
 class RedisHelperConfig(BaseConfigSchema):
@@ -1872,6 +2035,111 @@ class ApolloRouterConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="http://127.0.0.1:4000", prod="http://apollo-router:4000"),
+        ),
+    ]
+    health_check_probe_path: Annotated[
+        str,
+        Field(
+            default="/readiness",
+            validation_alias=AliasChoices("health_check_probe_path", "health-check-probe-path"),
+            serialization_alias="health-check-probe-path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "HTTP path that the Apollo Router pool's background probe targets "
+                "on each upstream. Must return 2xx for the endpoint to be considered "
+                "ready to accept traffic. Default '/readiness' matches the GraphQL "
+                "Hive Gateway readiness route — it requires the federated supergraph "
+                "to be loaded, so the webserver does not forward GraphQL traffic to "
+                "a gateway that is still starting up. Apollo Router (Rust) deployments "
+                "typically expose '/health/readiness' instead; switch via this option."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="/readiness", prod="/readiness"),
+        ),
+    ]
+    health_check_interval: Annotated[
+        float,
+        Field(
+            default=10.0,
+            gt=0,
+            validation_alias=AliasChoices("health_check_interval", "health-check-interval"),
+            serialization_alias="health-check-interval",
+        ),
+        BackendAIConfigMeta(
+            description="Seconds between background liveness probes per Apollo Router endpoint.",
+            added_version="26.4.4",
+            example=ConfigExample(local="10.0", prod="10.0"),
+        ),
+    ]
+    health_check_failure_threshold: Annotated[
+        int,
+        Field(
+            default=3,
+            ge=1,
+            validation_alias=AliasChoices(
+                "health_check_failure_threshold", "health-check-failure-threshold"
+            ),
+            serialization_alias="health-check-failure-threshold",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Consecutive probe (or caller-reported) failures required before an "
+                "Apollo Router endpoint flips from healthy to unhealthy."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="3", prod="3"),
+        ),
+    ]
+    health_check_recovery_timeout: Annotated[
+        float,
+        Field(
+            default=60.0,
+            gt=0,
+            validation_alias=AliasChoices(
+                "health_check_recovery_timeout", "health-check-recovery-timeout"
+            ),
+            serialization_alias="health-check-recovery-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds the unhealthy_since timestamp is retained after an Apollo "
+                "Router endpoint is marked unhealthy."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="60.0", prod="60.0"),
+        ),
+    ]
+    health_check_probe_timeout: Annotated[
+        float,
+        Field(
+            default=2.0,
+            gt=0,
+            validation_alias=AliasChoices(
+                "health_check_probe_timeout", "health-check-probe-timeout"
+            ),
+            serialization_alias="health-check-probe-timeout",
+        ),
+        BackendAIConfigMeta(
+            description="Per-endpoint HTTP probe timeout in seconds for Apollo Router.",
+            added_version="26.4.4",
+            example=ConfigExample(local="2.0", prod="2.0"),
+        ),
+    ]
+    endpoint_selection_policy: Annotated[
+        EndpointSelectionPolicy,
+        Field(
+            default=EndpointSelectionPolicy.ROUND_ROBIN,
+            validation_alias=AliasChoices("endpoint_selection_policy", "endpoint-selection-policy"),
+            serialization_alias="endpoint-selection-policy",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Selection policy ApolloRouterClientPool uses to pick an Apollo Router "
+                "endpoint per request."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="round_robin", prod="least_connections"),
         ),
     ]
 

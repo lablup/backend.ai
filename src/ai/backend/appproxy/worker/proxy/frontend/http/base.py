@@ -4,9 +4,10 @@ import time
 import aiohttp_jinja2
 import jwt
 from aiohttp import web
+from aiohttp_remotes import XForwardedStrict
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
-from ai.backend.appproxy.common.errors import InvalidCredentials
+from ai.backend.appproxy.common.errors import ClientIPNotAllowed, InvalidCredentials
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
@@ -25,6 +26,27 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TCircuitKeyType]):
     root_context: RootContext
+    _xff_strict: XForwardedStrict | None
+
+    def __init__(self, root_context: RootContext) -> None:
+        super().__init__(root_context)
+        # With trusted proxies set, an XForwardedStrict middleware resolves request.remote from X-Forwarded-For.
+        # Empty means directly exposed — no middleware.
+        trusted_proxies = root_context.local_config.proxy_worker.trusted_proxies
+        self._xff_strict = XForwardedStrict([list(trusted_proxies)]) if trusted_proxies else None
+
+    def ensure_allowed_ip(self, request: web.Request, circuit: Circuit) -> None:
+        validator = circuit.ip_validator
+        if not validator.is_restricted:
+            return
+        client_ip = request.remote
+        if not client_ip or not validator.is_allowed(client_ip):
+            log.debug(
+                "rejecting client {} for circuit {} (not in allowed_client_ips)",
+                client_ip,
+                circuit.id,
+            )
+            raise ClientIPNotAllowed("E20011: Client address not allowed")
 
     def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:
         if circuit.open_to_public or request.method == "OPTIONS":

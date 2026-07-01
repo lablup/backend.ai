@@ -7,12 +7,19 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
+from ai.backend.manager.data.sokovan import AgentInfo
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.roundrobin import (
     RoundRobinAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,
@@ -51,7 +58,7 @@ class TestRoundRobinAgentSelector:
         return ResourceRequirements(
             requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
-            kernel_ids=[uuid.uuid4()],
+            kernel_ids=[KernelId(uuid.uuid4())],
         )
 
     def test_sequential_selection(

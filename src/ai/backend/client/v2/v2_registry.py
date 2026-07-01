@@ -16,7 +16,8 @@ from .config import ClientConfig
 
 if TYPE_CHECKING:
     from .domains_v2.agent import V2AgentClient
-    from .domains_v2.app_config import V2AppConfigClient
+    from .domains_v2.app_config_allow_list import V2AppConfigAllowListClient
+    from .domains_v2.app_config_definition import V2AppConfigDefinitionClient
     from .domains_v2.artifact import V2ArtifactClient
     from .domains_v2.artifact_registry import V2ArtifactRegistryClient
     from .domains_v2.audit_log import V2AuditLogClient
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
     from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
     from .domains_v2.image import V2ImageClient
     from .domains_v2.keypair import V2KeypairClient
+    from .domains_v2.login_client_type import V2LoginClientTypeClient
     from .domains_v2.login_history import V2LoginHistoryClient
     from .domains_v2.login_session import V2LoginSessionClient
     from .domains_v2.model_card import V2ModelCardClient
@@ -37,6 +39,7 @@ if TYPE_CHECKING:
     from .domains_v2.object_storage import V2ObjectStorageClient
     from .domains_v2.project import V2ProjectClient
     from .domains_v2.prometheus_query_preset import V2PrometheusQueryPresetClient
+    from .domains_v2.prometheus_query_preset_category import V2PrometheusQueryPresetCategoryClient
     from .domains_v2.rbac import V2RBACClient
     from .domains_v2.reservoir_registry import V2ReservoirRegistryClient
     from .domains_v2.resource_allocation import V2ResourceAllocationClient
@@ -45,11 +48,15 @@ if TYPE_CHECKING:
     from .domains_v2.resource_preset import V2ResourcePresetClient
     from .domains_v2.resource_slot import V2ResourceSlotClient
     from .domains_v2.resource_usage import V2ResourceUsageClient
+    from .domains_v2.role_invitation import V2RoleInvitationClient
+    from .domains_v2.role_preset import V2RolePresetClient
     from .domains_v2.runtime_variant import V2RuntimeVariantClient
     from .domains_v2.runtime_variant_preset import V2RuntimeVariantPresetClient
+    from .domains_v2.scheduling_handler import V2SchedulingHandlerClient
     from .domains_v2.scheduling_history import V2SchedulingHistoryClient
     from .domains_v2.service_catalog import V2ServiceCatalogClient
     from .domains_v2.session import V2SessionClient
+    from .domains_v2.storage_host import V2StorageHostClient
     from .domains_v2.storage_namespace import V2StorageNamespaceClient
     from .domains_v2.user import V2UserClient
     from .domains_v2.vfolder import V2VFolderClient
@@ -85,10 +92,16 @@ class V2ClientRegistry:
         return V2AgentClient(self._client)
 
     @cached_property
-    def app_config(self) -> V2AppConfigClient:
-        from .domains_v2.app_config import V2AppConfigClient
+    def app_config_allow_list(self) -> V2AppConfigAllowListClient:
+        from .domains_v2.app_config_allow_list import V2AppConfigAllowListClient
 
-        return V2AppConfigClient(self._client)
+        return V2AppConfigAllowListClient(self._client)
+
+    @cached_property
+    def app_config_definition(self) -> V2AppConfigDefinitionClient:
+        from .domains_v2.app_config_definition import V2AppConfigDefinitionClient
+
+        return V2AppConfigDefinitionClient(self._client)
 
     @cached_property
     def artifact(self) -> V2ArtifactClient:
@@ -163,6 +176,12 @@ class V2ClientRegistry:
         return V2KeypairClient(self._client)
 
     @cached_property
+    def login_client_type(self) -> V2LoginClientTypeClient:
+        from .domains_v2.login_client_type import V2LoginClientTypeClient
+
+        return V2LoginClientTypeClient(self._client)
+
+    @cached_property
     def login_history(self) -> V2LoginHistoryClient:
         from .domains_v2.login_history import V2LoginHistoryClient
 
@@ -199,10 +218,30 @@ class V2ClientRegistry:
         return V2ProjectClient(self._client)
 
     @cached_property
+    def role_invitation(self) -> V2RoleInvitationClient:
+        from .domains_v2.role_invitation import V2RoleInvitationClient
+
+        return V2RoleInvitationClient(self._client)
+
+    @cached_property
+    def role_preset(self) -> V2RolePresetClient:
+        from .domains_v2.role_preset import V2RolePresetClient
+
+        return V2RolePresetClient(self._client)
+
+    @cached_property
     def prometheus_query_preset(self) -> V2PrometheusQueryPresetClient:
         from .domains_v2.prometheus_query_preset import V2PrometheusQueryPresetClient
 
         return V2PrometheusQueryPresetClient(self._client)
+
+    @cached_property
+    def prometheus_query_preset_category(self) -> V2PrometheusQueryPresetCategoryClient:
+        from .domains_v2.prometheus_query_preset_category import (
+            V2PrometheusQueryPresetCategoryClient,
+        )
+
+        return V2PrometheusQueryPresetCategoryClient(self._client)
 
     @cached_property
     def rbac(self) -> V2RBACClient:
@@ -271,6 +310,12 @@ class V2ClientRegistry:
         return V2ResourceUsageClient(self._client)
 
     @cached_property
+    def scheduling_handler(self) -> V2SchedulingHandlerClient:
+        from .domains_v2.scheduling_handler import V2SchedulingHandlerClient
+
+        return V2SchedulingHandlerClient(self._client)
+
+    @cached_property
     def scheduling_history(self) -> V2SchedulingHistoryClient:
         from .domains_v2.scheduling_history import V2SchedulingHistoryClient
 
@@ -287,6 +332,12 @@ class V2ClientRegistry:
         from .domains_v2.session import V2SessionClient
 
         return V2SessionClient(self._client)
+
+    @cached_property
+    def storage_host(self) -> V2StorageHostClient:
+        from .domains_v2.storage_host import V2StorageHostClient
+
+        return V2StorageHostClient(self._client)
 
     @cached_property
     def storage_namespace(self) -> V2StorageNamespaceClient:

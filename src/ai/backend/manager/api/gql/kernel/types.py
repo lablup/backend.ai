@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
+from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
@@ -56,6 +57,7 @@ from ai.backend.manager.api.gql.common.types import (
 )
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
+from ai.backend.manager.api.gql.image.types import ImageV2GQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
@@ -99,8 +101,12 @@ class KernelV2OrderFieldGQL(StrEnum):
     name="KernelV2StatusFilter",
 )
 class KernelV2StatusFilterGQL(PydanticInputMixin[KernelStatusFilter]):
+    equals: KernelV2StatusGQL | None = None
     in_: list[KernelV2StatusGQL] | None = gql_field(
         description="The in  field.", name="in", default=None
+    )
+    not_equals: KernelV2StatusGQL | None = gql_field(
+        description="Excludes exact status match.", name="notEquals", default=None
     )
     not_in: list[KernelV2StatusGQL] | None = None
 
@@ -294,6 +300,9 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     """Kernel type representing a compute container."""
 
     id: NodeID[str]
+    image_id: strawberry.ID | None = gql_field(
+        description="The UUID of the image used by this kernel. Null if the image has been purged.",
+    )
 
     # Inlined fields (from single-element types)
     startup_command: str | None = gql_field(
@@ -328,6 +337,20 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         if agent_data is None:
             return None
         return agent_data
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.3",
+            description="The image used by this kernel.",
+        )
+    )  # type: ignore[misc]
+    async def image(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> ImageV2GQL | None:
+        if self.image_id is None:
+            return None
+        return await info.context.data_loaders.image_loader.load(ImageID(UUID(str(self.image_id))))
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.2.0", description="The user who owns this kernel.")
@@ -379,6 +402,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     )  # type: ignore[misc]
     async def session(
         self,
+        info: Info[StrawberryGQLContext],
     ) -> (
         Annotated[
             SessionV2GQL,
@@ -386,7 +410,11 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         ]
         | None
     ):
-        raise NotImplementedError
+        from ai.backend.common.types import SessionId
+
+        return await info.context.data_loaders.session_loader.load(
+            SessionId(self.session_info.session_id)
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -414,10 +442,13 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         before: str | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> Annotated[
-        ResourceAllocationConnectionGQL,
-        strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
-    ]:
+    ) -> (
+        Annotated[
+            ResourceAllocationConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+        ]
+        | None
+    ):
         """Fetch per-slot resource allocation for this kernel."""
         import uuid as _uuid
         from decimal import Decimal

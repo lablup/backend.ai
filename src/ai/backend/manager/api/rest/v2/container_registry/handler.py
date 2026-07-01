@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
+    from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -1,12 +1,11 @@
 from dataclasses import dataclass
 from typing import Self
 
-from pydantic import BaseModel
-
 from ai.backend.common.arch import arch_name_aliases
+from ai.backend.common.types import BackendAISchema
 
 
-class InstalledImageInfo(BaseModel):
+class InstalledImageInfo(BackendAISchema):
     """ "
     Information about an installed image on an agent.
     Attributes:

@@ -43,5 +43,7 @@ class KernelStatusEnum(StrEnum):
 class KernelStatusFilter(BaseRequestModel):
     """Filter for kernel status values."""
 
+    equals: KernelStatusEnum | None = None
     in_: list[KernelStatusEnum] | None = None
+    not_equals: KernelStatusEnum | None = None
     not_in: list[KernelStatusEnum] | None = None

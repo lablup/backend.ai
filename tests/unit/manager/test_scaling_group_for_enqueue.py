@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.types import AccessKey, SessionTypes
 from ai.backend.manager.errors.resource import (
     ScalingGroupNotFound,
@@ -38,7 +39,7 @@ async def test_allowed_session_types_check(mock_query: MagicMock) -> None:
     # Test fixtures
     test_access_key = AccessKey("AKIAIOSFODNN7EXAMPLE")
     test_domain_name = "test-domain"
-    test_group_id = UUID("12345678-1234-5678-1234-567812345678")
+    test_group_id = ProjectID(UUID("12345678-1234-5678-1234-567812345678"))
 
     # Preferred scaling group with one match in allowed sgroups
 

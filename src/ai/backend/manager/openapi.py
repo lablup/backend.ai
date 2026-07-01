@@ -15,9 +15,10 @@ from trafaret.lib import _empty
 import ai.backend.common.validators as tx
 from ai.backend.common.api_handlers import BodyParam, PathParam, QueryParam
 from ai.backend.common.json import pretty_json_str
+from ai.backend.common.types import BackendAISchema
 from ai.backend.manager import __version__
-from ai.backend.manager.api import ManagerStatus
-from ai.backend.manager.api.utils import Undefined, undefined
+from ai.backend.manager.data.common.sentinel import Undefined, undefined
+from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
 
 
@@ -216,7 +217,9 @@ def parse_trafaret_definition(root: t.Dict) -> list[dict[str, Any]]:
 
 def extract_api_handler_params(
     handler: Any,
-) -> tuple[type[BaseModel] | None, type[BaseModel] | None, type[BaseModel] | None]:
+) -> tuple[
+    type[BackendAISchema] | None, type[BackendAISchema] | None, type[BackendAISchema] | None
+]:
     """
     Extract Pydantic models from @api_handler decorated functions.
 
@@ -227,9 +230,9 @@ def extract_api_handler_params(
     Returns:
         tuple of (body_model, query_model, path_model) - any can be None if not present
     """
-    body_model: type[BaseModel] | None = None
-    query_model: type[BaseModel] | None = None
-    path_model: type[BaseModel] | None = None
+    body_model: type[BackendAISchema] | None = None
+    query_model: type[BackendAISchema] | None = None
+    path_model: type[BackendAISchema] | None = None
 
     try:
         type_hints = get_type_hints(handler)
@@ -249,7 +252,7 @@ def extract_api_handler_params(
             continue
 
         model = args[0]
-        if not (isinstance(model, type) and issubclass(model, BaseModel)):
+        if not (isinstance(model, type) and issubclass(model, BackendAISchema)):
             continue
 
         if origin is BodyParam:
@@ -498,7 +501,7 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
                 response_schema: dict[str, Any]
                 if issubclass(response_cls, list):
                     # Handle list[SomeModel] return type
-                    arg: type[BaseModel]
+                    arg: type[BackendAISchema]
                     (arg,) = get_args(ret_type)
                     schema_name = f"{arg.__name__}_List"
                     response_schema = TypeAdapter(list[arg]).json_schema(  # type: ignore[valid-type]

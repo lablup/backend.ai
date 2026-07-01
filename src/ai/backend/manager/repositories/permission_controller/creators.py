@@ -12,6 +12,7 @@ from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
 from ai.backend.manager.data.permission.types import (
     OperationType,
+    Permission,
     RoleSource,
 )
 from ai.backend.manager.errors.permission import RoleAlreadyAssigned
@@ -39,6 +40,7 @@ class RoleCreatorSpec(CreatorSpec[RoleRow]):
     source: RoleSource
     status: RoleStatus
     description: str | None = None
+    auto_assign: bool = False
 
     @override
     def build_row(self) -> RoleRow:
@@ -47,6 +49,7 @@ class RoleCreatorSpec(CreatorSpec[RoleRow]):
             source=self.source,
             status=self.status,
             description=self.description,
+            auto_assign=self.auto_assign,
         )
 
 
@@ -68,6 +71,7 @@ class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
             scope_id=self.scope_id,
             entity_type=self.entity_type.to_entity_type(),
             operation=self.operation,
+            permission=Permission.from_operation(self.operation),
         )
 
 

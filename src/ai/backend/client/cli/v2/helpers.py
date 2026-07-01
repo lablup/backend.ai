@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
+import click
+from pydantic import TypeAdapter, ValidationError
 from yarl import URL
 
 if TYPE_CHECKING:
@@ -39,7 +43,7 @@ class V2ConnectionConfig:
     secret_key: str | None
     api_version: str
     skip_ssl_verification: bool = False
-    cookie_jar: aiohttp.CookieJar | None = field(default=None)
+    cookie_file: Path | None = field(default=None)
 
 
 def load_v2_config() -> V2ConnectionConfig:
@@ -79,14 +83,11 @@ def load_v2_config() -> V2ConnectionConfig:
     if env_sk := os.environ.get("BACKEND_SECRET_KEY"):
         secret_key = env_sk
 
-    # Load session cookie if endpoint_type is "session"
-    cookie_jar = None
+    # Defer cookie jar creation to async context (aiohttp >=3.13 requires event loop)
+    cookie_file = None
     endpoint_type = str(cfg["endpoint_type"])
     if endpoint_type == "session" and COOKIE_FILE.exists():
-        import aiohttp
-
-        cookie_jar = aiohttp.CookieJar(unsafe=True)
-        cookie_jar.load(COOKIE_FILE)
+        cookie_file = COOKIE_FILE
 
     return V2ConnectionConfig(
         endpoint=URL(str(cfg["endpoint"])),
@@ -95,7 +96,7 @@ def load_v2_config() -> V2ConnectionConfig:
         secret_key=secret_key,
         api_version=str(cfg["api_version"]),
         skip_ssl_verification=bool(cfg.get("skip_ssl_verification", False)),
-        cookie_jar=cookie_jar,
+        cookie_file=cookie_file,
     )
 
 
@@ -105,12 +106,17 @@ async def create_v2_registry(config: V2ConnectionConfig) -> V2ClientRegistry:
     from ai.backend.client.v2.config import ClientConfig
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
+    cookie_jar: aiohttp.CookieJar | None = None
+    if config.cookie_file is not None:
+        cookie_jar = aiohttp.CookieJar(unsafe=True)
+        cookie_jar.load(config.cookie_file)
+
     client_config = ClientConfig(
         endpoint=config.endpoint,
         endpoint_type=config.endpoint_type,
         api_version=config.api_version,
         skip_ssl_verification=config.skip_ssl_verification,
-        cookie_jar=config.cookie_jar,
+        cookie_jar=cookie_jar,
     )
 
     if config.endpoint_type == "session":
@@ -152,6 +158,57 @@ def parse_order_options(
             )
         )
     return orders
+
+
+def load_model[T](payload: str, model: type[T]) -> T:
+    """Parse a JSON string or ``@file`` path and validate it against *model*.
+
+    *payload* is either a raw JSON string or ``@<path>`` pointing to a JSON file.
+    *model* is any type usable with Pydantic ``TypeAdapter`` — a model class or a
+    parametrized form such as ``list[Entry]``. Exits with an error message on
+    malformed JSON or validation failure.
+    """
+    if payload.startswith("@"):
+        path = payload[1:]
+        try:
+            raw = Path(path).read_text()
+        except OSError as e:
+            click.echo(f"Cannot read file {path}: {e}", err=True)
+            sys.exit(1)
+    else:
+        raw = payload
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        click.echo(f"Invalid JSON: {e}", err=True)
+        sys.exit(1)
+
+    try:
+        return TypeAdapter(model).validate_python(data)
+    except ValidationError as e:
+        click.echo(f"Invalid input: {e}", err=True)
+        sys.exit(1)
+
+
+def run_async(coro_fn: Callable[[], Awaitable[None]]) -> None:
+    """Run an async function, translating SDK errors into clean CLI output.
+
+    On ``BackendAPIError`` the gateway's error detail is printed to stderr and
+    the process exits with code 1, instead of leaking a traceback.
+    """
+    from ai.backend.client.exceptions import BackendAPIError
+
+    try:
+        asyncio.run(coro_fn())
+    except BackendAPIError as e:
+        data = e.args[2] if len(e.args) > 2 else {}
+        title = data.get("title", "") if isinstance(data, dict) else ""
+        msg = data.get("msg", "") if isinstance(data, dict) else ""
+        status = e.args[0] if e.args else "?"
+        detail = title or msg or str(e)
+        click.echo(f"Error ({status}): {detail}", err=True)
+        sys.exit(1)
 
 
 def print_result(data: Any) -> None:

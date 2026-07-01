@@ -1,5 +1,14 @@
 """Prometheus query preset GQL types."""
 
+from .category import (
+    CategoryFilterGQL,
+    CategoryGQL,
+    CategoryOrderByGQL,
+    CategoryOrderFieldGQL,
+    CreateCategoryInputGQL,
+    CreateCategoryPayloadGQL,
+    DeleteCategoryPayloadGQL,
+)
 from .filters import (
     QueryDefinitionFilter,
     QueryDefinitionOrderBy,
@@ -10,6 +19,7 @@ from .inputs import (
     ExecuteQueryDefinitionOptionsInput,
     MetricLabelEntryInput,
     ModifyQueryDefinitionInput,
+    PreviewQueryDefinitionInputGQL,
     QueryTimeRangeInput,
 )
 from .node import (
@@ -29,6 +39,14 @@ from .payloads import (
 )
 
 __all__ = [
+    # Category types
+    "CategoryGQL",
+    "CategoryFilterGQL",
+    "CategoryOrderByGQL",
+    "CategoryOrderFieldGQL",
+    "CreateCategoryInputGQL",
+    "CreateCategoryPayloadGQL",
+    "DeleteCategoryPayloadGQL",
     # Node types
     "QueryDefinitionGQL",
     "QueryDefinitionEdge",
@@ -43,6 +61,7 @@ __all__ = [
     "QueryTimeRangeInput",
     "MetricLabelEntryInput",
     "ExecuteQueryDefinitionOptionsInput",
+    "PreviewQueryDefinitionInputGQL",
     # Payload and result types
     "QueryDefinitionOptionsGQL",
     "MetricLabelEntryGQL",

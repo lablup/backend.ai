@@ -39,10 +39,9 @@ from aiohttp.typedefs import Handler
 from pydantic import Field, TypeAdapter, ValidationError
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
-from ai.backend.common.json import load_json
+from ai.backend.common.exception import BackendAISchemaValidationFailed, DeprecatedAPI
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import (
-    DeprecatedAPI,
     InvalidAPIParameters,
     NotImplementedAPI,
 )
@@ -223,13 +222,15 @@ def pydantic_params_api_handler[
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError) as e:
                 raise InvalidAPIParameters("Malformed body") from e
-            except ValidationError as ex:
+            except (BackendAISchemaValidationFailed, ValidationError) as ex:
+                # ``ValidationError`` covers plain ``BaseModel`` subclasses that
+                # skip the ``BackendAISchema`` auto-conversion override.
+                # Format the first validation error as the message; the client
+                # may refer to ``extra_data["errors"]`` for the full list.
                 first_error = ex.errors()[0]
-                # Format the first validation error as the message
-                # The client may refer extra_data to access the full validation errors.
-                metadata = {
-                    "input": first_error["input"],
-                }
+                metadata: dict[str, Any] = {}
+                if (input_val := first_error.get("input")) is not None:
+                    metadata["input"] = input_val
                 if loc := first_error["loc"]:
                     metadata["loc"] = loc[0]
                 metadata_formatted_items = [
@@ -237,8 +238,7 @@ def pydantic_params_api_handler[
                     *(f"{k}={v!r}" for k, v in metadata.items()),
                 ]
                 msg = f"{first_error['msg']} [{', '.join(metadata_formatted_items)}]"
-                # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
-                raise InvalidAPIParameters(msg, extra_data=load_json(ex.json())) from ex
+                raise InvalidAPIParameters(msg, extra_data={"errors": ex.errors()}) from ex
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 
@@ -428,19 +428,3 @@ async def call_non_bursty(
             return await coro()
         return coro()
     return None
-
-
-class Singleton(type):
-    _instances: MutableMapping[Any, Any] = {}
-
-    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
-        if cls not in cls._instances:
-            cls._instances[cls] = super().__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class Undefined(metaclass=Singleton):
-    pass
-
-
-undefined = Undefined()
