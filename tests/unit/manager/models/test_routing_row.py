@@ -9,15 +9,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.routing.row import RoutingRow
 
-# Importing testutils.db registers the manager ORM relationship cluster on the
-# SQLAlchemy registry. Instantiating RoutingRow below triggers global mapper
-# configuration, which resolves string relationships (e.g. "EndpointRow") that
-# routing/row.py imports only under TYPE_CHECKING. Listed in __all__ so the
-# side-effect import is not pruned.
-from ai.backend.testutils import db as _register_orm_cluster
-
-__all__ = ["_register_orm_cluster"]
-
 
 def test_to_route_info_carries_replica_group_id() -> None:
     replica_group_id = ReplicaGroupID(uuid.uuid4())

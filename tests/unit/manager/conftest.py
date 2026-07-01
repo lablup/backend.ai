@@ -18,14 +18,144 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+
+# Import the manager ORM relationship cluster reachable from DomainRow so that
+# SQLAlchemy mapper configuration succeeds for manager unit tests. Instantiating
+# or querying any Row in this cluster triggers a global configure_mappers(), which
+# resolves string-based relationships (e.g. DomainRow -> "ScalingGroupForDomainRow")
+# only if every reachable Row has been imported. Registration happens here, in
+# manager test code, rather than in the shared ai.backend.testutils package.
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.association_container_registries_groups.row import (
+    AssociationContainerRegistriesGroupsRow,
+)
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import (
+    EndpointAutoScalingRuleRow,
+    EndpointRow,
+    EndpointTokenRow,
+)
+from ai.backend.manager.models.fair_share.row import (
+    DomainFairShareRow,
+    ProjectFairShareRow,
+    UserFairShareRow,
+)
+from ai.backend.manager.models.group.row import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.network.row import NetworkRow
+from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.resource_slot.row import (
+    AgentResourceRow,
+    DeploymentRevisionResourceSlotRow,
+    ResourceSlotTypeRow,
+)
+from ai.backend.manager.models.resource_usage_history.row import (
+    DomainUsageBucketRow,
+    KernelUsageRecordRow,
+    ProjectUsageBucketRow,
+    UserUsageBucketRow,
+)
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.scaling_group.row import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupRow,
+)
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.row import (
+    VFolderInvitationRow,
+    VFolderPermissionRow,
+    VFolderRow,
+)
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
     redis_container,
 )
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
+
+# Referencing the imported Row classes keeps the registration imports above from
+# being pruned as unused; the tuple itself is not used at runtime.
+_REGISTERED_ROW_MODELS = (
+    AgentResourceRow,
+    AgentRow,
+    AssocGroupUserRow,
+    AssociationContainerRegistriesGroupsRow,
+    AssociationScopesEntitiesRow,
+    ContainerRegistryRow,
+    DeploymentAutoScalingPolicyRow,
+    DeploymentPolicyRow,
+    DeploymentRevisionResourceSlotRow,
+    DeploymentRevisionRow,
+    DomainFairShareRow,
+    DomainRow,
+    DomainUsageBucketRow,
+    EndpointAutoScalingRuleRow,
+    EndpointRow,
+    EndpointTokenRow,
+    GroupRow,
+    ImageAliasRow,
+    ImageRow,
+    KernelRow,
+    KernelUsageRecordRow,
+    KeyPairResourcePolicyRow,
+    KeyPairRow,
+    NetworkRow,
+    NotificationChannelRow,
+    NotificationRuleRow,
+    ObjectPermissionRow,
+    ProjectFairShareRow,
+    ProjectResourcePolicyRow,
+    ProjectUsageBucketRow,
+    ReplicaGroupRow,
+    ResourcePresetRow,
+    ResourceSlotTypeRow,
+    RoleRow,
+    RoutingRow,
+    RuntimeVariantPresetRow,
+    RuntimeVariantRow,
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupRow,
+    SessionRow,
+    UserFairShareRow,
+    UserResourcePolicyRow,
+    UserRoleRow,
+    UserRow,
+    UserUsageBucketRow,
+    VFolderInvitationRow,
+    VFolderPermissionRow,
+    VFolderRow,
+)
 
 
 def create_test_password_info(password: str = "test_password") -> PasswordInfo:
@@ -146,12 +276,6 @@ def domain_factory() -> DomainFactory:
     exposes both ``domain_name`` and ``domain_id`` so call sites are ready for
     the upcoming domain PK migration to UUID.
     """
-    # Imported lazily so that merely loading this shared conftest does not register
-    # DomainRow on the global SQLAlchemy registry. DomainRow has string-based
-    # relationships (e.g. "ScalingGroupForDomainRow") that only resolve when the
-    # whole model graph is imported; registering it for tests that never use a
-    # domain would break their mapper configuration when run in isolation.
-    from ai.backend.manager.models.domain import domains
 
     async def _create(
         engine: ExtendedAsyncSAEngine,
