@@ -69,10 +69,10 @@ class SessionIdentity(_SpecBaseModel):
 class SessionScope(_SpecBaseModel):
     """Ownership / placement scope of the session."""
 
-    domain_id: DomainID | None = None
+    domain_id: DomainID
     domain_name: DomainName
     project_id: ProjectID
-    resource_group_id: ResourceGroupID | None = None
+    resource_group_id: ResourceGroupID
     resource_group_name: ResourceGroupName
 
 

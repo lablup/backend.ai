@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionOrderField,
     SessionStatusFilter,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 
 __all__ = (
     "AdminSearchSessionsInput",
@@ -303,7 +304,7 @@ class EnqueueSessionInput(BaseRequestModel):
         default=None,
         description="Deprecated since 26.7.0. Use resource_group_id instead. Scaling group name.",
     )
-    resource_group_id: UUID | None = Field(
+    resource_group_id: ResourceGroupID | None = Field(
         default=None, description="Resource group UUID. Auto-selected if omitted."
     )
     resource_opts: ResourceOptsInput | None = Field(

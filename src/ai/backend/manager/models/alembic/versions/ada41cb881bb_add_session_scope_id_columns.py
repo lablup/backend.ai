@@ -43,9 +43,30 @@ def upgrade() -> None:
           AND sessions.resource_group_id IS NULL
         """)
     )
+    op.alter_column("sessions", "domain_id", nullable=False)
+    op.create_foreign_key(
+        op.f("fk_sessions_domain_id_domains"),
+        "sessions",
+        "domains",
+        ["domain_id"],
+        ["id"],
+    )
+    op.create_foreign_key(
+        op.f("fk_sessions_resource_group_id_scaling_groups"),
+        "sessions",
+        "scaling_groups",
+        ["resource_group_id"],
+        ["id"],
+    )
 
 
 def downgrade() -> None:
+    op.drop_constraint(
+        op.f("fk_sessions_resource_group_id_scaling_groups"),
+        "sessions",
+        type_="foreignkey",
+    )
+    op.drop_constraint(op.f("fk_sessions_domain_id_domains"), "sessions", type_="foreignkey")
     op.drop_index("ix_sessions_resource_group_id", table_name="sessions")
     op.drop_index("ix_sessions_domain_id", table_name="sessions")
     op.drop_column("sessions", "resource_group_id")
