@@ -705,6 +705,41 @@ class AsyncEtcd(AbstractKVStore):
 
             return cast(bool, result.succeeded())
 
+    async def put_if_absent(
+        self,
+        key: str,
+        val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """
+        Atomically put a single key-value pair only if the key does not already exist,
+        using a compare-and-swap on ``create_revision == 0``.
+
+        :return: ``True`` if this call created the key, ``False`` if it already existed.
+        """
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        async with self.etcd.connect() as communicator:
+            result = await communicator.txn(
+                EtcdTransactionAction()
+                .when([
+                    Compare.create_revision(
+                        mangled_key.encode(self.encoding),
+                        CompareOp.EQUAL,
+                        0,
+                    ),
+                ])
+                .and_then([
+                    TxnOp.put(mangled_key.encode(self.encoding), str(val).encode(self.encoding))
+                ])
+                .or_else([])
+            )
+
+            return cast(bool, result.succeeded())
+
     @override
     async def delete(
         self,
