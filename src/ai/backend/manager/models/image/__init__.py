@@ -8,8 +8,6 @@ from .row import (
     PublicImageLoadFilter,
     Resources,
     bulk_get_image_configs,
-    rescan_images,
-    scan_single_image,
 )
 from .row import (
     get_permission_ctx as get_permission_ctx,
@@ -26,6 +24,4 @@ __all__ = (
     "PublicImageLoadFilter",
     "Resources",
     "bulk_get_image_configs",
-    "rescan_images",
-    "scan_single_image",
 )

@@ -10,14 +10,17 @@ import sqlalchemy as sa
 from tabulate import tabulate
 
 from ai.backend.common.arch import CURRENT_ARCH
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias, ImageID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
-from ai.backend.manager.models.image import rescan_images as rescan_images_func
 from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 
 from .context import CLIContext, redis_ctx
 
@@ -138,7 +141,15 @@ async def purge_image(
             await session.delete(image_row)
 
             if remove_from_registry:
-                await image_row.untag_image_from_registry(db=db, session=session)
+                registry_info = await session.get(ContainerRegistryRow, image_row.registry_id)
+                if registry_info is None:
+                    raise click.ClickException(f"Registry not found for image {image_row.name}")
+                if registry_info.type != ContainerRegistryType.HARBOR2:
+                    raise click.ClickException(
+                        "Untagging from the registry is only supported for Harbor v2 registries"
+                    )
+                scanner = HarborRegistry_v2(db, image_row.image_ref.registry, registry_info)
+                await scanner.untag(image_row.image_ref)
 
         except UnknownImageReference:
             log.exception("Image not found.")
@@ -191,7 +202,7 @@ async def rescan_images(
         connect_database(bootstrap_config.db) as db,
     ):
         try:
-            result = await rescan_images_func(db, registry_or_image, project)
+            result = await ImageDBSource(db).rescan_images(registry_or_image, project)
             for error in result.errors:
                 log.error(f"Failed to scan registries: {error}")
         except Exception as e:
