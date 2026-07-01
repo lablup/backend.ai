@@ -6,6 +6,8 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, override
 
+import aiotools
+
 from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
 from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.logging import BraceStyleAdapter
@@ -68,8 +70,16 @@ class VolumeStatsObserver(AbstractObserver):
             log.debug("No volumes to observe")
             return
 
+        # `_observe_single` captures its own exceptions, but iterating via
+        # `as_completed_safe` ensures that when the outer observe() is cancelled
+        # (e.g. by the Runner's timeout), in-flight per-volume tasks are
+        # cancelled and awaited cleanly instead of being orphaned.
         tasks = [self._observe_single(volume_name) for volume_name in volumes.keys()]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        async for fut in aiotools.as_completed_safe(tasks):
+            try:
+                await fut
+            except Exception:
+                log.exception("Unexpected error while observing a volume")
 
     @override
     async def cleanup(self) -> None:

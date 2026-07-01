@@ -1672,47 +1672,50 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self,
         status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
     ) -> Sequence[tuple[KernelId, Container]]:
-        result = []
         fetch_tasks = []
         async with closing_async(Docker()) as docker:
             for container in await docker.containers.list():
 
-                async def _fetch_container_info(container: DockerContainer) -> None:
-                    kernel_id_str: str = "(unknown)"
+                async def _fetch_container_info(
+                    container: DockerContainer,
+                ) -> tuple[KernelId, Container] | None:
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
-                        if kernel_id is None:
-                            return
-                        kernel_id_str = str(kernel_id)
-                        if container["State"]["Status"] in status_filter:
-                            owner_id = AgentId(
-                                container["Config"]["Labels"].get(LabelName.OWNER_AGENT, "")
-                            )
-                            if self.id == owner_id:
-                                await container.show()
-                                result.append(
-                                    (
-                                        kernel_id,
-                                        container_from_docker_container(container),
-                                    ),
-                                )
                     except DockerError as e:
                         if e.status == HTTPStatus.NOT_FOUND:
                             log.warning(e.message)
-                            return
+                            return None
                         raise
-                    except asyncio.CancelledError:
-                        pass
-                    except Exception:
-                        log.exception(
-                            "error while fetching container information (cid:{}, k:{})",
-                            container._id,
-                            kernel_id_str,
-                        )
+                    if kernel_id is None:
+                        return None
+                    if container["State"]["Status"] not in status_filter:
+                        return None
+                    owner_id = AgentId(container["Config"]["Labels"].get(LabelName.OWNER_AGENT, ""))
+                    if self.id != owner_id:
+                        return None
+                    try:
+                        await container.show()
+                    except DockerError as e:
+                        if e.status == HTTPStatus.NOT_FOUND:
+                            log.warning(e.message)
+                            return None
+                        raise
+                    return kernel_id, container_from_docker_container(container)
 
                 fetch_tasks.append(_fetch_container_info(container))
 
-            await asyncio.gather(*fetch_tasks, return_exceptions=True)
+            # Consolidate result collection and per-task exception handling in
+            # one place so each container's outcome is visible at a single
+            # call site.
+            result: list[tuple[KernelId, Container]] = []
+            async for fut in aiotools.as_completed_safe(fetch_tasks):
+                try:
+                    entry = await fut
+                except Exception:
+                    log.exception("error while fetching container information")
+                    continue
+                if entry is not None:
+                    result.append(entry)
         return result
 
     @override

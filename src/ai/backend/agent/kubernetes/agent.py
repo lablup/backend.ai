@@ -1041,37 +1041,34 @@ class KubernetesAgent(
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
-        result = []
         fetch_tasks = []
         for deployment in (await core_api.list_namespaced_pod("backend-ai")).items:
             # Additional check to filter out real worker pods only?
 
-            async def _fetch_container_info(pod: Any) -> None:
-                kernel_id: KernelId | str | None = "(unknown)"
-                try:
-                    kernel_id = await get_kernel_id_from_deployment(pod)
-                    if kernel_id is None or kernel_id not in self.kernel_registry:
-                        return
-                    # Is it okay to assume that only one container resides per pod?
-                    if pod["status"]["containerStatuses"][0]["stats"].keys()[0] in status_filter:
-                        result.append(
-                            (
-                                kernel_id,
-                                await container_from_pod(pod),
-                            ),
-                        )
-                except asyncio.CancelledError:
-                    pass
-                except Exception:
-                    log.exception(
-                        "error while fetching container information (cid:{}, k:{})",
-                        pod["metadata"]["uid"],
-                        kernel_id,
-                    )
+            async def _fetch_container_info(
+                pod: Any,
+            ) -> tuple[KernelId, Container] | None:
+                kernel_id = await get_kernel_id_from_deployment(pod)
+                if kernel_id is None or kernel_id not in self.kernel_registry:
+                    return None
+                # Is it okay to assume that only one container resides per pod?
+                if pod["status"]["containerStatuses"][0]["stats"].keys()[0] in status_filter:
+                    return kernel_id, await container_from_pod(pod)
+                return None
 
             fetch_tasks.append(_fetch_container_info(deployment))
 
-        await asyncio.gather(*fetch_tasks, return_exceptions=True)
+        # Consolidate result collection and per-task exception handling in one
+        # place so each pod's outcome is visible at a single call site.
+        result: list[tuple[KernelId, Container]] = []
+        async for fut in aiotools.as_completed_safe(fetch_tasks):
+            try:
+                entry = await fut
+            except Exception:
+                log.exception("error while fetching container information")
+                continue
+            if entry is not None:
+                result.append(entry)
         return result
 
     @override

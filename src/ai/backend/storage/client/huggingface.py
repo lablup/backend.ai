@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 
 import aiohttp
+import aiotools
 from huggingface_hub import (
     HfApi,
     hf_hub_url,
@@ -464,33 +465,46 @@ class HuggingFaceScanner:
         )
         semaphore = asyncio.Semaphore(max_concurrent)
 
-        async def download_metadata(model_data: ModelData) -> None:
-            """Download metadata (README and file size) for a single model."""
+        async def download_metadata(model_data: ModelData) -> str | None:
+            """Download metadata (README and file size) for a single model.
+
+            Returns the model id on success (for logging) and lets exceptions
+            propagate so the caller can log them centrally alongside result
+            processing.
+            """
             async with semaphore:
-                try:
-                    model_target = ModelTarget(model_id=model_data.id, revision=model_data.revision)
-                    total_size = await self._calculate_model_size(model_target)
-                    readme_content = await self._download_readme(model_target)
+                model_target = ModelTarget(model_id=model_data.id, revision=model_data.revision)
+                total_size = await self._calculate_model_size(model_target)
+                readme_content = await self._download_readme(model_target)
 
-                    # Only add to results if we have README content
-                    if readme_content:
-                        metadata_info = ModelMetadataInfo(
-                            model_id=model_data.id,
-                            revision=model_data.revision,
-                            readme_content=readme_content,
-                            registry_type=ArtifactRegistryType.HUGGINGFACE,
-                            registry_name=registry_name,
-                            size=total_size,
-                        )
-                        await event_producer.anycast_event(
-                            ModelMetadataFetchDoneEvent(model=metadata_info)
-                        )
-                except Exception:
-                    pass
+                # Only emit the event when README content is available.
+                if readme_content:
+                    metadata_info = ModelMetadataInfo(
+                        model_id=model_data.id,
+                        revision=model_data.revision,
+                        readme_content=readme_content,
+                        registry_type=ArtifactRegistryType.HUGGINGFACE,
+                        registry_name=registry_name,
+                        size=total_size,
+                    )
+                    await event_producer.anycast_event(
+                        ModelMetadataFetchDoneEvent(model=metadata_info)
+                    )
+                    return model_data.id
+                return None
 
-        # Download metadata concurrently with semaphore limit
+        # Download metadata concurrently with semaphore limit.
+        # Result handling (emitted count) and exception handling live together
+        # in the iterator to keep the per-model outcome visible at one site.
         tasks = [download_metadata(model) for model in models]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        emitted = 0
+        async for fut in aiotools.as_completed_safe(tasks):
+            try:
+                if await fut is not None:
+                    emitted += 1
+            except Exception:
+                log.exception("Failed to download model metadata")
+        log.info("Finished model metadata processing: {}/{} emitted", emitted, len(models))
 
     async def _download_readme(self, model: ModelTarget) -> str | None:
         """Download README content for a model.
