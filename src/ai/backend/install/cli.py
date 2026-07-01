@@ -62,7 +62,31 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     "--fqdn-prefix",
     type=str,
     default=None,
-    help="FQDN prefix for generating domain names (e.g., '786cdf' generates 786cdf.app.backend.ai, 786cdf.apphub.backend.ai, etc.).",
+    help=(
+        "FQDN prefix for generating domain names. Combined with --app-base-domain"
+        " / --storage-base-domain to build wildcard app and storage hostnames"
+        " (e.g. prefix 'abc' + app base 'example.com' -> abc.app.example.com)."
+    ),
+)
+@click.option(
+    "--app-base-domain",
+    type=str,
+    default=None,
+    help=(
+        "Base domain for app/apphub wildcard hostnames. Only used when"
+        " --fqdn-prefix is set; otherwise the public-facing address is used."
+        " Example: 'example.com' yields '<prefix>.app.example.com'."
+    ),
+)
+@click.option(
+    "--storage-base-domain",
+    type=str,
+    default=None,
+    help=(
+        "Base domain for the storage proxy's public hostname. Only used when"
+        " --fqdn-prefix is set; otherwise the public-facing address is used."
+        " Example: 'example.com' yields '<prefix>.public.example.com'."
+    ),
 )
 @click.option(
     "--tls-advertised",
@@ -98,7 +122,7 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     "--otel-endpoint",
     type=str,
     default=None,
-    help="OpenTelemetry collector endpoint (e.g., http://10.122.10.56:4317).",
+    help="OpenTelemetry collector endpoint (e.g., http://otel-collector.example.com:4317).",
 )
 @click.option(
     "--metric-access-cidr",
@@ -214,6 +238,8 @@ def main(
     headless: bool,
     public_facing_address: str,
     fqdn_prefix: str | None,
+    app_base_domain: str | None,
+    storage_base_domain: str | None,
     tls_advertised: bool,
     advertised_port: int,
     endpoint_protocol: str | None,
@@ -255,6 +281,8 @@ def main(
         public_facing_address=public_facing_address,
         accelerator=accelerator,
         fqdn_prefix=fqdn_prefix,
+        app_base_domain=app_base_domain,
+        storage_base_domain=storage_base_domain,
         tls_advertised=tls_advertised,
         advertised_port=advertised_port,
         endpoint_protocol=EndpointProtocol(endpoint_protocol) if endpoint_protocol else None,
