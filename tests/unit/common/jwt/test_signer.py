@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import jwt as pyjwt
 import pytest
 
-from ai.backend.common.jwt.config import JWTConfig
+from ai.backend.common.jwt.config import JWTAlgorithm, JWTConfig
 from ai.backend.common.jwt.signer import JWTSigner
 from ai.backend.common.jwt.types import JWTUserContext
 from ai.backend.common.types import AccessKey
@@ -18,7 +18,7 @@ from ai.backend.common.types import AccessKey
 def jwt_config() -> JWTConfig:
     """Create test JWT configuration."""
     return JWTConfig(
-        algorithm="HS256",
+        algorithm=JWTAlgorithm.HS256,
         token_expiration_seconds=900,
     )
 

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-import jwt
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 
-from .config import JWTConfig
-from .exceptions import JWTError
-from .types import JWTClaims, JWTUserContext
+import jwt
+from ai.backend.common.jwt.config import JWTAlgorithm, JWTConfig
+from ai.backend.common.jwt.exceptions import JWTError
+from ai.backend.common.jwt.types import JWTClaims, JWTUserContext
 
 
 class JWTSigner:
@@ -19,23 +20,18 @@ class JWTSigner:
     HMAC authentication. The generated tokens are then forwarded to the manager
     via Hive Router using the X-BackendAI-Token header.
 
-    Note: JWT tokens are signed using per-user secret keys (from keypair table),
-    not a shared system secret key. This maintains the same security model as HMAC authentication.
+    Supports both HS256 (symmetric, per-user secret keys) and RS256 (asymmetric,
+    RSA key pairs) signing algorithms.
 
-    Usage:
-        from ai.backend.common.jwt import JWTSigner, JWTConfig, JWTUserContext
-
+    Usage (HS256):
         config = JWTConfig()
         signer = JWTSigner(config)
+        token = signer.generate_token(user_context, secret_key="my-secret")
 
-        user_context = JWTUserContext(
-            user_id=user_uuid,
-            access_key=access_key,
-            role="user",
-        )
-        # Get user's secret key from keypair table
-        secret_key = keypair.secret_key
-        token = signer.generate_token(user_context, secret_key)
+    Usage (RS256):
+        config = JWTConfig(algorithm="RS256")
+        signer = JWTSigner(config)
+        token = signer.generate_token(user_context, private_key=rsa_private_key, kid="key-1")
     """
 
     _config: JWTConfig
@@ -49,22 +45,31 @@ class JWTSigner:
         """
         self._config = config
 
-    def generate_token(self, user_context: JWTUserContext, secret_key: str) -> str:
+    def generate_token(
+        self,
+        user_context: JWTUserContext,
+        secret_key: str | None = None,
+        *,
+        private_key: RSAPrivateKey | None = None,
+        kid: str | None = None,
+    ) -> str:
         """
         Generate a JWT token from authenticated user context.
 
-        This method creates a JWT token containing minimal user authentication
-        information. The token is signed using HS256 with the user's secret key.
+        For HS256, provide ``secret_key``. For RS256, provide ``private_key``
+        and optionally ``kid`` (key ID included in the JWT header).
 
         Args:
             user_context: User context data containing authentication information
-            secret_key: User's secret key from keypair table for signing the token
+            secret_key: Secret key string for HS256 signing
+            private_key: RSA private key object for RS256 signing
+            kid: Key ID to include in the JWT header (RS256 only)
 
         Returns:
             Encoded JWT token string
 
         Raises:
-            JWTError: If token generation fails
+            JWTError: If token generation fails or invalid key arguments are provided
         """
         now = datetime.now(UTC)
 
@@ -73,13 +78,30 @@ class JWTSigner:
             iat=now,
             access_key=user_context.access_key,
             role=user_context.role,
+            kid=kid,
         )
 
         try:
+            if self._config.algorithm == JWTAlgorithm.RS256:
+                if private_key is None:
+                    raise JWTError("RS256 algorithm requires a private_key argument")
+                headers: dict[str, str] = {}
+                if kid is not None:
+                    headers["kid"] = kid
+                return jwt.encode(
+                    claims.to_dict(),
+                    private_key,
+                    algorithm=self._config.algorithm,
+                    headers=headers if headers else None,
+                )
+            if secret_key is None:
+                raise JWTError("HS256 algorithm requires a secret_key argument")
             return jwt.encode(
                 claims.to_dict(),
                 secret_key,
                 algorithm=self._config.algorithm,
             )
+        except JWTError:
+            raise
         except Exception as e:
             raise JWTError(f"JWT generation failed: {e}") from e

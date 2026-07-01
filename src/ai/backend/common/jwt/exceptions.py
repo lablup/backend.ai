@@ -82,3 +82,37 @@ class JWTDecodeError(JWTError, web.HTTPUnauthorized):
 
     error_type = "https://api.backend.ai/probs/jwt-decode-error"
     error_title = "Failed to decode JWT token."
+
+
+class JWKSError(JWTError):
+    """
+    Base exception for JWKS-related errors.
+
+    All JWKS-specific exceptions inherit from this base class.
+    """
+
+    error_type = "https://api.backend.ai/probs/jwks-error"
+    error_title = "JWKS error."
+
+
+class JWKSFetchError(JWKSError, web.HTTPUnauthorized):
+    """
+    Failed to fetch JWKS from the remote endpoint.
+
+    Raised when the JWKS endpoint is unreachable or returns invalid data.
+    """
+
+    error_type = "https://api.backend.ai/probs/jwks-fetch-error"
+    error_title = "Failed to fetch JWKS."
+
+
+class JWKSKeyNotFoundError(JWKSError, web.HTTPUnauthorized):
+    """
+    Key ID (kid) not found in the JWKS key set.
+
+    Raised when a token references a key ID that is not present
+    in the available JWKS key set.
+    """
+
+    error_type = "https://api.backend.ai/probs/jwks-key-not-found"
+    error_title = "Key ID not found in JWKS."
