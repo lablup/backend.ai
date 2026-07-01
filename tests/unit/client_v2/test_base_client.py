@@ -56,6 +56,34 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
     return mock_session
 
 
+class TestSessionOwnership:
+    """close() must close an owned session but leave an injected one open."""
+
+    async def test_owned_auth_session_is_closed(self) -> None:
+        session = AsyncMock()
+        client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), session)
+        await client.close()
+        session.close.assert_awaited_once()
+
+    async def test_injected_auth_session_is_not_closed(self) -> None:
+        session = AsyncMock()
+        client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), session, owns_session=False)
+        await client.close()
+        session.close.assert_not_awaited()
+
+    async def test_owned_anon_session_is_closed(self) -> None:
+        session = AsyncMock()
+        client = BackendAIAnonymousClient(_DEFAULT_CONFIG, session)
+        await client.close()
+        session.close.assert_awaited_once()
+
+    async def test_injected_anon_session_is_not_closed(self) -> None:
+        session = AsyncMock()
+        client = BackendAIAnonymousClient(_DEFAULT_CONFIG, session, owns_session=False)
+        await client.close()
+        session.close.assert_not_awaited()
+
+
 class _RecordingAuth(MockAuth):
     """MockAuth that records the rel_url it was asked to sign."""
 

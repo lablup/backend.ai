@@ -15,6 +15,8 @@ from .base_client import BackendAIAuthClient
 from .config import ClientConfig
 
 if TYPE_CHECKING:
+    import aiohttp
+
     from .domains_v2.agent import V2AgentClient
     from .domains_v2.app_config_allow_list import V2AppConfigAllowListClient
     from .domains_v2.app_config_definition import V2AppConfigDefinitionClient
@@ -76,8 +78,19 @@ class V2ClientRegistry:
         cls,
         config: ClientConfig,
         auth: AuthStrategy,
+        *,
+        session: aiohttp.ClientSession | None = None,
     ) -> V2ClientRegistry:
-        client = await BackendAIAuthClient.create(config, auth)
+        """Build a registry.
+
+        When ``session`` is given, the client borrows that caller-owned session
+        (a shared connection pool) and ``close()`` leaves it open. When omitted,
+        the client creates and owns its own session, as before.
+        """
+        if session is not None:
+            client = BackendAIAuthClient(config, auth, session, owns_session=False)
+        else:
+            client = await BackendAIAuthClient.create(config, auth)
         return cls(client)
 
     async def close(self) -> None:

@@ -61,21 +61,30 @@ class BackendAIAuthClient:
 
     Prefer ``create()`` for production use; ``__init__`` accepts a pre-built
     session so tests can inject a mock directly.
+
+    Pass ``owns_session=False`` when injecting a caller-owned session (e.g. a
+    shared connection pool): ``close()`` will then leave the session open so the
+    caller can keep reusing it. Sessions built by ``create()`` are owned and
+    closed normally.
     """
 
     _config: ClientConfig
     _auth: AuthStrategy
     _session: aiohttp.ClientSession
+    _owns_session: bool
 
     def __init__(
         self,
         config: ClientConfig,
         auth: AuthStrategy,
         session: aiohttp.ClientSession,
+        *,
+        owns_session: bool = True,
     ) -> None:
         self._config = config
         self._auth = auth
         self._session = session
+        self._owns_session = owns_session
 
     @classmethod
     async def create(
@@ -95,7 +104,8 @@ class BackendAIAuthClient:
         return self._config
 
     async def close(self) -> None:
-        await self._session.close()
+        if self._owns_session:
+            await self._session.close()
 
     def _build_url(self, path: str) -> str:
         base = str(self._config.endpoint).rstrip("/")
@@ -378,14 +388,18 @@ class BackendAIAnonymousClient:
 
     _config: ClientConfig
     _session: aiohttp.ClientSession
+    _owns_session: bool
 
     def __init__(
         self,
         config: ClientConfig,
         session: aiohttp.ClientSession,
+        *,
+        owns_session: bool = True,
     ) -> None:
         self._config = config
         self._session = session
+        self._owns_session = owns_session
 
     @classmethod
     async def create(
@@ -396,7 +410,8 @@ class BackendAIAnonymousClient:
         return cls(config, session)
 
     async def close(self) -> None:
-        await self._session.close()
+        if self._owns_session:
+            await self._session.close()
 
     def _build_url(self, path: str) -> str:
         base = str(self._config.endpoint).rstrip("/")

@@ -8,6 +8,8 @@ from .base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from .config import ClientConfig
 
 if TYPE_CHECKING:
+    import aiohttp
+
     from .domains.acl import ACLClient
     from .domains.agent import AgentClient
     from .domains.artifact import ArtifactClient
@@ -62,9 +64,22 @@ class BackendAIClientRegistry:
         cls,
         config: ClientConfig,
         auth: AuthStrategy,
+        *,
+        session: aiohttp.ClientSession | None = None,
     ) -> BackendAIClientRegistry:
-        client = await BackendAIAuthClient.create(config, auth)
-        anon_client = await BackendAIAnonymousClient.create(config)
+        """Build a registry.
+
+        When ``session`` is given, both the authenticated and anonymous clients
+        borrow that caller-owned session (a shared connection pool) and
+        ``close()`` leaves it open. When omitted, each client creates and owns
+        its own session, as before.
+        """
+        if session is not None:
+            client = BackendAIAuthClient(config, auth, session, owns_session=False)
+            anon_client = BackendAIAnonymousClient(config, session, owns_session=False)
+        else:
+            client = await BackendAIAuthClient.create(config, auth)
+            anon_client = await BackendAIAnonymousClient.create(config)
         return cls(client, anon_client)
 
     async def close(self) -> None:

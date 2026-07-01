@@ -26,6 +26,7 @@ from ai.backend.client.v2.domains.template import TemplateClient
 from ai.backend.client.v2.domains.user import UserClient
 from ai.backend.client.v2.domains.vfolder import VFolderClient
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
 from .conftest import MockAuth
 
@@ -91,3 +92,34 @@ class TestBackendAIClientRegistry:
         await registry.close()
         mock_session.close.assert_awaited_once()
         mock_anon_session.close.assert_awaited_once()
+
+    async def test_create_with_injected_session_shares_it(self) -> None:
+        config = ClientConfig(endpoint=URL("https://api.example.com"))
+        shared_session = AsyncMock()
+        registry = await BackendAIClientRegistry.create(config, MockAuth(), session=shared_session)
+        # Both the authenticated and anonymous clients borrow the same session.
+        assert registry._client.session is shared_session
+        assert registry._anon_client._session is shared_session
+
+    async def test_close_preserves_injected_session(self) -> None:
+        config = ClientConfig(endpoint=URL("https://api.example.com"))
+        shared_session = AsyncMock()
+        registry = await BackendAIClientRegistry.create(config, MockAuth(), session=shared_session)
+        await registry.close()
+        # A borrowed pool must survive registry.close().
+        shared_session.close.assert_not_awaited()
+
+
+class TestV2ClientRegistry:
+    async def test_create_with_injected_session_shares_it(self) -> None:
+        config = ClientConfig(endpoint=URL("https://api.example.com"))
+        shared_session = AsyncMock()
+        registry = await V2ClientRegistry.create(config, MockAuth(), session=shared_session)
+        assert registry._client.session is shared_session
+
+    async def test_close_preserves_injected_session(self) -> None:
+        config = ClientConfig(endpoint=URL("https://api.example.com"))
+        shared_session = AsyncMock()
+        registry = await V2ClientRegistry.create(config, MockAuth(), session=shared_session)
+        await registry.close()
+        shared_session.close.assert_not_awaited()
