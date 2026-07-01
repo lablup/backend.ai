@@ -20,18 +20,8 @@ from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.manager.data.deployment_revision_preset.types import ResourceSlotEntryData
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
-
-# ORM cluster registration: configure_mappers() (triggered when this isolated
-# test registers a domain-cluster row) resolves string relationships against the
-# registry, so the forward-reachable rows below must be imported. Kept live by
-# the _ORM_CLUSTER reference.
-from ai.backend.manager.models.resource_slot import (
-    AgentResourceRow,
-    DeploymentRevisionResourceSlotRow,
-)
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.runtime_variant_preset import RuntimeVariantPresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment_revision_preset.creators import (
@@ -50,15 +40,6 @@ from ai.backend.testutils.db import with_tables
 
 # Shared runtime variant id; the preset's rank scope and the FOR UPDATE lock target it.
 _VARIANT_ID = RuntimeVariantID(uuid4())
-
-
-_ORM_CLUSTER = (
-    AgentResourceRow,
-    DeploymentRevisionResourceSlotRow,
-    ResourceSlotTypeRow,
-    RuntimeVariantPresetRow,
-    RuntimeVariantRow,
-)
 
 
 def _make_spec(name: str = "preset-1") -> DeploymentRevisionPresetCreatorSpec:

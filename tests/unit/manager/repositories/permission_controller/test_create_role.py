@@ -25,45 +25,18 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
-# registry, so the forward-reachable rows below must be imported. Kept live by
-# the _ORM_CLUSTER reference.
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
-)
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import (
-    EndpointAutoScalingRuleRow,
-    EndpointRow,
-    EndpointTokenRow,
-)
-from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.network import NetworkRow
-from ai.backend.manager.models.rbac_models import ObjectPermissionRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_policy import (
-    KeyPairResourcePolicyRow,
-    ProjectResourcePolicyRow,
-    UserResourcePolicyRow,
-)
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.resource_slot import (
-    AgentResourceRow,
-    DeploymentRevisionResourceSlotRow,
-    ResourceSlotTypeRow,
-)
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
@@ -71,9 +44,6 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupForProjectRow,
     ScalingGroupRow,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.vfolder import VFolderInvitationRow, VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
@@ -95,46 +65,17 @@ CREATE_ROLE_TABLES: Sequence[TableOrORM] = [
 
 
 _ORM_CLUSTER = (
-    AgentResourceRow,
     AgentRow,
-    AssocGroupUserRow,
-    AssociationContainerRegistriesGroupsRow,
-    AssociationScopesEntitiesRow,
-    ContainerRegistryRow,
     DeploymentAutoScalingPolicyRow,
     DeploymentPolicyRow,
-    DeploymentRevisionResourceSlotRow,
     DeploymentRevisionRow,
-    DomainRow,
-    EndpointAutoScalingRuleRow,
-    EndpointRow,
-    EndpointTokenRow,
-    GroupRow,
-    ImageAliasRow,
-    ImageRow,
-    KernelRow,
-    KeyPairResourcePolicyRow,
-    KeyPairRow,
-    NetworkRow,
-    ObjectPermissionRow,
-    ProjectResourcePolicyRow,
     ReplicaGroupRow,
     ResourcePresetRow,
-    ResourceSlotTypeRow,
-    RoleRow,
-    RoutingRow,
     RuntimeVariantRow,
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
     ScalingGroupForProjectRow,
     ScalingGroupRow,
-    SessionRow,
-    UserResourcePolicyRow,
-    UserRoleRow,
-    UserRow,
-    VFolderInvitationRow,
-    VFolderPermissionRow,
-    VFolderRow,
 )
 
 

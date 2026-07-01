@@ -28,8 +28,8 @@ from ai.backend.manager.data.permission.status import RoleStatus
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
-# registry, so the forward-reachable rows below must be imported. Kept live by
-# the _ORM_CLUSTER reference.
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
@@ -49,7 +49,6 @@ from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.network import NetworkRow
-from ai.backend.manager.models.rbac_models import ObjectPermissionRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -80,7 +79,6 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupRow,
 )
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import VFolderInvitationRow, VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.testutils.db import TableOrORM, with_tables
@@ -103,7 +101,6 @@ _ORM_CLUSTER = (
     AgentRow,
     AssocGroupUserRow,
     AssociationContainerRegistriesGroupsRow,
-    AssociationScopesEntitiesRow,
     ContainerRegistryRow,
     DeploymentAutoScalingPolicyRow,
     DeploymentPolicyRow,
@@ -120,12 +117,10 @@ _ORM_CLUSTER = (
     KeyPairResourcePolicyRow,
     KeyPairRow,
     NetworkRow,
-    ObjectPermissionRow,
     ProjectResourcePolicyRow,
     ReplicaGroupRow,
     ResourcePresetRow,
     ResourceSlotTypeRow,
-    RoleRow,
     RoutingRow,
     RuntimeVariantRow,
     ScalingGroupForDomainRow,
@@ -134,8 +129,6 @@ _ORM_CLUSTER = (
     ScalingGroupRow,
     SessionRow,
     UserResourcePolicyRow,
-    UserRoleRow,
-    UserRow,
     VFolderInvitationRow,
     VFolderPermissionRow,
     VFolderRow,

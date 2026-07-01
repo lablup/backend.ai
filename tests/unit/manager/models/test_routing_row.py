@@ -10,8 +10,8 @@ from ai.backend.manager.data.deployment.types import (
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
-# registry, so the forward-reachable rows below must be imported. Kept live by
-# the _ORM_CLUSTER reference.
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
@@ -89,7 +89,6 @@ _ORM_CLUSTER = (
     ResourcePresetRow,
     ResourceSlotTypeRow,
     RoleRow,
-    RoutingRow,
     RuntimeVariantRow,
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
