@@ -11,7 +11,8 @@ if len(sys.argv) == 1:
 STATIC_FILE = 'https://backend-ai-k8s-agent-static.s3.ap-northeast-2.amazonaws.com/bai-static.tar.gz'
 
 ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.load_system_host_keys()
+ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
 
 for ip in sys.argv[1:]:
     ssh.connect(ip)
