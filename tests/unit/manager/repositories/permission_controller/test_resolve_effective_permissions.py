@@ -24,8 +24,36 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.data.user.types import UserStatus
+
+# ORM relationship cluster registration: SQLAlchemy's global
+# configure_mappers() must resolve every string relationship reachable from
+# the rows this isolated test registers, so the whole domain cluster is
+# imported here. _ORM_CLUSTER below keeps these imports from being pruned.
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.endpoint import (
+    EndpointAutoScalingRuleRow,
+    EndpointRow,
+    EndpointTokenRow,
+)
+from ai.backend.manager.models.fair_share import (
+    DomainFairShareRow,
+    ProjectFairShareRow,
+    UserFairShareRow,
+)
+from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.network import NetworkRow
+from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -33,16 +61,94 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_slot import (
+    AgentResourceRow,
+    DeploymentRevisionResourceSlotRow,
+    ResourceSlotTypeRow,
+)
+from ai.backend.manager.models.resource_usage_history import (
+    DomainUsageBucketRow,
+    KernelUsageRecordRow,
+    ProjectUsageBucketRow,
+    UserUsageBucketRow,
+)
+from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
+from ai.backend.manager.models.runtime_variant_preset import RuntimeVariantPresetRow
+from ai.backend.manager.models.scaling_group import (
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupRow,
+)
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder import VFolderInvitationRow, VFolderPermissionRow, VFolderRow
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
 from ai.backend.testutils.db import with_tables
+
+_ORM_CLUSTER = (
+    AgentResourceRow,
+    AgentRow,
+    AssocGroupUserRow,
+    AssociationContainerRegistriesGroupsRow,
+    AssociationScopesEntitiesRow,
+    ContainerRegistryRow,
+    DeploymentAutoScalingPolicyRow,
+    DeploymentPolicyRow,
+    DeploymentRevisionResourceSlotRow,
+    DeploymentRevisionRow,
+    DomainFairShareRow,
+    DomainRow,
+    DomainUsageBucketRow,
+    EndpointAutoScalingRuleRow,
+    EndpointRow,
+    EndpointTokenRow,
+    GroupRow,
+    ImageAliasRow,
+    ImageRow,
+    KernelRow,
+    KernelUsageRecordRow,
+    KeyPairResourcePolicyRow,
+    KeyPairRow,
+    NetworkRow,
+    NotificationChannelRow,
+    NotificationRuleRow,
+    ObjectPermissionRow,
+    ProjectFairShareRow,
+    ProjectResourcePolicyRow,
+    ProjectUsageBucketRow,
+    ReplicaGroupRow,
+    ResourcePresetRow,
+    ResourceSlotTypeRow,
+    RoleRow,
+    RoutingRow,
+    RuntimeVariantPresetRow,
+    RuntimeVariantRow,
+    ScalingGroupForDomainRow,
+    ScalingGroupForKeypairsRow,
+    ScalingGroupForProjectRow,
+    ScalingGroupRow,
+    SessionRow,
+    UserFairShareRow,
+    UserResourcePolicyRow,
+    UserRoleRow,
+    UserRow,
+    UserUsageBucketRow,
+    VFolderInvitationRow,
+    VFolderPermissionRow,
+    VFolderRow,
+)
 
 
 @dataclass
