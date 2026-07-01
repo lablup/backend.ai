@@ -281,6 +281,9 @@ split-on-trailing-comma = true
 "src/ai/backend/logging/utils.py" = ["PLC0415"]
 # - Test files may use print for debugging, have flexible type annotations, and unused fixtures
 "tests/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
+# domain_factory imports the domains table lazily to avoid registering DomainRow
+# on the global SQLAlchemy registry for tests that never use a domain.
+"tests/unit/manager/conftest.py" = ["PLC0415"]
 "src/ai/backend/test/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
 # - GraphQL legacy and modern resolvers may have unused parameters for GraphQL interface compatibility
 "src/ai/backend/manager/api/gql_legacy/**/*.py" = ["ARG"]

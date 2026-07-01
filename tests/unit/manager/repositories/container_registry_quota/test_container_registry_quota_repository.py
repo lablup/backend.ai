@@ -17,10 +17,10 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import PerProjectContainerRegistryInfo
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 
-# ORM relationship cluster registration: SQLAlchemy's global
-# configure_mappers() must resolve every string relationship reachable from
-# the rows this isolated test registers, so the whole domain cluster is
-# imported here. _ORM_CLUSTER below keeps these imports from being pruned.
+# ORM cluster registration: configure_mappers() (triggered when this isolated
+# test registers a domain-cluster row) resolves string relationships against the
+# registry, so the forward-reachable rows below must be imported. Kept live by
+# the _ORM_CLUSTER reference.
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
@@ -35,17 +35,11 @@ from ai.backend.manager.models.endpoint import (
     EndpointRow,
     EndpointTokenRow,
 )
-from ai.backend.manager.models.fair_share import (
-    DomainFairShareRow,
-    ProjectFairShareRow,
-    UserFairShareRow,
-)
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.network import NetworkRow
-from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac_models import (
     AssociationScopesEntitiesRow,
@@ -65,15 +59,8 @@ from ai.backend.manager.models.resource_slot import (
     DeploymentRevisionResourceSlotRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.resource_usage_history import (
-    DomainUsageBucketRow,
-    KernelUsageRecordRow,
-    ProjectUsageBucketRow,
-    UserUsageBucketRow,
-)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.runtime_variant_preset import RuntimeVariantPresetRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
@@ -105,9 +92,7 @@ _ORM_CLUSTER = (
     DeploymentPolicyRow,
     DeploymentRevisionResourceSlotRow,
     DeploymentRevisionRow,
-    DomainFairShareRow,
     DomainRow,
-    DomainUsageBucketRow,
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
@@ -115,33 +100,25 @@ _ORM_CLUSTER = (
     ImageAliasRow,
     ImageRow,
     KernelRow,
-    KernelUsageRecordRow,
     KeyPairResourcePolicyRow,
     KeyPairRow,
     NetworkRow,
-    NotificationChannelRow,
-    NotificationRuleRow,
     ObjectPermissionRow,
-    ProjectFairShareRow,
     ProjectResourcePolicyRow,
-    ProjectUsageBucketRow,
     ReplicaGroupRow,
     ResourcePresetRow,
     ResourceSlotTypeRow,
     RoleRow,
     RoutingRow,
-    RuntimeVariantPresetRow,
     RuntimeVariantRow,
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
     ScalingGroupForProjectRow,
     ScalingGroupRow,
     SessionRow,
-    UserFairShareRow,
     UserResourcePolicyRow,
     UserRoleRow,
     UserRow,
-    UserUsageBucketRow,
     VFolderInvitationRow,
     VFolderPermissionRow,
     VFolderRow,
