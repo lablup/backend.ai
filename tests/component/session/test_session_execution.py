@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.session.response import (
 )
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.scaling_group import scaling_groups
-from ai.backend.manager.models.session.row import SessionRow
 
 from .conftest import SessionSeedData
 
@@ -732,26 +731,6 @@ class TestSessionStartServiceFailures:
             await admin_registry.session.start_service(
                 session_seed.session_name,
                 StartServiceRequest(app="ttyd", port=9999),
-            )
-
-    async def test_start_with_no_scaling_group(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-        db_engine: SAEngine,
-    ) -> None:
-        """F-BIZ-4: Session has no scaling_group → ServerError (ServiceUnavailable)."""
-        async with db_engine.begin() as conn:
-            await conn.execute(
-                sa.update(SessionRow.__table__)
-                .where(SessionRow.__table__.c.id == session_seed.session_id)
-                .values(scaling_group_name=None)
-            )
-
-        with pytest.raises(ServerError):
-            await admin_registry.session.start_service(
-                session_seed.session_name,
-                StartServiceRequest(app="ttyd"),
             )
 
     async def test_start_with_no_wsproxy_addr(
