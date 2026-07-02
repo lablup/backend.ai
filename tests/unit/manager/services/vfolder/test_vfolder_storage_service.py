@@ -199,6 +199,39 @@ class TestListHostsAction:
         assert "proxy2:volume2" not in result.allowed
         mock_vfolder_repository.get_allowed_hosts_for_listing.assert_awaited_once()
 
+    async def test_reports_per_host_permissions(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        user_uuid: uuid.UUID,
+    ) -> None:
+        # A host the user may create on and a host they only have read access to
+        # must both appear in `allowed`, but `allowed_permissions` must reflect
+        # which one actually grants create.
+        mock_vfolder_repository.get_allowed_hosts_for_listing = AsyncMock(
+            return_value=VFolderHostPermissionMap({
+                "proxy1:volume1": {VFolderHostPermission.CREATE, VFolderHostPermission.MODIFY},
+                "proxy2:volume2": {VFolderHostPermission.DOWNLOAD_FILE},
+            })
+        )
+        action = ListHostsAction(
+            user_uuid=user_uuid,
+            domain_name="default",
+            group_id=None,
+            resource_policy={"max_vfolder_count": 10},
+        )
+        result = await vfolder_service.list_hosts(action)
+
+        # Every allowed host is represented in the permission map.
+        assert set(result.allowed_permissions) == set(result.allowed)
+        assert VFolderHostPermission.CREATE.value in result.allowed_permissions["proxy1:volume1"]
+        assert (
+            VFolderHostPermission.CREATE.value not in result.allowed_permissions["proxy2:volume2"]
+        )
+        # Permissions are sorted for a deterministic response (sets are unordered).
+        for perms in result.allowed_permissions.values():
+            assert perms == sorted(perms)
+
     async def test_volume_info_includes_backend_capabilities_usage(
         self,
         vfolder_service: VFolderService,

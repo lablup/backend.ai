@@ -296,6 +296,16 @@ class ListHostsResponse(BaseResponseModel):
     volume_info: dict[str, VolumeInfoDTO] = Field(
         default_factory=dict, description="Volume info per host"
     )
+    allowed_permissions: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description=(
+            "Permissions the requesting user holds on each allowed host, keyed "
+            "by host name (e.g. `create-vfolder`, `mount-in-session`). Lets "
+            "clients distinguish hosts the user may create folders on from "
+            "read-only hosts, since `allowed` carries only host names. "
+            "Added in 26.4.5."
+        ),
+    )
 
 
 class ListAllHostsResponse(BaseResponseModel):

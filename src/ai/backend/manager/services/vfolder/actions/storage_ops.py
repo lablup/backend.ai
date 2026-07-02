@@ -168,6 +168,11 @@ class ListHostsActionResult(BaseActionResult):
     default: str | None
     allowed: list[str]
     volume_info: dict[str, Any]
+    # Per-host permissions the requesting user holds, keyed by host name
+    # (e.g. ``create-vfolder``, ``mount-in-session``). ``allowed`` only carries
+    # the host names, so this lets callers tell apart hosts the user may create
+    # folders on from read-only hosts.
+    allowed_permissions: dict[str, list[str]]
 
     @override
     def entity_id(self) -> str | None:

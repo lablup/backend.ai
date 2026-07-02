@@ -412,6 +412,7 @@ class VFolderHandler:
             default=result.default,
             allowed=result.allowed,
             volume_info=volume_info,
+            allowed_permissions=result.allowed_permissions,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
 
