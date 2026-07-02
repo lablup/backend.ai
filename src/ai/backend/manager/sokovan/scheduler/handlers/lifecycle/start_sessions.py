@@ -52,13 +52,27 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     def target_statuses(cls) -> list[SessionStatus]:
-        """Sessions in PREPARED state."""
-        return [SessionStatus.PREPARED]
+        """Sessions in PREPARED or CREATING state.
+
+        CREATING is included so the handler re-queries sessions that have
+        already started kernel creation and re-sends the idempotent
+        ``create_kernels`` RPC. This recovers sessions stuck in CREATING when
+        the KernelStarted event was lost in transit: the agent re-emits the
+        event for an already-running kernel and skips kernels whose creation
+        is still in flight, so no duplicate container is created.
+        """
+        return [SessionStatus.PREPARED, SessionStatus.CREATING]
 
     @classmethod
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
-        """Include sessions where kernels are in PREPARED status."""
-        return [KernelStatus.PREPARED]
+        """Include sessions with kernels in PREPARED or CREATING status.
+
+        CREATING is included so that a session stuck in CREATING whose
+        kernels have already advanced to CREATING (but whose KernelStarted
+        event was lost) is still picked up and has kernel creation
+        re-triggered.
+        """
+        return [KernelStatus.PREPARED, KernelStatus.CREATING]
 
     @classmethod
     def status_transitions(cls) -> StatusTransitions:

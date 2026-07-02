@@ -2522,6 +2522,57 @@ class AbstractAgent[
             service.start_command = [*service.start_command, *extra_args]
         return models
 
+    async def _replay_kernel_started_event(
+        self,
+        kernel_obj: AbstractKernel,
+        kernel_config: KernelCreationConfig,
+    ) -> KernelCreationResult:
+        """
+        Rebuild the creation result of an already-running kernel and re-emit the
+        KernelStarted events, so that a manager which missed the original event
+        can still transition the kernel to RUNNING.
+        """
+        kernel_id = kernel_obj.kernel_id
+        session_id = kernel_obj.session_id
+        attached_devices = {}
+        for dev_name, device_alloc in kernel_obj.resource_spec.allocations.items():
+            computer_ctx = self.computers[dev_name]
+            attached_devices[dev_name] = await computer_ctx.instance.get_attached_devices(
+                device_alloc
+            )
+        kernel_creation_info: KernelCreationResult = {
+            "id": kernel_id,
+            "kernel_host": str(kernel_obj["kernel_host"]),
+            "repl_in_port": kernel_obj["repl_in_port"],
+            "repl_out_port": kernel_obj["repl_out_port"],
+            "stdin_port": kernel_obj["stdin_port"],  # legacy
+            "stdout_port": kernel_obj["stdout_port"],  # legacy
+            "service_ports": self.get_public_service_ports(kernel_obj.service_ports),
+            "container_id": kernel_obj["container_id"],
+            "resource_spec": attrs.asdict(kernel_obj.resource_spec),
+            "scaling_group": kernel_config["scaling_group"],
+            "agent_addr": kernel_config["agent_addr"],
+            "attached_devices": attached_devices,
+        }
+        replayed_creation_info = {
+            **kernel_creation_info,
+            "id": str(kernel_id),
+            "container_id": str(kernel_obj["container_id"]),
+        }
+        await self.anycast_and_broadcast_event(
+            KernelStartedAnycastEvent(
+                kernel_id,
+                session_id,
+                creation_info=replayed_creation_info,
+            ),
+            KernelStartedBroadcastEvent(
+                kernel_id,
+                session_id,
+                creation_info=replayed_creation_info,
+            ),
+        )
+        return kernel_creation_info
+
     async def create_kernel(
         self,
         ownership_data: KernelOwnershipData,
@@ -2531,18 +2582,47 @@ class AbstractAgent[
         *,
         restarting: bool = False,
         throttle_sema: asyncio.Semaphore | None = None,
-    ) -> KernelCreationResult:
+    ) -> KernelCreationResult | None:
         """
         Create a new kernel.
+
+        This method is idempotent for non-restarting calls so that the manager
+        may safely re-send ``create_kernels`` for sessions stuck in CREATING:
+
+        - If the kernel is already running, the KernelStarted events are
+          re-emitted (recovering a lost event) without creating a new container.
+        - If a creation is already in flight (or the kernel exists in the
+          registry but has not reached RUNNING yet), the call is skipped and
+          returns ``None``; the in-flight creation emits the events itself.
         """
         kernel_id = ownership_data.kernel_id
         session_id = ownership_data.session_id
+
+        if not restarting and kernel_id not in self._active_creates:
+            existing_kernel = self.kernel_registry.get(kernel_id)
+            if existing_kernel is not None:
+                if existing_kernel.state == KernelLifecycleStatus.RUNNING:
+                    log.info(
+                        "create_kernel(kernel:{}, session:{}) kernel is already running;"
+                        " re-emitting KernelStarted events",
+                        kernel_id,
+                        session_id,
+                    )
+                    return await self._replay_kernel_started_event(existing_kernel, kernel_config)
+                log.debug(
+                    "create_kernel(kernel:{}, session:{}) kernel already exists in the registry"
+                    " (state: {}); skipping duplicate creation",
+                    kernel_id,
+                    session_id,
+                    existing_kernel.state,
+                )
+                return None
 
         # Track kernel creation for health monitoring
         with self.track_create(kernel_id, session_id) as should_proceed:
             if not should_proceed:
                 log.debug("Kernel {} is already being created, skipping", kernel_id)
-                raise ResourceError("Kernel creation already in progress")
+                return None
 
             if throttle_sema is None:
                 # make a local semaphore

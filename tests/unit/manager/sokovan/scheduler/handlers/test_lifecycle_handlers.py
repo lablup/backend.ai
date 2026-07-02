@@ -17,6 +17,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.sokovan import (
     SessionsForPullWithImages,
     SessionsForStartWithImages,
@@ -600,6 +602,23 @@ class TestStartSessionsLifecycleHandler:
         # Assert
         assert len(result.successes) == 1
         assert result.successes[0].session_id == prepared_session.session_info.identity.id
+
+    def test_target_statuses_include_creating_for_reconciliation(self) -> None:
+        """SC-ST-006: CREATING sessions/kernels are re-targeted.
+
+        Given: The handler's target status declarations
+        When: The periodic START sweep queries target sessions
+        Then: Sessions/kernels stuck in CREATING (lost KernelStarted event)
+              are re-picked so the idempotent create_kernels RPC is re-sent
+        """
+        assert StartSessionsLifecycleHandler.target_statuses() == [
+            SessionStatus.PREPARED,
+            SessionStatus.CREATING,
+        ]
+        assert StartSessionsLifecycleHandler.target_kernel_statuses() == [
+            KernelStatus.PREPARED,
+            KernelStatus.CREATING,
+        ]
 
 
 # =============================================================================

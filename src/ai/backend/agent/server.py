@@ -858,6 +858,10 @@ class AgentRPCServer(aobject):
             match result:
                 case BaseException():
                     errors.append(result)
+                case None:
+                    # Creation skipped: another creation for the kernel is
+                    # already in flight and will emit the lifecycle events.
+                    pass
                 case _:
                     raw_results.append({
                         "id": str(result["id"]),
