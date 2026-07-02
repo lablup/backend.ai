@@ -164,6 +164,35 @@ class DBConfig(BaseSchema):
             example=ConfigExample(local="64", prod="128"),
         ),
     ]
+    pool_recycle: Annotated[
+        float,
+        Field(default=-1, ge=-1),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum lifetime of a connection in seconds before it's recycled. "
+                "Set to -1 to disable connection recycling. "
+                "Useful for handling database connections closed by the server after inactivity "
+                "or by network equipment with idle timeouts."
+            ),
+            added_version="26.5.0",
+            example=ConfigExample(local="-1", prod="3600"),
+        ),
+    ]
+    pool_pre_ping: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to test connections with a lightweight ping before using them. "
+                "Detects stale or disconnected connections at pool checkout and transparently "
+                "reconnects them with clean transaction state, preventing 'SAVEPOINT can only be "
+                "used in transaction blocks' errors after a Postgres connection drop or failover. "
+                "Adds a small overhead per checkout but is recommended for production."
+            ),
+            added_version="26.5.0",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
 
 
 class ClientIPStrategyConfig(BaseSchema):
