@@ -19,6 +19,12 @@ from ai.backend.common.data.filter_specs import (
 from ai.backend.common.data.permission.types import EntityType, OperationType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.models.agent import AgentRow
+
+# ORM cluster registration: configure_mappers() (triggered when this isolated
+# test registers a domain-cluster row) resolves string relationships against the
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -35,6 +41,7 @@ from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
@@ -46,6 +53,11 @@ from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
 from ai.backend.testutils.db import with_tables
+
+_ORM_CLUSTER = (
+    AgentRow,
+    ScalingGroupForDomainRow,
+)
 
 
 @dataclass
