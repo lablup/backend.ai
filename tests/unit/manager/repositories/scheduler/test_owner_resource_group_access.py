@@ -24,7 +24,7 @@ import pytest
 
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.session.draft import (
@@ -91,7 +91,8 @@ class TestOwnerOnlyResourceGroupForDelegation:
     @pytest.fixture
     def sample_accessible_rg(self) -> AllowedScalingGroup:
         return AllowedScalingGroup(
-            name=RG_NAME,
+            id=ResourceGroupID(uuid.uuid4()),
+            name=ResourceGroupName(RG_NAME),
             is_private=False,
             scheduler_opts=ScalingGroupOpts(
                 allowed_session_types=[],

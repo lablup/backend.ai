@@ -30,10 +30,10 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.plugin.hook import PASSED, HookResult, HookResults
@@ -103,8 +103,10 @@ def draft(image_id: ImageID) -> SessionSpecDraft:
             access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
         ),
         scope=SessionScopeDraft(
+            domain_id=DomainID(uuid.uuid4()),
             domain_name=DomainName("default"),
             project_id=ProjectID(uuid.uuid4()),
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group_name=ResourceGroupName("default"),
         ),
         classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),

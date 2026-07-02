@@ -29,9 +29,13 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import (
+    ResourceGroupID,
+    ResourceGroupName,
+)
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
@@ -83,7 +87,7 @@ from ai.backend.manager.data.sokovan import (
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import DomainNotFound, ScalingGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent import AgentRow
@@ -162,6 +166,7 @@ from ai.backend.manager.repositories.scheduler.types.session import (
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
+    ResourceGroupIdentifier,
     SessionSpecContextFetch,
 )
 from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePolicies, SnapshotData
@@ -1720,7 +1725,7 @@ class ScheduleDBSource:
         access_key: AccessKey,
         domain_name: str,
         project_id: ProjectID,
-    ) -> ResourceGroupName:
+    ) -> ResourceGroupIdentifier:
         """Return the first resource group from the owner's allowlist."""
         async with self._begin_readonly_session_read_committed() as db_sess:
             allowed_rgs = await self._query_allowed_scaling_groups(
@@ -1728,7 +1733,23 @@ class ScheduleDBSource:
             )
         if not allowed_rgs:
             raise InvalidAPIParameters("No accessible scaling group available")
-        return ResourceGroupName(allowed_rgs[0].name)
+        return ResourceGroupIdentifier(id=allowed_rgs[0].id, name=allowed_rgs[0].name)
+
+    async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == name)
+            )
+        if resource_group_id is None:
+            raise ScalingGroupNotFound(name)
+        return ResourceGroupID(resource_group_id)
+
+    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            domain_id = await db_sess.scalar(sa.select(DomainRow.id).where(DomainRow.name == name))
+        if domain_id is None:
+            raise DomainNotFound(name)
+        return DomainID(domain_id)
 
     async def _get_scaling_group_network_info(
         self, db_sess: SASession, scaling_group_name: str
@@ -1954,7 +1975,8 @@ class ScheduleDBSource:
 
         return [
             AllowedScalingGroup(
-                name=sg.name,
+                id=ResourceGroupID(sg.id),
+                name=ResourceGroupName(sg.name),
                 is_private=not sg.is_public,  # Convert is_public to is_private
                 scheduler_opts=sg.scheduler_opts,
             )

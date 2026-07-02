@@ -135,7 +135,11 @@ class DomainRow(Base):  # type: ignore[misc]
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
 
-    sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="domain")
+    sessions: Mapped[list[SessionRow]] = relationship(
+        "SessionRow",
+        back_populates="domain",
+        foreign_keys="[SessionRow.domain_name]",
+    )
     users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="domain")
     groups: Mapped[list[GroupRow]] = relationship("GroupRow", back_populates="domain")
     sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(

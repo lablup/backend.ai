@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -420,14 +420,21 @@ class TestScalingGroupRepositoryDB:
             db_sess.add(sgroup)
             await db_sess.flush()  # Flush to ensure scaling group exists before creating references
 
+            domain_id = await db_sess.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == test_domain)
+            )
+            assert domain_id is not None
+
             # Create 2 sessions with this scaling group
             for i in range(2):
                 session_id = SessionId(uuid.uuid4())
                 session = SessionRow(
                     id=session_id,
                     domain_name=test_domain,
+                    domain_id=domain_id,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
+                    resource_group_id=sgroup.id,
                     scaling_group_name=sgroup_name,
                     cluster_size=1,
                     vfolder_mounts={},
@@ -1274,12 +1281,25 @@ class TestScalingGroupRepositoryDB:
         test_user_uuid, test_domain, test_group_id = test_user_domain_group
         session_id = SessionId(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
+            domain_id = await db_sess.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == test_domain)
+            )
+            resource_group_id = await db_sess.scalar(
+                sa.select(ScalingGroupRow.id).where(
+                    ScalingGroupRow.name == sample_scaling_group_for_hierarchy
+                )
+            )
+            assert domain_id is not None
+            assert resource_group_id is not None
+
             db_sess.add(
                 SessionRow(
                     id=session_id,
                     domain_name=test_domain,
+                    domain_id=domain_id,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
+                    resource_group_id=resource_group_id,
                     scaling_group_name=sample_scaling_group_for_hierarchy,
                     cluster_size=1,
                     vfolder_mounts={},
@@ -1448,4 +1468,25 @@ class TestScalingGroupRepositoryDB:
         with pytest.raises(ScalingGroupNotFound):
             await scaling_group_repository.get_resource_group_id_by_name(
                 ResourceGroupName("nonexistent-scaling-group")
+            )
+
+    async def test_get_resource_group_name_by_id_success(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_groups_small: list[str],
+    ) -> None:
+        target_name = sample_scaling_groups_small[0]
+        fetched = await scaling_group_repository.get_scaling_group_by_name(target_name)
+        resource_group_name = await scaling_group_repository.get_resource_group_name_by_id(
+            fetched.id
+        )
+        assert resource_group_name == ResourceGroupName(target_name)
+
+    async def test_get_resource_group_name_by_id_not_found(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+    ) -> None:
+        with pytest.raises(ScalingGroupNotFound):
+            await scaling_group_repository.get_resource_group_name_by_id(
+                ResourceGroupID(uuid.uuid4())
             )
