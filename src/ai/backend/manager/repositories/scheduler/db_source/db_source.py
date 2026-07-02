@@ -1509,11 +1509,8 @@ class ScheduleDBSource:
     async def fetch_session_spec_contexts(
         self,
         draft: SessionSpecDraft,
-        *,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: list[str],
     ) -> SessionSpecContextFetch:
-        """Batch-fetch every DB read the draft-based preparer and validator
+        """Batch-fetch the DB reads the draft-based preparer and validator
         rules depend on, inside a single readonly transaction.
 
         Returns raw fetched data as :class:`SessionSpecContextFetch` — the
@@ -1613,7 +1610,6 @@ class ScheduleDBSource:
             )
 
             keypair_policy = None
-            resource_policy_dict: dict[str, Any] = {}
             if access_key is not None:
                 kp_row = (
                     await db_sess.scalars(
@@ -1624,50 +1620,6 @@ class ScheduleDBSource:
                 ).one_or_none()
                 if kp_row is not None and kp_row.resource_policy_row is not None:
                     keypair_policy = kp_row.resource_policy_row.to_dataclass()
-                    resource_policy_dict = {
-                        "allowed_vfolder_hosts": keypair_policy.allowed_vfolder_hosts,
-                    }
-
-            # Resolve mount requests per kernel group keyed by ``role``.
-            # Each group's request list resolves to a single
-            # ``VFolderMount`` tuple that every replica sharing the role
-            # copies verbatim. Task #33 (role-based mount override) can
-            # write distinct values per role without structural change.
-            vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
-            if domain_name is not None and user_uuid is not None:
-                user_scope_for_mounts = UserScope(
-                    domain_name=domain_name,
-                    group_id=project_id if project_id is not None else UUID(int=0),
-                    user_uuid=user_uuid,
-                    user_role="user",
-                )
-                for group in kernel_specs:
-                    per_group_requests: list[VFolderMountRequest] = []
-                    for entry in group.execution_spec.mounts:
-                        per_group_requests.append(
-                            VFolderMountRequest(
-                                ref=UUID(str(entry.vfolder_id)),
-                                dst_path=entry.mount_destination,
-                                options=VFolderMountOptions(
-                                    permission=entry.mount_perm,
-                                    subpath=entry.subpath,
-                                ),
-                            )
-                        )
-                    # Always resolve mounts even when the request list is
-                    # empty: ``prepare_vfolder_mounts`` injects dot-prefixed
-                    # auto-mount vfolders regardless of explicit requests, so
-                    # skipping here would silently drop them.
-                    vfolder_mounts_by_role[group.role] = tuple(
-                        await self._fetch_vfolder_mounts(
-                            db_sess,
-                            storage_manager,
-                            allowed_vfolder_types,
-                            user_scope_for_mounts,
-                            resource_policy_dict,
-                            per_group_requests,
-                        )
-                    )
 
             dotfile_bundle = DotfileBundle()
             if domain_name is not None and user_uuid is not None and access_key is not None:
@@ -1706,13 +1658,90 @@ class ScheduleDBSource:
             container_user_info=user_container,
             image_infos=image_infos,
             resource_group_allow_fractional=resource_group_allow_fractional,
-            vfolder_mounts_by_role=vfolder_mounts_by_role,
             dotfile_data=dotfile_bundle,
             active_session_count=active_session_count,
             keypair_resource_policy=keypair_policy,
             known_slot_types=known_slot_types,
             slot_type_policy=slot_type_policy,
         )
+
+    async def resolve_vfolder_mounts_by_role(
+        self,
+        draft: SessionSpecDraft,
+        *,
+        storage_manager: StorageSessionManager,
+        allowed_vfolder_types: list[str],
+    ) -> dict[str, tuple[VFolderMount, ...]]:
+        """Resolve each kernel group's vfolder mounts, keyed by ``role``.
+
+        Split out of :meth:`fetch_session_spec_contexts` because it is the only
+        part that needs the storage-manager RPC (and the etcd-sourced
+        ``allowed_vfolder_types``); kernel resource resolution does not depend on
+        it, so callers that only need slots/arch can skip this. Each group's
+        request list resolves to a single ``VFolderMount`` tuple that every
+        replica sharing the role copies verbatim.
+        """
+        user_uuid = draft.identity.user_uuid
+        domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
+        project_id = draft.scope.project_id
+        access_key = draft.identity.access_key
+        kernel_specs = tuple(draft.options.kernel_groups or ())
+
+        vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
+        if domain_name is None or user_uuid is None:
+            return vfolder_mounts_by_role
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            resource_policy_dict: dict[str, Any] = {}
+            if access_key is not None:
+                kp_row = (
+                    await db_sess.scalars(
+                        sa.select(KeyPairRow)
+                        .options(selectinload(KeyPairRow.resource_policy_row))
+                        .where(KeyPairRow.access_key == access_key)
+                    )
+                ).one_or_none()
+                if kp_row is not None and kp_row.resource_policy_row is not None:
+                    resource_policy_dict = {
+                        "allowed_vfolder_hosts": (
+                            kp_row.resource_policy_row.to_dataclass().allowed_vfolder_hosts
+                        ),
+                    }
+
+            user_scope_for_mounts = UserScope(
+                domain_name=domain_name,
+                group_id=project_id if project_id is not None else UUID(int=0),
+                user_uuid=user_uuid,
+                user_role="user",
+            )
+            for group in kernel_specs:
+                per_group_requests: list[VFolderMountRequest] = []
+                for entry in group.execution_spec.mounts:
+                    per_group_requests.append(
+                        VFolderMountRequest(
+                            ref=UUID(str(entry.vfolder_id)),
+                            dst_path=entry.mount_destination,
+                            options=VFolderMountOptions(
+                                permission=entry.mount_perm,
+                                subpath=entry.subpath,
+                            ),
+                        )
+                    )
+                # Always resolve mounts even when the request list is empty:
+                # ``prepare_vfolder_mounts`` injects dot-prefixed auto-mount
+                # vfolders regardless of explicit requests, so skipping here
+                # would silently drop them.
+                vfolder_mounts_by_role[group.role] = tuple(
+                    await self._fetch_vfolder_mounts(
+                        db_sess,
+                        storage_manager,
+                        allowed_vfolder_types,
+                        user_scope_for_mounts,
+                        resource_policy_dict,
+                        per_group_requests,
+                    )
+                )
+        return vfolder_mounts_by_role
 
     async def pick_default_resource_group(
         self,
