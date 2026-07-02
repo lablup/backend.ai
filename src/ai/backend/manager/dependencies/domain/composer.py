@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.manager.notification.notification_center import NotificationCenter
@@ -69,10 +69,12 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "domain"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,

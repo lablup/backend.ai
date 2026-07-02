@@ -4,6 +4,8 @@ Base exception classes for storage proxy.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -21,6 +23,7 @@ class StorageProxyError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/generic"
     error_title = "Storage Proxy Error"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -35,6 +38,7 @@ class ProcessExecutionError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/execution/failed"
     error_title = "Storage Operation Execution Failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -49,6 +53,7 @@ class ExternalStorageServiceError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/external/failed"
     error_title = "External Operation Failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -63,6 +68,7 @@ class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/api/not-implemented"
     error_title = "API Not Implemented"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,

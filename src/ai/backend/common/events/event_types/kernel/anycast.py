@@ -171,6 +171,7 @@ class KernelTerminatedAnycastEvent(KernelTerminationEvent):
 class DoSyncKernelLogsEvent(BaseKernelEvent):
     container_id: str
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.kernel_id),
@@ -178,6 +179,7 @@ class DoSyncKernelLogsEvent(BaseKernelEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             KernelId(uuid.UUID(value[0])),
@@ -189,5 +191,6 @@ class DoSyncKernelLogsEvent(BaseKernelEvent):
         return None
 
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "do_sync_kernel_logs"

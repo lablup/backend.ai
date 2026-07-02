@@ -1461,12 +1461,14 @@ class ComputeSessionPermissionContext(
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(SessionRow).where(cond)
 
+    @override
     async def calculate_final_permission(
         self, rbac_obj: SessionRow
     ) -> frozenset[ComputeSessionPermission]:

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, cast, override
 
 from ai.backend.common.types import (
     BinarySize,
@@ -36,9 +36,11 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_ba
 class ResourceLimitRule(SessionSpecValidatorRule):
     """Per-kernel requested slots must satisfy image min/max + shmem rules."""
 
+    @override
     def name(self) -> str:
         return "resource_limit"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,

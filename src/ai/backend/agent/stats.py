@@ -20,6 +20,7 @@ from typing import (
     Any,
     Final,
     cast,
+    override,
 )
 
 import aiodocker
@@ -294,6 +295,7 @@ class MovingStatistics:
             "version": 2,
         }
 
+    @override
     def __str__(self) -> str:
         return str({
             "min": self.min,

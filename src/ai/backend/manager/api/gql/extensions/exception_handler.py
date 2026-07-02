@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from typing import Any, Final
+from typing import Any, Final, override
 
 from graphql import GraphQLError, GraphQLResolveInfo
 from strawberry.extensions.base_extension import SchemaExtension
@@ -18,6 +18,7 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class GQLExceptionHandlerExtension(SchemaExtension):
     """Transforms internal exceptions into client-safe GraphQL errors with error codes."""
 
+    @override
     def resolve(
         self,
         _next: Callable[..., Any],

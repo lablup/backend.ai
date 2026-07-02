@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import pytest
 import sqlalchemy as sa
@@ -71,11 +71,13 @@ class TestScopeEntityUnbinder(RBACScopeEntityUnbinder[ScopeUnbinderMappingRow]):
         self._scope_id = scope_id
         self._scope_element_type = scope_element_type
 
+    @override
     def build_purger_spec(self) -> BatchPurgerSpec[ScopeUnbinderMappingRow]:
         entity_ids = self._entity_ids_value
         scope_id = self._scope_id
 
         class _Spec(BatchPurgerSpec[ScopeUnbinderMappingRow]):
+            @override
             def build_subquery(self) -> sa.sql.Select[tuple[ScopeUnbinderMappingRow]]:
                 stmt = sa.select(ScopeUnbinderMappingRow).where(
                     ScopeUnbinderMappingRow.scope_id == scope_id,
@@ -89,14 +91,17 @@ class TestScopeEntityUnbinder(RBACScopeEntityUnbinder[ScopeUnbinderMappingRow]):
         return _Spec()
 
     @property
+    @override
     def entity_type(self) -> RBACElementType:
         return self._entity_element_type
 
     @property
+    @override
     def scope_ref(self) -> RBACElementRef:
         return RBACElementRef(self._scope_element_type, self._scope_id)
 
     @property
+    @override
     def entity_ids(self) -> Sequence[str] | None:
         return self._entity_ids_value
 

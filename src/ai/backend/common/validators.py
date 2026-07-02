@@ -22,6 +22,7 @@ from typing import (
     Literal,
     TypeVar,
     cast,
+    override,
 )
 
 import dateutil.tz
@@ -274,6 +275,7 @@ class Path(PurePath):
         self._allow_devnull = allow_devnull
         self._resolve = resolve
 
+    @override
     def check_and_return(self, value: Any) -> _Path:
         try:
             p = _Path(value).resolve() if self._resolve else _Path(value)

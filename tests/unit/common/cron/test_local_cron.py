@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from typing import cast
+from typing import cast, override
 from unittest.mock import AsyncMock
 
 import pytest
@@ -30,24 +30,29 @@ class MockTask(PeriodicTask):
         self.run_func = run_func or AsyncMock()
         self.run_count = 0
 
+    @override
     async def run(self) -> None:
         """Execute the mock task."""
         self.run_count += 1
         await self.run_func()
 
     @property
+    @override
     def name(self) -> str:
         return self._name
 
     @property
+    @override
     def interval(self) -> float:
         return self._interval
 
     @property
+    @override
     def initial_delay(self) -> float:
         return self._initial_delay
 
     @property
+    @override
     def run_timeout(self) -> float | None:
         return self._run_timeout
 

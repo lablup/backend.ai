@@ -3,7 +3,7 @@ import logging
 import socket
 from collections.abc import AsyncIterator, Sequence
 from contextlib import AbstractAsyncContextManager
-from typing import Any, Final
+from typing import Any, Final, override
 
 import hiredis
 
@@ -274,6 +274,7 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
 
         return client
 
+    @override
     async def __aenter__(self) -> RedisClient:
         return await self.connect()
 
@@ -286,5 +287,6 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
                     pass  # there's no more room we can do anything
                 raise e
 
+    @override
     async def __aexit__(self, *exc_info: Any) -> None:
         return await self.disconnect()

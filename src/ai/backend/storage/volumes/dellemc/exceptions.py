@@ -1,3 +1,6 @@
+from typing import override
+
+
 class DellError(Exception):
     pass
 
@@ -14,6 +17,7 @@ class DellAPIError(DellError):
 
         self.message = message or ""
 
+    @override
     def __str__(self) -> str:
         return type(self).__name__
 

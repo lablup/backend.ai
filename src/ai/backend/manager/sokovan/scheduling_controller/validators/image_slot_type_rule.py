@@ -15,6 +15,7 @@ would otherwise let the session reach the scheduler only to fail there.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import override
 
 from ai.backend.common.types import SlotName
 from ai.backend.manager.data.session.spec import SessionSpec
@@ -29,9 +30,11 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_ba
 class ImageSlotTypeRule(SessionSpecValidatorRule):
     """Image-declared slot keys must be served by an agent in the target RG."""
 
+    @override
     def name(self) -> str:
         return "image_slot_type"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,

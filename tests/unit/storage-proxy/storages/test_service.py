@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, override
 
 import pytest
 
@@ -23,10 +23,12 @@ class TestStreamReader(StreamReader):
     def __init__(self, data_chunks: list[bytes]):
         self._data_chunks = data_chunks
 
+    @override
     async def read(self) -> AsyncIterator[bytes]:
         for chunk in self._data_chunks:
             yield chunk
 
+    @override
     def content_type(self) -> str | None:
         return None
 

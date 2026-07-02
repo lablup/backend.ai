@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 from uuid import UUID
 
 import pytest
@@ -66,6 +66,7 @@ class MappingCreatorSpec(CreatorSpec[ScopeBinderMappingRow]):
         self._entity_id = entity_id
         self._scope_id = scope_id
 
+    @override
     def build_row(self) -> ScopeBinderMappingRow:
         return ScopeBinderMappingRow(
             id=uuid.uuid4(),

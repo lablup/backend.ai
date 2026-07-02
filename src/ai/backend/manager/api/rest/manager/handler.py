@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import textwrap
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, override
 
 import trafaret as t
 from aiohttp import web
@@ -67,48 +67,58 @@ class SQLAlchemyConnectionMetric(PromMetric):
         self.mgr_id = f"{node_id}:{pid}"
         self.val = val
 
+    @override
     def metric_value_string(self, metric_name: str, _primitive: PromMetricPrimitive) -> str:
         return f"""{metric_name}{{mgr_id="{self.mgr_id}"}} {self.val}"""
 
 
 class SQLAlchemyTotalConnectionMetricGroup(PromMetricGroup[SQLAlchemyConnectionMetric]):
     @property
+    @override
     def metric_name(self) -> str:
         return "sqlalchemy_total_connection"
 
     @property
+    @override
     def description(self) -> str:
         return "The number of total connections in SQLAlchemy connection pool."
 
     @property
+    @override
     def metric_primitive(self) -> PromMetricPrimitive:
         return PromMetricPrimitive.gauge
 
 
 class SQLAlchemyOpenConnectionMetricGroup(PromMetricGroup[SQLAlchemyConnectionMetric]):
     @property
+    @override
     def metric_name(self) -> str:
         return "sqlalchemy_open_connection"
 
     @property
+    @override
     def description(self) -> str:
         return "The number of open connections in SQLAlchemy connection pool."
 
     @property
+    @override
     def metric_primitive(self) -> PromMetricPrimitive:
         return PromMetricPrimitive.gauge
 
 
 class SQLAlchemyClosedConnectionMetricGroup(PromMetricGroup[SQLAlchemyConnectionMetric]):
     @property
+    @override
     def metric_name(self) -> str:
         return "sqlalchemy_closed_connection"
 
     @property
+    @override
     def description(self) -> str:
         return "The number of closed connections in SQLAlchemy connection pool."
 
     @property
+    @override
     def metric_primitive(self) -> PromMetricPrimitive:
         return PromMetricPrimitive.gauge
 
@@ -119,6 +129,7 @@ class RedisConnectionMetric(PromMetric):
         self.mgr_id = f"{node_id}:{pid}"
         self.val = val
 
+    @override
     def metric_value_string(self, metric_name: str, _primitive: PromMetricPrimitive) -> str:
         return (
             f"""{metric_name}{{mgr_id="{self.mgr_id}",name="{self.redis_obj_name}"}} {self.val}"""
@@ -127,14 +138,17 @@ class RedisConnectionMetric(PromMetric):
 
 class RedisConnectionMetricGroup(PromMetricGroup[RedisConnectionMetric]):
     @property
+    @override
     def metric_name(self) -> str:
         return "redis_connection"
 
     @property
+    @override
     def description(self) -> str:
         return "The number of connections in Redis Client's connection pool."
 
     @property
+    @override
     def metric_primitive(self) -> PromMetricPrimitive:
         return PromMetricPrimitive.gauge
 

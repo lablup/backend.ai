@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timedelta
+from typing import override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
@@ -82,6 +83,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
         self.status = status
         self.created_at = created_at
 
+    @override
     def __str__(self) -> str:
         return (
             f"AuditLogRow("
@@ -98,6 +100,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
             f")"
         )
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 

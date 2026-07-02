@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import override
 
 from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
 from ai.backend.common.health_checker.types import (
@@ -35,10 +36,12 @@ class DatabaseHealthChecker(StaticServiceHealthChecker):
         self._timeout = timeout
 
     @property
+    @override
     def target_service_group(self) -> ServiceGroup:
         """The service group this checker monitors."""
         return DATABASE
 
+    @override
     async def check_service(self) -> ServiceHealth:
         """
         Check database connection health by pinging the server.
@@ -65,6 +68,7 @@ class DatabaseHealthChecker(StaticServiceHealthChecker):
         return ServiceHealth(results={CID_POSTGRES: status})
 
     @property
+    @override
     def timeout(self) -> float:
         """The timeout for the health check in seconds."""
         return self._timeout

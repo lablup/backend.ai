@@ -28,6 +28,8 @@ so downstream expansion and finalize see fully-resolved options.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     SessionSpecDraft,
@@ -42,9 +44,11 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule impor
 class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
     """Overlay RG defaults under caller-supplied draft values."""
 
+    @override
     def name(self) -> str:
         return "merge_resource_group_defaults"
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,

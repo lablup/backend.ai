@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock
 
 import pytest
@@ -62,6 +62,7 @@ class ParentCreatorSpec(CreatorSpec[OpsTestParentRow]):
     name: str
     domain_name: str
 
+    @override
     def build_row(self) -> OpsTestParentRow:
         return OpsTestParentRow(name=self.name, domain_name=self.domain_name)
 
@@ -71,9 +72,11 @@ class ParentUpdaterSpec(UpdaterSpec[OpsTestParentRow]):
     new_name: str
 
     @property
+    @override
     def row_class(self) -> type[OpsTestParentRow]:
         return OpsTestParentRow
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"name": self.new_name}
 
@@ -87,6 +90,7 @@ class ChildDependency:
 class ChildDependentCreatorSpec(DependentCreatorSpec[ChildDependency, OpsTestChildRow]):
     label: str
 
+    @override
     def build_row(self, dependency: ChildDependency) -> OpsTestChildRow:
         return OpsTestChildRow(parent_id=dependency.parent_id, label=self.label)
 
@@ -95,10 +99,12 @@ class ChildDependentCreatorSpec(DependentCreatorSpec[ChildDependency, OpsTestChi
 class ParentDomainScope(SearchScope):
     domain_name: str
 
+    @override
     def to_condition(self) -> QueryCondition:
         return lambda: OpsTestParentRow.domain_name == self.domain_name
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return ()
 

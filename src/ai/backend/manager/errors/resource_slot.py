@@ -4,6 +4,8 @@ Resource slot domain exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -19,6 +21,7 @@ class ResourceSlotTypeNotFound(BackendAIError):
     error_type = "https://api.backend.ai/probs/resource-slot-type-not-found"
     error_title = "Resource slot type not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RESOURCE_PRESET,
@@ -33,6 +36,7 @@ class AgentResourceNotFound(BackendAIError):
     error_type = "https://api.backend.ai/probs/agent-resource-not-found"
     error_title = "Agent resource not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -47,6 +51,7 @@ class ResourceAllocationNotFound(BackendAIError):
     error_type = "https://api.backend.ai/probs/resource-allocation-not-found"
     error_title = "Resource allocation not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -61,6 +66,7 @@ class AgentResourceCapacityExceeded(BackendAIError):
     error_type = "https://api.backend.ai/probs/agent-resource-capacity-exceeded"
     error_title = "Agent resource capacity exceeded."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,

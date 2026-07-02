@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
-from typing import Protocol, final
+from typing import Protocol, final, override
 
 from ai.backend.test.tester.exporter import TestExporter
 
@@ -27,6 +27,7 @@ class TestCode(ABC):
 
 
 class NopTestCode(TestCode):
+    @override
     async def test(self) -> None:
         """
         A no-operation test code that does nothing.
@@ -79,9 +80,11 @@ class BasicTestTemplate(TestTemplate):
         self._testcode = testcode
 
     @property
+    @override
     def name(self) -> str:
         return "basic"
 
+    @override
     async def run_test(self, exporter: TestExporter) -> None:
         await self._testcode.test()
 
@@ -118,6 +121,7 @@ class WrapperTestTemplate(TestTemplate, ABC):
         yield  # type: ignore[unreachable]  # Required for async generator typing
 
     @final
+    @override
     async def run_test(self, exporter: TestExporter) -> None:
         try:
             async with self._context():
@@ -141,6 +145,7 @@ class SequenceTestTemplate(TestTemplate, ABC):
         self._templates = templates
 
     @final
+    @override
     async def run_test(self, exporter: TestExporter) -> None:
         """
         Run the test case by executing each template in sequence.

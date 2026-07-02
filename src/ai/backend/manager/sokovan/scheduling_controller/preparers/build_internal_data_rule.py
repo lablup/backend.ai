@@ -27,7 +27,7 @@ No-op when every overlay source is empty.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
@@ -39,9 +39,11 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule impor
 class BuildInternalDataRule(SessionSpecDraftRule):
     """Compose per-kernel ``internal_data`` from draft + context inputs."""
 
+    @override
     def name(self) -> str:
         return "build_internal_data"
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,

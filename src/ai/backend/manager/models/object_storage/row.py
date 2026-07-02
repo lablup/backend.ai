@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -88,6 +88,7 @@ class ObjectStorageRow(Base):  # type: ignore[misc]
         primaryjoin=_get_object_storage_namespace_join_cond,
     )
 
+    @override
     def __str__(self) -> str:
         return (
             f"ObjectStorageRow("
@@ -100,6 +101,7 @@ class ObjectStorageRow(Base):  # type: ignore[misc]
             f"region={self.region})"
         )
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 

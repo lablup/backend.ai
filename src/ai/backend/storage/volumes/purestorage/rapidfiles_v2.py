@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from stat import S_IFDIR, S_IFLNK
 from subprocess import CalledProcessError
+from typing import override
 
 from ai.backend.common.json import load_json
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -24,6 +25,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
+    @override
     async def copy_tree(
         self,
         src_path: Path,
@@ -46,6 +48,7 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
         except CalledProcessError as e:
             raise PureStorageCommandFailedError(f'"pcopy" command failed: {e.stderr}') from e
 
+    @override
     def scan_tree(
         self,
         path: Path,
@@ -96,6 +99,7 @@ class RapidFileToolsv2FSOpModel(RapidFileToolsFSOpModel):
 
         return _aiter()
 
+    @override
     async def scan_tree_usage(
         self,
         path: Path,

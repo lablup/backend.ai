@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, override
 
 from ai.backend.common.cron import PeriodicTask
 
@@ -21,16 +21,20 @@ class UpdateSlotsTask(PeriodicTask):
         self._runtime = runtime
 
     @property
+    @override
     def name(self) -> str:
         return "update_slots"
 
     @property
+    @override
     def interval(self) -> float:
         return _UPDATE_SLOTS_INTERVAL
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         await self._runtime.update_agent_slots()

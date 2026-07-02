@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Sequence
 from datetime import datetime
+from typing import override
 
 from aiohttp import web
 
@@ -31,6 +32,7 @@ class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
     error_type = "https://api.backend.ai/probs/scheduling-validation-failed"
     error_title = "Scheduling validation failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -46,6 +48,7 @@ class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
         """
         raise NotImplementedError
 
+    @override
     def failed_predicates(self) -> list[SchedulingPredicate]:
         """Return list of failed predicates for this error."""
         return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
@@ -69,9 +72,11 @@ class ConcurrencyLimitExceeded(SchedulingValidationError):
         self._session_type = session_type
         super().__init__(self.summary())
 
+    @override
     def summary(self) -> str:
         return f"You cannot run more than {self._max_sessions} {self._session_type} sessions"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -92,10 +97,12 @@ class DependenciesNotSatisfied(SchedulingValidationError):
         self._pending_dependency_names = list(pending_dependency_names)
         super().__init__(self.summary())
 
+    @override
     def summary(self) -> str:
         names = ", ".join(self._pending_dependency_names)
         return f"Waiting dependency sessions to finish as success. ({names})"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -116,9 +123,11 @@ class KeypairResourceQuotaExceeded(SchedulingValidationError):
         self._quota_slots = quota_slots
         super().__init__(self.summary())
 
+    @override
     def summary(self) -> str:
         return f"Your keypair resource quota is exceeded. ({_format_slots(self._quota_slots)})"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KEYPAIR,
@@ -139,9 +148,11 @@ class UserResourceQuotaExceeded(SchedulingValidationError):
         self._quota_slots = quota_slots
         super().__init__(self.summary())
 
+    @override
     def summary(self) -> str:
         return f"Your main-keypair resource quota is exceeded. ({_format_slots(self._quota_slots)})"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -162,9 +173,11 @@ class GroupResourceQuotaExceeded(SchedulingValidationError):
         self._quota_slots = quota_slots
         super().__init__(self.summary())
 
+    @override
     def summary(self) -> str:
         return f"Your group resource quota is exceeded. ({_format_slots(self._quota_slots)})"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
@@ -185,9 +198,11 @@ class DomainResourceQuotaExceeded(SchedulingValidationError):
         self._quota_slots = quota_slots
         super().__init__(self.summary())
 
+    @override
     def summary(self) -> str:
         return f"Your domain resource quota is exceeded. ({_format_slots(self._quota_slots)})"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -208,9 +223,11 @@ class PendingSessionCountLimitExceeded(SchedulingValidationError):
         self._max_pending_session_count = max_pending_session_count
         super().__init__(self.summary())
 
+    @override
     def summary(self) -> str:
         return f"You cannot create more than {self._max_pending_session_count} pending session(s)."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -231,12 +248,14 @@ class PendingSessionResourceLimitExceeded(SchedulingValidationError):
         self._current_pending_slots = current_pending_slots
         super().__init__(self.summary())
 
+    @override
     def summary(self) -> str:
         return (
             f"Your pending session quota is exceeded."
             f" ({_format_slots(self._current_pending_slots)})"
         )
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -257,12 +276,14 @@ class ReservedBatchSessionNotReady(SchedulingValidationError):
         self._scheduled_start = scheduled_start
         super().__init__(self.summary())
 
+    @override
     def summary(self) -> str:
         return (
             f"Batch session is scheduled to start at {self._scheduled_start.isoformat()};"
             " current time is before that."
         )
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -283,10 +304,12 @@ class MultipleValidationErrors(SchedulingValidationError):
         self._errors = list(errors)
         super().__init__(self.summary())
 
+    @override
     def summary(self) -> str:
         lines = [f"- {type(e).__name__}: {e.summary()}" for e in self._errors]
         return "Multiple validation errors occurred:\n" + "\n".join(lines)
 
+    @override
     def failed_predicates(self) -> list[SchedulingPredicate]:
         """Return list of all failed predicates from all errors."""
         predicates: list[SchedulingPredicate] = []
@@ -294,6 +317,7 @@ class MultipleValidationErrors(SchedulingValidationError):
             predicates.extend(error.failed_predicates())
         return predicates
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,

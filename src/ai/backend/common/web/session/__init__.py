@@ -102,6 +102,7 @@ class Session(MutableMapping[str, Any]):
         if session_data is not None:
             self._mapping.update(session_data)
 
+    @override
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} [new:{self.new}, changed:{self._changed}, created:{self.created} expiration:{self.expiration_dt}] {self._mapping!r}>"
 
@@ -155,23 +156,29 @@ class Session(MutableMapping[str, Any]):
 
         self._identity = identity
 
+    @override
     def __len__(self) -> int:
         return len(self._mapping)
 
+    @override
     def __iter__(self) -> Iterator[str]:
         return iter(self._mapping)
 
+    @override
     def __contains__(self, key: object) -> bool:
         return key in self._mapping
 
+    @override
     def __getitem__(self, key: str) -> Any:
         return self._mapping[key]
 
+    @override
     def __setitem__(self, key: str, value: Any) -> None:
         self._mapping[key] = value
         self._changed = True
         self._created = get_time()
 
+    @override
     def __delitem__(self, key: str) -> None:
         del self._mapping[key]
         self._changed = True
@@ -381,6 +388,7 @@ class SimpleCookieStorage(AbstractStorage):
             decoder=decoder,
         )
 
+    @override
     async def load_session(self, request: web.Request) -> Session:
         cookie = self.load_cookie(request)
         if cookie is None:

@@ -30,6 +30,7 @@ from typing import (
     Self,
     TypeVar,
     cast,
+    override,
 )
 from urllib.parse import quote as _quote
 from urllib.parse import unquote
@@ -402,6 +403,7 @@ class AsyncEtcd(AbstractKVStore):
         """
         return ChainMap(cast(MutableMapping[str, Any], override) or {}, self.scope_prefix_map)
 
+    @override
     async def put(
         self,
         key: str,
@@ -426,6 +428,7 @@ class AsyncEtcd(AbstractKVStore):
                 mangled_key.encode(self.encoding), str(val).encode(self.encoding)
             )
 
+    @override
     async def put_prefix(
         self,
         key: str,
@@ -459,6 +462,7 @@ class AsyncEtcd(AbstractKVStore):
         async with self.etcd.connect() as communicator:
             await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
+    @override
     async def put_dict(
         self,
         flattened_dict_obj: Mapping[str, str],
@@ -538,6 +542,7 @@ class AsyncEtcd(AbstractKVStore):
                 return
             await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
+    @override
     async def get(
         self,
         key: str,
@@ -584,6 +589,7 @@ class AsyncEtcd(AbstractKVStore):
                     return bytes(value).decode(self.encoding)
         return None
 
+    @override
     async def get_prefix(
         self,
         key_prefix: str,
@@ -668,6 +674,7 @@ class AsyncEtcd(AbstractKVStore):
     # for legacy
     get_prefix_dict = get_prefix
 
+    @override
     async def replace(
         self,
         key: str,
@@ -698,6 +705,7 @@ class AsyncEtcd(AbstractKVStore):
 
             return cast(bool, result.succeeded())
 
+    @override
     async def delete(
         self,
         key: str,
@@ -710,6 +718,7 @@ class AsyncEtcd(AbstractKVStore):
         async with self.etcd.connect() as communicator:
             await communicator.delete(mangled_key.encode(self.encoding))
 
+    @override
     async def delete_multi(
         self,
         keys: Iterable[str],
@@ -728,6 +737,7 @@ class AsyncEtcd(AbstractKVStore):
                 )
             await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
+    @override
     async def delete_prefix(
         self,
         key_prefix: str,
@@ -769,6 +779,7 @@ class AsyncEtcd(AbstractKVStore):
             if cleanup_event:
                 await cleanup_event.notify_waiters()
 
+    @override
     async def watch(
         self,
         key: str,
@@ -826,6 +837,7 @@ class AsyncEtcd(AbstractKVStore):
                 else:
                     raise
 
+    @override
     async def watch_prefix(
         self,
         key_prefix: str,

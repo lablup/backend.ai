@@ -13,6 +13,7 @@ from pprint import pformat
 from typing import (
     Any,
     Final,
+    override,
 )
 
 import click
@@ -400,6 +401,7 @@ class AbstractConfig(UserDict[str, Any]):
 
 
 class LocalConfig(AbstractConfig):
+    @override
     async def reload(self) -> None:
         raise NotImplementedError
 

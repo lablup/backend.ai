@@ -8,7 +8,7 @@ import asyncio
 import logging
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Coroutine
-from typing import Any, TypeVar
+from typing import Any, TypeVar, override
 
 import aiohttp
 import aiotools
@@ -70,6 +70,7 @@ class TCPProxy(ServiceProxy):
         super().__init__(*args, **kwargs)
         self.down_task: asyncio.Task[Any] | None = None
 
+    @override
     async def proxy(self) -> web.WebSocketResponse:
         reader: asyncio.StreamReader
         writer: asyncio.StreamWriter

@@ -10,6 +10,8 @@ error body, which is impossible to handle correctly.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -27,6 +29,7 @@ class WorkerNotAvailable(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/appproxy/worker-not-available"
     error_title = "Worker not available."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -41,6 +44,7 @@ class PortNotAvailable(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/appproxy/port-not-available"
     error_title = "Designated port already occupied."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -55,6 +59,7 @@ class UnsupportedProtocol(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/appproxy/unsupported-protocol"
     error_title = "Unsupported protocol."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -69,6 +74,7 @@ class DatabaseError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/appproxy/database-error"
     error_title = "Error while communicating with database."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -83,6 +89,7 @@ class ContainerConnectionRefused(BackendAIError, web.HTTPBadGateway):
     error_type = "https://api.backend.ai/probs/appproxy/container-connection-refused"
     error_title = "Cannot connect to Backend.AI kernel."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
@@ -97,6 +104,7 @@ class WorkerRegistrationError(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/appproxy/worker-registration-error"
     error_title = "E20013: Failed to register worker."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -111,6 +119,7 @@ class CoordinatorConnectionError(BackendAIError, web.HTTPBadGateway):
     error_type = "https://api.backend.ai/probs/appproxy/coordinator-connection-error"
     error_title = "E20014: Failed to communicate with coordinator."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,

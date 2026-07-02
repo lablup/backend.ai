@@ -10,7 +10,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.types import QueueSentinel
@@ -98,10 +98,12 @@ class ManagerStatusWatcherDependency(
     """Provides background tasks that watch and report manager status."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "manager-status-watcher"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: ManagerStatusWatcherInput
     ) -> AsyncIterator[ManagerStatusWatcherResult]:

@@ -577,9 +577,11 @@ class ImageRow(Base):  # type: ignore[misc]
         result = await session.execute(query)
         return list(result.scalars().all())
 
+    @override
     def __str__(self) -> str:
         return self.image_ref.canonical + f" ({self.image_ref.architecture})"
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 
@@ -931,12 +933,14 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(ImageRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: ImageRow) -> frozenset[ImagePermission]:
         image_row = rbac_obj
         image_id = image_row.id

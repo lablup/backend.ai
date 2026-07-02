@@ -4,6 +4,8 @@ Web server error classes.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -21,6 +23,7 @@ class InvalidAPIConfigurationError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/webserver/invalid-api-configuration"
     error_title = "Invalid API configuration state."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
@@ -35,6 +38,7 @@ class InvalidTemplateValueError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/webserver/invalid-template-value"
     error_title = "Invalid value in template."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
@@ -49,6 +53,7 @@ class ManagerConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/webserver/manager-connection-unavailable"
     error_title = "No healthy Manager endpoint is available."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,

@@ -5,6 +5,7 @@ VFolder-related exceptions.
 from __future__ import annotations
 
 from pathlib import PurePosixPath
+from typing import override
 
 from aiohttp import web
 
@@ -24,6 +25,7 @@ class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/vfolder/not-found"
     error_title = "VFolder Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -42,6 +44,7 @@ class InvalidSubpathError(BackendAIError, web.HTTPBadRequest):
         msg_str = f"Invalid Subpath (vfid={vfid}, relpath={relpath})"
         super().__init__(extra_msg=msg_str, extra_data=msg_str)
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,

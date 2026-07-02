@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, override
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -48,6 +48,7 @@ class GPFSQuotaModel(BaseQuotaModel):
     def _get_fileset_name(self, quota_scope_id: QuotaScopeID) -> str:
         return self._fileset_prefix + quota_scope_id.pathname
 
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -64,6 +65,7 @@ class GPFSQuotaModel(BaseQuotaModel):
         if options is not None:
             await self.update_quota_scope(quota_scope_id, options)
 
+    @override
     async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
         await self.api_client.set_quota(
             self.fs,
@@ -71,6 +73,7 @@ class GPFSQuotaModel(BaseQuotaModel):
             config.limit_bytes,
         )
 
+    @override
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
@@ -100,9 +103,11 @@ class GPFSQuotaModel(BaseQuotaModel):
             limit_bytes=limit_bytes,
         )
 
+    @override
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
         await self.api_client.remove_quota(self.fs, self._get_fileset_name(quota_scope_id))
 
+    @override
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
         await self.api_client.remove_fileset(self.fs, self._get_fileset_name(quota_scope_id))
 
@@ -119,6 +124,7 @@ class GPFSOpModel(BaseFSOpModel):
         self.api_client = api_client
         self.fs = fs
 
+    @override
     async def copy_tree(
         self,
         src_path: Path,
@@ -169,9 +175,11 @@ class GPFSVolume(BaseVolume):
         self.fs = self.config["gpfs_fs_name"]
         self.gpfs_owner = self.config.get("gpfs_owner", "1000:1000")
 
+    @override
     async def init(self) -> None:
         await super().init()
 
+    @override
     async def create_quota_model(self) -> AbstractQuotaModel:
         return GPFSQuotaModel(
             self.mount_path,
@@ -181,6 +189,7 @@ class GPFSVolume(BaseVolume):
             fileset_prefix=self.config.get("gpfs_fileset_prefix"),
         )
 
+    @override
     async def create_fsop_model(self) -> AbstractFSOpModel:
         return GPFSOpModel(
             self.mount_path,
@@ -189,9 +198,11 @@ class GPFSVolume(BaseVolume):
             self.fs,
         )
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
 
+    @override
     async def get_hwinfo(self) -> HardwareMetadata:
         nodes = await self.api_client.list_nodes()
         invalid_status = ["FAILED", "DEGRADED", "ERROR"]
@@ -224,6 +235,7 @@ class GPFSVolume(BaseVolume):
             },
         }
 
+    @override
     async def get_fs_usage(self) -> CapacityUsage:
         storage_pools = await self.api_client.list_fs_pools(self.fs)
         free, total = 0, 0
@@ -238,6 +250,7 @@ class GPFSVolume(BaseVolume):
             capacity_bytes=BinarySize(total) * 1024,
         )
 
+    @override
     async def get_performance_metric(self) -> FSPerfMetric:
         # ref: https://www.ibm.com/docs/en/spectrum-scale/5.0.3?topic=2-perfmondata-get
         query = (

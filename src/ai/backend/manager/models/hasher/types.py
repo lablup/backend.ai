@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, override
 
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
@@ -138,6 +138,7 @@ class PasswordColumn(TypeDecorator[str]):
     impl = VARCHAR
     cache_ok = True
 
+    @override
     def process_bind_param(self, value: Any, _dialect: Any) -> str | None:
         if value is None:
             return None

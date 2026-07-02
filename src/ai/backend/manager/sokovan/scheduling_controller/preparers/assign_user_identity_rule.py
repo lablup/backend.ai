@@ -13,6 +13,8 @@ finalize to surface as a missing-field error).
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
@@ -24,9 +26,11 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule impor
 class AssignUserIdentityRule(SessionSpecDraftRule):
     """Copy the current user's id into ``SessionIdentityDraft.user_uuid``."""
 
+    @override
     def name(self) -> str:
         return "assign_user_identity"
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,

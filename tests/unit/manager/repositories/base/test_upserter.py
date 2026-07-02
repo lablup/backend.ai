@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import pytest
 import sqlalchemy as sa
@@ -41,12 +41,15 @@ class SimpleUpserterSpec(UpserterSpec[UpserterTestRow]):
         self._value = value
 
     @property
+    @override
     def row_class(self) -> type[UpserterTestRow]:
         return UpserterTestRow
 
+    @override
     def build_insert_values(self) -> dict[str, Any]:
         return {"name": self._name, "value": self._value}
 
+    @override
     def build_update_values(self) -> dict[str, Any]:
         # On conflict (PK), only update value
         return {"value": self._value}

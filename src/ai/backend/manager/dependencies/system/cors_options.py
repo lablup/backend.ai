@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 import aiohttp_cors
 
@@ -14,10 +15,12 @@ class CORSOptionsDependency(SystemDependency[CORSOptions]):
     """Provides CORS options configuration."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "cors-options"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: object) -> AsyncIterator[CORSOptions]:
         yield {
             "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]

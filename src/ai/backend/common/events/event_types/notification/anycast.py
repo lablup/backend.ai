@@ -55,6 +55,7 @@ class NotificationTriggeredEvent(AbstractAnycastEvent, BackendAISchema):
     def user_event(self) -> UserEvent | None:
         return None
 
+    @override
     def serialize(self) -> tuple[bytes, ...]:
         return (
             self.rule_type.encode(),
@@ -63,6 +64,7 @@ class NotificationTriggeredEvent(AbstractAnycastEvent, BackendAISchema):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[bytes, ...]) -> NotificationTriggeredEvent:
         return cls(
             rule_type=value[0].decode(),

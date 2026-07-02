@@ -4,6 +4,7 @@ import logging
 from collections.abc import Mapping, Sequence
 from typing import (
     Any,
+    override,
 )
 
 import jwt
@@ -34,16 +35,20 @@ class OIDCHookPlugin(HookPlugin):
         super().__init__(plugin_config, local_config)
         self._config = OIDCHookConfig(**plugin_config)
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         self.plugin_config = plugin_config
         self._config = OIDCHookConfig(**plugin_config)
 
+    @override
     async def init(self, context: Any = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     def get_handlers(self) -> Sequence[tuple[str, HookHandler]]:
         return [
             ("AUTHORIZE", self.pre_auth_hook),

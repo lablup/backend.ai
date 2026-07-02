@@ -17,6 +17,8 @@ so the fallback targets each materialized per-replica draft.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
@@ -27,9 +29,11 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule impor
 class AssignContainerUserMappingRule(SessionSpecDraftRule):
     """Fill kernel-draft ``uid`` / ``main_gid`` / ``supplementary_gids`` from the context."""
 
+    @override
     def name(self) -> str:
         return "assign_container_user_mapping"
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,

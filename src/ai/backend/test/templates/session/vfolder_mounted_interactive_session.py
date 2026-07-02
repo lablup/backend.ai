@@ -22,6 +22,7 @@ from ai.backend.test.templates.template import WrapperTestTemplate
 
 class VFolderMountedInteractiveSessionTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "vfolder_mounted_interactive_session"
 

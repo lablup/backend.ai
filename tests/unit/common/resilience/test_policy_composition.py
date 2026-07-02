@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import ParamSpec, TypeVar
+from typing import ParamSpec, TypeVar, override
 
 import pytest
 
@@ -18,6 +18,7 @@ class TestPolicyComposition:
         execute_called = False
 
         class MockPolicy(Policy):
+            @override
             async def execute(
                 self,
                 next_call: Callable[P, Awaitable[R]],
@@ -44,6 +45,7 @@ class TestPolicyComposition:
         execution_order: list[str] = []
 
         class MockPolicy1(Policy):
+            @override
             async def execute(
                 self,
                 next_call: Callable[P, Awaitable[R]],
@@ -56,6 +58,7 @@ class TestPolicyComposition:
                 return result
 
         class MockPolicy2(Policy):
+            @override
             async def execute(
                 self,
                 next_call: Callable[P, Awaitable[R]],
@@ -68,6 +71,7 @@ class TestPolicyComposition:
                 return result
 
         class MockPolicy3(Policy):
+            @override
             async def execute(
                 self,
                 next_call: Callable[P, Awaitable[R]],
@@ -103,6 +107,7 @@ class TestPolicyComposition:
         execution_order: list[str] = []
 
         class MockPolicy1(Policy):
+            @override
             async def execute(
                 self,
                 next_call: Callable[P, Awaitable[R]],
@@ -116,6 +121,7 @@ class TestPolicyComposition:
                     execution_order.append("policy1_after")
 
         class MockPolicy2(Policy):
+            @override
             async def execute(
                 self,
                 next_call: Callable[P, Awaitable[R]],
@@ -159,6 +165,7 @@ class TestPolicyComposition:
         """Test that exceptions from policies themselves are propagated."""
 
         class FailingMockPolicy(Policy):
+            @override
             async def execute(
                 self,
                 next_call: Callable[P, Awaitable[R]],

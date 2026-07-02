@@ -114,9 +114,11 @@ class PermissionContext(AbstractPermissionContext[StorageHostPermission, str, st
     def host_to_permissions_map(self) -> StorageHostToPermissionMap:
         return self.object_id_to_additional_permission_map
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         return None
 
+    @override
     async def calculate_final_permission(self, rbac_obj: str) -> frozenset[StorageHostPermission]:
         host_name = rbac_obj
         return self.object_id_to_additional_permission_map.get(host_name, frozenset())

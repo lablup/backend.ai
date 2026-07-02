@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -41,20 +42,24 @@ class DrainingRouteHandler(RouteHandler):
         self._event_producer = event_producer
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "drain-routes"
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """No lock needed for draining routes."""
         return None
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.LIFECYCLE
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.TERMINATING],
@@ -62,6 +67,7 @@ class DrainingRouteHandler(RouteHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         """Drained → COOLING_DOWN; the transition history timestamps the
         start of the termination grace period."""
@@ -73,6 +79,7 @@ class DrainingRouteHandler(RouteHandler):
             stale=None,
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute traffic draining for routes.
 
@@ -83,6 +90,7 @@ class DrainingRouteHandler(RouteHandler):
         log.debug("Draining {} routes", len(routes))
         return await self._route_executor.drain_routes(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after draining routes."""
         log.info(

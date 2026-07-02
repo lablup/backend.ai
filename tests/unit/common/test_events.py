@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Any
+from typing import Any, override
 
 import aiotools
 
@@ -26,24 +26,30 @@ from ai.backend.common.types import AgentId
 class DummyBroadcastEvent(AbstractBroadcastEvent):
     value: int
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (self.value + 1,)
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
         return cls(value[0] + 1)
 
     @classmethod
+    @override
     def event_domain(cls) -> EventDomain:
         return EventDomain.AGENT
 
+    @override
     def domain_id(self) -> str | None:
         return None
 
+    @override
     def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "testing"
 

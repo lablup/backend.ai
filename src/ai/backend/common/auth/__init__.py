@@ -1,4 +1,4 @@
-from typing import NewType
+from typing import NewType, override
 
 from callosum.auth import (
     AbstractClientAuthenticator,
@@ -25,12 +25,15 @@ class ManagerAuthHandler(AbstractClientAuthenticator):
         self._manager_public_key = manager_public_key
         self._manager_secret_key = manager_secret_key
 
+    @override
     async def server_public_key(self) -> bytes:
         return self._agent_public_key
 
+    @override
     async def client_public_key(self) -> bytes:
         return self._manager_public_key
 
+    @override
     async def client_identity(self) -> Identity:
         if self._manager_secret_key is None:
             raise RuntimeError("Manager secret key is not initialized")
@@ -50,14 +53,17 @@ class AgentAuthHandler(AbstractServerAuthenticator):
         self._agent_public_key = agent_public_key
         self._agent_secret_key = agent_secret_key
 
+    @override
     async def server_public_key(self) -> bytes:
         return self._agent_public_key
 
+    @override
     async def server_identity(self) -> Identity:
         if self._agent_secret_key is None:
             raise RuntimeError("Agent secret key is not initialized")
         return Identity(self.domain, self._agent_secret_key)
 
+    @override
     async def check_client(self, creds: Credential) -> AuthResult:
         if creds.domain == self.domain and creds.public_key == self._manager_public_key:
             return AuthResult(success=True, user_id="manager")
