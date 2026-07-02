@@ -1457,6 +1457,35 @@ class QuotaScopeID:
             case _:
                 raise ValueError(f"Invalid quota scope type: {scope_type!r}")
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: Any,
+    ) -> Any:
+        """Provide Pydantic core schema for QuotaScopeID serialization/deserialization."""
+        from pydantic_core import core_schema
+
+        def validate_quota_scope_id(v: Any) -> QuotaScopeID:
+            if isinstance(v, QuotaScopeID):
+                return v
+            if isinstance(v, str):
+                return cls.parse(v)
+            raise ValueError(f"Invalid QuotaScopeID: {v}")
+
+        # Accept both QuotaScopeID objects and strings (e.g. "user:<uuid>")
+        return core_schema.no_info_after_validator_function(
+            validate_quota_scope_id,
+            core_schema.union_schema([
+                core_schema.is_instance_schema(cls),
+                core_schema.str_schema(),
+            ]),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda v: str(v),
+                return_schema=core_schema.str_schema(),
+            ),
+        )
+
     def __str__(self) -> str:
         match self.scope_id:
             case UUID():
