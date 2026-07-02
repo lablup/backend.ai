@@ -1,25 +1,33 @@
 import asyncio
 import inspect
+import logging
 import textwrap
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, cast, get_args, get_origin, get_type_hints
 
+import aiohttp_cors
 import click
 import trafaret as t
 from aiohttp import web
 from aiohttp.web_urldispatcher import AbstractResource, DynamicResource
 from pydantic import BaseModel, TypeAdapter
+from pydantic.errors import PydanticInvalidForJsonSchema
 from trafaret.lib import _empty
 
 import ai.backend.common.validators as tx
 from ai.backend.common.api_handlers import BodyParam, PathParam, QueryParam
 from ai.backend.common.json import pretty_json_str
 from ai.backend.common.types import BackendAISchema
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager import __version__
+from ai.backend.manager.api.rest.routing import RouteRegistry
+from ai.backend.manager.api.rest.tree import build_api_routes
 from ai.backend.manager.data.common.sentinel import Undefined, undefined
 from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class UndefChecker(t.Trafaret):
@@ -384,10 +392,43 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
                             }
                     elif issubclass(request_scheme, BaseModel):
                         schema_name = request_scheme.__name__
-                        request_schema = request_scheme.model_json_schema(
-                            ref_template="#/components/schemas/{model}"
+                        try:
+                            request_schema = request_scheme.model_json_schema(
+                                ref_template="#/components/schemas/{model}"
+                            )
+                            if additional_definitions := request_schema.pop("$defs", None):
+                                openapi["components"]["schemas"].update(additional_definitions)
+                            openapi["components"]["schemas"][schema_name] = request_schema
+                            route_def["requestBody"] = {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {"$ref": f"#/components/schemas/{schema_name}"}
+                                    }
+                                }
+                            }
+                        except PydanticInvalidForJsonSchema as exc:
+                            # field type pydantic can't render as JSON schema; document
+                            # the operation without its request-body schema
+                            log.warning(
+                                "openapi: skipping request-body schema for {} ({})",
+                                operation_id,
+                                exc,
+                            )
+                    else:
+                        raise RuntimeError(
+                            f"{request_scheme} not considered as a valid request type"
                         )
 
+            # Handle @api_handler decorated functions (BodyParam, QueryParam, PathParam)
+            if "requestBody" not in route_def:
+                body_model, query_model, path_model = extract_api_handler_params(route.handler)
+
+                try:
+                    if body_model is not None:
+                        schema_name = body_model.__name__
+                        request_schema = body_model.model_json_schema(
+                            ref_template="#/components/schemas/{model}"
+                        )
                         if additional_definitions := request_schema.pop("$defs", None):
                             openapi["components"]["schemas"].update(additional_definitions)
                         openapi["components"]["schemas"][schema_name] = request_schema
@@ -398,59 +439,43 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
                                 }
                             }
                         }
-                    else:
-                        raise RuntimeError(
-                            f"{request_scheme} not considered as a valid request type"
+
+                    if query_model is not None:
+                        query_schema = query_model.model_json_schema(
+                            ref_template="#/components/schemas/{model}"
                         )
-
-            # Handle @api_handler decorated functions (BodyParam, QueryParam, PathParam)
-            if "requestBody" not in route_def:
-                body_model, query_model, path_model = extract_api_handler_params(route.handler)
-
-                if body_model is not None:
-                    schema_name = body_model.__name__
-                    request_schema = body_model.model_json_schema(
-                        ref_template="#/components/schemas/{model}"
-                    )
-                    if additional_definitions := request_schema.pop("$defs", None):
-                        openapi["components"]["schemas"].update(additional_definitions)
-                    openapi["components"]["schemas"][schema_name] = request_schema
-                    route_def["requestBody"] = {
-                        "content": {
-                            "application/json": {
-                                "schema": {"$ref": f"#/components/schemas/{schema_name}"}
-                            }
-                        }
-                    }
-
-                if query_model is not None:
-                    query_schema = query_model.model_json_schema(
-                        ref_template="#/components/schemas/{model}"
-                    )
-                    properties = query_schema.get("properties", {})
-                    required_keys = query_schema.get("required", [])
-                    for prop_name, prop_schema in properties.items():
-                        parameters.append({
-                            "name": prop_name,
-                            "in": "query",
-                            "required": prop_name in required_keys,
-                            "schema": prop_schema,
-                        })
-
-                if path_model is not None:
-                    path_schema = path_model.model_json_schema(
-                        ref_template="#/components/schemas/{model}"
-                    )
-                    properties = path_schema.get("properties", {})
-                    for prop_name, prop_schema in properties.items():
-                        # Check if already added by get_path_parameters
-                        if not any(p["name"] == prop_name for p in parameters):
+                        properties = query_schema.get("properties", {})
+                        required_keys = query_schema.get("required", [])
+                        for prop_name, prop_schema in properties.items():
                             parameters.append({
                                 "name": prop_name,
-                                "in": "path",
-                                "required": True,
+                                "in": "query",
+                                "required": prop_name in required_keys,
                                 "schema": prop_schema,
                             })
+
+                    if path_model is not None:
+                        path_schema = path_model.model_json_schema(
+                            ref_template="#/components/schemas/{model}"
+                        )
+                        properties = path_schema.get("properties", {})
+                        for prop_name, prop_schema in properties.items():
+                            # Check if already added by get_path_parameters
+                            if not any(p["name"] == prop_name for p in parameters):
+                                parameters.append({
+                                    "name": prop_name,
+                                    "in": "path",
+                                    "required": True,
+                                    "schema": prop_schema,
+                                })
+                except PydanticInvalidForJsonSchema as exc:
+                    # param field type pydantic can't render as JSON schema; document
+                    # the operation without those param/body schemas
+                    log.warning(
+                        "openapi: skipping request/param schema for {} ({})",
+                        operation_id,
+                        exc,
+                    )
 
                 # TODO: Extract response model from @api_handler decorated functions.
                 # Currently, @api_handler returns APIResponse which wraps BaseResponseModel,
@@ -496,49 +521,100 @@ def generate_openapi(subapps: list[web.Application], verbose: bool = False) -> d
                 # For generic types like list[Model], get the origin (list).
                 # For non-generic types like Model, use the type itself.
                 and (response_cls := getattr(ret_type, "__origin__", ret_type))
+                # non-class origins (e.g. Optional/Union) would break issubclass()
+                and isinstance(response_cls, type)
                 and (issubclass(response_cls, BaseModel) or issubclass(response_cls, list))
             ):
                 response_schema: dict[str, Any]
-                if issubclass(response_cls, list):
-                    # Handle list[SomeModel] return type
-                    arg: type[BackendAISchema]
-                    (arg,) = get_args(ret_type)
-                    schema_name = f"{arg.__name__}_List"
-                    response_schema = TypeAdapter(list[arg]).json_schema(  # type: ignore[valid-type]
-                        ref_template="#/components/schemas/{model}"
-                    )
-                elif issubclass(response_cls, BaseModel):
-                    # Handle direct BaseModel return type
-                    schema_name = response_cls.__name__
-                    response_schema = response_cls.model_json_schema(
-                        ref_template="#/components/schemas/{model}"
-                    )
+                try:
+                    if issubclass(response_cls, list):
+                        # Handle list[SomeModel] return type
+                        arg: type[BackendAISchema]
+                        (arg,) = get_args(ret_type)
+                        schema_name = f"{arg.__name__}_List"
+                        response_schema = TypeAdapter(list[arg]).json_schema(  # type: ignore[valid-type]
+                            ref_template="#/components/schemas/{model}"
+                        )
+                    elif issubclass(response_cls, BaseModel):
+                        # Handle direct BaseModel return type
+                        schema_name = response_cls.__name__
+                        response_schema = response_cls.model_json_schema(
+                            ref_template="#/components/schemas/{model}"
+                        )
+                    else:
+                        raise RuntimeError(
+                            f"{response_cls} not considered as a valid response type"
+                        )
 
-                else:
-                    raise RuntimeError(f"{response_cls} not considered as a valid response type")
-
-                # Extract nested model definitions (e.g., referenced models) to components
-                if additional_definitions := response_schema.pop("$defs", None):
-                    openapi["components"]["schemas"].update(additional_definitions)
-                openapi["components"]["schemas"][schema_name] = response_schema
-                route_def["responses"] = {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {"$ref": f"#/components/schemas/{schema_name}"}
-                            }
-                        },
+                    # Extract nested model definitions (e.g., referenced models) to components
+                    if additional_definitions := response_schema.pop("$defs", None):
+                        openapi["components"]["schemas"].update(additional_definitions)
+                    openapi["components"]["schemas"][schema_name] = response_schema
+                    route_def["responses"] = {
+                        "200": {
+                            "description": "",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": f"#/components/schemas/{schema_name}"}
+                                }
+                            },
+                        }
                     }
-                }
+                except PydanticInvalidForJsonSchema as exc:
+                    # unrenderable response model; document the operation without
+                    # its response schema
+                    log.warning(
+                        "openapi: skipping response schema for {} ({})",
+                        operation_id,
+                        exc,
+                    )
             openapi["paths"][path][method.lower()] = route_def
     return openapi
 
 
+class _DepStub:
+    """No-op stand-in for the runtime deps ``build_api_routes`` injects.
+
+    Handlers only store their deps at construction and route registration reads
+    only method signatures, so nothing here is exercised during generation.
+    """
+
+    def __getattr__(self, name: str) -> "_DepStub":
+        return self
+
+    def __call__(self, *args: Any, **kwargs: Any) -> "_DepStub":
+        return self
+
+
 async def generate() -> dict[str, Any]:
-    # All API modules have been migrated to the RouteRegistry pattern.
-    # Legacy create_app()-based subapp packages are no longer available.
-    return generate_openapi([], verbose=True)
+    cors_options = {
+        "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
+            allow_credentials=False, expose_headers="*", allow_headers="*"
+        ),
+    }
+    stub: Any = _DepStub()
+    # reuse build_api_routes() (the single source of truth for routes) with stub deps
+    root_registry = RouteRegistry.create("", cors_options)
+    for sub in build_api_routes(
+        processors=stub,
+        adapters=stub,
+        cors_options=cors_options,
+        config_provider=stub,
+        error_monitor=stub,
+        gql_context_deps=stub,
+        valkey_rate_limit=None,
+        root_app=web.Application(),
+        stream_cleanup_handler=stub,
+        health_probe=stub,
+        pidx=0,
+    ):
+        root_registry.add_subregistry(sub)
+
+    subapps: list[web.Application] = []
+    for prefix, app, _reg in root_registry.collect_apps():
+        app["_registry_prefix"] = prefix
+        subapps.append(app)
+    return generate_openapi(subapps, verbose=True)
 
 
 @click.command()
