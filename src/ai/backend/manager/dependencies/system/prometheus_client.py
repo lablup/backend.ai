@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 from ai.backend.common.clients.http_client import ClientPool, tcp_client_session_factory
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -19,10 +20,12 @@ class PrometheusClientDependency(
     """Provides PrometheusClient with managed ClientPool lifecycle."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "prometheus-client"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: ManagerUnifiedConfig) -> AsyncIterator[PrometheusClient]:
         client_pool = ClientPool(tcp_client_session_factory)
         client = PrometheusClient(

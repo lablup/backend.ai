@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import sqlalchemy as sa
 
@@ -75,13 +75,16 @@ class NoPagination(QueryPagination):
     """
 
     @property
+    @override
     def uses_window_function(self) -> bool:
         return False
 
+    @override
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """No pagination applied - returns query unchanged."""
         return query
 
+    @override
     def compute_page_info(
         self, rows: list[Row[Any]], _total_count: int
     ) -> PageInfoResult[Row[Any]]:
@@ -110,9 +113,11 @@ class OffsetPagination(QueryPagination):
     """Number of items to skip from the beginning (must be non-negative)."""
 
     @property
+    @override
     def uses_window_function(self) -> bool:
         return True
 
+    @override
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """Apply offset-based pagination to query."""
 
@@ -121,6 +126,7 @@ class OffsetPagination(QueryPagination):
             query = query.offset(self.offset)
         return query
 
+    @override
     def compute_page_info(self, rows: list[Row[Any]], total_count: int) -> PageInfoResult[Row[Any]]:
         """Compute pagination info for offset-based pagination."""
 
@@ -156,9 +162,11 @@ class CursorForwardPagination(QueryPagination):
     """Optional QueryCondition for cursor position. If None, starts from the beginning."""
 
     @property
+    @override
     def uses_window_function(self) -> bool:
         return False
 
+    @override
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """
         Apply cursor-based forward pagination to query.
@@ -170,6 +178,7 @@ class CursorForwardPagination(QueryPagination):
         query = query.order_by(self.cursor_order)
         return query.limit(self.first + 1)
 
+    @override
     def compute_page_info(
         self, rows: list[Row[Any]], _total_count: int
     ) -> PageInfoResult[Row[Any]]:
@@ -210,9 +219,11 @@ class CursorBackwardPagination(QueryPagination):
     """Optional QueryCondition for cursor position. If None, starts from the end."""
 
     @property
+    @override
     def uses_window_function(self) -> bool:
         return False
 
+    @override
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """
         Apply cursor-based backward pagination to query.
@@ -224,6 +235,7 @@ class CursorBackwardPagination(QueryPagination):
         query = query.order_by(self.cursor_order)
         return query.limit(self.last + 1)
 
+    @override
     def compute_page_info(
         self, rows: list[Row[Any]], _total_count: int
     ) -> PageInfoResult[Row[Any]]:

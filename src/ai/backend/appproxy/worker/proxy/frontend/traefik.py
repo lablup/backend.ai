@@ -5,7 +5,7 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, override
 
 from aiohttp import web
 
@@ -46,17 +46,21 @@ class _LastUsedTimeMarkerWriterTask(PeriodicTask):
         self._frontend = frontend
 
     @property
+    @override
     def name(self) -> str:
         return "last_used_time_marker_writer"
 
     @property
+    @override
     def interval(self) -> float:
         return _LAST_USED_TIME_MARKER_WRITER_INTERVAL
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         await self._frontend.last_used_time_marker_writer()
 
@@ -70,17 +74,21 @@ class _ActiveCircuitWriterTask(PeriodicTask):
         self._frontend = frontend
 
     @property
+    @override
     def name(self) -> str:
         return "active_circuit_writer"
 
     @property
+    @override
     def interval(self) -> float:
         return _ACTIVE_CIRCUIT_WRITER_INTERVAL
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         await self._frontend.active_circuit_writer()
 
@@ -110,6 +118,7 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
         app.router.add_head("/{key}/mark-inactive", self.mark_inactive)
         self.runner = web.AppRunner(app, access_log=None)
 
+    @override
     async def start(self) -> None:
         if not self.root_context.local_config.proxy_worker.traefik:
             raise MissingTraefikConfigError("Traefik configuration is required")
@@ -130,6 +139,7 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
         ])
         await self._local_cron.start()
 
+    @override
     async def stop(self) -> None:
         if not self.root_context.local_config.proxy_worker.traefik:
             raise MissingTraefikConfigError("Traefik configuration is required")
@@ -180,24 +190,29 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
             async with self.redis_keys_lock:
                 self.redis_keys.update(keys)
 
+    @override
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TraefikBackend:
         return TraefikBackend(self.root_context, circuit, routes)
 
+    @override
     async def update_backend(
         self, backend: TraefikBackend, routes: list[RouteInfo]
     ) -> TraefikBackend:
         backend.routes = routes
         return backend
 
+    @override
     async def terminate_backend(self, backend: TraefikBackend) -> None:
         pass
 
+    @override
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         # FIXME: implement
         return []
 
 
 class TraefikPortFrontend(AbstractTraefikFrontend[int]):
+    @override
     def get_circuit_key(self, circuit: Circuit) -> int:
         if not isinstance(circuit.frontend, PortFrontendInfo):
             raise InvalidFrontendTypeError(
@@ -207,6 +222,7 @@ class TraefikPortFrontend(AbstractTraefikFrontend[int]):
 
 
 class TraefikSubdomainFrontend(AbstractTraefikFrontend[str]):
+    @override
     def get_circuit_key(self, circuit: Circuit) -> str:
         if not isinstance(circuit.frontend, SubdomainFrontendInfo):
             raise InvalidFrontendTypeError(
@@ -216,6 +232,7 @@ class TraefikSubdomainFrontend(AbstractTraefikFrontend[str]):
 
 
 class TraefikTCPFrontend(AbstractTraefikFrontend[int]):
+    @override
     def get_circuit_key(self, circuit: Circuit) -> int:
         if not isinstance(circuit.frontend, PortFrontendInfo):
             raise InvalidFrontendTypeError(

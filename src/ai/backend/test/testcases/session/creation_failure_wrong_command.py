@@ -1,4 +1,5 @@
 import asyncio
+from typing import override
 
 from ai.backend.common.types import ClusterMode
 from ai.backend.test.contexts.client_session import ClientSessionContext
@@ -13,6 +14,7 @@ from ai.backend.test.templates.template import TestCode
 
 
 class BatchSessionCreationFailureWrongCommand(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         image_dep = ImageContext.current()

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Final
+from typing import Final, override
 
 from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
 from ai.backend.common.cron import LocalCron, PeriodicTask
@@ -36,19 +36,23 @@ class _ServiceDiscoveryHeartbeatTask(PeriodicTask):
         self._interval = interval
 
     @property
+    @override
     def name(self) -> str:
         return "service_discovery_heartbeat"
 
     @property
+    @override
     def interval(self) -> float:
         return self._interval
 
     @property
+    @override
     def initial_delay(self) -> float:
         # The original loop slept for `interval` before publishing the first
         # heartbeat (the initial registration is published by start() directly).
         return self._interval
 
+    @override
     async def run(self) -> None:
         await self._publisher.publish_registered()
 

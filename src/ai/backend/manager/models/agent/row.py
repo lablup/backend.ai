@@ -318,12 +318,14 @@ class AgentPermissionContext(AbstractPermissionContext[AgentPermission, AgentRow
     ) -> None:
         self.sgroup_permission_ctx = sgroup_permission_ctx
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(AgentRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: AgentRow) -> frozenset[AgentPermission]:
         agent_row = rbac_obj
         agent_id = cast(AgentId, agent_row.id)

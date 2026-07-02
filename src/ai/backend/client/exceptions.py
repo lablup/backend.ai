@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, override
 
 __all__: tuple[str, ...] = (
     "APIVersionWarning",
@@ -12,6 +12,7 @@ __all__: tuple[str, ...] = (
 class BackendError(Exception):
     """Exception type to catch all ai.backend-related errors."""
 
+    @override
     def __str__(self) -> str:
         return repr(self)
 

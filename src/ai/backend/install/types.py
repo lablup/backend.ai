@@ -4,6 +4,7 @@ import dataclasses
 import enum
 from datetime import datetime
 from pathlib import Path
+from typing import override
 
 from pydantic import Field
 from rich.console import ConsoleRenderable, RichCast
@@ -92,6 +93,7 @@ class PrerequisiteError(RichCast, Exception):
         self.msg = msg
         self.instruction = instruction
 
+    @override
     def __rich__(self) -> ConsoleRenderable:
         text = f"[bold red]:warning: [bold white]{self.msg}[/]"
         if self.instruction:
@@ -138,6 +140,7 @@ class OSInfo(RichCast):
     distro: str
     distro_variants: set[str]
 
+    @override
     def __rich__(self) -> ConsoleRenderable:
         variants = [self.distro, *sorted(self.distro_variants)]
         variant = ", ".join(variants)

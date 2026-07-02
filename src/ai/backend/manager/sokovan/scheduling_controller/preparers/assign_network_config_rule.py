@@ -22,6 +22,8 @@ an earlier rule or by the caller.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
@@ -33,9 +35,11 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule impor
 class AssignNetworkConfigRule(SessionSpecDraftRule):
     """Resolve ``SessionNetworkDraft.network_type`` using the legacy priority."""
 
+    @override
     def name(self) -> str:
         return "assign_network_config"
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,

@@ -4,6 +4,8 @@ Image and container registry-related exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -20,6 +22,7 @@ from .common import InternalServerError, ObjectNotFound
 class ImageNotFound(ObjectNotFound):
     object_name = "environment image"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
@@ -31,6 +34,7 @@ class ImageNotFound(ObjectNotFound):
 class ImageAliasNotFound(ObjectNotFound):
     object_name = "image alias"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE_ALIAS,
@@ -42,6 +46,7 @@ class ImageAliasNotFound(ObjectNotFound):
 class ContainerRegistryNotFound(ObjectNotFound):
     object_name = "container_registry"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.CONTAINER_REGISTRY,
@@ -53,6 +58,7 @@ class ContainerRegistryNotFound(ObjectNotFound):
 class ContainerRegistryGroupsAssociationNotFound(ObjectNotFound):
     object_name = "association of container_registry and group"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.CONTAINER_REGISTRY,
@@ -65,6 +71,7 @@ class ContainerRegistryWebhookAuthorizationFailed(BackendAIError, web.HTTPUnauth
     error_type = "https://api.backend.ai/probs/webhook/auth-failed"
     error_title = "Container Registry Webhook authorization failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.CONTAINER_REGISTRY,
@@ -77,6 +84,7 @@ class HarborWebhookContainerRegistryRowNotFound(InternalServerError):
     error_type = "https://api.backend.ai/probs/webhook/harbor/container-registry-not-found"
     error_title = "Container registry row not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.CONTAINER_REGISTRY,
@@ -88,6 +96,7 @@ class HarborWebhookContainerRegistryRowNotFound(InternalServerError):
 class UnknownImageReferenceError(ObjectNotFound):
     object_name = "image reference"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
@@ -102,6 +111,7 @@ class ImageAccessForbiddenError(BackendAIError):
     error_type = "https://api.backend.ai/probs/generic-forbidden"
     error_title = "User does not have permission to access this image."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
@@ -114,6 +124,7 @@ class ForgetImageNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/generic-not-found"
     error_title = "The image you are trying to delete does not exist."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
@@ -126,6 +137,7 @@ class AliasImageActionValueError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-parameters"
     error_title = "Invalid parameters for image alias."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE_ALIAS,
@@ -142,6 +154,7 @@ class AliasImageActionDBError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/image-db-error"
     error_title = "Database error while managing image alias."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE_ALIAS,
@@ -154,6 +167,7 @@ class ModifyImageActionValueError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-parameters"
     error_title = "Invalid parameters for image modification."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
@@ -170,6 +184,7 @@ class PurgeImageActionByIdObjectDBError(BackendAIError, web.HTTPInternalServerEr
     error_type = "https://api.backend.ai/probs/image-db-error"
     error_title = "Database error while purging image."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
@@ -181,6 +196,7 @@ class PurgeImageActionByIdObjectDBError(BackendAIError, web.HTTPInternalServerEr
 class RegistryNotFoundForImage(ObjectNotFound):
     object_name = "registry for image"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.CONTAINER_REGISTRY,

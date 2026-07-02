@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, override
 
 import attrs
 from aiohttp.typedefs import Middleware
@@ -177,6 +177,7 @@ class ContainerLifecycleEvent:
     exit_code: int | None = None
     suppress_events: bool = False
 
+    @override
     def __str__(self) -> str:
         if self.container_id:
             cid = self.container_id[:13]

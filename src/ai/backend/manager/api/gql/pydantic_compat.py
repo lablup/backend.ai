@@ -40,7 +40,18 @@ import dataclasses
 import types
 from decimal import Decimal
 from enum import Enum
-from typing import Any, ClassVar, Self, Union, cast, final, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    ClassVar,
+    Self,
+    Union,
+    cast,
+    final,
+    get_args,
+    get_origin,
+    get_type_hints,
+    override,
+)
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -230,6 +241,7 @@ class PydanticInputMixin[T_DTO: BaseModel]:
 
     __dto_type__: ClassVar[type]
 
+    @override
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         for base in getattr(cls, "__orig_bases__", ()):

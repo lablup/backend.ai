@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any
+from typing import Any, override
 
 from ai.backend.common.types import BinarySize, ResourceSlotEntry
 from ai.backend.manager.data.session.creation import ImageInfo
@@ -49,9 +49,11 @@ class ComputeKernelResourcesRule(SessionSpecDraftRule):
 
     _SHMEM_IMAGE_LABEL = "ai.backend.resource.preferred.shmem"
 
+    @override
     def name(self) -> str:
         return "compute_kernel_resources"
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,

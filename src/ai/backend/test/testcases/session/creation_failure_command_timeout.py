@@ -1,4 +1,5 @@
 import asyncio
+from typing import override
 
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import ClusterMode
@@ -13,6 +14,7 @@ _TASK_TIMEOUT = 15
 
 
 class BatchSessionCreationFailureTimeout(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         spec_meta = TestSpecMetaContext.current()

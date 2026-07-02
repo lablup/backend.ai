@@ -4,6 +4,8 @@ Process/subprocess execution exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -23,6 +25,7 @@ class SubprocessStdoutNotAvailableError(BackendAIError, web.HTTPInternalServerEr
     error_type = "https://api.backend.ai/probs/storage/subprocess/stdout-unavailable"
     error_title = "Subprocess Stdout Not Available"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -37,6 +40,7 @@ class QuotaCommandFailedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/quota/command-failed"
     error_title = "Quota Command Failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -51,6 +55,7 @@ class CephNotInstalledError(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/storage/ceph/not-installed"
     error_title = "Ceph Not Installed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -65,6 +70,7 @@ class PureStorageCommandFailedError(BackendAIError, web.HTTPInternalServerError)
     error_type = "https://api.backend.ai/probs/storage/purestorage/command-failed"
     error_title = "PureStorage Command Failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -79,6 +85,7 @@ class NetAppClientError(ExternalStorageServiceError, web.HTTPServiceUnavailable)
     error_type = "https://api.backend.ai/probs/storage/netapp/api-error"
     error_title = "NetApp API Error"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -93,6 +100,7 @@ class NetAppQTreeNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/netapp/qtree-not-found"
     error_title = "NetApp QTree Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -107,6 +115,7 @@ class DDNCommandFailedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/ddn/command-failed"
     error_title = "DDN Command Failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -121,6 +130,7 @@ class MetricNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/metric-not-found"
     error_title = "Metric Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,

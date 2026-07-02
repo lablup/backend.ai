@@ -1,4 +1,5 @@
 import re
+from typing import override
 
 import strawberry
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
@@ -955,6 +956,7 @@ class Subscription:
 
 
 class CustomizedSchema(Schema):
+    @override
     def as_str(self) -> str:
         # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
         # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so

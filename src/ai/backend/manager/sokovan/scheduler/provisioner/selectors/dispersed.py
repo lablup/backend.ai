@@ -8,6 +8,7 @@ workloads across the cluster.
 import sys
 from collections.abc import Sequence
 from decimal import Decimal
+from typing import override
 
 from .selector import (
     AbstractAgentSelector,
@@ -37,18 +38,21 @@ class DispersedAgentSelector(AbstractAgentSelector):
         """
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
+    @override
     def name(self) -> str:
         """
         Return the selector name for predicates.
         """
         return "DispersedAgentSelector"
 
+    @override
     def success_message(self) -> str:
         """
         Return a message describing successful agent selection.
         """
         return "Agent selected using dispersed strategy for balanced workload distribution"
 
+    @override
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],

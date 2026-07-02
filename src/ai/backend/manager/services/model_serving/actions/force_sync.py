@@ -11,10 +11,12 @@ from ai.backend.manager.services.model_serving.actions.base import ModelServiceA
 class ForceSyncAction(ModelServiceAction):
     service_id: uuid.UUID
 
+    @override
     def entity_id(self) -> str | None:
         return None
 
     @classmethod
+    @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 

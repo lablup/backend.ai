@@ -11,6 +11,7 @@ from typing import (
     ClassVar,
     TypeVar,
     cast,
+    override,
 )
 
 import asyncpg.pgproto.pgproto
@@ -107,16 +108,20 @@ class EnumType(TypeDecorator[enum.Enum], SchemaType):
         super().__init__(*enums, **opts)
         self._enum_cls = enum_cls
 
+    @override
     def process_bind_param(self, value: enum.Enum | None, dialect: sa.Dialect) -> str | None:
         return value.name if value else None
 
+    @override
     def process_result_value(self, value: Any, dialect: sa.Dialect) -> enum.Enum | None:
         return self._enum_cls[value] if value else None
 
+    @override
     def copy(self, **kw: Any) -> EnumType:
         return EnumType(self._enum_cls, **self._opts)
 
     @property
+    @override
     def python_type(self) -> type[enum.Enum]:
         return self._enum_cls
 
@@ -135,6 +140,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
         self._use_name = use_name
         self._enum_cls = enum_cls
 
+    @override
     def process_bind_param(
         self,
         value: T_StrEnum | None,
@@ -148,6 +154,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
         val: str = value.value
         return val
 
+    @override
     def process_result_value(
         self,
         value: str | None,
@@ -159,10 +166,12 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
             return self._enum_cls[value]
         return self._enum_cls(value)
 
+    @override
     def copy(self, **kw: Any) -> StrEnumType[T_StrEnum]:
         return StrEnumType(self._enum_cls, self._use_name, **self._opts)
 
     @property
+    @override
     def python_type(self) -> type[T_StrEnum]:
         return self._enum_cls
 
@@ -180,11 +189,13 @@ class StructuredJSONColumn(TypeDecorator[BaseModel]):
         super().__init__()
         self._schema = schema
 
+    @override
     def load_dialect_impl(self, dialect: sa.Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
             return dialect.type_descriptor(sa.JSON())
         return super().load_dialect_impl(dialect)
 
+    @override
     def process_bind_param(self, value: Any, dialect: sa.Dialect) -> BaseModel:
         if value is None:
             return self._schema()
@@ -197,12 +208,14 @@ class StructuredJSONColumn(TypeDecorator[BaseModel]):
             ) from e
         return validated
 
+    @override
     def process_result_value(self, value: Any, dialect: sa.Dialect) -> BaseModel:
         if value is None:
             return self._schema()
         result: BaseModel = self._schema(**value)
         return result
 
+    @override
     def copy(self, **kw: Any) -> StructuredJSONColumn:
         return StructuredJSONColumn(self._schema)
 
@@ -219,16 +232,19 @@ class StructuredJSONObjectColumn(TypeDecorator[BaseModel]):
         super().__init__()
         self._schema = schema
 
+    @override
     def process_bind_param(self, value: BaseModel | None, dialect: sa.Dialect) -> str | None:
         if value:
             return value.model_dump_json()
         return None
 
+    @override
     def process_result_value(self, value: str | None, dialect: sa.Dialect) -> BaseModel | None:
         if value:
             return self._schema(**json.loads(value))
         return None
 
+    @override
     def copy(self, **kw: Any) -> StructuredJSONObjectColumn:
         return StructuredJSONObjectColumn(self._schema)
 
@@ -249,11 +265,13 @@ class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator[list[T
         super().__init__()
         self._schema = schema
 
+    @override
     def process_bind_param(self, value: list[TBaseModel] | None, dialect: sa.Dialect) -> str | None:
         if value is not None:
             return TypeAdapter(list[TBaseModel]).dump_json(value).decode("utf-8")
         return None
 
+    @override
     def process_result_value(
         self, value: str | None, dialect: sa.Dialect
     ) -> list[TBaseModel] | None:
@@ -261,6 +279,7 @@ class StructuredJSONObjectListColumn[TBaseModel: BaseModel](TypeDecorator[list[T
             return [self._schema(**i) for i in json.loads(value)]
         return None
 
+    @override
     def copy(self, **kw: Any) -> StructuredJSONObjectListColumn[TBaseModel]:
         return StructuredJSONObjectListColumn(self._schema)
 
@@ -287,9 +306,11 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]])
         super().__init__()
         self._schema = schema
 
+    @override
     def coerce_compared_value(self, _op: Any, _value: Any) -> JSONB:
         return JSONB()
 
+    @override
     def process_bind_param(
         self, value: list[TBaseModel] | None, _dialect: sa.Dialect
     ) -> list[dict[str, Any]]:
@@ -297,6 +318,7 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]])
             return [item.model_dump(mode="json") for item in value]
         return []
 
+    @override
     def process_result_value(
         self, value: list[dict[str, Any]] | str | None, _dialect: sa.Dialect
     ) -> list[TBaseModel]:
@@ -309,6 +331,7 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]])
             return [self._schema.model_validate(item) for item in value]
         return []
 
+    @override
     def copy(self, **kw: Any) -> PydanticListColumn[TBaseModel]:
         return PydanticListColumn(self._schema)
 
@@ -321,11 +344,13 @@ class URLColumn(TypeDecorator[yarl.URL]):
     impl = sa.types.UnicodeText
     cache_ok = True
 
+    @override
     def process_bind_param(self, value: yarl.URL | str | None, dialect: sa.Dialect) -> str | None:
         if isinstance(value, yarl.URL):
             return str(value)
         return value
 
+    @override
     def process_result_value(self, value: str | None, dialect: sa.Dialect) -> yarl.URL | None:
         if value is None:
             return None
@@ -340,6 +365,7 @@ class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6
     impl = CIDR
     cache_ok = True
 
+    @override
     def process_bind_param(
         self,
         value: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | str | None,
@@ -363,6 +389,7 @@ class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6
             return None
         return str(addr)
 
+    @override
     def process_result_value(
         self, value: str | None, dialect: sa.Dialect
     ) -> ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | None:
@@ -384,11 +411,13 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator[UUID_SubType]):
     uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
     cache_ok = True
 
+    @override
     def load_dialect_impl(self, dialect: sa.Dialect) -> TypeEngine[Any]:
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
 
+    @override
     def process_bind_param(self, value: Any, dialect: sa.Dialect) -> str | bytes | None:
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
@@ -404,6 +433,7 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator[UUID_SubType]):
             return value.bytes
         return uuid.UUID(value).bytes
 
+    @override
     def process_result_value(self, value: Any, dialect: sa.Dialect) -> UUID_SubType | None:
         if value is None:
             return value

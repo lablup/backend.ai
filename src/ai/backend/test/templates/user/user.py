@@ -17,6 +17,7 @@ from ai.backend.test.tester.dependency import DomainDep, GroupDep
 
 class UserTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "create_user"
 

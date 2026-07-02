@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -18,9 +18,11 @@ _RESERVED_PORTS: frozenset[int] = frozenset({2000, 2001, 2200, 7681})
 class ServicePortRule(SessionSpecValidatorRule):
     """Per-kernel preopen_ports must not collide with reserved or service ports."""
 
+    @override
     def name(self) -> str:
         return "service_port"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,

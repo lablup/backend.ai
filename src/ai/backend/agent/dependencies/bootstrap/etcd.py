@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.common.dependencies import DependencyProvider
@@ -18,10 +19,12 @@ class AgentEtcdDependency(DependencyProvider[AgentUnifiedConfig, AsyncEtcd]):
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "etcd"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: AgentUnifiedConfig) -> AsyncIterator[AsyncEtcd]:
         """Initialize and provide etcd client.
 
@@ -60,6 +63,7 @@ class AgentEtcdDependency(DependencyProvider[AgentUnifiedConfig, AsyncEtcd]):
         ) as etcd:
             yield etcd
 
+    @override
     def gen_liveness_checker(self, resource: AsyncEtcd) -> ServiceHealthChecker:
         """Liveness — stuck etcd connection observed; restart is the recovery path."""
         return EtcdHealthChecker(etcd=resource)

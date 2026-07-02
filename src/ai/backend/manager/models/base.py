@@ -21,6 +21,7 @@ from typing import (
     Self,
     TypeVar,
     cast,
+    override,
 )
 
 import sqlalchemy as sa
@@ -195,6 +196,7 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
         super().__init__(*enums, **opts)
         self._enum_cls = enum_cls
 
+    @override
     def process_bind_param(
         self,
         value: T_Enum | None,
@@ -202,6 +204,7 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
     ) -> str | None:
         return value.name if value else None
 
+    @override
     def process_result_value(
         self,
         value: Any | None,
@@ -209,10 +212,12 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
     ) -> T_Enum | None:
         return self._enum_cls[value] if value else None
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return EnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
+    @override
     def python_type(self) -> type[T_Enum]:
         return self._enum_cls
 
@@ -249,6 +254,7 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
         super().__init__(*enums, **opts)
         self._enum_cls = enum_cls
 
+    @override
     def process_bind_param(
         self,
         value: T_Enum | None,
@@ -256,6 +262,7 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
     ) -> str | None:
         return value.value if value else None
 
+    @override
     def process_result_value(
         self,
         value: Any | None,
@@ -263,10 +270,12 @@ class EnumValueType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
     ) -> T_Enum | None:
         return self._enum_cls(value) if value else None
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return EnumValueType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
+    @override
     def python_type(self) -> type[T_Enum]:
         return self._enum_cls
 
@@ -287,6 +296,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
         self._use_name = use_name
         self._enum_cls = enum_cls
 
+    @override
     def process_bind_param(
         self,
         value: T_StrEnum | None,
@@ -298,6 +308,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
             return value.name
         return cast(str, value.value)
 
+    @override
     def process_result_value(
         self,
         value: str | None,
@@ -309,10 +320,12 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[T_StrEnum]):
             return self._enum_cls[value]
         return self._enum_cls(value)
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return StrEnumType(self._enum_cls, self._use_name, **self._opts)  # type: ignore[return-value]
 
     @property
+    @override
     def python_type(self) -> type[T_StrEnum]:
         return self._enum_cls
 
@@ -336,6 +349,7 @@ class IntFlagType[T_IntFlag: enum.IntFlag](TypeDecorator[T_IntFlag]):
         super().__init__(**opts)
         self._enum_cls = enum_cls
 
+    @override
     def process_bind_param(
         self,
         value: T_IntFlag | None,
@@ -345,6 +359,7 @@ class IntFlagType[T_IntFlag: enum.IntFlag](TypeDecorator[T_IntFlag]):
             return None
         return int(value)
 
+    @override
     def process_result_value(
         self,
         value: int | None,
@@ -354,10 +369,12 @@ class IntFlagType[T_IntFlag: enum.IntFlag](TypeDecorator[T_IntFlag]):
             return None
         return self._enum_cls(value)
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return IntFlagType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
+    @override
     def python_type(self) -> type[T_IntFlag]:
         return self._enum_cls
 
@@ -377,9 +394,11 @@ class CurvePublicKeyColumn(TypeDecorator[PublicKey]):
     impl = sa.String
     cache_ok = True
 
+    @override
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         return dialect.type_descriptor(sa.String(40))
 
+    @override
     def process_bind_param(
         self,
         value: PublicKey | None,
@@ -387,6 +406,7 @@ class CurvePublicKeyColumn(TypeDecorator[PublicKey]):
     ) -> str | None:
         return value.decode("ascii") if value else None
 
+    @override
     def process_result_value(
         self,
         value: str | None,
@@ -405,9 +425,11 @@ class QuotaScopeIDType(TypeDecorator[QuotaScopeID]):
     impl = sa.String
     cache_ok = True
 
+    @override
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         return dialect.type_descriptor(sa.String(64))
 
+    @override
     def process_bind_param(
         self,
         value: QuotaScopeID | None,
@@ -415,6 +437,7 @@ class QuotaScopeIDType(TypeDecorator[QuotaScopeID]):
     ) -> str | None:
         return str(value) if value else None
 
+    @override
     def process_result_value(
         self,
         value: str | None,
@@ -431,6 +454,7 @@ class ResourceSlotColumn(TypeDecorator[ResourceSlot]):
     impl = JSONB
     cache_ok = True
 
+    @override
     def process_bind_param(
         self,
         value: ResourceSlot | None,
@@ -440,6 +464,7 @@ class ResourceSlotColumn(TypeDecorator[ResourceSlot]):
             return None
         return value.to_json()
 
+    @override
     def process_result_value(
         self,
         value: dict[str, str] | None,
@@ -466,11 +491,13 @@ class StructuredJSONColumn(TypeDecorator[Any]):
         super().__init__()
         self._schema = schema
 
+    @override
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
             return dialect.type_descriptor(sa.JSON())
         return super().load_dialect_impl(dialect)
 
+    @override
     def process_bind_param(
         self,
         value: Any | None,
@@ -487,6 +514,7 @@ class StructuredJSONColumn(TypeDecorator[Any]):
             ) from e
         return value
 
+    @override
     def process_result_value(
         self,
         value: Any | None,
@@ -496,6 +524,7 @@ class StructuredJSONColumn(TypeDecorator[Any]):
             return self._schema.check({})
         return self._schema.check(value)
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return StructuredJSONColumn(self._schema)  # type: ignore[return-value]
 
@@ -512,6 +541,7 @@ class StructuredJSONObjectColumn(TypeDecorator[JSONSerializableMixin]):
         super().__init__()
         self._schema = schema
 
+    @override
     def process_bind_param(
         self, value: JSONSerializableMixin | None, _dialect: Dialect
     ) -> dict[str, Any] | None:
@@ -519,6 +549,7 @@ class StructuredJSONObjectColumn(TypeDecorator[JSONSerializableMixin]):
             return None
         return self._schema.to_json(value)
 
+    @override
     def process_result_value(
         self, value: dict[str, Any] | None, dialect: Dialect
     ) -> JSONSerializableMixin | None:
@@ -526,6 +557,7 @@ class StructuredJSONObjectColumn(TypeDecorator[JSONSerializableMixin]):
             return None
         return self._schema.from_json(value)
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return StructuredJSONObjectColumn(self._schema)  # type: ignore[return-value]
 
@@ -543,14 +575,17 @@ class StructuredJSONObjectListColumn(TypeDecorator[list[JSONSerializableMixin]])
         super().__init__()
         self._schema = schema
 
+    @override
     def coerce_compared_value(self, _op: Any, _value: Any) -> JSONB:
         return JSONB()
 
+    @override
     def process_bind_param(
         self, value: list[JSONSerializableMixin] | None, _dialect: Dialect
     ) -> list[dict[str, Any]]:
         return [self._schema.to_json(item) for item in value] if value is not None else []
 
+    @override
     def process_result_value(
         self, value: list[Any] | None, _dialect: Dialect
     ) -> list[JSONSerializableMixin]:
@@ -558,6 +593,7 @@ class StructuredJSONObjectListColumn(TypeDecorator[list[JSONSerializableMixin]])
             return []
         return [self._schema.from_json(item) for item in value]
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return StructuredJSONObjectListColumn(self._schema)  # type: ignore[return-value]
 
@@ -575,6 +611,7 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
         super().__init__()
         self._schema = schema
 
+    @override
     def process_bind_param(
         self,
         value: TBaseModel | None,
@@ -585,6 +622,7 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
             return value.model_dump(mode="json")
         return None
 
+    @override
     def process_result_value(
         self,
         value: dict[str, Any] | None,
@@ -595,6 +633,7 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
             return self._schema.model_validate(value)
         return None
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return PydanticColumn(self._schema)  # type: ignore[return-value]
 
@@ -612,9 +651,11 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]])
         super().__init__()
         self._schema = schema
 
+    @override
     def coerce_compared_value(self, _op: Any, _value: Any) -> JSONB:
         return JSONB()
 
+    @override
     def process_bind_param(
         self, value: list[TBaseModel] | None, _dialect: Dialect
     ) -> list[dict[str, Any]]:
@@ -623,6 +664,7 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]])
             return [item.model_dump(mode="json") for item in value]
         return []
 
+    @override
     def process_result_value(
         self, value: list[dict[str, Any]] | str | None, _dialect: Dialect
     ) -> list[TBaseModel]:
@@ -634,6 +676,7 @@ class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]])
             return [self._schema.model_validate(item) for item in value]
         return []
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return PydanticListColumn(self._schema)  # type: ignore[return-value]
 
@@ -668,6 +711,7 @@ class ABCColumn(TypeDecorator[ABCColumnPayload]):
         super().__init__()
         self._schema = schema
 
+    @override
     def process_bind_param(
         self,
         value: ABCColumnPayload | None,
@@ -678,6 +722,7 @@ class ABCColumn(TypeDecorator[ABCColumnPayload]):
             return None
         return value.serialize()
 
+    @override
     def process_result_value(
         self,
         value: dict[str, Any] | None,
@@ -688,6 +733,7 @@ class ABCColumn(TypeDecorator[ABCColumnPayload]):
             return None
         return self._schema.load(value)
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return ABCColumn(self._schema)  # type: ignore[return-value]
 
@@ -700,9 +746,11 @@ class URLColumn(TypeDecorator[yarl.URL]):
     impl = UnicodeText
     cache_ok = True
 
+    @override
     def process_bind_param(self, value: yarl.URL | None, _dialect: Dialect) -> str | None:
         return str(value)
 
+    @override
     def process_result_value(self, value: str | None, _dialect: Dialect) -> yarl.URL | None:
         if value is None:
             return None
@@ -717,6 +765,7 @@ class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6
     impl = CIDR
     cache_ok = True
 
+    @override
     def process_bind_param(
         self,
         value: str | ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | None,
@@ -733,6 +782,7 @@ class IPColumn(TypeDecorator[ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6
             raise InvalidAPIParameters(f"{value} is invalid IP address value") from e
         return str(cidr)
 
+    @override
     def process_result_value(
         self, value: str | None, _dialect: Dialect
     ) -> ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] | None:
@@ -753,6 +803,7 @@ class PermissionListColumn(TypeDecorator[set[AbstractPermission]]):
         super().__init__(sa.String)
         self._perm_type = perm_type
 
+    @override
     def process_bind_param(
         self,
         value: set[AbstractPermission] | None,
@@ -765,6 +816,7 @@ class PermissionListColumn(TypeDecorator[set[AbstractPermission]]):
         except ValueError as e:
             raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}") from e
 
+    @override
     def process_result_value(
         self,
         value: Sequence[str] | None,
@@ -784,6 +836,7 @@ class VFolderHostPermissionColumn(TypeDecorator[VFolderHostPermissionMap]):
     cache_ok = True
     perm_col = PermissionListColumn(VFolderHostPermission)
 
+    @override
     def process_bind_param(
         self,
         value: Mapping[str, Any] | None,
@@ -795,6 +848,7 @@ class VFolderHostPermissionColumn(TypeDecorator[VFolderHostPermissionMap]):
             host: self.perm_col.process_bind_param(perms, dialect) for host, perms in value.items()
         }
 
+    @override
     def process_result_value(
         self,
         value: Mapping[str, Any] | None,
@@ -840,11 +894,13 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
         super().__init__()
         self._subtype_func: Callable[[uuid.UUID], Any] | None = subtype
 
+    @override
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
         return dialect.type_descriptor(CHAR(16))
 
+    @override
     def process_bind_param(self, value: Any | None, dialect: Dialect) -> str | bytes | None:
         # NOTE: DeploymentID, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
@@ -867,6 +923,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
             return self._subtype_func(raw)
         return type(self).uuid_subtype_func(raw)
 
+    @override
     def process_result_value(self, value: Any, _dialect: Dialect) -> TUUIDSubType | None:
         if value is None:
             return value
@@ -878,6 +935,7 @@ class GUID[TUUIDSubType: uuid.UUID](TypeDecorator[TUUIDSubType]):
             return cast(TUUIDSubType, self._apply_subtype(uuid.UUID(bytes=value.bytes)))
         return cast(TUUIDSubType, self._apply_subtype(uuid.UUID(value)))
 
+    @override
     def copy(self, **_kw: Any) -> Self:
         return type(self)(self._subtype_func)
 
@@ -906,9 +964,11 @@ class SlugType(TypeDecorator[str]):
             allow_unicode=allow_unicode,
         )
 
+    @override
     def coerce_compared_value(self, _op: Any, _value: Any) -> Unicode:
         return Unicode()
 
+    @override
     def process_bind_param(self, value: Any | None, _dialect: Dialect) -> str | None:
         if value is None:
             return value
@@ -1186,6 +1246,7 @@ class DecimalType(TypeDecorator[Decimal], Decimal):
     impl = sa.VARCHAR
     cache_ok = True
 
+    @override
     def process_bind_param(
         self,
         value: Decimal | None,
@@ -1193,6 +1254,7 @@ class DecimalType(TypeDecorator[Decimal], Decimal):
     ) -> str | None:
         return f"{value:f}" if value is not None else None
 
+    @override
     def process_result_value(
         self,
         value: Any | None,
@@ -1201,5 +1263,6 @@ class DecimalType(TypeDecorator[Decimal], Decimal):
         return Decimal(value) if value is not None else None
 
     @property
+    @override
     def python_type(self) -> type[Decimal]:
         return Decimal

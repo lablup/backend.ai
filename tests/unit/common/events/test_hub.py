@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Self
+from typing import Self, override
 from unittest.mock import AsyncMock
 
 from ai.backend.common.events.hub import WILDCARD, EventHub, EventPropagator
@@ -13,36 +13,44 @@ class DummyBaseEvent(AbstractEvent):
     def __init__(self, domain_id: str) -> None:
         self._domain_id = domain_id
 
+    @override
     def domain_id(self) -> str | None:
         return self._domain_id
 
     @classmethod
+    @override
     def delivery_pattern(cls) -> DeliveryPattern:
         return DeliveryPattern.BROADCAST
 
+    @override
     def serialize(self) -> tuple[bytes, ...]:
         raise NotImplementedError
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[bytes, ...]) -> Self:
         raise NotImplementedError
 
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "dummy"
 
+    @override
     def user_event(self) -> UserEvent | None:
         return None
 
 
 class DummySessionEvent(DummyBaseEvent):
     @classmethod
+    @override
     def event_domain(cls) -> EventDomain:
         return EventDomain.SESSION
 
 
 class DummyKernelEvent(DummyBaseEvent):
     @classmethod
+    @override
     def event_domain(cls) -> EventDomain:
         return EventDomain.KERNEL
 
@@ -54,12 +62,15 @@ class DummyEventPropagator(EventPropagator):
         self._id = uuid.uuid4()
         self.records = []
 
+    @override
     def id(self) -> uuid.UUID:
         return self._id
 
+    @override
     async def propagate_event(self, event: AbstractEvent) -> None:
         self.records.append(event.domain_id() or "")
 
+    @override
     async def close(self) -> None:
         pass
 

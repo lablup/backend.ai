@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.events.dispatcher import EventProducer
@@ -86,10 +86,12 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
     """Composes all agent-layer dependencies (Layer 4)."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "agents"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,

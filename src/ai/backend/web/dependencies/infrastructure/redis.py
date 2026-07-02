@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
@@ -17,10 +18,12 @@ class RedisProvider(DependencyProvider[WebServerUnifiedConfig, ValkeySessionClie
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "redis"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: WebServerUnifiedConfig
     ) -> AsyncIterator[ValkeySessionClient]:
@@ -42,6 +45,7 @@ class RedisProvider(DependencyProvider[WebServerUnifiedConfig, ValkeySessionClie
         finally:
             await valkey_session_client.close()
 
+    @override
     def gen_liveness_checker(self, resource: ValkeySessionClient) -> ServiceHealthChecker:
         """Liveness — Valkey connection-stuck observed; restart recovers."""
         return ValkeyHealthChecker(clients={CID_REDIS_SESSION: resource})

@@ -1,9 +1,12 @@
+from typing import override
+
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.session import CodeExecutionContext, CreatedSessionMetaContext
 from ai.backend.test.templates.template import TestCode
 
 
 class InteractiveSessionExecuteCodeSuccess(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         session_meta = CreatedSessionMetaContext.current()
@@ -40,6 +43,7 @@ class InteractiveSessionExecuteCodeSuccess(TestCode):
 
 
 class InteractiveSessionExecuteCodeFailureWrongCommand(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         session_meta = CreatedSessionMetaContext.current()
@@ -76,6 +80,7 @@ class InteractiveSessionExecuteCodeFailureWrongCommand(TestCode):
 
 
 class InteractiveSessionExecuteCodeFailureWithCustomExitCode(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         session_meta = CreatedSessionMetaContext.current()

@@ -3,7 +3,7 @@ import io
 import textwrap
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from ai.backend.client.output.types import FieldSet, FieldSpec
 
@@ -81,9 +81,11 @@ class ProgressReportingReader(io.BufferedReader):
             self._owns_tqdm = False
             self.tqdm = tqdm_instance
 
+    @override
     def __enter__(self) -> "ProgressReportingReader":
         return self
 
+    @override
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
@@ -94,24 +96,28 @@ class ProgressReportingReader(io.BufferedReader):
             self.tqdm.close()
         self.close()
 
+    @override
     def read(self, *args: Any, **kwargs: Any) -> bytes:
         chunk = super().read(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(len(chunk))
         return chunk
 
+    @override
     def read1(self, *args: Any, **kwargs: Any) -> bytes:
         chunk = super().read1(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(len(chunk))
         return chunk
 
+    @override
     def readinto(self, *args: Any, **kwargs: Any) -> int:
         count = super().readinto(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(count)
         return count
 
+    @override
     def readinto1(self, *args: Any, **kwargs: Any) -> int:
         count = super().readinto1(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)

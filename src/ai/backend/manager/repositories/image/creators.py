@@ -16,6 +16,7 @@ class ImageAliasCreatorSpec(CreatorSpec[ImageAliasRow]):
     alias: str
     image_id: UUID
 
+    @override
     def build_row(self) -> ImageAliasRow:
         return ImageAliasRow(
             alias=self.alias,

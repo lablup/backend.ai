@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID, uuid4
 
 import pytest
@@ -352,6 +352,7 @@ class TestScopeValidationError(BackendAIError):
     error_type = "https://api.backend.ai/probs/test-scope-error"
     error_title = "Test scope validation error."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -366,6 +367,7 @@ class TestScopeValidationError2(BackendAIError):
     error_type = "https://api.backend.ai/probs/test-scope-error-2"
     error_title = "Test scope validation error 2."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -392,6 +394,7 @@ class MockSearchScope(SearchScope):
     checks: Sequence[ExistenceCheck[Any]]
     filter_category: str | None = None
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition."""
         category = self.filter_category
@@ -404,6 +407,7 @@ class MockSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         """Return existence checks for scope validation."""
         return self.checks

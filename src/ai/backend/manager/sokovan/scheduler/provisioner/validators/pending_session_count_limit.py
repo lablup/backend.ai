@@ -1,5 +1,7 @@
 """Validator for pending session count limits."""
 
+from typing import override
+
 from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
 from .exceptions import PendingSessionCountLimitExceeded
@@ -12,14 +14,17 @@ class PendingSessionCountLimitValidator(ValidatorRule):
     This corresponds to check_pending_session_count_limit predicate.
     """
 
+    @override
     def name(self) -> str:
         """Return the validator name for predicates."""
         return "PendingSessionCountLimitValidator"
 
+    @override
     def success_message(self) -> str:
         """Return a message describing successful validation."""
         return "Pending session count is within the allowed limit for the access key"
 
+    @override
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the keypair's resource policy
         policy = snapshot.resource_policy.keypair_policies.get(workload.access_key)

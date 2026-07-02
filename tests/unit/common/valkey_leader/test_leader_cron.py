@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import cast
+from typing import cast, override
 from unittest.mock import AsyncMock, MagicMock, create_autospec
 
 import pytest
@@ -35,22 +35,26 @@ class MockTask(PeriodicTask):
         self.run_func = run_func or AsyncMock()
         self.run_count = 0
 
+    @override
     async def run(self) -> None:
         """Execute the mock task."""
         self.run_count += 1
         await self.run_func()
 
     @property
+    @override
     def name(self) -> str:
         """Task name."""
         return self._name
 
     @property
+    @override
     def interval(self) -> float:
         """Interval."""
         return self._interval
 
     @property
+    @override
     def initial_delay(self) -> float:
         """Initial delay."""
         return self._initial_delay

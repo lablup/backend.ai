@@ -5,7 +5,7 @@ import enum
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Final, ParamSpec, TypeVar, cast
+from typing import Final, ParamSpec, TypeVar, cast, override
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -30,6 +30,7 @@ class ResilienceRetryError(BackendAIError):
     error_type = "https://api.backend.ai/probs/resilience-retry-error"
     error_title = "Resilience retry error."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -98,6 +99,7 @@ class RetryPolicy(Policy):
             *args.non_retryable_exceptions,
         )
 
+    @override
     async def execute(
         self,
         next_call: Callable[P, Awaitable[R]],

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Final
+from typing import Final, override
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -30,14 +30,17 @@ class MockAction(BaseAction):
     type: str
     operation: str
 
+    @override
     def entity_id(self) -> str | None:
         return self.id
 
     @classmethod
+    @override
     def entity_type(cls) -> EntityType:
         return EntityType.SESSION
 
     @classmethod
+    @override
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
@@ -46,6 +49,7 @@ class MockAction(BaseAction):
 class MockActionResult(BaseActionResult):
     id: str
 
+    @override
     def entity_id(self) -> str | None:
         return self.id
 
@@ -73,10 +77,12 @@ class MockActionMonitor(ActionMonitor):
         self.expected_done_action = expected_done_action
         self.expected_done_result = expected_done_result
 
+    @override
     async def prepare(self, action: BaseAction, meta: BaseActionTriggerMeta) -> None:
         assert isinstance(action, MockAction)
         assert action == self.expected_prepare_action
 
+    @override
     async def done(self, action: BaseAction, result: ProcessResult) -> None:
         assert isinstance(action, MockAction)
         assert action == self.expected_done_action

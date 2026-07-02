@@ -18,6 +18,7 @@ from ai.backend.test.templates.template import WrapperTestTemplate
 
 class VFolderInviteTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "vfolder_invite"
 
@@ -47,6 +48,7 @@ class VFolderInviteTemplate(WrapperTestTemplate):
 
 class AcceptInvitationTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "accept_invitation"
 
@@ -76,6 +78,7 @@ class AcceptInvitationTemplate(WrapperTestTemplate):
 
 class RejectInvitationTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "reject_invitation"
 

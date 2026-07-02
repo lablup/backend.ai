@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, cast, override
 
 from tabulate import tabulate
 
@@ -21,6 +21,7 @@ class NoItems(Exception):
 
 
 class ConsoleOutputHandler(BaseOutputHandler):
+    @override
     def print_item(
         self,
         item: _Item | None,
@@ -44,6 +45,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
             )
         )
 
+    @override
     def print_items(
         self,
         items: Sequence[_Item],
@@ -67,6 +69,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                 )
             )
 
+    @override
     def print_result_set(
         self,
         result_set: ResultSet,
@@ -88,6 +91,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                 )
             )
 
+    @override
     def print_list(
         self,
         items: Sequence[_Item],
@@ -143,6 +147,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
                 ):
                     print(line, end="")
 
+    @override
     def print_paginated_list(
         self,
         fetch_func: Callable[[int, int], PaginatedResult[T]],
@@ -204,6 +209,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
             except NoItems:
                 print("No matching items.")
 
+    @override
     def print_mutation_result(
         self,
         item: _Item,
@@ -227,6 +233,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
             )
         )
 
+    @override
     def print_mutation_error(
         self,
         error: Exception | None = None,
@@ -251,12 +258,14 @@ class ConsoleOutputHandler(BaseOutputHandler):
         if error is not None:
             print_error(error)
 
+    @override
     def print_error(
         self,
         error: Exception,
     ) -> None:
         print_error(error)
 
+    @override
     def print_fail(
         self,
         message: str,

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -20,6 +22,7 @@ class JWTError(BackendAIError):
     All JWT-specific exceptions inherit from this base class.
     """
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -38,6 +41,7 @@ class JWTExpiredError(JWTError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/jwt-expired"
     error_title = "JWT token has expired."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,

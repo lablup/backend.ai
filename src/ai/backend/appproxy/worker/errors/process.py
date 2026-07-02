@@ -4,6 +4,8 @@ Process-related exceptions for the worker.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -19,6 +21,7 @@ class SubprocessPipeError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy-worker/subprocess-pipe-error"
     error_title = "Subprocess pipe is not available."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,

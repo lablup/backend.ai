@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, override
 
 from ai.backend.common.configs.loader import LoaderChain
 from ai.backend.common.configs.loader.types import AbstractConfigLoader
@@ -8,6 +8,7 @@ class DummyLoader(AbstractConfigLoader):
     def __init__(self, payload: dict[str, Any]) -> None:
         self.payload = payload
 
+    @override
     async def load(self) -> dict[str, Any]:
         return self.payload
 

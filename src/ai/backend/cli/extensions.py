@@ -2,7 +2,7 @@ import os
 import signal
 import sys
 from collections.abc import Callable
-from typing import Any
+from typing import Any, override
 
 import click
 from click.exceptions import Abort, ClickException
@@ -19,6 +19,7 @@ class InterruptAwareCommandMixin(click.BaseCommand):
     continuing the shell/batch script.
     """
 
+    @override
     def main(self, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
         _interrupted = False
         try:
@@ -80,6 +81,7 @@ class AliasGroupMixin(click.Group):
         self._commands: dict[str, click.Command] = {}
         self._aliases: dict[str, str] = {}
 
+    @override
     def command(self, *args: Any, **kwargs: Any) -> Any:
         aliases = kwargs.pop("aliases", [])
         decorator = super().command(*args, **kwargs)
@@ -96,6 +98,7 @@ class AliasGroupMixin(click.Group):
 
         return _decorator
 
+    @override
     def group(self, *args: Any, **kwargs: Any) -> Any:
         aliases = kwargs.pop("aliases", [])
         # keep the same class type unless explicitly specified
@@ -115,6 +118,7 @@ class AliasGroupMixin(click.Group):
 
         return _decorator
 
+    @override
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         if cmd_name in self._aliases:
             cmd_name = self._aliases[cmd_name]
@@ -123,6 +127,7 @@ class AliasGroupMixin(click.Group):
             return command
         return None
 
+    @override
     def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         commands = []
         for subcommand in self.list_commands(ctx):

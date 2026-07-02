@@ -263,9 +263,11 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
 
         self.event_producer = event_producer
 
+    @override
     async def __ainit__(self) -> None:
         return
 
+    @override
     def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         self.__dict__.update(props)
         self.zctx = None

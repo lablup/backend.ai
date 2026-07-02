@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -115,6 +115,7 @@ class ArtifactRevisionRow(Base):  # type: ignore[misc]
         )
     )
 
+    @override
     def __str__(self) -> str:
         readme_display = self.readme[:15] if self.readme else None
         created_at_str = self.created_at.isoformat() if self.created_at else None

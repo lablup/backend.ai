@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.bgtask.broadcast import BgtaskUpdatedEvent
@@ -17,6 +18,7 @@ class EventProducerHook(AbstractTaskHook):
         self._event_producer = event_producer
 
     @asynccontextmanager
+    @override
     async def apply(self, context: TaskContext) -> AsyncIterator[TaskContext]:
         # Pre-execution: send task started event
         cache_id = EventCacheDomain.BGTASK.cache_id(str(context.task_id))

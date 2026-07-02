@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, cast
+from typing import Any, Self, cast, override
 from uuid import UUID
 
 from strawberry import ID, Info
@@ -84,6 +84,7 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

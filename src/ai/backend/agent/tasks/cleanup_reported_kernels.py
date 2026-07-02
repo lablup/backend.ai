@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, override
 
 from ai.backend.common.cron import PeriodicTask
 
@@ -21,16 +21,20 @@ class CleanupReportedKernelsTask(PeriodicTask):
         self._agent = agent
 
     @property
+    @override
     def name(self) -> str:
         return "cleanup_reported_kernels"
 
     @property
+    @override
     def interval(self) -> float:
         return _CLEANUP_REPORTED_KERNELS_INTERVAL
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         await self._agent.cleanup_reported_kernels()

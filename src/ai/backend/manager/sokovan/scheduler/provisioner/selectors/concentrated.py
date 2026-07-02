@@ -10,6 +10,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 from decimal import Decimal
+from typing import override
 
 from ai.backend.common.types import SessionTypes
 
@@ -42,18 +43,21 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
         """
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
+    @override
     def name(self) -> str:
         """
         Return the selector name for predicates.
         """
         return "ConcentratedAgentSelector"
 
+    @override
     def success_message(self) -> str:
         """
         Return a message describing successful agent selection.
         """
         return "Agent selected using concentrated strategy for maximum resource utilization"
 
+    @override
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],

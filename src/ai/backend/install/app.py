@@ -5,7 +5,7 @@ import json
 import shutil
 import textwrap
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, override
 from weakref import WeakSet
 
 from rich.text import Text
@@ -56,6 +56,7 @@ class DevSetup(Static):
         self._non_interactive = non_interactive
         self._task = None
 
+    @override
     def compose(self) -> ComposeResult:
         yield Label("Development Setup", classes="mode-title")
         with TabbedContent():
@@ -119,6 +120,7 @@ class PackageSetup(Static):
         self._non_interactive = non_interactive
         self._task = None
 
+    @override
     def compose(self) -> ComposeResult:
         yield Label("Package Setup", classes="mode-title")
         with TabbedContent():
@@ -215,6 +217,7 @@ class PackageTypeMenu(Static):
         self._install_variable = install_variable
         self._non_interactive = non_interactive
 
+    @override
     def compose(self) -> ComposeResult:
         yield Label("Choose deployment type:", id="pkg-type-heading")
         with ListView(id="pkg-type-list") as lv:
@@ -265,6 +268,7 @@ class Configure(Static):
         address_input = self.app.query_one("#public-ip", Input)
         address_input.value = install_variable.public_facing_address
 
+    @override
     def compose(self) -> ComposeResult:
         yield Label("Configure", classes="mode-title")
         with Vertical(id="configure-form"):
@@ -307,6 +311,7 @@ class InstallReport(Static):
         super().__init__(**kwargs)
         self.install_info = install_info
 
+    @override
     def compose(self) -> ComposeResult:
         service = self.install_info.service_config
         yield Markdown(
@@ -573,6 +578,7 @@ class ModeMenu(Static):
             enable_telemetry=args.enable_telemetry,
         )
 
+    @override
     def compose(self) -> ComposeResult:
         yield Label(id="heading")
         if self._dist_info_path is None:
@@ -701,6 +707,7 @@ class InstallerApp(App[None]):
             )
         self._args = args
 
+    @override
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         logo_text = textwrap.dedent(

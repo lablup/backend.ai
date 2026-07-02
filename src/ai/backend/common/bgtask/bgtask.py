@@ -15,6 +15,7 @@ from typing import (
     Final,
     ParamSpec,
     Self,
+    override,
 )
 
 from ai.backend.common.bgtask.exception import InvalidTaskMetadataError
@@ -170,12 +171,15 @@ class LocalBgtask(BackgroundTaskMeta):
     def __init__(self, task: asyncio.Task[Any]) -> None:
         self._task = task
 
+    @override
     def total_info(self) -> TaskTotalInfo:
         raise NotImplementedError("LocalBgtask is not recoverable and cannot be stored")
 
+    @override
     def retriable(self) -> bool:
         return False
 
+    @override
     def async_tasks(self) -> Sequence[asyncio.Task[Any]]:
         return [self._task]
 
@@ -192,12 +196,15 @@ class SingleBgtask(BackgroundTaskMeta):
         self._total_info = total_info
         self._task = task
 
+    @override
     def total_info(self) -> TaskTotalInfo:
         return self._total_info
 
+    @override
     def retriable(self) -> bool:
         return True
 
+    @override
     def async_tasks(self) -> Sequence[asyncio.Task[Any]]:
         return [self._task]
 
@@ -214,12 +221,15 @@ class ParallelBgtask(BackgroundTaskMeta):
         self._total_info = total_info
         self._tasks = tasks
 
+    @override
     def total_info(self) -> TaskTotalInfo:
         return self._total_info
 
+    @override
     def retriable(self) -> bool:
         return True
 
+    @override
     def async_tasks(self) -> Sequence[asyncio.Task[Any]]:
         return self._tasks
 
