@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+import sys
 import textwrap
 from pathlib import Path
 from typing import Any, cast
@@ -319,7 +320,7 @@ class InstallReport(Static):
         - Username: `admin@lablup.com`
         - Password: `wJalrXUt`
 
-        To see this guide again, run './backendai-install-<platform> install --show-guide'.
+        To see this guide again, run '{sys.argv[0]} install --show-guide'.
         """
             )
         )
