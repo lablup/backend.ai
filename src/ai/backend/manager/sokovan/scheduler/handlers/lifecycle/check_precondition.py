@@ -50,13 +50,26 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     def target_statuses(cls) -> list[SessionStatus]:
-        """Sessions in SCHEDULED state."""
-        return [SessionStatus.SCHEDULED]
+        """Sessions in SCHEDULED or PREPARING state.
+
+        PREPARING is included so the handler re-queries sessions that have
+        already started preparation and re-triggers the idempotent image
+        pull. This recovers sessions stuck in PREPARING when a pull-related
+        event (e.g. ImagePullFinished) was lost in transit, since nothing
+        else re-sends check_and_pull once the session leaves SCHEDULED.
+        """
+        return [SessionStatus.SCHEDULED, SessionStatus.PREPARING]
 
     @classmethod
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
-        """Include sessions where kernels are in SCHEDULED status."""
-        return [KernelStatus.SCHEDULED]
+        """Include sessions with kernels in SCHEDULED or PULLING status.
+
+        PULLING is included so that a session stuck in PREPARING whose
+        kernels have already advanced to PULLING (but whose pull-completion
+        event was lost) is still picked up and has its image pull
+        re-triggered.
+        """
+        return [KernelStatus.SCHEDULED, KernelStatus.PULLING]
 
     @classmethod
     def status_transitions(cls) -> StatusTransitions:
