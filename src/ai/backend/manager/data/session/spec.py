@@ -35,13 +35,13 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     KernelExecutionSpec,
     SessionOptions,
 )
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
-from ai.backend.manager.models.network import NetworkType
 
 
 class _SpecBaseModel(BackendAISchema):
