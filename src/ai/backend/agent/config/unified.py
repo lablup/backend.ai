@@ -2318,7 +2318,9 @@ class AgentSpecificConfig(BaseConfigSchema):
         match self.agent.backend:
             case AgentBackend.KUBERNETES:
                 self.container.validate_kubernetes_nfs()
-            case AgentBackend.DOCKER:
+            case AgentBackend.DOCKER | AgentBackend.KATA:
+                # KataAgent reuses the Docker container-config handling, so it
+                # shares the same validation (scratch, bind host, etc.).
                 DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
                 pass
