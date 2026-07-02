@@ -213,7 +213,7 @@ class ContainerRegistryService:
             expected_auth = (registry_row.extra or {}).get("webhook_auth_header")
             if expected_auth:
                 if not action.auth_header or not secrets.compare_digest(
-                    action.auth_header, expected_auth
+                    action.auth_header.encode(), expected_auth.encode()
                 ):
                     raise ContainerRegistryWebhookAuthorizationFailed(
                         extra_msg=(

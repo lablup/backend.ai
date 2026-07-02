@@ -984,6 +984,34 @@ class TestHandleHarborWebhook:
         with pytest.raises(ContainerRegistryWebhookAuthorizationFailed):
             await container_registry_service.handle_harbor_webhook(action)
 
+    async def test_non_ascii_auth_header_raises_authorization_failed(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        sample_registry_row: MagicMock,
+    ) -> None:
+        """A non-ASCII header must fail cleanly, not raise TypeError from compare_digest."""
+        sample_registry_row.extra = {"webhook_auth_header": "Bearer correct-token"}
+        sample_registry_row.registry_name = "registry.example.com"
+        mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
+            return_value=sample_registry_row
+        )
+
+        action = HandleHarborWebhookAction(
+            event_type="PUSH_ARTIFACT",
+            resources=[
+                HarborWebhookResourceInput(
+                    resource_url="registry.example.com/project/img", tag="latest"
+                )
+            ],
+            project="project",
+            img_name="img",
+            auth_header="Bearer \x80\xff",
+        )
+
+        with pytest.raises(ContainerRegistryWebhookAuthorizationFailed):
+            await container_registry_service.handle_harbor_webhook(action)
+
     async def test_non_push_artifact_event_ignored(
         self,
         container_registry_service: ContainerRegistryService,
