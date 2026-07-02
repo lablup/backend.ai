@@ -956,6 +956,34 @@ class TestHandleHarborWebhook:
         with pytest.raises(ContainerRegistryWebhookAuthorizationFailed):
             await container_registry_service.handle_harbor_webhook(action)
 
+    async def test_missing_auth_header_raises_when_required(
+        self,
+        container_registry_service: ContainerRegistryService,
+        mock_container_registry_repository: MagicMock,
+        sample_registry_row: MagicMock,
+    ) -> None:
+        """Omitting the auth header must not bypass a configured secret."""
+        sample_registry_row.extra = {"webhook_auth_header": "Bearer correct-token"}
+        sample_registry_row.registry_name = "registry.example.com"
+        mock_container_registry_repository.get_registry_by_url_and_project = AsyncMock(
+            return_value=sample_registry_row
+        )
+
+        action = HandleHarborWebhookAction(
+            event_type="PUSH_ARTIFACT",
+            resources=[
+                HarborWebhookResourceInput(
+                    resource_url="registry.example.com/project/img", tag="latest"
+                )
+            ],
+            project="project",
+            img_name="img",
+            auth_header=None,
+        )
+
+        with pytest.raises(ContainerRegistryWebhookAuthorizationFailed):
+            await container_registry_service.handle_harbor_webhook(action)
+
     async def test_non_push_artifact_event_ignored(
         self,
         container_registry_service: ContainerRegistryService,

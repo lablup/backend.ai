@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.logging import BraceStyleAdapter
@@ -207,10 +208,13 @@ class ContainerRegistryService:
                     ),
                 )
 
-            # Validate webhook authorization
-            if action.auth_header:
-                extra = registry_row.extra or {}
-                if extra.get("webhook_auth_header") != action.auth_header:
+            # Validate webhook authorization: if the registry configured a secret,
+            # the request MUST present a matching header (omitting it must fail).
+            expected_auth = (registry_row.extra or {}).get("webhook_auth_header")
+            if expected_auth:
+                if not action.auth_header or not secrets.compare_digest(
+                    action.auth_header, expected_auth
+                ):
                     raise ContainerRegistryWebhookAuthorizationFailed(
                         extra_msg=(
                             f"Unauthorized webhook request"
