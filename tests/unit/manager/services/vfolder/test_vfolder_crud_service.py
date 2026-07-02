@@ -587,6 +587,54 @@ class TestListVFolderAction:
         assert isinstance(result, ListVFolderActionResult)
         assert result.vfolders == []
 
+    async def test_project_scope_restricts_project_vfolders(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        user_uuid: uuid.UUID,
+        group_uuid: uuid.UUID,
+    ) -> None:
+        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
+        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
+            return_value=VFolderListResult(vfolders=[])
+        )
+
+        action = ListVFolderAction(
+            user_uuid=user_uuid,
+            _scope_type=ScopeType.PROJECT,
+            _scope_id=str(group_uuid),
+        )
+
+        await vfolder_service.list(action)
+
+        assert (
+            mock_vfolder_repository.list_accessible_vfolders.call_args.kwargs["project_id"]
+            == group_uuid
+        )
+
+    async def test_user_scope_does_not_restrict_project_vfolders(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        user_uuid: uuid.UUID,
+    ) -> None:
+        mock_vfolder_repository.get_user_info = AsyncMock(return_value=(UserRole.USER, "default"))
+        mock_vfolder_repository.list_accessible_vfolders = AsyncMock(
+            return_value=VFolderListResult(vfolders=[])
+        )
+
+        action = ListVFolderAction(
+            user_uuid=user_uuid,
+            _scope_type=ScopeType.USER,
+            _scope_id=str(user_uuid),
+        )
+
+        await vfolder_service.list(action)
+
+        assert (
+            mock_vfolder_repository.list_accessible_vfolders.call_args.kwargs["project_id"] is None
+        )
+
     async def test_returns_owned_and_shared_vfolders(
         self,
         vfolder_service: VFolderService,
