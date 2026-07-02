@@ -16,6 +16,8 @@ __all__ = (
 @dataclass(frozen=True)
 class VirtualScopeData:
     id: VirtualScopeID
+    scope_type: ScopeType
+    scope_id: str
 
 
 @dataclass(frozen=True)
@@ -23,11 +25,6 @@ class AssociationScopeData:
     """Inbound edge ``real scope -> virtual_scope``: a traditional scope
     (domain/project/user/...) bound to a virtual scope so it can reach
     everything the VS owns. Many scopes may bind to the same VS.
-
-    ``is_origin`` marks the single scope the VS fundamentally represents (the
-    scope it was created for); the rest are additional bindings. It drives
-    reverse identity lookup and cascade lifecycle (removing the origin tears
-    down the VS, removing another binding only detaches that scope).
 
     ``permission_cap`` is the ceiling this hop grants (``None`` = no ceiling);
     effective permission is clipped by a bitwise AND with the cap.
@@ -37,7 +34,6 @@ class AssociationScopeData:
     scope_id: str
     virtual_scope_id: VirtualScopeID
     permission_cap: Permission | None
-    is_origin: bool
 
 
 @dataclass(frozen=True)
