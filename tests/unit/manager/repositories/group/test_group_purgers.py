@@ -206,6 +206,7 @@ class TestGroupPurgersIntegration:
         sample_group: GroupRow,
         sample_domain: DomainFixtureData,
         sample_user: UserRow,
+        sample_scaling_group: str,
     ) -> list[SessionRow]:
         """Create test sessions belonging to the group."""
         sessions: list[SessionRow] = []
@@ -218,6 +219,7 @@ class TestGroupPurgersIntegration:
                     cluster_size=1,
                     domain_name=sample_domain.domain_name,
                     group_id=sample_group.id,
+                    scaling_group_name=sample_scaling_group,
                     user_uuid=sample_user.uuid,
                     occupying_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
@@ -307,6 +309,7 @@ class TestGroupPurgersIntegration:
         sample_domain: DomainFixtureData,
         sample_group: GroupRow,
         sample_user: UserRow,
+        sample_scaling_group: str,
     ) -> tuple[list[SessionRow], list[RoutingRow]]:
         """Create test sessions connected to endpoints via routings."""
         sessions: list[SessionRow] = []
@@ -321,6 +324,7 @@ class TestGroupPurgersIntegration:
                     cluster_size=1,
                     domain_name=sample_domain.domain_name,
                     group_id=sample_group.id,
+                    scaling_group_name=sample_scaling_group,
                     user_uuid=sample_user.uuid,
                     occupying_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),

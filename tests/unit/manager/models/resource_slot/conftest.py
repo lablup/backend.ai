@@ -222,6 +222,7 @@ async def kernel_id(
                 id=sid,
                 domain_name=domain_name,
                 group_id=project_id,
+                scaling_group_name=scaling_group,
                 user_uuid=user_uuid,
                 occupying_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),
                 requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),

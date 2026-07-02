@@ -30,7 +30,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -494,6 +494,23 @@ class TestImageRepositoryLastUsedAt:
         return domain
 
     @pytest.fixture
+    async def scaling_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        scaling_group = ScalingGroupRow(
+            name="test-sg",
+            driver="static",
+            driver_opts={},
+            scheduler="fifo",
+            scheduler_opts=ScalingGroupOpts(),
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(scaling_group)
+            await db_sess.flush()
+        return scaling_group.name
+
+    @pytest.fixture
     async def user_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -625,6 +642,7 @@ class TestImageRepositoryLastUsedAt:
         user: UserRow,
         group: GroupRow,
         domain: DomainRow,
+        scaling_group: str,
     ) -> CreateKernelForImageFunc:
         """Return a factory that creates a session + kernel for the given image."""
 
@@ -637,6 +655,7 @@ class TestImageRepositoryLastUsedAt:
                     user_uuid=user.uuid,
                     group_id=group.id,
                     domain_name=domain.name,
+                    scaling_group_name=scaling_group,
                     occupying_slots=ResourceSlot(),
                     requested_slots=ResourceSlot(),
                     vfolder_mounts=[],
