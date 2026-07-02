@@ -10,7 +10,7 @@ Implemented-Version:
 <!-- context-for-ai
 type: master-bep
 scope: Replace Docker Swarm overlay for multi-node sessions with a runtime-neutral, pluggable cluster-network data plane coordinated via etcd, so containerd (and other host-native runtimes) can provide the same isolated cross-node connectivity without Kubernetes.
-detail-docs: [control-plane.md, agent-plugin-v2.md, data-plane-backends.md, migration.md]
+detail-docs: [control-plane.md, agent-plugin-v2.md, data-plane-backends.md, migration.md, verification.md]
 key-constraints:
   - Agents run host-native; no Kubernetes.
   - Reuse existing etcd; introduce no new coordination infrastructure.
@@ -76,6 +76,7 @@ The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and d
 | [agent-plugin-v2](./BEP-1055/agent-plugin-v2.md) | Runtime-neutral v2 agent plugin interface and attach spec |
 | [data-plane-backends](./BEP-1055/data-plane-backends.md) | vxlan / host-gw / wireguard backends and isolation |
 | [migration](./BEP-1055/migration.md) | Rollout, compatibility, config switches |
+| [verification](./BEP-1055/verification.md) | Real-infra smoke tests (vxlan / CNI / etcd CAS) |
 
 ## Migration / Compatibility
 
