@@ -105,7 +105,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RuntimeVariantPresetValueInfoDTO,
 )
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -427,7 +426,7 @@ class ModelServiceConfigGQL:
     )
     command: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.7.0",
             description="Single-string command to start the model service.",
         ),
         default=None,
@@ -984,7 +983,7 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
     )
     command: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.7.0",
             description="Single-string command to start the model service.",
         ),
         default=None,

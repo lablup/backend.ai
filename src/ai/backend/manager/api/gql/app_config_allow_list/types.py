@@ -37,7 +37,6 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -75,7 +74,7 @@ __all__ = (
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Permission to write config fragments for one config name at one scope type.",
     ),
     name="AppConfigAllowList",
@@ -111,7 +110,7 @@ AppConfigAllowListEdge = Edge[AppConfigAllowListGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Paginated connection for app config allow-list records.",
     ),
 )
@@ -133,7 +132,7 @@ class AppConfigAllowListConnection(Connection[AppConfigAllowListGQL]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for the scope_type enum field.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
     ),
     name="AppConfigScopeTypeFilter",
 )
@@ -155,7 +154,7 @@ class AppConfigScopeTypeFilterGQL(PydanticInputMixin[AppConfigScopeTypeFilterDTO
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for querying app config allow-list entries.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
     ),
     name="AppConfigAllowListFilter",
 )
@@ -171,28 +170,22 @@ class AppConfigAllowListFilterGQL(PydanticInputMixin[AppConfigAllowListFilterDTO
         description="Filter by last update datetime.", default=None
     )
     AND: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,
     )
     OR: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match any of the given sub-filters."),
         default=None,
     )
     NOT: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Negate the given sub-filters."),
         default=None,
     )
 
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Fields available for ordering app config allow-list results.",
     ),
     name="AppConfigAllowListOrderField",
@@ -207,7 +200,7 @@ class AppConfigAllowListOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Specifies ordering for app config allow-list results.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
     ),
     name="AppConfigAllowListOrderBy",
 )
@@ -224,7 +217,7 @@ class AppConfigAllowListOrderByGQL(PydanticInputMixin[AppConfigAllowListOrderDTO
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for registering a new app config allow-list entry.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
     ),
     name="CreateAppConfigAllowListInput",
 )
@@ -237,7 +230,7 @@ class CreateAppConfigAllowListInputGQL(PydanticInputMixin[CreateAppConfigAllowLi
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Payload for app config allow-list entry creation.",
     ),
     model=CreateAppConfigAllowListPayloadDTO,
@@ -252,7 +245,7 @@ class CreateAppConfigAllowListPayloadGQL(PydanticOutputMixin[CreateAppConfigAllo
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for purging an app config allow-list entry.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
     ),
     name="PurgeAppConfigAllowListInput",
 )
@@ -262,7 +255,7 @@ class PurgeAppConfigAllowListInputGQL(PydanticInputMixin[PurgeAppConfigAllowList
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Payload for app config allow-list entry purge.",
     ),
     model=PurgeAppConfigAllowListPayloadDTO,
