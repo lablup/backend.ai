@@ -1,0 +1,121 @@
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
+
+from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator
+from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient, TaskHandle
+from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
+from ai.backend.common.network.types import (
+    AttachKind,
+    EndpointPlan,
+    NetworkAttachSpec,
+    NetworkBackendKind,
+    NetworkRole,
+    SessionNetMeta,
+)
+from ai.backend.common.types import ClusterInfo, KernelCreationConfig
+
+_META = SessionNetMeta(
+    session_id="s1", subnet="10.128.5.0/24", backend=NetworkBackendKind.VXLAN, mtu=1450, vni=4097
+)
+
+
+def _plan() -> EndpointPlan:
+    return EndpointPlan(
+        attachments=[
+            NetworkAttachSpec(
+                kind=AttachKind.CNI, interface_name="baimulti0", role=NetworkRole.OVERLAY,
+                cni_config={"type": "bridge"},
+            )
+        ]
+    )
+
+
+class FakeRuntime(ContainerdRuntimeClient):
+    """Records the runtime call order; returns a fixed task PID."""
+
+    def __init__(self, pid: int = 4242) -> None:
+        self.calls: list[str] = []
+        self._pid = pid
+
+    async def image_exists(self, image_ref: str) -> bool:
+        return True
+
+    async def pull_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
+        self.calls.append("pull_image")
+
+    async def list_images(self) -> Sequence[str]:
+        return []
+
+    async def remove_image(self, image_ref: str) -> None:
+        self.calls.append("remove_image")
+
+    async def create_container(
+        self, container_id: str, *, image_ref: str, oci_spec: Mapping[str, Any]
+    ) -> None:
+        self.calls.append("create_container")
+
+    async def create_task(self, container_id: str) -> TaskHandle:
+        self.calls.append("create_task")
+        return TaskHandle(container_id=container_id, pid=self._pid)
+
+    async def start_task(self, container_id: str) -> None:
+        self.calls.append("start_task")
+
+    async def kill_task(self, container_id: str, *, signal: int) -> None:
+        self.calls.append("kill_task")
+
+    async def delete_task(self, container_id: str) -> None:
+        self.calls.append("delete_task")
+
+    async def delete_container(self, container_id: str) -> None:
+        self.calls.append("delete_container")
+
+    async def list_containers(self) -> Sequence[str]:
+        return []
+
+    async def task_pid(self, container_id: str) -> int | None:
+        return self._pid
+
+
+class RecordingNetworkRunner:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    async def __call__(
+        self, command: str, *, ifname: str, netns: str, container_id: str, config: Any
+    ) -> None:
+        self.calls.append((command, netns))
+
+
+def _orchestrator(runtime: FakeRuntime, runner: RecordingNetworkRunner) -> ContainerdKernelOrchestrator:
+    provisioner = ContainerNetworkProvisioner(cast(Any, _FixedPlanBackend()), runner)
+    return ContainerdKernelOrchestrator(runtime, provisioner)
+
+
+class _FixedPlanBackend:
+    async def attach_endpoint(self, kernel_config: Any, cluster_info: Any, *, meta: SessionNetMeta) -> EndpointPlan:
+        return _plan()
+
+
+class TestLaunch:
+    async def test_order_create_task_then_attach_then_start(self) -> None:
+        runtime = FakeRuntime(pid=4242)
+        runner = RecordingNetworkRunner()
+        orch = _orchestrator(runtime, runner)
+        result = await orch.launch(
+            "c1", image_ref="img", oci_spec={},
+            meta=_META, kernel_config=cast(KernelCreationConfig, {}), cluster_info=cast(ClusterInfo, {}),
+        )
+        # runtime creates container+task BEFORE network attaches, and starts AFTER
+        assert runtime.calls == ["create_container", "create_task", "start_task"]
+        # network attach happened against the task's PID netns, between create_task and start_task
+        assert runner.calls == [("ADD", "/proc/4242/ns/net")]
+        assert result.handle.pid == 4242
+
+    async def test_terminate_detaches_before_runtime_teardown(self) -> None:
+        runtime = FakeRuntime(pid=4242)
+        runner = RecordingNetworkRunner()
+        orch = _orchestrator(runtime, runner)
+        await orch.terminate("c1", plan=_plan(), task_pid=4242)
+        assert runner.calls == [("DEL", "/proc/4242/ns/net")]
+        assert runtime.calls == ["kill_task", "delete_task", "delete_container"]
