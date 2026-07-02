@@ -238,7 +238,7 @@ class HTTPBackend(BaseBackend):
         except aiohttp.ClientOSError as e:
             self._pool.record_failure(route)
             raise ContainerConnectionRefused from e
-        except:
+        except BaseException:
             log.exception("Unhandled exception while proxying HTTP request")
             raise
 
