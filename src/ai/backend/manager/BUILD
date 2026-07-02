@@ -54,6 +54,7 @@ python_distribution(
         },
         "backendai_network_manager_v1": {
             "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
+            "cni": "ai.backend.manager.network.cni:CNINetworkPlugin",
         },
     },
     generate_setup=True,

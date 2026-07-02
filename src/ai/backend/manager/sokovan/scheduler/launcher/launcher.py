@@ -511,9 +511,23 @@ class SessionLauncher:
                     )
 
                 network_plugin = self._network_plugin_ctx.plugins[driver]
+                # Pass the participating agents and the operator's backend override so
+                # runtime-neutral plugins (BEP-1055 CNINetworkPlugin) can select and
+                # allocate the per-session data plane. The Swarm overlay plugin ignores
+                # these extra options.
+                member_agents = sorted({
+                    str(kernel.agent_id) for kernel in session.kernels if kernel.agent_id
+                })
+                forced_backend = (
+                    self._config_provider.config.network.inter_container.forced_backend
+                )
                 try:
                     network_info = await network_plugin.create_network(
-                        identifier=str(session.session_id)
+                        identifier=str(session.session_id),
+                        options={
+                            "member_agents": member_agents,
+                            "forced_backend": forced_backend,
+                        },
                     )
                     network_config = dict(network_info.options)
                     network_name = network_info.network_id
