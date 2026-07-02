@@ -7,6 +7,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import (
     Any,
     Final,
@@ -40,6 +41,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.types import LogLevel
 from ai.backend.manager.data.image.types import (
     ImageData,
     ImageStatus,
@@ -76,6 +78,18 @@ commit_rescan_result_resilience = Resilience(
         ),
     ]
 )
+
+
+@dataclass(frozen=True)
+class _RescanProgressEvent:
+    """
+    A rescan progress message buffered during the commit transaction and emitted
+    only after a successful commit, so retries do not duplicate logs or over-count
+    the progress reporter.
+    """
+
+    level: LogLevel
+    message: str
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
@@ -198,13 +212,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 original_updates,
                 image_identifiers,
             )
-            for level, progress_msg in progress_events:
-                if level == "warning":
-                    log.warning(progress_msg)
-                else:
-                    log.info(progress_msg)
+            for event in progress_events:
+                match event.level:
+                    case LogLevel.WARNING:
+                        log.warning(event.message)
+                    case _:
+                        log.info(event.message)
                 if (reporter := progress_reporter.get()) is not None:
-                    await reporter.update(1, message=progress_msg)
+                    await reporter.update(1, message=event.message)
         return scanned_images
 
     @commit_rescan_result_resilience.apply()
@@ -212,9 +227,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         original_updates: dict[ImageIdentifier, dict[str, Any]],
         image_identifiers: list[tuple[str, str]],
-    ) -> tuple[list[ImageData], list[tuple[str, str]]]:
+    ) -> tuple[list[ImageData], list[_RescanProgressEvent]]:
         scanned_images: list[ImageData] = []
-        progress_events: list[tuple[str, str]] = []
+        progress_events: list[_RescanProgressEvent] = []
         pending_updates = dict(original_updates)
 
         async with self.db.begin_session() as session:
@@ -250,7 +265,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             f"Restored deleted image - {image_ref.canonical}/"
                             f"{image_ref.architecture} ({update['config_digest']})"
                         )
-                        progress_events.append(("info", progress_msg))
+                        progress_events.append(_RescanProgressEvent(LogLevel.INFO, progress_msg))
 
             rbac_creators: list[RBACEntityCreator[ImageRow]] = []
             for image_identifier, update in pending_updates.items():
@@ -267,7 +282,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         f"Skipped image - {image_identifier.canonical}/"
                         f"{image_identifier.architecture} ({skip_reason})"
                     )
-                    progress_events.append(("warning", progress_msg))
+                    progress_events.append(_RescanProgressEvent(LogLevel.WARNING, progress_msg))
                     continue
 
                 rbac_creators.append(
@@ -305,7 +320,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 progress_msg = (
                     f"Updated image - {row.name}/{row.architecture} ({row.config_digest})"
                 )
-                progress_events.append(("info", progress_msg))
+                progress_events.append(_RescanProgressEvent(LogLevel.INFO, progress_msg))
 
             await session.flush()
 
